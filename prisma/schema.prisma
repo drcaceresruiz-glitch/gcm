@@ -263,9 +263,36 @@ model Baseline {
   id        String @id @default(cuid())
   projectId String
 
-  version    Int
+  version Int
+  /// Fecha de la revision, la que aparece en el resumen del presupuesto.
+  /// No coincide con createdAt: una revision del 03/06 puede cargarse despues.
+  fechaRevision DateTime @db.Date
+  notas         String?  @db.Text
+
+  // --- Cascada del presupuesto -------------------------------------------
+  //
+  // El presupuesto no es la suma de partidas. Sobre el costo directo se
+  // aplican descuentos comerciales, gastos generales y utilidad. Los
+  // porcentajes viven aqui y no como partidas porque cambian entre
+  // revisiones, y cada revision debe conservar los suyos: si se guardaran
+  // en la obra, recalcular una revision antigua daria otro numero y la
+  // comparacion entre revisiones dejaria de tener sentido.
+
+  /// Suma de las partidas, antes de cualquier ajuste.
+  costoDirecto Decimal @db.Decimal(14, 2)
+  /// Descuentos comerciales, negativos.
+  descuentos   Decimal @db.Decimal(14, 2) @default(0)
+
+  porcentajeGastosGenerales Decimal @db.Decimal(6, 4) @default(0)
+  porcentajeUtilidad        Decimal @db.Decimal(6, 4) @default(0)
+  porcentajeIgv             Decimal @db.Decimal(6, 4) @default(0.18)
+
+  /// Presupuesto de la revision, sin IGV: es la cifra de control.
+  /// costoDirecto + descuentos, mas gastos generales y utilidad.
   montoTotal Decimal @db.Decimal(14, 2)
-  notas      String? @db.Text
+
+  /// Tipo de cambio del dia, para expresar el presupuesto en dolares.
+  tipoCambio Decimal? @db.Decimal(8, 4)
 
   /// null = borrador editable. Con fecha = CONGELADA e inmutable.
   aprobadaAt  DateTime?
