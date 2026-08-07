@@ -209,6 +209,41 @@ describe("analizarExcel", () => {
     expect(r.filas[4]?.modalidad).toBe("SUMA_ALZADA");
   });
 
+  it("respeta las celdas combinadas: un importe compartido cuenta una vez", async () => {
+    // Reproduce el bloque de drywall de CRIOCORD: nueve lineas que comparten
+    // una unica celda de unidad, cantidad, precio e importe.
+    const libro = new ExcelJS.Workbook();
+    const hoja = libro.addWorksheet("Presupuesto");
+
+    hoja.addRow(["ITEM", "DESCRIPCIÓN", "UND", "CANT", "PRECIO UNIT.", "SUB-TOTAL"]);
+    hoja.addRow(["11.01.01", "Tabique ST", "glb", 1, 79727.33, 79727.33]);
+    hoja.addRow(["11.01.02", "Tabique RH", null, null, null, null]);
+    hoja.addRow(["11.01.03", "Suspension y accesorios", null, null, null, null]);
+    hoja.addRow(["11.01.04", "Descuento comercial", "glb", 1, -5000, -5000]);
+
+    // Filas 2 a 4 comparten unidad, cantidad, precio e importe.
+    for (const col of ["C", "D", "E", "F"]) {
+      hoja.mergeCells(`${col}2:${col}4`);
+    }
+
+    const r = await analizarExcel((await libro.xlsx.writeBuffer()) as ArrayBuffer);
+
+    expect(r.errores).toHaveLength(0);
+
+    // La primera del bloque lleva el importe y queda como suma alzada.
+    expect(r.filas[0]?.modalidad).toBe("SUMA_ALZADA");
+    expect(r.filas[0]?.parcial).toBe("79727.33");
+
+    // Las cubiertas describen alcance y no tienen importe propio.
+    expect(r.filas[1]?.modalidad).toBe("ALCANCE");
+    expect(r.filas[1]?.parcial).toBeNull();
+    expect(r.filas[2]?.parcial).toBeNull();
+    expect(r.filas[1]?.aviso).toContain("Comparte importe");
+
+    // Contar el importe una vez por linea daria 239.181,99 en lugar de esto.
+    expect(r.montoTotal).toBe("74727.33");
+  });
+
   it("reconoce la cabecera SUB-TOTAL con guion", async () => {
     const libro = await construirLibro([["1.1", "Partida", "glb", 1, 500, 500]], {
       cabecera: ["ITEM", "DESCRIPCIÓN", "UND", "CANT", "PRECIO UNIT.", "SUB-TOTAL"],

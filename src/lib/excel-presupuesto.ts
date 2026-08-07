@@ -62,6 +62,65 @@ export interface ResultadoAnalisis {
 /** Numeros separados por punto: "4", "4.3", "01.02.01". */
 const CODIGO_VALIDO = /^\d+(\.\d+)*$/;
 
+export interface Combinacion {
+  /// Fila que posee el valor; el resto lo comparten.
+  maestra: number;
+  ultima: number;
+}
+
+/**
+ * Localiza las celdas combinadas verticalmente en las columnas de cifras.
+ *
+ * Una combinacion vertical significa que varias filas COMPARTEN un unico
+ * importe: es una partida contratada a suma alzada cuyo alcance se detalla
+ * en varias lineas. En el presupuesto de CRIOCORD, el paquete de drywall
+ * ocupa nueve filas que comparten un solo precio de 79.727,33.
+ *
+ * Es la senal autoritativa, y sustituye a adivinarlo comparando importes
+ * iguales: dos partidas distintas pueden costar lo mismo de forma legitima,
+ * y confundirlas descuadraria el presupuesto.
+ */
+function detectarCombinaciones(
+  hoja: ExcelJS.Worksheet,
+  columnas: number[],
+): Map<number, Combinacion> {
+  const modelo = hoja.model as unknown as { merges?: string[] };
+  const rangos = modelo.merges ?? [];
+
+  const letras = new Set(columnas.map((c) => letraDeColumna(c)));
+  const porFila = new Map<number, Combinacion>();
+
+  for (const rango of rangos) {
+    const [inicio, fin] = rango.split(":");
+    const a = /^([A-Z]+)(\d+)$/.exec(inicio ?? "");
+    const b = /^([A-Z]+)(\d+)$/.exec(fin ?? "");
+    if (!a || !b) continue;
+
+    const desde = Number(a[2]);
+    const hasta = Number(b[2]);
+
+    // Solo las verticales que tocan una columna de cifras.
+    if (hasta <= desde || !letras.has(a[1]!)) continue;
+
+    for (let n = desde; n <= hasta; n++) {
+      porFila.set(n, { maestra: desde, ultima: hasta });
+    }
+  }
+
+  return porFila;
+}
+
+function letraDeColumna(indice: number): string {
+  let n = indice;
+  let letra = "";
+  while (n > 0) {
+    const resto = (n - 1) % 26;
+    letra = String.fromCharCode(65 + resto) + letra;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letra;
+}
+
 /**
  * Sinonimos de cabecera aceptados.
  *
@@ -272,6 +331,14 @@ export async function analizarExcel(
 
   let filasTextoOmitidas = 0;
 
+  // Filas que comparten un unico importe por estar combinadas en el Excel.
+  const combinaciones = detectarCombinaciones(
+    hoja,
+    ["metrado", "precioUnitario", "parcial"]
+      .map((c) => mapa.get(c))
+      .filter((c): c is number => c !== undefined),
+  );
+
   /**
    * Ultima fila con un codigo valido.
    *
@@ -363,7 +430,10 @@ export async function analizarExcel(
       tieneDatosEconomicos,
       tieneImporte,
     );
-    const registro = construirFila({ hoja, fila, n, mapa, codigo, descripcion, tipo, nivel });
+    const registro = construirFila({
+      hoja, fila, n, mapa, codigo, descripcion, tipo, nivel,
+      combinacion: combinaciones.get(n) ?? null,
+    });
 
     if (registro) {
       filas.push(registro);
@@ -415,10 +485,12 @@ interface ArgsFila {
   descripcion: string;
   tipo: TipoFila;
   nivel: number;
+  /// Si la fila comparte importe con otras por estar combinada en el Excel.
+  combinacion: Combinacion | null;
 }
 
 function construirFila(args: ArgsFila): FilaImportada | null {
-  const { fila, n, mapa, codigo, descripcion, tipo, nivel } = args;
+  const { fila, n, mapa, codigo, descripcion, tipo, nivel, combinacion } = args;
 
   const leer = (campo: string) => {
     const col = mapa.get(campo);
@@ -431,6 +503,23 @@ function construirFila(args: ArgsFila): FilaImportada | null {
     return {
       fila: n, codigo, tipo, modalidad: "PRECIOS_UNITARIOS", descripcion, nivel,
       unidad: null, metrado: null, precioUnitario: null, parcial: null,
+    };
+  }
+
+  /**
+   * Fila cubierta por una celda combinada.
+   *
+   * El importe pertenece al bloque entero, no a esta linea: al leerla, Excel
+   * devuelve el valor de la celda maestra, y contarlo aqui multiplicaria el
+   * presupuesto por el numero de filas combinadas. Esta linea solo describe
+   * parte del alcance de la partida a suma alzada que encabeza el bloque.
+   */
+  if (combinacion && n !== combinacion.maestra) {
+    const cuantas = combinacion.ultima - combinacion.maestra + 1;
+    return {
+      fila: n, codigo, tipo, modalidad: "ALCANCE", descripcion, nivel,
+      unidad: null, metrado: null, precioUnitario: null, parcial: null,
+      aviso: `Comparte importe con las filas ${combinacion.maestra} a ${combinacion.ultima} (${cuantas} lineas a suma alzada).`,
     };
   }
 
@@ -489,9 +578,20 @@ function construirFila(args: ArgsFila): FilaImportada | null {
     avisos.push("Sin unidad de medida. Conviene completarla.");
   }
 
+  if (combinacion) {
+    const cuantas = combinacion.ultima - combinacion.maestra + 1;
+    avisos.push(
+      `Importe unico compartido con ${cuantas - 1} linea(s) mas, hasta la fila ${combinacion.ultima}.`,
+    );
+  }
+
   return {
     fila: n, codigo, tipo,
-    modalidad: deducirModalidad({ metrado, precioUnitario, parcial, unidad: unidadTexto }),
+    // Encabezar un bloque combinado es la definicion de suma alzada: un
+    // precio cerrado que cubre todo el alcance descrito debajo.
+    modalidad: combinacion
+      ? "SUMA_ALZADA"
+      : deducirModalidad({ metrado, precioUnitario, parcial, unidad: unidadTexto }),
     descripcion, nivel,
     unidad: unidadTexto || null,
     metrado, precioUnitario, parcial,
