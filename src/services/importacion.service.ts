@@ -128,6 +128,7 @@ export async function aplicarImportacion(
           parentId: padre ? (idPorCodigo.get(padre) ?? null) : null,
           codigoPartida: f.codigo,
           tipo: f.tipo,
+          modalidad: f.modalidad,
           descripcion: f.descripcion.slice(0, 500),
           // Profundidad real en el arbol, no numero de segmentos del
           // codigo: es la que gobierna la sangria en pantalla.

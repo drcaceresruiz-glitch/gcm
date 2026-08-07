@@ -17,11 +17,16 @@ import {
 
 export type TipoFila = "CAPITULO" | "PARTIDA";
 
+export type Modalidad = "PRECIOS_UNITARIOS" | "SUMA_ALZADA" | "ALCANCE";
+
 export interface FilaImportada {
   /// Numero de fila en el Excel, para que el usuario la localice.
   fila: number;
   codigo: string;
   tipo: TipoFila;
+  /// Como esta contratada. Determina si el importe se recalcula al cambiar
+  /// el metrado y como se valorizara su avance.
+  modalidad: Modalidad;
   descripcion: string;
   nivel: number;
   unidad: string | null;
@@ -424,7 +429,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
   // se toma del Excel, donde suele venir como subtotal ya calculado.
   if (tipo === "CAPITULO") {
     return {
-      fila: n, codigo, tipo, descripcion, nivel,
+      fila: n, codigo, tipo, modalidad: "PRECIOS_UNITARIOS", descripcion, nivel,
       unidad: null, metrado: null, precioUnitario: null, parcial: null,
     };
   }
@@ -485,9 +490,51 @@ function construirFila(args: ArgsFila): FilaImportada | null {
   }
 
   return {
-    fila: n, codigo, tipo, descripcion, nivel,
+    fila: n, codigo, tipo,
+    modalidad: deducirModalidad({ metrado, precioUnitario, parcial, unidad: unidadTexto }),
+    descripcion, nivel,
     unidad: unidadTexto || null,
     metrado, precioUnitario, parcial,
     ...(avisos.length > 0 ? { aviso: avisos.join(" ") } : {}),
   };
+}
+
+/** Unidades que en la practica significan "precio cerrado por el conjunto". */
+const UNIDADES_GLOBALES = new Set(["glb", "glb.", "glob", "global", "und.glb", "glg"]);
+
+/**
+ * Deduce como esta contratada la partida.
+ *
+ * La senal decisiva es si el importe se explica por metrado x precio. Si no
+ * se explica, o si no hay con que calcularlo, el precio esta cerrado por el
+ * conjunto y el metrado es referencial.
+ */
+function deducirModalidad(d: {
+  metrado: string | null;
+  precioUnitario: string | null;
+  parcial: string | null;
+  unidad: string;
+}): Modalidad {
+  // Metrado sin importe ni precio: describe el alcance de la partida padre.
+  if (d.parcial === null && d.precioUnitario === null && d.metrado !== null) {
+    return "ALCANCE";
+  }
+
+  if (d.parcial !== null && d.metrado !== null && d.precioUnitario !== null) {
+    const calculado = multiplicar(d.metrado, d.precioUnitario, 2);
+    // El importe no se explica por la multiplicacion: es un precio cerrado.
+    if (calculado !== d.parcial) return "SUMA_ALZADA";
+  }
+
+  // Precio cerrado sin metrado o sin unitario con que descomponerlo.
+  if (d.parcial !== null && (d.metrado === null || d.precioUnitario === null)) {
+    return "SUMA_ALZADA";
+  }
+
+  // Unidad global: el precio cubre el conjunto aunque la cantidad sea 1.
+  if (UNIDADES_GLOBALES.has(d.unidad.trim().toLowerCase())) {
+    return "SUMA_ALZADA";
+  }
+
+  return "PRECIOS_UNITARIOS";
 }

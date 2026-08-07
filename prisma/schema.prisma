@@ -48,6 +48,26 @@ enum WbsType {
   PARTIDA
 }
 
+/// Modalidad de contratacion de la partida.
+///
+/// No es una etiqueta: cambia como se calcula el importe, como se valoriza
+/// el avance y quien asume el riesgo si el metrado real difiere del previsto.
+enum ModalidadPartida {
+  /// Importe = metrado x precio unitario. El metrado real se mide y se
+  /// valoriza; si difiere del previsto, el costo cambia.
+  PRECIOS_UNITARIOS
+
+  /// Precio cerrado por el alcance completo. El metrado es referencial:
+  /// aunque se ejecute mas o menos, el importe pactado no cambia y el
+  /// riesgo lo asume el contratista.
+  SUMA_ALZADA
+
+  /// Detalle del alcance dentro de una partida a suma alzada. Lleva
+  /// metrado para describir que incluye, pero no tiene importe propio:
+  /// el dinero esta en su partida padre.
+  ALCANCE
+}
+
 enum AuditAction {
   CREATE
   UPDATE
@@ -226,6 +246,10 @@ model WbsItem {
   tipo          WbsType
   descripcion   String  @db.VarChar(500)
 
+  /// Como se contrato la partida. Gobierna si el importe se recalcula al
+  /// cambiar el metrado y como se valorizara su avance.
+  modalidad ModalidadPartida @default(PRECIOS_UNITARIOS)
+
   /// Profundidad en el arbol (0 = raiz). Evita recursion para ordenar y mostrar.
   nivel Int @default(0)
   orden Int @default(0)
@@ -315,10 +339,11 @@ model BaselineItem {
   id         String @id @default(cuid())
   baselineId String
 
-  codigoPartida  String   @db.VarChar(32)
-  descripcion    String   @db.VarChar(500)
+  codigoPartida  String           @db.VarChar(32)
+  descripcion    String           @db.VarChar(500)
   tipo           WbsType
-  nivel          Int      @default(0)
+  modalidad      ModalidadPartida @default(PRECIOS_UNITARIOS)
+  nivel          Int              @default(0)
   orden          Int      @default(0)
   unidad         String?  @db.VarChar(20)
   metrado        Decimal? @db.Decimal(14, 4)

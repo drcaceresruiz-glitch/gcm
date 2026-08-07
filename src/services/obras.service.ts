@@ -130,6 +130,8 @@ export interface PartidaFila {
   id: string;
   codigoPartida: string;
   tipo: "CAPITULO" | "PARTIDA";
+  /// Gobierna si el importe se recalcula al cambiar el metrado.
+  modalidad: "PRECIOS_UNITARIOS" | "SUMA_ALZADA" | "ALCANCE";
   descripcion: string;
   nivel: number;
   unidad: string | null;
@@ -164,7 +166,7 @@ export async function listarPartidas(
     orderBy: [{ orden: "asc" }, { codigoPartida: "asc" }],
     select: {
       id: true, parentId: true, codigoPartida: true, tipo: true,
-      descripcion: true, nivel: true, unidad: true,
+      modalidad: true, descripcion: true, nivel: true, unidad: true,
       metrado: true, precioUnitario: true, parcial: true,
     },
   });
@@ -191,6 +193,7 @@ export async function listarPartidas(
     id: i.id,
     codigoPartida: i.codigoPartida,
     tipo: i.tipo,
+    modalidad: i.modalidad,
     descripcion: i.descripcion,
     nivel: i.nivel,
     unidad: i.unidad,

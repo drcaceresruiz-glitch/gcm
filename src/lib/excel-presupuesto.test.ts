@@ -183,6 +183,32 @@ describe("analizarExcel", () => {
     expect(r.filas[1]?.aviso).toContain("suma alzada");
   });
 
+  it("distingue como esta contratada cada partida", async () => {
+    const libro = await construirLibro(
+      [
+        // Importe = metrado x precio: precios unitarios.
+        ["1.01", "Excavacion medida en obra", "m3", 10, 95, 950],
+        // El importe no se explica por la multiplicacion: precio cerrado.
+        ["1.02", "Paquete de red contratado en bloque", "Kit", 47, 44589.81, 44589.81],
+        // Precio cerrado sin metrado con que descomponerlo.
+        ["1.03", "REDES DE DESAGUE", null, null, null, 13109.04],
+        // Metrado sin precio ni importe: detalla el alcance del anterior.
+        ["1.04", "Corte de piso de concreto", "ml", 42, null, null],
+        // Unidad global: el precio cubre el conjunto.
+        ["1.05", "Movilizacion y desmovilizacion", "glb", 1, 1575, 1575],
+      ],
+      { cabecera: ["ITEM", "DESCRIPCIÓN", "UND", "CANT", "PRECIO UNIT.", "SUB-TOTAL"] },
+    );
+
+    const r = await analizarExcel(libro);
+
+    expect(r.filas[0]?.modalidad).toBe("PRECIOS_UNITARIOS");
+    expect(r.filas[1]?.modalidad).toBe("SUMA_ALZADA");
+    expect(r.filas[2]?.modalidad).toBe("SUMA_ALZADA");
+    expect(r.filas[3]?.modalidad).toBe("ALCANCE");
+    expect(r.filas[4]?.modalidad).toBe("SUMA_ALZADA");
+  });
+
   it("reconoce la cabecera SUB-TOTAL con guion", async () => {
     const libro = await construirLibro([["1.1", "Partida", "glb", 1, 500, 500]], {
       cabecera: ["ITEM", "DESCRIPCIÓN", "UND", "CANT", "PRECIO UNIT.", "SUB-TOTAL"],

@@ -141,7 +141,13 @@ export default async function ObraPage({
             )}
           </div>
         ) : (
-          <TablaPartidas filas={filas} />
+          <TablaPartidas
+            obraId={id}
+            filas={filas}
+            // Un presupuesto congelado no se edita: los indicadores se
+            // calculan contra el y cambiarlo los invalidaria hacia atras.
+            editable={puede(sesion.role, "partida:editar") && obra.lineaBaseVersion === null}
+          />
         )}
       </section>
     </div>
