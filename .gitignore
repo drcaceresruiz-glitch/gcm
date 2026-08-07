@@ -47,3 +47,14 @@ coverage/
 /.windsurf/
 /.claude/skills/
 /skills-lock.json
+
+# Documentos de negocio y de clientes. El repositorio es publico: los
+# informes de obra, planos y cronogramas pertenecen al cliente y no deben
+# publicarse. Se conservan en el equipo local.
+/docs/referencias/
+
+# Claves de despliegue, por si alguna vez se copian al proyecto.
+*.pem
+*.key
+id_*
+!*.key.example

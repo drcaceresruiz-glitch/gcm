@@ -68,7 +68,11 @@ async function main() {
   console.log(`  Empresa: ${empresa.razonSocial}`);
 
   // --- Usuario administrador -------------------------------------------
-  const emailAdmin = "drcaceresruiz@gmail.com";
+  // El correo se toma del entorno: un script de datos iniciales no debe
+  // llevar la cuenta de una persona escrita en el codigo, y menos en un
+  // repositorio publico.
+  const emailAdmin =
+    process.env["SEED_ADMIN_EMAIL"]?.trim().toLowerCase() ?? "admin@gcm.local";
   const yaExiste = await prisma.user.findUnique({ where: { email: emailAdmin } });
 
   let claveTemporal: string | null = null;

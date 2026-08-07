@@ -5,13 +5,16 @@ Este documento es la fuente de verdad para las decisiones de despliegue.
 
 ## Servidor
 
+> El nombre del servidor, el usuario de la cuenta y las credenciales **no se
+> documentan aquí**: este repositorio es público. Viven en las variables de
+> entorno del servidor y en los secretos del repositorio.
+
 | Dato | Valor |
 |---|---|
-| Proveedor / host | `server0808.cloudhostservers.com` |
-| Usuario de cuenta | `drcacere` |
-| Directorio base | `/home/drcacere/` |
+| Tipo | Hosting compartido con cPanel sobre CloudLinux |
 | cPanel | 136.0.32 (cpsrvd 11.136.0.32) |
-| Dominio | `drcaceresruiz.com` — la app irá en `gcm.drcaceresruiz.com` |
+| Directorio base | `/home/<usuario>/` |
+| Aplicación | `gcm.drcaceresruiz.com` |
 
 ## Capacidad (LVE)
 
@@ -39,9 +42,8 @@ estrangulamiento por límites.
 | PHP | 8.4.23 | No lo usamos; conviven otras aplicaciones |
 | Terminal / SSH | Disponible | Habilita el despliegue automático |
 
-Bases de datos ya existentes en la cuenta: `drcacere_finanzas`,
-`drcacere_sistema`, `drcacere_web`. Conviven otras aplicaciones, así que los
-recursos son compartidos dentro de la misma cuenta.
+En la cuenta conviven otras aplicaciones con sus propias bases de datos, así
+que los recursos se comparten dentro de la misma cuenta.
 
 ## Advertencias operativas
 
@@ -55,7 +57,7 @@ De lo contrario los acentos y la eñe se corrompen: "CAPÍTULO", "DESAGÜE" o
 "Demolición" quedarían ilegibles.
 
 ```sql
-ALTER DATABASE `drcacere_gcm`
+ALTER DATABASE `<cuenta>_gcm`
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 ```
@@ -63,7 +65,7 @@ ALTER DATABASE `drcacere_gcm`
 Además, la cadena de conexión debe fijar el juego de caracteres:
 
 ```
-DATABASE_URL="mysql://usuario:clave@localhost:3306/drcacere_gcm?charset=utf8mb4"
+DATABASE_URL="mysql://<usuario>:<clave>@localhost:3306/<cuenta>_gcm?charset=utf8mb4"
 ```
 
 ### 2. Diferencia de versión de MariaDB entre entornos
