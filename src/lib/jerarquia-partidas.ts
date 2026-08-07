@@ -81,13 +81,21 @@ export interface NodoImporte {
  */
 export function sumarHojas(nodos: readonly NodoImporte[]): string {
   const codigos = new Set(nodos.map((n) => n.codigo));
-  const tieneImporte = new Map(nodos.map((n) => [n.codigo, n.parcial !== null]));
 
   // Ancestros que quedan cubiertos por alguna descendiente con importe.
   const cubiertos = new Set<string>();
 
   for (const nodo of nodos) {
-    if (!tieneImporte.get(nodo.codigo)) continue;
+    /**
+     * Solo un importe positivo cubre a su ancestro.
+     *
+     * Un descuento no sustituye a la partida de la que cuelga: la ajusta.
+     * En CRIOCORD, "7.09.00 GASTOS VARIOS" lleva 779,10 a suma alzada y su
+     * unica hija con cifra es un descuento comercial. Tratar ese descuento
+     * como si reemplazara al padre hacia desaparecer los 779,10 del
+     * presupuesto.
+     */
+    if (nodo.parcial === null || !esPositivo(nodo.parcial)) continue;
 
     let padre = codigoPadre(nodo.codigo, codigos);
     while (padre) {

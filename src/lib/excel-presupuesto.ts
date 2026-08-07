@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { normalizarDecimal, multiplicar } from "@/lib/decimal";
+import { normalizarDecimal, multiplicar, sumar } from "@/lib/decimal";
 import {
   sumarHojas,
   detectarImportesRepetidos,
@@ -57,6 +57,10 @@ export interface ResultadoAnalisis {
   gruposRepetidos: GrupoRepetido[];
   /// Filas de texto sin codigo: notas, subtitulos y clausulas del contrato.
   filasTextoOmitidas: number;
+  /// Partidas ocultas en el Excel: quedaron fuera de alcance y no se importan.
+  filasOcultas: number;
+  /// Importe que suman esas partidas ocultas, para que se vea que se dejo fuera.
+  importeOculto: string;
 }
 
 /** Numeros separados por punto: "4", "4.3", "01.02.01". */
@@ -301,6 +305,7 @@ export async function analizarExcel(
       filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0,
       totalPartidas: 0, montoTotal: "0.00", montoSinRepetidos: "0.00",
       gruposRepetidos: [], filasTextoOmitidas: 0,
+      filasOcultas: 0, importeOculto: "0.00",
     };
   }
 
@@ -318,6 +323,7 @@ export async function analizarExcel(
       filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0,
       totalPartidas: 0, montoTotal: "0.00", montoSinRepetidos: "0.00",
       gruposRepetidos: [], filasTextoOmitidas: 0,
+      filasOcultas: 0, importeOculto: "0.00",
     };
   }
 
@@ -330,6 +336,8 @@ export async function analizarExcel(
   const codigosVistos = new Map<string, number>();
 
   let filasTextoOmitidas = 0;
+  let filasOcultas = 0;
+  const importesOcultos: string[] = [];
 
   // Filas que comparten un unico importe por estar combinadas en el Excel.
   const combinaciones = detectarCombinaciones(
@@ -366,6 +374,26 @@ export async function analizarExcel(
 
     const codigo = textoCelda(fila.getCell(mapa.get("codigo")!));
     const descripcion = textoCelda(fila.getCell(mapa.get("descripcion")!));
+
+    /**
+     * Las filas ocultas no se importan.
+     *
+     * En un presupuesto, ocultar una fila es la forma habitual de dejar una
+     * partida fuera de alcance sin borrarla, por si vuelve a entrar. Sus
+     * formulas de total tampoco la incluyen. Contarla inflaria el
+     * presupuesto con trabajo que nadie va a ejecutar.
+     */
+    if (fila.hidden) {
+      const importe = normalizarDecimal(
+        mapa.get("parcial") ? valorCelda(fila.getCell(mapa.get("parcial")!)) : null,
+        2,
+      );
+      if (codigo || descripcion) {
+        filasOcultas++;
+        if (importe) importesOcultos.push(importe);
+      }
+      continue;
+    }
 
     if (!codigo && !descripcion) continue;
 
@@ -473,6 +501,8 @@ export async function analizarExcel(
     ),
     gruposRepetidos: repetidos,
     filasTextoOmitidas,
+    filasOcultas,
+    importeOculto: sumar(importesOcultos),
   };
 }
 
