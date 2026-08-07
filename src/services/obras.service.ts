@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { sumar } from "@/lib/decimal";
+import { sumarHojas } from "@/lib/jerarquia-partidas";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -206,6 +207,14 @@ export async function listarPartidas(
   return {
     filas,
     totalPartidas: partidas.length,
-    montoTotal: sumar(partidas.map((p) => p.parcial?.toString() ?? "0")),
+    // Misma regla que en la importacion: el costo de una rama es la suma de
+    // sus hojas. Si aqui se sumara todo, el total de la obra no cuadraria
+    // con el que se mostro al importar.
+    montoTotal: sumarHojas(
+      filas.map((f) => ({
+        codigo: f.codigoPartida,
+        parcial: f.tipo === "PARTIDA" ? f.parcial : null,
+      })),
+    ),
   };
 }

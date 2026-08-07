@@ -58,3 +58,6 @@ coverage/
 *.key
 id_*
 !*.key.example
+
+# Archivos de cliente usados en pruebas manuales. Nunca al repositorio.
+/public/_prueba/

@@ -1,4 +1,4 @@
-import { sumar } from "@/lib/decimal";
+import { sumar, esPositivo, esNegativo } from "@/lib/decimal";
 
 /**
  * Jerarquia de codigos de partida.
@@ -37,17 +37,29 @@ export function codigoPadre(
 
   if (segmentos.length < 2) return null;
 
-  // Nivel superior directo: "01.02.01" -> "01.02".
-  const recorte = esCabeceraDeGrupo ? segmentos.slice(0, -2) : segmentos.slice(0, -1);
-  if (recorte.length === 0) return null;
+  /**
+   * Se sube por la jerarquia hasta encontrar un ancestro que exista.
+   *
+   * En los presupuestos reales faltan filas de grupo: en CRIOCORD estan
+   * "11.11.02" a "11.11.19" pero no la cabecera "11.11". Sin esta busqueda
+   * hacia arriba, esas 18 partidas quedarian colgando de la raiz, fuera de
+   * su capitulo y fuera de su subtotal.
+   */
+  let recorte = esCabeceraDeGrupo ? segmentos.slice(0, -2) : segmentos.slice(0, -1);
 
-  const directo = recorte.join(".");
-  if (existentes.has(directo)) return directo;
+  while (recorte.length > 0) {
+    const directo = recorte.join(".");
+    if (existentes.has(directo)) return directo;
 
-  // El nivel superior tambien puede ser una cabecera terminada en cero.
-  const ultimoRecorte = recorte.at(-1) ?? "";
-  const comoCabecera = [...recorte.slice(0, -1), ultimoRecorte, "0"].join(".");
-  if (existentes.has(comoCabecera)) return comoCabecera;
+    // El ancestro tambien puede estar escrito como cabecera de grupo.
+    const ultimoRecorte = recorte.at(-1) ?? "";
+    for (const relleno of ["0", "0".repeat(ultimoRecorte.length)]) {
+      const comoCabecera = [...recorte, relleno].join(".");
+      if (existentes.has(comoCabecera)) return comoCabecera;
+    }
+
+    recorte = recorte.slice(0, -1);
+  }
 
   return null;
 }
@@ -122,11 +134,18 @@ export function detectarImportesRepetidos(
   let racha: NodoRepetible[] = [];
 
   const cerrar = () => {
-    if (racha.length >= 2 && racha[0]!.parcial) {
+    // Los importes en cero se ignoran: varias filas a cero seguidas no
+    // delatan ninguna formula arrastrada, solo partidas sin valorizar.
+    // Senalarlas seria ruido que resta credibilidad a los avisos reales.
+    const importe = racha[0]?.parcial ?? null;
+    const tieneValor =
+      importe !== null && (esPositivo(importe) || esNegativo(importe));
+
+    if (racha.length >= 2 && tieneValor) {
       grupos.push({
         filas: racha.map((r) => r.fila),
         codigos: racha.map((r) => r.codigo),
-        importe: racha[0]!.parcial,
+        importe,
       });
     }
     racha = [];
@@ -153,4 +172,39 @@ export function detectarImportesRepetidos(
 
   cerrar();
   return grupos;
+}
+
+/**
+ * Profundidad real de cada nodo, contando su cadena de padres.
+ *
+ * No se puede deducir del numero de segmentos del codigo: "7.02.00" y
+ * "7.02.01" tienen tres segmentos cada uno y pareceria que estan al mismo
+ * nivel, pero el primero encabeza al segundo. Usar la cuenta de segmentos
+ * hace que el arbol se dibuje plano y que un borrado por niveles intente
+ * eliminar a un padre y a su hijo en el mismo paso.
+ */
+export function calcularProfundidades(
+  codigos: readonly string[],
+): Map<string, number> {
+  const existentes = new Set(codigos);
+  const profundidad = new Map<string, number>();
+
+  const resolver = (codigo: string, visitados: Set<string>): number => {
+    const cacheado = profundidad.get(codigo);
+    if (cacheado !== undefined) return cacheado;
+
+    // Proteccion ante un ciclo por datos corruptos: mejor devolver una
+    // profundidad plana que colgar el proceso.
+    if (visitados.has(codigo)) return 0;
+    visitados.add(codigo);
+
+    const padre = codigoPadre(codigo, existentes);
+    const valor = padre === null ? 0 : resolver(padre, visitados) + 1;
+
+    profundidad.set(codigo, valor);
+    return valor;
+  };
+
+  for (const codigo of codigos) resolver(codigo, new Set());
+  return profundidad;
 }

@@ -1,7 +1,11 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { sumar } from "@/lib/decimal";
+import {
+  codigoPadre,
+  sumarHojas,
+  calcularProfundidades,
+} from "@/lib/jerarquia-partidas";
 import type { FilaImportada } from "@/lib/excel-presupuesto";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -16,25 +20,6 @@ import type { SesionActiva } from "@/services/sesion.service";
 export type ResultadoImportacion =
   | { ok: true; capitulos: number; partidas: number; montoTotal: string }
   | { ok: false; error: string };
-
-/**
- * Deduce el codigo del padre.
- *
- * "4.3" cuelga de "4.0"; "01.02.01" cuelga de "01.02". Se prueban ambas
- * convenciones porque conviven segun de donde venga el presupuesto.
- */
-function codigoPadre(codigo: string, existentes: Set<string>): string | null {
-  const segmentos = codigo.split(".");
-  if (segmentos.length < 2) return null;
-
-  const directo = segmentos.slice(0, -1).join(".");
-  if (existentes.has(directo)) return directo;
-
-  const comoCapitulo = `${directo}.0`;
-  if (existentes.has(comoCapitulo)) return comoCapitulo;
-
-  return null;
-}
 
 export async function aplicarImportacion(
   sesion: SesionActiva,
@@ -85,23 +70,56 @@ export async function aplicarImportacion(
   }
 
   const codigos = new Set(filas.map((f) => f.codigo));
-  const montoTotal = sumar(filas.map((f) => f.parcial ?? "0"));
+  const montoTotal = sumarHojas(filas);
+
+  // Orden de presentacion: el del documento original. Mas abajo se insertan
+  // por niveles para que el padre exista antes que el hijo, pero ese orden
+  // tecnico no debe filtrarse a la pantalla, o el arbol saldria con todos
+  // los capitulos juntos y luego todas las partidas.
+  const ordenOriginal = new Map(filas.map((f, i) => [f.codigo, i]));
+
+  const profundidades = calcularProfundidades([...codigos]);
 
   await prisma.$transaction(async (tx) => {
     if (existentes > 0) {
-      // Se borran los hijos primero: la relacion padre-hijo tiene
-      // restriccion de integridad y el borrado directo fallaria.
-      await tx.wbsItem.deleteMany({
-        where: { projectId: obraId, parentId: { not: null } },
-      });
-      await tx.wbsItem.deleteMany({ where: { projectId: obraId } });
+      /**
+       * Se borra de fuera hacia dentro: en cada vuelta se eliminan las
+       * hojas, es decir las filas que no son padre de ninguna otra.
+       *
+       * La relacion padre-hijo tiene restriccion de integridad. Borrar "las
+       * que tienen padre" y luego el resto no funciona con tres niveles:
+       * dentro de una misma sentencia no hay garantia de que los nietos se
+       * eliminen antes que sus padres. Tampoco sirve borrar por `nivel`,
+       * porque un padre y su hijo pueden compartirlo.
+       */
+      for (let vuelta = 0; vuelta < 50; vuelta++) {
+        const conHijos = await tx.wbsItem.findMany({
+          where: { projectId: obraId, parentId: { not: null } },
+          select: { parentId: true },
+          distinct: ["parentId"],
+        });
+
+        const idsPadres = conHijos
+          .map((c) => c.parentId)
+          .filter((id): id is string => id !== null);
+
+        const { count } = await tx.wbsItem.deleteMany({
+          where: { projectId: obraId, id: { notIn: idsPadres } },
+        });
+
+        if (count === 0) break;
+      }
     }
 
-    // Se insertan por nivel para que el padre exista siempre antes que el hijo.
-    const porNivel = [...filas].sort((a, b) => a.nivel - b.nivel);
+    // Se insertan de menor a mayor profundidad real para que el padre
+    // exista siempre antes que el hijo.
+    const porProfundidad = [...filas].sort(
+      (a, b) =>
+        (profundidades.get(a.codigo) ?? 0) - (profundidades.get(b.codigo) ?? 0),
+    );
     const idPorCodigo = new Map<string, string>();
 
-    for (const [indice, f] of porNivel.entries()) {
+    for (const f of porProfundidad) {
       const padre = codigoPadre(f.codigo, codigos);
 
       const creado = await tx.wbsItem.create({
@@ -111,8 +129,10 @@ export async function aplicarImportacion(
           codigoPartida: f.codigo,
           tipo: f.tipo,
           descripcion: f.descripcion.slice(0, 500),
-          nivel: f.nivel,
-          orden: indice,
+          // Profundidad real en el arbol, no numero de segmentos del
+          // codigo: es la que gobierna la sangria en pantalla.
+          nivel: profundidades.get(f.codigo) ?? 0,
+          orden: ordenOriginal.get(f.codigo) ?? 0,
           unidad: f.unidad,
           metrado: f.metrado,
           precioUnitario: f.precioUnitario,
