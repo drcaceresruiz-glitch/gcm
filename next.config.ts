@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
   compress: false,
   poweredByHeader: false,
 
+  // Next genera AGENTS.md y CLAUDE.md automaticamente. Se desactiva: la
+  // documentacion del proyecto la controlamos nosotros y no queremos que
+  // una actualizacion del framework la sobrescriba.
+  agentRules: false,
+
   async headers() {
     return [
       {

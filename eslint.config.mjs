@@ -1,23 +1,36 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
+import coreWebVitals from "eslint-config-next/core-web-vitals";
+import typescriptConfig from "eslint-config-next/typescript";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({ baseDirectory: __dirname });
-
+/**
+ * Configuracion plana de ESLint.
+ *
+ * Next 16 publica sus configuraciones ya en formato plano, asi que no hace
+ * falta el puente `FlatCompat` del formato antiguo.
+ */
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...coreWebVitals,
+  ...typescriptConfig,
+
   {
     // El cliente Prisma es codigo generado: no se audita.
-    ignores: ["src/generated/**", ".next/**", "node_modules/**"],
+    ignores: [
+      "src/generated/**",
+      ".next/**",
+      "node_modules/**",
+      "next-env.d.ts",
+    ],
   },
+
   {
+    files: ["src/**/*.{ts,tsx}"],
     rules: {
-      // Regla de arquitectura: los componentes nunca importan Prisma
-      // directamente. Todo acceso a datos pasa por src/services, que es
-      // donde vive la verificacion de permisos y el filtro por empresa.
+      /**
+       * Regla de arquitectura: los componentes no importan Prisma
+       * directamente. Todo acceso a datos pasa por src/services, que es
+       * donde se verifican permisos y se filtra por empresa. Sin esta
+       * barrera, un descuido en un componente puede filtrar datos de otra
+       * empresa sin que nadie lo note en revision.
+       */
       "no-restricted-imports": [
         "error",
         {
@@ -32,9 +45,10 @@ const eslintConfig = [
       ],
     },
   },
+
   {
-    // Los servicios y la propia capa de datos si pueden usar Prisma.
-    files: ["src/services/**", "src/lib/prisma.ts", "prisma/**"],
+    // La capa de datos y los servicios si pueden usar Prisma.
+    files: ["src/services/**", "src/lib/prisma.ts"],
     rules: { "no-restricted-imports": "off" },
   },
 ];

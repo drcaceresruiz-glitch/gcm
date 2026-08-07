@@ -4,34 +4,65 @@ import { es } from "date-fns/locale";
 /**
  * Fechas en formato peruano.
  *
- * La obra se controla por dias calendario, no por horas: comparar con la
- * hora incluida haria que una partida programada para hoy apareciera como
- * vencida a las 00:01. Por eso las comparaciones usan dias calendario.
+ * CUIDADO CON LA ZONA HORARIA. Las fechas de obra (inicio, fin programado,
+ * fecha de un avance) son fechas de CALENDARIO, no instantes en el tiempo.
+ * Se guardan como `@db.Date` y Prisma las devuelve como medianoche UTC.
+ *
+ * Al formatearlas en horario de Lima (UTC-5) el reloj retrocede cinco horas
+ * y el 01/08 se muestra como 31/07. En una obra eso es inadmisible: correria
+ * un dia todo el cronograma. Por eso `soloFecha` reconstruye la fecha usando
+ * los componentes UTC, preservando el dia del calendario tal como se guardo.
+ *
+ * Los instantes reales (createdAt, hora de un ingreso) NO deben pasar por
+ * `soloFecha`: ahi si interesa la hora local.
  */
+function soloFecha(fecha: Date | string): Date {
+  const d = typeof fecha === "string" ? new Date(fecha) : fecha;
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
 
 /** "03/08/2026" */
 export function fechaCorta(fecha: Date | string): string {
-  return format(new Date(fecha), "dd/MM/yyyy");
+  return format(soloFecha(fecha), "dd/MM/yyyy");
 }
 
 /** "lun 03/08/26" — el formato del cronograma de MS Project. */
 export function fechaCronograma(fecha: Date | string): string {
-  return format(new Date(fecha), "EEE dd/MM/yy", { locale: es });
+  return format(soloFecha(fecha), "EEE dd/MM/yy", { locale: es });
 }
 
 /** "03 de agosto de 2026" — cabeceras de informe. */
 export function fechaLarga(fecha: Date | string): string {
-  return format(new Date(fecha), "dd 'de' MMMM 'de' yyyy", { locale: es });
+  return format(soloFecha(fecha), "dd 'de' MMMM 'de' yyyy", { locale: es });
 }
 
 /** "03/08" — eje horizontal de la Curva S. */
 export function fechaEje(fecha: Date | string): string {
-  return format(new Date(fecha), "dd/MM");
+  return format(soloFecha(fecha), "dd/MM");
 }
 
-/** Dias de calendario entre dos fechas, ignorando la hora. */
+/** "03/08/2026 14:30" — para registros con hora real (auditoria, ingresos). */
+export function fechaHora(instante: Date | string): string {
+  return format(new Date(instante), "dd/MM/yyyy HH:mm");
+}
+
+/**
+ * Fecha de hoy como fecha de calendario.
+ *
+ * Toma el dia LOCAL del usuario y lo representa igual que las fechas de la
+ * base (medianoche UTC), para que ambas sean comparables. Usar `new Date()`
+ * directamente reintroduce el desfase de un dia, pero al reves.
+ */
+export function hoy(): Date {
+  const ahora = new Date();
+  return new Date(
+    Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()),
+  );
+}
+
+/** Dias de calendario entre dos fechas de obra. */
 export function diasEntre(desde: Date | string, hasta: Date | string): number {
-  return differenceInCalendarDays(new Date(hasta), new Date(desde));
+  return differenceInCalendarDays(soloFecha(hasta), soloFecha(desde));
 }
 
 /**
@@ -41,7 +72,7 @@ export function diasEntre(desde: Date | string, hasta: Date | string): number {
 export function avanceCalendario(
   inicio: Date | string,
   fin: Date | string,
-  corte: Date | string = new Date(),
+  corte: Date | string = hoy(),
 ): number {
   const total = diasEntre(inicio, fin);
   if (total <= 0) return 100;
