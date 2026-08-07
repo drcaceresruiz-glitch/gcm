@@ -1,0 +1,335 @@
+// GCM - Gestor de Construccion y Mantenimiento
+// Esquema de datos - Fase 1 (Cimientos: Modulos 0 y 1)
+//
+// Reglas duras del modelo:
+//  - Todo importe monetario es Decimal(14,2). Jamas Float.
+//  - Los metrados y precios unitarios usan Decimal(14,4) por precision de obra.
+//  - La linea base (Baseline) es inmutable una vez aprobada.
+//  - Todo dato pertenece a una Company. El aislamiento es la frontera de seguridad.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ---------------------------------------------------------------------------
+// Enumeraciones
+// ---------------------------------------------------------------------------
+
+/// Roles del sistema. El rol efectivo se resuelve por obra (ProjectMembership),
+/// no por usuario global.
+enum Role {
+  ADMIN
+  RESIDENTE
+  ADMIN_OBRA
+  ALMACENERO
+  CONSULTOR
+}
+
+enum UserState {
+  ACTIVO
+  INACTIVO
+}
+
+enum ProjectState {
+  PLANIFICACION
+  EN_EJECUCION
+  PARALIZADA
+  CERRADA
+}
+
+/// Nivel del arbol de la EDT. CAPITULO agrupa; PARTIDA lleva el metrado y el costo.
+enum WbsType {
+  CAPITULO
+  PARTIDA
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  PASSWORD_CHANGE
+  PASSWORD_RESET
+}
+
+// ---------------------------------------------------------------------------
+// Empresa y personas
+// ---------------------------------------------------------------------------
+
+model Company {
+  id          String   @id @default(cuid())
+  razonSocial String   @db.VarChar(200)
+  ruc         String   @unique @db.VarChar(11)
+  direccion   String?  @db.VarChar(255)
+  telefono    String?  @db.VarChar(30)
+  email       String?  @db.VarChar(150)
+  activa      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users    User[]
+  projects Project[]
+
+  @@map("companies")
+}
+
+model User {
+  id        String @id @default(cuid())
+  companyId String
+
+  nombres   String  @db.VarChar(100)
+  apellidos String  @db.VarChar(100)
+  tipoDoc   String  @db.VarChar(10)
+  numDoc    String  @db.VarChar(20)
+  cargo     String? @db.VarChar(100)
+  celular   String? @db.VarChar(30)
+  email     String  @unique @db.VarChar(150)
+
+  passwordHash String @db.VarChar(255)
+
+  /// Rol por defecto a nivel empresa. El rol efectivo en una obra
+  /// lo define ProjectMembership y tiene prioridad sobre este.
+  role   Role
+  estado UserState @default(ACTIVO)
+
+  /// Fuerza el cambio de clave en el primer acceso tras el alta.
+  mustChangePassword Boolean   @default(true)
+  lastLoginAt        DateTime?
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company     Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  memberships ProjectMembership[]
+  sessions    Session[]
+  resetTokens PasswordResetToken[]
+
+  @@unique([companyId, numDoc])
+  @@index([companyId, estado])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Sesiones y recuperacion de clave
+//
+// Se usan tokens opacos aleatorios, no JWT: permiten revocar el acceso al
+// instante borrando la fila. En la base solo vive el hash del token, nunca
+// el token en claro, de modo que un volcado de la base no permite suplantar.
+// ---------------------------------------------------------------------------
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique @db.Char(64)
+  expiresAt DateTime
+  ip        String?  @db.VarChar(45)
+  userAgent String?  @db.VarChar(255)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique @db.Char(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Obras y equipo asignado
+// ---------------------------------------------------------------------------
+
+model Project {
+  id        String @id @default(cuid())
+  companyId String
+
+  nombreObra String  @db.VarChar(255)
+  codigoObra String? @db.VarChar(40)
+  ubicacion  String? @db.VarChar(255)
+  cliente    String? @db.VarChar(200)
+  descripcion String? @db.Text
+
+  fechaInicio        DateTime @db.Date
+  fechaFinProgramada DateTime @db.Date
+
+  estado ProjectState @default(PLANIFICACION)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  memberships ProjectMembership[]
+  wbsItems    WbsItem[]
+  baselines   Baseline[]
+
+  @@unique([companyId, codigoObra])
+  @@index([companyId, estado])
+  @@map("projects")
+}
+
+/// Asigna un usuario a una obra con un rol especifico.
+/// Un mismo usuario puede ser RESIDENTE en una obra y CONSULTOR en otra.
+model ProjectMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String
+  role      Role
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@index([projectId])
+  @@map("project_memberships")
+}
+
+// ---------------------------------------------------------------------------
+// EDT / Presupuesto por partidas
+//
+// Aqui se cierra la brecha detectada en el proceso actual: hoy los metrados
+// viven como texto libre dentro del nombre de la partida
+// ("Excavacion para zapatas (4.25 m3)"). Al volverlos campos propios se
+// habilita todo el control economico posterior.
+// ---------------------------------------------------------------------------
+
+model WbsItem {
+  id        String  @id @default(cuid())
+  projectId String
+  parentId  String?
+
+  /// Codigo jerarquico. "2.0" = capitulo, "2.1" = partida.
+  /// VarChar(32) admite tambien el formato S10 peruano ("01.01.02").
+  codigoPartida String  @db.VarChar(32)
+  tipo          WbsType
+  descripcion   String  @db.VarChar(500)
+
+  /// Profundidad en el arbol (0 = raiz). Evita recursion para ordenar y mostrar.
+  nivel Int @default(0)
+  orden Int @default(0)
+
+  // --- Datos de presupuesto. Solo aplican a tipo = PARTIDA ---
+  unidad         String?  @db.VarChar(20)
+  metrado        Decimal? @db.Decimal(14, 4)
+  precioUnitario Decimal? @db.Decimal(14, 4)
+  /// Derivado: metrado * precioUnitario. Se persiste para evitar recalcular
+  /// el arbol completo en cada consulta de tablero.
+  parcial        Decimal? @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent   WbsItem?  @relation("WbsTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children WbsItem[] @relation("WbsTree")
+
+  @@unique([projectId, codigoPartida])
+  @@index([projectId, parentId])
+  @@index([projectId, orden])
+  @@map("wbs_items")
+}
+
+// ---------------------------------------------------------------------------
+// Linea base del presupuesto (presupuesto congelado)
+//
+// Vive aparte de WbsItem a proposito. Si la linea base se pudiera editar,
+// los indicadores de avance y costo se recalcularian hacia atras y el
+// sistema mentiria. Una vez aprobada, es inmutable.
+// ---------------------------------------------------------------------------
+
+model Baseline {
+  id        String @id @default(cuid())
+  projectId String
+
+  version    Int
+  montoTotal Decimal @db.Decimal(14, 2)
+  notas      String? @db.Text
+
+  /// null = borrador editable. Con fecha = CONGELADA e inmutable.
+  aprobadaAt  DateTime?
+  aprobadaPor String?   @db.VarChar(150)
+
+  createdAt DateTime @default(now())
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items   BaselineItem[]
+
+  @@unique([projectId, version])
+  @@map("baselines")
+}
+
+/// Copia inmutable de la partida en el momento de congelar.
+/// Duplica los datos a proposito: no hay relacion con WbsItem porque la
+/// linea base debe sobrevivir intacta aunque despues se renombren o
+/// eliminen partidas del presupuesto vivo.
+model BaselineItem {
+  id         String @id @default(cuid())
+  baselineId String
+
+  codigoPartida  String   @db.VarChar(32)
+  descripcion    String   @db.VarChar(500)
+  tipo           WbsType
+  nivel          Int      @default(0)
+  orden          Int      @default(0)
+  unidad         String?  @db.VarChar(20)
+  metrado        Decimal? @db.Decimal(14, 4)
+  precioUnitario Decimal? @db.Decimal(14, 4)
+  parcial        Decimal? @db.Decimal(14, 2)
+
+  baseline Baseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+
+  @@index([baselineId, orden])
+  @@map("baseline_items")
+}
+
+// ---------------------------------------------------------------------------
+// Auditoria
+//
+// En un sistema que mueve dinero la trazabilidad no es opcional ni se
+// agrega despues. Se registra desde el primer dia.
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id        String  @id @default(cuid())
+  companyId String
+  userId    String?
+  projectId String?
+
+  entidad   String      @db.VarChar(60)
+  entidadId String      @db.VarChar(40)
+  accion    AuditAction
+
+  antes   Json?
+  despues Json?
+
+  ip        String?  @db.VarChar(45)
+  userAgent String?  @db.VarChar(255)
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entidad, entidadId])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}

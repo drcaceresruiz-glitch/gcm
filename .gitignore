@@ -1,0 +1,49 @@
+# Dependencias
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# Cliente Prisma generado (se regenera con: npm run db:generate)
+/src/generated/
+
+# Variables de entorno: nunca al repositorio
+.env
+.env.local
+.env.*.local
+
+# Archivos subidos por usuarios
+/storage/
+
+# Registros y cache
+*.log
+npm-debug.log*
+.eslintcache
+*.tsbuildinfo
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Empaquetado de escritorio (Tauri)
+src-tauri/target/
+
+# Cobertura de pruebas
+coverage/
+
+# Documentacion para asistentes generada por `prisma init`.
+# Se regenera sola y son ~200 archivos de ruido en el repositorio.
+/.agents/
+/.windsurf/
+/.claude/skills/
+/skills-lock.json

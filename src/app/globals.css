@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/*
+  Paleta y tipografia base de GCM.
+  Se define en variables para poder cambiar la identidad visual sin tocar
+  los componentes, y para soportar modo claro y oscuro desde el inicio.
+*/
+@theme {
+  --color-marca-50: oklch(0.97 0.02 250);
+  --color-marca-100: oklch(0.93 0.04 250);
+  --color-marca-500: oklch(0.55 0.16 250);
+  --color-marca-600: oklch(0.48 0.16 250);
+  --color-marca-700: oklch(0.4 0.14 250);
+  --color-marca-900: oklch(0.26 0.09 250);
+
+  /* Estados de obra: avance, alerta y desviacion */
+  --color-exito: oklch(0.62 0.15 150);
+  --color-alerta: oklch(0.75 0.15 80);
+  --color-peligro: oklch(0.58 0.2 25);
+}
+
+:root {
+  --fondo: oklch(0.99 0 0);
+  --texto: oklch(0.22 0.01 250);
+  --borde: oklch(0.9 0.005 250);
+  --superficie: oklch(1 0 0);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: oklch(0.18 0.01 250);
+    --texto: oklch(0.95 0.005 250);
+    --borde: oklch(0.3 0.01 250);
+    --superficie: oklch(0.22 0.012 250);
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background-color: var(--fondo);
+  color: var(--texto);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Accesibilidad: foco siempre visible para navegacion por teclado. */
+:focus-visible {
+  outline: 2px solid var(--color-marca-500);
+  outline-offset: 2px;
+}
+
+/* Respeta a quien pidio menos animacion en su sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
