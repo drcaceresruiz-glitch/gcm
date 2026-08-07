@@ -318,6 +318,12 @@ model Baseline {
   /// Tipo de cambio del dia, para expresar el presupuesto en dolares.
   tipoCambio Decimal? @db.Decimal(8, 4)
 
+  /// Clausulas de ejecucion: alcance, forma de pago, garantia, vigencia.
+  /// Son las condiciones comerciales de ESTA revision y cambian entre una
+  /// y otra, asi que se guardan con ella y no con la obra. La clausula de
+  /// alcance define cuando procede un adicional frente a una reconversion.
+  clausulas String? @db.Text
+
   /// null = borrador editable. Con fecha = CONGELADA e inmutable.
   aprobadaAt  DateTime?
   aprobadaPor String?   @db.VarChar(150)

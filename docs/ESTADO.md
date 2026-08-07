@@ -1,0 +1,286 @@
+# Estado del proyecto GCM
+
+Documento de traspaso. Léelo antes de tocar nada: recoge lo construido, por
+qué está construido así, y qué falta.
+
+Última actualización: 7 de agosto de 2026.
+
+---
+
+## 1. Qué es
+
+**GCM — Gestor de Construcción y Mantenimiento.** Sistema web y de escritorio
+para control de obras de construcción en Perú. Se desplegará en
+`gcm.drcaceresruiz.com`.
+
+El cliente es **LARQUITECTURA STUDIO SAC** (RUC 20601689988). La obra piloto
+es **CRIOCORD** — Laboratorio Instituto de Criopreservación y Terapia Celular,
+en Lurín, Lima. Del 01/08/2026 al 22/10/2026.
+
+Hoy el cliente controla la obra con MS Project y un informe semanal armado a
+mano en PDF. Su control es **100 % físico**: porcentajes de avance, sin capa
+económica. GCM debe sustituir ese proceso y añadir el control de costos.
+
+## 2. Cómo arrancar
+
+```bash
+npm install
+npm run db:migrate     # MariaDB local en 127.0.0.1:3306
+npm run db:seed
+npm run dev            # http://localhost:3000
+```
+
+Entorno local ya montado: **MariaDB 12.3.2** como servicio de Windows, base
+`gcm_dev`, usuario `gcm` / `gcm`, root `gcm_dev_2026`. Las variables están en
+`.env` (no versionado); la plantilla es `.env.example`.
+
+Acceso: `drcaceresruiz@gmail.com` / `GcmObra2026Lima`.
+
+**Repositorio: `github.com/drcaceresruiz-glitch/gcm` — es PÚBLICO.** Nunca
+subir documentos de cliente, credenciales ni datos del servidor.
+`docs/referencias/` está en `.gitignore` por ese motivo.
+
+### Comandos
+
+| Comando | Para qué |
+|---|---|
+| `npm run typecheck` | Tipos |
+| `npm run lint` | Estilo y reglas de arquitectura |
+| `npx vitest run` | 42 pruebas |
+| `npm run build` | Build de producción |
+| `npm run db:studio` | Explorador de la base |
+
+### Utilidades de diagnóstico
+
+En `scripts/`, todas reciben la ruta de un Excel:
+
+- `analizar-archivo.ts` — qué detecta el importador
+- `inspeccionar-filas.ts` — celdas crudas de un rango
+- `ver-combinadas.ts` — celdas combinadas
+- `ver-ocultas.ts` — filas ocultas y su importe
+- `cuadrar-con-excel.ts` — comparación capítulo a capítulo
+- `auditar-*.ts` — totales por capítulo y subcapítulo
+
+---
+
+## 3. Qué funciona hoy
+
+**Módulo 0 — Acceso.** Login, cambio forzado de clave en el primer ingreso,
+bloqueo tras 5 intentos, cierre de todas las sesiones al cambiar la clave,
+auditoría de cada ingreso. Verificado de extremo a extremo en navegador.
+
+**Módulo 1 — Obras y presupuesto.**
+- Panel con las obras de la empresa.
+- Página de obra con el árbol de partidas: capítulos colapsables (recuerda
+  cuáles dejaste abiertos), subtotales por capítulo, orden del documento.
+- **Importador de Excel** completo: vista previa con avisos, confirmación,
+  reemplazo. Probado con el presupuesto real de 360 partidas.
+- **Edición en línea**: descripción, unidad, metrado, precio, importe y
+  modalidad. Bloqueada si la revisión está congelada. Todo auditado.
+- **Revisiones**: servicio completo (`revisiones.service.ts`) para crear una
+  revisión fechada con sus porcentajes y calcular la cascada. **Sin pantalla
+  todavía** — ver pendientes.
+
+**Motores verificados con 42 pruebas.**
+- `lib/decimal.ts` — aritmética exacta con enteros grandes. Nunca coma
+  flotante para dinero.
+- `lib/excel-presupuesto.ts` — lectura de presupuestos.
+- `lib/jerarquia-partidas.ts` — jerarquía de códigos y suma por hojas.
+- `lib/presupuesto.ts` — cascada y comparación de revisiones.
+
+## 4. Decisiones de arquitectura, y por qué
+
+Ninguna es cosmética. Cambiarlas rompe algo.
+
+**Aritmética con enteros grandes, no coma flotante.** `4.25 × 95` en JS da
+`403.74999999999994`. En un presupuesto eso son céntimos que no cuadran. Los
+importes viajan siempre como texto, nunca pasan por un `number`.
+
+**Contraseñas con `scrypt` de Node, no argon2 ni bcrypt.** Estos son módulos
+compilados: el binario que se construye en el servidor de integración no
+ejecuta en CloudLinux. `scrypt` viene dentro de Node.
+
+**Adaptador `@prisma/adapter-mariadb`, no el motor Rust de Prisma.** Mismo
+motivo: el cliente queda en JavaScript puro.
+
+**Sesiones con tokens opacos en base de datos, no JWT.** Permite revocar el
+acceso al instante al desactivar un usuario. En la base solo vive el hash.
+
+**La línea base es inmutable.** Si se pudiera editar, los indicadores se
+recalcularían hacia atrás y el sistema mentiría. Los cambios posteriores van
+como adicionales o reconversiones ENCIMA de ella.
+
+**Los porcentajes viven en la revisión, no en la obra.** Si vivieran en la
+obra, recalcular una revisión antigua daría otro número y comparar dos
+revisiones perdería sentido.
+
+**Control SIN IGV.** El IGV que facturan los proveedores es crédito fiscal,
+no costo. Incluirlo inflaría el costo con dinero que se recupera. El propio
+Excel del cliente dice «RESUMEN FINAL (SIN IGV)». Se guardan las tres cifras:
+neto (costo), IGV (crédito) y total (lo que sale del banco).
+
+**Los componentes no importan Prisma.** Todo acceso a datos pasa por
+`src/services/`, donde se verifican permisos y se filtra por empresa. La
+regla la impone ESLint, no la convención.
+
+**El `companyId` sale siempre de la sesión, nunca de la petición.** Es lo
+único que impide que un cliente vea obras de otro manipulando la URL.
+
+---
+
+## 5. El caso CRIOCORD: cómo se cuadró el presupuesto
+
+Esto es conocimiento ganado a pulso. **No lo deshagas.**
+
+El importador leía inicialmente **S/ 1,817,055.47** de un presupuesto que
+vale **S/ 735,255.55**. Cuatro causas, todas reales:
+
+**1. Celdas combinadas.** El Excel tiene bloques donde varias filas comparten
+un único importe: `D315:H323` son nueve líneas de drywall con un solo precio
+de 79,727.33. Eso es la definición de una partida a suma alzada cuyo alcance
+se detalla en varias líneas. `exceljs` devuelve el valor de la celda maestra
+al leer cualquier celda del bloque, así que el importador lo contaba nueve
+veces. **Ahora se leen las combinaciones que declara el archivo.**
+
+> Antes intenté deducirlo comparando importes iguales en filas seguidas. Era
+> frágil: en el Capítulo III marcaba como repetidas dos partidas que valen
+> 1,050 cada una y son realmente distintas. El archivo lo declara; adivinarlo
+> sobraba.
+
+**2. Filas ocultas.** Hay **57 filas ocultas con S/ 159,283.68**: el Capítulo
+XII completo y los subcapítulos 11.11 a 11.14. Ocultar una fila es la forma
+habitual de dejar una partida fuera de alcance sin borrarla. **No se
+importan**, pero se informa cuántas eran y cuánto sumaban.
+
+**3. El importe del archivo manda sobre metrado × precio.** Hay partidas
+contratadas en bloque cuya fórmula es literalmente `=F225`, sin multiplicar
+por la cantidad. Recalcularlas sobrescribía la cifra pactada.
+
+**4. Un descuento no sustituye a su partida padre.** La regla «el costo de una
+rama es la suma de sus hojas» descartaba a un padre en cuanto una hija tenía
+importe. Pero `7.09.00 GASTOS VARIOS` lleva 779.10 a suma alzada y su única
+hija con cifra es un descuento comercial. **Solo un importe positivo cubre a
+su ancestro.**
+
+Resultado: **S/ 735,255.61** contra los S/ 735,255.55 del Excel. Seis
+céntimos, atribuibles a que el Excel arrastra más decimales de los que
+muestra.
+
+### Las tres verificaciones estructurales
+
+Todo importador de presupuestos debe hacerlas siempre:
+
+1. **Celdas combinadas** → un importe compartido cuenta una vez
+2. **Filas ocultas** → fuera de alcance, no se importan
+3. **Jerarquía real de códigos** → `7.02.00` es padre de `7.02.01`, aunque
+   ambos tengan tres segmentos
+
+### Convenciones de código que conviven
+
+- `4.0` capítulo, hijas `4.1`, `4.2`
+- `01.02` subcapítulo S10, hijas `01.02.01`
+- `7.02.00` cabecera de grupo, hijas `7.02.01` — **misma profundidad**
+
+Y hay huecos: `11.11.02` a `11.11.19` existen pero su cabecera `11.11` no.
+Por eso `codigoPadre` sube por la jerarquía hasta encontrar un ancestro real.
+
+### La cascada del presupuesto
+
+```
+costo directo         762,077.15    suma de partidas positivas
++ descuentos          -26,821.60    partidas con importe negativo
+= subtotal            735,255.55
++ gastos generales     88,230.67    12 %
++ utilidad             95,583.22    13 %
+= PRESUPUESTO         919,069.43    <- la cifra de control, SIN IGV
++ IGV                 165,432.50    18 %
+= total general     1,084,501.93
+```
+
+Revisiones del cliente: 19/05/2026 = S/ 952,596.43 · 03/06/2026 =
+S/ 919,069.43 · diferencia S/ 33,527.00 = US$ 9,689.88 (tipo de cambio 3.46).
+
+**Los pasos intermedios se calculan con seis decimales y solo se redondea al
+final.** Redondear en cada paso desplaza el total varios céntimos.
+
+---
+
+## 6. Pendiente, en el orden acordado con el cliente
+
+### Inmediato — pantalla de revisiones y resumen
+
+El servicio `revisiones.service.ts` está completo y probado: `crearRevision`
+y `obtenerResumen`. **Falta la interfaz.** Hay que:
+
+1. Formulario para crear una revisión: fecha, gastos generales, utilidad,
+   IGV, tipo de cambio y cláusulas.
+2. Panel de resumen que reproduzca el cuadro del Excel: la cascada completa,
+   el comparador de revisiones con la diferencia en soles y dólares, y las
+   cláusulas de ejecución.
+
+Con el costo directo ya cuadrado, la cascada saldrá en S/ 919,069, a
+céntimos de la cifra del cliente.
+
+### Después — reconversiones y adicionales
+
+Diseño ya acordado con el cliente, **sin implementar**. El cliente mueve
+presupuesto entre partidas cuando una se queda corta y otra sobra, o pide un
+adicional si no hay de dónde sacar.
+
+Modelo acordado: entidad `MovimientoPresupuestal` con líneas, encima de la
+línea base, que nunca se toca.
+
+| Tipo | Qué hace | Regla |
+|---|---|---|
+| Reconversión | Saca de una partida y mete en otra | **La suma debe dar cero** |
+| Adicional | Aumenta el presupuesto aprobado | Solo entradas |
+| Deductivo | Lo reduce | Solo salidas |
+
+Cada partida pasa a tener **presupuesto base**, **ajustes** y **vigente**.
+Los indicadores de costo se calculan contra el **vigente**, no contra el
+original; si no, cada reconversión aprobada aparecería como desviación.
+
+La cláusula 1 del contrato define cuándo procede un adicional: *«trabajo
+adicional por vicios ocultos o cambios en el diseño original»*.
+
+### Fases posteriores
+
+| Fase | Contenido |
+|---|---|
+| Despliegue | cPanel tiene **Git Version Control** — es la vía elegida. SSH externo está cerrado (probado: solo responden los puertos web 2082/2083). Clave `gcm_deploy` ya autorizada. Ver `docs/infraestructura.md` |
+| Cronograma | Importar desde XML de MS Project (el `.mpp` es binario propietario y no se puede leer). Planificación semanal, ruta crítica |
+| Avance físico | Metrados ejecutados, Curva S, evidencia fotográfica |
+| Proveedores | Órdenes de compra, **anticipos**, recepciones, abonos |
+| Indicadores | Tablero en vivo, cortes de control, EVM |
+| Reportes | PDF y Excel con el formato del informe semanal actual |
+| Resto | Caja chica, almacén, actas, gestión documental, WhatsApp |
+| Escritorio | Tauri v2 como contenedor + PWA |
+
+Hay 16 órdenes de compra reales del cliente en `docs/referencias/`
+(`OC 2026-07-00113` a `OC 2026-08-00126`) sin analizar todavía. Son la base
+para diseñar el módulo de proveedores.
+
+## 7. Cosas que conviene saber
+
+**El control es Comprometido / Devengado / Pagado / Saldo.** Decidido con el
+cliente. El indicador de rentabilidad se calcula sobre el **devengado**, no
+sobre lo pagado: la cláusula 5 del contrato fija un adelanto del 35 % más un
+20 % al día 15, así que más de la mitad se paga antes de ejecutar. Contarlo
+como costo mostraría medio presupuesto consumido con la obra empezando.
+
+**El servidor de producción usa `latin1` por defecto.** La base de producción
+debe crearse explícitamente en `utf8mb4` o los acentos y la eñe se rompen.
+
+**Producción tiene MariaDB 10.11 y desarrollo 12.3.** Validar las migraciones
+contra el servidor real pronto, no al final.
+
+**Al cambiar el esquema de Prisma hay que borrar `.next`.** El servidor de
+desarrollo cachea el cliente antiguo y da errores de campo desconocido que
+parecen otra cosa.
+
+**Quedan tres avisos de importes repetidos** que son legítimos (partidas
+distintas con el mismo precio). Son informativos y no alteran ningún total.
+
+**El Excel del cliente tiene un total en caché desconcertante.** El del
+Capítulo XI guarda 166,942.42, pero sus fórmulas recalculadas darían otra
+cosa. Merece la pena avisarle de que revise el archivo.

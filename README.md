@@ -5,9 +5,13 @@ físico y resultado económico. Se despliega en `gcm.drcaceresruiz.com`.
 
 ## Estado actual
 
-**Fase 1 — Cimientos.** Estructura base, esquema de datos y capa de
-seguridad instalados. Pendiente: motor de base de datos local y primera
-migración.
+**Fase 1 — Cimientos, en curso.** Acceso con roles, importador de
+presupuestos desde Excel, árbol de partidas editable y motor de cálculo del
+presupuesto. Pendiente la pantalla de revisiones.
+
+> **Antes de continuar el desarrollo, lee [docs/ESTADO.md](docs/ESTADO.md).**
+> Recoge lo construido, las decisiones de arquitectura y por qué son como
+> son, cómo se cuadró el presupuesto real del cliente, y qué falta.
 
 ## Stack
 
