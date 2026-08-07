@@ -76,15 +76,39 @@ describe("analizarExcel", () => {
     expect(r.montoTotal).toBe("5026.75");
   });
 
-  it("avisa cuando el parcial del archivo no cuadra", async () => {
+  it("respeta el importe del archivo aunque no sea metrado x precio", async () => {
     const libro = await construirLibro([
-      ["1.1", "Partida manipulada", "m2", 10, 5, 999],
+      ["1.1", "Partida contratada en bloque", "m2", 10, 5, 999],
     ]);
 
     const r = await analizarExcel(libro);
 
-    expect(r.filas[0]?.parcial).toBe("50.00");
-    expect(r.filas[0]?.aviso).toContain("no coincide");
+    // El importe del presupuesto es la cifra pactada. En los documentos
+    // reales no siempre equivale a metrado x precio, y sobrescribirla
+    // falsea el contrato.
+    expect(r.filas[0]?.parcial).toBe("999.00");
+    expect(r.filas[0]?.aviso).toContain("no es metrado x precio");
+  });
+
+  it("detecta importes repetidos en filas consecutivas", async () => {
+    // Sintoma de una formula arrastrada: todas las filas del grupo acaban
+    // mostrando el importe de la primera.
+    const libro = await construirLibro([
+      ["11.01.01", "Tabique tipo A", "glb", 1, 79727.33, 79727.33],
+      ["11.01.02", "Tabique tipo B", "glb", 1, 79727.33, 79727.33],
+      ["11.01.03", "Tabique tipo C", "glb", 1, 79727.33, 79727.33],
+      ["11.02.01", "Otra partida distinta", "glb", 1, 1000, 1000],
+    ]);
+
+    const r = await analizarExcel(libro);
+
+    expect(r.gruposRepetidos).toHaveLength(1);
+    expect(r.gruposRepetidos[0]?.filas).toHaveLength(3);
+    expect(r.montoTotal).toBe("240181.99");
+    expect(r.montoSinRepetidos).toBe("80727.33");
+    expect(r.filas[1]?.aviso).toContain("formula arrastrada");
+    // La primera del grupo conserva el importe y no lleva ese aviso.
+    expect(r.filas[0]?.aviso ?? "").not.toContain("formula arrastrada");
   });
 
   it("rechaza codigos duplicados indicando la fila original", async () => {
@@ -108,12 +132,86 @@ describe("analizarExcel", () => {
     expect(r.errores[0]?.mensaje).toContain("no valido");
   });
 
-  it("rechaza partidas sin metrado valido", async () => {
+  it("acepta una partida con precio pero sin metrado, avisando", async () => {
     const libro = await construirLibro([["3.1", "Sin metrado", "m2", "s/d", 5, null]]);
 
     const r = await analizarExcel(libro);
 
-    expect(r.errores[0]?.mensaje).toContain("metrado");
+    expect(r.errores).toHaveLength(0);
+    expect(r.filas).toHaveLength(1);
+    expect(r.filas[0]?.parcial).toBeNull();
+    expect(r.filas[0]?.aviso).toContain("Sin metrado");
+  });
+
+  it("trata como agrupador la fila sin ningun dato economico", async () => {
+    const libro = await construirLibro([
+      ["3.1", "SUBTITULO SIN CIFRAS", null, null, null, null],
+      ["3.2", "Esta si tiene precio", "m2", 10, 5, null],
+    ]);
+
+    const r = await analizarExcel(libro);
+
+    // Sin metrado, precio ni importe no hay nada que costear: la fila
+    // agrupa. Exigirle un metrado seria inventarle una naturaleza que no
+    // tiene.
+    expect(r.errores).toHaveLength(0);
+    expect(r.filas[0]?.tipo).toBe("CAPITULO");
+    expect(r.filas[1]?.tipo).toBe("PARTIDA");
+    expect(r.montoTotal).toBe("50.00");
+  });
+
+  // --- Casos aprendidos del presupuesto real de CRIOCORD ---
+
+  it("acepta grupos contratados a suma alzada", async () => {
+    // El grupo lleva el importe en SUB-TOTAL y sus hijas solo detallan el
+    // alcance, con metrado pero sin precio unitario.
+    const libro = await construirLibro(
+      [
+        ["7.02.00", "REDES DE DESAGUE", null, null, null, 13109.04],
+        ["7.02.01", "Corte de piso de concreto", "ml", 42, null, null],
+        ["7.02.02", "Resane de piso con concreto", "ml", 42, null, null],
+      ],
+      { cabecera: ["ITEM", "DESCRIPCIÓN", "UND", "CANT", "PRECIO UNIT.", "SUB-TOTAL"] },
+    );
+
+    const r = await analizarExcel(libro);
+
+    expect(r.errores).toHaveLength(0);
+    expect(r.montoTotal).toBe("13109.04");
+    expect(r.filas[1]?.metrado).toBe("42.0000");
+    expect(r.filas[1]?.parcial).toBeNull();
+    expect(r.filas[1]?.aviso).toContain("suma alzada");
+  });
+
+  it("reconoce la cabecera SUB-TOTAL con guion", async () => {
+    const libro = await construirLibro([["1.1", "Partida", "glb", 1, 500, 500]], {
+      cabecera: ["ITEM", "DESCRIPCIÓN", "UND", "CANT", "PRECIO UNIT.", "SUB-TOTAL"],
+    });
+
+    const r = await analizarExcel(libro);
+
+    expect(r.columnasDetectadas["parcial"]).toBe("SUB-TOTAL");
+  });
+
+  it("omite el texto sin codigo sin truncar lo que viene despues", async () => {
+    // En los presupuestos reales las clausulas del contrato aparecen
+    // intercaladas, con capitulos posteriores. Cortar ahi perderia dinero.
+    const libro = await construirLibro([
+      ["11.1", "Ultima del capitulo 11", "glb", 1, 1000, null],
+      [null, null, null, null, null, null],
+      [null, "CLAUSULAS DE EJECUCION DEL PRESUPUESTO", null, null, null, null],
+      [null, "1. ALCANCE: el presupuesto incluye...", null, null, null, null],
+      [null, null, null, null, null, null],
+      ["12", "CAPITULO XII: MOBILIARIO", null, null, null, null],
+      ["12.01.01", "Tableros de acero inoxidable", "glb", 1, 2500, null],
+    ]);
+
+    const r = await analizarExcel(libro);
+
+    expect(r.errores).toHaveLength(0);
+    expect(r.filasTextoOmitidas).toBe(2);
+    expect(r.montoTotal).toBe("3500.00");
+    expect(r.filas.some((f) => f.codigo === "12.01.01")).toBe(true);
   });
 
   it("acepta partidas sin unidad pero deja aviso", async () => {

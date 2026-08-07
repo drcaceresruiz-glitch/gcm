@@ -18,6 +18,15 @@ const nextConfig: NextConfig = {
   // una actualizacion del framework la sobrescriba.
   agentRules: false,
 
+  experimental: {
+    serverActions: {
+      // El limite por defecto es 1 MB: un presupuesto de obra con cientos
+      // de partidas lo supera. El importador rechaza por encima de 8 MB con
+      // un mensaje claro, asi que este techo nunca se alcanza en silencio.
+      bodySizeLimit: "10mb",
+    },
+  },
+
   async headers() {
     return [
       {

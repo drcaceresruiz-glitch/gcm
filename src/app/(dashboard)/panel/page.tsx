@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Building2, MapPin, CalendarDays } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
@@ -45,14 +46,15 @@ export default async function PanelPage() {
             );
 
             return (
-              <li
-                key={obra.id}
-                className="rounded-xl border p-4"
-                style={{
-                  borderColor: "var(--borde)",
-                  backgroundColor: "var(--superficie)",
-                }}
-              >
+              <li key={obra.id}>
+                <Link
+                  href={`/obras/${obra.id}`}
+                  className="block rounded-xl border p-4 transition-shadow hover:shadow-md"
+                  style={{
+                    borderColor: "var(--borde)",
+                    backgroundColor: "var(--superficie)",
+                  }}
+                >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-xs font-medium opacity-60">
                     {obra.codigoObra ?? "Sin codigo"}
@@ -126,6 +128,7 @@ export default async function PanelPage() {
                     />
                   </div>
                 </div>
+                </Link>
               </li>
             );
           })}

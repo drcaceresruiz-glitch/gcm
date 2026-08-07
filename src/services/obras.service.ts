@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { sumar } from "@/lib/decimal";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -75,4 +76,136 @@ export async function listarObras(
       totalPartidas: agregado?._count._all ?? 0,
     };
   });
+}
+
+export interface ObraDetalle {
+  id: string;
+  codigoObra: string | null;
+  nombreObra: string;
+  ubicacion: string | null;
+  cliente: string | null;
+  estado: string;
+  fechaInicio: Date;
+  fechaFinProgramada: Date;
+  /// Version de la linea base aprobada, o null si el presupuesto sigue abierto.
+  lineaBaseVersion: number | null;
+}
+
+export async function obtenerObra(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<ObraDetalle | null> {
+  if (!puede(sesion.role, "obra:leer")) throw new SinPermisoError();
+
+  // El companyId sale de la sesion: manipular el id de la URL no permite
+  // alcanzar la obra de otra empresa, simplemente no aparece.
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: {
+      id: true,
+      codigoObra: true,
+      nombreObra: true,
+      ubicacion: true,
+      cliente: true,
+      estado: true,
+      fechaInicio: true,
+      fechaFinProgramada: true,
+      baselines: {
+        where: { aprobadaAt: { not: null } },
+        orderBy: { version: "desc" },
+        take: 1,
+        select: { version: true },
+      },
+    },
+  });
+
+  if (!obra) return null;
+
+  const { baselines, ...resto } = obra;
+  return { ...resto, lineaBaseVersion: baselines[0]?.version ?? null };
+}
+
+export interface PartidaFila {
+  id: string;
+  codigoPartida: string;
+  tipo: "CAPITULO" | "PARTIDA";
+  descripcion: string;
+  nivel: number;
+  unidad: string | null;
+  metrado: string | null;
+  precioUnitario: string | null;
+  /// En las partidas, su propio parcial. En los capitulos, la suma de todo
+  /// lo que cuelga de ellos.
+  parcial: string | null;
+}
+
+export interface ArbolPartidas {
+  filas: PartidaFila[];
+  totalPartidas: number;
+  montoTotal: string;
+}
+
+export async function listarPartidas(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<ArbolPartidas> {
+  if (!puede(sesion.role, "partida:leer")) throw new SinPermisoError();
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { id: true },
+  });
+
+  if (!obra) return { filas: [], totalPartidas: 0, montoTotal: "0.00" };
+
+  const items = await prisma.wbsItem.findMany({
+    where: { projectId: obraId },
+    orderBy: [{ orden: "asc" }, { codigoPartida: "asc" }],
+    select: {
+      id: true, parentId: true, codigoPartida: true, tipo: true,
+      descripcion: true, nivel: true, unidad: true,
+      metrado: true, precioUnitario: true, parcial: true,
+    },
+  });
+
+  // Subtotal de cada capitulo: se acumula hacia arriba por la cadena de
+  // padres, para que un capitulo refleje tambien lo que hay en sus
+  // subcapitulos y no solo en sus hijos directos.
+  const parcialesPorNodo = new Map<string, string[]>();
+  const padreDe = new Map(items.map((i) => [i.id, i.parentId]));
+
+  for (const item of items) {
+    if (item.tipo !== "PARTIDA" || !item.parcial) continue;
+
+    let ancestro = padreDe.get(item.id) ?? null;
+    while (ancestro) {
+      const acumulado = parcialesPorNodo.get(ancestro) ?? [];
+      acumulado.push(item.parcial.toString());
+      parcialesPorNodo.set(ancestro, acumulado);
+      ancestro = padreDe.get(ancestro) ?? null;
+    }
+  }
+
+  const filas: PartidaFila[] = items.map((i) => ({
+    id: i.id,
+    codigoPartida: i.codigoPartida,
+    tipo: i.tipo,
+    descripcion: i.descripcion,
+    nivel: i.nivel,
+    unidad: i.unidad,
+    metrado: i.metrado?.toString() ?? null,
+    precioUnitario: i.precioUnitario?.toString() ?? null,
+    parcial:
+      i.tipo === "PARTIDA"
+        ? (i.parcial?.toString() ?? null)
+        : sumar(parcialesPorNodo.get(i.id) ?? []),
+  }));
+
+  const partidas = items.filter((i) => i.tipo === "PARTIDA");
+
+  return {
+    filas,
+    totalPartidas: partidas.length,
+    montoTotal: sumar(partidas.map((p) => p.parcial?.toString() ?? "0")),
+  };
 }

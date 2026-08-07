@@ -1,5 +1,10 @@
 import ExcelJS from "exceljs";
-import { normalizarDecimal, multiplicar, sumar } from "@/lib/decimal";
+import { normalizarDecimal, multiplicar } from "@/lib/decimal";
+import {
+  sumarHojas,
+  detectarImportesRepetidos,
+  type GrupoRepetido,
+} from "@/lib/jerarquia-partidas";
 
 /**
  * Lectura de presupuestos desde Excel.
@@ -41,7 +46,16 @@ export interface ResultadoAnalisis {
   totalCapitulos: number;
   totalPartidas: number;
   montoTotal: string;
+  /// El mismo total contando una sola vez cada grupo de importes repetidos.
+  montoSinRepetidos: string;
+  /// Rachas de filas consecutivas con importe identico.
+  gruposRepetidos: GrupoRepetido[];
+  /// Filas de texto sin codigo: notas, subtitulos y clausulas del contrato.
+  filasTextoOmitidas: number;
 }
+
+/** Numeros separados por punto: "4", "4.3", "01.02.01". */
+const CODIGO_VALIDO = /^\d+(\.\d+)*$/;
 
 /**
  * Sinonimos de cabecera aceptados.
@@ -52,7 +66,7 @@ export interface ResultadoAnalisis {
  */
 const ALIAS: Record<string, string[]> = {
   // Los alias van sin tildes ni simbolos: la cabecera leida se normaliza
-  // antes de comparar, asi que "Descripcion", "Descripción" y "DESCRIPCION"
+  // antes de comparar, asi que "Descripcion", "DescripciÃ³n" y "DESCRIPCION"
   // acaban siendo la misma cadena.
   codigo: ["item", "codigo", "cod", "nro", "n", "no", "num"],
   descripcion: ["descripcion", "partida", "detalle", "concepto", "actividad"],
@@ -71,17 +85,25 @@ const ALIAS: Record<string, string[]> = {
  */
 const DIACRITICOS = new RegExp("[\\u0300-\\u036f]", "g");
 
-/** Simbolos de grado y ordinal: aparecen en cabeceras como "N°" o "Nº". */
+/** Simbolos de grado y ordinal: aparecen en cabeceras como "NÂ°" o "NÂº". */
 const ORDINALES = new RegExp("[\\u00b0\\u00ba]", "g");
 
 function normalizarTexto(valor: unknown): string {
-  return String(valor ?? "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(DIACRITICOS, "")
-    .replace(ORDINALES, "")
-    .trim();
+  return (
+    String(valor ?? "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(DIACRITICOS, "")
+      .replace(ORDINALES, "")
+      // Guiones y guiones bajos se eliminan: "SUB-TOTAL" y "SUBTOTAL" son
+      // la misma columna, y separarlas hacia fallar la deteccion en
+      // presupuestos reales.
+      .replace(/[-_]/g, "")
+      // Espacios repetidos a uno solo.
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /** Extrae el texto de una celda, resolviendo formulas y texto enriquecido. */
@@ -168,18 +190,28 @@ function detectarCabecera(hoja: ExcelJS.Worksheet): {
 function clasificarCodigo(
   codigo: string,
   tieneDatosEconomicos: boolean,
+  tieneImporte: boolean,
 ): { tipo: TipoFila; nivel: number } {
   const segmentos = codigo.split(".");
   const ultimo = segmentos.at(-1) ?? "";
   const nivel = Math.max(0, segmentos.length - 1);
 
+  // Si la fila lleva un importe propio, es costeable, y manda sobre
+  // cualquier convencion de codigo. En los presupuestos reales hay grupos
+  // como "7.02.00 REDES DE DESAGUE" que llevan el precio del subcontrato a
+  // suma alzada mientras sus hijas solo detallan el alcance. Tratarlos como
+  // capitulo por terminar en cero descartaria ese dinero.
+  if (tieneImporte) {
+    return { tipo: "PARTIDA", nivel };
+  }
+
   // Convencion explicita: un solo segmento ("1") o terminacion en cero
-  // ("4.0") siempre es capitulo.
+  // ("4.0") es capitulo.
   if (segmentos.length === 1 || Number(ultimo) === 0) {
     return { tipo: "CAPITULO", nivel };
   }
 
-  // Señal de contenido: en el formato S10 los niveles intermedios como
+  // SeÃ±al de contenido: en el formato S10 los niveles intermedios como
   // "01.02" son subtitulos que agrupan, sin metrado ni precio. Una fila sin
   // datos economicos agrupa; no es una partida a la que se le pueda exigir
   // un metrado.
@@ -202,7 +234,9 @@ export async function analizarExcel(
   if (!hoja) {
     return {
       filas: [], errores: [{ fila: 0, mensaje: "El archivo no contiene ninguna hoja." }],
-      filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0, totalPartidas: 0, montoTotal: "0.00",
+      filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0,
+      totalPartidas: 0, montoTotal: "0.00", montoSinRepetidos: "0.00",
+      gruposRepetidos: [], filasTextoOmitidas: 0,
     };
   }
 
@@ -217,7 +251,9 @@ export async function analizarExcel(
           "No se encontro la tabla de partidas. Se necesitan al menos una columna de codigo, " +
           "una de descripcion y una de metrado o precio unitario.",
       }],
-      filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0, totalPartidas: 0, montoTotal: "0.00",
+      filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0,
+      totalPartidas: 0, montoTotal: "0.00", montoSinRepetidos: "0.00",
+      gruposRepetidos: [], filasTextoOmitidas: 0,
     };
   }
 
@@ -228,23 +264,52 @@ export async function analizarExcel(
 
   const filas: FilaImportada[] = [];
   const codigosVistos = new Map<string, number>();
-  const parciales: string[] = [];
 
+  let filasTextoOmitidas = 0;
+
+  /**
+   * Ultima fila con un codigo valido.
+   *
+   * Los presupuestos cierran con totales y con las clausulas contractuales,
+   * que son parrafos de texto sin codigo. Delimitar la tabla por aqui evita
+   * dos errores opuestos: leer el texto legal como partidas rotas, y cortar
+   * la tabla al primer hueco en blanco, que existe entre capitulos y haria
+   * perder presupuesto en silencio.
+   */
+  const colCodigo = mapa.get("codigo")!;
+  let ultimaFila = filaCabecera;
   for (let n = filaCabecera + 1; n <= hoja.rowCount; n++) {
+    const c = textoCelda(hoja.getRow(n).getCell(colCodigo));
+    if (c && CODIGO_VALIDO.test(c)) ultimaFila = n;
+  }
+
+  // Si no hay ningun codigo valido se recorre la hoja entera igualmente.
+  // De lo contrario el analisis terminaria sin leer nada y sin explicar por
+  // que, que es la peor respuesta posible: el usuario ve cero partidas y
+  // ningun motivo.
+  if (ultimaFila === filaCabecera) ultimaFila = hoja.rowCount;
+
+  for (let n = filaCabecera + 1; n <= ultimaFila; n++) {
     const fila = hoja.getRow(n);
 
     const codigo = textoCelda(fila.getCell(mapa.get("codigo")!));
     const descripcion = textoCelda(fila.getCell(mapa.get("descripcion")!));
 
-    // Filas vacias o de totales al pie: se ignoran en silencio.
     if (!codigo && !descripcion) continue;
 
     if (!codigo) {
-      errores.push({ fila: n, columna: "codigo", mensaje: `Falta el codigo de "${descripcion.slice(0, 60)}".` });
+      // Texto sin codigo: notas, subtitulos, filas de totales y clausulas
+      // contractuales, que en los presupuestos reales aparecen intercaladas
+      // entre capitulos. Se omiten en silencio y solo se cuentan.
+      //
+      // Listarlas como errores llenaria el informe de ruido, y un listado
+      // ruidoso ensena al usuario a ignorarlo: entonces se pierde tambien
+      // el error de verdad.
+      filasTextoOmitidas++;
       continue;
     }
 
-    if (!/^\d+(\.\d+)*$/.test(codigo)) {
+    if (!CODIGO_VALIDO.test(codigo)) {
       errores.push({
         fila: n, columna: "codigo",
         mensaje: `Codigo "${codigo}" no valido. Se esperan numeros separados por punto, como 4.3 o 01.02.01.`,
@@ -252,8 +317,29 @@ export async function analizarExcel(
       continue;
     }
 
+    const tieneValor = (campo: string) => {
+      const col = mapa.get(campo);
+      return col
+        ? normalizarDecimal(valorCelda(fila.getCell(col)), 4) !== null
+        : false;
+    };
+
+    // Cualquiera de los tres convierte la fila en algo costeable o medible.
+    // El subtotal cuenta por si solo: en los presupuestos reales hay grupos
+    // contratados a suma alzada, con precio pero sin metrado ni unitario.
+    const tieneImporte = tieneValor("parcial");
+    const tieneDatosEconomicos =
+      tieneValor("metrado") || tieneValor("precioUnitario") || tieneImporte;
+
     if (!descripcion) {
-      errores.push({ fila: n, columna: "descripcion", mensaje: `La partida ${codigo} no tiene descripcion.` });
+      // Un codigo suelto, sin descripcion ni cifras, es una fila residual
+      // del Excel. No aporta nada: se omite como una fila vacia mas.
+      if (!tieneDatosEconomicos) continue;
+
+      errores.push({
+        fila: n, columna: "descripcion",
+        mensaje: `La partida ${codigo} tiene cifras pero le falta la descripcion.`,
+      });
       continue;
     }
 
@@ -267,23 +353,32 @@ export async function analizarExcel(
     }
     codigosVistos.set(codigo, n);
 
-    const colMetrado = mapa.get("metrado");
-    const colPrecio = mapa.get("precioUnitario");
-    const tieneDatosEconomicos =
-      (colMetrado
-        ? normalizarDecimal(valorCelda(fila.getCell(colMetrado)), 4) !== null
-        : false) ||
-      (colPrecio
-        ? normalizarDecimal(valorCelda(fila.getCell(colPrecio)), 4) !== null
-        : false);
-
-    const { tipo, nivel } = clasificarCodigo(codigo, tieneDatosEconomicos);
-    const registro = construirFila({ hoja, fila, n, mapa, codigo, descripcion, tipo, nivel, errores });
+    const { tipo, nivel } = clasificarCodigo(
+      codigo,
+      tieneDatosEconomicos,
+      tieneImporte,
+    );
+    const registro = construirFila({ hoja, fila, n, mapa, codigo, descripcion, tipo, nivel });
 
     if (registro) {
       filas.push(registro);
-      if (registro.parcial) parciales.push(registro.parcial);
+
     }
+  }
+
+  // Importes que se repiten en filas consecutivas: casi siempre una formula
+  // arrastrada en el Excel. Se marcan y se ofrece el total sin ellos, para
+  // que el usuario compare y decida.
+  const repetidos = detectarImportesRepetidos(filas);
+
+  /// Todas las filas del grupo menos la primera, que si cuenta.
+  const filasRepetidas = new Set(repetidos.flatMap((g) => g.filas.slice(1)));
+
+  for (const f of filas) {
+    if (!filasRepetidas.has(f.fila)) continue;
+    const nota =
+      "Importe identico al de la fila anterior: posible formula arrastrada en el Excel.";
+    f.aviso = f.aviso ? `${f.aviso} ${nota}` : nota;
   }
 
   return {
@@ -293,7 +388,16 @@ export async function analizarExcel(
     columnasDetectadas,
     totalCapitulos: filas.filter((f) => f.tipo === "CAPITULO").length,
     totalPartidas: filas.filter((f) => f.tipo === "PARTIDA").length,
-    montoTotal: sumar(parciales),
+    // Solo las hojas: si un grupo lleva importe propio y sus hijas tambien,
+    // sumar ambos contaria el mismo dinero dos veces.
+    montoTotal: sumarHojas(filas),
+    montoSinRepetidos: sumarHojas(
+      filas.map((f) =>
+        filasRepetidas.has(f.fila) ? { ...f, parcial: null } : f,
+      ),
+    ),
+    gruposRepetidos: repetidos,
+    filasTextoOmitidas,
   };
 }
 
@@ -306,11 +410,10 @@ interface ArgsFila {
   descripcion: string;
   tipo: TipoFila;
   nivel: number;
-  errores: ErrorImportacion[];
 }
 
 function construirFila(args: ArgsFila): FilaImportada | null {
-  const { fila, n, mapa, codigo, descripcion, tipo, nivel, errores } = args;
+  const { fila, n, mapa, codigo, descripcion, tipo, nivel } = args;
 
   const leer = (campo: string) => {
     const col = mapa.get(campo);
@@ -329,49 +432,62 @@ function construirFila(args: ArgsFila): FilaImportada | null {
   const unidadTexto = String(leer("unidad") ?? "").trim();
   const metrado = normalizarDecimal(leer("metrado"), 4);
   const precioUnitario = normalizarDecimal(leer("precioUnitario"), 4);
+  const parcialArchivo = normalizarDecimal(leer("parcial"), 2);
 
-  if (metrado === null) {
-    errores.push({
-      fila: n, columna: "metrado",
-      mensaje: `La partida ${codigo} no tiene un metrado valido. Revisa el formato del numero.`,
-    });
-    return null;
+  const avisos: string[] = [];
+  let parcial: string | null = null;
+
+  /**
+   * El subtotal del archivo MANDA sobre el calculo.
+   *
+   * Es la cifra pactada en el presupuesto, y en los documentos reales no
+   * siempre equivale a metrado x precio unitario: hay partidas contratadas
+   * en bloque donde el precio es del paquete completo y la cantidad es
+   * informativa. En el presupuesto de CRIOCORD la formula de esas filas es
+   * literalmente "=F225", sin multiplicar por la cantidad.
+   *
+   * Recalcularlas y sobrescribir el importe acordado inflaba el
+   * presupuesto en varios millones. Se respeta el documento y, si el
+   * calculo discrepa, se avisa para que alguien lo revise.
+   */
+  if (parcialArchivo !== null) {
+    parcial = parcialArchivo;
+
+    if (metrado !== null && precioUnitario !== null) {
+      const calculado = multiplicar(metrado, precioUnitario, 2);
+      if (calculado !== null && calculado !== parcialArchivo) {
+        avisos.push(
+          `El importe del archivo (${parcialArchivo}) no es metrado x precio (${calculado}). Se respeta el del archivo.`,
+        );
+      }
+    } else {
+      avisos.push("Importe a suma alzada, sin metrado o sin precio unitario.");
+    }
+  } else if (metrado !== null && precioUnitario !== null) {
+    // Sin subtotal en el archivo, se calcula.
+    parcial = multiplicar(metrado, precioUnitario, 2);
   }
 
-  if (precioUnitario === null) {
-    errores.push({
-      fila: n, columna: "precioUnitario",
-      mensaje: `La partida ${codigo} no tiene un precio unitario valido.`,
-    });
-    return null;
-  }
+  // Invariante garantizada por quien llama: una fila sin ningun dato
+  // economico se clasifica como CAPITULO y ya salio arriba. Aqui siempre
+  // hay al menos metrado, precio o importe.
 
-  const parcial = multiplicar(metrado, precioUnitario, 2);
   if (parcial === null) {
-    errores.push({ fila: n, mensaje: `No se pudo calcular el parcial de la partida ${codigo}.` });
-    return null;
+    avisos.push(
+      metrado !== null
+        ? "Sin precio unitario: se importa como desglose de alcance dentro de una partida a suma alzada."
+        : "Sin metrado: no se puede calcular el importe de esta partida.",
+    );
   }
 
-  let aviso: string | undefined;
-
-  if (!unidadTexto) {
-    aviso = "Sin unidad de medida. Se importa, pero conviene completarla.";
-  }
-
-  // Si el Excel trae su propio parcial, se contrasta. Una discrepancia
-  // suele delatar celdas alteradas a mano o formulas rotas: el usuario
-  // debe saberlo antes de dar el presupuesto por bueno.
-  const parcialExcel = normalizarDecimal(leer("parcial"), 2);
-  if (parcialExcel !== null && parcialExcel !== parcial && parcialExcel !== "0.00") {
-    aviso =
-      `El parcial del archivo (${parcialExcel}) no coincide con metrado x precio (${parcial}). ` +
-      `Se usara el calculado.`;
+  if (!unidadTexto && metrado !== null) {
+    avisos.push("Sin unidad de medida. Conviene completarla.");
   }
 
   return {
     fila: n, codigo, tipo, descripcion, nivel,
     unidad: unidadTexto || null,
     metrado, precioUnitario, parcial,
-    ...(aviso ? { aviso } : {}),
+    ...(avisos.length > 0 ? { aviso: avisos.join(" ") } : {}),
   };
 }
