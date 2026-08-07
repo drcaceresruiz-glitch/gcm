@@ -31,14 +31,28 @@ npm run dev            # http://localhost:3000
 ```
 
 Entorno local ya montado: **MariaDB 12.3.2** como servicio de Windows, base
-`gcm_dev`, usuario `gcm` / `gcm`, root `gcm_dev_2026`. Las variables están en
-`.env` (no versionado); la plantilla es `.env.example`.
+`gcm_dev`.
 
-Acceso: `drcaceresruiz@gmail.com` / `GcmObra2026Lima`.
+> Las credenciales de la base y las del usuario administrador **no se
+> documentan aquí**: este repositorio es público. Viven en `.env`, que no
+> está versionado; la plantilla con todas las variables necesarias es
+> `.env.example`.
+
+El primer usuario lo crea `npm run db:seed`: toma el correo de
+`SEED_ADMIN_EMAIL`, genera una clave temporal aleatoria, la imprime **una
+sola vez** por consola y obliga a cambiarla en el primer ingreso.
 
 **Repositorio: `github.com/drcaceresruiz-glitch/gcm` — es PÚBLICO.** Nunca
 subir documentos de cliente, credenciales ni datos del servidor.
 `docs/referencias/` está en `.gitignore` por ese motivo.
+
+> ⚠️ **Credenciales expuestas — pendiente de rotar.** Este apartado
+> contuvo en claro la clave de la base, la de root y la del usuario
+> administrador, desde el commit `c19d002` y en un repositorio público.
+> Quitarlas de aquí **no las borra del historial**: siguen accesibles por
+> el SHA de ese commit, y GitHub conserva los objetos aunque se reescriba
+> la rama. La única mitigación real es **cambiarlas**; hasta que se haga,
+> hay que darlas por comprometidas. Los pasos están en §8.
 
 ### Comandos
 
@@ -46,7 +60,7 @@ subir documentos de cliente, credenciales ni datos del servidor.
 |---|---|
 | `npm run typecheck` | Tipos |
 | `npm run lint` | Estilo y reglas de arquitectura |
-| `npx vitest run` | 42 pruebas |
+| `npx vitest run` | 48 pruebas |
 | `npm run build` | Build de producción |
 | `npm run db:studio` | Explorador de la base |
 
@@ -298,3 +312,68 @@ distintas con el mismo precio). Son informativos y no alteran ningún total.
 **El Excel del cliente tiene un total en caché desconcertante.** El del
 Capítulo XI guarda 166,942.42, pero sus fórmulas recalculadas darían otra
 cosa. Merece la pena avisarle de que revise el archivo.
+
+---
+
+## 8. Rotación de las credenciales expuestas
+
+**Pendiente.** Estuvieron en claro en `docs/ESTADO.md` desde el commit
+`c19d002`, en un repositorio público. Se retiraron del documento el
+07/08/2026, pero **siguen en el historial de Git**: quien tenga el SHA de
+ese commit puede leerlas, y reescribir la rama tampoco basta porque GitHub
+conserva los objetos y las copias ya clonadas no se pueden recuperar.
+
+Por eso el orden importa: **primero cambiar, después limpiar**. Mientras no
+se cambien, hay que darlas por conocidas por terceros.
+
+### 1. Clave del usuario administrador — lo más urgente
+
+Es la única que da acceso a datos reales del cliente. Se cambia desde la
+propia aplicación, en **Cambiar contraseña**, que además cierra todas las
+sesiones abiertas.
+
+Si esa contraseña se reutiliza en cualquier otro servicio (correo, hosting,
+banca), cámbiala también allí: es lo que hace de verdad un atacante con una
+credencial filtrada.
+
+### 2. Usuario de la base de datos local
+
+```sql
+ALTER USER 'gcm'@'localhost' IDENTIFIED BY 'NUEVA_CLAVE';
+FLUSH PRIVILEGES;
+```
+
+Después, actualizar `DATABASE_URL` en `.env` con la clave nueva. El `.env`
+no está versionado, así que ahí puede vivir en claro.
+
+### 3. Clave de root de MariaDB
+
+```sql
+ALTER USER 'root'@'localhost' IDENTIFIED BY 'NUEVA_CLAVE_ROOT';
+FLUSH PRIVILEGES;
+```
+
+### 4. Comprobar que todo sigue en pie
+
+```bash
+npm run db:migrate
+npx vitest run
+npm run dev
+```
+
+### Qué NO hace falta
+
+- **No hay que reescribir el historial.** Con las credenciales ya rotadas,
+  las del historial no abren nada. Un `filter-repo` obligaría a reclonar a
+  cualquiera que tenga copia y no borra los objetos que GitHub ya guardó.
+- **`APP_SECRET` no estuvo expuesto:** nunca se documentó, solo aparece
+  como marcador en `.env.example`.
+- **El servidor de producción no está afectado:** `docs/infraestructura.md`
+  censura nombre de servidor, usuario y claves desde el principio.
+
+### Para que no vuelva a pasar
+
+La regla que ya sigue `docs/infraestructura.md`: en un archivo versionado
+se escribe `<usuario>`, `<clave>`, `CLAVE`, nunca el valor. Las credenciales
+viven en `.env` y en los secretos del repositorio, y el documento solo dice
+dónde buscarlas.
