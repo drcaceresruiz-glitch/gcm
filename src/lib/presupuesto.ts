@@ -1,4 +1,4 @@
-import { multiplicar, sumar } from "@/lib/decimal";
+import { multiplicar, normalizarDecimal, sumar } from "@/lib/decimal";
 
 /**
  * Cascada del presupuesto de obra.
@@ -139,4 +139,48 @@ function dividir(
   // pequena y el resultado se redondea a centimos, muy lejos del limite de
   // precision de la coma flotante.
   return (n / d).toFixed(decimales);
+}
+
+/**
+ * Decimales de un porcentaje guardado como fraccion.
+ *
+ * Coincide con el Decimal(6,4) de la base: cuatro posiciones permiten
+ * expresar hasta la centesima de punto porcentual (12.34 % -> 0.1234), muy
+ * por debajo de lo que distingue cualquier contrato de obra.
+ */
+const PRECISION_PORCENTAJE = 4;
+
+/**
+ * Porcentaje tal como lo escribe una persona -> fraccion para el calculo.
+ *
+ * En un presupuesto se lee «gastos generales 12 %», pero la cascada
+ * multiplica por 0.12 y la base guarda la fraccion. La conversion se hace
+ * con aritmetica exacta y no dividiendo entre cien en coma flotante: en JS
+ * `12 / 100` da 0.12 pero `12.1 / 100` da 0.12100000000000001, y ese ruido
+ * termina desplazando centimos en la utilidad de un presupuesto de un
+ * millon.
+ *
+ * Devuelve null si la entrada no es un numero valido.
+ */
+export function porcentajeAFraccion(entrada: string): string | null {
+  // Dos decimales en el porcentaje son los cuatro de la fraccion.
+  const normalizado = normalizarDecimal(entrada, 2);
+  if (normalizado === null) return null;
+
+  return multiplicar(normalizado, "0.01", PRECISION_PORCENTAJE);
+}
+
+/**
+ * Fraccion guardada -> porcentaje legible: "0.1200" -> "12".
+ *
+ * Se recortan los ceros de relleno porque el campo del formulario se
+ * rellena con este valor y "12.0000 %" invita a corregirlo.
+ */
+export function fraccionAPorcentaje(fraccion: string): string {
+  const valor = multiplicar(fraccion, "100", PRECISION_PORCENTAJE);
+  if (valor === null) return "0";
+
+  // Siempre trae parte decimal, asi que recortar los ceros finales no puede
+  // comerse un cero significativo de la parte entera.
+  return valor.replace(/\.?0+$/, "");
 }

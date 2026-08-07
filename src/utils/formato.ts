@@ -26,6 +26,11 @@ const METRADO = new Intl.NumberFormat("es-PE", {
   maximumFractionDigits: 4,
 });
 
+const CAMBIO = new Intl.NumberFormat("es-PE", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
 /** Convierte a number solo para mostrar. Nunca para calcular. */
 function aNumero(valor: Importe | null | undefined): number | null {
   if (valor === null || valor === undefined) return null;
@@ -49,6 +54,18 @@ export function decimal(valor: Importe | null | undefined, vacio = "—"): strin
 export function metrado(valor: Importe | null | undefined, vacio = "—"): string {
   const n = aNumero(valor);
   return n === null ? vacio : METRADO.format(n);
+}
+
+/**
+ * Tipo de cambio sin ceros de relleno: "3.4600" -> "3.46".
+ *
+ * La base lo guarda con cuatro decimales porque algunos son necesarios
+ * (3.4625), pero mostrarlos siempre hace que un 3.46 corriente parezca una
+ * cifra de mas precision de la que tiene.
+ */
+export function tipoCambio(valor: Importe | null | undefined, vacio = "—"): string {
+  const n = aNumero(valor);
+  return n === null ? vacio : CAMBIO.format(n);
 }
 
 /** "12.5%" */

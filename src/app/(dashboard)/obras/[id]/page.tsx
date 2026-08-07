@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
+  FileClock,
   FileSpreadsheet,
   Lock,
   MapPin,
@@ -72,16 +73,29 @@ export default async function ObraPage({
             </div>
           </div>
 
-          {puedeImportar && obra.lineaBaseVersion === null && (
-            <Link
-              href={`/obras/${id}/importar`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--color-marca-600)" }}
-            >
-              <FileSpreadsheet className="size-4" aria-hidden="true" />
-              Importar desde Excel
-            </Link>
-          )}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {puede(sesion.role, "linea_base:leer") && (
+              <Link
+                href={`/obras/${id}/revisiones`}
+                className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
+                style={{ borderColor: "var(--borde)" }}
+              >
+                <FileClock className="size-4" aria-hidden="true" />
+                Revisiones y resumen
+              </Link>
+            )}
+
+            {puedeImportar && obra.lineaBaseVersion === null && (
+              <Link
+                href={`/obras/${id}/importar`}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+                style={{ backgroundColor: "var(--color-marca-600)" }}
+              >
+                <FileSpreadsheet className="size-4" aria-hidden="true" />
+                Importar desde Excel
+              </Link>
+            )}
+          </div>
         </div>
       </div>
 
@@ -99,7 +113,11 @@ export default async function ObraPage({
       )}
 
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Tarjeta etiqueta="Presupuesto" valor={soles(montoTotal)} destacado />
+        {/* No es «el presupuesto»: es la suma de las partidas, antes de
+            gastos generales y utilidad. El presupuesto de control sale de
+            la cascada y vive en la pantalla de revisiones. Llamar
+            «Presupuesto» a las dos cifras invita a citar la que no es. */}
+        <Tarjeta etiqueta="Subtotal de partidas" valor={soles(montoTotal)} destacado />
         <Tarjeta etiqueta="Partidas" valor={String(totalPartidas)} />
         <Tarjeta
           etiqueta="Linea base"

@@ -77,16 +77,19 @@ auditoría de cada ingreso. Verificado de extremo a extremo en navegador.
   reemplazo. Probado con el presupuesto real de 360 partidas.
 - **Edición en línea**: descripción, unidad, metrado, precio, importe y
   modalidad. Bloqueada si la revisión está congelada. Todo auditado.
-- **Revisiones**: servicio completo (`revisiones.service.ts`) para crear una
-  revisión fechada con sus porcentajes y calcular la cascada. **Sin pantalla
-  todavía** — ver pendientes.
+- **Revisiones**: servicio (`revisiones.service.ts`) y pantalla completos en
+  `/obras/[id]/revisiones`. Formulario de alta con **vista previa en vivo** de
+  la cascada, panel de resumen con el cuadro del Excel, comparador entre las
+  dos últimas revisiones en soles y dólares, cláusulas e historial. Verificado
+  en navegador contra CRIOCORD.
 
-**Motores verificados con 42 pruebas.**
+**Motores verificados con 48 pruebas.**
 - `lib/decimal.ts` — aritmética exacta con enteros grandes. Nunca coma
   flotante para dinero.
 - `lib/excel-presupuesto.ts` — lectura de presupuestos.
 - `lib/jerarquia-partidas.ts` — jerarquía de códigos y suma por hojas.
-- `lib/presupuesto.ts` — cascada y comparación de revisiones.
+- `lib/presupuesto.ts` — cascada, comparación de revisiones y conversión
+  exacta entre porcentaje y fracción.
 
 ## 4. Decisiones de arquitectura, y por qué
 
@@ -207,19 +210,23 @@ final.** Redondear en cada paso desplaza el total varios céntimos.
 
 ## 6. Pendiente, en el orden acordado con el cliente
 
-### Inmediato — pantalla de revisiones y resumen
+### Inmediato — aprobar una revisión
 
-El servicio `revisiones.service.ts` está completo y probado: `crearRevision`
-y `obtenerResumen`. **Falta la interfaz.** Hay que:
+La pantalla de revisiones ya está (ver §3). Con 12 % y 13 % la cascada de
+CRIOCORD sale en **S/ 919,069.51**, ocho céntimos por encima de los
+919,069.43 del cliente: son los seis céntimos conocidos del costo directo
+(762,077.21 frente a 762,077.15) amplificados por el 25 % de gastos
+generales y utilidad. No es un error nuevo.
 
-1. Formulario para crear una revisión: fecha, gastos generales, utilidad,
-   IGV, tipo de cambio y cláusulas.
-2. Panel de resumen que reproduzca el cuadro del Excel: la cascada completa,
-   el comparador de revisiones con la diferencia en soles y dólares, y las
-   cláusulas de ejecución.
+**Lo que falta es congelar.** El permiso `linea_base:aprobar` y el campo
+`aprobadaAt` existen, pero no hay ni servicio ni botón: toda revisión nace
+y se queda en borrador, así que `obra.lineaBaseVersion` sigue en `null` y el
+presupuesto nunca se bloquea para edición. Hace falta:
 
-Con el costo directo ya cuadrado, la cascada saldrá en S/ 919,069, a
-céntimos de la cifra del cliente.
+1. `aprobarRevision` en el servicio: sella `aprobadaAt` y `aprobadaPor`,
+   audita, y rechaza si ya estaba aprobada.
+2. Botón en el panel, solo para ADMIN, con confirmación explícita: aprobar
+   es un acto contractual e irreversible.
 
 ### Después — reconversiones y adicionales
 
@@ -267,6 +274,13 @@ cliente. El indicador de rentabilidad se calcula sobre el **devengado**, no
 sobre lo pagado: la cláusula 5 del contrato fija un adelanto del 35 % más un
 20 % al día 15, así que más de la mitad se paga antes de ejecutar. Contarlo
 como costo mostraría medio presupuesto consumido con la obra empezando.
+
+**Los porcentajes se guardan como fracción y se muestran como porcentaje.**
+La base tiene `Decimal(6,4)` y la cascada multiplica por `0.12`, pero nadie
+dicta «cero coma doce» por teléfono. La traducción vive en la frontera, en
+`porcentajeAFraccion` y `fraccionAPorcentaje` (`lib/presupuesto.ts`), y se
+hace con aritmética exacta, nunca dividiendo entre cien: `12.1 / 100` da
+`0.12100000000000001`. Si añades otro porcentaje al sistema, pásalo por ahí.
 
 **El servidor de producción usa `latin1` por defecto.** La base de producción
 debe crearse explícitamente en `utf8mb4` o los acentos y la eñe se rompen.

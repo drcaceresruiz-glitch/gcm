@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { calcularCascada, compararRevisiones } from "./presupuesto";
+import {
+  calcularCascada,
+  compararRevisiones,
+  fraccionAPorcentaje,
+  porcentajeAFraccion,
+} from "./presupuesto";
 
 describe("calcularCascada", () => {
   it("reproduce el resumen final del presupuesto de CRIOCORD", () => {
@@ -89,5 +94,45 @@ describe("compararRevisiones", () => {
   it("omite la columna en dolares si no hay tipo de cambio", () => {
     expect(compararRevisiones("100.00", "50.00").diferenciaDolares).toBeNull();
     expect(compararRevisiones("100.00", "50.00", "0").diferenciaDolares).toBeNull();
+  });
+});
+
+describe("porcentajeAFraccion", () => {
+  it("convierte los porcentajes de CRIOCORD", () => {
+    expect(porcentajeAFraccion("12")).toBe("0.1200");
+    expect(porcentajeAFraccion("13")).toBe("0.1300");
+    expect(porcentajeAFraccion("18")).toBe("0.1800");
+  });
+
+  it("no arrastra el ruido de la coma flotante", () => {
+    // 12.1 / 100 en coma flotante da 0.12100000000000001.
+    expect(porcentajeAFraccion("12.1")).toBe("0.1210");
+    expect(porcentajeAFraccion("7.35")).toBe("0.0735");
+  });
+
+  it("acepta lo que se escribe en un formulario", () => {
+    expect(porcentajeAFraccion(" 12 ")).toBe("0.1200");
+    expect(porcentajeAFraccion("12,5")).toBe("0.1250");
+    expect(porcentajeAFraccion("0")).toBe("0.0000");
+  });
+
+  it("rechaza lo que no es un numero", () => {
+    expect(porcentajeAFraccion("")).toBeNull();
+    expect(porcentajeAFraccion("doce")).toBeNull();
+    expect(porcentajeAFraccion("12%")).toBeNull();
+  });
+
+  it("da la vuelta sin perder el valor", () => {
+    for (const p of ["12", "13", "18", "12.5", "0", "7.35"]) {
+      expect(fraccionAPorcentaje(porcentajeAFraccion(p)!)).toBe(p);
+    }
+  });
+});
+
+describe("fraccionAPorcentaje", () => {
+  it("recorta los ceros de relleno", () => {
+    expect(fraccionAPorcentaje("0.1200")).toBe("12");
+    expect(fraccionAPorcentaje("0.1250")).toBe("12.5");
+    expect(fraccionAPorcentaje("0.0000")).toBe("0");
   });
 });

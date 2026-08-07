@@ -23,6 +23,14 @@ export interface RevisionResumen {
   tipoCambio: string | null;
   clausulas: string | null;
   cascada: Cascada;
+  /// Como fraccion, tal cual se guardaron. La interfaz los muestra en
+  /// porcentaje; el cuadro del Excel rotula cada linea con el suyo y sin
+  /// ellos no se puede ver que una revision cambio la utilidad.
+  porcentajes: {
+    gastosGenerales: string;
+    utilidad: string;
+    igv: string;
+  };
 }
 
 export interface ResumenPresupuesto {
@@ -58,6 +66,51 @@ function separarDescuentos(
   return {
     costoDirecto: sumarHojas(positivas),
     descuentos: sumarHojas(negativas),
+  };
+}
+
+export interface CostoDirectoActual {
+  costoDirecto: string;
+  descuentos: string;
+  totalPartidas: number;
+}
+
+/**
+ * Costo directo del presupuesto vivo, ya separado en positivo y descuentos.
+ *
+ * Es exactamente lo que congelaria una revision creada en este momento. La
+ * pantalla lo necesita para dibujar la cascada ANTES de crear nada: una
+ * revision es un acto contractual y quien la firma tiene que ver la cifra
+ * antes, no descubrirla despues.
+ *
+ * Se separa aqui y no en el navegador porque la regla de que solo un
+ * importe positivo cubre a su ancestro vive en `sumarHojas`, y duplicarla
+ * en la interfaz seria condenarla a divergir.
+ */
+export async function obtenerCostoDirectoActual(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<CostoDirectoActual> {
+  if (!puede(sesion.role, "partida:leer")) {
+    return { costoDirecto: "0.00", descuentos: "0.00", totalPartidas: 0 };
+  }
+
+  const items = await prisma.wbsItem.findMany({
+    where: { projectId: obraId, project: { companyId: sesion.companyId } },
+    select: { codigoPartida: true, tipo: true, parcial: true },
+  });
+
+  const { costoDirecto, descuentos } = separarDescuentos(
+    items.map((i) => ({
+      codigo: i.codigoPartida,
+      parcial: i.tipo === "PARTIDA" ? (i.parcial?.toString() ?? null) : null,
+    })),
+  );
+
+  return {
+    costoDirecto,
+    descuentos,
+    totalPartidas: items.filter((i) => i.tipo === "PARTIDA").length,
   };
 }
 
@@ -238,6 +291,11 @@ export async function obtenerResumen(
       porcentajeUtilidad: r.porcentajeUtilidad.toString(),
       porcentajeIgv: r.porcentajeIgv.toString(),
     }),
+    porcentajes: {
+      gastosGenerales: r.porcentajeGastosGenerales.toString(),
+      utilidad: r.porcentajeUtilidad.toString(),
+      igv: r.porcentajeIgv.toString(),
+    },
   }));
 
   const [actual, anterior] = revisiones;
