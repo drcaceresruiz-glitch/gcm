@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import Link from "next/link";
 import { AlertCircle, LoaderCircle } from "lucide-react";
 import { accionIniciarSesion, type EstadoFormulario } from "@/app/(auth)/acciones";
 import { CampoTexto } from "@/components/auth/CampoTexto";
@@ -26,7 +27,13 @@ function BotonEnviar() {
   );
 }
 
-export function FormularioLogin({ avisoCambio }: { avisoCambio?: boolean }) {
+export function FormularioLogin({
+  avisoCambio,
+  avisoRecuperada,
+}: {
+  avisoCambio?: boolean;
+  avisoRecuperada?: boolean;
+}) {
   const [estado, accion] = useActionState<EstadoFormulario, FormData>(
     accionIniciarSesion,
     {},
@@ -34,6 +41,19 @@ export function FormularioLogin({ avisoCambio }: { avisoCambio?: boolean }) {
 
   return (
     <form action={accion} className="space-y-4" noValidate>
+      {avisoRecuperada && (
+        <p
+          role="status"
+          className="rounded-lg px-3 py-2 text-sm"
+          style={{
+            backgroundColor:
+              "color-mix(in oklab, var(--color-exito) 15%, transparent)",
+          }}
+        >
+          Clave restablecida. Ingresa con la nueva.
+        </p>
+      )}
+
       {avisoCambio && (
         <p
           role="status"
@@ -77,6 +97,15 @@ export function FormularioLogin({ avisoCambio }: { avisoCambio?: boolean }) {
       />
 
       <BotonEnviar />
+
+      <p className="text-center">
+        <Link
+          href="/recuperar-clave"
+          className="text-sm underline opacity-70"
+        >
+          Olvide mi contrasena
+        </Link>
+      </p>
     </form>
   );
 }

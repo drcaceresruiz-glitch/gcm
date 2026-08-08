@@ -83,7 +83,7 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
 }
 
 /// El remitente y la marca que encabeza los correos.
-const MARCA = "GCM - Gestor de Construccion y Mantenimiento";
+const MARCA = "GCM - Gestion en Construccion Moderna";
 
 /**
  * Envoltorio HTML comun a todos los correos: una caja centrada, sobria, sin
@@ -181,4 +181,45 @@ export function correoClaveRestablecida(datos: {
   );
 
   return { asunto: `Clave restablecida — ${MARCA}`, texto, html };
+}
+
+/**
+ * Correo con el enlace para recuperar la clave.
+ *
+ * Dice explicitamente que se ignore si nadie lo pidio, y cuanto dura el
+ * enlace: quien recibe esto sin haberlo pedido merece saber que su cuenta
+ * sigue intacta mientras no toque nada.
+ */
+export function correoRecuperacion(datos: {
+  nombre: string;
+  enlace: string;
+  minutos: number;
+}): Omit<Correo, "para"> {
+  const texto = [
+    `Hola ${datos.nombre},`,
+    ``,
+    `Alguien pidio restablecer la clave de tu cuenta en ${MARCA}.`,
+    ``,
+    `Abre este enlace para elegir una nueva:`,
+    datos.enlace,
+    ``,
+    `El enlace caduca en ${datos.minutos} minutos y sirve una sola vez.`,
+    ``,
+    `Si no lo pediste, ignora este correo: tu clave sigue siendo la misma`,
+    `y nadie ha entrado en tu cuenta.`,
+  ].join("\n");
+
+  const html = plantilla(
+    "Restablece tu clave",
+    `<p>Hola <strong>${datos.nombre}</strong>,</p>
+     <p>Alguien pidio restablecer la clave de tu cuenta. Si fuiste tu, elige una nueva aqui:</p>
+     <p style="margin:20px 0;">
+       <a href="${datos.enlace}" style="background:#0f7186;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:bold;">Elegir clave nueva</a>
+     </p>
+     <p style="color:#6b7a82;font-size:13px;">El enlace caduca en ${datos.minutos} minutos y sirve una sola vez.</p>
+     <p style="color:#6b7a82;font-size:13px;">Si no lo pediste, ignora este correo: tu clave sigue siendo la misma y nadie ha entrado en tu cuenta.</p>
+     <p style="color:#6b7a82;font-size:12px;word-break:break-all;">Si el boton no funciona, copia esta direccion: ${datos.enlace}</p>`,
+  );
+
+  return { asunto: `Restablece tu clave — ${MARCA}`, texto, html };
 }

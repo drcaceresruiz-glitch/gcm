@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { validarClaveNueva } from "@/lib/claves";
 import { crearSesion, cerrarTodasLasSesiones } from "@/services/sesion.service";
 import type { AuditAction } from "@/generated/prisma/enums";
 
@@ -153,12 +154,8 @@ export async function cambiarClave(
   claveActual: string,
   claveNueva: string,
 ): Promise<ResultadoCambioClave> {
-  if (claveNueva.length < 10) {
-    return { ok: false, error: "La nueva contrasena debe tener al menos 10 caracteres." };
-  }
-  if (claveNueva === claveActual) {
-    return { ok: false, error: "La nueva contrasena debe ser distinta de la actual." };
-  }
+  const politica = validarClaveNueva(claveNueva, claveActual);
+  if (!politica.ok) return politica;
 
   const usuario = await prisma.user.findUnique({
     where: { id: userId },
