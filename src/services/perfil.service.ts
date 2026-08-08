@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import {
@@ -60,6 +61,26 @@ export interface Perfil {
   /// Su solicitud viva, si la hay.
   pendiente: SolicitudPendiente | null;
 }
+
+/**
+ * Solo la foto de perfil del usuario de la sesion, para el avatar de la
+ * cabecera.
+ *
+ * Va aparte de `obtenerPerfil` y NO dentro de la sesion: la foto es un
+ * `MediumText` que puede pesar decenas de KB, y la sesion se resuelve en cada
+ * peticion y se usa en muchos sitios. Aqui se trae solo cuando la cabecera la
+ * necesita, y en `cache()` para no repetir la consulta si el layout la pide
+ * mas de una vez en la misma peticion.
+ */
+export const obtenerFotoPerfil = cache(async function obtenerFotoPerfil(
+  sesion: SesionActiva,
+): Promise<string | null> {
+  const usuario = await prisma.user.findFirst({
+    where: { id: sesion.userId, companyId: sesion.companyId },
+    select: { fotoPerfil: true },
+  });
+  return usuario?.fotoPerfil ?? null;
+});
 
 export async function obtenerPerfil(sesion: SesionActiva): Promise<Perfil | null> {
   const usuario = await prisma.user.findFirst({

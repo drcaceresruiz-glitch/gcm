@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { MenuDesplegable } from "@/components/ui/MenuDesplegable";
 import { SelectorApariencia } from "@/components/ui/SelectorApariencia";
+import { Avatar } from "@/components/ui/Avatar";
 import { accionCerrarSesion } from "@/app/(auth)/acciones";
 
 /**
@@ -54,7 +55,7 @@ export interface EnlaceEmpresa {
 
 interface Props {
   empresa: EnlaceEmpresa[];
-  usuario: { nombre: string; rol: string };
+  usuario: { nombre: string; rol: string; foto: string | null };
 }
 
 export function Navegacion({ empresa, usuario }: Props) {
@@ -74,7 +75,17 @@ export function Navegacion({ empresa, usuario }: Props) {
           </MenuDesplegable>
         )}
 
-        <MenuDesplegable etiqueta={usuario.nombre}>
+        <MenuDesplegable
+          etiqueta={usuario.nombre}
+          icono={
+            <Avatar
+              nombre={usuario.nombre}
+              foto={usuario.foto}
+              className="size-7"
+              textoClase="text-xs"
+            />
+          }
+        >
           <p className="px-3 py-2 text-xs opacity-60">{usuario.rol}</p>
           <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
           <SelectorApariencia />
@@ -120,12 +131,20 @@ export function Navegacion({ empresa, usuario }: Props) {
           }}
         >
           <div className="px-2 py-2">
-            <p className="px-3 py-2 text-sm font-medium">
-              {usuario.nombre}
-              <span className="ml-2 text-xs font-normal opacity-60">
-                {usuario.rol}
-              </span>
-            </p>
+            <div className="flex items-center gap-2.5 px-3 py-2">
+              <Avatar
+                nombre={usuario.nombre}
+                foto={usuario.foto}
+                className="size-8"
+                textoClase="text-xs"
+              />
+              <p className="text-sm font-medium">
+                {usuario.nombre}
+                <span className="ml-2 text-xs font-normal opacity-60">
+                  {usuario.rol}
+                </span>
+              </p>
+            </div>
 
             <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
 

@@ -2,7 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { HardHat } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
-import { contarSolicitudesPendientes } from "@/services/perfil.service";
+import {
+  contarSolicitudesPendientes,
+  obtenerFotoPerfil,
+} from "@/services/perfil.service";
 import { puede } from "@/lib/rbac";
 import {
   Navegacion,
@@ -29,6 +32,7 @@ export default async function DashboardLayout({
   // El numerito de solicitudes pendientes solo se pide si el rol las puede
   // resolver; para el resto la funcion devuelve cero sin tocar la base.
   const pendientes = await contarSolicitudesPendientes(sesion);
+  const foto = await obtenerFotoPerfil(sesion);
 
   // Los permisos se resuelven aqui y no en el componente de navegacion: la
   // comprobacion se queda en el servidor y al cliente solo viaja la lista de
@@ -109,6 +113,7 @@ export default async function DashboardLayout({
             usuario={{
               nombre: `${sesion.nombres} ${sesion.apellidos}`,
               rol: sesion.role,
+              foto,
             }}
           />
         </div>

@@ -2,11 +2,12 @@
 
 import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, Camera, LoaderCircle, Trash2, User } from "lucide-react";
+import { AlertCircle, Camera, LoaderCircle, Trash2 } from "lucide-react";
 import {
   accionGuardarFoto,
   type EstadoPerfil,
 } from "@/app/(dashboard)/perfil/acciones";
+import { Avatar } from "@/components/ui/Avatar";
 
 /**
  * Foto de perfil, opcional, recortada a un circulo.
@@ -71,7 +72,7 @@ export function FotoPerfil({
       <input type="hidden" name="foto" ref={campo} />
 
       <div className="flex items-center gap-4">
-        <Avatar nombre={nombre} foto={previa} />
+        <Avatar nombre={nombre} foto={previa} className="size-20" />
 
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
@@ -130,34 +131,6 @@ export function FotoPerfil({
         </p>
       )}
     </form>
-  );
-}
-
-/** El avatar circular. Sin foto, las iniciales sobre el color de marca. */
-function Avatar({ nombre, foto }: { nombre: string; foto: string | null }) {
-  const iniciales = nombre
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-
-  return (
-    <div
-      className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full border"
-      style={{ borderColor: "var(--borde)", backgroundColor: "var(--color-marca-500)" }}
-    >
-      {foto ? (
-        // Es un data URL ya recortado en el cliente, no una URL remota que
-        // `next/image` pueda optimizar; por eso un <img> normal.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={foto} alt="Foto de perfil" className="size-full object-cover" />
-      ) : iniciales ? (
-        <span className="text-2xl font-semibold text-white">{iniciales}</span>
-      ) : (
-        <User className="size-8 text-white" aria-hidden="true" />
-      )}
-    </div>
   );
 }
 
