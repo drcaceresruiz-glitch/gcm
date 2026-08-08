@@ -167,3 +167,16 @@ export function esNegativo(valor: string): boolean {
   const e = escalar(valor);
   return e !== null && e.valor < 0n;
 }
+
+/**
+ * true SOLO si el valor es un numero valido e igual a cero.
+ *
+ * Existe porque `!esPositivo(x) && !esNegativo(x)` no significa "es cero":
+ * ambas devuelven false tambien cuando `x` no es un numero. Con esa formula,
+ * un importe corrupto se clasificaria como cero y una reconversion
+ * descuadrada pasaria la validacion de suma cero.
+ */
+export function esCero(valor: string): boolean {
+  const e = escalar(valor);
+  return e !== null && e.valor === 0n;
+}

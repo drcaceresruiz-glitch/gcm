@@ -185,10 +185,10 @@ model Project {
   id        String @id @default(cuid())
   companyId String
 
-  nombreObra String  @db.VarChar(255)
-  codigoObra String? @db.VarChar(40)
-  ubicacion  String? @db.VarChar(255)
-  cliente    String? @db.VarChar(200)
+  nombreObra  String  @db.VarChar(255)
+  codigoObra  String? @db.VarChar(40)
+  ubicacion   String? @db.VarChar(255)
+  cliente     String? @db.VarChar(200)
   descripcion String? @db.Text
 
   fechaInicio        DateTime @db.Date
@@ -199,10 +199,11 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company     Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  company     Company                  @relation(fields: [companyId], references: [id], onDelete: Restrict)
   memberships ProjectMembership[]
   wbsItems    WbsItem[]
   baselines   Baseline[]
+  movimientos MovimientoPresupuestal[]
 
   @@unique([companyId, codigoObra])
   @@index([companyId, estado])
@@ -240,6 +241,12 @@ model WbsItem {
   projectId String
   parentId  String?
 
+  /// Movimiento que dio de alta esta partida, si nacio de un adicional y no
+  /// del presupuesto original. Sirve para dos cosas: distinguir en pantalla
+  /// lo contratado de lo anadido despues, y saber que su presupuesto BASE es
+  /// cero (no figura en la linea base) aunque tenga vigente.
+  origenMovimientoId String?
+
   /// Codigo jerarquico. "2.0" = capitulo, "2.1" = partida.
   /// VarChar(32) admite tambien el formato S10 peruano ("01.01.02").
   codigoPartida String  @db.VarChar(32)
@@ -269,9 +276,19 @@ model WbsItem {
   parent   WbsItem?  @relation("WbsTree", fields: [parentId], references: [id], onDelete: Restrict)
   children WbsItem[] @relation("WbsTree")
 
+  /// Cascade y no SetNull: si se elimina el borrador de un adicional, las
+  /// partidas que propuso deben irse con el. Con SetNull sobrevivirian sin
+  /// importe y sin marca de origen, imposibles de borrar despues porque la
+  /// linea base congelada bloquea el borrado de partidas, y ocupando su
+  /// codigo para siempre.
+  origenMovimiento MovimientoPresupuestal? @relation("PartidasDeAdicional", fields: [origenMovimientoId], references: [id], onDelete: Cascade)
+
+  lineasMovimiento MovimientoLinea[]
+
   @@unique([projectId, codigoPartida])
   @@index([projectId, parentId])
   @@index([projectId, orden])
+  @@index([origenMovimientoId])
   @@map("wbs_items")
 }
 
@@ -287,7 +304,7 @@ model Baseline {
   id        String @id @default(cuid())
   projectId String
 
-  version Int
+  version       Int
   /// Fecha de la revision, la que aparece en el resumen del presupuesto.
   /// No coincide con createdAt: una revision del 03/06 puede cargarse despues.
   fechaRevision DateTime @db.Date
@@ -305,11 +322,11 @@ model Baseline {
   /// Suma de las partidas, antes de cualquier ajuste.
   costoDirecto Decimal @db.Decimal(14, 2)
   /// Descuentos comerciales, negativos.
-  descuentos   Decimal @db.Decimal(14, 2) @default(0)
+  descuentos   Decimal @default(0) @db.Decimal(14, 2)
 
-  porcentajeGastosGenerales Decimal @db.Decimal(6, 4) @default(0)
-  porcentajeUtilidad        Decimal @db.Decimal(6, 4) @default(0)
-  porcentajeIgv             Decimal @db.Decimal(6, 4) @default(0.18)
+  porcentajeGastosGenerales Decimal @default(0) @db.Decimal(6, 4)
+  porcentajeUtilidad        Decimal @default(0) @db.Decimal(6, 4)
+  porcentajeIgv             Decimal @default(0.18) @db.Decimal(6, 4)
 
   /// Presupuesto de la revision, sin IGV: es la cifra de control.
   /// costoDirecto + descuentos, mas gastos generales y utilidad.
@@ -330,8 +347,9 @@ model Baseline {
 
   createdAt DateTime @default(now())
 
-  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  items   BaselineItem[]
+  project     Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items       BaselineItem[]
+  movimientos MovimientoPresupuestal[]
 
   @@unique([projectId, version])
   @@map("baselines")
@@ -350,16 +368,149 @@ model BaselineItem {
   tipo           WbsType
   modalidad      ModalidadPartida @default(PRECIOS_UNITARIOS)
   nivel          Int              @default(0)
-  orden          Int      @default(0)
-  unidad         String?  @db.VarChar(20)
-  metrado        Decimal? @db.Decimal(14, 4)
-  precioUnitario Decimal? @db.Decimal(14, 4)
-  parcial        Decimal? @db.Decimal(14, 2)
+  orden          Int              @default(0)
+  unidad         String?          @db.VarChar(20)
+  metrado        Decimal?         @db.Decimal(14, 4)
+  precioUnitario Decimal?         @db.Decimal(14, 4)
+  parcial        Decimal?         @db.Decimal(14, 2)
 
   baseline Baseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
 
   @@index([baselineId, orden])
   @@map("baseline_items")
+}
+
+// ---------------------------------------------------------------------------
+// Movimientos presupuestales
+//
+// Van ENCIMA de la linea base, que nunca se toca. De ahi salen las tres
+// cifras que maneja el control de obra:
+//
+//   BASE     lo que dice la copia congelada (baseline_items)
+//   AJUSTES  la suma de las lineas de movimientos APROBADOS
+//   VIGENTE  base + ajustes
+//
+// El vigente NO se recalcula con `sumarHojas`. Esa funcion decide que nodo
+// cuenta segun el signo de su importe: un adicional que cruce a positivo una
+// hoja hoy negativa la haria "cubrir" a su ancestro y borraria el importe del
+// ancestro sin error ni rastro. Se ejecuta una sola vez, sobre la linea base,
+// y los ajustes se suman planos encima.
+// ---------------------------------------------------------------------------
+
+/// Naturaleza contractual del movimiento. Gobierna como deben componerse sus
+/// lineas y si puede dar de alta partidas nuevas.
+enum TipoMovimiento {
+  /// Saca de una partida y mete en otra. La suma de sus lineas es CERO.
+  RECONVERSION
+  /// Aumenta el presupuesto aprobado. Solo entradas. La clausula 1 del
+  /// contrato define cuando procede: vicios ocultos o cambios de diseno.
+  ADICIONAL
+  /// Reduce el presupuesto aprobado. Solo salidas.
+  DEDUCTIVO
+}
+
+enum EstadoMovimiento {
+  BORRADOR
+  APROBADO
+}
+
+model MovimientoPresupuestal {
+  id        String @id @default(cuid())
+  projectId String
+
+  /// Linea base que ajusta. No es decorativo: de ella se heredan los
+  /// porcentajes de gastos generales y utilidad, que son terminos del
+  /// contrato y no se renegocian por un adicional.
+  baselineId String
+
+  /// Correlativo por obra, para poder citarlo en un acta: "Movimiento 003".
+  numero Int
+  tipo   TipoMovimiento
+  estado EstadoMovimiento @default(BORRADOR)
+
+  /// Fecha del documento que lo respalda, no la del alta en el sistema.
+  fecha DateTime @db.Date
+
+  concepto   String  @db.VarChar(300)
+  /// Por que procede. En un ADICIONAL es donde se invoca la clausula 1.
+  motivo     String  @db.Text
+  /// Carta, acta o correo del cliente que lo autoriza.
+  referencia String? @db.VarChar(120)
+
+  /// Totales derivados de las lineas. Se persisten para poder listar sin
+  /// agregar, igual que `WbsItem.parcial`, pero no se confia en ellos: se
+  /// recalculan desde las lineas dentro de la transaccion de aprobacion.
+  totalEntradas Decimal @default(0) @db.Decimal(14, 2)
+  totalSalidas  Decimal @default(0) @db.Decimal(14, 2)
+  importeNeto   Decimal @default(0) @db.Decimal(14, 2)
+
+  /// Aprobar es irreversible, como aprobar una revision. Un movimiento
+  /// aprobado se corrige con otro de signo contrario, no borrandolo.
+  aprobadoAt  DateTime?
+  aprobadoPor String?   @db.VarChar(150)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Restrict: borrar una linea base con movimientos encima se llevaria por
+  /// delante dinero aprobado sin dejar rastro. Que falle y se decida a mano.
+  baseline Baseline @relation(fields: [baselineId], references: [id], onDelete: Restrict)
+
+  lineas          MovimientoLinea[]
+  partidasCreadas WbsItem[]         @relation("PartidasDeAdicional")
+
+  @@unique([projectId, numero])
+  @@index([projectId, estado])
+  @@index([baselineId, estado])
+  @@map("movimientos_presupuestales")
+}
+
+model MovimientoLinea {
+  id           String @id @default(cuid())
+  movimientoId String
+
+  /// Partida afectada. Nula solo mientras el movimiento es BORRADOR y la
+  /// linea propone una partida nueva: esa se crea al APROBAR, no antes, para
+  /// que un borrador descartado no deje partidas fantasma en el arbol.
+  wbsItemId String?
+
+  /// Copia del codigo en el momento del movimiento, para que el documento
+  /// siga siendo legible aunque despues se renombre la partida.
+  codigoPartida String? @db.VarChar(32)
+
+  /// Positivo entra, negativo sale. Nunca cero.
+  importe Decimal @db.Decimal(14, 2)
+
+  /// Modalidad de la partida afectada, copiada al registrar. No se puede
+  /// sacar dinero por reconversion de una partida a SUMA_ALZADA: su precio
+  /// esta cerrado y el resultado no seria facturable.
+  modalidad ModalidadPartida?
+
+  justificacion String? @db.VarChar(300)
+
+  // --- Solo cuando la linea da de alta una partida nueva ---------------
+  nuevoCodigo      String?  @db.VarChar(32)
+  nuevaDescripcion String?  @db.VarChar(500)
+  nuevaUnidad      String?  @db.VarChar(20)
+  nuevoMetrado     Decimal? @db.Decimal(14, 4)
+  nuevoPrecio      Decimal? @db.Decimal(14, 4)
+  /// Capitulo del que colgara. Debe ser un CAPITULO y no una PARTIDA: si
+  /// colgara de una partida con importe propio, `sumarHojas` dejaria de
+  /// contar a esa partida y su importe desapareceria del presupuesto.
+  nuevoParentId    String?
+
+  createdAt DateTime @default(now())
+
+  movimiento MovimientoPresupuestal @relation(fields: [movimientoId], references: [id], onDelete: Cascade)
+  /// Restrict: una linea aprobada es dinero. Si alguna vez se habilita el
+  /// borrado de partidas, que choque aqui en vez de mover el vigente en
+  /// silencio.
+  partida    WbsItem?               @relation(fields: [wbsItemId], references: [id], onDelete: Restrict)
+
+  @@index([movimientoId])
+  @@index([wbsItemId])
+  @@map("movimiento_lineas")
 }
 
 // ---------------------------------------------------------------------------

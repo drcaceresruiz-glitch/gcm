@@ -257,6 +257,25 @@ original; si no, cada reconversión aprobada aparecería como desviación.
 La cláusula 1 del contrato define cuándo procede un adicional: *«trabajo
 adicional por vicios ocultos o cambios en el diseño original»*.
 
+### Después — gestión de permisos por empresa
+
+Hoy la matriz de `src/lib/rbac.ts` está **escrita en el código**: cambiar quién
+puede hacer qué exige tocar un archivo y desplegar. Sirve con una empresa; no
+escala a varias, cada una con su organización.
+
+Pedido por el cliente el 08/08/2026: que los permisos se puedan **asignar,
+editar y quitar por perfil** desde una pantalla. Los cinco roles quedarían como
+plantillas con valores por defecto, y encima se conceden o revocan permisos
+concretos, por empresa.
+
+> **Límite que no debe negociarse.** `linea_base:aprobar` y `movimiento:aprobar`
+> son actos contractuales, irreversibles, que mueven la cifra contra la que se
+> mide la obra. Si se vuelven configurables, cualquier día alguien se los
+> concede a quien no debe y el sistema pierde la garantía que lo hace fiable.
+> Deben quedar reservados al administrador, fuera de la matriz editable.
+
+Todo cambio de permisos tiene que quedar auditado, como el resto.
+
 ### Fases posteriores
 
 | Fase | Contenido |

@@ -39,6 +39,10 @@ export const PERMISOS = [
   "linea_base:crear",
   "linea_base:aprobar",
 
+  "movimiento:leer",
+  "movimiento:crear",
+  "movimiento:aprobar",
+
   "auditoria:leer",
 ] as const;
 
@@ -50,6 +54,7 @@ const SOLO_LECTURA: Permiso[] = [
   "obra:leer",
   "partida:leer",
   "linea_base:leer",
+  "movimiento:leer",
 ];
 
 const MATRIZ: Record<Role, readonly Permiso[]> = {
@@ -68,12 +73,17 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "partida:eliminar",
     "partida:importar",
     "linea_base:crear",
+    "movimiento:crear",
   ],
 
   /// Administrador de obra: perfil economico-administrativo. Consulta el
   /// presupuesto pero no lo modifica. En fases posteriores recibira los
   /// permisos de ordenes de compra, abonos y caja chica.
-  ADMIN_OBRA: [...SOLO_LECTURA, "usuario:leer"],
+  ///
+  /// Si redacta movimientos presupuestales aunque no edite partidas: mover
+  /// dinero entre partidas o pedir un adicional es una negociacion con el
+  /// cliente, no una decision tecnica. Aprobarlos sigue siendo de ADMIN.
+  ADMIN_OBRA: [...SOLO_LECTURA, "usuario:leer", "movimiento:crear"],
 
   /// Almacen: necesita ver las partidas para imputar movimientos de
   /// materiales, nada mas.

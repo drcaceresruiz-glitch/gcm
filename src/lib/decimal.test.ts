@@ -5,6 +5,7 @@ import {
   sumar,
   esPositivo,
   esNegativo,
+  esCero,
 } from "./decimal";
 
 describe("normalizarDecimal", () => {
@@ -107,5 +108,28 @@ describe("signo", () => {
     expect(esPositivo("0.00")).toBe(false);
     expect(esNegativo("-0.01")).toBe(true);
     expect(esNegativo("0.00")).toBe(false);
+  });
+});
+
+describe("esCero", () => {
+  it("reconoce el cero en cualquiera de sus escrituras", () => {
+    expect(esCero("0")).toBe(true);
+    expect(esCero("0.00")).toBe(true);
+    expect(esCero("-0.0000")).toBe(true);
+  });
+
+  it("distingue el cero de la basura, que es su razon de existir", () => {
+    // El idioma ingenuo `!esPositivo && !esNegativo` da true para todos
+    // estos. Con el, un importe corrupto contaria como cero y una
+    // reconversion descuadrada pasaria la validacion de suma cero.
+    for (const basura of ["", "abc", "12,500", "1.2.3", " "]) {
+      expect(!esPositivo(basura) && !esNegativo(basura)).toBe(true);
+      expect(esCero(basura)).toBe(false);
+    }
+  });
+
+  it("no confunde el cero con un importe cualquiera", () => {
+    expect(esCero("0.01")).toBe(false);
+    expect(esCero("-0.01")).toBe(false);
   });
 });
