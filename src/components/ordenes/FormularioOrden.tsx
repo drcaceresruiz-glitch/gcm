@@ -219,19 +219,7 @@ export function FormularioOrden({
       <input type="hidden" name="descuentoComercial" value={descuento} />
       <input type="hidden" name="porcentajeIgv" value={igv} />
 
-      {estado.error && (
-        <p
-          role="alert"
-          className="flex items-start gap-2 rounded-lg px-3 py-2 text-sm"
-          style={{
-            backgroundColor:
-              "color-mix(in oklab, var(--color-peligro) 15%, transparent)",
-          }}
-        >
-          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>{estado.error}</span>
-        </p>
-      )}
+      {estado.error && <Aviso mensaje={estado.error} />}
 
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">El documento</h2>
@@ -452,6 +440,12 @@ export function FormularioOrden({
       </section>
 
       <div className="space-y-3">
+        {/* El mismo error que hay arriba, repetido junto al boton.
+            El formulario es largo y quien pulsa guardar esta al final: un
+            aviso a tres pantallas de distancia no se ve, y el rechazo parece
+            que "no hizo nada". */}
+        {estado.error && <Aviso mensaje={estado.error} />}
+
         <BotonCrear />
         <p className="text-xs text-pretty opacity-60">
           Se guarda como borrador: todavia no compromete presupuesto. Alguien
@@ -929,5 +923,21 @@ function CampoArea({ etiqueta, ayuda, id, ...props }: CampoAreaProps) {
         </p>
       )}
     </div>
+  );
+}
+
+function Aviso({ mensaje }: { mensaje: string }) {
+  return (
+    <p
+      role="alert"
+      className="flex items-start gap-2 rounded-lg px-3 py-2 text-sm"
+      style={{
+        backgroundColor:
+          "color-mix(in oklab, var(--color-peligro) 15%, transparent)",
+      }}
+    >
+      <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <span>{mensaje}</span>
+    </p>
   );
 }
