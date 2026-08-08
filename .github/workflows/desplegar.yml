@@ -1,8 +1,18 @@
 # Despliegue a cPanel.
 #
-# GCM no es un sitio de archivos: es una aplicacion Next.js que hay que
-# compilar y cuyo proceso Node hay que reiniciar. Por eso la compilacion se
-# hace aqui y por FTP viaja solo el resultado, no el codigo fuente.
+# GCM es una aplicacion Next.js: hay que compilarla y reiniciar su proceso
+# Node. Se compila aqui y por FTP viaja SOLO UN ARCHIVO comprimido.
+#
+# Por que un solo archivo y no el arbol suelto: subir los 1452 archivos del
+# servidor autocontenido por FTP resulto inviable. FTP los manda de uno en
+# uno y sin transacciones, asi que cualquier corte deja la carpeta a medias;
+# y `mirror` compara por tamano y fecha, de modo que da por buenos los
+# archivos truncados y los salta. Eso produjo un despliegue "en verde" sobre
+# una instalacion rota, con errores de "Unexpected end of input" al arrancar.
+# Un unico .tar.gz o llega entero o no llega.
+#
+# Lo descomprime la propia aplicacion al arrancar (ver `arranque.js`), para
+# que el despliegue siga siendo automatico y no exija entrar a cPanel.
 #
 # La configuracion real (DATABASE_URL, APP_SECRET) NO viaja: vive en cPanel,
 # en las variables de entorno de la aplicacion Node.
@@ -12,17 +22,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      limpiar:
-        description: >-
-          Borrar del servidor lo que sube este workflow antes de subirlo.
-          Necesario si un despliegue quedo a medias: mirror compara por
-          tamano y fecha, da por buenos los archivos truncados y los salta.
-        type: boolean
-        default: false
 
-# Dos despliegues simultaneos dejarian el servidor con archivos de dos
-# compilaciones distintas mezclados a mitad de subida.
 concurrency:
   group: despliegue-produccion
   cancel-in-progress: false
@@ -30,6 +30,10 @@ concurrency:
 jobs:
   desplegar:
     runs-on: ubuntu-latest
+    # Un despliegue sano tarda un par de minutos. Sin este limite, un cuelgue
+    # de FTP consume las 6 horas por defecto antes de que nadie se entere:
+    # ya paso una vez.
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -50,72 +54,89 @@ jobs:
         # Valores de relleno, no credenciales. `src/lib/env.ts` valida el
         # entorno al importarse y aborta si falta DATABASE_URL o APP_SECRET;
         # el runner no tiene .env, asi que sin esto el build ni arranca.
-        # No llegan al servidor: la configuracion real esta en cPanel.
         env:
           DATABASE_URL: mysql://compilacion@127.0.0.1:3306/compilacion
           APP_SECRET: relleno-de-compilacion-sin-valor-real-32ch
         run: npm run build
 
-      # `output: "standalone"` deja en .next/standalone un servidor
-      # autocontenido con sus dependencias, pero los estaticos y public
-      # quedan fuera y hay que colocarlos en su sitio.
+      # `output: "standalone"` deja un servidor autocontenido, pero los
+      # estaticos y public quedan fuera y hay que colocarlos en su sitio.
       - name: Armar el paquete
         run: |
           mkdir -p deploy
           # -L dereferencia: el build deja enlaces simbolicos (rimraf y
-          # @prisma/client) dentro de .next/node_modules, y ProFTPD no
-          # soporta SITE SYMLINK. lftp fallaba al recrearlos y terminaba con
-          # codigo 1 aunque el resto hubiera subido bien. Se copian como
-          # archivos reales.
+          # @prisma/client) y el servidor no admite SITE SYMLINK.
           cp -rL .next/standalone/. deploy/
-          # El build de Next arrastra el .env dentro de standalone. En el
-          # runner no deberia existir, pero si alguna vez aparece subiria
-          # credenciales y pisaria la configuracion del servidor. Fuera.
+          # El build arrastra el .env dentro de standalone. Fuera: subirlo
+          # pisaria la configuracion del servidor con la de desarrollo.
           rm -f deploy/.env deploy/.env.*
           mkdir -p deploy/.next/static
           cp -r .next/static/. deploy/.next/static/
           if [ -d public ]; then cp -r public deploy/public; fi
-          # cPanel genera su propio `app.js` como arranque y su configuracion
-          # de Passenger puede seguir apuntando ahi aunque en el panel se
-          # elija `server.js`. Se envia un app.js que solo delega, para que
-          # la app levante apunte a donde apunte.
-          echo "require('./server.js');" > deploy/app.js
-          # Passenger reinicia la aplicacion al detectar que este archivo
-          # cambio. Sin esto el servidor seguiria sirviendo la version vieja.
-          mkdir -p deploy/tmp
-          date -u +"%Y-%m-%dT%H:%M:%SZ" > deploy/tmp/restart.txt
 
-          # El servidor no admite enlaces simbolicos. Si queda alguno, mejor
-          # parar aqui que descubrirlo a mitad de una subida de 60 MB.
-          if [ -n "$(find deploy -type l)" ]; then
-            echo "Quedan enlaces simbolicos en el paquete:"
-            find deploy -type l
-            exit 1
-          fi
+          mkdir -p envio
+          tar -czf envio/gcm.tar.gz -C deploy .
+          ls -lh envio/gcm.tar.gz
 
-      # Sin esta guarda, un FTP_SERVER_DIR vacio haria que la accion
-      # sincronizara contra la RAIZ del FTP y borrara de alli todo lo que no
-      # este en el paquete: incluidos otros sitios alojados en la cuenta.
+      # Este archivo es el punto de entrada que ejecuta Passenger. Descomprime
+      # el paquete si hay uno pendiente y despues arranca el servidor. Va
+      # aparte del .tar.gz a proposito: no puede sobrescribirse a si mismo
+      # mientras se esta ejecutando.
+      - name: Escribir el arranque
+        run: |
+          cat > envio/app.js <<'FIN'
+          // Punto de entrada en cPanel/Passenger.
+          //
+          // El despliegue sube un unico gcm.tar.gz y toca tmp/restart.txt.
+          // Passenger reinicia, y este archivo descomprime el paquete antes
+          // de ceder el control al servidor de Next.
+          //
+          // Se descomprime aqui y no por FTP porque subir los 1452 archivos
+          // sueltos dejaba la instalacion a medias en cuanto se cortaba una
+          // conexion, y los archivos truncados pasaban desapercibidos.
+          const { existsSync, renameSync, unlinkSync } = require("fs");
+          const { execFileSync } = require("child_process");
+          const { join } = require("path");
+
+          const paquete = join(__dirname, "gcm.tar.gz");
+          const enCurso = join(__dirname, "gcm.tar.gz.desplegando");
+
+          if (existsSync(paquete)) {
+            // Se renombra antes de tocarlo: si el proceso muere a mitad, el
+            // siguiente arranque no reintenta sobre un archivo incompleto y
+            // el fallo queda visible en el log en vez de repetirse en bucle.
+            renameSync(paquete, enCurso);
+            try {
+              execFileSync("tar", ["-xzf", enCurso], { cwd: __dirname });
+              unlinkSync(enCurso);
+              console.log("[gcm] Paquete desplegado.");
+            } catch (e) {
+              console.error("[gcm] No se pudo descomprimir:", e.message);
+              throw e;
+            }
+          }
+
+          require("./server.js");
+          FIN
+          node --check envio/app.js
+          echo "OK: app.js es JavaScript valido"
+
       - name: Comprobar que hay destino
         run: |
           if [ -z "${{ secrets.FTP_SERVER_DIR }}" ]; then
-            echo "Falta el secreto FTP_SERVER_DIR (ruta de la app en cPanel," \
-                 "con barra final). Se aborta para no sincronizar contra la" \
-                 "raiz del FTP."
+            echo "Falta el secreto FTP_SERVER_DIR. Se aborta para no subir" \
+                 "a la raiz del FTP."
             exit 1
           fi
 
-      # Se usa lftp y no una accion de FTP porque este ProFTPD resetea la
-      # conexion de DATOS cuando va cifrada: la sesion se abre bien, lista
-      # el directorio, y muere con ECONNRESET al primer `ensureDir`. lftp
-      # permite separar los dos canales.
+      # Tres archivos en total. El orden importa: primero el paquete, y el
+      # restart.txt AL FINAL, porque es lo que dispara el reinicio y no debe
+      # llegar antes de que el paquete este completo.
       #
-      # ftp:ssl-force        -> control CIFRADO: la contrasena nunca viaja en claro.
-      # ftp:ssl-protect-data -> datos SIN cifrar: es lo que evita el reset.
-      #
-      # El contenido que viaja es la compilacion de un repositorio publico y
-      # el paquete no lleva ningun .env, asi que no hay nada secreto en el
-      # canal de datos. Las credenciales, que si lo son, van protegidas.
+      # ftp:ssl-force        -> control CIFRADO: la contrasena no viaja en claro.
+      # ftp:ssl-protect-data -> datos SIN cifrar: este ProFTPD resetea la
+      #                         conexion de datos cuando va sobre TLS. Lo que
+      #                         viaja es la compilacion de un repo publico.
       - name: Subir por FTPS
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -126,59 +147,30 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq lftp
 
-          # Las credenciales van en ~/.netrc y no en la linea de comandos:
-          # asi no aparecen en la lista de procesos del runner. lftp lo lee
-          # solo para resolver el usuario y la clave del `open`.
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > envio/restart.txt
+
+          # Credenciales por ~/.netrc: no aparecen en la lista de procesos.
           umask 077
           printf 'machine %s\nlogin %s\npassword %s\n' \
             "$FTP_SERVER" "$FTP_USERNAME" "$LFTP_PASSWORD" > ~/.netrc
           chmod 600 ~/.netrc
 
-          # SIN --delete a proposito. El primer despliegue lo llevaba y se
-          # puso a borrar archivos que gestiona cPanel dentro del directorio
-          # de la aplicacion (`app.js`, `stderr.log`), rompio el arranque de
-          # Passenger y dejo la web en 503. Un espejo que borra no encaja con
-          # un directorio que otro sistema tambien administra.
-          #
-          # A cambio se acumulan archivos de compilaciones viejas. No
-          # estorban: el servidor de Next es autocontenido y solo carga lo
-          # que su manifiesto referencia.
-          #
-          # `open` explicito: pasar el host como ultimo argumento de lftp no
-          # llega a abrir la sesion y `mirror` falla con "Not connected".
-          # `cmd:fail-exit` hace que un error corte el script en vez de
-          # seguir y terminar con exito enganoso.
-          # Solo lo que genera este workflow. NO se tocan `.env`, `storage`
-          # ni lo que cPanel administra (stderr.log, su configuracion).
-          LIMPIEZA=""
-          if [ "${{ inputs.limpiar }}" = "true" ]; then
-            LIMPIEZA="rm -rf .next; rm -rf node_modules; rm -rf public;"
-            echo "Limpieza activada: se borran .next, node_modules y public."
-          fi
-
-          # SIN --continue. Reanudar transferencias parciales es justo lo que
-          # dejo el servidor con archivos truncados que luego mirror daba por
-          # buenos al comparar tamano y fecha.
-          #
-          # Se hace una segunda pasada: la primera puede dejar algun archivo
-          # fuera si una conexion se corta, y la segunda solo sube lo que
-          # falte, asi que cuesta segundos.
           lftp -c "
             set cmd:fail-exit true;
             set ftp:ssl-force true;
             set ftp:ssl-protect-data false;
             set ssl:verify-certificate no;
             set ftp:passive-mode true;
-            set net:max-retries 3;
-            set net:timeout 20;
-            set net:reconnect-interval-base 5;
-            set mirror:parallel-transfer-count 2;
+            set net:max-retries 2;
+            set net:timeout 30;
             open '$FTP_SERVER';
             cd '$FTP_SERVER_DIR';
-            $LIMPIEZA
-            mirror --reverse --verbose --exclude-glob '.env' --exclude-glob '.env.*' --exclude 'storage/' ./deploy/ .;
-            mirror --reverse --verbose --exclude-glob '.env' --exclude-glob '.env.*' --exclude 'storage/' ./deploy/ .;
+            put envio/gcm.tar.gz -o gcm.tar.gz;
+            put envio/app.js -o app.js;
+            mkdir -f tmp;
+            put envio/restart.txt -o tmp/restart.txt;
             bye
           "
 
           rm -f ~/.netrc
+          echo "Subido. La aplicacion descomprime el paquete al reiniciar."
