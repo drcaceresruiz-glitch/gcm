@@ -45,6 +45,11 @@ src-tauri/target/
 # Cobertura de pruebas
 coverage/
 
+# Entorno de Python del convertidor de .mpp (scripts/mpp-a-xml.py). Son ~30 MB
+# de JAR de MPXJ que se reinstalan con un comando; el script si va al
+# repositorio, el entorno no.
+/.venv-mpxj/
+
 # Documentacion para asistentes generada por `prisma init`.
 # Se regenera sola y son ~200 archivos de ruido en el repositorio.
 /.agents/

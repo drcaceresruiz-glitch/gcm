@@ -43,6 +43,10 @@ export const PERMISOS = [
   "partida:eliminar",
   "partida:importar",
 
+  "cronograma:leer",
+  "cronograma:importar",
+  "avance:registrar",
+
   "linea_base:leer",
   "linea_base:crear",
   "linea_base:aprobar",
@@ -102,6 +106,7 @@ const SOLO_LECTURA: Permiso[] = [
   "empresa:leer",
   "obra:leer",
   "partida:leer",
+  "cronograma:leer",
   "linea_base:leer",
   "movimiento:leer",
 ];
@@ -121,6 +126,11 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "partida:editar",
     "partida:eliminar",
     "partida:importar",
+    /// Lleva el cronograma: lo importa de Project y reporta el avance desde
+    /// obra. Es quien lo sabe —esta ahi— y encaja con que ya importe el
+    /// presupuesto. ADMIN_OBRA y CONSULTOR solo lo leen.
+    "cronograma:importar",
+    "avance:registrar",
     "linea_base:crear",
     "movimiento:crear",
     /// Ve a quien se le compra y cuanto se ha comprometido contra SU
