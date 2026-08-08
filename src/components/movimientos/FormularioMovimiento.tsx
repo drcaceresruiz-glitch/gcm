@@ -573,6 +573,7 @@ function FilaLinea({
             id={`${id}-partida`}
             partidas={partidas}
             valor={linea.wbsItemId}
+            direccion={linea.direccion}
             onCambio={(wbsItemId) => onCambio({ wbsItemId })}
           />
         ) : (
@@ -648,16 +649,24 @@ function FilaLinea({
  *
  * Cada opcion lleva su importe vigente porque la pregunta que se hace quien
  * redacta una reconversion es «de donde puedo sacarlo».
+ *
+ * Y por lo mismo se marcan las de SUMA ALZADA. Su precio esta cerrado por
+ * contrato y no se les puede quitar dinero: saberlo ANTES de elegirlas evita
+ * recorrer el desplegable a ciegas hasta que salta el aviso. Las de precios
+ * unitarios no se rotulan, que son la mayoria y el rotulo seria ruido.
  */
 function SelectorPartida({
   id,
   partidas,
   valor,
+  direccion,
   onCambio,
 }: {
   id: string;
   partidas: OpcionPartida[];
   valor: string;
+  /// Solo se explica la restriccion cuando estorba, que es al sacar dinero.
+  direccion: Direccion;
   onCambio: (wbsItemId: string) => void;
 }) {
   const grupos: [string, OpcionPartida[]][] = [];
@@ -673,6 +682,11 @@ function SelectorPartida({
       etiqueta="Partida"
       value={valor}
       onChange={(e) => onCambio(e.target.value)}
+      ayuda={
+        direccion === "sale"
+          ? "Las marcadas «suma alzada» tienen el precio cerrado por contrato: no se les puede quitar dinero."
+          : undefined
+      }
     >
       <option value="">Elige una partida</option>
       {grupos.map(([capitulo, suyas]) => (
@@ -680,6 +694,7 @@ function SelectorPartida({
           {suyas.map((p) => (
             <option key={p.wbsItemId} value={p.wbsItemId}>
               {p.codigoPartida} · {p.descripcion} · {soles(p.vigente)}
+              {p.modalidad === "SUMA_ALZADA" && " · suma alzada"}
             </option>
           ))}
         </optgroup>

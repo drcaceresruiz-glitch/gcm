@@ -120,7 +120,10 @@ dónde sacar.
   base real y con las migraciones aplicadas en producción.
 - **Pantallas**: `/obras/[id]/movimientos` (estado del vigente e historial) y
   `/obras/[id]/movimientos/nuevo` (alta). Son dos rutas porque con 360
-  partidas el formulario debajo de la tabla queda a media pantalla.
+  partidas el formulario debajo de la tabla queda a media pantalla. El
+  desplegable de partidas va agrupado por capítulo y en orden de documento, y
+  cada opción muestra su **vigente** y si está a **suma alzada**: son las dos
+  cosas que hay que saber antes de elegir de dónde sacar el dinero.
 - **El formulario no pide importes con signo.** Cada línea dice si el dinero
   *sale de* o *entra en* una partida y la cantidad va siempre en positivo; el
   signo se compone en la frontera. Un menos olvidado convertiría una
@@ -135,8 +138,15 @@ dónde sacar.
   partidas fantasma.
 - La cláusula 1 del contrato define cuándo procede un adicional: *«trabajo
   adicional por vicios ocultos o cambios en el diseño original»*.
-- **Pendiente: comprobarlo en navegador contra CRIOCORD.** El servicio sí
-  está probado contra la base real; la pantalla todavía no.
+- **Verificado en navegador contra CRIOCORD** el 08/08/2026: reconversión
+  que cuadra y que no cuadra, aprobación, avisos de suma alzada y de saldo
+  insuficiente, adicional con partida nueva, deductivo, borrado de borrador
+  y permisos por rol. Las dos comprobaciones que importaban salieron bien:
+  una reconversión aprobada **no mueve** el presupuesto, y un adicional de
+  S/ 2,500 lo sube exactamente S/ 3,125 (el 25 % de gastos generales y
+  utilidad de la línea base). Si el ajuste se hubiera repartido por el signo
+  del apunte en vez de por la partida que ajusta, el total habría cuadrado
+  igual y el error no se habría visto.
 
 **Motores verificados con 64 pruebas.**
 - `lib/decimal.ts` — aritmética exacta con enteros grandes. Nunca coma
