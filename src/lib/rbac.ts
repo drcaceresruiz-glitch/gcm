@@ -51,6 +51,15 @@ export const PERMISOS = [
   "movimiento:crear",
   "movimiento:aprobar",
 
+  "proveedor:leer",
+  "proveedor:crear",
+  "proveedor:editar",
+
+  "orden:leer",
+  "orden:crear",
+  "orden:aprobar",
+  "orden:anular",
+
   "permiso:leer",
   "permiso:editar",
 
@@ -114,16 +123,35 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "partida:importar",
     "linea_base:crear",
     "movimiento:crear",
+    /// Ve a quien se le compra y cuanto se ha comprometido contra SU
+    /// presupuesto, pero no pide ni aprueba: eso es administracion.
+    "proveedor:leer",
+    "orden:leer",
   ],
 
   /// Administrador de obra: perfil economico-administrativo. Consulta el
-  /// presupuesto pero no lo modifica. En fases posteriores recibira los
-  /// permisos de ordenes de compra, abonos y caja chica.
+  /// presupuesto pero no lo modifica. En fases posteriores recibira ademas
+  /// los permisos de abonos y caja chica.
   ///
   /// Si redacta movimientos presupuestales aunque no edite partidas: mover
   /// dinero entre partidas o pedir un adicional es una negociacion con el
   /// cliente, no una decision tecnica. Aprobarlos sigue siendo de ADMIN.
-  ADMIN_OBRA: [...SOLO_LECTURA, "usuario:leer", "movimiento:crear"],
+  ///
+  /// Y lleva los proveedores y las ordenes, que es su trabajo: mantener el
+  /// catalogo y redactar los pedidos. Aprobar una orden compromete
+  /// presupuesto contra un tercero, asi que por defecto se queda en ADMIN
+  /// —aunque, al contrario que aprobar una linea base, esto SI se puede
+  /// delegar desde la matriz de permisos si la empresa lo organiza asi.
+  ADMIN_OBRA: [
+    ...SOLO_LECTURA,
+    "usuario:leer",
+    "movimiento:crear",
+    "proveedor:leer",
+    "proveedor:crear",
+    "proveedor:editar",
+    "orden:leer",
+    "orden:crear",
+  ],
 
   /// Almacen: necesita ver las partidas para imputar movimientos de
   /// materiales, nada mas.
