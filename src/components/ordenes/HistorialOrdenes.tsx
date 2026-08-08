@@ -152,14 +152,28 @@ function Tarjeta({
           {o.descuentoComercial !== "0" && o.descuentoComercial !== "0.00" && (
             <Dato etiqueta="Descuento" valor={soles(o.descuentoComercial)} />
           )}
-          <Dato etiqueta="Neto" valor={soles(o.neto)} fuerte />
-          <Dato etiqueta="IGV" valor={soles(o.igv)} />
-          <Dato etiqueta="Total" valor={soles(o.total)} />
+          <Dato
+            etiqueta="Neto"
+            valor={soles(o.neto)}
+            fuerte={o.tipoImpuesto === "IGV"}
+          />
+          {o.tipoImpuesto !== "NINGUNO" && (
+            <Dato
+              etiqueta={o.tipoImpuesto === "IGV" ? "IGV" : "Retencion"}
+              valor={soles(o.impuesto)}
+            />
+          )}
+          <Dato
+            etiqueta="Total"
+            valor={soles(o.total)}
+            fuerte={o.tipoImpuesto !== "IGV"}
+          />
         </dl>
 
         <p className="mt-1 text-xs opacity-60">
-          Compromete el neto: {soles(o.neto)}. El IGV es credito fiscal, no
-          costo de obra.
+          {o.tipoImpuesto === "IGV"
+            ? `Compromete el neto: ${soles(o.neto)}. El IGV es credito fiscal, no costo de obra.`
+            : `Compromete el total: ${soles(o.total)}. La retencion no se recupera, asi que si es costo de obra.`}
           {o.totalLineas > 0 && ` · ${o.totalLineas} lineas de detalle`}
           {o.origen === "IMPORTADO" && " · cargada desde archivo"}
         </p>

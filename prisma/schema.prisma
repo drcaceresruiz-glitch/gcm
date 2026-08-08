@@ -517,6 +517,26 @@ enum MonedaCuenta {
   USD
 }
 
+/// Que impuesto lleva una orden, y con el, contra que cifra cuenta.
+///
+/// Sale de las ordenes reales, que traen los tres casos:
+///
+/// - IGV: el proveedor factura y el impuesto es CREDITO FISCAL. Se recupera,
+///   asi que el costo de obra es el NETO. Es el caso corriente.
+/// - RENTA: retencion de cuarta categoria, cuando el proveedor emite recibo
+///   por honorarios. NO se recupera: es dinero que sale y no vuelve, asi que
+///   el costo de obra es el TOTAL. La empresa la asume encima del neto, de
+///   modo que al proveedor le quede limpio lo pactado (OC 00115 y 00119).
+/// - NINGUNO: sin impuesto en el documento. El total iguala al neto
+///   (OC 00114, cuya casilla de IR viene vacia).
+///
+/// Confundir los dos primeros deja fuera del costo un 8 % que si se paga.
+enum TipoImpuesto {
+  IGV
+  RENTA
+  NINGUNO
+}
+
 enum EstadoOrden {
   BORRADOR
   APROBADA
@@ -675,6 +695,18 @@ model Proveedor {
   /// digitos. Es la que sirve para transferir desde otra entidad.
   cci String? @db.VarChar(40)
 
+  /// Que impuesto lleva lo que emite este proveedor.
+  ///
+  /// Va aqui y no en cada orden porque es una propiedad SUYA y no del pedido:
+  /// quien factura, factura siempre, y quien emite recibo por honorarios lo
+  /// emite siempre. Cada orden lo hereda ya puesto y solo se toca por
+  /// excepcion. Sin esto habria que acertarlo a mano en cada orden, y
+  /// equivocarse deja fuera del costo un 8 % que si se paga.
+  ///
+  /// NO se deduce del RUC: CABREJO empieza por 10, como persona natural, y
+  /// aun asi factura con IGV.
+  tipoImpuesto TipoImpuesto @default(IGV)
+
   activo Boolean @default(true)
 
   /// Igual que en las ordenes: el RUC es la clave que impide duplicarlo,
@@ -793,13 +825,22 @@ model OrdenCompra {
   formaPago     String? @db.Text
   observaciones String? @db.Text
 
-  /// La cascada del papel. Se guardan las tres cifras que usa el resto del
-  /// sistema: neto es el COSTO, igv es CREDITO FISCAL y total es lo que sale
-  /// del banco. El comprometido se mide contra `neto`.
+  /// Que impuesto lleva. NO es un detalle de presentacion: decide contra que
+  /// cifra se mide el comprometido, y las ordenes reales del cliente traen
+  /// los tres casos.
+  tipoImpuesto TipoImpuesto @default(IGV)
+
+  /// La cascada del papel. `neto` es el subtotal ya descontado, `impuesto` es
+  /// el IGV o la retencion segun `tipoImpuesto`, y `total` es lo que sale del
+  /// banco.
+  ///
+  /// El campo se llama `impuesto` y no `igv` a proposito: llamarlo igv
+  /// mientras a veces guarda una retencion de renta invita justo al error de
+  /// tratarla como credito fiscal y dejarla fuera del costo.
   subtotal           Decimal @db.Decimal(14, 2)
   descuentoComercial Decimal @default(0) @db.Decimal(14, 2)
   neto               Decimal @db.Decimal(14, 2)
-  igv                Decimal @db.Decimal(14, 2)
+  impuesto           Decimal @db.Decimal(14, 2)
   total              Decimal @db.Decimal(14, 2)
 
   aprobadaAt  DateTime?

@@ -177,6 +177,24 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
         />
       </div>
 
+      {/* Se pregunta UNA vez, aqui, y no en cada orden: quien factura factura
+          siempre. De aqui lo hereda cada pedido suyo. */}
+      <div className="mt-4">
+        <CampoSelect
+          id="tipoImpuesto"
+          name="tipoImpuesto"
+          etiqueta="Que emite este proveedor"
+          defaultValue={proveedor?.tipoImpuesto ?? "IGV"}
+          ayuda="Decide como cuenta su gasto en el presupuesto. El IGV se recupera y no cuesta; la retencion de renta se paga a SUNAT y no vuelve, asi que si cuesta."
+        >
+          <option value="IGV">Factura con IGV 18%</option>
+          <option value="RENTA">
+            Recibo por honorarios — retencion de renta 8%
+          </option>
+          <option value="NINGUNO">Sin impuesto</option>
+        </CampoSelect>
+      </div>
+
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
         <CampoTexto
           id="banco"

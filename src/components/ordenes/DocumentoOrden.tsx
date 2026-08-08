@@ -1,5 +1,5 @@
 import { decimal, precio, metrado } from "@/utils/formato";
-import { etiquetaIgv } from "@/lib/ordenes";
+import { etiquetaImpuesto } from "@/lib/ordenes";
 import type { OrdenImpresa } from "@/services/ordenes.service";
 
 /**
@@ -302,10 +302,12 @@ function Totales({ orden }: { orden: OrdenImpresa }) {
             />
           )}
           {hayDescuento && <Total etiqueta="SUB-TOTAL" importe={orden.neto} />}
-          <Total
-            etiqueta={etiquetaIgv(orden.neto, orden.igv)}
-            importe={orden.igv}
-          />
+          {orden.tipoImpuesto !== "NINGUNO" && (
+            <Total
+              etiqueta={etiquetaImpuesto(orden.tipoImpuesto, orden)}
+              importe={orden.impuesto}
+            />
+          )}
           <Total etiqueta="TOTAL" importe={orden.total} destacado />
         </tbody>
       </table>

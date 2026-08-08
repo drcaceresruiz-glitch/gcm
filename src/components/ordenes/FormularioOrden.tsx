@@ -19,7 +19,9 @@ import {
 import {
   calcularCascadaOrden,
   descuadreDelReparto,
+  importeImputable,
   sumarLineas,
+  type TipoImpuesto,
 } from "@/lib/ordenes";
 import { porcentajeAFraccion } from "@/lib/presupuesto";
 import { esNegativo, esPositivo, multiplicar, sumar } from "@/lib/decimal";
@@ -55,6 +57,8 @@ interface OpcionProveedor {
   id: string;
   razonSocial: string;
   ruc: string;
+  /// Que impuesto emite. La orden lo hereda al elegirlo.
+  tipoImpuesto: TipoImpuesto;
 }
 
 interface LineaEstado {
@@ -138,6 +142,7 @@ export function FormularioOrden({
   const [subtotalManual, setSubtotalManual] = useState("");
   const [descuento, setDescuento] = useState("");
   const [igv, setIgv] = useState("18");
+  const [tipoImpuesto, setTipoImpuesto] = useState<TipoImpuesto>("IGV");
 
   const [lineas, setLineas] = useState<LineaEstado[]>([lineaVacia(0)]);
   const [imputaciones, setImputaciones] = useState<ImputacionEstado[]>([
@@ -155,12 +160,18 @@ export function FormularioOrden({
   const cascada = calcularCascadaOrden({
     subtotal,
     descuentoComercial: descuento || "0",
+    tipoImpuesto,
     porcentajeIgv: porcentajeAFraccion(igv) ?? "0",
   });
 
+  // La cifra que hay que repartir: el neto con IGV, el total con retencion.
+  // Sale de la misma funcion que usa el servidor, para que la vista previa no
+  // pueda decir una cosa y el guardado otra.
+  const imputable = importeImputable({ tipoImpuesto, ...cascada });
+
   const repartido = sumar(imputaciones.map((i) => i.importe));
   const descuadre = descuadreDelReparto(
-    cascada.neto,
+    imputable,
     imputaciones.map((i) => i.importe),
   );
 
@@ -226,6 +237,22 @@ export function FormularioOrden({
   function elegirProveedor(id: string) {
     setProveedorId(id);
 
+    /**
+     * El impuesto se hereda del proveedor.
+     *
+     * Quien factura factura siempre y quien emite recibo por honorarios lo
+     * emite siempre, asi que no es una decision de cada pedido. Sigue siendo
+     * editable abajo por si una orden concreta va de otra forma.
+     */
+    const elegido = proveedores.find((p) => p.id === id);
+    if (elegido) {
+      setTipoImpuesto(elegido.tipoImpuesto);
+      // La tasa acompana al impuesto: 18 % el IGV, 8 % la retencion. Ponerla
+      // a mano cada vez seria pedir el error.
+      if (elegido.tipoImpuesto === "IGV") setIgv("18");
+      else if (elegido.tipoImpuesto === "RENTA") setIgv("8");
+    }
+
     const suyas = habituales[id] ?? [];
     const vacio = imputaciones.every((i) => !i.wbsItemId && !i.importe.trim());
     if (suyas.length === 0 || !vacio) return;
@@ -261,7 +288,12 @@ export function FormularioOrden({
         <input type="hidden" name="subtotal" value={subtotalManual} />
       )}
       <input type="hidden" name="descuentoComercial" value={descuento} />
-      <input type="hidden" name="porcentajeIgv" value={igv} />
+      <input type="hidden" name="tipoImpuesto" value={tipoImpuesto} />
+      <input
+        type="hidden"
+        name="porcentajeIgv"
+        value={tipoImpuesto === "NINGUNO" ? "0" : igv}
+      />
 
       {estado.error && <Aviso mensaje={estado.error} />}
 
@@ -446,14 +478,30 @@ export function FormularioOrden({
             onChange={(e) => setDescuento(e.target.value)}
             ayuda="En positivo. Suele usarse para dejar un neto redondo."
           />
-          <CampoTexto
-            id="igv"
-            type="text"
-            inputMode="decimal"
-            etiqueta="IGV %"
-            value={igv}
-            onChange={(e) => setIgv(e.target.value)}
-          />
+          <CampoSelect
+            id="tipoImpuesto"
+            etiqueta="Impuesto"
+            value={tipoImpuesto}
+            onChange={(e) => setTipoImpuesto(e.target.value as TipoImpuesto)}
+            ayuda="Viene del proveedor. Solo se cambia por excepcion."
+          >
+            <option value="IGV">IGV — el proveedor factura</option>
+            <option value="RENTA">
+              Retencion de renta — recibo por honorarios
+            </option>
+            <option value="NINGUNO">Sin impuesto</option>
+          </CampoSelect>
+
+          {tipoImpuesto !== "NINGUNO" && (
+            <CampoTexto
+              id="igv"
+              type="text"
+              inputMode="decimal"
+              etiqueta={tipoImpuesto === "IGV" ? "IGV %" : "Retencion %"}
+              value={igv}
+              onChange={(e) => setIgv(e.target.value)}
+            />
+          )}
         </div>
 
         <dl className="mt-4 space-y-1 text-sm">
@@ -466,12 +514,33 @@ export function FormularioOrden({
           )}
           <Linea
             etiqueta="Neto"
-            sufijo="consume presupuesto"
+            sufijo={
+              tipoImpuesto === "IGV" ? "consume presupuesto" : "cobra el proveedor"
+            }
             valor={soles(cascada.neto)}
-            destacado
+            destacado={tipoImpuesto === "IGV"}
           />
-          <Linea etiqueta="IGV" sufijo="credito fiscal" valor={soles(cascada.igv)} />
-          <Linea etiqueta="Total" sufijo="sale del banco" valor={soles(cascada.total)} />
+          {tipoImpuesto !== "NINGUNO" && (
+            <Linea
+              etiqueta={tipoImpuesto === "IGV" ? "IGV" : "Retencion de renta"}
+              sufijo={
+                tipoImpuesto === "IGV"
+                  ? "credito fiscal, se recupera"
+                  : "se paga a SUNAT y NO se recupera"
+              }
+              valor={soles(cascada.impuesto)}
+            />
+          )}
+          <Linea
+            etiqueta="Total"
+            sufijo={
+              tipoImpuesto === "IGV"
+                ? "sale del banco"
+                : "sale del banco y consume presupuesto"
+            }
+            valor={soles(cascada.total)}
+            destacado={tipoImpuesto !== "IGV"}
+          />
         </dl>
       </section>
 
@@ -489,8 +558,19 @@ export function FormularioOrden({
         </div>
 
         <p className="text-sm text-pretty opacity-70">
-          El reparto tiene que sumar el <strong>neto</strong>, no el total: el
-          IGV no consume presupuesto. Una orden puede cargar a varias partidas.
+          {tipoImpuesto === "IGV" ? (
+            <>
+              El reparto tiene que sumar el <strong>neto</strong>, no el total:
+              el IGV se recupera y no consume presupuesto.
+            </>
+          ) : (
+            <>
+              El reparto tiene que sumar el <strong>total</strong>, no el neto:
+              la retencion se paga a SUNAT y no vuelve, asi que si consume
+              presupuesto.
+            </>
+          )}{" "}
+          Una orden puede cargar a varias partidas: <strong>{soles(imputable)}</strong>.
         </p>
 
         <ul className="space-y-3">
@@ -591,7 +671,7 @@ function Reparto({
     >
       <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <div>
-          <dt className="inline opacity-70">Neto de la orden </dt>
+          <dt className="inline opacity-70">Hay que repartir </dt>
           <dd className="inline font-semibold tabular-nums">{soles(neto)}</dd>
         </div>
         <div>
@@ -604,7 +684,7 @@ function Reparto({
         {cuadra ? (
           <>
             <Check className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span>El reparto cuadra con el neto.</span>
+            <span>El reparto cuadra.</span>
           </>
         ) : (
           <>
@@ -612,7 +692,7 @@ function Reparto({
             <span>
               {sobra ? "Se reparten" : "Faltan por repartir"}{" "}
               <strong>{soles(magnitud)}</strong>
-              {sobra ? " de mas" : ""}. El reparto tiene que sumar el neto.
+              {sobra ? " de mas" : ""}.
             </span>
           </>
         )}

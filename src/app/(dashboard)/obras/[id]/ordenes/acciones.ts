@@ -59,10 +59,17 @@ export async function accionCrearOrden(
   const tipo = z.enum(["COMPRA", "SERVICIO"]).safeParse(texto("tipo"));
   if (!tipo.success) return { error: "Elige si es orden de compra o de servicio." };
 
-  // El IGV lo fija la ley, pero se escribe en el formulario porque las
-  // ordenes antiguas pueden llevar otro y porque puede cambiar.
+  // El impuesto llega heredado del proveedor y se puede cambiar por
+  // excepcion. Si viniera manipulado, se queda en IGV, que es el caso
+  // corriente: el servidor no confia en lo que dice el formulario.
+  const impuesto = z
+    .enum(["IGV", "RENTA", "NINGUNO"])
+    .safeParse(texto("tipoImpuesto"));
+
+  // La tasa se escribe en el formulario porque las ordenes antiguas pueden
+  // llevar otra y porque puede cambiar.
   const igv = porcentajeAFraccion(texto("porcentajeIgv"));
-  if (igv === null) return { error: "El porcentaje de IGV no es valido." };
+  if (igv === null) return { error: "El porcentaje del impuesto no es valido." };
 
   let lineasCrudas: unknown;
   let imputacionesCrudas: unknown;
@@ -94,6 +101,7 @@ export async function accionCrearOrden(
     observaciones: texto("observaciones") || undefined,
     subtotal: texto("subtotal") || undefined,
     descuentoComercial: texto("descuentoComercial") || undefined,
+    tipoImpuesto: impuesto.success ? impuesto.data : undefined,
     porcentajeIgv: igv,
     lineas: lineas.data,
     imputaciones: imputaciones.data,

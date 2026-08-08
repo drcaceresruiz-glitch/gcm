@@ -139,6 +139,49 @@ export function multiplicar(
   );
 }
 
+/**
+ * Division exacta, redondeada al alza en el medio como el resto del modulo.
+ *
+ * La necesita el calculo inverso de una retencion: cuando la empresa asume el
+ * IR, el total sale de dividir el neto entre (1 - tasa), y no de multiplicar
+ * por nada. Multiplicar por el reciproco no vale, porque 1/0.92 es periodico
+ * y ahi se perderia justo la exactitud que este modulo existe para conservar.
+ *
+ * Devuelve null si algun operando no es un numero o si el divisor es cero.
+ */
+export function dividir(
+  a: string,
+  b: string,
+  decimales: number,
+): string | null {
+  const ea = escalar(a);
+  const eb = escalar(b);
+  if (!ea || !eb) return null;
+  if (eb.valor === 0n) return null;
+
+  // r x 10^d = (va x 10^-ea) / (vb x 10^-eb) x 10^d
+  //          = va x 10^(eb - ea + d) / vb
+  const exponente = eb.escala - ea.escala + decimales;
+
+  let numerador = ea.valor;
+  let denominador = eb.valor;
+  if (exponente >= 0) numerador *= 10n ** BigInt(exponente);
+  else denominador *= 10n ** BigInt(-exponente);
+
+  const negativo = numerador < 0n !== denominador < 0n;
+  const absN = numerador < 0n ? -numerador : numerador;
+  const absD = denominador < 0n ? -denominador : denominador;
+
+  const cociente = absN / absD;
+  const resto = absN % absD;
+  const redondeado = resto * 2n >= absD ? cociente + 1n : cociente;
+
+  return formatear(
+    { valor: negativo ? -redondeado : redondeado, escala: decimales },
+    decimales,
+  );
+}
+
 /** Suma exacta de una lista de importes. */
 export function sumar(valores: string[], decimales = 2): string {
   let acumulado: Escalado = { valor: 0n, escala: 0 };

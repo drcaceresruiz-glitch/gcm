@@ -6,6 +6,7 @@ import type {
   MonedaCuenta,
   OrigenRegistro,
   TipoCuenta,
+  TipoImpuesto,
 } from "@/generated/prisma/enums";
 
 /**
@@ -35,6 +36,8 @@ export interface ProveedorResumen {
   monedaCuenta: MonedaCuenta | null;
   cuentaBancaria: string | null;
   cci: string | null;
+  /// Que impuesto lleva lo que emite. De aqui lo hereda cada orden suya.
+  tipoImpuesto: TipoImpuesto;
   activo: boolean;
   origen: OrigenRegistro;
   /// Cuantas ordenes tiene. Se ensena para que nadie desactive a ciegas a
@@ -70,6 +73,7 @@ export async function listarProveedores(
       monedaCuenta: true,
       cuentaBancaria: true,
       cci: true,
+      tipoImpuesto: true,
       activo: true,
       origen: true,
       _count: { select: { ordenes: true } },
@@ -94,6 +98,8 @@ export interface DatosProveedor {
   monedaCuenta?: string;
   cuentaBancaria?: string;
   cci?: string;
+  /// "IGV" | "RENTA" | "NINGUNO". Si no llega, se queda en IGV.
+  tipoImpuesto?: string;
 }
 
 /** Comprobaciones de forma, comunes al alta y a la edicion. */
@@ -135,6 +141,15 @@ function saneado(datos: DatosProveedor) {
     monedaCuenta: enumerado<MonedaCuenta>(datos.monedaCuenta, ["PEN", "USD"]),
     cuentaBancaria: opcional(datos.cuentaBancaria, 40),
     cci: opcional(datos.cci, 40),
+    // Este no admite null: toda orden lleva un tratamiento u otro. Ante un
+    // valor raro se queda en IGV, que es el caso corriente y el que menos
+    // sorprende si alguien no toco el desplegable.
+    tipoImpuesto:
+      enumerado<TipoImpuesto>(datos.tipoImpuesto, [
+        "IGV",
+        "RENTA",
+        "NINGUNO",
+      ]) ?? "IGV",
   };
 }
 
@@ -225,6 +240,7 @@ export async function editarProveedor(
       monedaCuenta: true,
       cuentaBancaria: true,
       cci: true,
+      tipoImpuesto: true,
     },
   });
 

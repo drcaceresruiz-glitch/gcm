@@ -6,7 +6,9 @@ import {
   calcularCascadaOrden,
   descuadreDelReparto,
   importeDeOrden,
+  importeImputable,
   sumarLineas,
+  type TipoImpuesto,
 } from "@/lib/ordenes";
 import type { SesionActiva } from "@/services/sesion.service";
 import type {
@@ -62,6 +64,8 @@ export interface DatosOrden {
   /// historicas se cargan solo por cabecera, y entonces se indica aqui.
   subtotal?: string;
   descuentoComercial?: string;
+  /// Que impuesto lleva. Si no viene, se hereda del proveedor.
+  tipoImpuesto?: TipoImpuesto;
   /// Fraccion: "0.18". La traduccion desde porcentaje vive en la frontera.
   porcentajeIgv: string;
   lineas: LineaEntrada[];
@@ -117,6 +121,29 @@ export async function crearOrden(
 
   const numero = datos.numero.trim().slice(0, 30);
 
+  /**
+   * El proveedor se busca ANTES de calcular nada, y no con el resto de
+   * comprobaciones contra la base, porque de el sale que impuesto lleva la
+   * orden. Y el impuesto no es un adorno del final: decide si el total se
+   * suma o se eleva, y contra que cifra se reparte el comprometido.
+   */
+  const proveedor = await prisma.proveedor.findFirst({
+    where: { id: datos.proveedorId, companyId: sesion.companyId },
+    select: {
+      id: true,
+      activo: true,
+      razonSocial: true,
+      tipoImpuesto: true,
+    },
+  });
+  if (!proveedor) return { ok: false, error: "Proveedor no encontrado." };
+  if (!proveedor.activo) {
+    return {
+      ok: false,
+      error: `"${proveedor.razonSocial}" esta desactivado. Vuelve a activarlo si le vas a comprar.`,
+    };
+  }
+
   // --- Importes, con la aritmetica exacta ---------------------------------
   const lineas: { entrada: LineaEntrada; importe: string }[] = [];
   for (const linea of datos.lineas) {
@@ -148,11 +175,20 @@ export async function crearOrden(
   }
 
   const descuento = importeDeOrden(datos.descuentoComercial ?? "0") ?? "0.00";
+  // Se hereda del proveedor salvo que la orden diga otra cosa: quien factura
+  // factura siempre, y acertar esto a mano en cada orden seria pedir el
+  // error.
+  const tipoImpuesto = datos.tipoImpuesto ?? proveedor.tipoImpuesto;
   const cascada = calcularCascadaOrden({
     subtotal,
     descuentoComercial: descuento,
+    tipoImpuesto,
     porcentajeIgv: datos.porcentajeIgv,
   });
+
+  // Contra que cifra cuenta la orden. Con IGV es el neto, porque el impuesto
+  // se recupera; con retencion de renta es el total, porque no se recupera.
+  const imputable = importeImputable({ tipoImpuesto, ...cascada });
 
   if (!esPositivo(cascada.neto)) {
     return {
@@ -177,20 +213,27 @@ export async function crearOrden(
   // comprobar al aprobar: descubrirlo al final obligaria a rehacer el reparto
   // entero sin tener delante las cifras.
   const descuadre = descuadreDelReparto(
-    cascada.neto,
+    imputable,
     imputaciones.map((i) => i.importe),
   );
 
   if (descuadre !== null) {
     // Se dice de que lado falta, no solo que no cuadra: con varias partidas
-    // delante, "faltan 1,980.00" es accionable y ademas delata el error mas
-    // probable, que es haber repartido el total con IGV en vez del neto.
+    // delante, "faltan 1,980.00" es accionable. Y se nombra la cifra contra
+    // la que hay que cuadrar, que no es la misma en los dos impuestos:
+    // repartir el total en una orden con IGV es el error mas probable, y
+    // repartir el neto en una con retencion lo es en la otra direccion.
     const sobra = esPositivo(descuadre);
     const magnitud = sobra ? descuadre : descuadre.slice(1);
 
+    const explicacion =
+      tipoImpuesto === "IGV"
+        ? "el neto de la orden, SIN IGV, porque el IGV se recupera"
+        : "el total de la orden, retencion incluida, porque la retencion no se recupera";
+
     return {
       ok: false,
-      error: `El reparto entre partidas suma ${sumar(imputaciones.map((i) => i.importe))} y el neto de la orden es ${cascada.neto}: ${sobra ? "sobran" : "faltan"} ${magnitud}. Recuerda que el comprometido se imputa SIN IGV.`,
+      error: `El reparto entre partidas suma ${sumar(imputaciones.map((i) => i.importe))} y hay que repartir ${imputable}: ${sobra ? "sobran" : "faltan"} ${magnitud}. Se imputa ${explicacion}.`,
     };
   }
 
@@ -200,18 +243,6 @@ export async function crearOrden(
     select: { id: true },
   });
   if (!obra) return { ok: false, error: "Obra no encontrada." };
-
-  const proveedor = await prisma.proveedor.findFirst({
-    where: { id: datos.proveedorId, companyId: sesion.companyId },
-    select: { id: true, activo: true, razonSocial: true },
-  });
-  if (!proveedor) return { ok: false, error: "Proveedor no encontrado." };
-  if (!proveedor.activo) {
-    return {
-      ok: false,
-      error: `"${proveedor.razonSocial}" esta desactivado. Vuelve a activarlo si le vas a comprar.`,
-    };
-  }
 
   /**
    * El numero repetido se comprueba aqui para decir QUE orden lo ocupa.
@@ -288,8 +319,9 @@ export async function crearOrden(
         observaciones: texto(datos.observaciones, 5000),
         subtotal: cascada.subtotal,
         descuentoComercial: cascada.descuentoComercial,
+        tipoImpuesto,
         neto: cascada.neto,
-        igv: cascada.igv,
+        impuesto: cascada.impuesto,
         total: cascada.total,
         lineas: {
           create: lineas.map((l, i) => ({
@@ -339,8 +371,9 @@ export async function crearOrden(
           proveedor: proveedor.razonSocial,
           tipo: datos.tipo,
           origen,
+          tipoImpuesto,
           neto: cascada.neto,
-          igv: cascada.igv,
+          impuesto: cascada.impuesto,
           total: cascada.total,
           lineas: lineas.length,
           imputaciones: imputaciones.length,
@@ -399,7 +432,9 @@ export async function aprobarOrden(
           numero: true,
           estado: true,
           subtotal: true,
+          tipoImpuesto: true,
           neto: true,
+          total: true,
           lineas: { select: { esAgrupador: true, importe: true } },
           imputaciones: { select: { importe: true } },
         },
@@ -415,14 +450,22 @@ export async function aprobarOrden(
         );
       }
 
-      // Regla 1: el reparto suma el neto.
+      // Regla 1: el reparto suma el importe imputable, que no es el neto en
+      // las ordenes con retencion. Se recalcula desde lo guardado y no se
+      // confia en lo que dijo el formulario.
+      const imputable = importeImputable({
+        tipoImpuesto: orden.tipoImpuesto,
+        neto: orden.neto.toString(),
+        total: orden.total.toString(),
+      });
+
       const descuadre = descuadreDelReparto(
-        orden.neto.toString(),
+        imputable,
         orden.imputaciones.map((i) => i.importe.toString()),
       );
       if (descuadre !== null) {
         throw new FalloOrden(
-          `El reparto entre partidas no cuadra con el neto de la orden: difiere en ${descuadre}. Corrigelo antes de aprobar.`,
+          `El reparto entre partidas no cuadra: hay que repartir ${imputable} y difiere en ${descuadre}. Corrigelo antes de aprobar.`,
         );
       }
 
@@ -608,9 +651,14 @@ export interface OrdenResumen {
   proveedor: { id: string; razonSocial: string; ruc: string };
   subtotal: string;
   descuentoComercial: string;
+  tipoImpuesto: TipoImpuesto;
   neto: string;
-  igv: string;
+  impuesto: string;
   total: string;
+  /// La cifra contra la que cuenta esta orden: el neto con IGV, el total con
+  /// retencion. Se calcula aqui para que ninguna pantalla tenga que repetir
+  /// la regla y equivocarse.
+  imputable: string;
   aprobadaAt: Date | null;
   aprobadaPor: string | null;
   anuladaAt: Date | null;
@@ -633,7 +681,8 @@ export async function listarOrdenes(
     select: {
       id: true, numero: true, tipo: true, estado: true, origen: true,
       fecha: true, descripcion: true, referencia: true, formaPago: true,
-      subtotal: true, descuentoComercial: true, neto: true, igv: true,
+      subtotal: true, descuentoComercial: true, tipoImpuesto: true,
+      neto: true, impuesto: true,
       total: true, aprobadaAt: true, aprobadaPor: true, anuladaAt: true,
       motivoAnulado: true,
       proveedor: { select: { id: true, razonSocial: true, ruc: true } },
@@ -660,9 +709,15 @@ export async function listarOrdenes(
     proveedor: o.proveedor,
     subtotal: o.subtotal.toString(),
     descuentoComercial: o.descuentoComercial.toString(),
+    tipoImpuesto: o.tipoImpuesto,
     neto: o.neto.toString(),
-    igv: o.igv.toString(),
+    impuesto: o.impuesto.toString(),
     total: o.total.toString(),
+    imputable: importeImputable({
+      tipoImpuesto: o.tipoImpuesto,
+      neto: o.neto.toString(),
+      total: o.total.toString(),
+    }),
     aprobadaAt: o.aprobadaAt,
     aprobadaPor: o.aprobadaPor,
     anuladaAt: o.anuladaAt,
@@ -737,6 +792,7 @@ export interface OrdenImpresa {
   obra: { nombreObra: string; cliente: string | null };
   numero: string;
   tipo: TipoOrden;
+  tipoImpuesto: TipoImpuesto;
   estado: EstadoOrden;
   fecha: Date;
   descripcion: string;
@@ -759,7 +815,7 @@ export interface OrdenImpresa {
   subtotal: string;
   descuentoComercial: string;
   neto: string;
-  igv: string;
+  impuesto: string;
   total: string;
 }
 
@@ -814,6 +870,7 @@ export async function obtenerOrdenParaImpresion(
     },
     numero: orden.numero,
     tipo: orden.tipo,
+    tipoImpuesto: orden.tipoImpuesto,
     estado: orden.estado,
     fecha: orden.fecha,
     descripcion: orden.descripcion,
@@ -847,7 +904,7 @@ export async function obtenerOrdenParaImpresion(
     subtotal: orden.subtotal.toString(),
     descuentoComercial: orden.descuentoComercial.toString(),
     neto: orden.neto.toString(),
-    igv: orden.igv.toString(),
+    impuesto: orden.impuesto.toString(),
     total: orden.total.toString(),
   };
 }

@@ -138,6 +138,7 @@ export default async function NuevaOrdenPage({
             id: p.id,
             razonSocial: p.razonSocial,
             ruc: p.ruc,
+            tipoImpuesto: p.tipoImpuesto,
           }))}
           partidas={partidas}
           formasPago={formasPago}
