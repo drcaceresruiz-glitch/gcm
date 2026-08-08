@@ -36,3 +36,19 @@ export function generateTemporaryPassword(longitud = 12): string {
   }
   return salida;
 }
+
+/**
+ * Codigo numerico para la verificacion en dos pasos.
+ *
+ * `randomInt` y no `Math.random()`: este numero es una credencial, y
+ * `Math.random` es predecible si se observan suficientes salidas.
+ *
+ * Se rellena con ceros por la izquierda para que siempre tenga la misma
+ * longitud. Sin eso, uno de cada diez codigos empezaria por cero, saldria
+ * como cinco cifras y la gente creeria que llego cortado.
+ */
+export function generateNumericCode(longitud = 6): string {
+  let salida = "";
+  for (let i = 0; i < longitud; i++) salida += randomInt(10).toString();
+  return salida;
+}

@@ -30,9 +30,11 @@ function BotonEnviar() {
 export function FormularioLogin({
   avisoCambio,
   avisoRecuperada,
+  avisoCodigo,
 }: {
   avisoCambio?: boolean;
   avisoRecuperada?: boolean;
+  avisoCodigo?: boolean;
 }) {
   const [estado, accion] = useActionState<EstadoFormulario, FormData>(
     accionIniciarSesion,
@@ -41,6 +43,20 @@ export function FormularioLogin({
 
   return (
     <form action={accion} className="space-y-4" noValidate>
+      {avisoCodigo && (
+        <p
+          role="status"
+          className="rounded-lg px-3 py-2 text-sm"
+          style={{
+            backgroundColor:
+              "color-mix(in oklab, var(--color-alerta) 15%, transparent)",
+          }}
+        >
+          El codigo caduco o se agotaron los intentos. Ingresa otra vez para
+          pedir uno nuevo.
+        </p>
+      )}
+
       {avisoRecuperada && (
         <p
           role="status"

@@ -223,3 +223,42 @@ export function correoRecuperacion(datos: {
 
   return { asunto: `Restablece tu clave — ${MARCA}`, texto, html };
 }
+
+/**
+ * Correo con el codigo de verificacion en dos pasos.
+ *
+ * El codigo va grande y espaciado porque se teclea a mano desde el movil
+ * mirando esta pantalla, y avisa de que hacer si no fue uno quien entro:
+ * recibir este correo sin haberlo pedido significa que alguien sabe la clave.
+ */
+export function correoCodigoAcceso(datos: {
+  nombre: string;
+  codigo: string;
+  minutos: number;
+}): Omit<Correo, "para"> {
+  const texto = [
+    `Hola ${datos.nombre},`,
+    ``,
+    `Tu codigo para entrar en ${MARCA} es:`,
+    ``,
+    datos.codigo,
+    ``,
+    `Caduca en ${datos.minutos} minutos.`,
+    ``,
+    `Si no estabas entrando, alguien conoce tu clave: cambiala en cuanto`,
+    `puedas y avisa a tu administrador.`,
+  ].join("\n");
+
+  const html = plantilla(
+    "Tu codigo de acceso",
+    `<p>Hola <strong>${datos.nombre}</strong>,</p>
+     <p>Escribe este codigo para terminar de entrar:</p>
+     <p style="margin:20px 0;text-align:center;">
+       <span style="display:inline-block;background:#f1f5f6;border:1px solid #d9e2e5;border-radius:10px;padding:14px 24px;font-family:monospace;font-size:30px;letter-spacing:8px;font-weight:bold;color:#0f7186;">${datos.codigo}</span>
+     </p>
+     <p style="color:#6b7a82;font-size:13px;text-align:center;">Caduca en ${datos.minutos} minutos.</p>
+     <p style="color:#6b7a82;font-size:13px;">Si no estabas entrando, alguien conoce tu clave: cambiala en cuanto puedas y avisa a tu administrador.</p>`,
+  );
+
+  return { asunto: `Codigo de acceso: ${datos.codigo}`, texto, html };
+}

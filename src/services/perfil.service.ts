@@ -55,6 +55,8 @@ export interface Perfil {
   /// Solo lectura: el correo es el identificador de acceso y no se edita.
   email: string;
   role: string;
+  /// Verificacion en dos pasos. Libre, la enciende y apaga cada persona.
+  dosFactoresActivo: boolean;
   /// De la empresa, solo lectura.
   razonSocial: string;
   ruc: string;
@@ -96,6 +98,7 @@ export async function obtenerPerfil(sesion: SesionActiva): Promise<Perfil | null
       fotoPerfil: true,
       email: true,
       role: true,
+      dosFactoresActivo: true,
       company: { select: { razonSocial: true, ruc: true } },
     },
   });
@@ -128,6 +131,7 @@ export async function obtenerPerfil(sesion: SesionActiva): Promise<Perfil | null
     fotoPerfil: usuario.fotoPerfil,
     email: usuario.email,
     role: usuario.role,
+    dosFactoresActivo: usuario.dosFactoresActivo,
     razonSocial: usuario.company.razonSocial,
     ruc: usuario.company.ruc,
     pendiente,
@@ -166,6 +170,53 @@ export async function guardarCelular(
         accion: "UPDATE",
         antes: { celular: antes.celular },
         despues: { celular: valor },
+      },
+    });
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Enciende o apaga la verificacion en dos pasos de uno mismo.
+ *
+ * Libre, como el celular: es una proteccion que uno se pone, no un dato que
+ * identifique a nadie, asi que no pasa por aprobacion.
+ *
+ * Al apagarla se tiran los desafios abiertos. Si no, un codigo pedido hace un
+ * minuto seguiria sirviendo despues de haber quitado la verificacion.
+ */
+export async function cambiarDosFactores(
+  sesion: SesionActiva,
+  activo: boolean,
+): Promise<Resultado> {
+  const antes = await prisma.user.findFirst({
+    where: { id: sesion.userId, companyId: sesion.companyId },
+    select: { dosFactoresActivo: true },
+  });
+  if (!antes) return { ok: false, error: "No se encontro el usuario." };
+
+  if (antes.dosFactoresActivo === activo) return { ok: true };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: sesion.userId },
+      data: { dosFactoresActivo: activo },
+    });
+
+    if (!activo) {
+      await tx.codigoAcceso.deleteMany({ where: { userId: sesion.userId } });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        entidad: "User",
+        entidadId: sesion.userId,
+        accion: "UPDATE",
+        antes: { dosFactoresActivo: antes.dosFactoresActivo },
+        despues: { dosFactoresActivo: activo },
       },
     });
   });

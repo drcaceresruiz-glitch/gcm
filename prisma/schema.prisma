@@ -198,6 +198,12 @@ model User {
   failedLoginCount   Int       @default(0)
   lockedUntil        DateTime?
 
+  /// Verificacion en dos pasos por codigo al correo. La activa cada persona
+  /// desde su perfil; por defecto esta apagada para no dejar fuera a nadie al
+  /// desplegar. Un ADMIN puede apagarla si alguien pierde el acceso al buzon,
+  /// que si no seria un callejon sin salida.
+  dosFactoresActivo Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -206,6 +212,7 @@ model User {
   sessions    Session[]
   resetTokens PasswordResetToken[]
   solicitudesPerfil SolicitudCambioPerfil[]
+  codigosAcceso CodigoAcceso[]
 
   @@unique([companyId, numDoc])
   @@index([companyId, estado])
@@ -291,6 +298,41 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+/// Codigo de un solo uso para la verificacion en dos pasos.
+///
+/// Existe entre que alguien acierta su clave y termina de entrar. Guarda DOS
+/// secretos distintos y por eso hay dos hashes:
+///
+/// - `tokenHash` identifica el desafio. Su token viaja en una cookie, de modo
+///   que el navegador no puede decir "soy el usuario X": solo presenta un
+///   vale opaco que el servidor resuelve.
+/// - `codigoHash` es el codigo de seis cifras que llega al correo, que es lo
+///   unico que demuestra el acceso al buzon.
+///
+/// Sin el token, el usuario tendria que reenviar su correo junto al codigo y
+/// bastaria con adivinar seis cifras de CUALQUIER cuenta; con el, un intento
+/// solo vale contra el desafio que uno mismo abrio.
+model CodigoAcceso {
+  id     String @id @default(cuid())
+  userId String
+
+  tokenHash  String @unique @db.Char(64)
+  codigoHash String @db.Char(64)
+
+  /// Intentos gastados. Al llegar al tope el desafio se borra y toca volver a
+  /// empezar por la clave: sin esto, seis cifras se agotan a fuerza bruta.
+  intentos Int @default(0)
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("codigos_acceso")
 }
 
 // ---------------------------------------------------------------------------

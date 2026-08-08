@@ -20,7 +20,14 @@ import { NextResponse, type NextRequest } from "next/server";
 const COOKIE_SESION = "gcm_sesion";
 
 /** Rutas accesibles sin sesion. */
-const RUTAS_PUBLICAS = ["/login", "/recuperar-clave", "/api/health"];
+const RUTAS_PUBLICAS = [
+  "/login",
+  "/recuperar-clave",
+  // Segundo paso del acceso: quien esta aqui acerto la clave pero aun no
+  // tiene sesion, asi que la cookie de sesion todavia no existe.
+  "/verificar-codigo",
+  "/api/health",
+];
 
 export default function proxy(peticion: NextRequest) {
   const { pathname } = peticion.nextUrl;

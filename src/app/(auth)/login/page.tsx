@@ -8,7 +8,11 @@ export const metadata: Metadata = { title: "Ingresar" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cambio?: string; recuperada?: string }>;
+  searchParams: Promise<{
+    cambio?: string;
+    recuperada?: string;
+    codigo?: string;
+  }>;
 }) {
   // Si ya hay sesion no tiene sentido mostrar el formulario.
   const sesion = await obtenerSesion();
@@ -16,12 +20,13 @@ export default async function LoginPage({
     redirect(sesion.mustChangePassword ? "/cambiar-clave" : "/panel");
   }
 
-  const { cambio, recuperada } = await searchParams;
+  const { cambio, recuperada, codigo } = await searchParams;
 
   return (
     <FormularioLogin
       avisoCambio={cambio === "ok"}
       avisoRecuperada={recuperada === "ok"}
+      avisoCodigo={codigo === "expirado"}
     />
   );
 }

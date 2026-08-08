@@ -3,8 +3,14 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { iniciarSesion, cambiarClave } from "@/services/auth.service";
+import {
+  iniciarSesion,
+  cambiarClave,
+  completarAccesoConCodigo,
+} from "@/services/auth.service";
 import { obtenerSesion, cerrarSesion } from "@/services/sesion.service";
+import { verificarCodigo, olvidarDesafio } from "@/services/dosFactores.service";
+import { codigoBienFormado, LONGITUD_CODIGO } from "@/lib/dosFactores";
 
 /**
  * Acciones de servidor del flujo de acceso.
@@ -56,7 +62,41 @@ export async function accionIniciarSesion(
 
   if (!resultado.ok) return { error: resultado.error };
 
+  // Con dos pasos, la clave correcta solo abre la pantalla del codigo.
+  if (resultado.requiere2FA) redirect("/verificar-codigo");
+
   redirect(resultado.mustChangePassword ? "/cambiar-clave" : "/panel");
+}
+
+/**
+ * Segundo paso del acceso. No exige sesion —todavia no hay— sino el desafio
+ * abierto, que vive en su propia cookie.
+ */
+export async function accionVerificarCodigo(
+  _estadoPrevio: EstadoFormulario,
+  datos: FormData,
+): Promise<EstadoFormulario> {
+  const codigo = String(datos.get("codigo") ?? "");
+
+  if (!codigoBienFormado(codigo)) {
+    return { error: `El codigo son ${LONGITUD_CODIGO} cifras.` };
+  }
+
+  const resultado = await verificarCodigo(codigo);
+
+  if (!resultado.ok) {
+    if (resultado.volverAlLogin) redirect("/login?codigo=expirado");
+    return { error: resultado.error };
+  }
+
+  const acceso = await completarAccesoConCodigo(
+    resultado.userId,
+    await metadatosPeticion(),
+  );
+
+  if (!acceso) redirect("/login");
+
+  redirect(acceso.mustChangePassword ? "/cambiar-clave" : "/panel");
 }
 
 const esquemaCambio = z
@@ -102,5 +142,11 @@ export async function accionCambiarClave(
 
 export async function accionCerrarSesion(): Promise<void> {
   await cerrarSesion();
+  redirect("/login");
+}
+
+/** Abandonar la verificacion y volver a empezar por la clave. */
+export async function accionCancelarCodigo(): Promise<void> {
+  await olvidarDesafio();
   redirect("/login");
 }

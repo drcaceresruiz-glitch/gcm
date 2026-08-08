@@ -4,6 +4,7 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerPerfil } from "@/services/perfil.service";
 import { Volver } from "@/components/ui/Volver";
 import { FormularioPerfil } from "@/components/perfil/FormularioPerfil";
+import { DosFactores } from "@/components/perfil/DosFactores";
 
 export const metadata: Metadata = { title: "Mi perfil" };
 
@@ -34,6 +35,11 @@ export default async function PerfilPage() {
       </div>
 
       <FormularioPerfil perfil={perfil} />
+
+      <DosFactores
+        activo={perfil.dosFactoresActivo}
+        email={perfil.email}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   guardarFotoPerfil,
   solicitarCambio,
   cancelarSolicitud,
+  cambiarDosFactores,
 } from "@/services/perfil.service";
 import { CAMPOS_CONTROLADOS } from "@/lib/perfil";
 
@@ -46,6 +47,27 @@ export async function accionGuardarFoto(
 
   revalidatePath("/perfil");
   return { ok: foto === "" ? "Foto quitada." : "Foto actualizada." };
+}
+
+/** Enciende o apaga la verificacion en dos pasos. Libre, sin aprobacion. */
+export async function accionCambiarDosFactores(
+  _previo: EstadoPerfil,
+  datos: FormData,
+): Promise<EstadoPerfil> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const activo = datos.get("activo") === "si";
+
+  const resultado = await cambiarDosFactores(sesion, activo);
+  if (!resultado.ok) return { error: resultado.error };
+
+  revalidatePath("/perfil");
+  return {
+    ok: activo
+      ? "Verificacion en dos pasos activada. La proxima vez que entres te pediremos un codigo."
+      : "Verificacion en dos pasos desactivada.",
+  };
 }
 
 /** Pide cambiar los datos controlados. Queda pendiente de aprobacion. */

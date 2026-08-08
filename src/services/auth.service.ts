@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { validarClaveNueva } from "@/lib/claves";
 import { crearSesion, cerrarTodasLasSesiones } from "@/services/sesion.service";
+import { crearDesafio } from "@/services/dosFactores.service";
 import type { AuditAction } from "@/generated/prisma/enums";
 
 /**
@@ -19,7 +20,8 @@ const MAX_INTENTOS = 5;
 const BLOQUEO_MINUTOS = 15;
 
 export type ResultadoLogin =
-  | { ok: true; mustChangePassword: boolean }
+  | { ok: true; requiere2FA: true }
+  | { ok: true; requiere2FA?: false; mustChangePassword: boolean }
   | { ok: false; error: string };
 
 interface MetadatosPeticion {
@@ -68,6 +70,9 @@ export async function iniciarSesion(
       mustChangePassword: true,
       failedLoginCount: true,
       lockedUntil: true,
+      dosFactoresActivo: true,
+      nombres: true,
+      email: true,
     },
   });
 
@@ -121,7 +126,25 @@ export async function iniciarSesion(
 
   await prisma.user.update({
     where: { id: usuario.id },
-    data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
+    data: { failedLoginCount: 0, lockedUntil: null },
+  });
+
+  // Con dos pasos activos la clave sola no abre nada: se manda el codigo y
+  // aqui se acaba. No hay sesion todavia, y por eso `lastLoginAt` y el
+  // registro de LOGIN se dejan para cuando el codigo acierte: si no,
+  // constaria como entrada alguien que quiza nunca llego a entrar.
+  if (usuario.dosFactoresActivo) {
+    await crearDesafio({
+      id: usuario.id,
+      nombres: usuario.nombres,
+      email: usuario.email,
+    });
+    return { ok: true, requiere2FA: true };
+  }
+
+  await prisma.user.update({
+    where: { id: usuario.id },
+    data: { lastLoginAt: new Date() },
   });
 
   await crearSesion(usuario.id, meta);
@@ -136,6 +159,42 @@ export async function iniciarSesion(
   });
 
   return { ok: true, mustChangePassword: usuario.mustChangePassword };
+}
+
+/**
+ * Segundo tramo del acceso, cuando el codigo ya acerto.
+ *
+ * Va aparte de `iniciarSesion` y no dentro del servicio de dos factores para
+ * que las sesiones se abran en un unico sitio de todo el sistema.
+ */
+export async function completarAccesoConCodigo(
+  userId: string,
+  meta: MetadatosPeticion = {},
+): Promise<{ mustChangePassword: boolean } | null> {
+  const usuario = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, companyId: true, estado: true, mustChangePassword: true },
+  });
+
+  if (!usuario || usuario.estado !== "ACTIVO") return null;
+
+  await prisma.user.update({
+    where: { id: usuario.id },
+    data: { lastLoginAt: new Date() },
+  });
+
+  await crearSesion(usuario.id, meta);
+
+  await auditar({
+    companyId: usuario.companyId,
+    userId: usuario.id,
+    accion: "LOGIN",
+    entidad: "User",
+    entidadId: usuario.id,
+    meta,
+  });
+
+  return { mustChangePassword: usuario.mustChangePassword };
 }
 
 export type ResultadoCambioClave =
