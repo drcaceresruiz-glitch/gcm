@@ -371,6 +371,8 @@ model Project {
   baselines   Baseline[]
   movimientos MovimientoPresupuestal[]
   ordenes     OrdenCompra[]
+  cronogramas Cronograma[]
+  avances     AvanceTarea[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -1042,6 +1044,181 @@ model OrdenImputacion {
   @@unique([ordenId, wbsItemId])
   @@index([wbsItemId])
   @@map("orden_imputaciones")
+}
+
+// ---------------------------------------------------------------------------
+// Cronograma
+//
+// El plan lo manda MS Project y el avance real lo manda GCM. Ese reparto es la
+// decision que gobierna estas cuatro tablas: cada lado escribe campos que el
+// otro no toca, asi que reimportar NUNCA obliga a decidir quien gana.
+//
+// Anadir una partida en Project la hace aparecer al reimportar, sin avance.
+// Alargar una duracion actualiza el plan sin tocar lo ya reportado.
+// ---------------------------------------------------------------------------
+
+/// Una importacion del cronograma. Se versiona en vez de pisarse: el historico
+/// de cortes es lo que despues permite dibujar la curva S.
+///
+/// Si el plan no cambia respecto a la version anterior NO se crea una nueva.
+/// Sin esa comprobacion, subir el archivo a diario llenaria el historial de
+/// versiones gemelas y las reprogramaciones de verdad se perderian entre ellas.
+model Cronograma {
+  id        String @id @default(cuid())
+  projectId String
+
+  version Int
+
+  /// El `<StatusDate>` del archivo: la fecha a la que estan referidos los
+  /// avances que trae. Es la clave para avisar de que un corte ya se cargo.
+  /// NO sirven `LastSaved` ni `CurrentDate`: hay dos exports del mismo corte
+  /// guardados con cinco horas de diferencia.
+  fechaCorte DateTime @db.Date
+
+  /// El nombre de la obra segun el archivo. Sale de la primera fila real, no
+  /// del titulo del documento: el titulo lleva la fecha y cambia cada semana.
+  nombreProyecto String @db.VarChar(255)
+
+  /// Minutos de jornada (`<MinutesPerDay>`, 480 en los archivos actuales). Se
+  /// guarda porque de el dependen las conversiones de duracion y de desfase, y
+  /// puede cambiar si el planificador altera el calendario. Cablearlo dejaria
+  /// las cifras viejas incomparables con las nuevas y sin rastro del porque.
+  minutosPorDia Int @default(480)
+
+  archivo      String   @db.VarChar(255)
+  importadoAt  DateTime @default(now())
+  importadoPor String   @db.VarChar(150)
+
+  project      Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tareas       TareaCronograma[]
+  dependencias DependenciaTarea[]
+
+  @@unique([projectId, version])
+  @@index([projectId, fechaCorte])
+  @@map("cronogramas")
+}
+
+/// Una tarea del archivo, copiada fielmente. Es la foto del PLAN.
+model TareaCronograma {
+  id           String @id @default(cuid())
+  cronogramaId String
+
+  /// El `<UID>` de MS Project: lo unico estable entre semanas, y por tanto el
+  /// ancla contra la que se guarda el avance. Comprobado con dos cortes
+  /// reales: los `<GUID>` se regeneran enteros, el `<ID>` se corre al insertar
+  /// o borrar, el `<WBS>` se recalcula con la posicion y el nombre se edita.
+  /// Todos ellos fallan en silencio; este no.
+  uid Int
+
+  /// El numero de fila del archivo. Sirve para ordenar y para componer las
+  /// cadenas de predecesoras del informe ("24FC+3 dias" usa la fila, no el
+  /// UID). JAMAS como clave.
+  fila Int
+
+  /// El "4.4" del principio del nombre. Nulo cuando el nombre no lo trae —solo
+  /// las filas de proyecto—. NO sale de `<WBS>`, que lleva la numeracion
+  /// interna de Project ("1.5.4" para la partida 4.4).
+  codigo String? @db.VarChar(40)
+  nombre String  @db.VarChar(500)
+
+  /// Profundidad de esquema (`<OutlineLevel>`). UNICA fuente de jerarquia: el
+  /// codigo es una etiqueta y no la refleja. En el archivo real "7.3.1" es
+  /// HERMANA de "7.3", no su hija, y las dos estan en el mismo nivel.
+  nivel Int
+
+  esResumen Boolean @default(false)
+  esHito    Boolean @default(false)
+
+  /// Viene dado por el archivo (`<Critical>`). No se deduce de la holgura: hay
+  /// 18 tareas con holgura cero que NO son criticas.
+  esCritico Boolean @default(false)
+
+  inicio DateTime @db.Date
+  fin    DateTime @db.Date
+
+  /// Sale de `<Duration>`, nunca de restar las fechas: una partida de un dia
+  /// puede abarcar tres dias naturales por el calendario. Admite fraccion —en
+  /// el archivo real hay una de 8,8 dias y el informe la imprime asi—.
+  duracionDias Decimal @db.Decimal(8, 2)
+
+  /// El "% Planeado" del archivo (campo personalizado Text1). Se LEE, no se
+  /// calcula: asi las cifras coinciden con el informe que el cliente ya emite.
+  porcentajePlaneado Decimal @db.Decimal(5, 2)
+
+  /// El `<PercentComplete>` del archivo. Solo siembra el avance en la primera
+  /// importacion; despues manda el que se reporta en GCM. Se conserva para
+  /// poder ensenar la discrepancia entre lo que dice Project y lo reportado.
+  porcentajeArchivo Decimal @db.Decimal(5, 2)
+
+  /// Holgura total en dias. MSPDI omite el campo cuando vale cero, asi que la
+  /// ausencia se guarda como 0 y se marca, para no confundir "sin holgura" con
+  /// "no informado" al auditar.
+  holguraDias     Decimal @db.Decimal(8, 2) @default(0)
+  holguraInferida Boolean @default(false)
+
+  cronograma Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+
+  @@unique([cronogramaId, uid])
+  @@index([cronogramaId, fila])
+  @@map("tareas_cronograma")
+}
+
+/// Un enlace entre dos tareas del mismo cronograma.
+///
+/// Se guarda por UID y no por clave foranea a la tarea porque el predecesor
+/// puede aparecer DESPUES en el documento —pasa en 16 de 76 enlaces— y la
+/// resolucion es en dos pasadas.
+model DependenciaTarea {
+  id           String @id @default(cuid())
+  cronogramaId String
+
+  tareaUid       Int
+  predecesoraUid Int
+
+  /// FC (fin-comienzo), CC (comienzo-comienzo), FF (fin-fin), CF (comienzo-fin).
+  /// Hoy el archivo solo trae FC y un CC, pero el mapeo va completo: un enlace
+  /// mal tipado desplaza fechas sin dar ningun sintoma.
+  tipo String @db.VarChar(2)
+
+  /// Desfase en dias, con signo. El archivo lo trae en decimas de minuto.
+  desfaseDias Decimal @db.Decimal(8, 2) @default(0)
+
+  cronograma Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
+
+  @@index([cronogramaId, tareaUid])
+  @@index([cronogramaId, predecesoraUid])
+  @@map("dependencias_tarea")
+}
+
+/// El avance que se reporta desde obra. Es lo que GCM posee.
+///
+/// NO lleva clave foranea a `TareaCronograma`, y es deliberado: las versiones
+/// del cronograma se sustituyen y el avance tiene que sobrevivirlas. Se ancla
+/// en (projectId, uid), igual que `BaselineItem` duplica los datos en vez de
+/// referenciar a `WbsItem` para sobrevivir a que se renombren partidas.
+///
+/// Cada reporte es una fila nueva, nunca un UPDATE: la curva S sale de la
+/// serie historica, y saber quien dijo que una partida iba al 60% y cuando es
+/// justamente lo que hoy se pierde al sobrescribir el porcentaje en Project.
+model AvanceTarea {
+  id        String @id @default(cuid())
+  projectId String
+
+  uid Int
+
+  fecha      DateTime @db.Date
+  porcentaje Decimal  @db.Decimal(5, 2)
+
+  nota String? @db.Text
+
+  reportadoPor String   @db.VarChar(150)
+  createdAt    DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, uid])
+  @@index([projectId, fecha])
+  @@map("avances_tarea")
 }
 
 // ---------------------------------------------------------------------------
