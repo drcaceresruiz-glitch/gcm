@@ -435,29 +435,16 @@ ellos es comprobarlos en navegador contra CRIOCORD (§3).
 La gestión de permisos por empresa, que la encabezaba después, **también está
 hecha**: está en §3. Lo siguiente en el orden acordado son las fases de abajo.
 
-### Pendiente en producción — dos migraciones sin aplicar
+**Producción está al día con el esquema** a 08/08/2026: la última migración
+aplicada en `drcacere_gcm` es `20260808113630_datos_de_la_empresa`. El
+procedimiento y sus dos trampas —el despliegue no entra hasta la primera
+petición, y el orden importa cuando el esquema cambia— están en
+`docs/infraestructura.md`.
 
-En local están aplicadas; en `drcacere_gcm` no:
-
-- `20260808110951_partidas_habituales_por_proveedor` — tabla
-  `proveedor_partidas`.
-- `20260808113630_datos_de_la_empresa` — tres columnas en `companies`:
-  `representanteLegal`, `cargoRepresentante`, `observacionesOrden`.
-
-Ninguna de las dos tumba la aplicación si falta: solo falla la pantalla que
-las consulta —el alta de órdenes y `/empresa/datos`— porque son tablas y
-columnas nuevas que nadie más toca. Al revés que con los permisos, donde
-faltar la migración rompía la sesión entera.
-
-Se aplican desde el Terminal de cPanel, **después** de que el despliegue haya
-entrado —y el despliegue no entra hasta la primera petición al sitio, que es
-lo que hace que Passenger descomprima el paquete:
-
-```
-source /home/<usuario>/nodevenv/<app>/22/bin/activate
-cd ~/gcm
-npx --yes prisma@7 migrate deploy
-```
+> **La base de producción no se llena sola.** Los datos de la empresa
+> —representante legal, cargo, observaciones al pie— se escriben en cada
+> entorno por separado. Rellenarlos en local no los pone en producción, y una
+> orden impresa allí saldría firmada con la razón social en lugar del nombre.
 
 ### Brecha conocida — el rol por obra no se aplica
 
