@@ -407,7 +407,7 @@ algo que no ocurre**: o se implementa o se retira.
 | Cronograma | Importar desde XML de MS Project (el `.mpp` es binario propietario y no se puede leer). Planificación semanal, ruta crítica |
 | Avance físico | Metrados ejecutados, Curva S, evidencia fotográfica |
 | Proveedores | **Órdenes HECHAS** (§3). Faltan **anticipos**, recepciones y abonos, que son las otras tres columnas del control |
-| Indicadores | Tablero en vivo, cortes de control, EVM |
+| Indicadores | Tablero en vivo, cortes de control, EVM. **Antes de dibujarlo, resolver que las cuatro columnas del control no son homogéneas: lo pagado lleva IGV y el resto no** (§7) |
 | Reportes | PDF y Excel con el formato del informe semanal actual |
 | Resto | Caja chica, almacén, actas, gestión documental, WhatsApp |
 | Escritorio | Tauri v2 como contenedor + PWA |
@@ -427,6 +427,30 @@ cliente. El indicador de rentabilidad se calcula sobre el **devengado**, no
 sobre lo pagado: la cláusula 5 del contrato fija un adelanto del 35 % más un
 20 % al día 15, así que más de la mitad se paga antes de ejecutar. Contarlo
 como costo mostraría medio presupuesto consumido con la obra empezando.
+
+> **Las cuatro columnas NO son homogéneas, y eso hay que resolverlo antes de
+> construir el tablero.** Comprometido y devengado son costo y van **sin
+> IGV**; lo pagado sale del banco **con IGV**. Puestas en la misma fila tal
+> cual, «pagado» aparecería siempre por encima de «devengado» aunque se
+> hubiera pagado exactamente lo devengado, y esa diferencia —el 18 %— se
+> leería como un sobrecosto que no existe.
+>
+> La salida es separar dos cosas que hoy caben en la misma palabra: **lo
+> pagado imputable a costo**, sin IGV y comparable con el resto, y **la salida
+> de caja**, con IGV, que es lo que cuadra con el extracto bancario. Son dos
+> columnas, no una.
+>
+> No hace falta decidirlo hasta que se construya el módulo de abonos, pero sí
+> antes: si el tablero nace con cuatro columnas, el problema se descubre
+> enseñándoselo al cliente.
+
+**Se guardan siempre las tres cifras: neto, IGV y total.** Lo hacen la
+revisión y ahora también cada orden, y cada una responde a una pregunta
+distinta: el **neto** es lo que cuesta la obra y consume presupuesto, el
+**IGV** es lo que se recupera y lo necesita contabilidad, y el **total** es lo
+que sale del banco y lo necesita tesorería. Tirar cualquiera obliga a
+recalcularla después, y recalcular un impuesto hacia atrás es donde aparecen
+los céntimos que no cuadran.
 
 **Los porcentajes se guardan como fracción y se muestran como porcentaje.**
 La base tiene `Decimal(6,4)` y la cascada multiplica por `0.12`, pero nadie
