@@ -15,7 +15,7 @@ export default function AuthLayout({
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">GCM</h1>
           <p className="mt-1 text-sm opacity-70">
-            Gestor de Construccion y Mantenimiento
+            Gestion en Construccion Moderna
           </p>
         </header>
 

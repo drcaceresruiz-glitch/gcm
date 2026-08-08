@@ -1,4 +1,4 @@
-import { HardHat, Code2, Ruler, Tag } from "lucide-react";
+import { HardHat, Ruler, Tag } from "lucide-react";
 
 /**
  * Pie de pagina del area privada: marca, ano, creditos y version.
@@ -40,15 +40,15 @@ export function PieDePagina() {
         {/* Creditos y version, centrados y en negrita, envolviendo en pantallas
             estrechas. */}
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
-          <span className="flex items-center gap-1.5">
-            <Code2 className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
-            Dr. Caceres Ruiz
-          </span>
+          <span>Dr. Caceres Ruiz</span>
           <span className="flex items-center gap-1.5">
             <Ruler className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
             Arq. Eduardo Antonio Perez Moreno
           </span>
-          <span className="flex items-center gap-1.5 tabular-nums opacity-70">
+          <span
+            className="flex items-center gap-1.5 tracking-wider opacity-70"
+            style={{ textShadow: "0 1px 2px rgba(0,0,0,0.35)" }}
+          >
             <Tag className="size-3.5 shrink-0" aria-hidden="true" />
             v{VERSION}
           </span>
