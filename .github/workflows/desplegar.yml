@@ -62,6 +62,11 @@ jobs:
           mkdir -p deploy/.next/static
           cp -r .next/static/. deploy/.next/static/
           if [ -d public ]; then cp -r public deploy/public; fi
+          # cPanel genera su propio `app.js` como arranque y su configuracion
+          # de Passenger puede seguir apuntando ahi aunque en el panel se
+          # elija `server.js`. Se envia un app.js que solo delega, para que
+          # la app levante apunte a donde apunte.
+          echo "require('./server.js');" > deploy/app.js
           # Passenger reinicia la aplicacion al detectar que este archivo
           # cambio. Sin esto el servidor seguiria sirviendo la version vieja.
           mkdir -p deploy/tmp
@@ -108,6 +113,16 @@ jobs:
             "$FTP_SERVER" "$FTP_USERNAME" "$LFTP_PASSWORD" > ~/.netrc
           chmod 600 ~/.netrc
 
+          # SIN --delete a proposito. El primer despliegue lo llevaba y se
+          # puso a borrar archivos que gestiona cPanel dentro del directorio
+          # de la aplicacion (`app.js`, `stderr.log`), rompio el arranque de
+          # Passenger y dejo la web en 503. Un espejo que borra no encaja con
+          # un directorio que otro sistema tambien administra.
+          #
+          # A cambio se acumulan archivos de compilaciones viejas. No
+          # estorban: el servidor de Next es autocontenido y solo carga lo
+          # que su manifiesto referencia.
+          #
           # `open` explicito: pasar el host como ultimo argumento de lftp no
           # llega a abrir la sesion y `mirror` falla con "Not connected".
           # `cmd:fail-exit` hace que un error corte el script en vez de
@@ -123,7 +138,7 @@ jobs:
             set net:reconnect-interval-base 5;
             set mirror:parallel-transfer-count 4;
             open '$FTP_SERVER';
-            mirror --reverse --delete --verbose --continue --exclude-glob '.env' --exclude-glob '.env.*' --exclude 'storage/' ./deploy/ '$FTP_SERVER_DIR';
+            mirror --reverse --verbose --continue --exclude-glob '.env' --exclude-glob '.env.*' --exclude 'storage/' ./deploy/ '$FTP_SERVER_DIR';
             bye
           "
 
