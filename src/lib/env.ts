@@ -31,14 +31,17 @@ const envSchema = z.object({
   STORAGE_ROOT: z.string().min(1).default("./storage"),
 
   /**
-   * Token de apis.net.pe para consultar el RUC en SUNAT.
+   * Token de decolecta.com para consultar el RUC en SUNAT.
+   *
+   * Se llamaba APIS_NET_PE_TOKEN: apis.net.pe migro a decolecta y su dominio
+   * antiguo devuelve 401 aunque el token sea bueno.
    *
    * OPCIONAL a proposito. Sin el, el alta de proveedores sigue funcionando
    * igual: solo se pierde el autorrelleno de la razon social, que es una
    * comodidad y no un requisito. Hacerlo obligatorio ataria el arranque de
    * toda la aplicacion a un servicio de terceros.
    */
-  APIS_NET_PE_TOKEN: z.string().optional(),
+  DECOLECTA_TOKEN: z.string().optional(),
 
   // --- Correo saliente (alta de usuarios y recuperacion de clave) ---
   SMTP_HOST: z.string().optional(),

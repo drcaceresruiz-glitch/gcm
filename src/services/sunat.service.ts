@@ -18,7 +18,14 @@ import { env } from "@/lib/env";
  * editable. Nunca se guarda sin que alguien lo haya visto.
  */
 
-const URL_BASE = "https://api.apis.net.pe/v2/sunat/ruc";
+/**
+ * apis.net.pe migro a decolecta y el dominio antiguo ya no atiende estas
+ * consultas: devuelve 401 aunque el token sea bueno, que se lee como "token
+ * caducado" y manda a mirar donde no es. El token se genera en
+ * `decolecta.com/profile` y la documentacion vive en
+ * `decolecta.gitbook.io/docs`.
+ */
+const URL_BASE = "https://api.decolecta.com/v1/sunat/ruc";
 
 /** Cinco segundos: si tarda mas, es mas rapido teclear el nombre. */
 const TIEMPO_LIMITE_MS = 5000;
@@ -28,15 +35,16 @@ export type ConsultaRuc =
   | { ok: false; motivo: "sin_token" | "no_encontrado" | "fallo"; detalle: string };
 
 /**
- * El nombre del campo cambia entre versiones de la API: v2 devuelve
- * `razonSocial` y v1 devolvia `nombre`. Se aceptan los dos para que una
- * actualizacion del proveedor no rompa el autorrelleno en silencio.
+ * Decolecta devuelve `razon_social`, en snake_case. Se aceptan tambien los
+ * nombres que usaban las versiones anteriores de apis.net.pe: el servicio ya
+ * cambio una vez de dominio y de formato, y no hay motivo para pensar que no
+ * vuelva a hacerlo.
  */
 function leerRazonSocial(datos: unknown): string | null {
   if (typeof datos !== "object" || datos === null) return null;
   const registro = datos as Record<string, unknown>;
 
-  for (const campo of ["razonSocial", "nombre", "razon_social"]) {
+  for (const campo of ["razon_social", "razonSocial", "nombre"]) {
     const valor = registro[campo];
     if (typeof valor === "string" && valor.trim()) return valor.trim();
   }
@@ -57,7 +65,7 @@ export async function consultarRuc(ruc: string): Promise<ConsultaRuc> {
     return { ok: false, motivo: "fallo", detalle: "El RUC son 11 digitos." };
   }
 
-  if (!env.APIS_NET_PE_TOKEN) {
+  if (!env.DECOLECTA_TOKEN) {
     return {
       ok: false,
       motivo: "sin_token",
@@ -71,7 +79,7 @@ export async function consultarRuc(ruc: string): Promise<ConsultaRuc> {
     // el formulario esperando indefinidamente por un dato que es opcional.
     const respuesta = await fetch(`${URL_BASE}?numero=${limpio}`, {
       headers: {
-        Authorization: `Bearer ${env.APIS_NET_PE_TOKEN}`,
+        Authorization: `Bearer ${env.DECOLECTA_TOKEN}`,
         Accept: "application/json",
       },
       signal: AbortSignal.timeout(TIEMPO_LIMITE_MS),
@@ -80,7 +88,9 @@ export async function consultarRuc(ruc: string): Promise<ConsultaRuc> {
       cache: "no-store",
     });
 
-    if (respuesta.status === 404) {
+    // 422 es como decolecta rechaza un RUC que no existe o no es valido; el
+    // 404 se acepta tambien por si vuelve a cambiar.
+    if (respuesta.status === 404 || respuesta.status === 422) {
       return {
         ok: false,
         motivo: "no_encontrado",

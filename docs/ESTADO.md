@@ -38,11 +38,18 @@ Entorno local ya montado: **MariaDB 12.3.2** como servicio de Windows, base
 > está versionado; la plantilla con todas las variables necesarias es
 > `.env.example`.
 
-Hay una variable **opcional**, `APIS_NET_PE_TOKEN`, para consultar el RUC en
+Hay una variable **opcional**, `DECOLECTA_TOKEN`, para consultar el RUC en
 SUNAT al dar de alta un proveedor. Sin ella el alta funciona igual: solo se
-pierde el autorrelleno de la razón social. Se saca en `apis.net.pe`, que
-tiene plan gratuito, y no se hizo obligatoria a propósito — atar el arranque
-de toda la aplicación a un servicio de terceros no compensa por una comodidad.
+pierde el autorrelleno de la razón social. No se hizo obligatoria a propósito
+— atar el arranque de toda la aplicación a un servicio de terceros no
+compensa por una comodidad.
+
+> **`apis.net.pe` migró a `decolecta`.** El token se genera en
+> `decolecta.com/profile` y la documentación está en
+> `decolecta.gitbook.io/docs`. El dominio antiguo sigue en pie pero responde
+> **401 aunque el token sea bueno**, y eso se lee como «token caducado» y
+> manda a buscar donde no es. El endpoint válido es
+> `api.decolecta.com/v1/sunat/ruc` y el campo se llama `razon_social`.
 
 El primer usuario lo crea `npm run db:seed`: toma el correo de
 `SEED_ADMIN_EMAIL`, genera una clave temporal aleatoria, la imprime **una
