@@ -79,28 +79,38 @@ jobs:
             exit 1
           fi
 
+      # Se usa lftp y no una accion de FTP porque este ProFTPD resetea la
+      # conexion de DATOS cuando va cifrada: la sesion se abre bien, lista
+      # el directorio, y muere con ECONNRESET al primer `ensureDir`. lftp
+      # permite separar los dos canales.
+      #
+      # ftp:ssl-force        -> control CIFRADO: la contrasena nunca viaja en claro.
+      # ftp:ssl-protect-data -> datos SIN cifrar: es lo que evita el reset.
+      #
+      # El contenido que viaja es la compilacion de un repositorio publico y
+      # el paquete no lleva ningun .env, asi que no hay nada secreto en el
+      # canal de datos. Las credenciales, que si lo son, van protegidas.
       - name: Subir por FTPS
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          # ProFTPD con AUTH TLS: cifrado explicito sobre el puerto 21. El
-          # 990 (FTPS implicito) esta cerrado en este servidor. Con `ftp` a
-          # secas la contrasena viajaria en claro.
-          protocol: ftps
-          local-dir: ./deploy/
-          # Ruta de la aplicacion en cPanel, con barra final. Va en un
-          # secreto y no escrita aqui porque revela el usuario de la cuenta
-          # y este repositorio es publico.
-          server-dir: ${{ secrets.FTP_SERVER_DIR }}
-          # La accion SINCRONIZA: borra del servidor lo que no este en el
-          # paquete. Estas exclusiones son lo unico que impide que un
-          # despliegue se lleve por delante la configuracion y los archivos
-          # subidos por los usuarios.
-          exclude: |
-            **/.git*
-            **/.git*/**
-            .env
-            .env.*
-            storage/**
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          # lftp la lee del entorno con --env-password, para que no aparezca
+          # en la linea de comandos ni en la lista de procesos.
+          LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lftp
+
+          lftp --env-password -u "$FTP_USERNAME" -e "
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data false;
+            set ssl:verify-certificate no;
+            set ftp:passive-mode true;
+            set net:max-retries 3;
+            set net:timeout 20;
+            set net:reconnect-interval-base 5;
+            set mirror:parallel-transfer-count 4;
+            mirror --reverse --delete --verbose --continue --exclude-glob '.env' --exclude-glob '.env.*' --exclude 'storage/' ./deploy/ '$FTP_SERVER_DIR';
+            bye
+          " "$FTP_SERVER"
