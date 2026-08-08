@@ -49,6 +49,11 @@ export default async function DashboardLayout({
       etiqueta: "Datos de la empresa",
       clave: "empresa",
     },
+    puede(sesion, "usuario:leer") && {
+      href: "/empresa/usuarios",
+      etiqueta: "Usuarios",
+      clave: "usuarios",
+    },
     puede(sesion, "permiso:leer") && {
       href: "/empresa/permisos",
       etiqueta: "Permisos",

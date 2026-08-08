@@ -169,6 +169,22 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
  */
 export const ROLES = Object.keys(MATRIZ) as Role[];
 
+/**
+ * Como se escribe cada rol en pantalla, en UN solo sitio.
+ *
+ * Vive aqui, junto a los roles, y no en cada pantalla: el alta de usuarios y
+ * la matriz de permisos tenian su propia version y ya divergian —una decia
+ * "Administrador de obra" y la otra "Admin. de obra" para el mismo rol—. Con
+ * una sola fuente, el nombre de un rol es el mismo se mire donde se mire.
+ */
+export const ETIQUETA_ROL: Record<Role, string> = {
+  ADMIN: "Administrador",
+  RESIDENTE: "Residente",
+  ADMIN_OBRA: "Administrador de obra",
+  ALMACENERO: "Almacenero",
+  CONSULTOR: "Consultor",
+};
+
 /** Lo que la plantilla del rol concede, antes de excepciones. */
 export function permisosDe(role: Role): readonly Permiso[] {
   return MATRIZ[role];

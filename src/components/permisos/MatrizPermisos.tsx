@@ -8,6 +8,7 @@ import {
   type EstadoPermisos,
 } from "@/app/(dashboard)/empresa/permisos/acciones";
 import type { MatrizPermisos as Matriz } from "@/services/permisos.service";
+import { ETIQUETA_ROL } from "@/lib/rbac";
 import type { Role } from "@/generated/prisma/enums";
 
 /**
@@ -23,14 +24,6 @@ import type { Role } from "@/generated/prisma/enums";
  * porque le toca» de «alguien se lo concedio», que es justo lo que se viene
  * a averiguar.
  */
-
-const ETIQUETA_ROL: Record<Role, string> = {
-  ADMIN: "Administrador",
-  RESIDENTE: "Residente",
-  ADMIN_OBRA: "Admin. de obra",
-  ALMACENERO: "Almacenero",
-  CONSULTOR: "Consultor",
-};
 
 /** Cabecera legible de cada bloque, por el prefijo del permiso. */
 const ETIQUETA_DOMINIO: Record<string, string> = {

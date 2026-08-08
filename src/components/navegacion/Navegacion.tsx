@@ -11,6 +11,7 @@ import {
   Receipt,
   ShieldCheck,
   UserCircle,
+  UsersRound,
   Users,
   X,
 } from "lucide-react";
@@ -37,6 +38,7 @@ const ICONOS = {
   proveedores: Users,
   formasPago: Receipt,
   empresa: Building2,
+  usuarios: UsersRound,
   permisos: ShieldCheck,
   solicitudes: ClipboardCheck,
 } as const;
