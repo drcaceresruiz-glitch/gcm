@@ -232,6 +232,14 @@ ninguna parte.
   IMPORTADO), que es lo que responde a «esta cifra, ¿la tecleó alguien o la
   leyó un importador?» cuando un total no cuadre.
 
+- **Verificado en navegador contra CRIOCORD** el 08/08/2026 con la orden real
+  de CABREJO (`2026-07-00118`). Reprodujo el papel al céntimo —subtotal
+  11,564.05, descuento 564.05, neto 11,000.00, IGV 1,980.00, total
+  12,980.00— y el comprometido subió **11,000 y no 12,980**, que es la
+  comprobación que valida el módulo. Se probó también el aviso de exceso:
+  imputando toda la línea de ventanas a una sola de las tres partidas de
+  mamparas, el saldo salió en negativo y la pantalla lo señaló.
+
 > **Las dos reglas que se comprueban al aprobar**, y contra lo guardado, no
 > contra lo que dijo el formulario:
 >
