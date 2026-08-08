@@ -14,7 +14,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#1e40af",
+  // El teal de --color-marca-600. Va en hexadecimal porque lo lee el
+  // navegador para pintar su barra, fuera de la hoja de estilos.
+  themeColor: "#0f7186",
 };
 
 export default function RootLayout({

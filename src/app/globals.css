@@ -6,43 +6,144 @@
   los componentes, y para soportar modo claro y oscuro desde el inicio.
 */
 @theme {
-  --color-marca-50: oklch(0.97 0.02 250);
-  --color-marca-100: oklch(0.93 0.04 250);
-  --color-marca-500: oklch(0.55 0.16 250);
-  --color-marca-600: oklch(0.48 0.16 250);
-  --color-marca-700: oklch(0.4 0.14 250);
-  --color-marca-900: oklch(0.26 0.09 250);
+  /* Marca: teal. Es el color del sector y, sobre todo, NO colisiona con
+     ninguno de los tres semaforos de estado, cosa que el azul anterior si
+     hacia con el "en curso". */
+  --color-marca-50: oklch(0.97 0.02 195);
+  --color-marca-100: oklch(0.93 0.05 195);
+  --color-marca-500: oklch(0.62 0.11 195);
+  --color-marca-600: oklch(0.54 0.1 195);
+  --color-marca-700: oklch(0.45 0.09 195);
+  --color-marca-900: oklch(0.3 0.06 195);
 
-  /* Estados de obra: avance, alerta y desviacion */
+  /* Estados de obra: avance, alerta y desviacion.
+     Los tres se separan en TONO y ademas en LUMINOSIDAD (0.62 / 0.78 / 0.58),
+     para que sigan distinguiendose con daltonismo rojo-verde, que es el mas
+     frecuente. Fiarlo solo al tono dejaria exito y peligro iguales para
+     bastante gente. */
   --color-exito: oklch(0.62 0.15 150);
-  --color-alerta: oklch(0.75 0.15 80);
-  --color-peligro: oklch(0.58 0.2 25);
+  --color-alerta: oklch(0.78 0.16 75);
+  --color-peligro: oklch(0.58 0.19 25);
 }
 
+/* Tema claro por defecto. Antes se seguia `prefers-color-scheme`, asi que la
+   aplicacion salia oscura para quien tuviera el sistema en oscuro; el oscuro
+   pasa a ser una eleccion explicita. */
 :root {
-  --fondo: oklch(0.99 0 0);
-  --texto: oklch(0.22 0.01 250);
-  --borde: oklch(0.9 0.005 250);
+  /* El fondo NO es blanco: si lo fuera, las tarjetas —que si son blancas—
+     no se distinguirian de el y todo se veria plano. Esa separacion entre
+     `--fondo` y `--superficie` es la que da profundidad, mas que cualquier
+     sombra. */
+  --fondo: oklch(0.955 0.008 205);
+  --texto: oklch(0.19 0.018 230);
+  /* Texto secundario con color propio en vez de `opacity`, que sobre fondo
+     claro lo deja ilegible. */
+  --texto-suave: oklch(0.46 0.02 230);
+  --borde: oklch(0.86 0.012 220);
   --superficie: oklch(1 0 0);
+
+  /* Elevacion. Tres capas y no una, porque una cabecera pegada y una tarjeta
+     en reposo no estan a la misma altura. */
+  --sombra-1: 0 1px 2px oklch(0.2 0.03 230 / 0.06),
+    0 1px 3px oklch(0.2 0.03 230 / 0.1);
+  --sombra-2: 0 2px 4px oklch(0.2 0.03 230 / 0.06),
+    0 4px 12px oklch(0.2 0.03 230 / 0.08);
+  --sombra-3: 0 8px 24px oklch(0.2 0.03 230 / 0.12);
+
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fondo: oklch(0.18 0.01 250);
-    --texto: oklch(0.95 0.005 250);
-    --borde: oklch(0.3 0.01 250);
-    --superficie: oklch(0.22 0.012 250);
-  }
-}
+:root[data-tema="oscuro"] {
+  --fondo: oklch(0.17 0.012 230);
+  --texto: oklch(0.96 0.005 220);
+  --texto-suave: oklch(0.72 0.012 220);
+  --borde: oklch(0.32 0.014 220);
+  --superficie: oklch(0.22 0.016 230);
 
-html {
-  color-scheme: light dark;
+  /* En oscuro la sombra no separa: lo que separa es que la superficie sea
+     mas CLARA que el fondo. Se dejan casi planas para no ensuciar. */
+  --sombra-1: 0 1px 2px oklch(0 0 0 / 0.4);
+  --sombra-2: 0 2px 8px oklch(0 0 0 / 0.45);
+  --sombra-3: 0 8px 24px oklch(0 0 0 / 0.5);
+
+  color-scheme: dark;
 }
 
 body {
   background-color: var(--fondo);
   color: var(--texto);
   -webkit-font-smoothing: antialiased;
+
+  /**
+   * Textura: una retícula de puntos muy tenue, dibujada con un gradiente y
+   * sin imagen, así que no cuesta ni una petición.
+   *
+   * Va SOLO en el fondo de la página. Debajo de una tabla de importes
+   * competiria con las cifras, y las tarjetas son opacas justamente para
+   * taparla: la textura sirve para que el papel se note detras del
+   * contenido, no para decorar el contenido.
+   */
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in oklab, var(--texto) 7%, transparent) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
+  background-attachment: fixed;
+}
+
+/* Elevacion. Se usan como clases para no repetir la sombra en cada
+   `style={{}}`, que es donde acabaria divergiendo. */
+.elevacion-1 {
+  box-shadow: var(--sombra-1);
+}
+
+.elevacion-2 {
+  box-shadow: var(--sombra-2);
+}
+
+.elevacion-3 {
+  box-shadow: var(--sombra-3);
+}
+
+/* Una tarjeta que responde al puntero: sube una capa. Sin transicion de
+   color, que en una rejilla de veinte tarjetas marea. */
+.tarjeta-interactiva {
+  box-shadow: var(--sombra-1);
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.tarjeta-interactiva:hover {
+  box-shadow: var(--sombra-2);
+  transform: translateY(-1px);
+}
+
+/* Filas de tabla: el realce al pasar por encima es lo que permite seguir una
+   fila larga de izquierda a derecha sin perderla. */
+.fila-tabla:hover {
+  background-color: color-mix(in oklab, var(--color-marca-500) 5%, transparent);
+}
+
+/**
+ * Contraste de los textos secundarios.
+ *
+ * El texto atenuado se escribio con `opacity-60` y `opacity-70`, y son 204
+ * usos repartidos por 51 componentes. Sobre el fondo oscuro de antes se leian;
+ * sobre el fondo claro de ahora quedan lavados: un `opacity-60` sobre gris
+ * claro cae a un contraste de ~4.5:1, justo en el limite de lo legible.
+ *
+ * Se sube el suelo aqui, en un sitio, en lugar de tocar 204. No es la
+ * solucion definitiva —lo seria `--texto-suave` en cada componente— pero
+ * evita 204 ediciones a mano con el riesgo que eso trae, y deja el contraste
+ * en ~7:1. Va fuera de `@layer` a proposito, para ganarle a las utilidades de
+ * Tailwind sin recurrir a `!important`.
+ */
+.opacity-60 {
+  opacity: 0.78;
+}
+
+.opacity-70 {
+  opacity: 0.85;
 }
 
 /* Accesibilidad: foco siempre visible para navegacion por teclado. */
@@ -86,6 +187,17 @@ body {
   body {
     background-color: #fff;
     color: #000;
+    /* La textura del fondo NO se imprime: saldria como una trama de puntos
+       grises sobre el papel que recibe el proveedor. */
+    background-image: none;
+  }
+
+  /* Ni las sombras: en papel se convierten en manchas. */
+  .elevacion-1,
+  .elevacion-2,
+  .elevacion-3,
+  .tarjeta-interactiva {
+    box-shadow: none;
   }
 
   /* Por defecto los navegadores no imprimen fondos, y sin ellos las lineas

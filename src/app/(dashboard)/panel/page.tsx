@@ -5,9 +5,14 @@ import { Building2, MapPin, CalendarDays, Plus, SearchX } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { listarObras } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
-import { ETIQUETA_ESTADO_OBRA, type EstadoObra } from "@/lib/obras";
+import {
+  ETIQUETA_ESTADO_OBRA,
+  TONO_ESTADO_OBRA,
+  type EstadoObra,
+} from "@/lib/obras";
 import { soles } from "@/utils/formato";
 import { fechaCorta, avanceCalendario, diasEntre, hoy } from "@/utils/fechas";
+import { Chip } from "@/components/ui/Chip";
 import { Paginacion } from "@/components/ui/Paginacion";
 import { FiltrosObras } from "@/components/obras/FiltrosObras";
 import { FranjaObra, type AlertaObra } from "@/components/obras/FranjaObra";
@@ -161,7 +166,7 @@ export default async function PanelPage({
               <li key={obra.id} className="h-full">
                 <Link
                   href={`/obras/${obra.id}`}
-                  className="flex h-full flex-col rounded-xl border p-4 transition-shadow hover:shadow-md"
+                  className="tarjeta-interactiva flex h-full flex-col rounded-xl border p-4"
                   style={{
                     borderColor: "var(--borde)",
                     backgroundColor: "var(--superficie)",
@@ -171,16 +176,10 @@ export default async function PanelPage({
                   <span className="text-xs font-medium opacity-60">
                     {obra.codigoObra ?? "Sin codigo"}
                   </span>
-                  <span
-                    className="rounded-full px-2 py-0.5 text-xs font-medium"
-                    style={{
-                      backgroundColor:
-                        "color-mix(in oklab, var(--color-marca-500) 15%, transparent)",
-                    }}
-                  >
+                  <Chip tono={TONO_ESTADO_OBRA[obra.estado as EstadoObra]}>
                     {ETIQUETA_ESTADO_OBRA[obra.estado as EstadoObra] ??
                       obra.estado}
-                  </span>
+                  </Chip>
                 </div>
 
                 <h2 className="mt-2 text-sm font-semibold text-balance">

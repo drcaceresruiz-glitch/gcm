@@ -14,6 +14,7 @@ import {
 import type { OrdenResumen } from "@/services/ordenes.service";
 import { soles } from "@/utils/formato";
 import { fechaCorta, fechaHora } from "@/utils/fechas";
+import { Chip, type TonoChip } from "@/components/ui/Chip";
 import { BotonAprobarOrden } from "@/components/ordenes/BotonAprobarOrden";
 import { BotonAnularOrden } from "@/components/ordenes/BotonAnularOrden";
 import { BotonEliminarOrden } from "@/components/ordenes/BotonEliminarOrden";
@@ -279,22 +280,16 @@ function Estado({ estado }: { estado: OrdenResumen["estado"] }) {
   const Icono =
     estado === "APROBADA" ? Lock : estado === "ANULADA" ? Ban : PenLine;
 
-  const color =
+  const tono: TonoChip =
     estado === "APROBADA"
-      ? "var(--color-exito)"
+      ? "exito"
       : estado === "ANULADA"
-        ? "var(--color-peligro)"
-        : "var(--color-alerta)";
+        ? "peligro"
+        : "alerta";
 
   return (
-    <span
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-      style={{
-        backgroundColor: `color-mix(in oklab, ${color} 18%, transparent)`,
-      }}
-    >
-      <Icono className="size-3.5" aria-hidden="true" />
+    <Chip tono={tono} icono={Icono}>
       {ETIQUETA_ESTADO[estado]}
-    </span>
+    </Chip>
   );
 }

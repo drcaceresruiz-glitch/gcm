@@ -250,10 +250,15 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
               Presupuesto por partidas, agrupado en capitulos
             </caption>
             <thead>
+              {/* Cabecera con contraste de verdad, como en las tablas de las
+                  referencias: antes era un gris del 40 % del borde y apenas
+                  se separaba de las filas. */}
               <tr
-                className="text-left text-xs uppercase"
+                className="text-left text-xs font-semibold tracking-wide uppercase"
                 style={{
-                  backgroundColor: "color-mix(in oklab, var(--borde) 40%, transparent)",
+                  backgroundColor:
+                    "color-mix(in oklab, var(--color-marca-500) 12%, var(--superficie))",
+                  color: "var(--texto)",
                 }}
               >
                 {COLUMNAS.filter((c) => ve(c.clave)).map((c) => (
@@ -286,11 +291,11 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
                 return (
                   <tr
                     key={f.id}
-                    className="border-t align-top"
+                    className={`border-t align-top ${esCapitulo ? "" : "fila-tabla"}`}
                     style={{
                       borderColor: "var(--borde)",
                       backgroundColor: esCapitulo
-                        ? "color-mix(in oklab, var(--color-marca-500) 7%, transparent)"
+                        ? "color-mix(in oklab, var(--color-marca-500) 8%, transparent)"
                         : undefined,
                     }}
                   >

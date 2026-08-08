@@ -56,7 +56,7 @@ export default async function DashboardLayout({
           documentos —la orden que se le manda al proveedor— salgan por la
           impresora sin la barra de navegacion encima. */}
       <header
-        className="sticky top-0 z-20 border-b print:hidden"
+        className="elevacion-1 sticky top-0 z-20 border-b print:hidden"
         style={{
           borderColor: "var(--borde)",
           backgroundColor: "var(--superficie)",

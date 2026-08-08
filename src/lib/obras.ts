@@ -30,6 +30,25 @@ export const ETIQUETA_ESTADO_OBRA: Record<EstadoObra, string> = {
 };
 
 /**
+ * De que color va cada estado en pantalla.
+ *
+ * Al lado de la etiqueta y no en el componente: si el mapa de colores vive en
+ * la pantalla, la siguiente que muestre obras elegira otros y el mismo estado
+ * saldra de dos colores en dos sitios. Los valores son tonos de `ui/Chip`.
+ */
+export const TONO_ESTADO_OBRA: Record<
+  EstadoObra,
+  "neutro" | "curso" | "exito" | "alerta" | "peligro"
+> = {
+  // La que esta viva es la que se mira: lleva el color de marca.
+  EN_EJECUCION: "curso",
+  PLANIFICACION: "neutro",
+  PARALIZADA: "alerta",
+  // Cerrada no es un fallo, es el final natural: verde, no rojo.
+  CERRADA: "exito",
+};
+
+/**
  * Una obra nueva nace en planificacion salvo que se diga otra cosa.
  *
  * Un valor fuera del enum cae aqui en vez de romper: viene de un desplegable,

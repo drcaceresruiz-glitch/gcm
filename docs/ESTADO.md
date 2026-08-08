@@ -441,6 +441,43 @@ día se quedó corta. Se rehízo entera.
   > migración ni SQL a mano. Si algún día se reordena ese enum, **este orden
   > cambia con él**.
 
+**Lenguaje visual.** La aplicación pasa a **tema claro por defecto** con
+paleta **teal + coral**, siguiendo las referencias del cliente y lo que hacen
+Procore, Autodesk Build o Linear.
+
+- **El cambio salió barato porque la paleta ya estaba centralizada**: 62
+  componentes, **362 usos de `var(--)` y un solo color fijo** en todo `src/`
+  —el `themeColor` del navegador—. Cambiar los tokens de `globals.css`
+  repinta la aplicación entera sin tocar los 52 ficheros con estilos en línea.
+- **El oscuro deja de seguir al sistema.** Antes mandaba
+  `prefers-color-scheme`, así que quien tuviera el sistema en oscuro veía la
+  aplicación oscura sin haberlo pedido. Ahora es explícito:
+  `:root[data-tema="oscuro"]`.
+- **El fondo NO es blanco** (`oklch(0.955)`) y las tarjetas sí. Esa diferencia
+  es la que da profundidad; con los dos en blanco todo se veía plano. Encima,
+  tres capas de sombra (`--sombra-1/2/3`) y una textura de puntos en el fondo
+  hecha con un gradiente, sin imagen ni petición.
+- **Nada de 3D**, y es deliberado: las propias referencias son planas. En una
+  pantalla de importes el 3D resta legibilidad. La sensación de solidez viene
+  de la elevación, no del relieve.
+- Los tres semáforos se separan en **tono y además en luminosidad**, para que
+  se distingan también con daltonismo rojo-verde.
+- **`ui/Chip.tsx`** unifica las etiquetas de estado, que estaban escritas tres
+  veces —órdenes, obras y movimientos— y ya habían divergido en redondeo,
+  tamaño y criterio de color. El color de cada estado de obra vive junto a su
+  etiqueta en `lib/obras.ts`, no en la pantalla.
+
+> **La impresión no se toca, y se comprobó.** El documento de la orden sigue
+> en blanco y negro fijos; además el bloque `@media print` apaga ahora la
+> textura del fondo y las sombras, que en papel saldrían como una trama de
+> puntos grises y manchas.
+
+> **Deuda asumida a conciencia.** Los textos secundarios se escribieron con
+> `opacity-60/70`: son **204 usos en 51 componentes**. Sobre el fondo oscuro
+> se leían; sobre el claro caen a ~4.5:1, al límite. Se subió el suelo de esas
+> dos utilidades en `globals.css` (~7:1) en vez de hacer 204 ediciones a mano.
+> Lo correcto a futuro es usar el token `--texto-suave`, que ya existe.
+
 **Motores verificados con 102 pruebas.** (131 en total con las de paginación,
 filtro, obras y borrado de órdenes.)
 - `lib/decimal.ts` — aritmética exacta con enteros grandes, **división
