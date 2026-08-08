@@ -10,7 +10,7 @@ import {
   type CamposPartida,
   type NuevaPartida,
 } from "@/services/partidas.service";
-import { eliminarObra } from "@/services/obras.service";
+import { eliminarObra, cambiarEstadoObra } from "@/services/obras.service";
 
 export interface RespuestaEdicion {
   ok: boolean;
@@ -78,4 +78,21 @@ export async function accionEliminarObra(
 
   revalidatePath("/panel");
   redirect("/panel");
+}
+
+/** Cambia el estado de la obra por uno de los permitidos desde el actual. */
+export async function accionCambiarEstadoObra(
+  _previo: RespuestaEdicion,
+  datos: FormData,
+): Promise<RespuestaEdicion> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const obraId = String(datos.get("id") ?? "");
+  const r = await cambiarEstadoObra(sesion, obraId, String(datos.get("estado") ?? ""));
+  if (!r.ok) return { ok: false, error: r.error };
+
+  revalidatePath(`/obras/${obraId}`, "layout");
+  revalidatePath("/panel");
+  return { ok: true };
 }

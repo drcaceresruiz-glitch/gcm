@@ -49,6 +49,49 @@ export const TONO_ESTADO_OBRA: Record<
 };
 
 /**
+ * Que estados puede tomar una obra a partir del que tiene ahora.
+ *
+ * No es una lista de deseos: una obra avanza, no salta ni retrocede. Se
+ * planifica, arranca, quiza se paraliza y se reanuda, y termina cerrada. No
+ * se paraliza lo que no empezo, no se vuelve a planificar lo ya iniciado, y
+ * de CERRADA no se sale —el resultado de una obra cerrada es historia y
+ * reabrirla lo falsearia—. Cancelar antes de empezar es pasar de planificacion
+ * a cerrada directamente.
+ */
+export const TRANSICIONES_OBRA: Record<EstadoObra, EstadoObra[]> = {
+  PLANIFICACION: ["EN_EJECUCION", "CERRADA"],
+  EN_EJECUCION: ["PARALIZADA", "CERRADA"],
+  PARALIZADA: ["EN_EJECUCION", "CERRADA"],
+  CERRADA: [],
+};
+
+/** Los estados a los que se puede pasar desde el actual. */
+export function transicionesDeObra(desde: string): EstadoObra[] {
+  return TRANSICIONES_OBRA[desde as EstadoObra] ?? [];
+}
+
+/** Si el paso de un estado a otro es uno de los permitidos. */
+export function puedeTransicionarObra(desde: string, hacia: string): boolean {
+  return transicionesDeObra(desde).includes(hacia as EstadoObra);
+}
+
+/**
+ * El verbo del boton que hace la transicion, no el nombre del estado destino.
+ *
+ * "Iniciar ejecucion" y "Reanudar" llevan al MISMO estado (EN_EJECUCION) pero
+ * se leen distinto segun de donde se venga: arrancar por primera vez no es lo
+ * mismo que retomar algo parado, y el boton debe decir lo que de verdad hace.
+ */
+export function etiquetaTransicionObra(desde: EstadoObra, hacia: EstadoObra): string {
+  if (hacia === "EN_EJECUCION") {
+    return desde === "PARALIZADA" ? "Reanudar" : "Iniciar ejecucion";
+  }
+  if (hacia === "PARALIZADA") return "Paralizar";
+  if (hacia === "CERRADA") return "Cerrar obra";
+  return ETIQUETA_ESTADO_OBRA[hacia];
+}
+
+/**
  * Una obra nueva nace en planificacion salvo que se diga otra cosa.
  *
  * Un valor fuera del enum cae aqui en vez de romper: viene de un desplegable,

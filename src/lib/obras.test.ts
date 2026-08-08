@@ -4,7 +4,48 @@ import {
   fechaDeObra,
   validarObra,
   formatearCorrelativoObra,
+  puedeTransicionarObra,
+  transicionesDeObra,
+  etiquetaTransicionObra,
 } from "@/lib/obras";
+
+describe("transiciones de estado de obra", () => {
+  it("una obra avanza, no salta ni retrocede", () => {
+    expect(transicionesDeObra("PLANIFICACION")).toEqual(["EN_EJECUCION", "CERRADA"]);
+    expect(transicionesDeObra("EN_EJECUCION")).toEqual(["PARALIZADA", "CERRADA"]);
+    expect(transicionesDeObra("PARALIZADA")).toEqual(["EN_EJECUCION", "CERRADA"]);
+  });
+
+  it("cerrada es terminal: no se sale de ella", () => {
+    expect(transicionesDeObra("CERRADA")).toEqual([]);
+    expect(puedeTransicionarObra("CERRADA", "EN_EJECUCION")).toBe(false);
+    expect(puedeTransicionarObra("CERRADA", "PLANIFICACION")).toBe(false);
+  });
+
+  it("no se paraliza lo que no empezo, ni se vuelve a planificar", () => {
+    expect(puedeTransicionarObra("PLANIFICACION", "PARALIZADA")).toBe(false);
+    expect(puedeTransicionarObra("EN_EJECUCION", "PLANIFICACION")).toBe(false);
+  });
+
+  it("acepta las transiciones del ciclo de vida", () => {
+    expect(puedeTransicionarObra("PLANIFICACION", "EN_EJECUCION")).toBe(true);
+    expect(puedeTransicionarObra("EN_EJECUCION", "PARALIZADA")).toBe(true);
+    expect(puedeTransicionarObra("PARALIZADA", "EN_EJECUCION")).toBe(true);
+    expect(puedeTransicionarObra("PLANIFICACION", "CERRADA")).toBe(true);
+  });
+
+  it("un estado inventado no habilita ninguna transicion", () => {
+    expect(transicionesDeObra("INVENTADO")).toEqual([]);
+    expect(puedeTransicionarObra("INVENTADO", "CERRADA")).toBe(false);
+  });
+
+  it("el verbo del boton distingue arrancar de reanudar", () => {
+    expect(etiquetaTransicionObra("PLANIFICACION", "EN_EJECUCION")).toBe("Iniciar ejecucion");
+    expect(etiquetaTransicionObra("PARALIZADA", "EN_EJECUCION")).toBe("Reanudar");
+    expect(etiquetaTransicionObra("EN_EJECUCION", "PARALIZADA")).toBe("Paralizar");
+    expect(etiquetaTransicionObra("EN_EJECUCION", "CERRADA")).toBe("Cerrar obra");
+  });
+});
 
 describe("formatearCorrelativoObra", () => {
   it("rellena con ceros a seis digitos", () => {

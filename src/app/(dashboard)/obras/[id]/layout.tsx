@@ -10,6 +10,8 @@ import {
   type Pestana,
 } from "@/components/obras/PestanasObra";
 import { EliminarObra } from "@/components/obras/EliminarObra";
+import { EstadoObra } from "@/components/obras/EstadoObra";
+import type { EstadoObra as EstadoObraTipo } from "@/lib/obras";
 
 /**
  * Marco comun de una obra.
@@ -95,6 +97,16 @@ export default async function ObraLayout({
               {fechaCorta(obra.fechaInicio)} &ndash;{" "}
               {fechaCorta(obra.fechaFinProgramada)}
             </span>
+          </div>
+
+          {/* Estado de la obra y los pasos que puede dar. El chip muestra el
+              actual; los botones, las transiciones validas. */}
+          <div className="mt-3">
+            <EstadoObra
+              obraId={obra.id}
+              estado={obra.estado as EstadoObraTipo}
+              puedeEditar={puede(sesion, "obra:editar")}
+            />
           </div>
 
           {/* Eliminar la obra solo tiene sentido en planificacion: aun no ha

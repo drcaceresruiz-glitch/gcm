@@ -9,6 +9,9 @@ import {
   validarObra,
   ESTADOS_OBRA,
   formatearCorrelativoObra,
+  puedeTransicionarObra,
+  ETIQUETA_ESTADO_OBRA,
+  type EstadoObra,
 } from "@/lib/obras";
 import { diasEntre } from "@/utils/fechas";
 import {
@@ -692,6 +695,64 @@ export async function eliminarObra(
     await tx.wbsItem.deleteMany({ where: { projectId: obraId } });
 
     await tx.project.delete({ where: { id: obraId } });
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Cambia el estado de una obra por uno de los permitidos desde el actual.
+ *
+ * La maquina de estados vive en `lib/obras` para poder probarla; aqui solo se
+ * comprueba que el paso pedido sea uno de los validos y se registra el cambio.
+ * Un paso invalido —o manipulado en la peticion— se rechaza con un mensaje
+ * claro en vez de escribir un estado imposible.
+ */
+export async function cambiarEstadoObra(
+  sesion: SesionActiva,
+  obraId: string,
+  nuevoEstado: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!puede(sesion, "obra:editar")) {
+    return { ok: false, error: "No tienes permiso para cambiar el estado de la obra." };
+  }
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { estado: true, nombreObra: true },
+  });
+  if (!obra) return { ok: false, error: "No se encontro la obra." };
+
+  if (!ESTADOS_OBRA.includes(nuevoEstado as EstadoObra)) {
+    return { ok: false, error: "Estado no valido." };
+  }
+
+  if (obra.estado === nuevoEstado) return { ok: true }; // nada que hacer
+
+  if (!puedeTransicionarObra(obra.estado, nuevoEstado)) {
+    return {
+      ok: false,
+      error: `No se puede pasar de ${ETIQUETA_ESTADO_OBRA[obra.estado as EstadoObra]} a ${ETIQUETA_ESTADO_OBRA[nuevoEstado as EstadoObra]}.`,
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.project.update({
+      where: { id: obraId },
+      data: { estado: nuevoEstado as EstadoObra },
+    });
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "Project",
+        entidadId: obraId,
+        accion: "UPDATE",
+        antes: { estado: obra.estado },
+        despues: { estado: nuevoEstado },
+      },
+    });
   });
 
   return { ok: true };
