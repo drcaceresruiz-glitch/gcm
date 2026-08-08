@@ -46,13 +46,12 @@ sola vez** por consola y obliga a cambiarla en el primer ingreso.
 subir documentos de cliente, credenciales ni datos del servidor.
 `docs/referencias/` está en `.gitignore` por ese motivo.
 
-> ⚠️ **Credenciales expuestas — pendiente de rotar.** Este apartado
-> contuvo en claro la clave de la base, la de root y la del usuario
-> administrador, desde el commit `c19d002` y en un repositorio público.
-> Quitarlas de aquí **no las borra del historial**: siguen accesibles por
-> el SHA de ese commit, y GitHub conserva los objetos aunque se reescriba
-> la rama. La única mitigación real es **cambiarlas**; hasta que se haga,
-> hay que darlas por comprometidas. Los pasos están en §8.
+> ⚠️ **Credenciales expuestas.** Este apartado contuvo en claro la clave de
+> la base, la de root y la del usuario administrador, desde el commit
+> `c19d002` y en un repositorio público. Quitarlas de aquí **no las borra
+> del historial**: siguen accesibles por el SHA de ese commit. Las de
+> MariaDB ya se rotaron; **la del usuario administrador sigue pendiente**.
+> Estado y pasos en §8.
 
 ### Comandos
 
@@ -317,63 +316,68 @@ cosa. Merece la pena avisarle de que revise el archivo.
 
 ## 8. Rotación de las credenciales expuestas
 
-**Pendiente.** Estuvieron en claro en `docs/ESTADO.md` desde el commit
-`c19d002`, en un repositorio público. Se retiraron del documento el
-07/08/2026, pero **siguen en el historial de Git**: quien tenga el SHA de
-ese commit puede leerlas, y reescribir la rama tampoco basta porque GitHub
-conserva los objetos y las copias ya clonadas no se pueden recuperar.
+Estuvieron en claro en este documento desde el commit `c19d002`, en un
+repositorio público. Se retiraron el 07/08/2026, pero **siguen en el
+historial de Git**: quien tenga el SHA de ese commit puede leerlas.
+Reescribir la rama no ayuda —GitHub conserva los objetos y las copias ya
+clonadas no se recuperan—, así que lo único que las invalida es cambiarlas.
 
-Por eso el orden importa: **primero cambiar, después limpiar**. Mientras no
-se cambien, hay que darlas por conocidas por terceros.
+### Hecho el 07/08/2026 — MariaDB
 
-### 1. Clave del usuario administrador — lo más urgente
+- Usuario `gcm`, en todos sus hosts (`localhost` y `127.0.0.1`).
+- `root` en `localhost`, `127.0.0.1`, `::1` y **`asus-caceres`**.
+- Comprobado: la clave publicada `gcm_dev_2026` ya no abre ninguna cuenta.
+- `DATABASE_URL` de `.env` actualizada. La clave nueva de root se escribió
+  en `mariadb-root.key` (ignorado por la regla `*.key`) para moverla a un
+  gestor de contraseñas y borrar el archivo.
 
-Es la única que da acceso a datos reales del cliente. Se cambia desde la
-propia aplicación, en **Cambiar contraseña**, que además cierra todas las
-sesiones abiertas.
+Las claves se generaron dentro del script de rotación y nunca se
+imprimieron por consola: una clave que pasa por la terminal acaba en su
+registro, que es el problema que se estaba cerrando.
+
+> **La cuenta por nombre de equipo casi se escapa.** MariaDB crea en la
+> instalación un `root@<nombre-del-equipo>` además de los de loopback. Un
+> primer intento rotó solo `localhost`, `127.0.0.1` y `::1`, y
+> `root@asus-caceres` se quedó con la clave publicada. Al rotar claves de
+> MariaDB hay que listar siempre `SELECT User, Host FROM mysql.user` y
+> cubrir todas las filas, no las que uno da por supuestas.
+
+### Pendiente — clave del usuario administrador
+
+**Es la más sensible: es la única que da acceso a datos reales del
+cliente.** Se cambia desde la propia aplicación, en *Cambiar contraseña*,
+que además cierra todas las sesiones abiertas.
 
 Si esa contraseña se reutiliza en cualquier otro servicio (correo, hosting,
-banca), cámbiala también allí: es lo que hace de verdad un atacante con una
-credencial filtrada.
+banca), hay que cambiarla también allí. Es lo primero que prueba quien
+encuentra una credencial filtrada.
 
-### 2. Usuario de la base de datos local
+### Pendiente — restringir a quién escucha MariaDB
 
-```sql
-ALTER USER 'gcm'@'localhost' IDENTIFIED BY 'NUEVA_CLAVE';
-FLUSH PRIVILEGES;
-```
+Durante la rotación se vio que `bind_address` está **vacío** y
+`skip_networking` en `OFF`: el servidor escucha en todas las interfaces, no
+solo en loopback. Con una clave de root publicada en GitHub, cualquier
+equipo de la red local podía entrar como root. Ya no, pero un MariaDB de
+desarrollo no tiene por qué ser alcanzable desde fuera. En `my.ini`:
 
-Después, actualizar `DATABASE_URL` en `.env` con la clave nueva. El `.env`
-no está versionado, así que ahí puede vivir en claro.
-
-### 3. Clave de root de MariaDB
-
-```sql
-ALTER USER 'root'@'localhost' IDENTIFIED BY 'NUEVA_CLAVE_ROOT';
-FLUSH PRIVILEGES;
-```
-
-### 4. Comprobar que todo sigue en pie
-
-```bash
-npm run db:migrate
-npx vitest run
-npm run dev
+```ini
+[mysqld]
+bind-address = 127.0.0.1
 ```
 
 ### Qué NO hace falta
 
-- **No hay que reescribir el historial.** Con las credenciales ya rotadas,
-  las del historial no abren nada. Un `filter-repo` obligaría a reclonar a
-  cualquiera que tenga copia y no borra los objetos que GitHub ya guardó.
+- **No hay que reescribir el historial.** Con las credenciales rotadas, las
+  del historial no abren nada. Un `filter-repo` obligaría a reclonar a
+  cualquiera con copia y no borra los objetos que GitHub ya guardó.
 - **`APP_SECRET` no estuvo expuesto:** nunca se documentó, solo aparece
   como marcador en `.env.example`.
-- **El servidor de producción no está afectado:** `docs/infraestructura.md`
-  censura nombre de servidor, usuario y claves desde el principio.
+- **Producción no está afectada:** `docs/infraestructura.md` censura nombre
+  de servidor, usuario y claves desde el principio.
 
 ### Para que no vuelva a pasar
 
-La regla que ya sigue `docs/infraestructura.md`: en un archivo versionado
-se escribe `<usuario>`, `<clave>`, `CLAVE`, nunca el valor. Las credenciales
+La regla que ya sigue `docs/infraestructura.md`: en un archivo versionado se
+escribe `<usuario>`, `<clave>`, `CLAVE`, nunca el valor. Las credenciales
 viven en `.env` y en los secretos del repositorio, y el documento solo dice
 dónde buscarlas.
