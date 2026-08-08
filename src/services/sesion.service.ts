@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { isProduction } from "@/lib/env";
+import { resolverPermisos, type Permiso } from "@/lib/rbac";
 import type { Role } from "@/generated/prisma/enums";
 
 /**
@@ -24,6 +25,15 @@ export interface SesionActiva {
   userId: string;
   companyId: string;
   role: Role;
+  /**
+   * Permisos EFECTIVOS: la plantilla del rol con las excepciones de su
+   * empresa aplicadas. Se resuelven aqui, una vez por peticion, para que
+   * `puede()` siga siendo una comprobacion sincrona sin tocar la base.
+   *
+   * Al recalcularse en cada peticion, un cambio de permisos surte efecto en
+   * la siguiente: no hay que cerrar sesiones ni esperar a que caduquen.
+   */
+  permisos: Permiso[];
   nombres: string;
   apellidos: string;
   email: string;
@@ -83,6 +93,17 @@ export async function obtenerSesion(): Promise<SesionActiva | null> {
           email: true,
           estado: true,
           mustChangePassword: true,
+          // Las excepciones de permisos de su empresa, en la misma consulta.
+          // Se traen todas y se filtran por rol en memoria: son como mucho
+          // cinco roles por los permisos que existan, y filtrar aqui exigiria
+          // una segunda consulta porque el rol vive en la fila de al lado.
+          company: {
+            select: {
+              permisos: {
+                select: { role: true, permiso: true, concedido: true },
+              },
+            },
+          },
         },
       },
     },
@@ -95,11 +116,16 @@ export async function obtenerSesion(): Promise<SesionActiva | null> {
     return null;
   }
 
+  const excepciones = sesion.user.company.permisos.filter(
+    (p) => p.role === sesion.user.role,
+  );
+
   return {
     sesionId: sesion.id,
     userId: sesion.user.id,
     companyId: sesion.user.companyId,
     role: sesion.user.role,
+    permisos: resolverPermisos(sesion.user.role, excepciones),
     nombres: sesion.user.nombres,
     apellidos: sesion.user.apellidos,
     email: sesion.user.email,

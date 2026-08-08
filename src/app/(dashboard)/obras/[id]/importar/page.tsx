@@ -21,7 +21,7 @@ export default async function ImportarPage({
   const obra = await obtenerObra(sesion, id);
   if (!obra) notFound();
 
-  if (!puede(sesion.role, "partida:importar")) {
+  if (!puede(sesion, "partida:importar")) {
     redirect(`/obras/${id}`);
   }
 

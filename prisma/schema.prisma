@@ -97,8 +97,44 @@ model Company {
 
   users    User[]
   projects Project[]
+  permisos CompanyPermission[]
 
   @@map("companies")
+}
+
+/// Excepcion al permiso que un rol trae por defecto, para UNA empresa.
+///
+/// Guarda EXCEPCIONES, no la matriz entera: la ausencia de fila significa
+/// "lo que diga la plantilla del rol" en `src/lib/rbac.ts`. De ahi salen dos
+/// propiedades que importan. Desplegar esta tabla no cambia el permiso de
+/// nadie hasta que alguien edita algo a proposito, y volver a los valores por
+/// defecto es BORRAR la fila, no guardar otra: asi la tabla solo contiene
+/// desviaciones reales y se puede leer de un vistazo.
+///
+/// Hay permisos que nunca llegan aqui. `linea_base:aprobar` y
+/// `movimiento:aprobar` son actos contractuales irreversibles, y
+/// `permiso:leer` y `permiso:editar` reparten los demas. El resolvedor
+/// IGNORA cualquier fila que recaiga sobre ellos, aunque se inserte a mano.
+model CompanyPermission {
+  id        String @id @default(cuid())
+  companyId String
+
+  role Role
+
+  /// Nombre tal como aparece en PERMISOS ("obra:editar"). Texto y no enum a
+  /// proposito: anadir un permiso al codigo no debe exigir una migracion.
+  permiso String @db.VarChar(40)
+
+  /// true concede lo que la plantilla niega; false revoca lo que concede.
+  concedido Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, role, permiso])
+  @@map("company_permissions")
 }
 
 model User {

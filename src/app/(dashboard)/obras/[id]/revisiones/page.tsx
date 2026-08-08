@@ -38,11 +38,11 @@ export default async function RevisionesPage({
   const obra = await obtenerObra(sesion, id);
   if (!obra) notFound();
 
-  if (!puede(sesion.role, "linea_base:leer")) redirect(`/obras/${id}`);
+  if (!puede(sesion, "linea_base:leer")) redirect(`/obras/${id}`);
 
   const resumen = await obtenerResumen(sesion, id);
   const { creada, aprobada } = await searchParams;
-  const puedeCrear = puede(sesion.role, "linea_base:crear");
+  const puedeCrear = puede(sesion, "linea_base:crear");
 
   // Con la linea base ya aprobada, el presupuesto es un contrato firmado:
   // no se crean mas revisiones, los cambios van por adicionales. Se deja de
@@ -119,7 +119,7 @@ export default async function RevisionesPage({
       <PanelResumen
         resumen={resumen}
         obraId={id}
-        puedeAprobar={puede(sesion.role, "linea_base:aprobar")}
+        puedeAprobar={puede(sesion, "linea_base:aprobar")}
       />
 
       {costo && (

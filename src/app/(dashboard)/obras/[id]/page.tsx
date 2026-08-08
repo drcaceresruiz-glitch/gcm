@@ -37,7 +37,7 @@ export default async function ObraPage({
 
   const { filas, totalPartidas, montoTotal } = await listarPartidas(sesion, id);
   const { importadas } = await searchParams;
-  const puedeImportar = puede(sesion.role, "partida:importar");
+  const puedeImportar = puede(sesion, "partida:importar");
 
   return (
     <div className="space-y-6">
@@ -75,7 +75,7 @@ export default async function ObraPage({
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {puede(sesion.role, "linea_base:leer") && (
+            {puede(sesion, "linea_base:leer") && (
               <Link
                 href={`/obras/${id}/revisiones`}
                 className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
@@ -88,7 +88,7 @@ export default async function ObraPage({
 
             {/* Los movimientos van encima de la linea base: sin ella
                 aprobada, la pantalla no tiene nada que ensenar. */}
-            {puede(sesion.role, "movimiento:leer") &&
+            {puede(sesion, "movimiento:leer") &&
               obra.lineaBaseVersion !== null && (
                 <Link
                   href={`/obras/${id}/movimientos`}
@@ -179,7 +179,7 @@ export default async function ObraPage({
             filas={filas}
             // Un presupuesto congelado no se edita: los indicadores se
             // calculan contra el y cambiarlo los invalidaria hacia atras.
-            editable={puede(sesion.role, "partida:editar") && obra.lineaBaseVersion === null}
+            editable={puede(sesion, "partida:editar") && obra.lineaBaseVersion === null}
           />
         )}
       </section>

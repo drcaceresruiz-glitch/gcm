@@ -40,7 +40,7 @@ export default async function NuevoMovimientoPage({
   const obra = await obtenerObra(sesion, id);
   if (!obra) notFound();
 
-  if (!puede(sesion.role, "movimiento:crear")) {
+  if (!puede(sesion, "movimiento:crear")) {
     redirect(`/obras/${id}/movimientos`);
   }
 

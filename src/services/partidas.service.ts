@@ -98,7 +98,7 @@ export async function actualizarPartida(
   partidaId: string,
   campos: CamposPartida,
 ): Promise<Resultado> {
-  if (!puede(sesion.role, "partida:editar")) {
+  if (!puede(sesion, "partida:editar")) {
     return { ok: false, error: "No tienes permiso para editar partidas." };
   }
 
@@ -198,7 +198,7 @@ export async function eliminarPartida(
   sesion: SesionActiva,
   partidaId: string,
 ): Promise<Resultado> {
-  if (!puede(sesion.role, "partida:eliminar")) {
+  if (!puede(sesion, "partida:eliminar")) {
     return { ok: false, error: "No tienes permiso para eliminar partidas." };
   }
 
@@ -247,7 +247,7 @@ export async function crearPartida(
   obraId: string,
   nueva: NuevaPartida,
 ): Promise<Resultado<{ id: string }>> {
-  if (!puede(sesion.role, "partida:crear")) {
+  if (!puede(sesion, "partida:crear")) {
     return { ok: false, error: "No tienes permiso para crear partidas." };
   }
 

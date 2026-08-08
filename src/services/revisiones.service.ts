@@ -96,7 +96,7 @@ export async function obtenerCostoDirectoActual(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<CostoDirectoActual> {
-  if (!puede(sesion.role, "partida:leer")) {
+  if (!puede(sesion, "partida:leer")) {
     return { costoDirecto: "0.00", descuentos: "0.00", totalPartidas: 0 };
   }
 
@@ -138,7 +138,7 @@ export async function crearRevision(
   obraId: string,
   datos: DatosRevision,
 ): Promise<ResultadoRevision> {
-  if (!puede(sesion.role, "linea_base:crear")) {
+  if (!puede(sesion, "linea_base:crear")) {
     return { ok: false, error: "No tienes permiso para crear revisiones." };
   }
 
@@ -285,7 +285,7 @@ export async function obtenerResumen(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<ResumenPresupuesto> {
-  if (!puede(sesion.role, "linea_base:leer")) {
+  if (!puede(sesion, "linea_base:leer")) {
     return { revisiones: [], comparacion: null };
   }
 
@@ -373,7 +373,7 @@ export async function aprobarRevision(
   sesion: SesionActiva,
   revisionId: string,
 ): Promise<ResultadoAprobacion> {
-  if (!puede(sesion.role, "linea_base:aprobar")) {
+  if (!puede(sesion, "linea_base:aprobar")) {
     return {
       ok: false,
       error: "No tienes permiso para aprobar revisiones del presupuesto.",

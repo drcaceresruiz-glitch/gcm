@@ -51,7 +51,7 @@ export default async function MovimientosPage({
   const obra = await obtenerObra(sesion, id);
   if (!obra) notFound();
 
-  if (!puede(sesion.role, "movimiento:leer")) redirect(`/obras/${id}`);
+  if (!puede(sesion, "movimiento:leer")) redirect(`/obras/${id}`);
 
   const { creado, aprobado, eliminado, todas } = await searchParams;
 
@@ -68,7 +68,7 @@ export default async function MovimientosPage({
   }
 
   const movimientos = presupuesto ? await listarMovimientos(sesion, id) : [];
-  const puedeCrear = puede(sesion.role, "movimiento:crear");
+  const puedeCrear = puede(sesion, "movimiento:crear");
 
   return (
     <div className="space-y-8">
@@ -134,12 +134,12 @@ export default async function MovimientosPage({
           <HistorialMovimientos
             movimientos={movimientos}
             obraId={id}
-            puedeAprobar={puede(sesion.role, "movimiento:aprobar")}
+            puedeAprobar={puede(sesion, "movimiento:aprobar")}
             puedeCrear={puedeCrear}
           />
         </>
       ) : (
-        <SinLineaBase obraId={id} puedeVerLineaBase={puede(sesion.role, "linea_base:leer")} />
+        <SinLineaBase obraId={id} puedeVerLineaBase={puede(sesion, "linea_base:leer")} />
       )}
     </div>
   );

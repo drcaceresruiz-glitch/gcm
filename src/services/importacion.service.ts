@@ -27,7 +27,7 @@ export async function aplicarImportacion(
   filas: FilaImportada[],
   reemplazar: boolean,
 ): Promise<ResultadoImportacion> {
-  if (!puede(sesion.role, "partida:importar")) {
+  if (!puede(sesion, "partida:importar")) {
     return { ok: false, error: "No tienes permiso para importar partidas." };
   }
 

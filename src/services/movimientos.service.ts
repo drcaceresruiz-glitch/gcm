@@ -110,7 +110,7 @@ export async function obtenerPresupuestoVigente(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<PresupuestoVigente> {
-  if (!puede(sesion.role, "movimiento:leer")) {
+  if (!puede(sesion, "movimiento:leer")) {
     throw new Error("No tienes permiso para ver el presupuesto vigente.");
   }
 
@@ -398,7 +398,7 @@ export async function crearMovimiento(
   obraId: string,
   datos: DatosMovimiento,
 ): Promise<ResultadoMovimiento> {
-  if (!puede(sesion.role, "movimiento:crear")) {
+  if (!puede(sesion, "movimiento:crear")) {
     return { ok: false, error: "No tienes permiso para crear movimientos." };
   }
 
@@ -616,7 +616,7 @@ export async function aprobarMovimiento(
   sesion: SesionActiva,
   movimientoId: string,
 ): Promise<ResultadoAprobacion> {
-  if (!puede(sesion.role, "movimiento:aprobar")) {
+  if (!puede(sesion, "movimiento:aprobar")) {
     return {
       ok: false,
       error: "No tienes permiso para aprobar movimientos presupuestales.",
@@ -864,7 +864,7 @@ export async function listarMovimientos(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<MovimientoResumen[]> {
-  if (!puede(sesion.role, "movimiento:leer")) return [];
+  if (!puede(sesion, "movimiento:leer")) return [];
 
   const filas = await prisma.movimientoPresupuestal.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
@@ -919,7 +919,7 @@ export async function eliminarBorrador(
   sesion: SesionActiva,
   movimientoId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!puede(sesion.role, "movimiento:crear")) {
+  if (!puede(sesion, "movimiento:crear")) {
     return { ok: false, error: "No tienes permiso para eliminar movimientos." };
   }
 

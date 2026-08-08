@@ -37,7 +37,7 @@ export interface ObraResumen {
 export async function listarObras(
   sesion: SesionActiva,
 ): Promise<ObraResumen[]> {
-  if (!puede(sesion.role, "obra:leer")) throw new SinPermisoError();
+  if (!puede(sesion, "obra:leer")) throw new SinPermisoError();
 
   const obras = await prisma.project.findMany({
     where: { companyId: sesion.companyId },
@@ -96,7 +96,7 @@ export async function obtenerObra(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<ObraDetalle | null> {
-  if (!puede(sesion.role, "obra:leer")) throw new SinPermisoError();
+  if (!puede(sesion, "obra:leer")) throw new SinPermisoError();
 
   // El companyId sale de la sesion: manipular el id de la URL no permite
   // alcanzar la obra de otra empresa, simplemente no aparece.
@@ -152,7 +152,7 @@ export async function listarPartidas(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<ArbolPartidas> {
-  if (!puede(sesion.role, "partida:leer")) throw new SinPermisoError();
+  if (!puede(sesion, "partida:leer")) throw new SinPermisoError();
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
