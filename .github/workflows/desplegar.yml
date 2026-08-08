@@ -74,6 +74,16 @@ jobs:
           cp -r .next/static/. deploy/.next/static/
           if [ -d public ]; then cp -r public deploy/public; fi
 
+          # El esquema y las migraciones viajan con el paquete: sin ellos no
+          # se pueden crear las tablas en el servidor, y la base de produccion
+          # no acepta conexiones desde fuera, asi que `prisma migrate deploy`
+          # solo puede ejecutarse alli.
+          cp -r prisma deploy/prisma
+          # Crea la empresa y el usuario administrador. Va en JS plano para
+          # poder ejecutarse con el Node de cPanel, sin tsx ni devDependencies.
+          mkdir -p deploy/scripts
+          cp scripts/crear-admin.js deploy/scripts/
+
           mkdir -p envio
           tar -czf envio/gcm.tar.gz -C deploy .
           ls -lh envio/gcm.tar.gz

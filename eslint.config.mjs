@@ -51,6 +51,17 @@ const eslintConfig = [
     files: ["src/services/**", "src/lib/prisma.ts"],
     rules: { "no-restricted-imports": "off" },
   },
+
+  {
+    /**
+     * Scripts que se ejecutan EN EL SERVIDOR, con el Node de cPanel y sin
+     * dependencias de desarrollo. Van en JavaScript plano y CommonJS a
+     * proposito: alli no hay `tsx` que compile TypeScript, y el paquete
+     * desplegado tampoco es un modulo ES. `require` es lo correcto aqui.
+     */
+    files: ["scripts/**/*.js"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
 ];
 
 export default eslintConfig;
