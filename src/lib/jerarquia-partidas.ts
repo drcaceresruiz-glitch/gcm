@@ -80,6 +80,24 @@ export interface NodoImporte {
  * Un nodo cuenta si tiene importe y ninguna de sus descendientes lo tiene.
  */
 export function sumarHojas(nodos: readonly NodoImporte[]): string {
+  return sumar(aportantes(nodos).map((n) => n.parcial!));
+}
+
+/**
+ * Los nodos que APORTAN al costo directo: los que tienen importe y no quedan
+ * cubiertos por una descendiente costeada.
+ *
+ * Es el mismo criterio que aplica `sumarHojas`, expuesto por separado porque
+ * los movimientos presupuestales necesitan saberlo POR PARTIDA y no solo el
+ * total: la columna BASE de cada fila debe ser la que efectivamente conto,
+ * o la suma de las bases no cuadraria con el costo directo de la linea base.
+ *
+ * Tambien define que partidas pueden recibir un ajuste: reconvertir dinero
+ * de una partida cubierta seria moverlo de un sitio donde no estaba.
+ */
+export function aportantes<T extends NodoImporte>(
+  nodos: readonly T[],
+): T[] {
   const codigos = new Set(nodos.map((n) => n.codigo));
 
   // Ancestros que quedan cubiertos por alguna descendiente con importe.
@@ -104,11 +122,7 @@ export function sumarHojas(nodos: readonly NodoImporte[]): string {
     }
   }
 
-  return sumar(
-    nodos
-      .filter((n) => n.parcial !== null && !cubiertos.has(n.codigo))
-      .map((n) => n.parcial!),
-  );
+  return nodos.filter((n) => n.parcial !== null && !cubiertos.has(n.codigo));
 }
 
 export interface NodoRepetible extends NodoImporte {

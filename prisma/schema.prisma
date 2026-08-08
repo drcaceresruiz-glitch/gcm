@@ -453,9 +453,19 @@ model MovimientoPresupuestal {
   updatedAt DateTime @updatedAt
 
   project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  /// Restrict: borrar una linea base con movimientos encima se llevaria por
-  /// delante dinero aprobado sin dejar rastro. Que falle y se decida a mano.
-  baseline Baseline @relation(fields: [baselineId], references: [id], onDelete: Restrict)
+
+  /// Cascade, y no Restrict como parecia prudente al principio.
+  ///
+  /// Con Restrict, borrar la OBRA falla: su cascada llega a `baselines`
+  /// antes que a `movimientos_presupuestales` y choca contra la propia
+  /// restriccion. Comprobado, no supuesto. Restrict aqui no protege el
+  /// dinero: solo rompe el borrado de obras.
+  ///
+  /// La proteccion que se buscaba va donde si puede aplicarse: cuando exista
+  /// un borrado de revisiones, debe rechazar en el servicio las lineas base
+  /// que tengan movimientos encima. Hoy no hay ningun camino que borre una
+  /// `Baseline` suelta.
+  baseline Baseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
 
   lineas          MovimientoLinea[]
   partidasCreadas WbsItem[]         @relation("PartidasDeAdicional")

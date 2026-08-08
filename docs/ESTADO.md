@@ -308,6 +308,13 @@ dicta «cero coma doce» por teléfono. La traducción vive en la frontera, en
 hace con aritmética exacta, nunca dividiendo entre cien: `12.1 / 100` da
 `0.12100000000000001`. Si añades otro porcentaje al sistema, pásalo por ahí.
 
+**Borrar una obra no funciona, y viene de antes.** `WbsItem.parent` es
+`onDelete: Restrict`, así que la cascada de `Project` choca en cuanto la obra
+tiene capítulos con partidas dentro. El permiso `obra:eliminar` existe en la
+matriz pero no hay servicio que lo use, así que nadie se ha topado con ello.
+Cuando se implemente habrá que borrar a mano en orden: movimientos, partidas
+hijas, partidas raíz, líneas base y por último la obra.
+
 **El servidor de producción usa `latin1` por defecto.** La base de producción
 debe crearse explícitamente en `utf8mb4` o los acentos y la eñe se rompen.
 
