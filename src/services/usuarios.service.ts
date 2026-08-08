@@ -67,6 +67,9 @@ export interface UsuarioLista {
   numDoc: string;
   role: string;
   estado: string;
+  /// Solo para ofrecer el rescate: un ADMIN puede apagarsela a quien perdio
+  /// el acceso a su buzon. Encenderla es cosa de cada uno, en su perfil.
+  dosFactoresActivo: boolean;
   /// El propio usuario de la sesion: la interfaz le oculta las acciones que
   /// no puede hacerse a si mismo (degradarse, desactivarse, eliminarse).
   esYo: boolean;
@@ -97,6 +100,7 @@ export async function listarUsuarios(
       numDoc: true,
       role: true,
       estado: true,
+      dosFactoresActivo: true,
       createdAt: true,
     },
   });
@@ -114,6 +118,7 @@ export async function listarUsuarios(
     numDoc: u.numDoc,
     role: u.role,
     estado: u.estado,
+    dosFactoresActivo: u.dosFactoresActivo,
     esYo: u.id === sesion.userId,
     esPrincipal: u.id === principalId,
   }));
@@ -463,6 +468,73 @@ export async function resetearClave(
   });
 
   return { ok: true, claveTemporal, correoEnviado: enviado };
+}
+
+/**
+ * Apaga la verificacion en dos pasos de OTRO usuario.
+ *
+ * Es un rescate, no una preferencia: si alguien la activo y despues perdio el
+ * acceso a su buzon, el codigo no le llega y no hay forma de entrar. Sin esto,
+ * la unica salida seria tocar la base a mano.
+ *
+ * Solo apaga. Encenderla a otro empezaria a mandarle codigos a un buzon que
+ * quiza no controla, y ademas es una proteccion que uno se pone: la enciende
+ * cada cual desde su perfil.
+ *
+ * No abre un agujero nuevo: quien puede hacer esto ya podia restablecerle la
+ * clave, que es estrictamente mas poder.
+ */
+export async function desactivarDosFactoresUsuario(
+  sesion: SesionActiva,
+  userId: string,
+): Promise<Resultado> {
+  if (!puede(sesion, "usuario:editar")) {
+    return {
+      ok: false,
+      error: "No tienes permiso para editar usuarios.",
+    };
+  }
+
+  // Para la propia esta el perfil, que ademas explica lo que implica.
+  if (userId === sesion.userId) {
+    return {
+      ok: false,
+      error: 'Para la tuya usa "Mi perfil".',
+    };
+  }
+
+  const usuario = await prisma.user.findFirst({
+    where: { id: userId, companyId: sesion.companyId },
+    select: { dosFactoresActivo: true },
+  });
+  if (!usuario) return { ok: false, error: "No se encontro el usuario." };
+
+  if (!usuario.dosFactoresActivo) return { ok: true }; // idempotente
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: { dosFactoresActivo: false },
+    });
+
+    // Los desafios abiertos mueren con ella: si no, un codigo pedido hace un
+    // minuto seguiria sirviendo despues de haberla apagado.
+    await tx.codigoAcceso.deleteMany({ where: { userId } });
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        entidad: "User",
+        entidadId: userId,
+        accion: "UPDATE",
+        antes: { dosFactoresActivo: true },
+        despues: { dosFactoresActivo: false },
+      },
+    });
+  });
+
+  return { ok: true };
 }
 
 /**

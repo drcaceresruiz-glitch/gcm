@@ -9,6 +9,7 @@ import {
   cambiarEstadoUsuario,
   resetearClave,
   eliminarUsuario,
+  desactivarDosFactoresUsuario,
 } from "@/services/usuarios.service";
 
 /**
@@ -99,6 +100,24 @@ export async function accionCambiarEstado(
 
   revalidatePath("/empresa/usuarios");
   return { ok: activar ? "Usuario activado." : "Usuario desactivado." };
+}
+
+/** Rescate: apaga la verificacion en dos pasos de quien perdio su buzon. */
+export async function accionDesactivarDosFactores(
+  _previo: EstadoUsuarios,
+  datos: FormData,
+): Promise<EstadoUsuarios> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const resultado = await desactivarDosFactoresUsuario(
+    sesion,
+    texto(datos, "id"),
+  );
+  if (!resultado.ok) return { error: resultado.error };
+
+  revalidatePath("/empresa/usuarios");
+  return { ok: "Verificacion en dos pasos desactivada para ese usuario." };
 }
 
 export async function accionEliminarUsuario(

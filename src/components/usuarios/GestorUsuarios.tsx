@@ -10,6 +10,7 @@ import {
   LoaderCircle,
   Pencil,
   Plus,
+  ShieldOff,
   Trash2,
   UserPlus,
   X,
@@ -20,6 +21,7 @@ import {
   accionCambiarEstado,
   accionResetearClave,
   accionEliminarUsuario,
+  accionDesactivarDosFactores,
   type EstadoUsuarios,
 } from "@/app/(dashboard)/empresa/usuarios/acciones";
 import type { UsuarioLista } from "@/services/usuarios.service";
@@ -240,6 +242,11 @@ function FilaUsuario({ usuario }: { usuario: UsuarioLista }) {
                 {/* El reseteo es para OTROS: genera clave temporal y cierra
                     sesiones. Para la propia clave esta "Cambiar clave". */}
                 {!usuario.esYo && <FormReset usuario={usuario} />}
+                {/* Rescate: solo si la tiene encendida y no es uno mismo. La
+                  propia se apaga desde "Mi perfil". */}
+                {!usuario.esYo && usuario.dosFactoresActivo && (
+                  <FormDosFactores usuario={usuario} />
+                )}
                 {/* Nadie se desactiva a si mismo: no se ofrece el boton. */}
                 {!usuario.esYo && <FormEstado usuario={usuario} inactivo={inactivo} />}
                 {/* Eliminar: nunca al administrador principal ni a uno mismo. */}
@@ -342,6 +349,38 @@ function FormReset({ usuario }: { usuario: UsuarioLista }) {
       <input type="hidden" name="email" value={usuario.email} />
       <BotonMini icono={<KeyRound className="size-3.5" />} confirmar="Resetear la clave de este usuario? Se cerraran sus sesiones.">
         Resetear clave
+      </BotonMini>
+    </form>
+  );
+}
+
+/**
+ * Solo aparece cuando ese usuario tiene la verificacion encendida, y solo
+ * apaga. Encenderla es cosa de cada uno desde su perfil: hacerselo a otro
+ * empezaria a mandarle codigos a un buzon que quiza no controla.
+ */
+function FormDosFactores({ usuario }: { usuario: UsuarioLista }) {
+  const [estado, accion] = useActionState<EstadoUsuarios, FormData>(
+    accionDesactivarDosFactores,
+    {},
+  );
+
+  if (estado.error) {
+    return (
+      <span className="text-xs" style={{ color: "var(--color-peligro)" }}>
+        {estado.error}
+      </span>
+    );
+  }
+
+  return (
+    <form action={accion}>
+      <input type="hidden" name="id" value={usuario.id} />
+      <BotonMini
+        icono={<ShieldOff className="size-3.5" />}
+        confirmar={`Apagar la verificacion en dos pasos de ${usuario.nombres} ${usuario.apellidos}? Hazlo solo si perdio el acceso a su correo: volvera a entrar con la clave sola.`}
+      >
+        Apagar 2FA
       </BotonMini>
     </form>
   );
