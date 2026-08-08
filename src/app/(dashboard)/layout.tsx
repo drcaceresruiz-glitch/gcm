@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { HardHat, LogOut } from "lucide-react";
+import { HardHat, KeyRound, LogOut } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { accionCerrarSesion } from "@/app/(auth)/acciones";
 
@@ -46,6 +47,18 @@ export default async function DashboardLayout({
               </p>
               <p className="text-xs leading-tight opacity-60">{sesion.role}</p>
             </div>
+
+            {/* La pantalla existia desde el modulo 0 pero no estaba
+                enlazada: la unica forma de llegar era escribir la direccion
+                de memoria. Nadie cambia una contrasena asi. */}
+            <Link
+              href="/cambiar-clave"
+              className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <KeyRound className="size-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Cambiar clave</span>
+            </Link>
 
             <form action={accionCerrarSesion}>
               <button

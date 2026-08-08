@@ -336,15 +336,37 @@ registro, que es el problema que se estaba cerrando.
 > MariaDB hay que listar siempre `SELECT User, Host FROM mysql.user` y
 > cubrir todas las filas, no las que uno da por supuestas.
 
-### Pendiente — clave del usuario administrador
+### La clave de root de MariaDB se perdió
 
-**Es la más sensible: es la única que da acceso a datos reales del
-cliente.** Se cambia desde la propia aplicación, en *Cambiar contraseña*,
-que además cierra todas las sesiones abiertas.
+Al rotarla el 07/08/2026 se guardó en `mariadb-root.key`, y ese archivo se
+sobrescribió por accidente antes de copiarla a un gestor. Era aleatoria y no
+estaba en ningún otro sitio, así que **nadie conoce la clave de root del
+MariaDB de desarrollo**.
 
-Si esa contraseña se reutiliza en cualquier otro servicio (correo, hosting,
-banca), hay que cambiarla también allí. Es lo primero que prueba quien
-encuentra una credencial filtrada.
+**No bloquea nada.** La aplicación se conecta con el usuario `gcm`, que tiene
+todos los privilegios sobre `gcm_dev` y sobre las bases sombra que necesita
+Prisma para migrar. Root solo hace falta para crear bases o usuarios nuevos.
+
+Si algún día se necesita, se reinicia con el procedimiento estándar de
+MariaDB en Windows, desde un símbolo del sistema **como administrador**:
+parar el servicio, arrancar `mysqld` con `--skip-grant-tables`, fijar la
+clave nueva y volver a arrancar el servicio.
+
+Lección: una clave de un solo uso no debe quedarse en un archivo de texto
+esperando a que alguien se acuerde de moverla. O va directa al gestor de
+contraseñas, o no se genera.
+
+### Hecho — clave del usuario administrador
+
+Cambiada el 07/08/2026 desde la propia aplicación. Sustituye a la que quedó
+publicada en el commit `c19d002`.
+
+De paso se descubrió que *Cambiar contraseña* **existía desde el módulo 0
+pero no estaba enlazada en ninguna pantalla**: la única forma de llegar era
+escribir la dirección de memoria. Ya hay un botón en la cabecera.
+
+Sigue en pie el aviso general: si esa contraseña se reutilizaba en algún otro
+servicio (correo, hosting, banca), hay que cambiarla también allí.
 
 ### Pendiente — restringir a quién escucha MariaDB
 
