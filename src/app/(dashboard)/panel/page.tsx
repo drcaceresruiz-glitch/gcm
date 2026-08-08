@@ -14,6 +14,7 @@ import { soles } from "@/utils/formato";
 import { fechaCorta, avanceCalendario, diasEntre, hoy } from "@/utils/fechas";
 import { Chip } from "@/components/ui/Chip";
 import { Paginacion } from "@/components/ui/Paginacion";
+import { AcentoTitulo, Regla } from "@/components/ui/Regla";
 import { FiltrosObras } from "@/components/obras/FiltrosObras";
 import { FranjaObra, type AlertaObra } from "@/components/obras/FranjaObra";
 
@@ -49,14 +50,14 @@ export default async function PanelPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <AcentoTitulo>
           <h1 className="text-2xl font-semibold tracking-tight">Obras</h1>
           <p className="mt-1 text-sm opacity-70">
             {vacioDeVerdad
               ? "Aun no hay obras registradas."
               : `${obras.total} obra(s)${hayFiltro ? " coinciden" : " en tu empresa"}.`}
           </p>
-        </div>
+        </AcentoTitulo>
 
         {puedeCrear && !vacioDeVerdad && (
           <Link
@@ -105,6 +106,11 @@ export default async function PanelPage({
           </p>
         </div>
       ) : (
+        <>
+        {/* Las reglas enmarcan la rejilla: le dan un principio y un final
+            claros en vez de dejarla flotando sobre el fondo. */}
+        <Regla />
+
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {obras.filas.map((obra) => {
             const avance = avanceCalendario(
@@ -235,6 +241,9 @@ export default async function PanelPage({
             );
           })}
         </ul>
+
+        <Regla intensidad="suave" />
+        </>
       )}
 
       <Paginacion
