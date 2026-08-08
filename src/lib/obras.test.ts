@@ -1,5 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { estadoDeObra, fechaDeObra, validarObra } from "@/lib/obras";
+import {
+  estadoDeObra,
+  fechaDeObra,
+  validarObra,
+  formatearCorrelativoObra,
+} from "@/lib/obras";
+
+describe("formatearCorrelativoObra", () => {
+  it("rellena con ceros a seis digitos", () => {
+    expect(formatearCorrelativoObra(1)).toBe("OB-000001");
+    expect(formatearCorrelativoObra(42)).toBe("OB-000042");
+    expect(formatearCorrelativoObra(123456)).toBe("OB-123456");
+  });
+
+  /** El padding es justo para esto: ordenar como texto = ordenar como numero. */
+  it("OB-000009 va antes que OB-000010 al ordenar", () => {
+    const nueve = formatearCorrelativoObra(9);
+    const diez = formatearCorrelativoObra(10);
+    expect([diez, nueve].sort()).toEqual([nueve, diez]);
+  });
+});
 
 describe("estadoDeObra", () => {
   it("acepta los estados del esquema", () => {

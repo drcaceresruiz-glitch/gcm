@@ -76,7 +76,8 @@ export default async function ObraLayout({
           <Volver href="/panel">Volver al panel</Volver>
 
           <p className="mt-3 text-xs font-medium opacity-60">
-            {obra.codigoObra ?? "Sin codigo"}
+            {obra.correlativo ?? "Sin correlativo"}
+            {obra.codigoObra && ` · ${obra.codigoObra}`}
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-balance">
             {obra.nombreObra}

@@ -4,7 +4,12 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { esPositivo, sumar } from "@/lib/decimal";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
-import { estadoDeObra, validarObra, ESTADOS_OBRA } from "@/lib/obras";
+import {
+  estadoDeObra,
+  validarObra,
+  ESTADOS_OBRA,
+  formatearCorrelativoObra,
+} from "@/lib/obras";
 import { diasEntre } from "@/utils/fechas";
 import {
   contarPaginas,
@@ -33,6 +38,9 @@ export class SinPermisoError extends Error {
 export interface ObraResumen {
   id: string;
   codigoObra: string | null;
+  /// Correlativo del sistema ("OB-000001"). Null solo en obras anteriores a
+  /// su introduccion.
+  correlativo: string | null;
   nombreObra: string;
   ubicacion: string | null;
   estado: string;
@@ -315,6 +323,8 @@ export async function listarObras(
           OR: [
             { nombreObra: { contains: texto } },
             { codigoObra: { contains: texto } },
+            // El correlativo tambien se busca: es justo para lo que existe.
+            { correlativo: { contains: texto } },
           ],
         }
       : {}),
@@ -332,6 +342,7 @@ export async function listarObras(
     select: {
       id: true,
       codigoObra: true,
+      correlativo: true,
       nombreObra: true,
       ubicacion: true,
       estado: true,
@@ -434,6 +445,7 @@ export async function listarObras(
 export interface ObraDetalle {
   id: string;
   codigoObra: string | null;
+  correlativo: string | null;
   nombreObra: string;
   ubicacion: string | null;
   cliente: string | null;
@@ -464,6 +476,7 @@ export const obtenerObra = cache(async function obtenerObra(
     select: {
       id: true,
       codigoObra: true,
+      correlativo: true,
       nombreObra: true,
       ubicacion: true,
       cliente: true,
@@ -562,8 +575,21 @@ export async function crearObra(
   };
 
   const creada = await prisma.$transaction(async (tx) => {
+    // El correlativo sale del contador de la empresa, incrementado de forma
+    // atomica: el valor PREVIO al incremento es el de esta obra. Hacerlo con
+    // `increment` y no leyendo-y-sumando evita que dos altas simultaneas se
+    // lleven el mismo numero.
+    const empresa = await tx.company.update({
+      where: { id: sesion.companyId },
+      data: { siguienteCorrelativoObra: { increment: 1 } },
+      select: { siguienteCorrelativoObra: true },
+    });
+    const correlativo = formatearCorrelativoObra(
+      empresa.siguienteCorrelativoObra - 1,
+    );
+
     const obra = await tx.project.create({
-      data: { companyId: sesion.companyId, ...campos },
+      data: { companyId: sesion.companyId, correlativo, ...campos },
       select: { id: true },
     });
 
@@ -576,6 +602,7 @@ export async function crearObra(
         entidadId: obra.id,
         accion: "CREATE",
         despues: {
+          correlativo,
           ...campos,
           fechaInicio: datos.fechaInicio,
           fechaFinProgramada: datos.fechaFinProgramada,

@@ -109,6 +109,12 @@ model Company {
   /// codigo porque es una condicion contractual suya, no del sistema.
   observacionesOrden String? @db.Text
 
+  /// Contador del proximo correlativo de obra de esta empresa. Solo sube: al
+  /// crear una obra se incrementa y su valor previo se le asigna. Que viva
+  /// aqui —y no se derive del maximo de las obras— es lo que hace que borrar
+  /// una obra NO recicle su numero: un correlativo de auditoria no se repite.
+  siguienteCorrelativoObra Int @default(1)
+
   activa Boolean @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -289,6 +295,14 @@ model Project {
 
   nombreObra  String  @db.VarChar(255)
   codigoObra  String? @db.VarChar(40)
+
+  /// Correlativo interno que asigna el SISTEMA, ascendente por empresa
+  /// ("OB-000001"). Distinto de `codigoObra`, que lo pone la persona y puede
+  /// faltar o repetir formato entre obras. Este es unico, no se recicla y
+  /// sirve para buscar y para auditoria. Nullable solo por las obras que
+  /// existian antes de introducirlo; las nuevas siempre lo llevan.
+  correlativo String? @db.VarChar(20)
+
   ubicacion   String? @db.VarChar(255)
   cliente     String? @db.VarChar(200)
   descripcion String? @db.Text
@@ -309,6 +323,7 @@ model Project {
   ordenes     OrdenCompra[]
 
   @@unique([companyId, codigoObra])
+  @@unique([companyId, correlativo])
   @@index([companyId, estado])
   @@map("projects")
 }

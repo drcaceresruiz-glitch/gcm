@@ -77,6 +77,18 @@ export function fechaDeObra(valor: string | undefined): Date | null {
   return fecha.toISOString().slice(0, 10) === valor ? fecha : null;
 }
 
+/**
+ * El correlativo de obra a partir de su numero: `OB-000001`.
+ *
+ * Seis digitos con ceros a la izquierda para que ordene igual como texto que
+ * como numero —"OB-000009" antes que "OB-000010"— y quepan casi un millon de
+ * obras antes de crecer. El prefijo lo hace reconocible de un vistazo en una
+ * busqueda o una auditoria.
+ */
+export function formatearCorrelativoObra(numero: number): string {
+  return `OB-${String(numero).padStart(6, "0")}`;
+}
+
 export interface PlazoObra {
   inicio: Date;
   fin: Date;

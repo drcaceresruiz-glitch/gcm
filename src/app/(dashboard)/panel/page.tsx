@@ -202,7 +202,10 @@ export default async function PanelPage({
                 >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-xs font-medium opacity-60">
-                    {obra.codigoObra ?? "Sin codigo"}
+                    {/* El correlativo del sistema encabeza; el codigo de la
+                        persona, si lo hay, va detras. */}
+                    {obra.correlativo ?? "Sin correlativo"}
+                    {obra.codigoObra && ` · ${obra.codigoObra}`}
                   </span>
                   <Chip tono={TONO_ESTADO_OBRA[obra.estado as EstadoObra]}>
                     {ETIQUETA_ESTADO_OBRA[obra.estado as EstadoObra] ??
