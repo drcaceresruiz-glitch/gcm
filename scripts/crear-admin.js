@@ -13,14 +13,25 @@
  * - JavaScript plano y CommonJS, no TypeScript: en el servidor solo hay el
  *   Node de cPanel y el node_modules que viaja en el paquete. No hay `tsx`.
  *
- * - Habla directo con MariaDB y no por Prisma. El proyecto genera su cliente
- *   en `src/generated/prisma`, no en `@prisma/client`, y esa ruta no existe
- *   como modulo en el paquete desplegado: `require("@prisma/client")` falla
- *   con MODULE_NOT_FOUND. El driver `mariadb` si esta, porque lo arrastra
- *   `@prisma/adapter-mariadb`.
+ * - No usa Prisma. El proyecto genera su cliente en `src/generated/prisma` y
+ *   Next lo empaqueta DENTRO del codigo compilado, asi que no existe como
+ *   modulo suelto: `require("@prisma/client")` falla con MODULE_NOT_FOUND.
+ *
+ * - El driver `mariadb` tampoco viaja en el paquete, por lo mismo. Si no
+ *   esta, el script no se rinde: imprime el SQL para pegarlo en phpMyAdmin.
+ *   Asi funciona con o sin dependencias, que es lo que se quiere de una
+ *   herramienta de rescate.
  */
 const { randomBytes, randomInt, scrypt } = require("node:crypto");
-const mariadb = require("mariadb");
+
+/** El driver es opcional: sin el se cae al modo SQL. */
+function cargarDriver() {
+  try {
+    return require("mariadb");
+  } catch {
+    return null;
+  }
+}
 
 // --- Copia fiel de src/lib/password.ts -------------------------------------
 // Los parametros deben coincidir con los de la aplicacion, o el hash que se
@@ -79,11 +90,62 @@ async function numDocLibre(con, empresaId) {
 const RUC = "20601689988";
 const RAZON_SOCIAL = "LARQUITECTURA STUDIO SAC";
 
+/** Comillas simples dobladas: es todo lo que necesita un literal de MySQL. */
+function sql(valor) {
+  return "'" + String(valor).replace(/'/g, "''") + "'";
+}
+
+/**
+ * Modo sin driver: se imprimen las sentencias para pegarlas en phpMyAdmin.
+ *
+ * Se usa INSERT IGNORE en la empresa por si ya existe, y se elige el numero
+ * de documento con una subconsulta, para no depender de conocer el estado de
+ * la base desde aqui.
+ */
+function imprimirSql(email, hash, empresaId, usuarioId) {
+  console.log("\nNo se encontro el driver `mariadb`, asi que no puedo");
+  console.log("escribir en la base directamente.");
+  console.log("\nCopia TODO lo que va entre las lineas y pegalo en");
+  console.log("phpMyAdmin, en la pestana SQL de la base de la aplicacion:");
+  console.log("\n-------------------------------------------------------");
+  console.log(
+    "INSERT IGNORE INTO companies (id, razonSocial, ruc, direccion, updatedAt)\n" +
+      "VALUES (" + sql(empresaId) + ", " + sql(RAZON_SOCIAL) + ", " +
+      sql(RUC) + ", 'Lima, Peru', NOW(3));",
+  );
+  console.log(
+    "\nINSERT INTO users (id, companyId, nombres, apellidos, tipoDoc, numDoc,\n" +
+      "  cargo, email, passwordHash, role, estado, mustChangePassword, updatedAt)\n" +
+      "SELECT " + sql(usuarioId) + ", c.id, 'Administrador', 'GCM', 'DNI',\n" +
+      "  LPAD((SELECT COUNT(*) FROM users u WHERE u.companyId = c.id), 8, '0'),\n" +
+      "  'Administrador del sistema', " + sql(email) + ", " + sql(hash) + ",\n" +
+      "  'ADMIN', 'ACTIVO', true, NOW(3)\n" +
+      "FROM companies c WHERE c.ruc = " + sql(RUC) + ";",
+  );
+  console.log("-------------------------------------------------------");
+}
+
 async function main() {
   const email = (process.argv[2] || "").trim().toLowerCase();
   if (!email || !email.includes("@")) {
     console.error("Uso: node scripts/crear-admin.js tu-correo@ejemplo.com");
     process.exit(1);
+  }
+
+  const clave = claveTemporal();
+  const hash = await hashPassword(clave);
+
+  const mariadb = cargarDriver();
+
+  // Sin driver no hace falta ni la URL: se imprime el SQL y listo.
+  if (!mariadb) {
+    imprimirSql(email, hash, id(), id());
+    console.log("\n=====================================================");
+    console.log("  Usuario:  " + email);
+    console.log("  Clave:    " + clave);
+    console.log("=====================================================");
+    console.log("Ejecuta ese SQL y despues entra con estos datos.");
+    return;
   }
 
   const url = process.env.DATABASE_URL;
@@ -130,7 +192,6 @@ async function main() {
       console.log("Empresa creada: " + RAZON_SOCIAL);
     }
 
-    const clave = claveTemporal();
     await con.query(
       "INSERT INTO users (id, companyId, nombres, apellidos, tipoDoc, numDoc," +
         " cargo, email, passwordHash, role, estado, mustChangePassword," +
@@ -139,7 +200,7 @@ async function main() {
       [
         id(), empresaId, "Administrador", "GCM", "DNI",
         await numDocLibre(con, empresaId),
-        "Administrador del sistema", email, await hashPassword(clave),
+        "Administrador del sistema", email, hash,
       ],
     );
 
