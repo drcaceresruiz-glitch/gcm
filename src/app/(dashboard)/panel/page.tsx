@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2, MapPin, CalendarDays, Plus, SearchX } from "lucide-react";
+import { MapPin, CalendarDays, Plus } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
   listarObras,
@@ -18,6 +18,7 @@ import {
 import { soles } from "@/utils/formato";
 import { fechaCorta, avanceCalendario, diasEntre, hoy } from "@/utils/fechas";
 import { Chip } from "@/components/ui/Chip";
+import { Mascota } from "@/components/ui/Mascota";
 import { Paginacion } from "@/components/ui/Paginacion";
 import { AcentoTitulo, Regla } from "@/components/ui/Regla";
 import { FiltrosObras } from "@/components/obras/FiltrosObras";
@@ -102,7 +103,9 @@ export default async function PanelPage({
           className="rounded-xl border border-dashed p-10 text-center"
           style={{ borderColor: "var(--borde)" }}
         >
-          <Building2 className="mx-auto size-8 opacity-40" aria-hidden="true" />
+          <div className="flex justify-center">
+            <Mascota pose="saludando" ancho={110} alto={180} flotar />
+          </div>
           <p className="mt-3 text-sm opacity-70">
             Crea tu primera obra para empezar a cargar el presupuesto.
           </p>
@@ -122,7 +125,9 @@ export default async function PanelPage({
           className="rounded-xl border border-dashed p-10 text-center"
           style={{ borderColor: "var(--borde)" }}
         >
-          <SearchX className="mx-auto size-8 opacity-40" aria-hidden="true" />
+          <div className="flex justify-center">
+            <Mascota pose="pensando" ancho={130} alto={140} />
+          </div>
           <p className="mt-3 text-sm opacity-70">
             Ninguna obra coincide con la busqueda.
           </p>

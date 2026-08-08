@@ -264,6 +264,27 @@ body {
   animation: latido 2.4s ease-out infinite;
 }
 
+/* ---------------------------------------------------------------------------
+   Mascota
+   ---------------------------------------------------------------------------
+   Un balanceo minimo —seis pixeles— y lento. La mascota acompana, no reclama
+   atencion: si se moviera mas, competiria con el formulario que tiene al lado.
+   La regla global de `prefers-reduced-motion` la detiene con el resto.
+*/
+@keyframes flotar {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.flotar {
+  animation: flotar 4s ease-in-out infinite;
+}
+
 /* Accesibilidad: foco siempre visible para navegacion por teclado. */
 :focus-visible {
   outline: 2px solid var(--color-marca-500);
