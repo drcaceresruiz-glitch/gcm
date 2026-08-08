@@ -589,6 +589,100 @@ export async function crearObra(
   return { ok: true, id: creada.id };
 }
 
+// ---------------------------------------------------------------------------
+// Baja de obras
+// ---------------------------------------------------------------------------
+
+/**
+ * Elimina una obra, con trazabilidad, SOLO si es segura de eliminar.
+ *
+ * Segura = en PLANIFICACION, sin ninguna orden y sin ninguna linea base. Es
+ * decir, una obra que aun no ha comprometido nada con nadie ni ha congelado
+ * su presupuesto: lo unico que puede tener son partidas cargadas, que se van
+ * con ella. En cuanto hay una orden o una linea base, la obra ya es historia
+ * economica y no se borra —a lo sumo se cierra—.
+ *
+ * Sin linea base no puede haber movimientos (un movimiento exige una), asi
+ * que el arbol de partidas es lo unico colgando. Se rompe la jerarquia antes
+ * de borrar —`parentId` a NULL— porque la relacion padre-hijo es `Restrict`:
+ * un `deleteMany` sobre filas que se referencian entre si fallaria.
+ */
+export async function eliminarObra(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!puede(sesion, "obra:eliminar")) {
+    return { ok: false, error: "No tienes permiso para eliminar obras." };
+  }
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { id: true, nombreObra: true, codigoObra: true, estado: true },
+  });
+  if (!obra) return { ok: false, error: "No se encontro la obra." };
+
+  if (obra.estado !== "PLANIFICACION") {
+    return {
+      ok: false,
+      error:
+        "Solo se pueden eliminar obras en planificacion. Una obra en ejecucion, paralizada o cerrada es historia de la empresa: se conserva.",
+    };
+  }
+
+  const [ordenes, baselines] = await Promise.all([
+    prisma.ordenCompra.count({ where: { projectId: obraId } }),
+    prisma.baseline.count({ where: { projectId: obraId } }),
+  ]);
+
+  if (ordenes > 0) {
+    return {
+      ok: false,
+      error:
+        "Esta obra ya tiene ordenes registradas; no puede eliminarse. Anula las ordenes o cierra la obra.",
+    };
+  }
+  if (baselines > 0) {
+    return {
+      ok: false,
+      error:
+        "Esta obra ya tiene una linea base; no puede eliminarse. Una vez congelado el presupuesto, la obra se conserva.",
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // El apunte va ANTES del borrado: si algo fallara despues, queda el
+    // intento registrado y no un borrado silencioso.
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "Project",
+        entidadId: obraId,
+        accion: "DELETE",
+        antes: {
+          nombreObra: obra.nombreObra,
+          codigoObra: obra.codigoObra,
+          estado: obra.estado,
+        },
+      },
+    });
+
+    // Romper la jerarquia antes de borrar: la relacion padre-hijo es Restrict
+    // y un borrado masivo con las referencias intactas chocaria contra ella.
+    await tx.wbsItem.updateMany({
+      where: { projectId: obraId },
+      data: { parentId: null },
+    });
+    // Las partidas se van; sus filas de "proveedor habitual" caen en cascada.
+    await tx.wbsItem.deleteMany({ where: { projectId: obraId } });
+
+    await tx.project.delete({ where: { id: obraId } });
+  });
+
+  return { ok: true };
+}
+
 export interface PartidaFila {
   id: string;
   codigoPartida: string;

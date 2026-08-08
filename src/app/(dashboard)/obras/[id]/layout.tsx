@@ -9,6 +9,7 @@ import {
   PestanasObra,
   type Pestana,
 } from "@/components/obras/PestanasObra";
+import { EliminarObra } from "@/components/obras/EliminarObra";
 
 /**
  * Marco comun de una obra.
@@ -94,6 +95,12 @@ export default async function ObraLayout({
               {fechaCorta(obra.fechaFinProgramada)}
             </span>
           </div>
+
+          {/* Eliminar la obra solo tiene sentido en planificacion: aun no ha
+              comprometido nada. El servicio lo vuelve a comprobar. */}
+          {obra.estado === "PLANIFICACION" && puede(sesion, "obra:eliminar") && (
+            <EliminarObra obraId={obra.id} nombre={obra.nombreObra} />
+          )}
         </div>
 
         <PestanasObra pestanas={pestanas} raiz={raiz} />

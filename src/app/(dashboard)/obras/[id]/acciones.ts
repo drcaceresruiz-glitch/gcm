@@ -10,6 +10,7 @@ import {
   type CamposPartida,
   type NuevaPartida,
 } from "@/services/partidas.service";
+import { eliminarObra } from "@/services/obras.service";
 
 export interface RespuestaEdicion {
   ok: boolean;
@@ -57,4 +58,24 @@ export async function accionEliminarPartida(
 
   revalidatePath(`/obras/${obraId}`);
   return { ok: true };
+}
+
+/**
+ * Elimina la obra entera. Solo procede en planificacion y sin compromisos; de
+ * eso se encarga el servicio. Al lograrlo, la obra ya no existe: se vuelve al
+ * panel, y por eso el `redirect` va fuera —no se puede revalidar una ruta que
+ * se acaba de borrar—.
+ */
+export async function accionEliminarObra(
+  _previo: RespuestaEdicion,
+  datos: FormData,
+): Promise<RespuestaEdicion> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await eliminarObra(sesion, String(datos.get("id") ?? ""));
+  if (!r.ok) return { ok: false, error: r.error };
+
+  revalidatePath("/panel");
+  redirect("/panel");
 }
