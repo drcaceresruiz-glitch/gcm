@@ -84,6 +84,19 @@ jobs:
           mkdir -p deploy/scripts
           cp scripts/crear-admin.js deploy/scripts/
 
+          # Prisma 7 lee la URL de la base de un archivo de configuracion, no
+          # del esquema. El del repositorio es TypeScript e importa `dotenv` y
+          # `prisma/config`, que no existen en el servidor. Se genera aqui una
+          # version minima en CommonJS que solo mira la variable de entorno.
+          cat > deploy/prisma.config.js <<'FIN'
+          module.exports = {
+            schema: "prisma/schema.prisma",
+            migrations: { path: "prisma/migrations" },
+            datasource: { url: process.env.DATABASE_URL },
+          };
+          FIN
+          node --check deploy/prisma.config.js
+
           mkdir -p envio
           tar -czf envio/gcm.tar.gz -C deploy .
           ls -lh envio/gcm.tar.gz
