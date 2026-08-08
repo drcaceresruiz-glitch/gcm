@@ -161,9 +161,37 @@ export function FormularioOrden({
     })),
   };
 
+  /**
+   * Cambia una linea y, si toco la cantidad o el precio, recalcula el
+   * importe.
+   *
+   * En las tres ordenes reales el importe es siempre cantidad x precio: 6 x
+   * 1,254.56 = 7,527.36 en CABREJO, 4 x 4,729.57 = 18,918.28 en SIV AIRE.
+   * Teclearlo a mano ademas de los otros dos es trabajo de sobra y una
+   * ocasion de equivocarse.
+   *
+   * El importe SIGUE siendo editable: hay lineas globales que traen su total
+   * sin desglose, y las agrupadoras no tienen cantidad ni precio. Solo se
+   * recalcula al tocar los factores, nunca al escribir en el importe.
+   */
   function cambiarLinea(clave: number, cambios: Partial<LineaEstado>) {
+    const recalcula =
+      cambios.cantidad !== undefined || cambios.precioUnitario !== undefined;
+
     setLineas((previas) =>
-      previas.map((l) => (l.clave === clave ? { ...l, ...cambios } : l)),
+      previas.map((l) => {
+        if (l.clave !== clave) return l;
+
+        const linea = { ...l, ...cambios };
+        if (!recalcula) return linea;
+
+        const producto =
+          linea.cantidad.trim() && linea.precioUnitario.trim()
+            ? multiplicar(linea.cantidad.trim(), linea.precioUnitario.trim(), 2)
+            : null;
+
+        return producto === null ? linea : { ...linea, importe: producto };
+      }),
     );
   }
 
@@ -732,6 +760,7 @@ function FilaLinea({
           etiqueta="Importe"
           value={linea.importe}
           onChange={(e) => onCambio({ importe: e.target.value })}
+          ayuda="Sale de cantidad x precio. Se puede corregir."
         />
       </div>
     </div>
