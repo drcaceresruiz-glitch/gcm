@@ -261,7 +261,7 @@ adicional por vicios ocultos o cambios en el diseño original»*.
 
 | Fase | Contenido |
 |---|---|
-| Despliegue | cPanel tiene **Git Version Control** — es la vía elegida. SSH externo está cerrado (probado: solo responden los puertos web 2082/2083). Clave `gcm_deploy` ya autorizada. Ver `docs/infraestructura.md` |
+| Despliegue | **GitHub Actions + FTPS** (`.github/workflows/desplegar.yml`): compila en CI y sube solo el resultado. Sustituye a Git Version Control. El 21 está abierto y el servidor admite `AUTH TLS` (comprobado). Falta crear la app Node en cPanel. Migraciones, a mano. Ver `docs/infraestructura.md` |
 | Cronograma | Importar desde XML de MS Project (el `.mpp` es binario propietario y no se puede leer). Planificación semanal, ruta crítica |
 | Avance físico | Metrados ejecutados, Curva S, evidencia fotográfica |
 | Proveedores | Órdenes de compra, **anticipos**, recepciones, abonos |

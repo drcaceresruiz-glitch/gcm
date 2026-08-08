@@ -1,0 +1,106 @@
+# Despliegue a cPanel.
+#
+# GCM no es un sitio de archivos: es una aplicacion Next.js que hay que
+# compilar y cuyo proceso Node hay que reiniciar. Por eso la compilacion se
+# hace aqui y por FTP viaja solo el resultado, no el codigo fuente.
+#
+# La configuracion real (DATABASE_URL, APP_SECRET) NO viaja: vive en cPanel,
+# en las variables de entorno de la aplicacion Node.
+name: Desplegar a cPanel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Dos despliegues simultaneos dejarian el servidor con archivos de dos
+# compilaciones distintas mezclados a mitad de subida.
+concurrency:
+  group: despliegue-produccion
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Un presupuesto mal calculado no debe llegar a produccion.
+      - name: Pruebas
+        run: npx vitest run
+
+      - name: Compilar
+        # Valores de relleno, no credenciales. `src/lib/env.ts` valida el
+        # entorno al importarse y aborta si falta DATABASE_URL o APP_SECRET;
+        # el runner no tiene .env, asi que sin esto el build ni arranca.
+        # No llegan al servidor: la configuracion real esta en cPanel.
+        env:
+          DATABASE_URL: mysql://compilacion@127.0.0.1:3306/compilacion
+          APP_SECRET: relleno-de-compilacion-sin-valor-real-32ch
+        run: npm run build
+
+      # `output: "standalone"` deja en .next/standalone un servidor
+      # autocontenido con sus dependencias, pero los estaticos y public
+      # quedan fuera y hay que colocarlos en su sitio.
+      - name: Armar el paquete
+        run: |
+          mkdir -p deploy
+          cp -r .next/standalone/. deploy/
+          # El build de Next arrastra el .env dentro de standalone. En el
+          # runner no deberia existir, pero si alguna vez aparece subiria
+          # credenciales y pisaria la configuracion del servidor. Fuera.
+          rm -f deploy/.env deploy/.env.*
+          mkdir -p deploy/.next/static
+          cp -r .next/static/. deploy/.next/static/
+          if [ -d public ]; then cp -r public deploy/public; fi
+          # Passenger reinicia la aplicacion al detectar que este archivo
+          # cambio. Sin esto el servidor seguiria sirviendo la version vieja.
+          mkdir -p deploy/tmp
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > deploy/tmp/restart.txt
+
+      # Sin esta guarda, un FTP_SERVER_DIR vacio haria que la accion
+      # sincronizara contra la RAIZ del FTP y borrara de alli todo lo que no
+      # este en el paquete: incluidos otros sitios alojados en la cuenta.
+      - name: Comprobar que hay destino
+        run: |
+          if [ -z "${{ secrets.FTP_SERVER_DIR }}" ]; then
+            echo "Falta el secreto FTP_SERVER_DIR (ruta de la app en cPanel," \
+                 "con barra final). Se aborta para no sincronizar contra la" \
+                 "raiz del FTP."
+            exit 1
+          fi
+
+      - name: Subir por FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # ProFTPD con AUTH TLS: cifrado explicito sobre el puerto 21. El
+          # 990 (FTPS implicito) esta cerrado en este servidor. Con `ftp` a
+          # secas la contrasena viajaria en claro.
+          protocol: ftps
+          local-dir: ./deploy/
+          # Ruta de la aplicacion en cPanel, con barra final. Va en un
+          # secreto y no escrita aqui porque revela el usuario de la cuenta
+          # y este repositorio es publico.
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          # La accion SINCRONIZA: borra del servidor lo que no este en el
+          # paquete. Estas exclusiones son lo unico que impide que un
+          # despliegue se lleve por delante la configuracion y los archivos
+          # subidos por los usuarios.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .env
+            .env.*
+            storage/**

@@ -86,10 +86,73 @@ Con 20 Entry Processes, cada archivo servido por Node consume un proceso.
 Los archivos estáticos deben servirse directamente por Apache mediante
 reglas en `.htaccess`, no a través de la aplicación.
 
+## Despliegue automático — GitHub Actions + FTPS
+
+La vía elegida es `.github/workflows/desplegar.yml`: **compilar en GitHub
+Actions y subir por FTPS solo el resultado**. Sustituye a Git Version Control
+de cPanel, que se había considerado antes.
+
+GCM no es un sitio de archivos: es una aplicación Next.js que hay que compilar
+y cuyo proceso Node hay que reiniciar. Copiar el código fuente por FTP no la
+deja funcionando.
+
+### Comprobado el 07/08/2026
+
+- Puerto **21 abierto** desde fuera, en `drcaceresruiz.com` y en
+  `ftp.drcaceresruiz.com` (IP `213.239.205.92`).
+- **990 cerrado**, así que no hay FTPS implícito.
+- El servidor es **ProFTPD y anuncia `AUTH TLS`, `PBSZ` y `PROT`**: admite
+  FTPS explícito sobre el 21. Por eso el workflow usa `protocol: ftps`. Con
+  `ftp` a secas la contraseña viajaría en claro.
+
+### Qué se sube
+
+`output: "standalone"` genera un servidor autocontenido. El workflow arma un
+paquete con `.next/standalone` + `.next/static` + `public`, y **borra
+explícitamente cualquier `.env`** (el build de Next lo arrastra dentro de
+standalone). Son unos **1450 archivos y 102 MB**: el primer despliegue es
+lento, los siguientes son incrementales porque la acción mantiene un estado de
+sincronización y solo envía lo que cambió.
+
+### Reinicio
+
+Passenger reinicia la aplicación cuando cambia `tmp/restart.txt`. El workflow
+lo escribe con la fecha en cada despliegue. Sin eso el servidor seguiría
+sirviendo la versión anterior.
+
+### Secretos del repositorio
+
+`FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD` y **`FTP_SERVER_DIR`** (la ruta
+de la aplicación en cPanel, con barra final). La ruta va en un secreto y no
+escrita en el workflow porque revela el usuario de la cuenta y **el
+repositorio es público**.
+
+### La configuración NO viaja
+
+`DATABASE_URL`, `APP_SECRET` y el resto viven en cPanel, en las variables de
+entorno de la aplicación Node. El workflow usa valores de relleno solo para
+compilar, porque `src/lib/env.ts` valida el entorno al importarse y sin ellos
+el build ni arranca.
+
+> ⚠️ **La acción sincroniza: borra del servidor lo que no esté en el
+> paquete.** Las exclusiones (`.env`, `.env.*`, `storage/**`) son lo único que
+> impide que un despliegue se lleve por delante la configuración y los
+> archivos subidos por los usuarios. No las quites.
+
+### Migraciones — paso MANUAL
+
+**El workflow no aplica migraciones.** `prisma migrate deploy` necesita
+alcanzar MariaDB, y en hosting compartido la base no acepta conexiones
+externas. Tras un despliegue que cambie el esquema, desde cPanel → *Terminal*,
+dentro del application root:
+
+```bash
+npx prisma migrate deploy
+```
+
+Validar pronto las migraciones contra MariaDB 10.11: en desarrollo corre 12.3.
+
 ## Pendiente de confirmar
 
-- **Claves SSH para el despliegue automático.** El Terminal del navegador
-  funciona, pero la automatización necesita autenticación por clave
-  (cPanel → *SSH Access* → *Manage SSH Keys*) y el puerto SSH.
 - Cuota de disco e inodos disponibles.
 - Política de copias de seguridad del proveedor.

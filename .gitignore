@@ -9,6 +9,10 @@ out/
 build/
 next-env.d.ts
 
+# Paquete de despliegue que arma el workflow (.next/standalone + estaticos).
+# Son ~100 MB y se regenera en cada compilacion.
+/deploy/
+
 # Cliente Prisma generado (se regenera con: npm run db:generate)
 /src/generated/
 
