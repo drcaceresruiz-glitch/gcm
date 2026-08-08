@@ -94,34 +94,44 @@ export async function obtenerResumenEmpresa(
 
   const deLaEmpresa = { companyId: sesion.companyId };
 
-  const [obras, obrasEnEjecucion, presupuesto, comprometido, vencidas] =
-    await Promise.all([
-      prisma.project.count({ where: deLaEmpresa }),
+  const [
+    obras,
+    obrasEnEjecucion,
+    presupuesto,
+    comprometido,
+    vencidas,
+    partidasSobregiradas,
+  ] = await Promise.all([
+    prisma.project.count({ where: deLaEmpresa }),
 
-      prisma.project.count({
-        where: { ...deLaEmpresa, estado: "EN_EJECUCION" },
-      }),
+    prisma.project.count({
+      where: { ...deLaEmpresa, estado: "EN_EJECUCION" },
+    }),
 
-      prisma.wbsItem.aggregate({
-        where: { tipo: "PARTIDA", project: deLaEmpresa },
-        _sum: { parcial: true },
-      }),
+    prisma.wbsItem.aggregate({
+      where: { tipo: "PARTIDA", project: deLaEmpresa },
+      _sum: { parcial: true },
+    }),
 
-      prisma.ordenImputacion.aggregate({
-        where: { ordenCompra: { ...deLaEmpresa, estado: "APROBADA" } },
-        _sum: { importe: true },
-      }),
+    prisma.ordenImputacion.aggregate({
+      where: { ordenCompra: { ...deLaEmpresa, estado: "APROBADA" } },
+      _sum: { importe: true },
+    }),
 
-      // El plazo vencido solo es una alerta si la obra sigue en ejecucion:
-      // una cerrada que acabo tarde ya no requiere ninguna accion.
-      prisma.project.count({
-        where: {
-          ...deLaEmpresa,
-          estado: "EN_EJECUCION",
-          fechaFinProgramada: { lt: new Date() },
-        },
-      }),
-    ]);
+    // El plazo vencido solo es una alerta si la obra sigue en ejecucion:
+    // una cerrada que acabo tarde ya no requiere ninguna accion.
+    prisma.project.count({
+      where: {
+        ...deLaEmpresa,
+        estado: "EN_EJECUCION",
+        fechaFinProgramada: { lt: new Date() },
+      },
+    }),
+
+    // Va en el mismo lote y no despues: es otra consulta independiente, y
+    // encadenarla solo sumaba su latencia a la del resto.
+    contarPartidasSobregiradas(sesion),
+  ]);
 
   const presupuestoTotal = sumar([
     presupuesto._sum.parcial?.toString() ?? "0",
@@ -136,7 +146,7 @@ export async function obtenerResumenEmpresa(
     // Con `sumar` y no con resta de numeros: aqui son importes, y en este
     // sistema el dinero nunca pasa por coma flotante.
     saldo: sumar([presupuestoTotal, `-${comprometidoTotal}`]),
-    partidasSobregiradas: await contarPartidasSobregiradas(sesion),
+    partidasSobregiradas,
     obrasConPlazoVencido: vencidas,
   };
 }
@@ -357,38 +367,42 @@ export async function listarObras(
 
   // Se agrega en la base y no en JavaScript: sumar miles de partidas en
   // memoria seria innecesariamente costoso y perderia precision decimal.
-  const totales = await prisma.wbsItem.groupBy({
-    by: ["projectId"],
-    where: {
-      projectId: { in: obras.map((o) => o.id) },
-      tipo: "PARTIDA",
-    },
-    _sum: { parcial: true },
-    _count: { _all: true },
-  });
+  //
+  // Los dos agregados —presupuesto por obra y comprometido por partida— son
+  // independientes entre si, asi que van en el mismo lote: encadenarlos solo
+  // sumaba una ida y vuelta a la base de mas por cada carga del panel.
+  const idsObras = obras.map((o) => o.id);
+  const [totales, comprometidos] = await Promise.all([
+    prisma.wbsItem.groupBy({
+      by: ["projectId"],
+      where: { projectId: { in: idsObras }, tipo: "PARTIDA" },
+      _sum: { parcial: true },
+      _count: { _all: true },
+    }),
+
+    /**
+     * Comprometido por obra, con la MISMA definicion que `obtenerComprometido`:
+     * solo ordenes APROBADAS y sobre el importe imputable, que es el neto con
+     * IGV y el total con retencion —de eso ya se encarga la imputacion, que
+     * guarda la cifra que cuenta—.
+     *
+     * Va en su propia consulta y no colgando de la de partidas porque son dos
+     * agregados distintos; juntarlos multiplicaria filas y falsearia ambos.
+     */
+    prisma.ordenImputacion.groupBy({
+      by: ["wbsItemId"],
+      where: {
+        ordenCompra: {
+          projectId: { in: idsObras },
+          estado: "APROBADA",
+          companyId: sesion.companyId,
+        },
+      },
+      _sum: { importe: true },
+    }),
+  ]);
 
   const porObra = new Map(totales.map((t) => [t.projectId, t]));
-
-  /**
-   * Comprometido por obra, con la MISMA definicion que `obtenerComprometido`:
-   * solo ordenes APROBADAS y sobre el importe imputable, que es el neto con
-   * IGV y el total con retencion —de eso ya se encarga la imputacion, que
-   * guarda la cifra que cuenta—.
-   *
-   * Va en su propia consulta y no colgando de la de partidas porque son dos
-   * agregados distintos; juntarlos multiplicaria filas y falsearia ambos.
-   */
-  const comprometidos = await prisma.ordenImputacion.groupBy({
-    by: ["wbsItemId"],
-    where: {
-      ordenCompra: {
-        projectId: { in: obras.map((o) => o.id) },
-        estado: "APROBADA",
-        companyId: sesion.companyId,
-      },
-    },
-    _sum: { importe: true },
-  });
 
   // Para saber a que obra pertenece cada partida, y su parcial, con el que se
   // detecta el sobregiro.
