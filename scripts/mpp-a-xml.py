@@ -48,18 +48,34 @@ except ImportError as e:
     print("Instala con: .venv-mpxj\\Scripts\\python.exe -m pip install mpxj JPype1")
     sys.exit(1)
 
-jpype.startJVM()
+# MPXJ arrastra la API de Log4j pero no incluye ninguna implementacion, asi que
+# al arrancar escupe un "ERROR Log4j API could not find a logging provider".
+# Es inofensivo, pero una linea roja de ERROR en cada ejecucion acostumbra a
+# pasar por alto los errores de verdad. Se silencia el registro de estado.
+jpype.startJVM(
+    "-Dlog4j2.statusLoggerLevel=OFF",
+    "-Dlog4j2.StatusLogger.level=OFF",
+)
 
 # El paquete es `org.mpxj` desde la version 13. En las anteriores era
 # `net.sf.mpxj`, que es lo que sigue diciendo casi toda la documentacion.
 from org.mpxj.reader import UniversalProjectReader  # noqa: E402
 from org.mpxj.mspdi import MSPDIWriter  # noqa: E402
 
-origenes = sorted(glob.glob(os.path.join(CARPETA, "*.mpp")))
-
-if not origenes:
-    print("No hay ningun .mpp en", CARPETA)
-    sys.exit(0)
+# Con argumentos convierte esos archivos; sin ellos, recorre la carpeta de
+# referencias. Lo primero es para soltar un .mpp sobre el acceso directo —
+# Windows pasa la ruta como argumento—; lo segundo, para convertirlo todo de
+# una vez.
+if len(sys.argv) > 1:
+    origenes = [a for a in sys.argv[1:] if a.lower().endswith(".mpp")]
+    if not origenes:
+        print("Ninguno de los archivos indicados es un .mpp.")
+        sys.exit(1)
+else:
+    origenes = sorted(glob.glob(os.path.join(CARPETA, "*.mpp")))
+    if not origenes:
+        print("No hay ningun .mpp en", CARPETA)
+        sys.exit(0)
 
 for origen in origenes:
     destino = os.path.splitext(origen)[0] + ".xml"
