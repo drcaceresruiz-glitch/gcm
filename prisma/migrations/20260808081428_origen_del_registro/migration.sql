@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `ordenes_compra` ADD COLUMN `origen` ENUM('MANUAL', 'IMPORTADO') NOT NULL DEFAULT 'MANUAL';
+
+-- AlterTable
+ALTER TABLE `proveedores` ADD COLUMN `origen` ENUM('MANUAL', 'IMPORTADO') NOT NULL DEFAULT 'MANUAL';

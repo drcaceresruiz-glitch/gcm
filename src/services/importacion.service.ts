@@ -21,6 +21,67 @@ export type ResultadoImportacion =
   | { ok: true; capitulos: number; partidas: number; montoTotal: string }
   | { ok: false; error: string };
 
+/**
+ * Lo que un reemplazo destruiria y ningun archivo puede devolver.
+ *
+ * Las partidas importadas se pueden barrer sin drama: el Excel las vuelve a
+ * traer. Las creadas a mano y las importadas que alguien corrigio despues no
+ * existen en ninguna otra parte.
+ *
+ * Sin esto, la confirmacion de reemplazo solo puede decir "se borraran 360
+ * partidas", que se lee como rutina y esconde que dentro van doce que costo
+ * una tarde teclear.
+ */
+export interface EnRiesgoPorReemplazo {
+  /// Creadas a mano: no estan en ningun archivo.
+  creadasAMano: { codigo: string; descripcion: string }[];
+  /// Importadas pero corregidas despues: el archivo las trae, con los
+  /// valores viejos.
+  corregidasAMano: { codigo: string; descripcion: string }[];
+  totalPartidas: number;
+}
+
+export async function analizarRiesgoDeReemplazo(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<EnRiesgoPorReemplazo> {
+  const vacio = { creadasAMano: [], corregidasAMano: [], totalPartidas: 0 };
+
+  // La pantalla ya exige `partida:importar`, pero el permiso se comprueba
+  // aqui igualmente: los servicios son la frontera real y una ruta nueva
+  // podria llamar a esto sin pasar por alli.
+  if (!puede(sesion, "partida:leer")) return vacio;
+
+  const items = await prisma.wbsItem.findMany({
+    where: {
+      projectId: obraId,
+      project: { companyId: sesion.companyId },
+    },
+    orderBy: { orden: "asc" },
+    select: {
+      codigoPartida: true,
+      descripcion: true,
+      origen: true,
+      editadaAMano: true,
+    },
+  });
+
+  const aviso = (i: (typeof items)[number]) => ({
+    codigo: i.codigoPartida,
+    descripcion: i.descripcion,
+  });
+
+  return {
+    creadasAMano: items.filter((i) => i.origen === "MANUAL").map(aviso),
+    // Solo las importadas: una creada a mano ya se cuenta arriba, y contarla
+    // dos veces inflaria el aviso y le quitaria credibilidad.
+    corregidasAMano: items
+      .filter((i) => i.origen === "IMPORTADO" && i.editadaAMano)
+      .map(aviso),
+    totalPartidas: items.length,
+  };
+}
+
 export async function aplicarImportacion(
   sesion: SesionActiva,
   obraId: string,
@@ -134,6 +195,10 @@ export async function aplicarImportacion(
           // codigo: es la que gobierna la sangria en pantalla.
           nivel: profundidades.get(f.codigo) ?? 0,
           orden: ordenOriginal.get(f.codigo) ?? 0,
+          // Vino de un archivo. Perderla en un reemplazo posterior no es
+          // grave: el Excel la vuelve a traer. Lo que no vuelve es lo que
+          // alguien tecleo o corrigio a mano, y por eso se distinguen.
+          origen: "IMPORTADO",
           unidad: f.unidad,
           metrado: f.metrado,
           precioUnitario: f.precioUnitario,

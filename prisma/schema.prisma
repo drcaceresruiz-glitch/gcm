@@ -95,9 +95,11 @@ model Company {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users    User[]
-  projects Project[]
-  permisos CompanyPermission[]
+  users       User[]
+  projects    Project[]
+  permisos    CompanyPermission[]
+  proveedores Proveedor[]
+  ordenes     OrdenCompra[]
 
   @@map("companies")
 }
@@ -240,6 +242,7 @@ model Project {
   wbsItems    WbsItem[]
   baselines   Baseline[]
   movimientos MovimientoPresupuestal[]
+  ordenes     OrdenCompra[]
 
   @@unique([companyId, codigoObra])
   @@index([companyId, estado])
@@ -297,6 +300,19 @@ model WbsItem {
   nivel Int @default(0)
   orden Int @default(0)
 
+  /// Por donde entro la partida, y si alguien la ha tocado despues.
+  ///
+  /// Existen para una sola pregunta, la que se hace al reimportar un Excel
+  /// corregido: de lo que voy a borrar, ¿que NO esta en ningun archivo?
+  ///
+  /// Una partida importada se puede perder sin drama, porque el Excel la
+  /// vuelve a traer. Una creada a mano, o una importada cuyo precio alguien
+  /// corrigio despues, no existe en ninguna otra parte: borrarla destruye
+  /// trabajo. Sin estos dos campos, el aviso de reemplazo solo puede decir
+  /// "se borraran 360 partidas", que se lee como rutina.
+  origen       OrigenRegistro @default(MANUAL)
+  editadaAMano Boolean        @default(false)
+
   // --- Datos de presupuesto. Solo aplican a tipo = PARTIDA ---
   unidad         String?  @db.VarChar(20)
   metrado        Decimal? @db.Decimal(14, 4)
@@ -320,6 +336,7 @@ model WbsItem {
   origenMovimiento MovimientoPresupuestal? @relation("PartidasDeAdicional", fields: [origenMovimientoId], references: [id], onDelete: Cascade)
 
   lineasMovimiento MovimientoLinea[]
+  imputaciones     OrdenImputacion[]
 
   @@unique([projectId, codigoPartida])
   @@index([projectId, parentId])
@@ -450,6 +467,39 @@ enum EstadoMovimiento {
   APROBADO
 }
 
+/// Las ordenes reales del cliente se titulan todas "ORDEN DE SERVICIO",
+/// incluso las que suministran equipos. El titulo del papel no distingue
+/// nada, asi que el tipo se guarda aparte.
+enum TipoOrden {
+  COMPRA
+  SERVICIO
+}
+
+/// Por donde entro el dato al sistema.
+///
+/// El formulario SIEMPRE tiene que estar disponible: la carga de archivo es
+/// un acelerador, no el unico camino. Si el archivo del proveedor viene raro,
+/// o simplemente no existe, la orden se teclea y punto.
+///
+/// Que las dos vias no se pisen NO se confia a la interfaz, se cierra en la
+/// base con `@@unique([companyId, numero])`. Da igual por donde entre: el
+/// numero de orden identifica el documento y no puede repetirse. El
+/// importador topa con la misma restriccion que el formulario, y por eso
+/// tiene que ENSENAR lo que ya existe en vez de insertarlo otra vez.
+enum OrigenRegistro {
+  MANUAL
+  IMPORTADO
+}
+
+enum EstadoOrden {
+  BORRADOR
+  APROBADA
+  /// Anulada NO es borrada: deja de contar en el comprometido pero se
+  /// conserva con su motivo. Cancelar un pedido a un proveedor es corriente,
+  /// al reves que rehacer una linea base.
+  ANULADA
+}
+
 model MovimientoPresupuestal {
   id        String @id @default(cuid())
   projectId String
@@ -557,6 +607,184 @@ model MovimientoLinea {
   @@index([movimientoId])
   @@index([wbsItemId])
   @@map("movimiento_lineas")
+}
+
+// ---------------------------------------------------------------------------
+// Proveedores y ordenes
+//
+// De aqui sale el COMPROMETIDO, la primera columna del control de obra: lo
+// que ya se pactó con proveedores aunque todavia no se haya recibido ni
+// pagado. Se mide SIN IGV, como todo lo demas: el IGV que factura el
+// proveedor es credito fiscal, no costo.
+// ---------------------------------------------------------------------------
+
+model Proveedor {
+  id        String @id @default(cuid())
+  companyId String
+
+  razonSocial String @db.VarChar(200)
+
+  /// Puede ser persona natural: en las ordenes reales hay RUC que empiezan
+  /// por 10 (CABREJO, 10061662257) junto a empresas que empiezan por 20.
+  ruc String @db.VarChar(11)
+
+  contactoNombre   String? @db.VarChar(150)
+  contactoTelefono String? @db.VarChar(30)
+  email            String? @db.VarChar(150)
+
+  /// Los datos bancarios viven en el proveedor y no en cada orden, aunque el
+  /// papel los repita en todas: son del proveedor, no del pedido.
+  cuentaBancaria String? @db.VarChar(40)
+  cci            String? @db.VarChar(40)
+
+  activo Boolean @default(true)
+
+  /// Igual que en las ordenes: el RUC es la clave que impide duplicarlo,
+  /// entre por donde entre.
+  origen OrigenRegistro @default(MANUAL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  ordenes OrdenCompra[]
+
+  @@unique([companyId, ruc])
+  @@index([companyId])
+  @@map("proveedores")
+}
+
+model OrdenCompra {
+  id          String @id @default(cuid())
+  companyId   String
+  projectId   String
+  proveedorId String
+
+  /// El numero tal como lo escribe el cliente ("2026-07-00113").
+  ///
+  /// NO se genera ni se ordena por el: en las ordenes reales el correlativo
+  /// no es cronologico —hay una de mayo con el 00121, posterior a una de
+  /// julio con el 00113—, asi que ordenar por numero mentiria sobre la
+  /// secuencia. Para eso esta `fecha`.
+  numero String @db.VarChar(30)
+
+  tipo   TipoOrden
+  estado EstadoOrden @default(BORRADOR)
+
+  /// Por donde entro. No cambia el comportamiento, pero sin esto no se puede
+  /// responder a "esta cifra la tecleo alguien o la leyo un importador", que
+  /// es la primera pregunta cuando un total no cuadra.
+  origen OrigenRegistro @default(MANUAL)
+
+  /// La del documento, no la del alta en el sistema.
+  fecha DateTime @db.Date
+
+  /// "EN ATENCION A: ORDEN DE COMPRA N° PERC218": la orden del cliente final.
+  referencia String? @db.VarChar(60)
+
+  /// La etiqueta que el papel llama "Partida" y es texto libre
+  /// ("CRIOCORD ESTRUCTURAS METALICAS"). Se conserva como viene; la
+  /// imputacion de verdad son las lineas de `OrdenImputacion`.
+  descripcion String @db.VarChar(255)
+
+  /// Texto y no un calendario de anticipos. Las tres ordenes analizadas
+  /// tienen tres formas distintas —cinco adelantos con condiciones, "60% y
+  /// saldo", 50/40/10—, y modelar un calendario sin haber visto como se
+  /// pagan de verdad seria inventarlo. Llegara con el modulo de abonos.
+  formaPago     String? @db.Text
+  observaciones String? @db.Text
+
+  /// La cascada del papel. Se guardan las tres cifras que usa el resto del
+  /// sistema: neto es el COSTO, igv es CREDITO FISCAL y total es lo que sale
+  /// del banco. El comprometido se mide contra `neto`.
+  subtotal           Decimal @db.Decimal(14, 2)
+  descuentoComercial Decimal @default(0) @db.Decimal(14, 2)
+  neto               Decimal @db.Decimal(14, 2)
+  igv                Decimal @db.Decimal(14, 2)
+  total              Decimal @db.Decimal(14, 2)
+
+  aprobadaAt  DateTime?
+  aprobadaPor String?   @db.VarChar(150)
+
+  anuladaAt     DateTime?
+  anuladaPor    String?   @db.VarChar(150)
+  motivoAnulado String?   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company      Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  project      Project            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  proveedor    Proveedor          @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  lineas       OrdenLinea[]
+  imputaciones OrdenImputacion[]
+
+  @@unique([companyId, numero])
+  @@index([projectId, estado])
+  @@index([proveedorId])
+  @@map("ordenes_compra")
+}
+
+/// El detalle del papel. Opcional: las ordenes historicas se cargan solo por
+/// cabecera, porque para el comprometido hacen falta los importes y no las
+/// especificaciones de cada difusor.
+model OrdenLinea {
+  id      String @id @default(cuid())
+  ordenId String
+
+  /// Posicion en el documento. El orden del papel es informacion: agrupa.
+  orden Int
+  /// Profundidad. SIV AIRE llega a tres niveles.
+  nivel Int    @default(0)
+
+  /// LA MARCA QUE EVITA CONTAR EL DINERO DOS VECES.
+  ///
+  /// Las ordenes reales abren cada bloque con una linea que REPITE la suma de
+  /// sus hijas: "TOTAL ESTRUCTURAS 34,800.00" y debajo siete lineas que suman
+  /// exactamente 34,800. Sumar en plano cuenta ese dinero dos veces, y en SIV
+  /// AIRE tres. Es el mismo fallo de las celdas combinadas del Excel.
+  esAgrupador Boolean @default(false)
+
+  cantidad       Decimal? @db.Decimal(14, 4)
+  unidad         String?  @db.VarChar(20)
+  descripcion    String   @db.Text
+  precioUnitario Decimal? @db.Decimal(14, 4)
+  importe        Decimal  @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now())
+
+  ordenCompra OrdenCompra @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+
+  @@index([ordenId])
+  @@map("orden_lineas")
+}
+
+/// El reparto de la orden contra el presupuesto, SIN IGV.
+///
+/// Existe porque las ordenes reales cruzan varias partidas: los S/ 159,450 de
+/// SIV AIRE se reparten entre laboratorios, bunker y administracion. Con una
+/// sola partida por orden, la desviacion de esa partida dejaria de significar
+/// nada.
+///
+/// INVARIANTE: la suma de las imputaciones es igual al NETO de la orden. Se
+/// comprueba al aprobar, como que una reconversion sume cero.
+model OrdenImputacion {
+  id        String @id @default(cuid())
+  ordenId   String
+  wbsItemId String
+
+  importe Decimal @db.Decimal(14, 2)
+
+  createdAt DateTime @default(now())
+
+  ordenCompra OrdenCompra @relation(fields: [ordenId], references: [id], onDelete: Cascade)
+  /// Restrict: una imputacion aprobada es dinero comprometido contra esa
+  /// partida. Que choque aqui antes que desaparecer en silencio.
+  partida     WbsItem     @relation(fields: [wbsItemId], references: [id], onDelete: Restrict)
+
+  @@unique([ordenId, wbsItemId])
+  @@index([wbsItemId])
+  @@map("orden_imputaciones")
 }
 
 // ---------------------------------------------------------------------------

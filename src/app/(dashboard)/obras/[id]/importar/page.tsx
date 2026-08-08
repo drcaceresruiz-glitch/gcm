@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Lock } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, listarPartidas } from "@/services/obras.service";
+import { analizarRiesgoDeReemplazo } from "@/services/importacion.service";
 import { puede } from "@/lib/rbac";
 import { ImportadorPresupuesto } from "@/components/importador/ImportadorPresupuesto";
 
@@ -26,6 +27,11 @@ export default async function ImportarPage({
   }
 
   const { totalPartidas } = await listarPartidas(sesion, id);
+
+  // Que se perderia al reemplazar y ningun archivo puede devolver. Solo se
+  // consulta si hay algo que reemplazar.
+  const enRiesgo =
+    totalPartidas > 0 ? await analizarRiesgoDeReemplazo(sesion, id) : null;
 
   return (
     <div className="space-y-6">
@@ -71,6 +77,7 @@ export default async function ImportarPage({
           obraId={obra.id}
           nombreObra={obra.nombreObra}
           partidasExistentes={totalPartidas}
+          enRiesgo={enRiesgo}
         />
       )}
     </div>

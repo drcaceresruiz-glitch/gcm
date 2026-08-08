@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import type { ResultadoAnalisis } from "@/lib/excel-presupuesto";
+import type { EnRiesgoPorReemplazo } from "@/services/importacion.service";
 import {
   accionAnalizar,
   accionImportar,
@@ -20,12 +21,16 @@ interface Props {
   nombreObra: string;
   /// Cantidad de partidas que ya tiene la obra. Si hay, importar sustituye.
   partidasExistentes: number;
+  /// Lo que el reemplazo destruiria sin que ningun archivo pueda devolverlo.
+  /// null cuando la obra esta vacia y no hay nada que reemplazar.
+  enRiesgo: EnRiesgoPorReemplazo | null;
 }
 
 export function ImportadorPresupuesto({
   obraId,
   nombreObra,
   partidasExistentes,
+  enRiesgo,
 }: Props) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [analisis, setAnalisis] = useState<ResultadoAnalisis | null>(null);
@@ -198,6 +203,8 @@ export function ImportadorPresupuesto({
             </div>
           )}
 
+          <TrabajoQueSePierde enRiesgo={enRiesgo} />
+
           <button
             type="button"
             onClick={confirmar}
@@ -222,6 +229,95 @@ export function ImportadorPresupuesto({
           )}
         </section>
       )}
+    </div>
+  );
+}
+
+/**
+ * El trabajo que un reemplazo destruye y ningun archivo devuelve.
+ *
+ * Va aparte del aviso de reemplazo, y con otro color, porque dice otra cosa.
+ * Aquel avisa de que se sustituye el presupuesto, que es lo que se ha venido
+ * a hacer. Este avisa de que dentro van partidas que alguien tecleo o
+ * corrigio a mano y no estan en el Excel: eso no se viene a hacer, se hace
+ * sin querer.
+ *
+ * Se enumeran los codigos en vez de contarlos. «12 partidas en riesgo» no
+ * permite decidir; ver que una de ellas es la que se anadio ayer, si.
+ */
+function TrabajoQueSePierde({
+  enRiesgo,
+}: {
+  enRiesgo: EnRiesgoPorReemplazo | null;
+}) {
+  if (!enRiesgo) return null;
+
+  const { creadasAMano, corregidasAMano } = enRiesgo;
+  if (creadasAMano.length === 0 && corregidasAMano.length === 0) return null;
+
+  return (
+    <div
+      className="mt-3 rounded-lg border p-3"
+      style={{
+        borderColor: "var(--color-peligro)",
+        backgroundColor:
+          "color-mix(in oklab, var(--color-peligro) 12%, transparent)",
+      }}
+    >
+      <p className="flex items-start gap-2 text-sm font-semibold">
+        <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span>Esto no viene en ningun archivo</span>
+      </p>
+
+      <div className="mt-2 space-y-2 text-sm">
+        <Grupo
+          titulo="Creadas a mano"
+          explicacion="No estan en el Excel. Al reemplazar desapareceran."
+          partidas={creadasAMano}
+        />
+        <Grupo
+          titulo="Corregidas a mano"
+          explicacion="El archivo las trae, pero con los valores de antes de la correccion."
+          partidas={corregidasAMano}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Grupo({
+  titulo,
+  explicacion,
+  partidas,
+}: {
+  titulo: string;
+  explicacion: string;
+  partidas: { codigo: string; descripcion: string }[];
+}) {
+  if (partidas.length === 0) return null;
+
+  // Se enumeran unas pocas y se cuenta el resto: una lista de doscientas
+  // tapa el boton y deja de leerse, que es lo contrario de avisar.
+  const visibles = partidas.slice(0, 8);
+
+  return (
+    <div>
+      <p className="font-medium">
+        {titulo}: {partidas.length}
+      </p>
+      <p className="opacity-70">{explicacion}</p>
+      <ul className="mt-1 space-y-0.5">
+        {visibles.map((p) => (
+          <li key={p.codigo} className="truncate opacity-90">
+            <span className="font-medium">{p.codigo}</span> {p.descripcion}
+          </li>
+        ))}
+        {partidas.length > visibles.length && (
+          <li className="opacity-70">
+            y {partidas.length - visibles.length} mas
+          </li>
+        )}
+      </ul>
     </div>
   );
 }

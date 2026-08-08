@@ -173,6 +173,17 @@ export async function actualizarPartida(
 
   if (Object.keys(datos).length === 0) return { ok: true };
 
+  /**
+   * Queda marcada como tocada a mano.
+   *
+   * Una partida importada y despues corregida ya no coincide con ningun
+   * archivo: si se reimporta el Excel, esa correccion se pierde y nadie la
+   * echa de menos hasta que el total no cuadra. Con esta marca, el
+   * importador puede avisar de cuantas correcciones va a barrer ANTES de
+   * hacerlo.
+   */
+  datos["editadaAMano"] = true;
+
   await prisma.wbsItem.update({ where: { id: partidaId }, data: datos });
 
   await auditar({
@@ -338,6 +349,10 @@ export async function crearPartida(
         descripcion: descripcion.slice(0, 500),
         nivel: profundidades.get(codigo) ?? 0,
         orden,
+        // Nacio aqui, no de un archivo. Es lo que hace que el importador
+        // avise antes de barrerla en un reemplazo: esta partida no esta en
+        // ningun Excel y borrarla la pierde para siempre.
+        origen: "MANUAL",
         unidad: nueva.unidad?.trim() ? nueva.unidad.trim().slice(0, 20) : null,
         metrado,
         precioUnitario,
