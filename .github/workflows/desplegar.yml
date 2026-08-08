@@ -12,6 +12,14 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      limpiar:
+        description: >-
+          Borrar del servidor lo que sube este workflow antes de subirlo.
+          Necesario si un despliegue quedo a medias: mirror compara por
+          tamano y fecha, da por buenos los archivos truncados y los salta.
+        type: boolean
+        default: false
 
 # Dos despliegues simultaneos dejarian el servidor con archivos de dos
 # compilaciones distintas mezclados a mitad de subida.
@@ -140,6 +148,21 @@ jobs:
           # llega a abrir la sesion y `mirror` falla con "Not connected".
           # `cmd:fail-exit` hace que un error corte el script en vez de
           # seguir y terminar con exito enganoso.
+          # Solo lo que genera este workflow. NO se tocan `.env`, `storage`
+          # ni lo que cPanel administra (stderr.log, su configuracion).
+          LIMPIEZA=""
+          if [ "${{ inputs.limpiar }}" = "true" ]; then
+            LIMPIEZA="rm -rf .next; rm -rf node_modules; rm -rf public;"
+            echo "Limpieza activada: se borran .next, node_modules y public."
+          fi
+
+          # SIN --continue. Reanudar transferencias parciales es justo lo que
+          # dejo el servidor con archivos truncados que luego mirror daba por
+          # buenos al comparar tamano y fecha.
+          #
+          # Se hace una segunda pasada: la primera puede dejar algun archivo
+          # fuera si una conexion se corta, y la segunda solo sube lo que
+          # falte, asi que cuesta segundos.
           lftp -c "
             set cmd:fail-exit true;
             set ftp:ssl-force true;
@@ -149,9 +172,12 @@ jobs:
             set net:max-retries 3;
             set net:timeout 20;
             set net:reconnect-interval-base 5;
-            set mirror:parallel-transfer-count 4;
+            set mirror:parallel-transfer-count 2;
             open '$FTP_SERVER';
-            mirror --reverse --verbose --continue --exclude-glob '.env' --exclude-glob '.env.*' --exclude 'storage/' ./deploy/ '$FTP_SERVER_DIR';
+            cd '$FTP_SERVER_DIR';
+            $LIMPIEZA
+            mirror --reverse --verbose --exclude-glob '.env' --exclude-glob '.env.*' --exclude 'storage/' ./deploy/ .;
+            mirror --reverse --verbose --exclude-glob '.env' --exclude-glob '.env.*' --exclude 'storage/' ./deploy/ .;
             bye
           "
 
