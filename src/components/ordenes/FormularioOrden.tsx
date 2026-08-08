@@ -89,11 +89,18 @@ const imputacionVacia = (clave: number): ImputacionEstado => ({
   importe: "",
 });
 
+export interface OpcionFormaPago {
+  id: string;
+  nombre: string;
+  texto: string;
+}
+
 interface Props {
   obraId: string;
   fechaHoy: string;
   proveedores: OpcionProveedor[];
   partidas: OpcionImputacion[];
+  formasPago: OpcionFormaPago[];
 }
 
 export function FormularioOrden({
@@ -101,11 +108,19 @@ export function FormularioOrden({
   fechaHoy,
   proveedores,
   partidas,
+  formasPago,
 }: Props) {
   const [estado, accion] = useActionState<EstadoOrden, FormData>(
     accionCrearOrden,
     {},
   );
+
+  /**
+   * La forma de pago se copia de la plantilla pero queda EDITABLE, asi que es
+   * un campo controlado y no un `defaultValue`: lo pactado con un proveedor
+   * concreto casi siempre tiene un matiz que la plantilla no recoge.
+   */
+  const [formaPago, setFormaPago] = useState("");
 
   /**
    * Con detalle o solo cabecera.
@@ -279,13 +294,37 @@ export function FormularioOrden({
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <CampoArea
-            id="formaPago"
-            name="formaPago"
-            etiqueta="Forma de pago"
-            rows={3}
-            ayuda="Tal cual viene: «50% adelanto, 40% contra instalacion, 10% contra dossier»."
-          />
+          <div className="space-y-3">
+            {formasPago.length > 0 && (
+              <CampoSelect
+                id="plantillaFormaPago"
+                etiqueta="Forma de pago habitual"
+                value=""
+                onChange={(e) => {
+                  const elegida = formasPago.find((f) => f.id === e.target.value);
+                  if (elegida) setFormaPago(elegida.texto);
+                }}
+                ayuda="Copia una guardada. Despues se puede ajustar."
+              >
+                <option value="">Elegir una guardada...</option>
+                {formasPago.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nombre}
+                  </option>
+                ))}
+              </CampoSelect>
+            )}
+
+            <CampoArea
+              id="formaPago"
+              name="formaPago"
+              etiqueta="Forma de pago"
+              rows={3}
+              value={formaPago}
+              onChange={(e) => setFormaPago(e.target.value)}
+              ayuda="Tal cual viene: «50% adelanto, 40% contra instalacion, 10% contra dossier»."
+            />
+          </div>
           <CampoArea
             id="observaciones"
             name="observaciones"

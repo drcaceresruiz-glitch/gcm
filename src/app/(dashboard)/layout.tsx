@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { HardHat, KeyRound, LogOut, ShieldCheck, Users } from "lucide-react";
+import {
+  HardHat,
+  KeyRound,
+  LogOut,
+  Receipt,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { puede } from "@/lib/rbac";
 import { accionCerrarSesion } from "@/app/(auth)/acciones";
@@ -48,6 +55,17 @@ export default async function DashboardLayout({
               </p>
               <p className="text-xs leading-tight opacity-60">{sesion.role}</p>
             </div>
+
+            {puede(sesion, "orden:leer") && (
+              <Link
+                href="/empresa/formas-pago"
+                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm"
+                style={{ borderColor: "var(--borde)" }}
+              >
+                <Receipt className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Formas de pago</span>
+              </Link>
+            )}
 
             {puede(sesion, "proveedor:leer") && (
               <Link

@@ -5,6 +5,7 @@ import { ArrowLeft, Users } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { listarPartidas, obtenerObra } from "@/services/obras.service";
 import { listarProveedores } from "@/services/proveedores.service";
+import { listarFormasPago } from "@/services/formas-pago.service";
 import {
   obtenerPresupuestoVigente,
   SinLineaBaseError,
@@ -41,9 +42,10 @@ export default async function NuevaOrdenPage({
 
   if (!puede(sesion, "orden:crear")) redirect(`/obras/${id}/ordenes`);
 
-  const [proveedores, { filas }] = await Promise.all([
+  const [proveedores, { filas }, formasPago] = await Promise.all([
     listarProveedores(sesion),
     listarPartidas(sesion, id),
+    listarFormasPago(sesion),
   ]);
 
   // El vigente es la mejor referencia, pero solo existe con linea base
@@ -136,6 +138,7 @@ export default async function NuevaOrdenPage({
             ruc: p.ruc,
           }))}
           partidas={partidas}
+          formasPago={formasPago}
         />
       )}
     </div>
