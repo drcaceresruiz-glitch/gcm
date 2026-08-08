@@ -11,6 +11,7 @@ import {
   Lock,
   MapPin,
   Table2,
+  Truck,
 } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, listarPartidas } from "@/services/obras.service";
@@ -99,6 +100,19 @@ export default async function ObraPage({
                   Movimientos
                 </Link>
               )}
+
+            {/* Las ordenes no dependen de la linea base: se puede pedir a un
+                proveedor antes de congelar el presupuesto. */}
+            {puede(sesion, "orden:leer") && (
+              <Link
+                href={`/obras/${id}/ordenes`}
+                className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
+                style={{ borderColor: "var(--borde)" }}
+              >
+                <Truck className="size-4" aria-hidden="true" />
+                Ordenes
+              </Link>
+            )}
 
             {puedeImportar && obra.lineaBaseVersion === null && (
               <Link
