@@ -1,4 +1,8 @@
-import { format, differenceInCalendarDays } from "date-fns";
+import {
+  format,
+  differenceInCalendarDays,
+  formatDistanceToNowStrict,
+} from "date-fns";
 import { es } from "date-fns/locale";
 
 /**
@@ -58,6 +62,22 @@ export function hoy(): Date {
   return new Date(
     Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()),
   );
+}
+
+/**
+ * «hace 2 h», «hace 3 dias». Para el registro de actividad.
+ *
+ * Aqui SI es un instante y no una fecha de calendario —lleva hora—, asi que
+ * no aplica la precaucion de zona horaria del resto del archivo: se compara
+ * un momento con otro y el desfase se cancela.
+ *
+ * `Strict` para que diga «hace 1 mes» y no «hace alrededor de 1 mes»: en un
+ * registro de actividad la precision aparente sobra y alarga la linea.
+ */
+export function haceCuanto(instante: Date | string): string {
+  const fecha = typeof instante === "string" ? new Date(instante) : instante;
+
+  return `hace ${formatDistanceToNowStrict(fecha, { locale: es })}`;
 }
 
 /** Dias de calendario entre dos fechas de obra. */

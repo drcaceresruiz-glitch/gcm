@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { Check, Monitor, Moon, Sun } from "lucide-react";
 import {
   aplicarApariencia,
-  CLAVE_PALETA,
-  CLAVE_TEMA,
+  COOKIE_PALETA,
+  COOKIE_TEMA,
   ETIQUETA_PALETA,
+  leerCookie,
   MUESTRA_PALETA,
   PALETAS,
   TEMAS,
@@ -19,10 +20,12 @@ import {
 /**
  * Elegir tema y paleta.
  *
- * No guarda nada en el servidor: es una preferencia de quien mira, como las
- * columnas del presupuesto o los capitulos colapsados, y vive en
- * `localStorage`. Aplicarlo es solo escribir dos atributos en `<html>`; de
- * traducirlos a color se encarga `globals.css`.
+ * No guarda nada en la base de datos: es una preferencia de quien mira, como
+ * las columnas del presupuesto o los capitulos colapsados, y vive en una
+ * cookie -no en `localStorage`, para que el servidor pueda leerla y pintar
+ * el tema correcto desde la primera respuesta-. Aplicarlo es solo escribir
+ * dos atributos en `<html>`; de traducirlos a color se encarga
+ * `globals.css`.
  */
 
 const ICONO_TEMA = { auto: Monitor, claro: Sun, oscuro: Moon } as const;
@@ -33,15 +36,15 @@ export function SelectorApariencia() {
   const [listo, setListo] = useState(false);
 
   /**
-   * Lo guardado se lee al montar y no en el estado inicial: `localStorage` no
-   * existe en el servidor, y leerlo ahi romperia la hidratacion. El tema ya
-   * esta APLICADO por el script del layout antes de llegar aqui; esto solo
-   * pone los botones en su sitio.
+   * Lo guardado se lee al montar y no en el estado inicial: `document.cookie`
+   * no existe en el servidor, y leerlo ahi romperia la hidratacion. El tema
+   * ya esta APLICADO por el layout -que lo lee del lado del servidor- antes
+   * de llegar aqui; esto solo pone los botones en su sitio.
    */
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTema(temaValido(localStorage.getItem(CLAVE_TEMA)));
-    setPaleta(paletaValida(localStorage.getItem(CLAVE_PALETA)));
+    setTema(temaValido(leerCookie(COOKIE_TEMA)));
+    setPaleta(paletaValida(leerCookie(COOKIE_PALETA)));
     setListo(true);
   }, []);
 

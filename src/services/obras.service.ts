@@ -5,6 +5,7 @@ import { puede } from "@/lib/rbac";
 import { esPositivo, sumar } from "@/lib/decimal";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
 import { estadoDeObra, validarObra, ESTADOS_OBRA } from "@/lib/obras";
+import { diasEntre } from "@/utils/fechas";
 import {
   contarPaginas,
   normalizarPagina,
@@ -50,6 +51,227 @@ export interface ObraResumen {
   /// Partidas cuyo comprometido supera su parcial. Es la alerta de sobrecosto
   /// que se puede afirmar hoy; el avance fisico no existe todavia.
   partidasSobregiradas: number;
+}
+
+export interface ResumenEmpresa {
+  obras: number;
+  obrasEnEjecucion: number;
+  /// Suma de las partidas de TODAS las obras de la empresa.
+  presupuestoTotal: string;
+  /// Comprometido con proveedores, sin IGV y solo de ordenes aprobadas.
+  comprometido: string;
+  /// Presupuesto menos comprometido. Puede salir negativo, y entonces hay que
+  /// verlo: significa que se ha pedido mas de lo que hay presupuestado.
+  saldo: string;
+  partidasSobregiradas: number;
+  obrasConPlazoVencido: number;
+}
+
+/**
+ * Las cifras de la empresa entera, para encabezar el panel.
+ *
+ * Hasta ahora estos totales **no existian en ninguna pantalla**: el
+ * comprometido y el presupuesto solo se veian obra por obra, asi que nadie
+ * podia responder «cuanto tengo comprometido en total» sin sumar a mano.
+ *
+ * Va aparte de `listarObras` a proposito: aquella devuelve UNA PAGINA y estas
+ * cifras son de todas las obras. Calcularlas desde la pagina daria un total
+ * distinto en cada pagina, que es justo la clase de cifra que no puede
+ * aparecer en un panel de control.
+ */
+export async function obtenerResumenEmpresa(
+  sesion: SesionActiva,
+): Promise<ResumenEmpresa> {
+  if (!puede(sesion, "obra:leer")) throw new SinPermisoError();
+
+  const deLaEmpresa = { companyId: sesion.companyId };
+
+  const [obras, obrasEnEjecucion, presupuesto, comprometido, vencidas] =
+    await Promise.all([
+      prisma.project.count({ where: deLaEmpresa }),
+
+      prisma.project.count({
+        where: { ...deLaEmpresa, estado: "EN_EJECUCION" },
+      }),
+
+      prisma.wbsItem.aggregate({
+        where: { tipo: "PARTIDA", project: deLaEmpresa },
+        _sum: { parcial: true },
+      }),
+
+      prisma.ordenImputacion.aggregate({
+        where: { ordenCompra: { ...deLaEmpresa, estado: "APROBADA" } },
+        _sum: { importe: true },
+      }),
+
+      // El plazo vencido solo es una alerta si la obra sigue en ejecucion:
+      // una cerrada que acabo tarde ya no requiere ninguna accion.
+      prisma.project.count({
+        where: {
+          ...deLaEmpresa,
+          estado: "EN_EJECUCION",
+          fechaFinProgramada: { lt: new Date() },
+        },
+      }),
+    ]);
+
+  const presupuestoTotal = sumar([
+    presupuesto._sum.parcial?.toString() ?? "0",
+  ]);
+  const comprometidoTotal = sumar([comprometido._sum.importe?.toString() ?? "0"]);
+
+  return {
+    obras,
+    obrasEnEjecucion,
+    presupuestoTotal,
+    comprometido: comprometidoTotal,
+    // Con `sumar` y no con resta de numeros: aqui son importes, y en este
+    // sistema el dinero nunca pasa por coma flotante.
+    saldo: sumar([presupuestoTotal, `-${comprometidoTotal}`]),
+    partidasSobregiradas: await contarPartidasSobregiradas(sesion),
+    obrasConPlazoVencido: vencidas,
+  };
+}
+
+/**
+ * Partidas de la empresa cuyo comprometido supera su parcial.
+ *
+ * Hay que comparar partida a partida —no valen dos sumas— porque un total
+ * holgado puede esconder varias partidas pasadas de largo, que es justo lo
+ * que hay que corregir con una reconversion.
+ */
+async function contarPartidasSobregiradas(
+  sesion: SesionActiva,
+): Promise<number> {
+  const porPartida = await prisma.ordenImputacion.groupBy({
+    by: ["wbsItemId"],
+    where: {
+      ordenCompra: { companyId: sesion.companyId, estado: "APROBADA" },
+    },
+    _sum: { importe: true },
+  });
+
+  if (porPartida.length === 0) return 0;
+
+  const partidas = await prisma.wbsItem.findMany({
+    where: { id: { in: porPartida.map((p) => p.wbsItemId) } },
+    select: { id: true, parcial: true },
+  });
+
+  const parcialPorId = new Map(
+    partidas.map((p) => [p.id, p.parcial?.toString() ?? "0"]),
+  );
+
+  return porPartida.filter((p) => {
+    const parcial = parcialPorId.get(p.wbsItemId);
+    if (parcial === undefined) return false;
+
+    return esPositivo(
+      sumar([p._sum.importe?.toString() ?? "0", `-${parcial}`]),
+    );
+  }).length;
+}
+
+export interface AlertaEmpresa {
+  obraId: string;
+  obraNombre: string;
+  clave: "sobregiro" | "plazo";
+  texto: string;
+}
+
+/**
+ * El detalle de las alertas que `obtenerResumenEmpresa` solo cuenta.
+ *
+ * El resumen dice «1 alerta» pero no dice DE QUE obra ni de que tipo: sin
+ * esto, la unica forma de encontrarla era abrir cada tarjeta de obra una por
+ * una a ver cual tenia la insignia encendida. Aqui se resuelve la misma
+ * pregunta que ya contesta el globo de `FranjaObra`, pero para la empresa
+ * entera y con enlace a la obra que corresponde.
+ */
+export async function listarAlertasEmpresa(
+  sesion: SesionActiva,
+): Promise<AlertaEmpresa[]> {
+  if (!puede(sesion, "obra:leer")) throw new SinPermisoError();
+
+  const deLaEmpresa = { companyId: sesion.companyId };
+
+  const [porPartida, vencidas] = await Promise.all([
+    prisma.ordenImputacion.groupBy({
+      by: ["wbsItemId"],
+      where: { ordenCompra: { ...deLaEmpresa, estado: "APROBADA" } },
+      _sum: { importe: true },
+    }),
+    prisma.project.findMany({
+      where: {
+        ...deLaEmpresa,
+        estado: "EN_EJECUCION",
+        fechaFinProgramada: { lt: new Date() },
+      },
+      select: { id: true, nombreObra: true, fechaFinProgramada: true },
+    }),
+  ]);
+
+  const alertas: AlertaEmpresa[] = [];
+
+  // Mismo calculo que `contarPartidasSobregiradas`, pero agrupado por obra
+  // en vez de solo contar: aqui hace falta saber A CUAL obra pertenece cada
+  // partida pasada de largo para poder enlazarla.
+  if (porPartida.length > 0) {
+    const partidas = await prisma.wbsItem.findMany({
+      where: { id: { in: porPartida.map((p) => p.wbsItemId) } },
+      select: { id: true, parcial: true, projectId: true },
+    });
+    const partidaPorId = new Map(partidas.map((p) => [p.id, p]));
+
+    const sobregiroPorObra = new Map<string, number>();
+    for (const fila of porPartida) {
+      const partida = partidaPorId.get(fila.wbsItemId);
+      if (!partida) continue;
+
+      const exceso = sumar([
+        fila._sum.importe?.toString() ?? "0",
+        `-${partida.parcial?.toString() ?? "0"}`,
+      ]);
+
+      if (esPositivo(exceso)) {
+        sobregiroPorObra.set(
+          partida.projectId,
+          (sobregiroPorObra.get(partida.projectId) ?? 0) + 1,
+        );
+      }
+    }
+
+    if (sobregiroPorObra.size > 0) {
+      const obras = await prisma.project.findMany({
+        where: { id: { in: [...sobregiroPorObra.keys()] } },
+        select: { id: true, nombreObra: true },
+      });
+      const nombrePorId = new Map(obras.map((o) => [o.id, o.nombreObra]));
+
+      for (const [obraId, n] of sobregiroPorObra) {
+        alertas.push({
+          obraId,
+          obraNombre: nombrePorId.get(obraId) ?? "Obra",
+          clave: "sobregiro",
+          texto:
+            n === 1
+              ? "1 partida comprometida por encima de su presupuesto"
+              : `${n} partidas comprometidas por encima de su presupuesto`,
+        });
+      }
+    }
+  }
+
+  for (const obra of vencidas) {
+    alertas.push({
+      obraId: obra.id,
+      obraNombre: obra.nombreObra,
+      clave: "plazo",
+      texto: `El plazo vencio hace ${diasEntre(obra.fechaFinProgramada, new Date())} dia(s)`,
+    });
+  }
+
+  return alertas;
 }
 
 export interface FiltrosObras {

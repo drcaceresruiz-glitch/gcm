@@ -3,7 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Building2, MapPin, CalendarDays, Plus, SearchX } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
-import { listarObras } from "@/services/obras.service";
+import {
+  listarObras,
+  listarAlertasEmpresa,
+  obtenerResumenEmpresa,
+} from "@/services/obras.service";
+import { listarActividad } from "@/services/actividad.service";
 import { puede } from "@/lib/rbac";
 import {
   ETIQUETA_ESTADO_OBRA,
@@ -17,6 +22,8 @@ import { Paginacion } from "@/components/ui/Paginacion";
 import { AcentoTitulo, Regla } from "@/components/ui/Regla";
 import { FiltrosObras } from "@/components/obras/FiltrosObras";
 import { FranjaObra, type AlertaObra } from "@/components/obras/FranjaObra";
+import { ResumenEmpresaPanel } from "@/components/obras/ResumenEmpresaPanel";
+import { ActividadReciente } from "@/components/obras/ActividadReciente";
 
 export const metadata: Metadata = { title: "Panel" };
 
@@ -32,14 +39,22 @@ export default async function PanelPage({
   const filtros = { q: consulta.q, estado: consulta.estado };
   const hayFiltro = Object.values(filtros).some(Boolean);
 
-  const obras = await listarObras(sesion, {
-    pagina: consulta.p,
-    // Doce por pagina: con la rejilla de tres columnas son cuatro filas
-    // completas, sin dejar huecos al final.
-    porPagina: 12,
-    q: consulta.q,
-    estado: consulta.estado,
-  });
+  const [obras, resumen, alertasEmpresa, actividad] = await Promise.all([
+    listarObras(sesion, {
+      pagina: consulta.p,
+      // Doce por pagina: con la rejilla de tres columnas son cuatro filas
+      // completas, sin dejar huecos al final.
+      porPagina: 12,
+      q: consulta.q,
+      estado: consulta.estado,
+    }),
+    // Las cifras, las alertas y la actividad son de la empresa entera: no
+    // dependen del filtro ni de la pagina, y por eso van en sus propias
+    // consultas.
+    obtenerResumenEmpresa(sesion),
+    listarAlertasEmpresa(sesion),
+    listarActividad(sesion),
+  ]);
 
   const puedeCrear = puede(sesion, "obra:crear");
 
@@ -70,6 +85,13 @@ export default async function PanelPage({
           </Link>
         )}
       </div>
+
+      {/* Las cifras encabezan porque son la lectura de un vistazo; la lista
+          de obras es el detalle. Con la empresa vacia no se pintan: cuatro
+          ceros no informan de nada. */}
+      {!vacioDeVerdad && (
+        <ResumenEmpresaPanel resumen={resumen} alertas={alertasEmpresa} />
+      )}
 
       {/* El buscador no se pinta con la empresa vacia: no hay nada que
           filtrar y solo estorbaria al unico paso que toca, crear la obra. */}
@@ -256,6 +278,10 @@ export default async function PanelPage({
         // la busqueda que el usuario acaba de hacer.
         params={filtros}
       />
+
+      {/* Debajo de las obras y no encima: contesta a «que ha pasado» cuando
+          ya se ha visto «como va», que es el orden en que se mira un panel. */}
+      <ActividadReciente entradas={actividad} />
     </div>
   );
 }

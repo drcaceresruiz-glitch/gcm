@@ -7,6 +7,7 @@ import {
   Navegacion,
   type EnlaceEmpresa,
 } from "@/components/navegacion/Navegacion";
+import { RelojPeru } from "@/components/ui/RelojPeru";
 
 /**
  * Area privada.
@@ -75,6 +76,12 @@ export default async function DashboardLayout({
             </div>
             <span className="font-semibold">GCM</span>
           </Link>
+
+          {/* En el medio de la cabecera y no en un rincon: es la unica
+              pantalla que se ve SIEMPRE, en cualquier pagina del sistema, y
+              una obra se rige por fechas de calendario -saber que dia y hora
+              es en Peru tiene que estar a la vista, no a un clic. */}
+          <RelojPeru />
 
           <Navegacion
             empresa={enlaces}

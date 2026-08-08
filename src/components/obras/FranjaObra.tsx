@@ -75,7 +75,9 @@ export function FranjaObra({
             }}
             aria-expanded={abierto}
             aria-label={`Ver ${alertas.length} alerta(s) de esta obra`}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+            // El latido solo va aqui, donde de verdad hay algo que corregir.
+            // Si latiera en todas las tarjetas dejaria de llamar la atencion.
+            className="latido inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
             style={{
               backgroundColor:
                 "color-mix(in oklab, var(--color-peligro) 20%, transparent)",

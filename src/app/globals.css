@@ -103,20 +103,59 @@
   color-scheme: light;
 }
 
-:root[data-tema="oscuro"] {
-  --fondo: oklch(0.17 0.012 230);
-  --texto: oklch(0.96 0.005 220);
-  --texto-suave: oklch(0.72 0.012 220);
-  --borde: oklch(0.32 0.014 220);
-  --superficie: oklch(0.22 0.016 230);
+/**
+ * Los valores del tema oscuro, declarados UNA vez.
+ *
+ * Se aplican en dos situaciones distintas —elegido a mano, o «segun el
+ * sistema» con el sistema en oscuro— y cada una necesita su propio selector.
+ * Teniendo los colores aqui, esos dos selectores solo repiten referencias:
+ * cambiar un color del modo oscuro se sigue haciendo en un solo sitio.
+ */
+:root {
+  --oscuro-fondo: oklch(0.17 0.012 230);
+  --oscuro-texto: oklch(0.96 0.005 220);
+  --oscuro-texto-suave: oklch(0.72 0.012 220);
+  --oscuro-borde: oklch(0.32 0.014 220);
+  --oscuro-superficie: oklch(0.22 0.016 230);
 
   /* En oscuro la sombra no separa: lo que separa es que la superficie sea
      mas CLARA que el fondo. Se dejan casi planas para no ensuciar. */
-  --sombra-1: 0 1px 2px oklch(0 0 0 / 0.4);
-  --sombra-2: 0 2px 8px oklch(0 0 0 / 0.45);
-  --sombra-3: 0 8px 24px oklch(0 0 0 / 0.5);
+  --oscuro-sombra-1: 0 1px 2px oklch(0 0 0 / 0.4);
+  --oscuro-sombra-2: 0 2px 8px oklch(0 0 0 / 0.45);
+  --oscuro-sombra-3: 0 8px 24px oklch(0 0 0 / 0.5);
+}
 
+:root[data-tema="oscuro"] {
+  --fondo: var(--oscuro-fondo);
+  --texto: var(--oscuro-texto);
+  --texto-suave: var(--oscuro-texto-suave);
+  --borde: var(--oscuro-borde);
+  --superficie: var(--oscuro-superficie);
+  --sombra-1: var(--oscuro-sombra-1);
+  --sombra-2: var(--oscuro-sombra-2);
+  --sombra-3: var(--oscuro-sombra-3);
   color-scheme: dark;
+}
+
+/**
+ * «Segun el sistema».
+ *
+ * Que lo resuelva el CSS y no el servidor es lo que permite prescindir de
+ * cualquier script: el servidor no puede saber la preferencia del equipo,
+ * pero el navegador si, y una consulta de medios se evalua antes de pintar.
+ */
+@media (prefers-color-scheme: dark) {
+  :root[data-tema="auto"] {
+    --fondo: var(--oscuro-fondo);
+    --texto: var(--oscuro-texto);
+    --texto-suave: var(--oscuro-texto-suave);
+    --borde: var(--oscuro-borde);
+    --superficie: var(--oscuro-superficie);
+    --sombra-1: var(--oscuro-sombra-1);
+    --sombra-2: var(--oscuro-sombra-2);
+    --sombra-3: var(--oscuro-sombra-3);
+    color-scheme: dark;
+  }
 }
 
 body {
@@ -194,6 +233,35 @@ body {
 
 .opacity-70 {
   opacity: 0.85;
+}
+
+/**
+ * Latido del indicador de alertas.
+ *
+ * Un halo que se expande y se apaga, NO un parpadeo del propio indicador:
+ * algo que aparece y desaparece se lee como un fallo de pintado, y ademas
+ * dejaria la cifra ilegible la mitad del tiempo.
+ *
+ * Ciclo largo —2.4 s— y a proposito: un pulso rapido en una pantalla de
+ * control cansa en cinco minutos. Solo se pone donde hay algo que corregir de
+ * verdad; si latiera siempre, dejaria de significar nada.
+ *
+ * La regla global de `prefers-reduced-motion` lo detiene junto con el resto.
+ */
+@keyframes latido {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-peligro) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.latido {
+  animation: latido 2.4s ease-out infinite;
 }
 
 /* Accesibilidad: foco siempre visible para navegacion por teclado. */

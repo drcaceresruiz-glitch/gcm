@@ -1,4 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
+import {
+  COOKIE_PALETA,
+  COOKIE_TEMA,
+  paletaValida,
+  temaValido,
+} from "@/lib/tema";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,40 +26,25 @@ export const viewport: Viewport = {
   themeColor: "#0f7186",
 };
 
-/**
- * Aplica el tema y la paleta ANTES de que se pinte nada.
- *
- * Tiene que ser un script en linea y sincrono: si la eleccion se aplicara
- * desde React, la primera pintura saldria con el tema por defecto y cambiaria
- * de golpe al hidratar. Ese parpadeo es exactamente lo que separa un selector
- * de apariencia bien hecho de uno que molesta.
- *
- * Va envuelto en `try` porque `localStorage` lanza en navegacion privada de
- * algunos navegadores, y quedarse sin tema es mejor que quedarse sin pagina.
- */
-const APLICAR_APARIENCIA = `
-try {
-  var t = localStorage.getItem('gcm:tema') || 'claro';
-  var p = localStorage.getItem('gcm:paleta') || 'teal';
-  if (t === 'auto') {
-    t = matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro';
-  }
-  document.documentElement.dataset.tema = t;
-  document.documentElement.dataset.paleta = p;
-} catch (e) {}
-`;
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // El tema y la paleta se resuelven aqui, en el servidor, leyendo la cookie
+  // que escribe `aplicarApariencia`. Sin esto haria falta un script en linea
+  // que corriera antes que React para evitar el parpadeo del tema por
+  // defecto -y un `<script>` suelto dentro de un componente ya no se
+  // ejecuta en esta version de Next-. Leyendo la cookie no hace falta
+  // script ninguno: el HTML llega ya pintado con el tema correcto.
+  //
+  // `auto` se deja tal cual en el atributo -no se resuelve aqui contra el
+  // sistema, porque el servidor no puede saber la preferencia del equipo-;
+  // de eso se encarga una consulta de medios en `globals.css`.
+  const almacen = await cookies();
+  const tema = temaValido(almacen.get(COOKIE_TEMA)?.value);
+  const paleta = paletaValida(almacen.get(COOKIE_PALETA)?.value);
+
   return (
-    <html lang="es-PE" suppressHydrationWarning>
-      <head>
-        {/* `suppressHydrationWarning` arriba porque este script cambia el
-            `<html>` antes de que React lo compare con lo que trae del
-            servidor, y esa diferencia es intencionada. */}
-        <script dangerouslySetInnerHTML={{ __html: APLICAR_APARIENCIA }} />
-      </head>
+    <html lang="es-PE" data-tema={tema} data-paleta={paleta}>
       <body className="min-h-dvh antialiased">{children}</body>
     </html>
   );

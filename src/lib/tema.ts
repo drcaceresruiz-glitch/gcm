@@ -43,10 +43,24 @@ export const MUESTRA_PALETA: Record<Paleta, string> = {
   grafito: "oklch(0.48 0.02 240)",
 };
 
-/// Claves de `localStorage`. Con el mismo prefijo que el resto de
-/// preferencias que ya guarda la aplicacion.
-export const CLAVE_TEMA = "gcm:tema";
-export const CLAVE_PALETA = "gcm:paleta";
+/**
+ * Se guarda en COOKIE y no en `localStorage`, al contrario que las columnas
+ * del presupuesto.
+ *
+ * El motivo es que la apariencia tiene que estar decidida **antes de pintar
+ * nada**. Con `localStorage` haria falta un script en linea que corriera
+ * antes que React —el patron clasico contra el parpadeo—, y en esta version
+ * de Next un `<script>` dentro de un componente da error de consola. Una
+ * cookie la lee el servidor, que ya escribe el `<html>`: no hay script, no
+ * hay parpadeo y no hay nada que sincronizar despues.
+ *
+ * Los dos puntos no valen en el nombre de una cookie, de ahi el guion.
+ */
+export const COOKIE_TEMA = "gcm-tema";
+export const COOKIE_PALETA = "gcm-paleta";
+
+/// Un ano. Es una preferencia, no una sesion: no debe caducar con ella.
+const DURACION_COOKIE = 60 * 60 * 24 * 365;
 
 export const TEMA_POR_DEFECTO: Tema = "claro";
 export const PALETA_POR_DEFECTO: Paleta = "teal";
@@ -89,18 +103,32 @@ export function temaEfectivo(tema: Tema, sistemaPrefiereOscuro: boolean): "claro
 export function aplicarApariencia(tema: Tema, paleta: Paleta): void {
   if (typeof document === "undefined") return;
 
-  try {
-    localStorage.setItem(CLAVE_TEMA, tema);
-    localStorage.setItem(CLAVE_PALETA, paleta);
-  } catch {
-    // Navegacion privada de algunos navegadores. Se aplica igual, aunque no
-    // sobreviva a la recarga: es mejor que no hacer nada.
-  }
+  document.cookie = `${COOKIE_TEMA}=${tema}; path=/; max-age=${DURACION_COOKIE}; SameSite=Lax`;
+  document.cookie = `${COOKIE_PALETA}=${paleta}; path=/; max-age=${DURACION_COOKIE}; SameSite=Lax`;
 
-  const oscuroDelSistema =
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-  document.documentElement.dataset.tema = temaEfectivo(tema, oscuroDelSistema);
+  // Se aplica tambien en el acto para que el cambio se vea al instante, sin
+  // esperar a la siguiente peticion. `auto` se deja tal cual en el atributo:
+  // de resolverlo contra el sistema se encarga una consulta de medios en
+  // `globals.css`, que es lo que permite que el servidor tampoco tenga que
+  // saber la preferencia del equipo.
+  document.documentElement.dataset.tema = tema;
   document.documentElement.dataset.paleta = paleta;
+}
+
+/**
+ * Lee una cookie del lado del cliente.
+ *
+ * `document.cookie` devuelve todas juntas en una sola cadena
+ * (`"a=1; b=2"`), asi que hace falta partirla. Solo la usa el selector para
+ * poner sus botones en el estado correcto al montar: la aplicacion en si ya
+ * llega pintada, porque el layout la lee en el servidor con `next/headers`.
+ */
+export function leerCookie(nombre: string): string | null {
+  if (typeof document === "undefined") return null;
+
+  for (const par of document.cookie.split("; ")) {
+    const [clave, ...resto] = par.split("=");
+    if (clave === nombre) return decodeURIComponent(resto.join("="));
+  }
+  return null;
 }

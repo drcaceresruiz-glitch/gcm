@@ -1,0 +1,154 @@
+import { AlertTriangle, Building2, HandCoins, Wallet } from "lucide-react";
+import type { AlertaEmpresa, ResumenEmpresa } from "@/services/obras.service";
+import { soles } from "@/utils/formato";
+import { CifraAnimada } from "@/components/obras/CifraAnimada";
+import { AlertasEmpresa } from "@/components/obras/AlertasEmpresa";
+
+/**
+ * Las cifras de la empresa entera, encabezando el panel.
+ *
+ * Antes no existian en ninguna pantalla: el presupuesto y el comprometido
+ * solo se veian obra por obra, asi que «cuanto tengo comprometido en total»
+ * no se podia responder sin sumar a mano.
+ *
+ * Todas son SIN IGV, que es como se mide el costo de obra en este sistema.
+ */
+export function ResumenEmpresaPanel({
+  resumen,
+  alertas,
+}: {
+  resumen: ResumenEmpresa;
+  /// El detalle de las alertas: DE QUE obra es cada una. El popup de la
+  /// tarjeta de Saldo enlaza a la obra directamente en vez de dejar solo el
+  /// numero, que no llevaba a ningun sitio.
+  alertas: AlertaEmpresa[];
+}) {
+  const saldoNegativo = resumen.saldo.trimStart().startsWith("-");
+
+  return (
+    // `relative z-20`: crea un contexto de apilamiento para TODO el panel de
+    // cifras, por encima de la fila de filtros que viene despues en el DOM.
+    // Sin esto, el popup de alertas -que se abre hacia abajo- quedaba por
+    // detras del buscador y el select de estado, que se pintan despues.
+    <dl className="relative z-20 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Cifra
+        icono={Building2}
+        etiqueta="Obras"
+        valor={String(resumen.obras)}
+        numero={resumen.obras}
+        acento="var(--color-marca-500)"
+        detalle={
+          resumen.obrasEnEjecucion === 1
+            ? "1 en ejecucion"
+            : `${resumen.obrasEnEjecucion} en ejecucion`
+        }
+      />
+
+      <Cifra
+        icono={Wallet}
+        etiqueta="Presupuesto"
+        valor={soles(resumen.presupuestoTotal)}
+        numero={Number(resumen.presupuestoTotal)}
+        moneda
+        acento="var(--color-exito)"
+        detalle="Suma de partidas, sin IGV"
+      />
+
+      <Cifra
+        icono={HandCoins}
+        etiqueta="Comprometido"
+        valor={soles(resumen.comprometido)}
+        numero={Number(resumen.comprometido)}
+        moneda
+        acento="var(--color-alerta)"
+        detalle="Solo ordenes aprobadas"
+      />
+
+      <Cifra
+        icono={AlertTriangle}
+        etiqueta="Saldo"
+        valor={soles(resumen.saldo)}
+        numero={Math.abs(Number(resumen.saldo))}
+        moneda
+        // En negativo se ha comprometido mas de lo presupuestado, y eso no
+        // puede leerse igual que un saldo holgado: el degradado tambien lo
+        // dice, no solo el numero.
+        tono={saldoNegativo ? "peligro" : undefined}
+        acento={saldoNegativo ? "var(--color-peligro)" : "var(--color-exito)"}
+        detalle={<AlertasEmpresa alertas={alertas} />}
+        detalleTono={alertas.length > 0 ? "peligro" : undefined}
+      />
+    </dl>
+  );
+}
+
+function Cifra({
+  icono: Icono,
+  etiqueta,
+  valor,
+  numero,
+  moneda,
+  acento,
+  detalle,
+  tono,
+  detalleTono,
+}: {
+  icono: typeof Building2;
+  etiqueta: string;
+  valor: string;
+  numero: number;
+  moneda?: boolean;
+  /// El color que tine el degradado de fondo. Cada tarjeta el suyo, para que
+  /// se distingan entre si a un vistazo y no solo por el texto.
+  acento: string;
+  /// String en tres tarjetas; en Saldo es el popup de `AlertasEmpresa`, que
+  /// tambien es valido aqui porque un string es un ReactNode como cualquiera.
+  detalle: React.ReactNode;
+  tono?: "peligro";
+  detalleTono?: "peligro";
+}) {
+  const color = tono === "peligro" ? "var(--color-peligro)" : undefined;
+
+  return (
+    <div
+      className="elevacion-1 rounded-xl border p-4"
+      style={{
+        borderColor: "var(--borde)",
+        // Un lavado diagonal, no un fondo saturado: el texto sigue siendo
+        // oscuro sobre un fondo que sigue siendo casi blanco, asi que las
+        // cifras de dinero no pierden legibilidad por darle color a la
+        // tarjeta. El acento se mezcla con la SUPERFICIE y no con blanco a
+        // secas, para que tambien funcione en modo oscuro.
+        backgroundImage: `linear-gradient(135deg, color-mix(in oklab, ${acento} 20%, var(--superficie)) 0%, var(--superficie) 65%)`,
+      }}
+    >
+      <dt className="flex items-center gap-1.5 text-xs opacity-70">
+        <Icono
+          className="size-3.5 shrink-0"
+          style={{ color: color ?? "var(--color-marca-500)" }}
+          aria-hidden="true"
+        />
+        {etiqueta}
+      </dt>
+
+      <dd
+        className="mt-1 text-xl font-semibold tabular-nums"
+        style={color ? { color } : undefined}
+      >
+        <CifraAnimada hasta={numero} texto={valor} moneda={moneda} />
+      </dd>
+
+      {/* `div` y no `p`: el detalle de Saldo es el popup de `AlertasEmpresa`,
+          que abre un `div` absolutamente posicionado, y un `div` dentro de un
+          `p` es HTML invalido -React avisa por consola de eso mismo-. */}
+      <div
+        className="mt-0.5 text-xs opacity-70"
+        style={
+          detalleTono === "peligro" ? { color: "var(--color-peligro)" } : undefined
+        }
+      >
+        {detalle}
+      </div>
+    </div>
+  );
+}
