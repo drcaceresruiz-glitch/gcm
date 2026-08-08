@@ -1,0 +1,210 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Lock,
+  Plus,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
+import { obtenerSesion } from "@/services/sesion.service";
+import { obtenerObra } from "@/services/obras.service";
+import {
+  listarMovimientos,
+  obtenerPresupuestoVigente,
+  SinLineaBaseError,
+  type PresupuestoVigente,
+} from "@/services/movimientos.service";
+import { puede } from "@/lib/rbac";
+import { PanelVigente } from "@/components/movimientos/PanelVigente";
+import { HistorialMovimientos } from "@/components/movimientos/HistorialMovimientos";
+
+export const metadata: Metadata = { title: "Movimientos presupuestales" };
+
+/**
+ * Reconversiones, adicionales y deductivos de una obra.
+ *
+ * La pantalla responde a dos preguntas: «cuanto vale hoy esta obra despues
+ * de los ajustes» (el panel del vigente) y «que se ha movido, quien lo
+ * aprobo y por que» (el historial). Dar de alta un movimiento vive en otra
+ * ruta: con 360 partidas, el formulario debajo de la tabla quedaria a media
+ * pantalla de distancia.
+ */
+export default async function MovimientosPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    creado?: string;
+    aprobado?: string;
+    eliminado?: string;
+    todas?: string;
+  }>;
+}) {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const { id } = await params;
+  const obra = await obtenerObra(sesion, id);
+  if (!obra) notFound();
+
+  if (!puede(sesion.role, "movimiento:leer")) redirect(`/obras/${id}`);
+
+  const { creado, aprobado, eliminado, todas } = await searchParams;
+
+  /**
+   * Sin linea base aprobada no existe el concepto de «encima de la base»,
+   * y el servicio lo dice lanzando. Se atrapa aqui para explicarlo en vez
+   * de mostrar una pantalla de error.
+   */
+  let presupuesto: PresupuestoVigente | null = null;
+  try {
+    presupuesto = await obtenerPresupuestoVigente(sesion, id);
+  } catch (error) {
+    if (!(error instanceof SinLineaBaseError)) throw error;
+  }
+
+  const movimientos = presupuesto ? await listarMovimientos(sesion, id) : [];
+  const puedeCrear = puede(sesion.role, "movimiento:crear");
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <Link
+          href={`/obras/${id}`}
+          className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Volver a la obra
+        </Link>
+
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Movimientos presupuestales
+            </h1>
+            <p className="mt-1 text-sm text-pretty opacity-70">
+              {obra.nombreObra}
+            </p>
+          </div>
+
+          {presupuesto && puedeCrear && (
+            <Link
+              href={`/obras/${id}/movimientos/nuevo`}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: "var(--color-marca-600)" }}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              Registrar movimiento
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {creado && (
+        <Aviso icono={CheckCircle2} tono="exito">
+          Movimiento {creado} guardado como borrador. Todavia no ajusta el
+          presupuesto: hay que aprobarlo.
+        </Aviso>
+      )}
+
+      {aprobado && (
+        <Aviso icono={Lock} tono="exito">
+          Movimiento {aprobado} aprobado. Ya cuenta en el presupuesto vigente.
+        </Aviso>
+      )}
+
+      {eliminado && (
+        <Aviso icono={Trash2} tono="exito">
+          Borrador {eliminado} eliminado.
+        </Aviso>
+      )}
+
+      {presupuesto ? (
+        <>
+          <PanelVigente
+            presupuesto={presupuesto}
+            obraId={id}
+            mostrarTodas={todas === "1"}
+          />
+
+          <HistorialMovimientos
+            movimientos={movimientos}
+            obraId={id}
+            puedeAprobar={puede(sesion.role, "movimiento:aprobar")}
+            puedeCrear={puedeCrear}
+          />
+        </>
+      ) : (
+        <SinLineaBase obraId={id} puedeVerLineaBase={puede(sesion.role, "linea_base:leer")} />
+      )}
+    </div>
+  );
+}
+
+function Aviso({
+  icono: Icono,
+  tono,
+  children,
+}: {
+  icono: LucideIcon;
+  tono: "exito" | "alerta";
+  children: React.ReactNode;
+}) {
+  const color = tono === "exito" ? "var(--color-exito)" : "var(--color-alerta)";
+
+  return (
+    <p
+      role="status"
+      className="flex items-center gap-2 rounded-lg px-4 py-3 text-sm"
+      style={{
+        backgroundColor: `color-mix(in oklab, ${color} 15%, transparent)`,
+      }}
+    >
+      <Icono className="size-4 shrink-0" aria-hidden="true" />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+/**
+ * Una obra sin linea base aprobada no puede tener movimientos: no hay nada
+ * sobre lo que ajustar. Se explica el orden en vez de dejar la pantalla en
+ * blanco, porque el paso que falta esta en otra pantalla.
+ */
+function SinLineaBase({
+  obraId,
+  puedeVerLineaBase,
+}: {
+  obraId: string;
+  puedeVerLineaBase: boolean;
+}) {
+  return (
+    <div
+      className="rounded-xl border border-dashed p-10 text-center"
+      style={{ borderColor: "var(--borde)" }}
+    >
+      <Lock className="mx-auto size-8 opacity-40" aria-hidden="true" />
+      <p className="mt-3 text-sm opacity-70">
+        Esta obra todavia no tiene una linea base aprobada.
+      </p>
+      <p className="mx-auto mt-1 max-w-lg text-sm text-pretty opacity-60">
+        Los movimientos van ENCIMA de la linea base y se miden contra ella,
+        asi que primero hay que congelar el presupuesto contractual. Mientras
+        no exista, el presupuesto se corrige editando las partidas.
+      </p>
+
+      {puedeVerLineaBase && (
+        <Link
+          href={`/obras/${obraId}/revisiones`}
+          className="mt-4 inline-flex items-center gap-2 text-sm font-medium underline"
+        >
+          Ir a las revisiones del presupuesto
+        </Link>
+      )}
+    </div>
+  );
+}

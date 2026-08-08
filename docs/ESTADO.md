@@ -3,7 +3,7 @@
 Documento de traspaso. Léelo antes de tocar nada: recoge lo construido, por
 qué está construido así, y qué falta.
 
-Última actualización: 7 de agosto de 2026.
+Última actualización: 8 de agosto de 2026.
 
 ---
 
@@ -59,7 +59,7 @@ subir documentos de cliente, credenciales ni datos del servidor.
 |---|---|
 | `npm run typecheck` | Tipos |
 | `npm run lint` | Estilo y reglas de arquitectura |
-| `npx vitest run` | 48 pruebas |
+| `npx vitest run` | 64 pruebas |
 | `npm run build` | Build de producción |
 | `npm run db:studio` | Explorador de la base |
 
@@ -102,7 +102,43 @@ auditoría de cada ingreso. Verificado de extremo a extremo en navegador.
   que muestra versión, fecha e importe. Al aprobar, la obra congela el
   presupuesto: se bloquea la edición de partidas y desaparece el importador.
 
-**Motores verificados con 48 pruebas.**
+**Módulo 2 — Movimientos presupuestales.** Los cambios que van ENCIMA de la
+línea base, que nunca se toca. El cliente mueve presupuesto entre partidas
+cuando una se queda corta y otra sobra, o pide un adicional si no hay de
+dónde sacar.
+
+| Tipo | Qué hace | Regla |
+|---|---|---|
+| Reconversión | Saca de una partida y mete en otra | **La suma debe dar cero** |
+| Adicional | Aumenta el presupuesto aprobado | Solo entradas |
+| Deductivo | Lo reduce | Solo salidas |
+
+- **Servicio** (`movimientos.service.ts`): alta en borrador, aprobación y
+  cálculo del vigente. Cada partida tiene **base**, **ajustes** y
+  **vigente**, y los indicadores de costo se miden contra el vigente; si no,
+  cada reconversión aprobada aparecería como desviación. Probado contra la
+  base real y con las migraciones aplicadas en producción.
+- **Pantallas**: `/obras/[id]/movimientos` (estado del vigente e historial) y
+  `/obras/[id]/movimientos/nuevo` (alta). Son dos rutas porque con 360
+  partidas el formulario debajo de la tabla queda a media pantalla.
+- **El formulario no pide importes con signo.** Cada línea dice si el dinero
+  *sale de* o *entra en* una partida y la cantidad va siempre en positivo; el
+  signo se compone en la frontera. Un menos olvidado convertiría una
+  reconversión en un adicional encubierto, y uno de más la descuadraría. La
+  unión vive en `lib/movimientos.ts`, compartida con la acción de servidor
+  para que la vista previa y lo que se guarda no puedan discrepar.
+- **El cuadre se recalcula mientras se escribe** y dice de qué lado falta
+  («sale 500,00 más de lo que entra»), no solo que no cuadra.
+- **Aprobar es de ADMIN y no se deshace**: un movimiento equivocado se
+  corrige registrando otro de signo contrario. Las partidas de un adicional
+  nacen al aprobar, no al guardar, para que un borrador descartado no deje
+  partidas fantasma.
+- La cláusula 1 del contrato define cuándo procede un adicional: *«trabajo
+  adicional por vicios ocultos o cambios en el diseño original»*.
+- **Pendiente: comprobarlo en navegador contra CRIOCORD.** El servicio sí
+  está probado contra la base real; la pantalla todavía no.
+
+**Motores verificados con 64 pruebas.**
 - `lib/decimal.ts` — aritmética exacta con enteros grandes. Nunca coma
   flotante para dinero.
 - `lib/excel-presupuesto.ts` — lectura de presupuestos.
@@ -235,29 +271,11 @@ Son los seis céntimos conocidos del costo directo (762,077.21 frente a
 762,077.15) amplificados por el 25 % de gastos generales y utilidad. No es
 un error nuevo.
 
-### Inmediato — reconversiones y adicionales
+Las reconversiones y los adicionales, que encabezaban esta lista, **ya están
+hechos**: servicio, pantallas y migraciones en producción. Lo que queda de
+ellos es comprobarlos en navegador contra CRIOCORD (§3).
 
-Diseño ya acordado con el cliente, **sin implementar**. El cliente mueve
-presupuesto entre partidas cuando una se queda corta y otra sobra, o pide un
-adicional si no hay de dónde sacar.
-
-Modelo acordado: entidad `MovimientoPresupuestal` con líneas, encima de la
-línea base, que nunca se toca.
-
-| Tipo | Qué hace | Regla |
-|---|---|---|
-| Reconversión | Saca de una partida y mete en otra | **La suma debe dar cero** |
-| Adicional | Aumenta el presupuesto aprobado | Solo entradas |
-| Deductivo | Lo reduce | Solo salidas |
-
-Cada partida pasa a tener **presupuesto base**, **ajustes** y **vigente**.
-Los indicadores de costo se calculan contra el **vigente**, no contra el
-original; si no, cada reconversión aprobada aparecería como desviación.
-
-La cláusula 1 del contrato define cuándo procede un adicional: *«trabajo
-adicional por vicios ocultos o cambios en el diseño original»*.
-
-### Después — gestión de permisos por empresa
+### Inmediato — gestión de permisos por empresa
 
 Hoy la matriz de `src/lib/rbac.ts` está **escrita en el código**: cambiar quién
 puede hacer qué exige tocar un archivo y desplegar. Sirve con una empresa; no
@@ -331,6 +349,12 @@ distintas con el mismo precio). Son informativos y no alteran ningún total.
 **El Excel del cliente tiene un total en caché desconcertante.** El del
 Capítulo XI guarda 166,942.42, pero sus fórmulas recalculadas darían otra
 cosa. Merece la pena avisarle de que revise el archivo.
+
+**Las migraciones se siguen aplicando a mano.** Lo dice la fila de Despliegue
+de la sección 6 y sigue siendo cierto: el despliegue del código es automático
+en cada push a `main`, pero el esquema no viaja con él. Hay que entrar al
+Terminal de cPanel y ejecutar `npx prisma migrate deploy`. El detalle está en
+`docs/infraestructura.md`.
 
 ---
 

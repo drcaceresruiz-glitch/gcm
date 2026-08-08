@@ -162,8 +162,14 @@ export default async function RevisionesPage({
             <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
               La linea base v{obra.lineaBaseVersion} esta aprobada, asi que ya
               no se crean revisiones nuevas. Los cambios posteriores se
-              registran como adicionales o reconversiones sobre ella, que
-              todavia no estan implementados.
+              registran como adicionales o reconversiones sobre ella, en{" "}
+              <Link
+                href={`/obras/${id}/movimientos`}
+                className="font-medium underline"
+              >
+                movimientos presupuestales
+              </Link>
+              .
             </p>
           </div>
         </section>

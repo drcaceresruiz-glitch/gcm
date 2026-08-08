@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowLeftRight,
   CalendarDays,
   CheckCircle2,
   FileClock,
@@ -84,6 +85,20 @@ export default async function ObraPage({
                 Revisiones y resumen
               </Link>
             )}
+
+            {/* Los movimientos van encima de la linea base: sin ella
+                aprobada, la pantalla no tiene nada que ensenar. */}
+            {puede(sesion.role, "movimiento:leer") &&
+              obra.lineaBaseVersion !== null && (
+                <Link
+                  href={`/obras/${id}/movimientos`}
+                  className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  <ArrowLeftRight className="size-4" aria-hidden="true" />
+                  Movimientos
+                </Link>
+              )}
 
             {puedeImportar && obra.lineaBaseVersion === null && (
               <Link

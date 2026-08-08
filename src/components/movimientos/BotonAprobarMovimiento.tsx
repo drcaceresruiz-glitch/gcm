@@ -2,40 +2,45 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, Lock, LoaderCircle } from "lucide-react";
+import { AlertCircle, LoaderCircle, Lock } from "lucide-react";
 import {
-  accionAprobarRevision,
-  type EstadoRevision,
-} from "@/app/(dashboard)/obras/[id]/revisiones/acciones";
+  accionAprobarMovimiento,
+  type EstadoMovimiento,
+} from "@/app/(dashboard)/obras/[id]/movimientos/acciones";
 
 /**
- * Aprobar la revision vigente.
+ * Aprobar un movimiento presupuestal.
  *
- * La confirmacion es en dos pasos y con las cifras delante, no un
- * `confirm()` del navegador. Congelar la linea base es un acto contractual
- * irreversible que ademas bloquea la edicion del presupuesto: quien lo
- * pulsa tiene que leer que version y que importe esta firmando, no
- * responder «aceptar» a un dialogo del sistema.
+ * Misma confirmacion en dos pasos que aprobar una revision, y por el mismo
+ * motivo: es irreversible y mueve la cifra contra la que se mide la obra.
+ * Aqui ademas nacen las partidas de un adicional, asi que la pulsacion
+ * cambia el arbol del presupuesto y no solo un total.
  */
 
 interface Props {
   obraId: string;
-  revisionId: string;
-  version: number;
-  /// Ya formateadas por quien renderiza, que es un componente de servidor.
-  fecha: string;
-  presupuesto: string;
+  movimientoId: string;
+  numero: number;
+  /// Ya formateados por quien renderiza, que es un componente de servidor.
+  tipo: string;
+  concepto: string;
+  entradas: string;
+  salidas: string;
+  neto: string;
 }
 
-export function BotonAprobar({
+export function BotonAprobarMovimiento({
   obraId,
-  revisionId,
-  version,
-  fecha,
-  presupuesto,
+  movimientoId,
+  numero,
+  tipo,
+  concepto,
+  entradas,
+  salidas,
+  neto,
 }: Props) {
-  const [estado, accion] = useActionState<EstadoRevision, FormData>(
-    accionAprobarRevision,
+  const [estado, accion] = useActionState<EstadoMovimiento, FormData>(
+    accionAprobarMovimiento,
     {},
   );
   const [confirmando, setConfirmando] = useState(false);
@@ -50,7 +55,7 @@ export function BotonAprobar({
           style={{ borderColor: "var(--borde)" }}
         >
           <Lock className="size-4" aria-hidden="true" />
-          Aprobar y congelar
+          Aprobar
         </button>
 
         {estado.error && <Aviso mensaje={estado.error} />}
@@ -61,44 +66,50 @@ export function BotonAprobar({
   return (
     <form
       action={accion}
-      className="rounded-lg border p-4"
+      className="w-full rounded-lg border p-4"
       style={{
         borderColor: "var(--color-alerta)",
-        backgroundColor: "color-mix(in oklab, var(--color-alerta) 10%, transparent)",
+        backgroundColor:
+          "color-mix(in oklab, var(--color-alerta) 10%, transparent)",
       }}
     >
       <input type="hidden" name="obraId" value={obraId} />
-      <input type="hidden" name="revisionId" value={revisionId} />
+      <input type="hidden" name="movimientoId" value={movimientoId} />
 
-      <h3 className="text-sm font-semibold">
-        Vas a congelar la revision v{version}
-      </h3>
+      <h4 className="text-sm font-semibold">
+        Vas a aprobar el movimiento {numero}
+      </h4>
+      <p className="mt-0.5 text-sm opacity-80">
+        {tipo} · {concepto}
+      </p>
 
       <dl className="mt-3 space-y-1 text-sm">
         <div className="flex justify-between gap-4">
-          <dt className="opacity-70">Fecha de la revision</dt>
-          <dd className="tabular-nums">{fecha}</dd>
+          <dt className="opacity-70">Entra</dt>
+          <dd className="tabular-nums">{entradas}</dd>
         </div>
         <div className="flex justify-between gap-4">
-          <dt className="opacity-70">Presupuesto que se congela</dt>
-          <dd className="font-semibold tabular-nums">{presupuesto}</dd>
+          <dt className="opacity-70">Sale</dt>
+          <dd className="tabular-nums">{salidas}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="opacity-70">Efecto en el presupuesto</dt>
+          <dd className="font-semibold tabular-nums">{neto}</dd>
         </div>
       </dl>
 
       <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
         <li>
-          <strong>No se puede deshacer.</strong> Los indicadores de avance y
-          costo se miden contra esta cifra; poder cambiarla despues los
-          invalidaria hacia atras.
+          <strong>No se puede deshacer.</strong> Para corregir un movimiento
+          aprobado hay que registrar otro de signo contrario.
         </li>
         <li>
-          La obra dejara de permitir <strong>editar partidas</strong> y de
-          ofrecer el <strong>importador de Excel</strong>.
+          Pasa a contar en el <strong>presupuesto vigente</strong>, que es
+          contra el que se miden los indicadores de costo.
         </li>
         <li>
-          Los cambios posteriores se registran como{" "}
-          <strong>adicionales o reconversiones</strong> encima de esta linea
-          base, que ya no se toca.
+          Si trae partidas nuevas, <strong>se crean ahora</strong> en el
+          arbol del presupuesto.
         </li>
       </ul>
 
@@ -109,7 +120,7 @@ export function BotonAprobar({
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <BotonConfirmar version={version} />
+        <BotonConfirmar numero={numero} />
         <button
           type="button"
           onClick={() => setConfirmando(false)}
@@ -123,7 +134,7 @@ export function BotonAprobar({
   );
 }
 
-function BotonConfirmar({ version }: { version: number }) {
+function BotonConfirmar({ numero }: { numero: number }) {
   const { pending } = useFormStatus();
 
   return (
@@ -138,7 +149,7 @@ function BotonConfirmar({ version }: { version: number }) {
       ) : (
         <Lock className="size-4" aria-hidden="true" />
       )}
-      {pending ? "Congelando..." : `Si, congelar la v${version}`}
+      {pending ? "Aprobando..." : `Si, aprobar el ${numero}`}
     </button>
   );
 }
@@ -149,7 +160,8 @@ function Aviso({ mensaje }: { mensaje: string }) {
       role="alert"
       className="flex items-start gap-2 rounded-lg px-3 py-2 text-sm"
       style={{
-        backgroundColor: "color-mix(in oklab, var(--color-peligro) 15%, transparent)",
+        backgroundColor:
+          "color-mix(in oklab, var(--color-peligro) 15%, transparent)",
       }}
     >
       <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
