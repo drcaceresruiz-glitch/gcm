@@ -211,7 +211,12 @@ function EnlaceMenu({
 
 function BotonSalir() {
   return (
-    <form action={accionCerrarSesion}>
+    // `stopPropagation`: sin esto, el clic burbujea al contenedor del menu,
+    // que se cierra —y desmonta este formulario— ANTES de que su envio llegue
+    // a ejecutarse, y cerrar sesion no hacia nada. Los enlaces de arriba no
+    // sufren esto porque navegan; un `form` con server action, si. El menu no
+    // se cierra, pero da igual: cerrar sesion lleva a /login de inmediato.
+    <form action={accionCerrarSesion} onClick={(e) => e.stopPropagation()}>
       <button
         type="submit"
         role="menuitem"

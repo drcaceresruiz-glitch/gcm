@@ -13,6 +13,7 @@ import {
 } from "@/components/navegacion/Navegacion";
 import { RelojPeru } from "@/components/ui/RelojPeru";
 import { CierrePorInactividad } from "@/components/navegacion/CierrePorInactividad";
+import { PieDePagina } from "@/components/navegacion/PieDePagina";
 
 /**
  * Area privada.
@@ -129,6 +130,8 @@ export default async function DashboardLayout({
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 print:max-w-none print:p-0">
         {children}
       </main>
+
+      <PieDePagina />
     </div>
   );
 }
