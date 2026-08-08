@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { HardHat } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
+import { contarSolicitudesPendientes } from "@/services/perfil.service";
 import { puede } from "@/lib/rbac";
 import {
   Navegacion,
@@ -24,6 +25,10 @@ export default async function DashboardLayout({
 
   // Nadie navega por el sistema con una clave temporal sin estrenar.
   if (sesion.mustChangePassword) redirect("/cambiar-clave");
+
+  // El numerito de solicitudes pendientes solo se pide si el rol las puede
+  // resolver; para el resto la funcion devuelve cero sin tocar la base.
+  const pendientes = await contarSolicitudesPendientes(sesion);
 
   // Los permisos se resuelven aqui y no en el componente de navegacion: la
   // comprobacion se queda en el servidor y al cliente solo viaja la lista de
@@ -48,6 +53,12 @@ export default async function DashboardLayout({
       href: "/empresa/permisos",
       etiqueta: "Permisos",
       clave: "permisos",
+    },
+    puede(sesion, "usuario:editar") && {
+      href: "/empresa/solicitudes",
+      etiqueta: "Solicitudes de perfil",
+      clave: "solicitudes",
+      badge: pendientes,
     },
   ].filter(Boolean) as EnlaceEmpresa[];
 

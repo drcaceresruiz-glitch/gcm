@@ -4,11 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Building2,
+  ClipboardCheck,
   KeyRound,
   LogOut,
   Menu,
   Receipt,
   ShieldCheck,
+  UserCircle,
   Users,
   X,
 } from "lucide-react";
@@ -36,12 +38,16 @@ const ICONOS = {
   formasPago: Receipt,
   empresa: Building2,
   permisos: ShieldCheck,
+  solicitudes: ClipboardCheck,
 } as const;
 
 export interface EnlaceEmpresa {
   href: string;
   etiqueta: string;
   clave: keyof typeof ICONOS;
+  /// Numerito a la derecha del enlace, para pendientes que reclaman atencion.
+  /// Se omite cuando es cero: un badge en cero solo distrae.
+  badge?: number;
 }
 
 interface Props {
@@ -71,6 +77,9 @@ export function Navegacion({ empresa, usuario }: Props) {
           <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
           <SelectorApariencia />
           <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
+          <EnlaceMenu href="/perfil" icono={UserCircle}>
+            Mi perfil
+          </EnlaceMenu>
           <EnlaceMenu href="/cambiar-clave" icono={KeyRound}>
             Cambiar clave
           </EnlaceMenu>
@@ -126,6 +135,9 @@ export function Navegacion({ empresa, usuario }: Props) {
             <SelectorApariencia />
             <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
 
+            <EnlaceMenu href="/perfil" icono={UserCircle}>
+              Mi perfil
+            </EnlaceMenu>
             <EnlaceMenu href="/cambiar-clave" icono={KeyRound}>
               Cambiar clave
             </EnlaceMenu>
@@ -139,7 +151,7 @@ export function Navegacion({ empresa, usuario }: Props) {
 
 function Opcion({ enlace }: { enlace: EnlaceEmpresa }) {
   return (
-    <EnlaceMenu href={enlace.href} icono={ICONOS[enlace.clave]}>
+    <EnlaceMenu href={enlace.href} icono={ICONOS[enlace.clave]} badge={enlace.badge}>
       {enlace.etiqueta}
     </EnlaceMenu>
   );
@@ -148,10 +160,12 @@ function Opcion({ enlace }: { enlace: EnlaceEmpresa }) {
 function EnlaceMenu({
   href,
   icono: Icono,
+  badge,
   children,
 }: {
   href: string;
   icono: React.ComponentType<{ className?: string }>;
+  badge?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -161,7 +175,15 @@ function EnlaceMenu({
       className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm hover:bg-[color-mix(in_oklab,var(--borde)_50%,transparent)]"
     >
       <Icono className="size-4 shrink-0 opacity-70" />
-      {children}
+      <span className="flex-1">{children}</span>
+      {badge !== undefined && badge > 0 && (
+        <span
+          className="ml-auto rounded-full px-1.5 py-0.5 text-xs font-semibold text-white"
+          style={{ backgroundColor: "var(--color-marca-500)" }}
+        >
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }

@@ -35,6 +35,13 @@ enum UserState {
   INACTIVO
 }
 
+/// Estado de una solicitud de cambio de datos de perfil.
+enum EstadoSolicitud {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+}
+
 enum ProjectState {
   PLANIFICACION
   EN_EJECUCION
@@ -112,6 +119,7 @@ model Company {
   proveedores Proveedor[]
   ordenes     OrdenCompra[]
   formasPago  FormaPagoPlantilla[]
+  solicitudesPerfil SolicitudCambioPerfil[]
 
   @@map("companies")
 }
@@ -183,10 +191,54 @@ model User {
   memberships ProjectMembership[]
   sessions    Session[]
   resetTokens PasswordResetToken[]
+  solicitudesPerfil SolicitudCambioPerfil[]
 
   @@unique([companyId, numDoc])
   @@index([companyId, estado])
   @@map("users")
+}
+
+/// Solicitud de cambio de datos de identidad del propio perfil.
+///
+/// El celular se cambia directo, pero nombres, apellidos, cargo y documento NO:
+/// son exactamente lo que queda escrito en los `aprobadaPor` de ordenes y
+/// movimientos ya emitidos, y el documento identifica a la persona. De ahi
+/// que se soliciten y los apruebe un ADMIN.
+///
+/// Cada campo es nullable: NULL significa «este campo no se cambia». Solo
+/// viajan los que de verdad difieren de lo que hay.
+model SolicitudCambioPerfil {
+  id        String @id @default(cuid())
+  companyId String
+  userId    String
+
+  /// Lo propuesto. NULL = ese campo no se cambia.
+  nombres   String? @db.VarChar(100)
+  apellidos String? @db.VarChar(100)
+  cargo     String? @db.VarChar(100)
+  tipoDoc   String? @db.VarChar(10)
+  numDoc    String? @db.VarChar(20)
+
+  motivo String? @db.Text
+
+  estado        EstadoSolicitud @default(PENDIENTE)
+  resueltaAt    DateTime?
+  resueltaPor   String?  @db.VarChar(150)
+  motivoRechazo String?  @db.Text
+
+  /// Vale `userId` mientras esta PENDIENTE y NULL en cuanto se resuelve.
+  /// Es lo que garantiza EN LA BASE «una sola pendiente por usuario»: MySQL
+  /// admite varios NULL en una columna unica, asi que las resueltas no chocan
+  /// entre si. Un indice unico parcial no existe en MySQL.
+  usuarioPendienteId String? @unique
+
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, estado])
+  @@map("solicitudes_cambio_perfil")
 }
 
 // ---------------------------------------------------------------------------
