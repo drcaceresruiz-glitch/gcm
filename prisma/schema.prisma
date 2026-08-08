@@ -91,7 +91,18 @@ model Company {
   direccion   String?  @db.VarChar(255)
   telefono    String?  @db.VarChar(30)
   email       String?  @db.VarChar(150)
-  activa      Boolean  @default(true)
+
+  /// Quien firma las ordenes. Sale en el pie del documento que se le manda
+  /// al proveedor, sobre la linea de firma.
+  representanteLegal String? @db.VarChar(150)
+  cargoRepresentante String? @db.VarChar(100)
+
+  /// Texto que se repite al pie de todas las ordenes del cliente, sobre la
+  /// responsabilidad del traslado. Va en la empresa y no escrito en el
+  /// codigo porque es una condicion contractual suya, no del sistema.
+  observacionesOrden String? @db.Text
+
+  activa Boolean @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

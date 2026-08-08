@@ -1,4 +1,5 @@
-import { Ban, FileText, Lock, PenLine, Truck } from "lucide-react";
+import Link from "next/link";
+import { Ban, FileText, Lock, PenLine, Printer, Truck } from "lucide-react";
 import type { OrdenResumen } from "@/services/ordenes.service";
 import { soles } from "@/utils/formato";
 import { fechaCorta, fechaHora } from "@/utils/fechas";
@@ -110,7 +111,21 @@ function Tarjeta({
           </p>
         </div>
 
-        <Estado estado={o.estado} />
+        <div className="flex shrink-0 items-center gap-3">
+          {/* Se imprime en cualquier estado: un borrador hay que poder
+              revisarlo antes de aprobarlo, y el documento lleva su propio
+              sello diciendo que todavia no vale. */}
+          <Link
+            href={`/obras/${obraId}/ordenes/${o.id}/imprimir`}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <Printer className="size-3.5" aria-hidden="true" />
+            Imprimir
+          </Link>
+
+          <Estado estado={o.estado} />
+        </div>
       </header>
 
       <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>

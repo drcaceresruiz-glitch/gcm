@@ -121,3 +121,33 @@ export function importeDeOrden(entrada: string): string | null {
   if (valor === null) return null;
   return esNegativo(valor) ? null : valor;
 }
+
+/**
+ * La etiqueta del IGV en el documento impreso: "IGV 18%" o "IGV" a secas.
+ *
+ * La tasa no se guarda —solo se guardan neto e igv ya calculados—, asi que se
+ * deduce dividiendo. Y aqui SI se usa coma flotante a proposito: no se esta
+ * calculando dinero, se esta eligiendo un texto. Ninguna cifra que salga de
+ * esta funcion se suma a nada.
+ *
+ * Cuando la division no da una tasa entera reconocible se omite el
+ * porcentaje. Es preferible un documento que dice menos a uno que le declara
+ * al proveedor una tasa que no es la que se le esta cobrando.
+ */
+export function etiquetaIgv(neto: string, igv: string): string {
+  const base = Number(neto);
+  const impuesto = Number(igv);
+
+  if (!Number.isFinite(base) || !Number.isFinite(impuesto)) return "IGV";
+  // Sin base no hay tasa que deducir, y dividir daria Infinity o NaN.
+  if (base === 0) return "IGV";
+
+  const tasa = (impuesto / base) * 100;
+  const redondeada = Math.round(tasa);
+
+  // Una tasa de 0% es real —hay operaciones exoneradas— pero "IGV 0%" y "IGV"
+  // con importe 0.00 dicen lo mismo, y el segundo no invita a preguntar.
+  if (redondeada <= 0) return "IGV";
+
+  return Math.abs(tasa - redondeada) < 0.01 ? `IGV ${redondeada}%` : "IGV";
+}

@@ -72,7 +72,7 @@ subir documentos de cliente, credenciales ni datos del servidor.
 |---|---|
 | `npm run typecheck` | Tipos |
 | `npm run lint` | Estilo y reglas de arquitectura |
-| `npx vitest run` | 89 pruebas |
+| `npx vitest run` | 93 pruebas |
 | `npm run build` | Build de producción |
 | `npm run db:studio` | Explorador de la base |
 
@@ -248,7 +248,49 @@ ninguna parte.
 >    pidió de verdad.
 > 2. **Las líneas que no son agrupadoras suman el subtotal.** Ver más abajo.
 
-**Motores verificados con 89 pruebas.**
+**Módulo 5 — El documento de la orden.** Hasta aquí la orden existía en la
+base pero no había papel que mandarle al proveedor.
+
+- **Se imprime desde el navegador**, en `/obras/[id]/ordenes/[ordenId]/imprimir`.
+  El PDF lo compone el propio navegador con «Guardar como PDF»; no hay
+  librería ni archivo generado en el servidor. El motivo es el mismo que
+  obligó al adaptador puro de Prisma: en CloudLinux no corren los módulos
+  nativos, así que Chromium queda descartado, y con 20 Entry Processes
+  componer PDF en Node se paga en cada documento.
+- **El documento no usa las variables del tema.** Lleva blanco y negro fijos y
+  `print-color-adjust: exact`. Con `var(--fondo)` saldría gris sobre negro
+  para quien tuviera el modo oscuro puesto, y esto sale a un tercero.
+- **Se imprime en cualquier estado**, y el papel lo dice: un borrador lleva
+  impreso que todavía no compromete presupuesto, y una anulada que quedó sin
+  efecto. Hace falta poder revisar antes de aprobar y guardar copia de lo
+  anulado, y el aviso viaja en el propio documento porque es ahí donde importa
+  —cuando alguien reenvía el PDF por correo.
+- **Las líneas agrupadoras se dibujan como subtotales**, con fondo gris y sin
+  cantidad ni precio unitario. En el papel del cliente van con el mismo
+  aspecto que las demás, y eso invita a sumar la columna y contar ese dinero
+  dos veces: el mismo tropiezo que el Excel del presupuesto (§5).
+- **La tasa del IGV no se guarda**, se deduce dividiendo el IGV entre el neto.
+  Si la división no da una tasa reconociblemente entera, la etiqueta dice
+  «IGV» a secas: es preferible un documento que dice menos a uno que le
+  declara al proveedor una tasa que no es la que se le cobra. Está en
+  `lib/ordenes.ts` y probado, porque una etiqueta equivocada sale impresa.
+
+**Datos de la empresa**, en `/empresa/datos`. Existían en la base desde el
+primer día pero no había dónde tocarlos. Se abren ahora porque son los que
+encabezan y firman ese documento: sin representante legal, la orden sale sin
+firmante.
+
+- **El RUC no se edita desde ahí.** Identifica a la empresa y ya figura
+  impreso en las órdenes emitidas; cambiarlo desde una pantalla de ajustes
+  reescribiría en silencio documentos ya enviados.
+- Las **observaciones al pie** —de quién es el riesgo del traslado y demás—
+  viven en la empresa y no escritas en el código: son una condición
+  contractual suya, no del sistema. Cada orden puede añadir las suyas encima.
+- **Todavía no hay logotipo.** `public/` está vacío y no existe infraestructura
+  de subida de archivos; `STORAGE_ROOT` está declarado en el entorno y no lo
+  usa nadie. La cabecera sale con la razón social en texto.
+
+**Motores verificados con 93 pruebas.**
 - `lib/decimal.ts` — aritmética exacta con enteros grandes. Nunca coma
   flotante para dinero.
 - `lib/excel-presupuesto.ts` — lectura de presupuestos.
@@ -393,6 +435,30 @@ ellos es comprobarlos en navegador contra CRIOCORD (§3).
 La gestión de permisos por empresa, que la encabezaba después, **también está
 hecha**: está en §3. Lo siguiente en el orden acordado son las fases de abajo.
 
+### Pendiente en producción — dos migraciones sin aplicar
+
+En local están aplicadas; en `drcacere_gcm` no:
+
+- `20260808110951_partidas_habituales_por_proveedor` — tabla
+  `proveedor_partidas`.
+- `20260808113630_datos_de_la_empresa` — tres columnas en `companies`:
+  `representanteLegal`, `cargoRepresentante`, `observacionesOrden`.
+
+Ninguna de las dos tumba la aplicación si falta: solo falla la pantalla que
+las consulta —el alta de órdenes y `/empresa/datos`— porque son tablas y
+columnas nuevas que nadie más toca. Al revés que con los permisos, donde
+faltar la migración rompía la sesión entera.
+
+Se aplican desde el Terminal de cPanel, **después** de que el despliegue haya
+entrado —y el despliegue no entra hasta la primera petición al sitio, que es
+lo que hace que Passenger descomprima el paquete:
+
+```
+source /home/<usuario>/nodevenv/<app>/22/bin/activate
+cd ~/gcm
+npx --yes prisma@7 migrate deploy
+```
+
 ### Brecha conocida — el rol por obra no se aplica
 
 `ProjectMembership` existe en el esquema con un `role` por obra, y el
@@ -416,7 +482,7 @@ algo que no ocurre**: o se implementa o se retira.
 | Avance físico | Metrados ejecutados, Curva S, evidencia fotográfica |
 | Proveedores | **Órdenes HECHAS** (§3). Faltan **anticipos**, recepciones y abonos, que son las otras tres columnas del control |
 | Indicadores | Tablero en vivo, cortes de control, EVM. **Antes de dibujarlo, resolver que las cuatro columnas del control no son homogéneas: lo pagado lleva IGV y el resto no** (§7) |
-| Reportes | PDF y Excel con el formato del informe semanal actual |
+| Reportes | Informe semanal en PDF y Excel. El PDF sigue el camino ya abierto por el documento de la orden (§3): vista de impresión y `window.print()`, sin librería en el servidor |
 | Resto | Caja chica, almacén, actas, gestión documental, WhatsApp |
 | Escritorio | Tauri v2 como contenedor + PWA |
 

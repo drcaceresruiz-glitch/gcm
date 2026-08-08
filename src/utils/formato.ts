@@ -68,6 +68,19 @@ export function tipoCambio(valor: Importe | null | undefined, vacio = "—"): st
   return n === null ? vacio : CAMBIO.format(n);
 }
 
+/**
+ * Precios unitarios: dos decimales siempre, hasta cuatro si los tiene.
+ *
+ * La base los guarda con cuatro para que `cantidad x precio` de el importe
+ * exacto, pero un 1,254.56 corriente no debe salir como 1,254.5600. Al reves,
+ * si el precio es de verdad 0.3333, recortarlo a 0.33 haria que la
+ * multiplicacion no cuadrara a la vista.
+ */
+export function precio(valor: Importe | null | undefined, vacio = "—"): string {
+  const n = aNumero(valor);
+  return n === null ? vacio : CAMBIO.format(n);
+}
+
 /** "12.5%" */
 export function porcentaje(valor: number | null | undefined, decimales = 1): string {
   if (valor === null || valor === undefined || !Number.isFinite(valor)) return "—";

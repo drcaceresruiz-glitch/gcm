@@ -708,3 +708,146 @@ export async function obtenerPartidasHabituales(
 
   return porProveedor;
 }
+
+// ---------------------------------------------------------------------------
+// El documento
+// ---------------------------------------------------------------------------
+
+export interface LineaImpresa {
+  nivel: number;
+  esAgrupador: boolean;
+  cantidad: string | null;
+  unidad: string | null;
+  descripcion: string;
+  precioUnitario: string | null;
+  importe: string;
+}
+
+export interface OrdenImpresa {
+  emisor: {
+    razonSocial: string;
+    ruc: string;
+    direccion: string | null;
+    telefono: string | null;
+    email: string | null;
+    representanteLegal: string | null;
+    cargoRepresentante: string | null;
+    observacionesOrden: string | null;
+  };
+  obra: { nombreObra: string; cliente: string | null };
+  numero: string;
+  tipo: TipoOrden;
+  estado: EstadoOrden;
+  fecha: Date;
+  descripcion: string;
+  referencia: string | null;
+  formaPago: string | null;
+  observaciones: string | null;
+  proveedor: {
+    razonSocial: string;
+    ruc: string;
+    contactoNombre: string | null;
+    contactoTelefono: string | null;
+    email: string | null;
+    banco: string | null;
+    tipoCuenta: string | null;
+    monedaCuenta: string | null;
+    cuentaBancaria: string | null;
+    cci: string | null;
+  };
+  lineas: LineaImpresa[];
+  subtotal: string;
+  descuentoComercial: string;
+  neto: string;
+  igv: string;
+  total: string;
+}
+
+/**
+ * Todo lo que lleva impreso el papel que se le manda al proveedor.
+ *
+ * Va en una consulta aparte de `listarOrdenes` porque pide cosas que el
+ * listado no necesita —los datos del emisor, los bancarios del proveedor, el
+ * detalle linea a linea— y cargarlas en cada fila de la tabla para usarlas en
+ * una de cada cien seria pagar por adelantado algo que casi nunca se usa.
+ *
+ * Se puede imprimir en cualquier estado, tambien BORRADOR y ANULADA: hace
+ * falta poder revisar antes de aprobar, y guardar copia de lo que se anulo.
+ * Es el documento el que tiene que decir en cual esta, y por eso viaja
+ * `estado` con el resto.
+ */
+export async function obtenerOrdenParaImpresion(
+  sesion: SesionActiva,
+  obraId: string,
+  ordenId: string,
+): Promise<OrdenImpresa | null> {
+  if (!puede(sesion, "orden:leer")) return null;
+
+  const orden = await prisma.ordenCompra.findFirst({
+    // El companyId no es redundante con el id: sin el, un id adivinado de
+    // otra empresa devolveria su orden entera, con sus datos bancarios.
+    where: { id: ordenId, projectId: obraId, companyId: sesion.companyId },
+    include: {
+      company: true,
+      project: { select: { nombreObra: true, cliente: true } },
+      proveedor: true,
+      lineas: { orderBy: { orden: "asc" } },
+    },
+  });
+
+  if (!orden) return null;
+
+  return {
+    emisor: {
+      razonSocial: orden.company.razonSocial,
+      ruc: orden.company.ruc,
+      direccion: orden.company.direccion,
+      telefono: orden.company.telefono,
+      email: orden.company.email,
+      representanteLegal: orden.company.representanteLegal,
+      cargoRepresentante: orden.company.cargoRepresentante,
+      observacionesOrden: orden.company.observacionesOrden,
+    },
+    obra: {
+      nombreObra: orden.project.nombreObra,
+      cliente: orden.project.cliente,
+    },
+    numero: orden.numero,
+    tipo: orden.tipo,
+    estado: orden.estado,
+    fecha: orden.fecha,
+    descripcion: orden.descripcion,
+    referencia: orden.referencia,
+    formaPago: orden.formaPago,
+    observaciones: orden.observaciones,
+    proveedor: {
+      razonSocial: orden.proveedor.razonSocial,
+      ruc: orden.proveedor.ruc,
+      contactoNombre: orden.proveedor.contactoNombre,
+      contactoTelefono: orden.proveedor.contactoTelefono,
+      email: orden.proveedor.email,
+      banco: orden.proveedor.banco,
+      tipoCuenta: orden.proveedor.tipoCuenta,
+      monedaCuenta: orden.proveedor.monedaCuenta,
+      cuentaBancaria: orden.proveedor.cuentaBancaria,
+      cci: orden.proveedor.cci,
+    },
+    // Los importes salen como cadena, sin tocar. Darles formato es cosa de
+    // `utils/formato`, en el ultimo paso: aqui pasar por coma flotante seria
+    // perder precision para ganar nada.
+    lineas: orden.lineas.map((l) => ({
+      nivel: l.nivel,
+      esAgrupador: l.esAgrupador,
+      cantidad: l.cantidad?.toString() ?? null,
+      unidad: l.unidad,
+      descripcion: l.descripcion,
+      precioUnitario: l.precioUnitario?.toString() ?? null,
+      importe: l.importe.toString(),
+    })),
+    subtotal: orden.subtotal.toString(),
+    descuentoComercial: orden.descuentoComercial.toString(),
+    neto: orden.neto.toString(),
+    igv: orden.igv.toString(),
+    total: orden.total.toString(),
+  };
+}

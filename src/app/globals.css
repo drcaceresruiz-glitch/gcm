@@ -60,3 +60,39 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Impresion
+   ---------------------------------------------------------------------------
+   Las ordenes se le mandan al proveedor en papel o en PDF, y el PDF lo hace
+   el navegador desde este mismo estilo. No hay librerias: en CloudLinux no
+   corren los modulos nativos que necesitaria un Chromium en el servidor.
+
+   El margen va aqui y no en el componente porque `@page` es lo unico que
+   gobierna el area imprimible de la hoja; el `padding` de un div deja el
+   contenido dentro del margen que ponga cada impresora por su cuenta. */
+@page {
+  size: A4;
+  margin: 14mm;
+}
+
+@media print {
+  /* El documento manda sus propios colores y no los del tema: un papel que
+     sale a un tercero tiene que imprimirse igual lo tenga quien lo tenga. */
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: #fff;
+    color: #000;
+  }
+
+  /* Por defecto los navegadores no imprimen fondos, y sin ellos las lineas
+     agrupadoras de la orden pierden justo lo que las distingue de una
+     partida mas. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calcularCascadaOrden,
   descuadreDelReparto,
+  etiquetaIgv,
   importeDeOrden,
   sumarLineas,
 } from "@/lib/ordenes";
@@ -140,5 +141,35 @@ describe("importes que llegan de un formulario", () => {
   it("rechaza lo que no es un numero", () => {
     expect(importeDeOrden("once mil")).toBeNull();
     expect(importeDeOrden("")).toBeNull();
+  });
+});
+
+describe("etiqueta del IGV en el documento impreso", () => {
+  it("deduce el 18% de las tres ordenes reales", () => {
+    // CABREJO: 11,000.00 -> 1,980.00
+    expect(etiquetaIgv("11000.00", "1980.00")).toBe("IGV 18%");
+    // SIV AIRE: 159,450.51 -> 28,701.09
+    expect(etiquetaIgv("159450.51", "28701.09")).toBe("IGV 18%");
+    // FCM: 34,800.00 -> 6,264.00
+    expect(etiquetaIgv("34800.00", "6264.00")).toBe("IGV 18%");
+  });
+
+  it("tolera el redondeo del importe del impuesto", () => {
+    // El IGV se guarda a dos decimales, asi que la tasa deducida casi nunca
+    // da 18 exacto: SIV AIRE sale 17.99994% y este caso, 18.0018%. La
+    // etiqueta tiene que decir 18% en los dos.
+    expect(etiquetaIgv("33.33", "6.00")).toBe("IGV 18%");
+  });
+
+  it("omite el porcentaje antes que declarar uno falso", () => {
+    // Una tasa que no es reconociblemente entera no se imprime: es un
+    // documento que sale a un tercero.
+    expect(etiquetaIgv("1000.00", "155.00")).toBe("IGV");
+  });
+
+  it("no divide entre cero ni imprime tasas imposibles", () => {
+    expect(etiquetaIgv("0.00", "0.00")).toBe("IGV");
+    expect(etiquetaIgv("1000.00", "0.00")).toBe("IGV");
+    expect(etiquetaIgv("no es un numero", "180.00")).toBe("IGV");
   });
 });

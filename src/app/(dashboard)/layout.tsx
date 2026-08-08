@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  Building2,
   HardHat,
   KeyRound,
   LogOut,
@@ -30,8 +31,11 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* `print:hidden` es lo que permite que las pantallas que son
+          documentos —la orden que se le manda al proveedor— salgan por la
+          impresora sin la barra de navegacion encima. */}
       <header
-        className="sticky top-0 z-10 border-b"
+        className="sticky top-0 z-10 border-b print:hidden"
         style={{
           borderColor: "var(--borde)",
           backgroundColor: "var(--superficie)",
@@ -78,6 +82,17 @@ export default async function DashboardLayout({
               </Link>
             )}
 
+            {puede(sesion, "empresa:editar") && (
+              <Link
+                href="/empresa/datos"
+                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm"
+                style={{ borderColor: "var(--borde)" }}
+              >
+                <Building2 className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Empresa</span>
+              </Link>
+            )}
+
             {puede(sesion, "permiso:leer") && (
               <Link
                 href="/empresa/permisos"
@@ -115,7 +130,7 @@ export default async function DashboardLayout({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 print:max-w-none print:p-0">
         {children}
       </main>
     </div>
