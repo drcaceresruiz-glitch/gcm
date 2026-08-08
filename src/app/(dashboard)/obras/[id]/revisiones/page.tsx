@@ -44,10 +44,14 @@ export default async function RevisionesPage({
   const { creada, aprobada } = await searchParams;
   const puedeCrear = puede(sesion.role, "linea_base:crear");
 
-  // Lo que congelaria una revision creada ahora mismo.
-  const costo = puedeCrear
-    ? await obtenerCostoDirectoActual(sesion, id)
-    : null;
+  // Con la linea base ya aprobada, el presupuesto es un contrato firmado:
+  // no se crean mas revisiones, los cambios van por adicionales. Se deja de
+  // cargar el costo para no dibujar un formulario que el servicio rechazaria.
+  const congelado = obra.lineaBaseVersion !== null;
+  const costo =
+    puedeCrear && !congelado
+      ? await obtenerCostoDirectoActual(sesion, id)
+      : null;
 
   /**
    * Una revision nueva casi siempre repite las condiciones de la anterior:
@@ -140,6 +144,28 @@ export default async function RevisionesPage({
             iniciales={iniciales}
             ultimaVersion={ultima?.version ?? null}
           />
+        </section>
+      )}
+
+      {/* Quien puede crear pero la obra ya esta congelada: se explica por
+          que no hay formulario, en vez de dejar un vacio desconcertante. */}
+      {puedeCrear && congelado && (
+        <section
+          className="flex items-start gap-3 rounded-xl border p-5"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <Lock className="mt-0.5 size-5 shrink-0 opacity-70" aria-hidden="true" />
+          <div>
+            <h2 className="text-sm font-semibold">
+              El presupuesto esta congelado
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
+              La linea base v{obra.lineaBaseVersion} esta aprobada, asi que ya
+              no se crean revisiones nuevas. Los cambios posteriores se
+              registran como adicionales o reconversiones sobre ella, que
+              todavia no estan implementados.
+            </p>
+          </div>
         </section>
       )}
     </div>

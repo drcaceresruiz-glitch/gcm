@@ -148,6 +148,26 @@ export async function crearRevision(
   });
   if (!obra) return { ok: false, error: "Obra no encontrada." };
 
+  // Con una revision ya aprobada, el presupuesto es un contrato firmado y la
+  // linea base es inmutable: los cambios posteriores van como adicionales o
+  // reconversiones ENCIMA de ella, nunca como una revision nueva que la
+  // sustituya. Crear revisiones queda para la fase de negociacion, cuando
+  // todas son borradores.
+  const aprobada = await prisma.baseline.findFirst({
+    where: { projectId: obraId, aprobadaAt: { not: null } },
+    orderBy: { version: "desc" },
+    select: { version: true },
+  });
+  if (aprobada) {
+    return {
+      ok: false,
+      error:
+        `El presupuesto ya tiene la linea base v${aprobada.version} aprobada. ` +
+        `Los cambios posteriores se registran como adicionales o ` +
+        `reconversiones, no como una revision nueva.`,
+    };
+  }
+
   const items = await prisma.wbsItem.findMany({
     where: { projectId: obraId },
     orderBy: { orden: "asc" },
