@@ -66,6 +66,9 @@ export interface DatosOrden {
   porcentajeIgv: string;
   lineas: LineaEntrada[];
   imputaciones: ImputacionEntrada[];
+  /// Guardar las partidas imputadas como habituales de este proveedor en
+  /// esta obra, para que la proxima orden las traiga puestas.
+  recordarPartidas?: boolean;
 }
 
 export type ResultadoOrden =
@@ -304,6 +307,24 @@ export async function crearOrden(
       },
       select: { id: true, numero: true },
     });
+
+    /**
+     * Se recuerdan las partidas para este proveedor en esta obra.
+     *
+     * `createMany` con `skipDuplicates` y no un borrado previo: la intencion
+     * es ANADIR a lo que ya se sabe, no sustituirlo. Una orden pequena de un
+     * proveedor que normalmente hace cinco partidas no debe reducir su lista
+     * a la unica que trajo esta vez.
+     */
+    if (datos.recordarPartidas) {
+      await tx.proveedorPartida.createMany({
+        data: imputaciones.map((i) => ({
+          proveedorId: proveedor.id,
+          wbsItemId: i.wbsItemId,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     await tx.auditLog.create({
       data: {
@@ -653,4 +674,37 @@ export async function listarOrdenes(
       importe: i.importe.toString(),
     })),
   }));
+}
+
+/**
+ * Partidas habituales de cada proveedor en una obra.
+ *
+ * Se devuelven TODOS los proveedores de una vez, indexados por su id, porque
+ * quien redacta una orden todavia no ha elegido proveedor: el formulario
+ * necesita poder reaccionar en cuanto lo elija, sin otra ida al servidor.
+ *
+ * Son una ayuda, no un limite: la orden puede imputar a cualquier partida de
+ * la obra.
+ */
+export async function obtenerPartidasHabituales(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<Record<string, string[]>> {
+  if (!puede(sesion, "orden:crear")) return {};
+
+  const filas = await prisma.proveedorPartida.findMany({
+    where: {
+      proveedor: { companyId: sesion.companyId },
+      // La obra sale de la partida, que es quien sabe a que proyecto va.
+      partida: { projectId: obraId },
+    },
+    select: { proveedorId: true, wbsItemId: true },
+  });
+
+  const porProveedor: Record<string, string[]> = {};
+  for (const fila of filas) {
+    (porProveedor[fila.proveedorId] ??= []).push(fila.wbsItemId);
+  }
+
+  return porProveedor;
 }

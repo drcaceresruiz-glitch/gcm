@@ -338,6 +338,7 @@ model WbsItem {
 
   lineasMovimiento MovimientoLinea[]
   imputaciones     OrdenImputacion[]
+  proveedores      ProveedorPartida[]
 
   @@unique([projectId, codigoPartida])
   @@index([projectId, parentId])
@@ -672,12 +673,43 @@ model Proveedor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  ordenes OrdenCompra[]
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  ordenes   OrdenCompra[]
+  habituales ProveedorPartida[]
 
   @@unique([companyId, ruc])
   @@index([companyId])
   @@map("proveedores")
+}
+
+/// Partidas de las que un proveedor se hace cargo habitualmente en UNA obra.
+///
+/// Es por obra y no por empresa porque una partida no es una idea abstracta:
+/// `11.02.04` es una fila del presupuesto de CRIOCORD, y en la siguiente obra
+/// sera otra, quiza con otro codigo. Ademas es lo que refleja la realidad, que
+/// un mismo proveedor puede hacer vidrios en una obra y mamparas en otra.
+///
+/// NO limita nada: al redactar una orden estas salen primero, pero se puede
+/// imputar a cualquier partida de la obra. Solo evita buscar entre 314 cada
+/// vez.
+///
+/// Se configura USANDOLAS: al guardar una orden se ofrece recordar sus
+/// partidas para ese proveedor. Una pantalla de configuracion aparte seria
+/// una que nadie visitaria.
+model ProveedorPartida {
+  id          String @id @default(cuid())
+  proveedorId String
+  /// La obra sale de la partida: `WbsItem` ya sabe a que proyecto pertenece.
+  wbsItemId   String
+
+  createdAt DateTime @default(now())
+
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+  partida   WbsItem   @relation(fields: [wbsItemId], references: [id], onDelete: Cascade)
+
+  @@unique([proveedorId, wbsItemId])
+  @@index([wbsItemId])
+  @@map("proveedor_partidas")
 }
 
 /// Forma de pago reutilizable.

@@ -101,6 +101,8 @@ interface Props {
   proveedores: OpcionProveedor[];
   partidas: OpcionImputacion[];
   formasPago: OpcionFormaPago[];
+  /// Partidas habituales de cada proveedor en esta obra, por id de proveedor.
+  habituales: Record<string, string[]>;
 }
 
 export function FormularioOrden({
@@ -109,11 +111,14 @@ export function FormularioOrden({
   proveedores,
   partidas,
   formasPago,
+  habituales,
 }: Props) {
   const [estado, accion] = useActionState<EstadoOrden, FormData>(
     accionCrearOrden,
     {},
   );
+
+  const [proveedorId, setProveedorId] = useState("");
 
   /**
    * La forma de pago se copia de la plantilla pero queda EDITABLE, asi que es
@@ -210,6 +215,30 @@ export function FormularioOrden({
     );
   }
 
+  /**
+   * Al elegir proveedor, se cargan sus partidas habituales en el reparto.
+   *
+   * Solo si el reparto esta VACIO: si ya se escribio algo, cambiar de
+   * proveedor no puede barrer el trabajo hecho. Y los importes se dejan en
+   * blanco a proposito: la partida se repite de una orden a otra, la cifra
+   * nunca.
+   */
+  function elegirProveedor(id: string) {
+    setProveedorId(id);
+
+    const suyas = habituales[id] ?? [];
+    const vacio = imputaciones.every((i) => !i.wbsItemId && !i.importe.trim());
+    if (suyas.length === 0 || !vacio) return;
+
+    setImputaciones(
+      suyas.map((wbsItemId) => ({
+        clave: clave.current++,
+        wbsItemId,
+        importe: "",
+      })),
+    );
+  }
+
   function cambiarImputacion(
     clave: number,
     cambios: Partial<ImputacionEstado>,
@@ -240,7 +269,18 @@ export function FormularioOrden({
         <h2 className="text-lg font-semibold">El documento</h2>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <CampoSelect id="proveedorId" name="proveedorId" etiqueta="Proveedor">
+          <CampoSelect
+            id="proveedorId"
+            name="proveedorId"
+            etiqueta="Proveedor"
+            value={proveedorId}
+            onChange={(e) => elegirProveedor(e.target.value)}
+            ayuda={
+              (habituales[proveedorId]?.length ?? 0) > 0
+                ? "Sus partidas habituales se han cargado abajo. Se pueden quitar o anadir otras."
+                : undefined
+            }
+          >
             <option value="">Elige el proveedor</option>
             {proveedores.map((p) => (
               <option key={p.id} value={p.id}>
@@ -476,6 +516,30 @@ export function FormularioOrden({
           repartido={repartido}
           descuadre={descuadre}
         />
+
+        {/* Se configura usando: al guardar se recuerdan estas partidas para
+            este proveedor. Una pantalla de configuracion aparte seria una que
+            nadie visitaria. */}
+        {proveedorId && (
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+            <input
+              type="checkbox"
+              name="recordarPartidas"
+              className="mt-0.5 size-4 shrink-0"
+            />
+            <span>
+              Recordar estas partidas para{" "}
+              <strong>
+                {proveedores.find((p) => p.id === proveedorId)?.razonSocial}
+              </strong>{" "}
+              en esta obra
+              <span className="block text-xs opacity-70">
+                La proxima orden suya las traera cargadas. Se anaden a las que
+                ya tenga; no sustituyen su lista.
+              </span>
+            </span>
+          </label>
+        )}
       </section>
 
       <div className="space-y-3">

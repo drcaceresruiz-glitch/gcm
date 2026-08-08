@@ -6,6 +6,7 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { listarPartidas, obtenerObra } from "@/services/obras.service";
 import { listarProveedores } from "@/services/proveedores.service";
 import { listarFormasPago } from "@/services/formas-pago.service";
+import { obtenerPartidasHabituales } from "@/services/ordenes.service";
 import {
   obtenerPresupuestoVigente,
   SinLineaBaseError,
@@ -42,10 +43,11 @@ export default async function NuevaOrdenPage({
 
   if (!puede(sesion, "orden:crear")) redirect(`/obras/${id}/ordenes`);
 
-  const [proveedores, { filas }, formasPago] = await Promise.all([
+  const [proveedores, { filas }, formasPago, habituales] = await Promise.all([
     listarProveedores(sesion),
     listarPartidas(sesion, id),
     listarFormasPago(sesion),
+    obtenerPartidasHabituales(sesion, id),
   ]);
 
   // El vigente es la mejor referencia, pero solo existe con linea base
@@ -139,6 +141,7 @@ export default async function NuevaOrdenPage({
           }))}
           partidas={partidas}
           formasPago={formasPago}
+          habituales={habituales}
         />
       )}
     </div>

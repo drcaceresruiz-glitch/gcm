@@ -97,6 +97,7 @@ export async function accionCrearOrden(
     porcentajeIgv: igv,
     lineas: lineas.data,
     imputaciones: imputaciones.data,
+    recordarPartidas: datos.get("recordarPartidas") === "on",
   });
 
   if (!resultado.ok) return { error: resultado.error };
