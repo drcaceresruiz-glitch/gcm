@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeftRight, FileClock, Table2, Truck } from "lucide-react";
+import {
+  ArrowLeftRight,
+  CalendarClock,
+  FileClock,
+  Table2,
+  Truck,
+} from "lucide-react";
 
 /**
  * Las secciones de una obra.
@@ -14,6 +20,7 @@ import { ArrowLeftRight, FileClock, Table2, Truck } from "lucide-react";
 
 const ICONOS = {
   presupuesto: Table2,
+  cronograma: CalendarClock,
   revisiones: FileClock,
   movimientos: ArrowLeftRight,
   ordenes: Truck,

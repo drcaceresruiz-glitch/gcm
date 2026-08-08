@@ -46,6 +46,14 @@ export default async function ObraLayout({
       etiqueta: "Presupuesto",
       clave: "presupuesto",
     },
+    // Va junto al presupuesto y antes que las revisiones: el cronograma es
+    // la otra mitad del plan de la obra —el presupuesto dice cuanto y este
+    // dice cuando—, y no depende de nada para poder cargarse.
+    puede(sesion, "cronograma:leer") && {
+      href: `${raiz}/cronograma`,
+      etiqueta: "Cronograma",
+      clave: "cronograma",
+    },
     puede(sesion, "linea_base:leer") && {
       href: `${raiz}/revisiones`,
       etiqueta: "Revisiones",
