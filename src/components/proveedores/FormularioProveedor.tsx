@@ -177,12 +177,43 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
         />
       </div>
 
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <CampoTexto
+          id="banco"
+          name="banco"
+          type="text"
+          etiqueta="Banco"
+          defaultValue={proveedor?.banco ?? ""}
+          ayuda="BCP, BBVA, Interbank..."
+        />
+        <CampoSelect
+          id="tipoCuenta"
+          name="tipoCuenta"
+          etiqueta="Tipo de cuenta"
+          defaultValue={proveedor?.tipoCuenta ?? ""}
+        >
+          <option value="">Sin indicar</option>
+          <option value="AHORROS">Ahorros</option>
+          <option value="CORRIENTE">Corriente</option>
+        </CampoSelect>
+        <CampoSelect
+          id="monedaCuenta"
+          name="monedaCuenta"
+          etiqueta="Moneda"
+          defaultValue={proveedor?.monedaCuenta ?? ""}
+        >
+          <option value="">Sin indicar</option>
+          <option value="PEN">Soles</option>
+          <option value="USD">Dolares</option>
+        </CampoSelect>
+      </div>
+
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <CampoTexto
           id="cuentaBancaria"
           name="cuentaBancaria"
           type="text"
-          etiqueta="Cuenta bancaria"
+          etiqueta="Numero de cuenta"
           defaultValue={proveedor?.cuentaBancaria ?? ""}
           ayuda="La de depositos. Es donde se le paga."
         />
@@ -192,7 +223,7 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
           type="text"
           etiqueta="CCI"
           defaultValue={proveedor?.cci ?? ""}
-          ayuda="Cuenta interbancaria, para transferencias desde otro banco."
+          ayuda="Interbancaria, para transferir desde otro banco. Lleva el banco codificado."
         />
       </div>
 
@@ -226,5 +257,44 @@ function BotonGuardar({ edicion }: { edicion: boolean }) {
       )}
       {pending ? "Guardando..." : edicion ? "Guardar cambios" : "Crear proveedor"}
     </button>
+  );
+}
+
+interface CampoSelectProps
+  extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  etiqueta: string;
+  ayuda?: string;
+}
+
+/** Version de CampoTexto para desplegables, con la misma accesibilidad. */
+function CampoSelect({
+  etiqueta,
+  ayuda,
+  id,
+  children,
+  ...props
+}: CampoSelectProps) {
+  const idAyuda = ayuda ? `${id}-ayuda` : undefined;
+
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="block text-sm font-medium">
+        {etiqueta}
+      </label>
+      <select
+        id={id}
+        aria-describedby={idAyuda}
+        className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+        style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+        {...props}
+      >
+        {children}
+      </select>
+      {ayuda && (
+        <p id={idAyuda} className="text-xs opacity-60">
+          {ayuda}
+        </p>
+      )}
+    </div>
   );
 }

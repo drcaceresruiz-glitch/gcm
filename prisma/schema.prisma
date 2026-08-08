@@ -100,6 +100,7 @@ model Company {
   permisos    CompanyPermission[]
   proveedores Proveedor[]
   ordenes     OrdenCompra[]
+  formasPago  FormaPagoPlantilla[]
 
   @@map("companies")
 }
@@ -491,6 +492,19 @@ enum OrigenRegistro {
   IMPORTADO
 }
 
+enum TipoCuenta {
+  AHORROS
+  CORRIENTE
+}
+
+/// Moneda de la cuenta. Las ordenes del cliente dicen "Cta. BCP Soles", y hay
+/// proveedores que facturan en dolares: pagar a la cuenta equivocada es un
+/// error caro de deshacer.
+enum MonedaCuenta {
+  PEN
+  USD
+}
+
 enum EstadoOrden {
   BORRADOR
   APROBADA
@@ -634,8 +648,20 @@ model Proveedor {
 
   /// Los datos bancarios viven en el proveedor y no en cada orden, aunque el
   /// papel los repita en todas: son del proveedor, no del pedido.
-  cuentaBancaria String? @db.VarChar(40)
-  cci            String? @db.VarChar(40)
+  ///
+  /// El numero de cuenta SOLO no sirve para pagar: hace falta saber a que
+  /// banco es y de que tipo. Las ordenes del cliente lo escriben todo junto
+  /// ("Cta. BCP Soles: 194 2629150 0 70") y aqui va en campos aparte, para
+  /// que se pueda listar por banco y para no depender de como lo tecleo cada
+  /// quien.
+  banco          String?       @db.VarChar(80)
+  tipoCuenta     TipoCuenta?
+  monedaCuenta   MonedaCuenta?
+  cuentaBancaria String?       @db.VarChar(40)
+
+  /// La interbancaria no necesita banco: lo lleva codificado en sus primeros
+  /// digitos. Es la que sirve para transferir desde otra entidad.
+  cci String? @db.VarChar(40)
 
   activo Boolean @default(true)
 
@@ -652,6 +678,36 @@ model Proveedor {
   @@unique([companyId, ruc])
   @@index([companyId])
   @@map("proveedores")
+}
+
+/// Forma de pago reutilizable.
+///
+/// Las de las ordenes reales se repiten con pocas variantes —"50% adelanto,
+/// 40% contra instalacion, 10% contra dossier"— y volver a teclearlas invita
+/// a que cada una acabe diciendo algo distinto de lo pactado.
+///
+/// Es una PLANTILLA de texto, no un calendario de anticipos. Lo que se guarda
+/// en la orden sigue siendo el texto, copiado y editable: modelar los tramos
+/// sin haber visto como se pagan de verdad seria inventarlo, y eso llegara
+/// con el modulo de abonos.
+model FormaPagoPlantilla {
+  id        String @id @default(cuid())
+  companyId String
+
+  /// Como se elige en el desplegable: "50/40/10 con dossier".
+  nombre String @db.VarChar(100)
+  /// Lo que se copia a la orden.
+  texto  String @db.Text
+
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, nombre])
+  @@index([companyId])
+  @@map("formas_pago_plantillas")
 }
 
 model OrdenCompra {

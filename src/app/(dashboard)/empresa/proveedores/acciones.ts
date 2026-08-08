@@ -34,6 +34,9 @@ function leerDatos(datos: FormData): DatosProveedor {
     contactoNombre: texto("contactoNombre"),
     contactoTelefono: texto("contactoTelefono"),
     email: texto("email"),
+    banco: texto("banco"),
+    tipoCuenta: texto("tipoCuenta"),
+    monedaCuenta: texto("monedaCuenta"),
     cuentaBancaria: texto("cuentaBancaria"),
     cci: texto("cci"),
   };

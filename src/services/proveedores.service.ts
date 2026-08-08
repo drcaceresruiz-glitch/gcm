@@ -2,7 +2,11 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import type { SesionActiva } from "@/services/sesion.service";
-import type { OrigenRegistro } from "@/generated/prisma/enums";
+import type {
+  MonedaCuenta,
+  OrigenRegistro,
+  TipoCuenta,
+} from "@/generated/prisma/enums";
 
 /**
  * Catalogo de proveedores de la empresa.
@@ -26,6 +30,9 @@ export interface ProveedorResumen {
   contactoNombre: string | null;
   contactoTelefono: string | null;
   email: string | null;
+  banco: string | null;
+  tipoCuenta: TipoCuenta | null;
+  monedaCuenta: MonedaCuenta | null;
   cuentaBancaria: string | null;
   cci: string | null;
   activo: boolean;
@@ -58,6 +65,9 @@ export async function listarProveedores(
       contactoNombre: true,
       contactoTelefono: true,
       email: true,
+      banco: true,
+      tipoCuenta: true,
+      monedaCuenta: true,
       cuentaBancaria: true,
       cci: true,
       activo: true,
@@ -78,6 +88,10 @@ export interface DatosProveedor {
   contactoNombre?: string;
   contactoTelefono?: string;
   email?: string;
+  banco?: string;
+  /// Cadena vacia = sin indicar. Se convierte a null al guardar.
+  tipoCuenta?: string;
+  monedaCuenta?: string;
   cuentaBancaria?: string;
   cci?: string;
 }
@@ -101,12 +115,24 @@ function saneado(datos: DatosProveedor) {
   const opcional = (v: string | undefined, largo: number) =>
     v?.trim() ? v.trim().slice(0, largo) : null;
 
+  // Un valor fuera del enum se guarda como null en vez de romper: viene de un
+  // desplegable, y si alguien manipula la peticion lo peor que consigue es
+  // dejar el campo vacio.
+  const enumerado = <T extends string>(v: string | undefined, validos: T[]) =>
+    v && (validos as string[]).includes(v) ? (v as T) : null;
+
   return {
     razonSocial: datos.razonSocial.trim().slice(0, 200),
     ruc: datos.ruc.trim(),
     contactoNombre: opcional(datos.contactoNombre, 150),
     contactoTelefono: opcional(datos.contactoTelefono, 30),
     email: opcional(datos.email, 150),
+    banco: opcional(datos.banco, 80),
+    tipoCuenta: enumerado<TipoCuenta>(datos.tipoCuenta, [
+      "AHORROS",
+      "CORRIENTE",
+    ]),
+    monedaCuenta: enumerado<MonedaCuenta>(datos.monedaCuenta, ["PEN", "USD"]),
     cuentaBancaria: opcional(datos.cuentaBancaria, 40),
     cci: opcional(datos.cci, 40),
   };
@@ -194,6 +220,9 @@ export async function editarProveedor(
       contactoNombre: true,
       contactoTelefono: true,
       email: true,
+      banco: true,
+      tipoCuenta: true,
+      monedaCuenta: true,
       cuentaBancaria: true,
       cci: true,
     },

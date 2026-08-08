@@ -158,9 +158,24 @@ function Fila({
           {p.contactoTelefono && ` · ${p.contactoTelefono}`}
         </p>
 
-        {p.cuentaBancaria && (
+        {(p.cuentaBancaria || p.banco) && (
           <p className="mt-0.5 text-xs opacity-60">
-            Cta. {p.cuentaBancaria}
+            {[
+              p.banco,
+              p.tipoCuenta === "AHORROS"
+                ? "ahorros"
+                : p.tipoCuenta === "CORRIENTE"
+                  ? "corriente"
+                  : null,
+              p.monedaCuenta === "USD"
+                ? "dolares"
+                : p.monedaCuenta === "PEN"
+                  ? "soles"
+                  : null,
+              p.cuentaBancaria,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
             {p.cci && ` · CCI ${p.cci}`}
           </p>
         )}
