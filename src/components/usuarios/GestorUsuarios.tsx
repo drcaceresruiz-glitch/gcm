@@ -23,12 +23,17 @@ import {
   type EstadoUsuarios,
 } from "@/app/(dashboard)/empresa/usuarios/acciones";
 import type { UsuarioLista } from "@/services/usuarios.service";
-import { ETIQUETA_ROL, DESCRIPCION_ROL } from "@/lib/usuarios";
-import { TIPOS_DOC, ETIQUETA_TIPO_DOC } from "@/lib/perfil";
+import { ETIQUETA_ROL, DESCRIPCION_ROL, correoValido } from "@/lib/usuarios";
+import { TIPOS_DOC, ETIQUETA_TIPO_DOC, validarDocumento } from "@/lib/perfil";
 import { ROLES } from "@/lib/rbac";
 import { Chip } from "@/components/ui/Chip";
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
 import { CampoTexto } from "@/components/auth/CampoTexto";
+import {
+  ChecklistRequisitos,
+  todosCumplidos,
+  type Requisito,
+} from "@/components/ui/ChecklistRequisitos";
 import type { Role } from "@/generated/prisma/enums";
 
 /**
@@ -74,6 +79,40 @@ function PanelAlta({ alCerrar }: { alCerrar: () => void }) {
     {},
   );
 
+  // Los campos siguen sueltos (defaultValue); para el semaforo basta con
+  // escuchar los cambios a nivel de formulario y releer sus valores. Asi no
+  // hay que controlar cada input ni tocar los selects compartidos.
+  const [vals, setVals] = useState({
+    nombres: "",
+    apellidos: "",
+    email: "",
+    tipoDoc: "DNI",
+    numDoc: "",
+  });
+
+  function alCambiar(e: React.FormEvent<HTMLFormElement>) {
+    const fd = new FormData(e.currentTarget);
+    setVals({
+      nombres: String(fd.get("nombres") ?? ""),
+      apellidos: String(fd.get("apellidos") ?? ""),
+      email: String(fd.get("email") ?? ""),
+      tipoDoc: String(fd.get("tipoDoc") ?? "DNI"),
+      numDoc: String(fd.get("numDoc") ?? ""),
+    });
+  }
+
+  // Los mismos criterios que valida el servidor, campo a campo.
+  const requisitos: Requisito[] = [
+    { etiqueta: "Nombres", cumplido: vals.nombres.trim().length > 0 },
+    { etiqueta: "Apellidos", cumplido: vals.apellidos.trim().length > 0 },
+    { etiqueta: "Correo valido", cumplido: correoValido(vals.email) },
+    {
+      etiqueta: "Documento valido para su tipo",
+      cumplido: validarDocumento(vals.tipoDoc, vals.numDoc).ok,
+    },
+  ];
+  const listo = todosCumplidos(requisitos);
+
   // Creado con exito: se muestra la clave y se oculta el formulario, para que
   // el foco quede en apuntar la clave y no en volver a rellenar campos.
   if (estado.ok && estado.claveTemporal) {
@@ -97,56 +136,64 @@ function PanelAlta({ alCerrar }: { alCerrar: () => void }) {
   }
 
   return (
-    <form action={accion}>
-      <Tarjeta>
-        <SeccionTarjeta
-          titulo="Nuevo usuario"
-          nota="Nace con una clave temporal que debera cambiar en su primer acceso. El rol trae sus permisos ya configurados."
-          primera
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <CampoTexto id="nombres" name="nombres" etiqueta="Nombres" required maxLength={100} />
-            <CampoTexto id="apellidos" name="apellidos" etiqueta="Apellidos" required maxLength={100} />
-          </div>
-
-          <CampoTexto
-            id="email"
-            name="email"
-            type="email"
-            etiqueta="Correo"
-            ayuda="Sera su usuario de acceso. No se puede cambiar despues."
-            required
-            maxLength={150}
-          />
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SelectorTipoDoc actual="DNI" />
-            <CampoTexto id="numDoc" name="numDoc" etiqueta="Numero de documento" required maxLength={20} />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <CampoTexto id="cargo" name="cargo" etiqueta="Cargo" ayuda="Opcional." maxLength={100} />
-            <CampoTexto id="celular" name="celular" type="tel" etiqueta="Celular" ayuda="Opcional." maxLength={30} />
-          </div>
-
-          <SelectorRol actual="CONSULTOR" />
-        </SeccionTarjeta>
-
-        {estado.error && <BannerError mensaje={estado.error} />}
-
-        <div className="mt-6 flex gap-2 border-t pt-5" style={{ borderColor: "var(--borde)" }}>
-          <BotonEnviar icono={<UserPlus className="size-4" />}>Crear usuario</BotonEnviar>
-          <button
-            type="button"
-            onClick={alCerrar}
-            className="rounded-lg border px-4 py-2 text-sm"
-            style={{ borderColor: "var(--borde)" }}
+    <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
+      <form action={accion} onChange={alCambiar}>
+        <Tarjeta>
+          <SeccionTarjeta
+            titulo="Nuevo usuario"
+            nota="Nace con una clave temporal que debera cambiar en su primer acceso. El rol trae sus permisos ya configurados."
+            primera
           >
-            Cancelar
-          </button>
-        </div>
-      </Tarjeta>
-    </form>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <CampoTexto id="nombres" name="nombres" etiqueta="Nombres" required maxLength={100} />
+              <CampoTexto id="apellidos" name="apellidos" etiqueta="Apellidos" required maxLength={100} />
+            </div>
+
+            <CampoTexto
+              id="email"
+              name="email"
+              type="email"
+              etiqueta="Correo"
+              ayuda="Sera su usuario de acceso. No se puede cambiar despues."
+              required
+              maxLength={150}
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectorTipoDoc actual="DNI" />
+              <CampoTexto id="numDoc" name="numDoc" etiqueta="Numero de documento" required maxLength={20} />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <CampoTexto id="cargo" name="cargo" etiqueta="Cargo" ayuda="Opcional." maxLength={100} />
+              <CampoTexto id="celular" name="celular" type="tel" etiqueta="Celular" ayuda="Opcional." maxLength={30} />
+            </div>
+
+            <SelectorRol actual="CONSULTOR" />
+          </SeccionTarjeta>
+
+          {estado.error && <BannerError mensaje={estado.error} />}
+
+          <div className="mt-6 flex gap-2 border-t pt-5" style={{ borderColor: "var(--borde)" }}>
+            <BotonEnviar icono={<UserPlus className="size-4" />} bloqueado={!listo}>
+              Crear usuario
+            </BotonEnviar>
+            <button
+              type="button"
+              onClick={alCerrar}
+              className="rounded-lg border px-4 py-2 text-sm"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </Tarjeta>
+      </form>
+
+      <div className="lg:sticky lg:top-24">
+        <ChecklistRequisitos requisitos={requisitos} titulo="Para crear el usuario" />
+      </div>
+    </div>
   );
 }
 
@@ -493,12 +540,22 @@ function BannerOk({ mensaje }: { mensaje: string }) {
   );
 }
 
-function BotonEnviar({ children, icono }: { children: React.ReactNode; icono?: React.ReactNode }) {
+function BotonEnviar({
+  children,
+  icono,
+  bloqueado = false,
+}: {
+  children: React.ReactNode;
+  icono?: React.ReactNode;
+  /// El alta lo bloquea hasta que el semaforo de requisitos este completo. La
+  /// edicion no lo pasa, asi que por defecto no bloquea.
+  bloqueado?: boolean;
+}) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || bloqueado}
       className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
       style={{ backgroundColor: "var(--color-marca-600)" }}
     >

@@ -37,38 +37,39 @@ export default async function NuevaObraPage() {
         </p>
       </div>
 
-      {/* El formulario manda y la ayuda acompana, de ahi el 3fr / 2fr. Por
-          debajo de `lg` la ayuda cae DEBAJO: en un movil, leerla antes de
-          llegar al primer campo solo retrasa el trabajo. */}
-      <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
-        <FormularioObra fechaHoy={hoy().toISOString().slice(0, 10)} />
-
-        <PanelAyuda
-          ilustracion={<IlustracionPlano />}
-          puntos={[
-            {
-              titulo: "La obra nace vacia",
-              texto:
-                "Al crearla no tiene partidas. El paso siguiente es cargarle el presupuesto, desde un Excel o partida a partida.",
-            },
-            {
-              titulo: "El codigo es opcional, pero no se repite",
-              texto:
-                "Sirve para nombrar la obra en corto. Dos obras de la misma empresa no pueden compartirlo.",
-            },
-            {
-              titulo: "Empieza en planificacion",
-              texto:
-                "Es lo normal: se pasa a ejecucion cuando la obra arranca de verdad. El estado ordena el panel y deja filtrar.",
-            },
-            {
-              titulo: "Las fechas dan el avance de calendario",
-              texto:
-                "De ellas sale la barra del panel, que mide tiempo transcurrido y no avance ejecutado.",
-            },
-          ]}
-        />
-      </div>
+      {/* El formulario maneja su propio layout de dos columnas —campos a la
+          izquierda, semaforo de requisitos y ayuda a la derecha—, porque el
+          semaforo tiene que reaccionar en vivo a lo que se escribe. */}
+      <FormularioObra
+        fechaHoy={hoy().toISOString().slice(0, 10)}
+        ayuda={
+          <PanelAyuda
+            ilustracion={<IlustracionPlano />}
+            puntos={[
+              {
+                titulo: "La obra nace vacia",
+                texto:
+                  "Al crearla no tiene partidas. El paso siguiente es cargarle el presupuesto, desde un Excel o partida a partida.",
+              },
+              {
+                titulo: "El codigo es opcional, pero no se repite",
+                texto:
+                  "Sirve para nombrar la obra en corto. Ademas, el sistema le pone un correlativo propio (OB-000001).",
+              },
+              {
+                titulo: "Empieza en planificacion",
+                texto:
+                  "Es lo normal: se pasa a ejecucion cuando la obra arranca de verdad. El estado ordena el panel y deja filtrar.",
+              },
+              {
+                titulo: "Las fechas dan el avance de calendario",
+                texto:
+                  "De ellas sale la barra del panel, que mide tiempo transcurrido y no avance ejecutado.",
+              },
+            ]}
+          />
+        }
+      />
     </div>
   );
 }
