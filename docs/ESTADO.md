@@ -38,6 +38,12 @@ Entorno local ya montado: **MariaDB 12.3.2** como servicio de Windows, base
 > está versionado; la plantilla con todas las variables necesarias es
 > `.env.example`.
 
+Hay una variable **opcional**, `APIS_NET_PE_TOKEN`, para consultar el RUC en
+SUNAT al dar de alta un proveedor. Sin ella el alta funciona igual: solo se
+pierde el autorrelleno de la razón social. Se saca en `apis.net.pe`, que
+tiene plan gratuito, y no se hizo obligatoria a propósito — atar el arranque
+de toda la aplicación a un servicio de terceros no compensa por una comodidad.
+
 El primer usuario lo crea `npm run db:seed`: toma el correo de
 `SEED_ADMIN_EMAIL`, genera una clave temporal aleatoria, la imprime **una
 sola vez** por consola y obliga a cambiarla en el primer ingreso.
@@ -59,7 +65,7 @@ subir documentos de cliente, credenciales ni datos del servidor.
 |---|---|
 | `npm run typecheck` | Tipos |
 | `npm run lint` | Estilo y reglas de arquitectura |
-| `npx vitest run` | 74 pruebas |
+| `npx vitest run` | 89 pruebas |
 | `npm run build` | Build de producción |
 | `npm run db:studio` | Explorador de la base |
 
@@ -90,6 +96,13 @@ auditoría de cada ingreso. Verificado de extremo a extremo en navegador.
   reemplazo. Probado con el presupuesto real de 360 partidas.
 - **Edición en línea**: descripción, unidad, metrado, precio, importe y
   modalidad. Bloqueada si la revisión está congelada. Todo auditado.
+- **Las dos vías de carga no se cruzan.** Duplicar códigos ya lo impedía la
+  clave única, pero reemplazar sí destruía trabajo en silencio: el aviso decía
+  «se borrarán 360 partidas» y dentro podían ir doce creadas a mano y varias
+  correcciones de precio que no están en ningún Excel. Ahora cada partida
+  guarda su `origen` y si alguien la editó, y antes de reemplazar la pantalla
+  **enumera lo que no viene en ningún archivo**, separando las creadas a mano
+  de las corregidas a mano: se pierden de formas distintas.
 - **Revisiones**: servicio (`revisiones.service.ts`) y pantalla completos en
   `/obras/[id]/revisiones`. Formulario de alta con **vista previa en vivo** de
   la cascada, panel de resumen con el cuadro del Excel, comparador entre las
@@ -179,7 +192,48 @@ permisos sueltos encima de ella, desde `/empresa/permisos`.
 > incluso frente a una fila insertada a mano en la base. Es lo que prueba
 > `rbac.test.ts`, y no debe quitarse.
 
-**Motores verificados con 74 pruebas.**
+**Módulo 4 — Proveedores y órdenes.** De aquí sale el **comprometido**, la
+primera de las cuatro columnas del control (§7), que hasta ahora no existía en
+ninguna parte.
+
+- **Catálogo de proveedores** en `/empresa/proveedores`, de la empresa y no de
+  cada obra: el mismo proveedor trabaja en varias. El RUC lo identifica y es
+  único. Al teclear los 11 dígitos se consulta SUNAT y se rellena la razón
+  social; si el servicio falla o no hay token, se escribe a mano y ya.
+- Un proveedor **no se borra, se desactiva**: sus órdenes son historia de la
+  obra y tienen que seguir diciendo a quién se le compró.
+- **Órdenes** en `/obras/[id]/ordenes`, con su alta en `/nueva`. Cada orden
+  guarda su cascada —subtotal, descuento comercial, **neto**, IGV y total— y
+  se **reparte entre las partidas** a las que carga.
+- **El comprometido se mide contra el NETO.** El IGV que factura el proveedor
+  es crédito fiscal: repartir el total inflaría la obra con dinero que se
+  recupera. Hay un error dedicado a ese caso porque es el más fácil de
+  cometer, dado que el total es la cifra que sale del banco.
+- La pantalla cruza el comprometido con el **vigente** de cada partida y
+  enseña el **saldo**, que es la columna que se mira. En negativo significa
+  que ya se pidió de más, y eso se corrige con una reconversión o un
+  adicional, no tocando la orden.
+- **Anular no es borrar**, al revés que en los movimientos: cancelar un pedido
+  a un proveedor es corriente. La orden se conserva con su motivo, que es
+  obligatorio, y deja de contar.
+- **El formulario siempre está disponible.** La carga por archivo, cuando
+  llegue, será un acelerador encima, no la única vía. Que las dos no se pisen
+  **no se confía a la interfaz**: se cierra en la base con el número de orden
+  y el RUC como claves únicas por empresa. El importador topará con la misma
+  restricción y por eso tendrá que enseñar lo que ya existe en vez de
+  insertarlo otra vez. Cada registro guarda además su `origen` (MANUAL o
+  IMPORTADO), que es lo que responde a «esta cifra, ¿la tecleó alguien o la
+  leyó un importador?» cuando un total no cuadre.
+
+> **Las dos reglas que se comprueban al aprobar**, y contra lo guardado, no
+> contra lo que dijo el formulario:
+>
+> 1. **El reparto suma el neto.** Es el equivalente a que una reconversión
+>    sume cero. Sin esto, el comprometido por partida no cuadra con lo que se
+>    pidió de verdad.
+> 2. **Las líneas que no son agrupadoras suman el subtotal.** Ver más abajo.
+
+**Motores verificados con 89 pruebas.**
 - `lib/decimal.ts` — aritmética exacta con enteros grandes. Nunca coma
   flotante para dinero.
 - `lib/excel-presupuesto.ts` — lectura de presupuestos.
@@ -188,6 +242,9 @@ permisos sueltos encima de ella, desde `/empresa/permisos`.
   exacta entre porcentaje y fracción.
 - `lib/rbac.ts` — permisos efectivos por empresa, y que los cuatro
   innegociables no se puedan reconfigurar por ninguna vía.
+- `lib/ordenes.ts` — cascada de la orden, la regla del agrupador y el cuadre
+  del reparto. Sus pruebas usan las cifras **reales** de tres órdenes del
+  cliente; si alguna deja de cuadrar, lo que está mal es el código.
 
 ## 4. Decisiones de arquitectura, y por qué
 
@@ -342,15 +399,19 @@ algo que no ocurre**: o se implementa o se retira.
 | Despliegue | **HECHO.** `gcm.drcaceresruiz.com` en línea. GitHub Actions compila y sube un `gcm.tar.gz` por FTPS; `app.js` lo descomprime al arrancar. Automático en cada push a `main`. **Las migraciones siguen siendo manuales** (`npx prisma migrate deploy` desde el Terminal de cPanel). Ver `docs/infraestructura.md` |
 | Cronograma | Importar desde XML de MS Project (el `.mpp` es binario propietario y no se puede leer). Planificación semanal, ruta crítica |
 | Avance físico | Metrados ejecutados, Curva S, evidencia fotográfica |
-| Proveedores | Órdenes de compra, **anticipos**, recepciones, abonos |
+| Proveedores | **Órdenes HECHAS** (§3). Faltan **anticipos**, recepciones y abonos, que son las otras tres columnas del control |
 | Indicadores | Tablero en vivo, cortes de control, EVM |
 | Reportes | PDF y Excel con el formato del informe semanal actual |
 | Resto | Caja chica, almacén, actas, gestión documental, WhatsApp |
 | Escritorio | Tauri v2 como contenedor + PWA |
 
-Hay 16 órdenes de compra reales del cliente en `docs/referencias/`
-(`OC 2026-07-00113` a `OC 2026-08-00126`) sin analizar todavía. Son la base
-para diseñar el módulo de proveedores.
+Las 16 órdenes reales del cliente están en `docs/referencias/`
+(`OC 2026-07-00113` a `OC 2026-08-00126`). Se analizaron tres —FCM, SIV AIRE
+y CABREJO, la más simple, la más grande y una con descuento— y de ahí salió
+el diseño del módulo; lo aprendido está en §7. **Quedan por cargar al
+sistema**: se meten solo las cabeceras, sin el detalle de líneas, porque para
+el comprometido hacen falta los importes y no las especificaciones de cada
+difusor.
 
 ## 7. Cosas que conviene saber
 
@@ -390,6 +451,32 @@ distintas con el mismo precio). Son informativos y no alteran ningún total.
 **El Excel del cliente tiene un total en caché desconcertante.** El del
 Capítulo XI guarda 166,942.42, pero sus fórmulas recalculadas darían otra
 cosa. Merece la pena avisarle de que revise el archivo.
+
+**Las órdenes del cliente repiten la trampa del presupuesto.** Cada bloque
+abre con una línea que **repite la suma de sus hijas**: en la de FCM,
+«TOTAL ESTRUCTURAS 34,800.00» va seguida de siete líneas que suman
+exactamente 34,800, y la de SIV AIRE llega a **tres** niveles. Sumar las
+líneas en plano da 69,600 en vez de 34,800 —el doble— sin que nada falle. Es
+el mismo fallo de las celdas combinadas de §5, y por eso cada línea guarda
+`esAgrupador`. Hay una prueba que verifica ese 69,600 para que se vea el
+tamaño del error si alguien quita la marca.
+
+**El correlativo de las órdenes no es cronológico.** Hay una de mayo con el
+número 00121, posterior a una de julio con el 00113. Nunca ordenar por
+número: para eso está la fecha.
+
+**Las órdenes se titulan todas «orden de servicio»**, incluso las que
+suministran equipos (SIV AIRE son 159 mil de aire acondicionado). El título
+del papel no distingue nada; el tipo se guarda aparte.
+
+**El proveedor puede ser persona natural.** CABREJO tiene RUC 10061662257: los
+de empresa empiezan por 20 y los de persona natural por 10.
+
+**Las formas de pago varían demasiado para modelarlas todavía.** Cinco
+adelantos con condiciones en FCM, «60 % adelanto y saldo contra entrega» en
+SIV AIRE, 50/40/10 en CABREJO. Se guardan como TEXTO a propósito: modelar un
+calendario de anticipos sin haber visto cómo se pagan de verdad sería
+inventárselo. Llegará con el módulo de abonos.
 
 **Las migraciones se siguen aplicando a mano.** Lo dice la fila de Despliegue
 de la sección 6 y sigue siendo cierto: el despliegue del código es automático
