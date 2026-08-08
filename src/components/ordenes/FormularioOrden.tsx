@@ -27,6 +27,11 @@ import { porcentajeAFraccion } from "@/lib/presupuesto";
 import { esNegativo, esPositivo, multiplicar, sumar } from "@/lib/decimal";
 import { soles } from "@/utils/formato";
 import { CampoTexto } from "@/components/auth/CampoTexto";
+import {
+  ChecklistRequisitos,
+  todosCumplidos,
+  type Requisito,
+} from "@/components/ui/ChecklistRequisitos";
 
 /**
  * Alta de una orden de compra o de servicio.
@@ -124,6 +129,11 @@ export function FormularioOrden({
 
   const [proveedorId, setProveedorId] = useState("");
 
+  // Controlados para el semaforo de requisitos: son los datos minimos que
+  // identifican la orden.
+  const [numero, setNumero] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+
   /**
    * La forma de pago se copia de la plantilla pero queda EDITABLE, asi que es
    * un campo controlado y no un `defaultValue`: lo pactado con un proveedor
@@ -174,6 +184,21 @@ export function FormularioOrden({
     imputable,
     imputaciones.map((i) => i.importe),
   );
+
+  // Requisitos minimos para poder guardar el borrador. El reparto cuadrado es
+  // la invariante que el servidor exige al aprobar; verla aqui evita cargar
+  // una orden que no se podra aprobar.
+  const requisitos: Requisito[] = [
+    { etiqueta: "Proveedor elegido", cumplido: proveedorId !== "" },
+    { etiqueta: "Concepto", cumplido: descripcion.trim().length > 0 },
+    { etiqueta: "Numero de la orden", cumplido: numero.trim().length > 0 },
+    { etiqueta: "Importe mayor que cero", cumplido: esPositivo(imputable) },
+    {
+      etiqueta: "El reparto cuadra con el importe",
+      cumplido: esPositivo(imputable) && descuadre === null,
+    },
+  ];
+  const listo = todosCumplidos(requisitos);
 
   const carga = {
     lineas: conDetalle
@@ -340,6 +365,8 @@ export function FormularioOrden({
             type="text"
             etiqueta="Numero"
             ayuda="Como en el papel: 2026-07-00113."
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
           />
           <CampoTexto
             id="fecha"
@@ -363,6 +390,8 @@ export function FormularioOrden({
           type="text"
           etiqueta="Concepto"
           ayuda="Lo que el papel llama «Partida»: «CRIOCORD ESTRUCTURAS METALICAS»."
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -623,13 +652,20 @@ export function FormularioOrden({
       </section>
 
       <div className="space-y-3">
+        {/* El semaforo, junto al boton: reune lo minimo que hace falta para
+            guardar y se completa a medida que se rellena el formulario. */}
+        <ChecklistRequisitos
+          requisitos={requisitos}
+          titulo="Para guardar la orden"
+        />
+
         {/* El mismo error que hay arriba, repetido junto al boton.
             El formulario es largo y quien pulsa guardar esta al final: un
             aviso a tres pantallas de distancia no se ve, y el rechazo parece
             que "no hizo nada". */}
         {estado.error && <Aviso mensaje={estado.error} />}
 
-        <BotonCrear />
+        <BotonCrear bloqueado={!listo} />
         <p className="text-xs text-pretty opacity-60">
           Se guarda como borrador: todavia no compromete presupuesto. Alguien
           con permiso para aprobar tiene que hacerlo, y entonces empieza a
@@ -1021,13 +1057,13 @@ function BotonSecundario({
   );
 }
 
-function BotonCrear() {
+function BotonCrear({ bloqueado = false }: { bloqueado?: boolean }) {
   const { pending } = useFormStatus();
 
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || bloqueado}
       className="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
       style={{ backgroundColor: "var(--color-marca-600)" }}
     >
