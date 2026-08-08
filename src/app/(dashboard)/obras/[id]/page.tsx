@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CheckCircle2, FileSpreadsheet, Lock, Table2 } from "lucide-react";
+import { CheckCircle2, FileSpreadsheet, Lock } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, listarPartidas } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
 import { soles } from "@/utils/formato";
 import { TablaPartidas } from "@/components/partidas/TablaPartidas";
+import { Mascota } from "@/components/ui/Mascota";
 
 export const metadata: Metadata = { title: "Obra" };
 
@@ -96,7 +97,9 @@ export default async function ObraPage({
             className="rounded-xl border border-dashed p-10 text-center"
             style={{ borderColor: "var(--borde)" }}
           >
-            <Table2 className="mx-auto size-8 opacity-40" aria-hidden="true" />
+            <div className="flex justify-center">
+              <Mascota pose="trabajando" alto={170} flotar />
+            </div>
             <p className="mt-3 text-sm opacity-70">
               Esta obra aun no tiene partidas.
             </p>
