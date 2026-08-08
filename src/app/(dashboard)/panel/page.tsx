@@ -104,7 +104,7 @@ export default async function PanelPage({
           style={{ borderColor: "var(--borde)" }}
         >
           <div className="flex justify-center">
-            <Mascota pose="saludando" ancho={110} alto={180} flotar />
+            <Mascota pose="saludando" alto={180} flotar />
           </div>
           <p className="mt-3 text-sm opacity-70">
             Crea tu primera obra para empezar a cargar el presupuesto.
@@ -126,7 +126,7 @@ export default async function PanelPage({
           style={{ borderColor: "var(--borde)" }}
         >
           <div className="flex justify-center">
-            <Mascota pose="pensando" ancho={130} alto={140} />
+            <Mascota pose="pensando" alto={150} />
           </div>
           <p className="mt-3 text-sm opacity-70">
             Ninguna obra coincide con la busqueda.

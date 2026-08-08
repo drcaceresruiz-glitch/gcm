@@ -18,6 +18,7 @@ import {
 import type { SolicitudRevision } from "@/services/perfil.service";
 import { haceCuanto, fechaHora } from "@/utils/fechas";
 import { Tarjeta } from "@/components/ui/Tarjeta";
+import { Mascota } from "@/components/ui/Mascota";
 
 /**
  * La bandeja del ADMIN: cada solicitud con el antes y el despues de cada
@@ -34,7 +35,12 @@ export function BandejaSolicitudes({
         className="rounded-xl border border-dashed p-10 text-center"
         style={{ borderColor: "var(--borde)" }}
       >
-        <p className="text-sm opacity-70">No hay solicitudes pendientes.</p>
+        <div className="flex justify-center">
+          <Mascota pose="sonriendo" alto={180} flotar />
+        </div>
+        <p className="mt-3 text-sm opacity-70">
+          No hay solicitudes pendientes.
+        </p>
       </div>
     );
   }
