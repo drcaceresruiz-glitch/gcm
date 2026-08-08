@@ -5,8 +5,9 @@ import type {
 } from "@/services/revisiones.service";
 import { fraccionAPorcentaje } from "@/lib/presupuesto";
 import { decimal, soles, tipoCambio } from "@/utils/formato";
-import { fechaCorta } from "@/utils/fechas";
+import { fechaCorta, fechaHora } from "@/utils/fechas";
 import { CuadroCascada } from "@/components/revisiones/CuadroCascada";
+import { BotonAprobar } from "@/components/revisiones/BotonAprobar";
 
 /**
  * Resumen del presupuesto: la revision vigente, su cascada, la diferencia
@@ -30,7 +31,14 @@ function porcentajesLegibles(revision: RevisionResumen) {
   };
 }
 
-export function PanelResumen({ resumen }: { resumen: ResumenPresupuesto }) {
+interface PanelProps {
+  resumen: ResumenPresupuesto;
+  obraId: string;
+  /// Solo ADMIN aprueba: congelar el presupuesto es un acto contractual.
+  puedeAprobar: boolean;
+}
+
+export function PanelResumen({ resumen, obraId, puedeAprobar }: PanelProps) {
   const [vigente] = resumen.revisiones;
 
   if (!vigente) {
@@ -82,6 +90,32 @@ export function PanelResumen({ resumen }: { resumen: ResumenPresupuesto }) {
             porcentajes={porcentajesLegibles(vigente)}
           />
         </div>
+
+        {vigente.aprobada ? (
+          <p
+            className="border-t px-4 py-3 text-xs opacity-70"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            Congelada
+            {vigente.aprobadaAt && ` el ${fechaHora(vigente.aprobadaAt)}`}
+            {vigente.aprobadaPor && ` por ${vigente.aprobadaPor}`}.
+          </p>
+        ) : (
+          puedeAprobar && (
+            <div
+              className="border-t p-4"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <BotonAprobar
+                obraId={obraId}
+                revisionId={vigente.id}
+                version={vigente.version}
+                fecha={fechaCorta(vigente.fechaRevision)}
+                presupuesto={soles(vigente.cascada.presupuesto)}
+              />
+            </div>
+          )
+        )}
       </section>
 
       {resumen.comparacion && <Comparacion comparacion={resumen.comparacion} />}

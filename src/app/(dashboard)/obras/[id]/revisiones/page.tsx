@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Lock } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import {
@@ -29,7 +29,7 @@ export default async function RevisionesPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ creada?: string }>;
+  searchParams: Promise<{ creada?: string; aprobada?: string }>;
 }) {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
@@ -41,7 +41,7 @@ export default async function RevisionesPage({
   if (!puede(sesion.role, "linea_base:leer")) redirect(`/obras/${id}`);
 
   const resumen = await obtenerResumen(sesion, id);
-  const { creada } = await searchParams;
+  const { creada, aprobada } = await searchParams;
   const puedeCrear = puede(sesion.role, "linea_base:crear");
 
   // Lo que congelaria una revision creada ahora mismo.
@@ -97,7 +97,26 @@ export default async function RevisionesPage({
         </p>
       )}
 
-      <PanelResumen resumen={resumen} />
+      {aprobada && (
+        <p
+          role="status"
+          className="flex items-center gap-2 rounded-lg px-4 py-3 text-sm"
+          style={{
+            backgroundColor:
+              "color-mix(in oklab, var(--color-exito) 15%, transparent)",
+          }}
+        >
+          <Lock className="size-4 shrink-0" aria-hidden="true" />
+          Revision v{aprobada} aprobada. El presupuesto queda congelado y la
+          obra ya no permite editar partidas.
+        </p>
+      )}
+
+      <PanelResumen
+        resumen={resumen}
+        obraId={id}
+        puedeAprobar={puede(sesion.role, "linea_base:aprobar")}
+      />
 
       {costo && (
         <section

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
-import { crearRevision } from "@/services/revisiones.service";
+import { aprobarRevision, crearRevision } from "@/services/revisiones.service";
 import { porcentajeAFraccion } from "@/lib/presupuesto";
 import { esNegativo, esPositivo, normalizarDecimal, sumar } from "@/lib/decimal";
 
@@ -115,4 +115,30 @@ export async function accionCrearRevision(
   revalidatePath(`/obras/${obraId}`);
   revalidatePath(`/obras/${obraId}/revisiones`);
   redirect(`/obras/${obraId}/revisiones?creada=${resultado.version}`);
+}
+
+/**
+ * Aprobar congela el presupuesto y no se puede deshacer, asi que la accion
+ * no acepta nada que se pueda escribir: solo los dos identificadores. El
+ * permiso y la comprobacion de que sea la ultima revision se resuelven en
+ * el servicio, que es la frontera real.
+ */
+export async function accionAprobarRevision(
+  _previo: EstadoRevision,
+  datos: FormData,
+): Promise<EstadoRevision> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const obraId = String(datos.get("obraId") ?? "");
+  const revisionId = String(datos.get("revisionId") ?? "");
+  if (!obraId || !revisionId) return { error: "Falta la revision a aprobar." };
+
+  const resultado = await aprobarRevision(sesion, revisionId);
+  if (!resultado.ok) return { error: resultado.error };
+
+  // La obra pasa a mostrar la linea base congelada y a bloquear la edicion.
+  revalidatePath(`/obras/${obraId}`);
+  revalidatePath(`/obras/${obraId}/revisiones`);
+  redirect(`/obras/${obraId}/revisiones?aprobada=${resultado.version}`);
 }

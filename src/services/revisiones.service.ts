@@ -20,6 +20,11 @@ export interface RevisionResumen {
   version: number;
   fechaRevision: Date;
   aprobada: boolean;
+  /// Quien la aprobo y cuando. Es el registro del acto contractual: se
+  /// guarda como texto y no como clave ajena, para que sobreviva aunque
+  /// despues se desactive o se borre a esa persona.
+  aprobadaAt: Date | null;
+  aprobadaPor: string | null;
   tipoCambio: string | null;
   clausulas: string | null;
   cascada: Cascada;
@@ -268,7 +273,8 @@ export async function obtenerResumen(
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
     orderBy: { version: "desc" },
     select: {
-      id: true, version: true, fechaRevision: true, aprobadaAt: true,
+      id: true, version: true, fechaRevision: true,
+      aprobadaAt: true, aprobadaPor: true,
       costoDirecto: true, descuentos: true, montoTotal: true, tipoCambio: true,
       clausulas: true, porcentajeGastosGenerales: true,
       porcentajeUtilidad: true, porcentajeIgv: true,
@@ -280,6 +286,8 @@ export async function obtenerResumen(
     version: r.version,
     fechaRevision: r.fechaRevision,
     aprobada: r.aprobadaAt !== null,
+    aprobadaAt: r.aprobadaAt,
+    aprobadaPor: r.aprobadaPor,
     tipoCambio: r.tipoCambio?.toString() ?? null,
     clausulas: r.clausulas,
     // Se recalcula desde los datos guardados en lugar de leer montoTotal:
@@ -318,4 +326,122 @@ export async function obtenerResumen(
       encarece: dif.encarece,
     },
   };
+}
+
+/**
+ * Se lanza dentro de la transaccion cuando la revision ya habia sido
+ * aprobada entre la comprobacion y la escritura. Es un caso de carrera, no
+ * un fallo: dos pulsaciones del mismo boton bastan para provocarlo.
+ */
+class YaAprobada extends Error {}
+
+export type ResultadoAprobacion =
+  | { ok: true; version: number }
+  | { ok: false; error: string };
+
+/**
+ * Aprueba una revision y la convierte en la linea base de la obra.
+ *
+ * Es un acto contractual y es IRREVERSIBLE por diseño. A partir de aqui el
+ * presupuesto queda congelado: la obra bloquea la edicion de partidas y el
+ * importador, y todos los indicadores de avance y costo se miden contra
+ * esta cifra. Poder deshacerlo significaria poder recalcular hacia atras
+ * los indicadores ya publicados, que es justo lo que la linea base existe
+ * para impedir.
+ */
+export async function aprobarRevision(
+  sesion: SesionActiva,
+  revisionId: string,
+): Promise<ResultadoAprobacion> {
+  if (!puede(sesion.role, "linea_base:aprobar")) {
+    return {
+      ok: false,
+      error: "No tienes permiso para aprobar revisiones del presupuesto.",
+    };
+  }
+
+  // El companyId sale de la sesion y se filtra por la obra: un id de
+  // revision de otra empresa simplemente no aparece.
+  const revision = await prisma.baseline.findFirst({
+    where: { id: revisionId, project: { companyId: sesion.companyId } },
+    select: {
+      id: true, projectId: true, version: true,
+      aprobadaAt: true, montoTotal: true,
+    },
+  });
+
+  if (!revision) return { ok: false, error: "Revision no encontrada." };
+
+  if (revision.aprobadaAt) {
+    return {
+      ok: false,
+      error: `La revision v${revision.version} ya estaba aprobada.`,
+    };
+  }
+
+  // Solo la ultima. Aprobar una revision antigua teniendo un borrador mas
+  // nuevo dejaria como linea base un contrato ya superado, y `obtenerObra`
+  // toma la version mas alta de las aprobadas: el numero que veria la obra
+  // no seria el que se acaba de firmar.
+  const ultima = await prisma.baseline.findFirst({
+    where: { projectId: revision.projectId },
+    orderBy: { version: "desc" },
+    select: { version: true },
+  });
+
+  if (ultima && ultima.version !== revision.version) {
+    return {
+      ok: false,
+      error:
+        `Solo se puede aprobar la ultima revision, y la v${ultima.version} ` +
+        `es posterior a esta. Aprueba esa, o eliminala antes.`,
+    };
+  }
+
+  const aprobadaAt = new Date();
+  const aprobadaPor = `${sesion.nombres} ${sesion.apellidos} (${sesion.email})`
+    .trim()
+    .slice(0, 150);
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // La condicion `aprobadaAt: null` es lo que hace segura la carrera:
+      // si otra peticion aprobo primero, esta no encuentra fila que tocar y
+      // no sobrescribe ni la fecha ni el firmante originales.
+      const { count } = await tx.baseline.updateMany({
+        where: { id: revision.id, aprobadaAt: null },
+        data: { aprobadaAt, aprobadaPor },
+      });
+
+      if (count === 0) throw new YaAprobada();
+
+      await tx.auditLog.create({
+        data: {
+          companyId: sesion.companyId,
+          userId: sesion.userId,
+          projectId: revision.projectId,
+          entidad: "Baseline",
+          entidadId: revision.id,
+          accion: "APPROVE",
+          antes: { aprobada: false },
+          despues: {
+            version: revision.version,
+            aprobadaAt: aprobadaAt.toISOString(),
+            aprobadaPor,
+            montoTotal: revision.montoTotal.toString(),
+          },
+        },
+      });
+    });
+  } catch (e) {
+    if (e instanceof YaAprobada) {
+      return {
+        ok: false,
+        error: `La revision v${revision.version} ya estaba aprobada.`,
+      };
+    }
+    throw e;
+  }
+
+  return { ok: true, version: revision.version };
 }

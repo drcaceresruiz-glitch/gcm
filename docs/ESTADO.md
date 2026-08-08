@@ -95,6 +95,12 @@ auditoría de cada ingreso. Verificado de extremo a extremo en navegador.
   la cascada, panel de resumen con el cuadro del Excel, comparador entre las
   dos últimas revisiones en soles y dólares, cláusulas e historial. Verificado
   en navegador contra CRIOCORD.
+- **Aprobar una revisión**: `aprobarRevision` sella `aprobadaAt` y
+  `aprobadaPor`, audita con `APPROVE`, y solo deja aprobar la última versión
+  y una sola vez (la carrera se cierra con un `updateMany` condicionado a
+  `aprobadaAt: null`). Botón solo para ADMIN, con confirmación en dos pasos
+  que muestra versión, fecha e importe. Al aprobar, la obra congela el
+  presupuesto: se bloquea la edición de partidas y desaparece el importador.
 
 **Motores verificados con 48 pruebas.**
 - `lib/decimal.ts` — aritmética exacta con enteros grandes. Nunca coma
@@ -223,25 +229,13 @@ final.** Redondear en cada paso desplaza el total varios céntimos.
 
 ## 6. Pendiente, en el orden acordado con el cliente
 
-### Inmediato — aprobar una revisión
+Nota de cuadre: con 12 % y 13 % la cascada de CRIOCORD sale en
+**S/ 919,069.51**, ocho céntimos por encima de los 919,069.43 del cliente.
+Son los seis céntimos conocidos del costo directo (762,077.21 frente a
+762,077.15) amplificados por el 25 % de gastos generales y utilidad. No es
+un error nuevo.
 
-La pantalla de revisiones ya está (ver §3). Con 12 % y 13 % la cascada de
-CRIOCORD sale en **S/ 919,069.51**, ocho céntimos por encima de los
-919,069.43 del cliente: son los seis céntimos conocidos del costo directo
-(762,077.21 frente a 762,077.15) amplificados por el 25 % de gastos
-generales y utilidad. No es un error nuevo.
-
-**Lo que falta es congelar.** El permiso `linea_base:aprobar` y el campo
-`aprobadaAt` existen, pero no hay ni servicio ni botón: toda revisión nace
-y se queda en borrador, así que `obra.lineaBaseVersion` sigue en `null` y el
-presupuesto nunca se bloquea para edición. Hace falta:
-
-1. `aprobarRevision` en el servicio: sella `aprobadaAt` y `aprobadaPor`,
-   audita, y rechaza si ya estaba aprobada.
-2. Botón en el panel, solo para ADMIN, con confirmación explícita: aprobar
-   es un acto contractual e irreversible.
-
-### Después — reconversiones y adicionales
+### Inmediato — reconversiones y adicionales
 
 Diseño ya acordado con el cliente, **sin implementar**. El cliente mueve
 presupuesto entre partidas cuando una se queda corta y otra sobra, o pide un
