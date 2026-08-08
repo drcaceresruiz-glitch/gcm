@@ -26,6 +26,56 @@
   --color-peligro: oklch(0.58 0.19 25);
 }
 
+/**
+ * Paletas de marca.
+ *
+ * Solo redefinen `--color-marca-*`. Los semaforos —exito, alerta, peligro—
+ * NO se tocan en ninguna: verde tiene que seguir significando bien y rojo
+ * mal, se elija la paleta que se elija. Una paleta que cambiara el rojo del
+ * sobrecosto convertiria una preferencia estetica en un error de lectura.
+ *
+ * El valor por defecto (teal) vive en `@theme`, arriba, para que la
+ * aplicacion tenga color aunque no haya ninguna eleccion guardada.
+ */
+:root[data-paleta="azul"] {
+  --color-marca-50: oklch(0.97 0.02 250);
+  --color-marca-100: oklch(0.93 0.04 250);
+  --color-marca-500: oklch(0.55 0.16 250);
+  --color-marca-600: oklch(0.48 0.16 250);
+  --color-marca-700: oklch(0.4 0.14 250);
+  --color-marca-900: oklch(0.26 0.09 250);
+}
+
+:root[data-paleta="indigo"] {
+  --color-marca-50: oklch(0.96 0.02 285);
+  --color-marca-100: oklch(0.92 0.05 285);
+  --color-marca-500: oklch(0.54 0.18 285);
+  --color-marca-600: oklch(0.47 0.19 285);
+  --color-marca-700: oklch(0.4 0.17 285);
+  --color-marca-900: oklch(0.27 0.11 285);
+}
+
+/* Ambar. Es el color de obra por excelencia, pero queda MUY cerca de
+   `--color-alerta`: por eso su tono se separa hacia el naranja (55 frente a
+   75) y se oscurece, para que un boton de marca no se confunda con un aviso. */
+:root[data-paleta="ambar"] {
+  --color-marca-50: oklch(0.96 0.03 55);
+  --color-marca-100: oklch(0.92 0.06 55);
+  --color-marca-500: oklch(0.6 0.15 55);
+  --color-marca-600: oklch(0.52 0.14 55);
+  --color-marca-700: oklch(0.44 0.12 55);
+  --color-marca-900: oklch(0.3 0.08 55);
+}
+
+:root[data-paleta="grafito"] {
+  --color-marca-50: oklch(0.96 0.004 240);
+  --color-marca-100: oklch(0.92 0.006 240);
+  --color-marca-500: oklch(0.48 0.02 240);
+  --color-marca-600: oklch(0.4 0.02 240);
+  --color-marca-700: oklch(0.33 0.018 240);
+  --color-marca-900: oklch(0.24 0.014 240);
+}
+
 /* Tema claro por defecto. Antes se seguia `prefers-color-scheme`, asi que la
    aplicacion salia oscura para quien tuviera el sistema en oscuro; el oscuro
    pasa a ser una eleccion explicita. */

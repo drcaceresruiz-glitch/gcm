@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { MenuDesplegable } from "@/components/ui/MenuDesplegable";
+import { SelectorApariencia } from "@/components/ui/SelectorApariencia";
 import { accionCerrarSesion } from "@/app/(auth)/acciones";
 
 /**
@@ -68,6 +69,8 @@ export function Navegacion({ empresa, usuario }: Props) {
         <MenuDesplegable etiqueta={usuario.nombre}>
           <p className="px-3 py-2 text-xs opacity-60">{usuario.rol}</p>
           <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
+          <SelectorApariencia />
+          <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
           <EnlaceMenu href="/cambiar-clave" icono={KeyRound}>
             Cambiar clave
           </EnlaceMenu>
@@ -118,6 +121,10 @@ export function Navegacion({ empresa, usuario }: Props) {
             {empresa.map((e) => (
               <Opcion key={e.href} enlace={e} />
             ))}
+
+            <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
+            <SelectorApariencia />
+            <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
 
             <EnlaceMenu href="/cambiar-clave" icono={KeyRound}>
               Cambiar clave
