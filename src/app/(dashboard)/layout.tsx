@@ -57,7 +57,12 @@ export default async function DashboardLayout({
           documentos —la orden que se le manda al proveedor— salgan por la
           impresora sin la barra de navegacion encima. */}
       <header
-        className="elevacion-1 sticky top-0 z-20 border-b print:hidden"
+        // `z-40`: la cabecera y sus desplegables tienen que quedar SIEMPRE
+        // por encima del contenido. El panel de cifras crea su propio
+        // contexto de apilamiento (z-20, para que su popup de alertas gane a
+        // los filtros), asi que la cabecera necesita superarlo o el menu de
+        // usuario se abriria por detras de las tarjetas.
+        className="elevacion-1 sticky top-0 z-40 border-b print:hidden"
         style={{
           borderColor: "var(--borde)",
           backgroundColor: "var(--superficie)",
