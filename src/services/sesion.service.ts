@@ -18,8 +18,22 @@ import type { Role } from "@/generated/prisma/enums";
 
 const COOKIE_SESION = "gcm_sesion";
 
-/** Ocho horas: una jornada de obra. Obliga a reautenticar cada dia. */
-const DURACION_MS = 8 * 60 * 60 * 1000;
+/**
+ * La sesion caduca por INACTIVIDAD, no a las ocho horas cuente lo que cuente.
+ *
+ * - `IDLE_MS`: sin ninguna peticion durante media hora, la sesion muere. Cada
+ *   peticion valida la renueva (expiracion deslizante), asi que quien trabaja
+ *   no se ve expulsado; quien deja el equipo, si.
+ * - `MAX_ABSOLUTO_MS`: un techo que la renovacion nunca supera. Pase lo que
+ *   pase, a la jornada hay que volver a autenticarse: una sesion eterna en un
+ *   equipo compartido es un riesgo por si sola.
+ * - `RENOVAR_SI_GANA_MS`: solo se reescribe la expiracion si con ello gana mas
+ *   de un minuto. Sin este freno, una pantalla que refresca sola escribiria en
+ *   la base en cada peticion.
+ */
+const IDLE_MS = 30 * 60 * 1000;
+const MAX_ABSOLUTO_MS = 8 * 60 * 60 * 1000;
+const RENOVAR_SI_GANA_MS = 60 * 1000;
 
 export interface SesionActiva {
   sesionId: string;
@@ -51,7 +65,8 @@ export async function crearSesion(
     data: {
       userId,
       tokenHash: hashToken(token),
-      expiresAt: new Date(Date.now() + DURACION_MS),
+      // Nace con la ventana de inactividad; cada peticion la ira deslizando.
+      expiresAt: new Date(Date.now() + IDLE_MS),
       ip: datos.ip?.slice(0, 45) ?? null,
       userAgent: datos.userAgent?.slice(0, 255) ?? null,
     },
@@ -63,7 +78,10 @@ export async function crearSesion(
     secure: isProduction,
     sameSite: "lax", // mitiga CSRF sin romper la navegacion normal
     path: "/",
-    maxAge: DURACION_MS / 1000,
+    // La cookie vive hasta el tope absoluto; la sesion de la base puede morir
+    // antes por inactividad, y entonces la cookie apunta a una fila que ya no
+    // existe y no hay sesion. El tope manda.
+    maxAge: MAX_ABSOLUTO_MS / 1000,
   });
 }
 
@@ -90,6 +108,7 @@ export const obtenerSesion = cache(async function obtenerSesion(): Promise<Sesio
     select: {
       id: true,
       expiresAt: true,
+      createdAt: true,
       user: {
         select: {
           id: true,
@@ -118,9 +137,25 @@ export const obtenerSesion = cache(async function obtenerSesion(): Promise<Sesio
 
   if (!sesion) return null;
 
-  if (sesion.expiresAt < new Date() || sesion.user.estado !== "ACTIVO") {
+  const ahora = Date.now();
+
+  if (sesion.expiresAt.getTime() < ahora || sesion.user.estado !== "ACTIVO") {
     await prisma.session.delete({ where: { id: sesion.id } }).catch(() => {});
     return null;
+  }
+
+  // Expiracion deslizante: se empuja la caducidad a `ahora + IDLE`, sin pasar
+  // del tope absoluto medido desde que nacio la sesion. Solo se escribe si el
+  // avance vale la pena, para no tocar la base en cada peticion.
+  const tope = sesion.createdAt.getTime() + MAX_ABSOLUTO_MS;
+  const nuevaExpira = Math.min(ahora + IDLE_MS, tope);
+  if (nuevaExpira - sesion.expiresAt.getTime() > RENOVAR_SI_GANA_MS) {
+    await prisma.session
+      .update({
+        where: { id: sesion.id },
+        data: { expiresAt: new Date(nuevaExpira) },
+      })
+      .catch(() => {});
   }
 
   const excepciones = sesion.user.company.permisos.filter(

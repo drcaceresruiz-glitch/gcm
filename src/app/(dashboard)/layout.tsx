@@ -12,6 +12,7 @@ import {
   type EnlaceEmpresa,
 } from "@/components/navegacion/Navegacion";
 import { RelojPeru } from "@/components/ui/RelojPeru";
+import { CierrePorInactividad } from "@/components/navegacion/CierrePorInactividad";
 
 /**
  * Area privada.
@@ -29,10 +30,13 @@ export default async function DashboardLayout({
   // Nadie navega por el sistema con una clave temporal sin estrenar.
   if (sesion.mustChangePassword) redirect("/cambiar-clave");
 
-  // El numerito de solicitudes pendientes solo se pide si el rol las puede
+  // En paralelo: son dos consultas independientes y encadenarlas solo suma
+  // sus latencias. El numerito de solicitudes solo se pide si el rol las puede
   // resolver; para el resto la funcion devuelve cero sin tocar la base.
-  const pendientes = await contarSolicitudesPendientes(sesion);
-  const foto = await obtenerFotoPerfil(sesion);
+  const [pendientes, foto] = await Promise.all([
+    contarSolicitudesPendientes(sesion),
+    obtenerFotoPerfil(sesion),
+  ]);
 
   // Los permisos se resuelven aqui y no en el componente de navegacion: la
   // comprobacion se queda en el servidor y al cliente solo viaja la lista de
@@ -73,6 +77,9 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* Cierra la sesion sola tras un rato sin actividad. No pinta nada. */}
+      <CierrePorInactividad />
+
       {/* `print:hidden` es lo que permite que las pantallas que son
           documentos —la orden que se le manda al proveedor— salgan por la
           impresora sin la barra de navegacion encima. */}

@@ -28,20 +28,50 @@ const nextConfig: NextConfig = {
   },
 
   async headers() {
-    return [
+    const seguras = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       {
-        source: "/:path*",
-        headers: [
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(self)",
-          },
-        ],
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=(self)",
+      },
+      // Fuerza HTTPS durante dos anos. En desarrollo (http) el navegador la
+      // ignora, asi que no molesta; en produccion evita que una primera
+      // peticion viaje en claro.
+      {
+        key: "Strict-Transport-Security",
+        value: "max-age=63072000; includeSubDomains; preload",
       },
     ];
+
+    // La CSP solo en produccion: en desarrollo, el hot-reload de Next abre un
+    // WebSocket y evalua codigo que `connect-src 'self'` y la ausencia de
+    // 'unsafe-eval' bloquearian, dejando la recarga en caliente inservible.
+    //
+    // `img-src` incluye `data:` a proposito: las fotos de perfil se guardan y
+    // se muestran como data URL. `frame-ancestors 'none'` es el equivalente
+    // moderno de X-Frame-Options: nadie puede embeber la app en un iframe, que
+    // es como se montan los ataques de clickjacking.
+    if (process.env.NODE_ENV === "production") {
+      seguras.push({
+        key: "Content-Security-Policy",
+        value: [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: blob:",
+          "font-src 'self'",
+          "connect-src 'self'",
+          "frame-ancestors 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
+          "object-src 'none'",
+        ].join("; "),
+      });
+    }
+
+    return [{ source: "/:path*", headers: seguras }];
   },
 };
 
