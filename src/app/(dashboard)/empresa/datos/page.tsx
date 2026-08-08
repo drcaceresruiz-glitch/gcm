@@ -5,6 +5,8 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerEmpresa } from "@/services/empresa.service";
 import { puede } from "@/lib/rbac";
 import { Volver } from "@/components/ui/Volver";
+import { PanelAyuda } from "@/components/ui/PanelAyuda";
+import { IlustracionDocumento } from "@/components/ui/IlustracionDocumento";
 import { FormularioEmpresa } from "@/components/empresa/FormularioEmpresa";
 
 export const metadata: Metadata = { title: "Datos de la empresa" };
@@ -57,10 +59,38 @@ export default async function DatosEmpresaPage({
         </p>
       )}
 
-      <FormularioEmpresa
-        empresa={empresa}
-        soloLectura={!puede(sesion, "empresa:editar")}
-      />
+      <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
+        <FormularioEmpresa
+          empresa={empresa}
+          soloLectura={!puede(sesion, "empresa:editar")}
+        />
+
+        <PanelAyuda
+          ilustracion={<IlustracionDocumento />}
+          puntos={[
+            {
+              titulo: "Esto sale impreso a terceros",
+              texto:
+                "La razon social, el contacto y el representante encabezan y firman cada orden que recibe un proveedor. No es una ficha interna.",
+            },
+            {
+              titulo: "Sin representante, la orden va sin firmante",
+              texto:
+                "Si no se rellena, el documento sale encabezado con la razon social en lugar del nombre de quien firma.",
+            },
+            {
+              titulo: "El RUC no se edita aqui",
+              texto:
+                "Identifica a la empresa y ya figura impreso en las ordenes emitidas. Cambiarlo desde una pantalla de ajustes reescribiria documentos ya enviados.",
+            },
+            {
+              titulo: "Cada entorno tiene los suyos",
+              texto:
+                "Rellenarlos aqui no los pone en produccion: la base de cada entorno se completa por separado.",
+            },
+          ]}
+        />
+      </div>
     </div>
   );
 }

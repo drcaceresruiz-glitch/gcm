@@ -8,6 +8,7 @@ import {
   type EstadoObra,
 } from "@/app/(dashboard)/obras/nueva/acciones";
 import { CampoTexto } from "@/components/auth/CampoTexto";
+import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
 
 /**
  * Alta de una obra.
@@ -31,8 +32,9 @@ export function FormularioObra({ fechaHoy }: { fechaHoy: string }) {
   );
 
   return (
-    <form action={accion} className="max-w-2xl space-y-8">
-      <Bloque titulo="Identificacion">
+    <form action={accion} className="max-w-2xl">
+      <Tarjeta>
+      <SeccionTarjeta titulo="Identificacion" primera>
         <CampoTexto
           id="nombreObra"
           name="nombreObra"
@@ -60,9 +62,9 @@ export function FormularioObra({ fechaHoy }: { fechaHoy: string }) {
           etiqueta="Ubicacion"
           maxLength={255}
         />
-      </Bloque>
+      </SeccionTarjeta>
 
-      <Bloque
+      <SeccionTarjeta
         titulo="Plazo"
         nota="De aqui sale el avance de calendario que se ve en el panel."
       >
@@ -83,9 +85,9 @@ export function FormularioObra({ fechaHoy }: { fechaHoy: string }) {
             required
           />
         </div>
-      </Bloque>
+      </SeccionTarjeta>
 
-      <Bloque titulo="Estado">
+      <SeccionTarjeta titulo="Estado">
         <div className="space-y-1.5">
           <label htmlFor="estado" className="block text-sm font-medium">
             Estado inicial
@@ -111,12 +113,12 @@ export function FormularioObra({ fechaHoy }: { fechaHoy: string }) {
             arranque.
           </p>
         </div>
-      </Bloque>
+      </SeccionTarjeta>
 
       {estado.error && (
         <p
           role="alert"
-          className="flex items-start gap-2 rounded-lg px-3 py-2 text-sm"
+          className="mt-6 flex items-start gap-2 rounded-lg px-3 py-2 text-sm"
           style={{
             backgroundColor:
               "color-mix(in oklab, var(--color-peligro) 15%, transparent)",
@@ -127,7 +129,16 @@ export function FormularioObra({ fechaHoy }: { fechaHoy: string }) {
         </p>
       )}
 
-      <BotonCrear />
+      {/* El boton va DENTRO de la tarjeta y separado por una regla: fuera
+          quedaria flotando sobre el fondo, sin relacion visible con el
+          formulario que envia. */}
+      <div
+        className="mt-8 border-t pt-5"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <BotonCrear />
+      </div>
+      </Tarjeta>
     </form>
   );
 }
@@ -157,22 +168,4 @@ function BotonCrear() {
   );
 }
 
-function Bloque({
-  titulo,
-  nota,
-  children,
-}: {
-  titulo: string;
-  nota?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">{titulo}</h2>
-        {nota && <p className="mt-0.5 text-sm opacity-70">{nota}</p>}
-      </div>
-      {children}
-    </section>
-  );
-}
+

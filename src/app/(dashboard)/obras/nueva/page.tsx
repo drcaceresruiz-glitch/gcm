@@ -4,6 +4,8 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { puede } from "@/lib/rbac";
 import { hoy } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
+import { PanelAyuda } from "@/components/ui/PanelAyuda";
+import { IlustracionPlano } from "@/components/ui/IlustracionPlano";
 import { FormularioObra } from "@/components/obras/FormularioObra";
 
 export const metadata: Metadata = { title: "Nueva obra" };
@@ -35,7 +37,38 @@ export default async function NuevaObraPage() {
         </p>
       </div>
 
-      <FormularioObra fechaHoy={hoy().toISOString().slice(0, 10)} />
+      {/* El formulario manda y la ayuda acompana, de ahi el 3fr / 2fr. Por
+          debajo de `lg` la ayuda cae DEBAJO: en un movil, leerla antes de
+          llegar al primer campo solo retrasa el trabajo. */}
+      <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
+        <FormularioObra fechaHoy={hoy().toISOString().slice(0, 10)} />
+
+        <PanelAyuda
+          ilustracion={<IlustracionPlano />}
+          puntos={[
+            {
+              titulo: "La obra nace vacia",
+              texto:
+                "Al crearla no tiene partidas. El paso siguiente es cargarle el presupuesto, desde un Excel o partida a partida.",
+            },
+            {
+              titulo: "El codigo es opcional, pero no se repite",
+              texto:
+                "Sirve para nombrar la obra en corto. Dos obras de la misma empresa no pueden compartirlo.",
+            },
+            {
+              titulo: "Empieza en planificacion",
+              texto:
+                "Es lo normal: se pasa a ejecucion cuando la obra arranca de verdad. El estado ordena el panel y deja filtrar.",
+            },
+            {
+              titulo: "Las fechas dan el avance de calendario",
+              texto:
+                "De ellas sale la barra del panel, que mide tiempo transcurrido y no avance ejecutado.",
+            },
+          ]}
+        />
+      </div>
     </div>
   );
 }

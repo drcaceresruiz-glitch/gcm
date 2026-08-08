@@ -9,6 +9,7 @@ import {
 } from "@/app/(dashboard)/empresa/datos/acciones";
 import type { DatosEmpresa } from "@/services/empresa.service";
 import { CampoTexto } from "@/components/auth/CampoTexto";
+import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
 
 /**
  * Los datos que encabezan y firman las ordenes.
@@ -32,8 +33,9 @@ export function FormularioEmpresa({ empresa, soloLectura }: Props) {
   );
 
   return (
-    <form action={accion} className="max-w-2xl space-y-8">
-      <Bloque titulo="Identificacion">
+    <form action={accion} className="max-w-2xl">
+      <Tarjeta>
+      <Bloque titulo="Identificacion" primera>
         <CampoTexto
           id="razonSocial"
           name="razonSocial"
@@ -143,10 +145,10 @@ export function FormularioEmpresa({ empresa, soloLectura }: Props) {
       {estado.error && (
         <p
           role="alert"
-          className="flex items-start gap-2 rounded-lg px-4 py-3 text-sm"
+          className="mt-6 flex items-start gap-2 rounded-lg px-4 py-3 text-sm"
           style={{
             backgroundColor:
-              "color-mix(in oklab, var(--color-error) 15%, transparent)",
+              "color-mix(in oklab, var(--color-peligro) 15%, transparent)",
           }}
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -154,28 +156,36 @@ export function FormularioEmpresa({ empresa, soloLectura }: Props) {
         </p>
       )}
 
-      {!soloLectura && <BotonGuardar />}
+      {!soloLectura && (
+        <div
+          className="mt-8 border-t pt-5"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <BotonGuardar />
+        </div>
+      )}
+      </Tarjeta>
     </form>
   );
 }
 
+/** Delega en la seccion compartida, para que este formulario y el de alta de
+ *  obra se vean iguales sin repetir el marcado en los dos. */
 function Bloque({
   titulo,
   nota,
+  primera,
   children,
 }: {
   titulo: string;
   nota?: string;
+  primera?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-4">
-      <div>
-        <h2 className="text-sm font-semibold tracking-tight">{titulo}</h2>
-        {nota && <p className="mt-0.5 text-xs opacity-60">{nota}</p>}
-      </div>
+    <SeccionTarjeta titulo={titulo} nota={nota} primera={primera}>
       {children}
-    </section>
+    </SeccionTarjeta>
   );
 }
 
