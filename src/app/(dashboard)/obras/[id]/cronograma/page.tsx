@@ -7,7 +7,9 @@ import { obtenerObra } from "@/services/obras.service";
 import {
   obtenerCronograma,
   historialCronogramas,
+  serieDeAvance,
 } from "@/services/cronograma.service";
+import { CurvaS } from "@/components/cronograma/CurvaS";
 import { puede } from "@/lib/rbac";
 import { fechaCorta, fechaCronograma, fechaLarga, haceCuanto } from "@/utils/fechas";
 import { decimal } from "@/utils/formato";
@@ -35,9 +37,10 @@ export default async function CronogramaPage({
 
   if (!puede(sesion, "cronograma:leer")) redirect(`/obras/${id}`);
 
-  const [cronograma, historial] = await Promise.all([
+  const [cronograma, historial, serie] = await Promise.all([
     obtenerCronograma(sesion, id),
     historialCronogramas(sesion, id),
+    serieDeAvance(sesion, id),
   ]);
 
   const puedeImportar = puede(sesion, "cronograma:importar");
@@ -146,6 +149,34 @@ export default async function CronogramaPage({
               </span>
             </Mensaje>
           )}
+
+          <section
+            className="rounded-xl border p-5"
+            style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
+          >
+            <h3 className="text-sm font-semibold">Curva de avance</h3>
+            <p className="mt-0.5 mb-4 text-sm opacity-70">
+              Un punto por corte cargado. Cada tarea pesa segun su duracion, no
+              todas por igual: terminar una partida de un dia no es lo mismo que
+              terminar una de veinte.
+            </p>
+
+            <CurvaS serie={serie} />
+
+            {serie.length === 1 && (
+              <p className="mt-3 text-xs opacity-60">
+                Con un solo corte no hay curva todavia, solo el punto de hoy.
+                Carga los cortes siguientes y la linea se ira dibujando sola.
+              </p>
+            )}
+
+            <p className="mt-3 text-xs opacity-60">
+              La ponderacion es por duracion porque es el unico peso que trae el
+              archivo —no lleva costes ni horas de trabajo—. Cuando se confirme
+              el mapeo entre tareas y partidas, pasara a ponderarse por dinero,
+              que es lo que hace comparable el avance con lo comprometido.
+            </p>
+          </section>
 
           <TablaCronograma
             obraId={id}

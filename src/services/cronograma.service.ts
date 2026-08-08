@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { medirAvance, type AvanceReportado, type Medida } from "@/lib/cronograma";
 import { normalizarDecimal } from "@/lib/decimal";
+import { serieCurvaS, type PuntoCurva } from "@/lib/curva-s";
 import type { ResultadoAnalisisCronograma } from "@/lib/msproject-xml";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -468,5 +469,62 @@ function hoyUtc(): Date {
   const ahora = new Date();
   return new Date(
     Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()),
+  );
+}
+
+/**
+ * La serie de la curva de avance: un punto por corte cargado.
+ *
+ * Se traen TODOS los cortes con sus tareas. Son unas cien filas por corte y
+ * unos pocos cortes por obra, asi que cabe de sobra en una consulta; hacerlo
+ * por partes obligaria a repetir el calculo de la ponderacion en dos sitios.
+ */
+export async function serieDeAvance(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<PuntoCurva[]> {
+  if (!puede(sesion, "cronograma:leer")) return [];
+
+  const [cortes, avances] = await Promise.all([
+    prisma.cronograma.findMany({
+      where: { projectId: obraId, project: { companyId: sesion.companyId } },
+      orderBy: { fechaCorte: "asc" },
+      select: {
+        version: true,
+        fechaCorte: true,
+        tareas: {
+          select: {
+            uid: true,
+            esResumen: true,
+            duracionDias: true,
+            porcentajePlaneado: true,
+            porcentajeArchivo: true,
+          },
+        },
+      },
+    }),
+    prisma.avanceTarea.findMany({
+      where: { projectId: obraId },
+      orderBy: [{ fecha: "asc" }, { createdAt: "asc" }],
+      select: {
+        uid: true, porcentaje: true, fecha: true,
+        createdAt: true, reportadoPor: true, nota: true,
+      },
+    }),
+  ]);
+
+  return serieCurvaS(
+    cortes.map((c) => ({
+      version: c.version,
+      fechaCorte: c.fechaCorte,
+      tareas: c.tareas.map((t) => ({
+        uid: t.uid,
+        esResumen: t.esResumen,
+        duracionDias: t.duracionDias.toString(),
+        porcentajePlaneado: t.porcentajePlaneado.toString(),
+        porcentajeArchivo: t.porcentajeArchivo.toString(),
+      })),
+    })),
+    avances.map((a) => ({ ...a, porcentaje: a.porcentaje.toString() })),
   );
 }
