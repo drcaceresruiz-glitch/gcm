@@ -373,6 +373,7 @@ model Project {
   ordenes     OrdenCompra[]
   cronogramas Cronograma[]
   avances     AvanceTarea[]
+  mapeos      MapeoTareaPartida[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -1219,6 +1220,54 @@ model AvanceTarea {
   @@index([projectId, uid])
   @@index([projectId, fecha])
   @@map("avances_tarea")
+}
+
+/// Que partidas del presupuesto cubre cada tarea del cronograma.
+///
+/// Existe para poder PONDERAR EL AVANCE POR DINERO. Sin esto, el avance de la
+/// obra es un promedio de porcentajes donde terminar una partida de 500 soles
+/// pesa lo mismo que terminar una de 200.000, y la curva S no significa nada.
+/// Con esto, el avance se expresa en soles y se puede contrastar con lo
+/// comprometido en ordenes.
+///
+/// SE CONFIRMA A MANO, siempre. Se midio sobre los archivos reales de CRIOCORD
+/// y enlazar por codigo automaticamente es peor que no enlazar: de las 56
+/// coincidencias de codigo, 36 apuntaban a otra cosa —el capitulo 5 del
+/// cronograma va desplazado una posicion respecto al del presupuesto, y el
+/// "5.5" habria caido sobre un descuento comercial—. Un mapeo equivocado no da
+/// ningun sintoma: la curva sale bonita y miente. GCM propone por codigo y por
+/// parecido de descripcion; la fila solo se escribe cuando una persona acepta.
+///
+/// Es de UNA TAREA A VARIAS PARTIDAS: hay 314 partidas de presupuesto para 106
+/// tareas, asi que el presupuesto es tres veces mas fino y una tarea cubre
+/// varias. Ese reparto no lo deduce ningun algoritmo.
+model MapeoTareaPartida {
+  id        String @id @default(cuid())
+  projectId String
+
+  /// El `<UID>` de la tarea. Mismo ancla que `AvanceTarea`, por el mismo
+  /// motivo: las versiones del cronograma se sustituyen.
+  uid Int
+
+  /// El codigo de la partida, NO su id. Reimportar el presupuesto borra las
+  /// filas de `wbs_items` y las recrea con identificadores nuevos, asi que una
+  /// clave foranea dejaria el mapeo roto —o lo borraria en cascada— cada vez
+  /// que se corrige el Excel. El codigo sobrevive a eso.
+  codigoPartida String @db.VarChar(32)
+
+  /// Quien lo acepto y cuando. Que la fila exista significa que una persona lo
+  /// reviso: las propuestas automaticas no se guardan, se calculan al vuelo.
+  confirmadoPor String   @db.VarChar(150)
+  confirmadoAt  DateTime @default(now())
+
+  nota String? @db.Text
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, uid, codigoPartida])
+  @@index([projectId, uid])
+  @@index([projectId, codigoPartida])
+  @@map("mapeo_tarea_partida")
 }
 
 // ---------------------------------------------------------------------------
