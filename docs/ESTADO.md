@@ -428,6 +428,18 @@ día se quedó corta. Se rehízo entera.
 - Las tarjetas del panel se estiran a la altura de la fila (`h-full` y la
   franja al pie con `mt-auto`): si no, cada una mide lo que mide su texto y
   las barras arrancan a alturas distintas.
+- **El panel se busca, se filtra y se pagina.** `listarObras` traía TODAS las
+  obras y encima hacía dos agregados sobre todas ellas. Ahora acepta buscador
+  por nombre y código, filtro por estado y páginas de 12. **No hay borrado de
+  obras a propósito**: una obra es el registro contra el que se midió todo, y
+  para apartarla está el estado Cerrada.
+  > **El orden pone las activas primero y las cerradas al final, y sale
+  > gratis de la base.** `estado` es un `ENUM` de MariaDB, y `ORDER BY` sobre
+  > un ENUM ordena por el **índice de declaración**, no alfabéticamente. El
+  > esquema lo declara `PLANIFICACION, EN_EJECUCION, PARALIZADA, CERRADA`,
+  > que es justo el orden en que interesa verlas, así que no hizo falta ni
+  > migración ni SQL a mano. Si algún día se reordena ese enum, **este orden
+  > cambia con él**.
 
 **Motores verificados con 102 pruebas.** (131 en total con las de paginación,
 filtro, obras y borrado de órdenes.)
@@ -595,20 +607,14 @@ pantalla, paginación de las listas y columnas colapsables en el presupuesto—
 
 ### Lo siguiente, acordado con el cliente
 
-1. **El panel con muchas obras.** `listarObras` las trae TODAS, sin límite, y
-   además hace dos agregados sobre todas ellas. Con cincuenta obras son
-   cincuenta tarjetas y dos consultas que crecen. Toca **buscador por nombre
-   y código, filtro por estado, paginación de 12 y orden con las activas
-   primero**. Se reutiliza `lib/paginacion` y el patrón de `FiltrosOrdenes`.
-   > **Sin borrado de obras, a propósito.** Una obra es el registro contra el
-   > que se midió todo —línea base, órdenes, movimientos aprobados—, y para
-   > apartarla ya existe el estado **Cerrada**. Además hoy ni funcionaría: la
-   > cascada choca con el `onDelete: Restrict` de `WbsItem.parent` (ver §7).
-2. **Página de perfil del usuario.** Casi todo existe ya en el modelo `User`
+El **panel con muchas obras** —buscador, filtro por estado y paginación— ya
+está hecho: el detalle está en §3.
+
+1. **Página de perfil del usuario.** Casi todo existe ya en el modelo `User`
    —`tipoDoc`, `numDoc`, `celular`, `email`, `cargo`—, así que es sobre todo
    mostrarlo y editarlo, sin migración. Ojo: **el RUC no es de la persona**,
    es de la empresa; ahí iría en solo lectura.
-3. **Biblioteca de archivos** con categorías, subcategorías, subida de
+2. **Biblioteca de archivos** con categorías, subcategorías, subida de
    documentos y envío con trazabilidad. Es un subsistema, no una pantalla:
    necesita **migración propia**, infraestructura de subida —`STORAGE_ROOT`
    está declarado en el entorno y **no lo usa nadie**— y un mailer, porque las

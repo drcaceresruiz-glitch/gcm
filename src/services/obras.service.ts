@@ -4,7 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { esPositivo, sumar } from "@/lib/decimal";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
-import { estadoDeObra, validarObra } from "@/lib/obras";
+import { estadoDeObra, validarObra, ESTADOS_OBRA } from "@/lib/obras";
+import {
+  contarPaginas,
+  normalizarPagina,
+  saltar,
+  POR_PAGINA,
+  type Pagina,
+} from "@/lib/paginacion";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -45,14 +52,61 @@ export interface ObraResumen {
   partidasSobregiradas: number;
 }
 
+export interface FiltrosObras {
+  pagina?: string;
+  porPagina?: number;
+  /// Texto libre sobre nombre y codigo.
+  q?: string;
+  estado?: string;
+}
+
+/**
+ * Las obras de la empresa, filtradas y paginadas.
+ *
+ * Antes las traia TODAS y ademas hacia dos agregados sobre todas ellas: con
+ * cincuenta obras eran cincuenta tarjetas y dos consultas que crecian sin
+ * limite.
+ *
+ * **El orden pone las activas primero y las cerradas al final**, y sale gratis
+ * de la base: `estado` es un ENUM de MariaDB y ORDER BY sobre un ENUM ordena
+ * por el indice de declaracion, no alfabeticamente. El esquema lo declara
+ * PLANIFICACION, EN_EJECUCION, PARALIZADA, CERRADA, que es justo el orden en
+ * que interesa verlas. Si algun dia se reordena ese enum, este orden cambia
+ * con el.
+ */
 export async function listarObras(
   sesion: SesionActiva,
-): Promise<ObraResumen[]> {
+  opciones: FiltrosObras = {},
+): Promise<Pagina<ObraResumen>> {
   if (!puede(sesion, "obra:leer")) throw new SinPermisoError();
 
+  const porPagina = opciones.porPagina ?? POR_PAGINA;
+
+  const texto = opciones.q?.trim();
+  const estado = ESTADOS_OBRA.find((e) => e === opciones.estado);
+
+  const where = {
+    companyId: sesion.companyId,
+    ...(estado ? { estado } : {}),
+    ...(texto
+      ? {
+          OR: [
+            { nombreObra: { contains: texto } },
+            { codigoObra: { contains: texto } },
+          ],
+        }
+      : {}),
+  };
+
+  const total = await prisma.project.count({ where });
+  const totalPaginas = contarPaginas(total, porPagina);
+  const pagina = normalizarPagina(opciones.pagina, totalPaginas);
+
   const obras = await prisma.project.findMany({
-    where: { companyId: sesion.companyId },
-    orderBy: { createdAt: "desc" },
+    where,
+    orderBy: [{ estado: "asc" }, { createdAt: "desc" }],
+    skip: saltar(pagina, porPagina),
+    take: porPagina,
     select: {
       id: true,
       codigoObra: true,
@@ -64,7 +118,9 @@ export async function listarObras(
     },
   });
 
-  if (obras.length === 0) return [];
+  if (obras.length === 0) {
+    return { filas: [], total, pagina, totalPaginas };
+  }
 
   // Se agrega en la base y no en JavaScript: sumar miles de partidas en
   // memoria seria innecesariamente costoso y perderia precision decimal.
@@ -139,7 +195,7 @@ export async function listarObras(
     }
   }
 
-  return obras.map((obra) => {
+  const filas = obras.map((obra) => {
     const agregado = porObra.get(obra.id);
     return {
       ...obra,
@@ -149,6 +205,8 @@ export async function listarObras(
       partidasSobregiradas: sobregiradasPorObra.get(obra.id) ?? 0,
     };
   });
+
+  return { filas, total, pagina, totalPaginas };
 }
 
 export interface ObraDetalle {

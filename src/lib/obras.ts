@@ -16,6 +16,20 @@ export const ESTADOS_OBRA = [
 export type EstadoObra = (typeof ESTADOS_OBRA)[number];
 
 /**
+ * Como se escriben los estados en pantalla.
+ *
+ * En un solo sitio porque el panel los pinta en la tarjeta y ademas los
+ * ofrece en el desplegable del filtro: separados, uno acabaria diciendo
+ * «EN EJECUCION» y el otro «En ejecucion».
+ */
+export const ETIQUETA_ESTADO_OBRA: Record<EstadoObra, string> = {
+  PLANIFICACION: "Planificacion",
+  EN_EJECUCION: "En ejecucion",
+  PARALIZADA: "Paralizada",
+  CERRADA: "Cerrada",
+};
+
+/**
  * Una obra nueva nace en planificacion salvo que se diga otra cosa.
  *
  * Un valor fuera del enum cae aqui en vez de romper: viene de un desplegable,

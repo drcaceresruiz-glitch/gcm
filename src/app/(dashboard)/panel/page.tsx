@@ -1,22 +1,45 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2, MapPin, CalendarDays, Plus } from "lucide-react";
+import { Building2, MapPin, CalendarDays, Plus, SearchX } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { listarObras } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
+import { ETIQUETA_ESTADO_OBRA, type EstadoObra } from "@/lib/obras";
 import { soles } from "@/utils/formato";
 import { fechaCorta, avanceCalendario, diasEntre, hoy } from "@/utils/fechas";
+import { Paginacion } from "@/components/ui/Paginacion";
+import { FiltrosObras } from "@/components/obras/FiltrosObras";
 import { FranjaObra, type AlertaObra } from "@/components/obras/FranjaObra";
 
 export const metadata: Metadata = { title: "Panel" };
 
-export default async function PanelPage() {
+export default async function PanelPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ p?: string; q?: string; estado?: string }>;
+}) {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
-  const obras = await listarObras(sesion);
+  const consulta = await searchParams;
+  const filtros = { q: consulta.q, estado: consulta.estado };
+  const hayFiltro = Object.values(filtros).some(Boolean);
+
+  const obras = await listarObras(sesion, {
+    pagina: consulta.p,
+    // Doce por pagina: con la rejilla de tres columnas son cuatro filas
+    // completas, sin dejar huecos al final.
+    porPagina: 12,
+    q: consulta.q,
+    estado: consulta.estado,
+  });
+
   const puedeCrear = puede(sesion, "obra:crear");
+
+  // Sin filtros, «no hay obras» significa que la empresa esta vacia; con
+  // filtros solo significa que ninguna coincide. Son dos pantallas distintas.
+  const vacioDeVerdad = obras.total === 0 && !hayFiltro;
 
   return (
     <div className="space-y-6">
@@ -24,13 +47,13 @@ export default async function PanelPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Obras</h1>
           <p className="mt-1 text-sm opacity-70">
-            {obras.length === 0
+            {vacioDeVerdad
               ? "Aun no hay obras registradas."
-              : `${obras.length} obra(s) en tu empresa.`}
+              : `${obras.total} obra(s)${hayFiltro ? " coinciden" : " en tu empresa"}.`}
           </p>
         </div>
 
-        {puedeCrear && obras.length > 0 && (
+        {puedeCrear && !vacioDeVerdad && (
           <Link
             href="/obras/nueva"
             className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
@@ -42,7 +65,11 @@ export default async function PanelPage() {
         )}
       </div>
 
-      {obras.length === 0 ? (
+      {/* El buscador no se pinta con la empresa vacia: no hay nada que
+          filtrar y solo estorbaria al unico paso que toca, crear la obra. */}
+      {!vacioDeVerdad && <FiltrosObras />}
+
+      {vacioDeVerdad ? (
         <div
           className="rounded-xl border border-dashed p-10 text-center"
           style={{ borderColor: "var(--borde)" }}
@@ -62,9 +89,19 @@ export default async function PanelPage() {
             </Link>
           )}
         </div>
+      ) : obras.filas.length === 0 ? (
+        <div
+          className="rounded-xl border border-dashed p-10 text-center"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <SearchX className="mx-auto size-8 opacity-40" aria-hidden="true" />
+          <p className="mt-3 text-sm opacity-70">
+            Ninguna obra coincide con la busqueda.
+          </p>
+        </div>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {obras.map((obra) => {
+          {obras.filas.map((obra) => {
             const avance = avanceCalendario(
               obra.fechaInicio,
               obra.fechaFinProgramada,
@@ -141,7 +178,8 @@ export default async function PanelPage() {
                         "color-mix(in oklab, var(--color-marca-500) 15%, transparent)",
                     }}
                   >
-                    {obra.estado.replace("_", " ")}
+                    {ETIQUETA_ESTADO_OBRA[obra.estado as EstadoObra] ??
+                      obra.estado}
                   </span>
                 </div>
 
@@ -199,6 +237,17 @@ export default async function PanelPage() {
           })}
         </ul>
       )}
+
+      <Paginacion
+        pagina={obras.pagina}
+        totalPaginas={obras.totalPaginas}
+        total={obras.total}
+        porPagina={12}
+        etiqueta="obras"
+        // Los filtros viajan con la pagina; perderlos al avanzar reiniciaria
+        // la busqueda que el usuario acaba de hacer.
+        params={filtros}
+      />
     </div>
   );
 }
