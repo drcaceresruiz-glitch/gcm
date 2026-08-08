@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { ponderarPorDuracion, serieCurvaS, type TareaParaCurva } from "./curva-s";
+import {
+  curvaPlaneada,
+  planeadoEnFecha,
+  ponderarPorDuracion,
+  proyectar,
+  serieCurvaS,
+  type TareaParaCurva,
+} from "./curva-s";
 import type { AvanceReportado } from "./cronograma";
 
 function tarea(
@@ -134,5 +141,125 @@ describe("serieCurvaS", () => {
     );
 
     expect(serie.map((p) => p.desfase)).toEqual(["15.00", "-35.00"]);
+  });
+});
+
+function planificada(
+  uid: number,
+  duracionDias: string,
+  inicio: string,
+  fin: string,
+  esResumen = false,
+) {
+  return {
+    uid,
+    duracionDias,
+    esResumen,
+    inicio: new Date(`${inicio}T00:00:00Z`),
+    fin: new Date(`${fin}T00:00:00Z`),
+  };
+}
+
+const f = (d: string) => new Date(`${d}T00:00:00Z`);
+
+describe("planeadoEnFecha", () => {
+  it("reparte cada tarea linealmente a lo largo de sus dias", async () => {
+    // Una sola tarea de 10 dias: a mitad de camino va por la mitad.
+    const tareas = [planificada(1, "10.00", "2026-08-01", "2026-08-11")];
+
+    expect(planeadoEnFecha(tareas, f("2026-08-01"))).toBe(0);
+    expect(planeadoEnFecha(tareas, f("2026-08-06"))).toBeCloseTo(50, 6);
+    expect(planeadoEnFecha(tareas, f("2026-08-11"))).toBe(100);
+  });
+
+  it("no pasa del 100 ni baja de 0 fuera del plazo de la tarea", async () => {
+    const tareas = [planificada(1, "5.00", "2026-08-10", "2026-08-15")];
+
+    expect(planeadoEnFecha(tareas, f("2026-08-01"))).toBe(0);
+    expect(planeadoEnFecha(tareas, f("2026-12-31"))).toBe(100);
+  });
+
+  it("dibuja una S: arranque lento, centro rapido y cierre lento", async () => {
+    // Es la forma que da el solape real de una obra: al principio y al final
+    // hay pocas tareas a la vez, y en el centro se acumulan.
+    const tareas = [
+      planificada(1, "2.00", "2026-08-01", "2026-08-11"),
+      planificada(2, "10.00", "2026-08-06", "2026-08-16"),
+      planificada(3, "2.00", "2026-08-11", "2026-08-21"),
+    ];
+
+    const en = (d: string) => planeadoEnFecha(tareas, f(d));
+    const primerTramo = en("2026-08-06") - en("2026-08-01");
+    const tramoCentral = en("2026-08-16") - en("2026-08-06");
+    const ultimoTramo = en("2026-08-21") - en("2026-08-16");
+
+    expect(tramoCentral).toBeGreaterThan(primerTramo);
+    expect(tramoCentral).toBeGreaterThan(ultimoTramo);
+  });
+
+  it("no cuenta las tareas resumen ni los hitos sin duracion", async () => {
+    const tareas = [
+      planificada(1, "10.00", "2026-08-01", "2026-08-11", true),
+      planificada(2, "0.00", "2026-08-01", "2026-08-01"),
+      planificada(3, "10.00", "2026-08-01", "2026-08-11"),
+    ];
+
+    expect(planeadoEnFecha(tareas, f("2026-08-06"))).toBeCloseTo(50, 6);
+  });
+});
+
+describe("curvaPlaneada", () => {
+  it("empieza en cero, acaba en cien y no se salta el ultimo dia", async () => {
+    const tareas = [planificada(1, "10.00", "2026-08-01", "2026-08-11")];
+    const curva = curvaPlaneada(tareas, f("2026-08-01"), f("2026-08-11"));
+
+    expect(curva[0]?.valor).toBe(0);
+    expect(curva[curva.length - 1]?.fecha.toISOString().slice(0, 10)).toBe("2026-08-11");
+    expect(curva[curva.length - 1]?.valor).toBe(100);
+  });
+
+  it("muestrea mas grueso en plazos largos en vez de soltar miles de puntos", async () => {
+    const tareas = [planificada(1, "700.00", "2026-01-01", "2027-12-01")];
+    const curva = curvaPlaneada(tareas, f("2026-01-01"), f("2027-12-01"));
+
+    expect(curva.length).toBeLessThanOrEqual(402);
+  });
+});
+
+describe("proyectar", () => {
+  it("continua al ritmo que se lleva y arranca en el punto real", async () => {
+    // A mitad del plazo se lleva el 25% donde tocaba el 50%: se rinde a la
+    // mitad, asi que la obra acabaria al 50% de lo previsto en la fecha fin.
+    const tareas = [planificada(1, "10.00", "2026-08-01", "2026-08-11")];
+    const plan = curvaPlaneada(tareas, f("2026-08-01"), f("2026-08-11"));
+
+    const { puntos, factor } = proyectar(plan, f("2026-08-06"), 25);
+
+    expect(factor).toBeCloseTo(0.5, 6);
+    expect(puntos[0]?.valor).toBe(25);
+    expect(puntos[0]?.fecha.toISOString().slice(0, 10)).toBe("2026-08-06");
+    expect(puntos[puntos.length - 1]?.valor).toBeCloseTo(50, 6);
+  });
+
+  it("dice cuando se llegaria al 100% si se adelanta el ritmo", async () => {
+    const tareas = [planificada(1, "10.00", "2026-08-01", "2026-08-11")];
+    const plan = curvaPlaneada(tareas, f("2026-08-01"), f("2026-08-11"));
+
+    const { terminoProyectado } = proyectar(plan, f("2026-08-06"), 100);
+
+    expect(terminoProyectado).not.toBeNull();
+    expect(terminoProyectado!.getTime()).toBeLessThan(f("2026-08-11").getTime());
+  });
+
+  it("no dispara la curva cuando todavia no habia nada planeado", async () => {
+    // Dividir por un planeado de cero daria infinito y la proyeccion se
+    // saldria del grafico el primer dia de obra.
+    const tareas = [planificada(1, "10.00", "2026-08-01", "2026-08-11")];
+    const plan = curvaPlaneada(tareas, f("2026-08-01"), f("2026-08-11"));
+
+    const { factor, puntos } = proyectar(plan, f("2026-08-01"), 0);
+
+    expect(factor).toBe(1);
+    expect(puntos.every((p) => Number.isFinite(p.valor))).toBe(true);
   });
 });

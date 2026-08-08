@@ -3,7 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { medirAvance, type AvanceReportado, type Medida } from "@/lib/cronograma";
 import { normalizarDecimal } from "@/lib/decimal";
-import { serieCurvaS, type PuntoCurva } from "@/lib/curva-s";
+import {
+  curvaPlaneada,
+  proyectar,
+  serieCurvaS,
+  type PuntoCurva,
+  type PuntoDiario,
+} from "@/lib/curva-s";
 import type { ResultadoAnalisisCronograma } from "@/lib/msproject-xml";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -472,18 +478,37 @@ function hoyUtc(): Date {
   );
 }
 
+export interface DatosCurva {
+  /// Un punto por corte cargado: lo medido.
+  cortes: PuntoCurva[];
+  /// El plan dia a dia, de principio a fin de obra.
+  plan: PuntoDiario[];
+  /// Como acabaria si se siguiera al ritmo actual, desde el ultimo corte.
+  proyeccion: PuntoDiario[];
+  /// Real entre planeado en la fecha de corte. 1 es ir justo al plan.
+  factor: number;
+  terminoProyectado: Date | null;
+  inicio: Date | null;
+  fin: Date | null;
+}
+
 /**
- * La serie de la curva de avance: un punto por corte cargado.
+ * Todo lo que necesita la curva de avance.
  *
  * Se traen TODOS los cortes con sus tareas. Son unas cien filas por corte y
  * unos pocos cortes por obra, asi que cabe de sobra en una consulta; hacerlo
  * por partes obligaria a repetir el calculo de la ponderacion en dos sitios.
  */
-export async function serieDeAvance(
+export async function datosCurvaS(
   sesion: SesionActiva,
   obraId: string,
-): Promise<PuntoCurva[]> {
-  if (!puede(sesion, "cronograma:leer")) return [];
+): Promise<DatosCurva> {
+  const vacio: DatosCurva = {
+    cortes: [], plan: [], proyeccion: [],
+    factor: 1, terminoProyectado: null, inicio: null, fin: null,
+  };
+
+  if (!puede(sesion, "cronograma:leer")) return vacio;
 
   const [cortes, avances] = await Promise.all([
     prisma.cronograma.findMany({
@@ -499,6 +524,8 @@ export async function serieDeAvance(
             duracionDias: true,
             porcentajePlaneado: true,
             porcentajeArchivo: true,
+            inicio: true,
+            fin: true,
           },
         },
       },
@@ -513,7 +540,11 @@ export async function serieDeAvance(
     }),
   ]);
 
-  return serieCurvaS(
+  if (cortes.length === 0) return vacio;
+
+  const reportes = avances.map((a) => ({ ...a, porcentaje: a.porcentaje.toString() }));
+
+  const serie = serieCurvaS(
     cortes.map((c) => ({
       version: c.version,
       fechaCorte: c.fechaCorte,
@@ -525,6 +556,49 @@ export async function serieDeAvance(
         porcentajeArchivo: t.porcentajeArchivo.toString(),
       })),
     })),
-    avances.map((a) => ({ ...a, porcentaje: a.porcentaje.toString() })),
+    reportes,
   );
+
+  // El plan continuo se dibuja con las tareas del corte MAS RECIENTE: es la
+  // reprogramacion vigente, y es contra ella contra la que se mide hoy.
+  const vigente = cortes[cortes.length - 1]!;
+
+  const planificadas = vigente.tareas.map((t) => ({
+    uid: t.uid,
+    esResumen: t.esResumen,
+    duracionDias: t.duracionDias.toString(),
+    inicio: t.inicio,
+    fin: t.fin,
+  }));
+
+  const conDuracion = planificadas.filter((t) => !t.esResumen);
+  if (conDuracion.length === 0) return { ...vacio, cortes: serie };
+
+  const inicio = conDuracion.reduce(
+    (m, t) => (t.inicio < m ? t.inicio : m),
+    conDuracion[0]!.inicio,
+  );
+  const fin = conDuracion.reduce(
+    (m, t) => (t.fin > m ? t.fin : m),
+    conDuracion[0]!.fin,
+  );
+
+  const plan = curvaPlaneada(planificadas, inicio, fin);
+
+  const ultimo = serie[serie.length - 1]!;
+  const { puntos, factor, terminoProyectado } = proyectar(
+    plan,
+    ultimo.fecha,
+    Number(ultimo.real) || 0,
+  );
+
+  return {
+    cortes: serie,
+    plan,
+    proyeccion: puntos,
+    factor,
+    terminoProyectado,
+    inicio,
+    fin,
+  };
 }

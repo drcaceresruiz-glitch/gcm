@@ -7,7 +7,7 @@ import { obtenerObra } from "@/services/obras.service";
 import {
   obtenerCronograma,
   historialCronogramas,
-  serieDeAvance,
+  datosCurvaS,
 } from "@/services/cronograma.service";
 import { CurvaS } from "@/components/cronograma/CurvaS";
 import { puede } from "@/lib/rbac";
@@ -37,10 +37,10 @@ export default async function CronogramaPage({
 
   if (!puede(sesion, "cronograma:leer")) redirect(`/obras/${id}`);
 
-  const [cronograma, historial, serie] = await Promise.all([
+  const [cronograma, historial, curva] = await Promise.all([
     obtenerCronograma(sesion, id),
     historialCronogramas(sesion, id),
-    serieDeAvance(sesion, id),
+    datosCurvaS(sesion, id),
   ]);
 
   const puedeImportar = puede(sesion, "cronograma:importar");
@@ -156,17 +156,18 @@ export default async function CronogramaPage({
           >
             <h3 className="text-sm font-semibold">Curva de avance</h3>
             <p className="mt-0.5 mb-4 text-sm opacity-70">
-              Un punto por corte cargado. Cada tarea pesa segun su duracion, no
-              todas por igual: terminar una partida de un dia no es lo mismo que
+              La linea de puntos es el plan repartido dia a dia; la continua, lo
+              medido en cada corte. Cada tarea pesa segun su duracion, no todas
+              por igual: terminar una partida de un dia no es lo mismo que
               terminar una de veinte.
             </p>
 
-            <CurvaS serie={serie} />
+            <CurvaS datos={curva} />
 
-            {serie.length === 1 && (
+            {curva.cortes.length === 1 && (
               <p className="mt-3 text-xs opacity-60">
-                Con un solo corte no hay curva todavia, solo el punto de hoy.
-                Carga los cortes siguientes y la linea se ira dibujando sola.
+                Con un solo corte la linea real es todavia un punto. Carga los
+                cortes siguientes y se ira dibujando sola.
               </p>
             )}
 
