@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { medirAvance, type AvanceReportado, type Medida } from "@/lib/cronograma";
+import { normalizarDecimal } from "@/lib/decimal";
 import type { ResultadoAnalisisCronograma } from "@/lib/msproject-xml";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -366,4 +367,106 @@ export async function historialCronogramas(
     importadoPor: c.importadoPor,
     tareas: c._count.tareas,
   }));
+}
+
+export type ResultadoAvance = { ok: true } | { ok: false; error: string };
+
+/**
+ * Registra lo que reporta obra sobre una tarea.
+ *
+ * Cada reporte es una fila NUEVA, nunca un UPDATE. La serie historica es lo
+ * que despues dibuja la curva de avance, y saber quien dijo que una partida
+ * iba al 60% y cuando es justamente lo que hoy se pierde cuando alguien
+ * sobrescribe el porcentaje en Project.
+ */
+export async function registrarAvance(
+  sesion: SesionActiva,
+  obraId: string,
+  datos: { uid: number; porcentaje: string; fecha: string; nota?: string },
+): Promise<ResultadoAvance> {
+  if (!puede(sesion, "avance:registrar")) {
+    return { ok: false, error: "No tienes permiso para reportar avance." };
+  }
+
+  const porcentaje = normalizarDecimal(datos.porcentaje, 2);
+  if (porcentaje === null) {
+    return { ok: false, error: "El porcentaje no es un numero valido." };
+  }
+
+  // Comparacion de rango, no aritmetica: el valor que se guarda sigue siendo
+  // el texto exacto que se normalizo.
+  const n = Number(porcentaje);
+  if (n < 0 || n > 100) {
+    return { ok: false, error: "El porcentaje debe estar entre 0 y 100." };
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datos.fecha)) {
+    return { ok: false, error: "La fecha del reporte no es valida." };
+  }
+
+  const fecha = fechaDeObra(datos.fecha);
+
+  // Un reporte con fecha futura descolocaria la serie: el ultimo reporte de
+  // cada tarea es el de fecha mas alta, asi que uno fechado el mes que viene
+  // congelaria esa tarea hasta que llegara el mes que viene.
+  if (fecha.getTime() > hoyUtc().getTime()) {
+    return { ok: false, error: "No se puede reportar avance con fecha futura." };
+  }
+
+  // La tarea tiene que estar en el cronograma vigente. Reportar contra un UID
+  // que no existe crea un huerfano de nacimiento, sin nada que ensenar.
+  const tarea = await prisma.tareaCronograma.findFirst({
+    where: {
+      uid: datos.uid,
+      cronograma: { projectId: obraId, project: { companyId: sesion.companyId } },
+    },
+    orderBy: { cronograma: { fechaCorte: "desc" } },
+    select: { nombre: true, codigo: true },
+  });
+
+  if (!tarea) {
+    return { ok: false, error: "Esa tarea no esta en el cronograma de la obra." };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const avance = await tx.avanceTarea.create({
+      data: {
+        projectId: obraId,
+        uid: datos.uid,
+        fecha,
+        porcentaje,
+        nota: datos.nota?.trim() ? datos.nota.trim() : null,
+        reportadoPor: `${sesion.nombres} ${sesion.apellidos}`.trim().slice(0, 150),
+      },
+      select: { id: true },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "AvanceTarea",
+        entidadId: avance.id,
+        accion: "CREATE",
+        despues: {
+          uid: datos.uid,
+          codigo: tarea.codigo,
+          tarea: tarea.nombre,
+          porcentaje,
+          fecha: datos.fecha,
+        },
+      },
+    });
+  });
+
+  return { ok: true };
+}
+
+/** Hoy como fecha de calendario en UTC, comparable con las columnas `@db.Date`. */
+function hoyUtc(): Date {
+  const ahora = new Date();
+  return new Date(
+    Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()),
+  );
 }

@@ -147,7 +147,11 @@ export default async function CronogramaPage({
             </Mensaje>
           )}
 
-          <TablaCronograma tareas={cronograma.tareas} />
+          <TablaCronograma
+            obraId={id}
+            tareas={cronograma.tareas}
+            puedeRegistrar={puede(sesion, "avance:registrar")}
+          />
 
           <p className="text-xs opacity-60">
             La marca vertical de cada barra es el % planeado que trae el
