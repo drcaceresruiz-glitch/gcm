@@ -72,7 +72,7 @@ subir documentos de cliente, credenciales ni datos del servidor.
 |---|---|
 | `npm run typecheck` | Tipos |
 | `npm run lint` | Estilo y reglas de arquitectura |
-| `npx vitest run` | 93 pruebas |
+| `npx vitest run` | 102 pruebas |
 | `npm run build` | Build de producción |
 | `npm run db:studio` | Explorador de la base |
 
@@ -231,6 +231,32 @@ ninguna parte.
   insertarlo otra vez. Cada registro guarda además su `origen` (MANUAL o
   IMPORTADO), que es lo que responde a «esta cifra, ¿la tecleó alguien o la
   leyó un importador?» cuando un total no cuadre.
+- **Formas de pago reutilizables**, en `/empresa/formas-pago`. Las de las
+  órdenes reales se repiten con pocas variantes, y volver a teclearlas invita
+  a que cada orden acabe diciendo algo distinto de lo pactado. Se guardan con
+  un nombre corto para el desplegable y su texto completo; al elegir una, el
+  texto se **copia** en la orden y allí sigue siendo editable, porque lo
+  acordado con un proveedor concreto casi siempre tiene un matiz que la
+  plantilla no recoge. Desactivar no borra: las órdenes que la usaron guardan
+  su propia copia, así que borrarla no las cambiaría, pero sí perdería el
+  rastro de por qué media obra dice lo mismo. **No tienen permiso propio**:
+  las gobiernan `orden:leer` y `orden:crear`, porque quien redacta órdenes es
+  quien las necesita.
+- **Partidas habituales por proveedor y obra.** Al elegir el proveedor, el
+  reparto se carga con las partidas de las que suele hacerse cargo en esa
+  obra: con 314 partidas, buscar las mismas cinco cada vez es trabajo que se
+  puede ahorrar. Es **por obra y no por empresa** porque una partida no es una
+  idea abstracta —`11.02.04` es una fila del presupuesto de CRIOCORD y en la
+  siguiente obra será otra—, y además un mismo proveedor puede hacer vidrios
+  en una obra y mamparas en otra. No limita nada: se sigue pudiendo imputar a
+  cualquier partida. Tres decisiones evitan que estorbe: **solo carga si el
+  reparto está vacío** (cambiar de proveedor a media orden no puede barrer lo
+  ya escrito), **los importes se dejan en blanco** (la partida se repite de
+  una orden a otra; la cifra nunca) y al guardar **se añaden** a las que ya
+  tenga en vez de sustituirlas (una orden pequeña no debe reducir su lista a
+  la única partida que trajo esta vez). Se configuran usándolas, con una
+  casilla al guardar la orden: una pantalla de ajustes aparte sería una que
+  nadie visitaría.
 
 - **Verificado en navegador contra CRIOCORD** el 08/08/2026 con la orden real
   de CABREJO (`2026-07-00118`). Reprodujo el papel al céntimo —subtotal
@@ -290,18 +316,52 @@ firmante.
   de subida de archivos; `STORAGE_ROOT` está declarado en el entorno y no lo
   usa nadie. La cabecera sale con la razón social en texto.
 
-**Motores verificados con 93 pruebas.**
-- `lib/decimal.ts` — aritmética exacta con enteros grandes. Nunca coma
-  flotante para dinero.
+**Módulo 6 — Retención de renta: no todo impuesto es IGV.** Leyendo las
+órdenes reales para cargarlas apareció que tres de ellas no llevan IGV sino
+**retención de cuarta categoría del 8 %**, porque el proveedor emite recibo
+por honorarios. Y eso da la vuelta a la regla del módulo 4.
+
+- **El IGV se recupera; la retención no.** El IGV es crédito fiscal, así que
+  el costo de obra es el **neto**. La retención sale del banco y no vuelve,
+  así que el costo es el **total**. Tratarla como IGV dejaba fuera del costo
+  un 8 % que sí se paga —2,521.74 solo en la orden de RUBEN DARIO.
+- **Tampoco se calcula igual.** El IGV se aplica SOBRE el neto y se suma. La
+  retención se calcula sobre el **total**, porque lo pactado es lo que el
+  proveedor cobra limpio: `29,000 / 0.92 = 31,521.74`. Calcularla como el IGV
+  daría 2,320 y al proveedor le faltarían 201.74. Hizo falta añadir **división
+  exacta** a `lib/decimal.ts`: multiplicar por el recíproco de 0.92 pierde
+  precisión.
+- **El tipo de impuesto va en el PROVEEDOR, no en cada orden.** Quien factura
+  factura siempre, y quien emite recibo por honorarios también. Se pregunta
+  una vez en su ficha y cada orden lo hereda con su tasa ya puesta; sigue
+  siendo editable por excepción.
+- **La columna `igv` pasa a llamarse `impuesto`.** Un campo llamado `igv` que
+  a veces guarda una retención es justo la mentira que causó el error. Por lo
+  mismo, la pantalla etiqueta la cifra según lo que sea y dice en cada orden
+  contra qué se mide el comprometido.
+- **La migración se escribió a mano con `RENAME COLUMN`.** Prisma la traducía
+  como `DROP` + `ADD`, y eso habría borrado los importes de las órdenes ya
+  cargadas. Vale como regla: al renombrar una columna con datos dentro, leer
+  el SQL que genera Prisma antes de aplicarlo.
+- **Está en el esquema pero todavía no en producción.** Es la migración
+  pendiente de §6, y hasta aplicarla las órdenes no funcionan allí.
+- Verificado con **102 pruebas**, con las cifras reales de PEDRO MENDOZA y
+  RUBEN DARIO.
+
+**Motores verificados con 102 pruebas.**
+- `lib/decimal.ts` — aritmética exacta con enteros grandes, **división
+  incluida**. Nunca coma flotante para dinero.
 - `lib/excel-presupuesto.ts` — lectura de presupuestos.
 - `lib/jerarquia-partidas.ts` — jerarquía de códigos y suma por hojas.
 - `lib/presupuesto.ts` — cascada, comparación de revisiones y conversión
   exacta entre porcentaje y fracción.
 - `lib/rbac.ts` — permisos efectivos por empresa, y que los cuatro
   innegociables no se puedan reconfigurar por ninguna vía.
-- `lib/ordenes.ts` — cascada de la orden, la regla del agrupador y el cuadre
-  del reparto. Sus pruebas usan las cifras **reales** de tres órdenes del
-  cliente; si alguna deja de cuadrar, lo que está mal es el código.
+- `lib/ordenes.ts` — cascada de la orden, la regla del agrupador, el cuadre
+  del reparto y las dos formas de calcular el impuesto (IGV sobre el neto,
+  retención sobre el total). Sus pruebas usan las cifras **reales** de cinco
+  órdenes del cliente; si alguna deja de cuadrar, lo que está mal es el
+  código.
 
 ## 4. Decisiones de arquitectura, y por qué
 
@@ -332,7 +392,13 @@ revisiones perdería sentido.
 **Control SIN IGV.** El IGV que facturan los proveedores es crédito fiscal,
 no costo. Incluirlo inflaría el costo con dinero que se recupera. El propio
 Excel del cliente dice «RESUMEN FINAL (SIN IGV)». Se guardan las tres cifras:
-neto (costo), IGV (crédito) y total (lo que sale del banco).
+neto (costo), impuesto (crédito) y total (lo que sale del banco).
+
+**Pero «sin IGV» no es «sin impuestos».** La retención de renta que se aplica
+a quien emite recibo por honorarios **no se recupera**, así que ahí el costo
+es el total y no el neto (§3, módulo 6). La regla de arriba vale para el IGV
+porque el IGV vuelve; generalizarla a todo impuesto es el error que costó
+dejar fuera del costo un 8 % en tres órdenes reales.
 
 **Los componentes no importan Prisma.** Todo acceso a datos pasa por
 `src/services/`, donde se verifican permisos y se filtra por empresa. La
@@ -435,11 +501,34 @@ ellos es comprobarlos en navegador contra CRIOCORD (§3).
 La gestión de permisos por empresa, que la encabezaba después, **también está
 hecha**: está en §3. Lo siguiente en el orden acordado son las fases de abajo.
 
-**Producción está al día con el esquema** a 08/08/2026: la última migración
-aplicada en `drcacere_gcm` es `20260808113630_datos_de_la_empresa`. El
-procedimiento y sus dos trampas —el despliegue no entra hasta la primera
-petición, y el orden importa cuando el esquema cambia— están en
-`docs/infraestructura.md`.
+> ### ⚠️ Migración pendiente en producción — `20260808120000_impuesto_de_la_orden`
+>
+> **Lo primero que hay que hacer.** La última migración aplicada en
+> `drcacere_gcm` es `20260808113630_datos_de_la_empresa`; la del módulo 6
+> **no está aplicada**, y el código que la necesita **sí está desplegado**
+> (`origin/main` está en `130a4f4` y el despliegue es automático en cada
+> push). Producción corre por tanto con un código que busca `impuesto` y
+> `tipoImpuesto` en una base que todavía tiene `igv` y ninguna de las dos
+> columnas nuevas: **las pantallas de órdenes fallan allí hasta que se
+> aplique**.
+>
+> Se arregla desde el Terminal de cPanel:
+>
+> ```bash
+> npx prisma migrate deploy
+> ```
+>
+> La migración renombra `ordenes_compra.igv` a `impuesto` y añade
+> `tipoImpuesto` a `ordenes_compra` y a `proveedores`, con `IGV` por defecto
+> para que las órdenes ya cargadas queden correctas sin tocarlas. **Está
+> escrita a mano con `RENAME COLUMN` precisamente para conservar los
+> importes**: no la sustituyas por una regenerada con Prisma, que la traduce
+> como `DROP` + `ADD`.
+>
+> Esta es exactamente la segunda trampa del procedimiento —que el orden
+> importa cuando el esquema cambia: el código llegó antes que la migración—.
+> Esa y la otra (el despliegue no entra hasta la primera petición) están en
+> `docs/infraestructura.md`.
 
 > **La base de producción no se llena sola.** Los datos de la empresa
 > —representante legal, cargo, observaciones al pie— se escriben en cada
@@ -505,13 +594,18 @@ como costo mostraría medio presupuesto consumido con la obra empezando.
 > antes: si el tablero nace con cuatro columnas, el problema se descubre
 > enseñándoselo al cliente.
 
-**Se guardan siempre las tres cifras: neto, IGV y total.** Lo hacen la
-revisión y ahora también cada orden, y cada una responde a una pregunta
-distinta: el **neto** es lo que cuesta la obra y consume presupuesto, el
-**IGV** es lo que se recupera y lo necesita contabilidad, y el **total** es lo
-que sale del banco y lo necesita tesorería. Tirar cualquiera obliga a
-recalcularla después, y recalcular un impuesto hacia atrás es donde aparecen
-los céntimos que no cuadran.
+**Se guardan siempre las tres cifras: neto, impuesto y total.** Lo hacen la
+revisión y también cada orden, y cada una responde a una pregunta distinta:
+el **impuesto** lo necesita contabilidad y el **total** es lo que sale del
+banco y lo necesita tesorería. Tirar cualquiera obliga a recalcularla
+después, y recalcular un impuesto hacia atrás es donde aparecen los céntimos
+que no cuadran.
+
+**Cuál de ellas es el costo depende del impuesto** (§3, módulo 6): con IGV
+es el **neto**, porque el IGV se recupera; con retención de renta es el
+**total**, porque no se recupera. Por eso el campo se llama `impuesto` y no
+`igv`, y por eso no se puede escribir «el comprometido es el neto» sin mirar
+antes qué clase de impuesto lleva la orden.
 
 **Los porcentajes se guardan como fracción y se muestran como porcentaje.**
 La base tiene `Decimal(6,4)` y la cascada multiplica por `0.12`, pero nadie
@@ -568,13 +662,16 @@ de empresa empiezan por 20 y los de persona natural por 10.
 adelantos con condiciones en FCM, «60 % adelanto y saldo contra entrega» en
 SIV AIRE, 50/40/10 en CABREJO. Se guardan como TEXTO a propósito: modelar un
 calendario de anticipos sin haber visto cómo se pagan de verdad sería
-inventárselo. Llegará con el módulo de abonos.
+inventárselo. Llegará con el módulo de abonos. Lo que sí hay es un catálogo
+de **plantillas de texto** reutilizables (§3, módulo 4): ahorra teclearlas,
+pero sigue sin ser un calendario.
 
 **Las migraciones se siguen aplicando a mano.** Lo dice la fila de Despliegue
 de la sección 6 y sigue siendo cierto: el despliegue del código es automático
 en cada push a `main`, pero el esquema no viaja con él. Hay que entrar al
 Terminal de cPanel y ejecutar `npx prisma migrate deploy`. El detalle está en
-`docs/infraestructura.md`.
+`docs/infraestructura.md`. **Ahora mismo hay una pendiente** y producción
+está rota por eso: ver el aviso al principio de §6.
 
 ---
 
