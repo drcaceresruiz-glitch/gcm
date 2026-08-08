@@ -5,6 +5,7 @@ import {
   etiquetaImpuesto,
   importeDeOrden,
   importeImputable,
+  permisoParaEliminar,
   sumarLineas,
 } from "@/lib/ordenes";
 
@@ -292,5 +293,30 @@ describe("etiqueta del impuesto en el documento impreso", () => {
     expect(conIgv("0.00", "0.00", "0.00")).toBe("IGV");
     expect(conIgv("1000.00", "0.00", "1000.00")).toBe("IGV");
     expect(conIgv("no es un numero", "180.00", "1180.00")).toBe("IGV");
+  });
+});
+
+describe("que ordenes se pueden borrar", () => {
+  /**
+   * La regla que sostiene el borrado: el comprometido solo cuenta las
+   * APROBADAS. Un borrador y una anulada valen cero, asi que borrarlos no
+   * revierte ninguna cifra; lo unico que se pierde es el registro.
+   */
+  it("un borrador lo descarta quien puede redactar ordenes", () => {
+    expect(permisoParaEliminar("BORRADOR")).toBe("orden:crear");
+  });
+
+  it("purgar una anulada pide el permiso de anular", () => {
+    expect(permisoParaEliminar("ANULADA")).toBe("orden:anular");
+  });
+
+  /**
+   * La que importa. Una aprobada SI cuenta en el comprometido, y para dejar
+   * de contar existe anular, que ademas conserva la orden con su motivo. Si
+   * esto deja de devolver null, se podra destruir el registro de algo que ya
+   * se le envio a un proveedor.
+   */
+  it("una aprobada no se borra por ninguna via", () => {
+    expect(permisoParaEliminar("APROBADA")).toBeNull();
   });
 });

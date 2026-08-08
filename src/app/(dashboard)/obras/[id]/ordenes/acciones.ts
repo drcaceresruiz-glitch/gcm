@@ -8,6 +8,7 @@ import {
   anularOrden,
   aprobarOrden,
   crearOrden,
+  eliminarOrden,
 } from "@/services/ordenes.service";
 import { porcentajeAFraccion } from "@/lib/presupuesto";
 
@@ -157,4 +158,32 @@ export async function accionAnularOrden(
   revalidatePath(`/obras/${obraId}`);
   revalidatePath(`/obras/${obraId}/ordenes`);
   redirect(`/obras/${obraId}/ordenes?anulada=${encodeURIComponent(resultado.numero)}`);
+}
+
+/**
+ * Borra una orden. Solo borradores y anuladas; el servicio rechaza las
+ * aprobadas y decide el permiso segun el estado.
+ *
+ * Se revalida tambien la obra porque el panel cuenta ordenes por partida,
+ * aunque el comprometido no cambie: ni un borrador ni una anulada contaban.
+ */
+export async function accionEliminarOrden(
+  _previo: EstadoOrden,
+  datos: FormData,
+): Promise<EstadoOrden> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const obraId = String(datos.get("obraId") ?? "");
+  const ordenId = String(datos.get("ordenId") ?? "");
+  if (!obraId || !ordenId) return { error: "Falta la orden a eliminar." };
+
+  const resultado = await eliminarOrden(sesion, ordenId);
+  if (!resultado.ok) return { error: resultado.error };
+
+  revalidatePath(`/obras/${obraId}`);
+  revalidatePath(`/obras/${obraId}/ordenes`);
+  redirect(
+    `/obras/${obraId}/ordenes?eliminada=${encodeURIComponent(resultado.numero)}`,
+  );
 }

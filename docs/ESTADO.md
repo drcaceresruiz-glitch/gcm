@@ -388,13 +388,57 @@ día se quedó corta. Se rehízo entera.
   filtro con ancestros, `?p=` acotado, y la vista de impresión sin cabecera
   ni pestañas.
 
-**Motores verificados con 102 pruebas.** (117 en total con las 15 de
-paginación y filtro.)
+**Alta de obras, y limpieza del historial de órdenes.**
+
+- **Crear obra** en `/obras/nueva`, con botón en el panel. Hasta ahora las
+  obras **solo nacían del script de seed**: `obra:crear` estaba en la matriz
+  de permisos pero ningún servicio lo usaba, así que una empresa con la base
+  recién creada no tenía por dónde empezar —el panel invitaba a crear la
+  primera obra y no había con qué—. Nace en **planificación** por defecto; el
+  código es opcional y, si se repite, el error dice **con qué obra** choca en
+  vez de soltar el `Unique constraint failed` de Prisma. Las reglas están en
+  `lib/obras.ts`, probadas.
+- **Franja de dos barras en cada tarjeta del panel**: calendario (tiempo
+  transcurrido) y comprometido sobre presupuesto, con un icono que abre las
+  alertas reales —partidas sobregiradas, plazo vencido—.
+  > **Solo se dibuja lo que se puede afirmar.** El avance físico y la ruta
+  > crítica no existen todavía en el sistema, así que su barra va **vacía y
+  > rotulada como pendiente**, y el globo lo dice. Pintarlas con un número
+  > inventado sería peor que no pintarlas: las dos de arriba se leen juntas y
+  > una tercera falsa contaminaría la lectura.
+- **Las órdenes anuladas nacen plegadas** en el historial: ya no cuentan para
+  nada y ocupaban lo mismo que una viva. La cabecera deja ver el motivo sin
+  abrirla.
+- **Borrar órdenes**, solo BORRADOR y ANULADA. Ninguna de las dos cuenta en el
+  comprometido —`obtenerComprometido` solo suma las aprobadas—, así que
+  borrarlas **no revierte ninguna cifra**: ya valían cero, y lo único que se
+  pierde es el registro. Por eso el `AuditLog` se escribe **antes** de borrar,
+  con número, proveedor e importes dentro. **Una aprobada no se borra nunca**:
+  para eso está anular, que revierte igual y la conserva con su motivo. El
+  permiso depende del estado —`orden:crear` para el borrador, `orden:anular`
+  para purgar una anulada—, y la regla vive en `lib/ordenes.ts` con prueba.
+- **Buscar y filtrar órdenes** por texto, proveedor, rango de fechas y estado,
+  con la página bajada a **5**. Todo viaja en la URL, así que sobrevive al
+  cambio de página y el enlace se puede compartir.
+  > **Los filtros no tocan el comprometido.** Se descubrió probándolo: al
+  > pasarle el total *filtrado* al panel, buscar algo que no coincidía lo
+  > dejaba en cero y **el panel desaparecía**, como si el comprometido se
+  > hubiera esfumado por escribir en un buscador. Por eso existe
+  > `contarOrdenesDeObra`, que cuenta sin filtrar.
+- Las tarjetas del panel se estiran a la altura de la fila (`h-full` y la
+  franja al pie con `mt-auto`): si no, cada una mide lo que mide su texto y
+  las barras arrancan a alturas distintas.
+
+**Motores verificados con 102 pruebas.** (131 en total con las de paginación,
+filtro, obras y borrado de órdenes.)
 - `lib/decimal.ts` — aritmética exacta con enteros grandes, **división
   incluida**. Nunca coma flotante para dinero.
 - `lib/paginacion.ts` — acotado de la página y cuenta de páginas.
 - `lib/partidas-filtro.ts` — filtrado que conserva los ancestros de cada
   coincidencia.
+- `lib/obras.ts` — validación del alta: nombre, estado y un plazo que no vaya
+  hacia atrás. Rechaza los días que no existen, porque `new Date("2026-02-31")`
+  no falla: rueda al 3 de marzo.
 - `lib/excel-presupuesto.ts` — lectura de presupuestos.
 - `lib/jerarquia-partidas.ts` — jerarquía de códigos y suma por hojas.
 - `lib/presupuesto.ts` — cascada, comparación de revisiones y conversión
@@ -549,6 +593,30 @@ La **arquitectura de navegación** —menús responsive, volver al panel en cada
 pantalla, paginación de las listas y columnas colapsables en el presupuesto—
 **está hecha y verificada en navegador**: el detalle está en §3.
 
+### Lo siguiente, acordado con el cliente
+
+1. **El panel con muchas obras.** `listarObras` las trae TODAS, sin límite, y
+   además hace dos agregados sobre todas ellas. Con cincuenta obras son
+   cincuenta tarjetas y dos consultas que crecen. Toca **buscador por nombre
+   y código, filtro por estado, paginación de 12 y orden con las activas
+   primero**. Se reutiliza `lib/paginacion` y el patrón de `FiltrosOrdenes`.
+   > **Sin borrado de obras, a propósito.** Una obra es el registro contra el
+   > que se midió todo —línea base, órdenes, movimientos aprobados—, y para
+   > apartarla ya existe el estado **Cerrada**. Además hoy ni funcionaría: la
+   > cascada choca con el `onDelete: Restrict` de `WbsItem.parent` (ver §7).
+2. **Página de perfil del usuario.** Casi todo existe ya en el modelo `User`
+   —`tipoDoc`, `numDoc`, `celular`, `email`, `cargo`—, así que es sobre todo
+   mostrarlo y editarlo, sin migración. Ojo: **el RUC no es de la persona**,
+   es de la empresa; ahí iría en solo lectura.
+3. **Biblioteca de archivos** con categorías, subcategorías, subida de
+   documentos y envío con trazabilidad. Es un subsistema, no una pantalla:
+   necesita **migración propia**, infraestructura de subida —`STORAGE_ROOT`
+   está declarado en el entorno y **no lo usa nadie**— y un mailer, porque las
+   variables `SMTP_*` existen pero no hay código que las use. Acordado:
+   **correo con adjunto de verdad, y para WhatsApp un enlace `wa.me`** con el
+   texto ya escrito. Sin la API de WhatsApp Business **no se puede adjuntar un
+   archivo**; como mucho viaja un enlace. Eso es un límite del canal.
+
 > ### ⚠️ Migración pendiente en producción — `20260808120000_impuesto_de_la_orden`
 >
 > **Lo primero que hay que hacer.** La última migración aplicada en
@@ -560,11 +628,19 @@ pantalla, paginación de las listas y columnas colapsables en el presupuesto—
 > columnas nuevas: **las pantallas de órdenes fallan allí hasta que se
 > aplique**.
 >
-> Se arregla desde el Terminal de cPanel:
+> Se arregla desde el Terminal de cPanel. **Las tres líneas, en este orden**:
 >
 > ```bash
-> npx prisma migrate deploy
+> source /home/<usuario>/nodevenv/<app>/22/bin/activate
+> cd ~/gcm
+> npx --yes prisma@7 migrate deploy
 > ```
+>
+> Sin el `source`, el jailshell responde `npx: command not found` —Node no
+> está en el PATH hasta activar el entorno del panel— y con `npx prisma` a
+> secas tampoco lo encuentra: Next empaqueta Prisma dentro del código
+> compilado y no queda como módulo suelto. Está en `docs/infraestructura.md`,
+> y aun así se tropezó con ello.
 >
 > La migración renombra `ordenes_compra.igv` a `impuesto` y añade
 > `tipoImpuesto` a `ordenes_compra` y a `proveedores`, con `IGV` por defecto

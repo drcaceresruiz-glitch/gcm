@@ -4,7 +4,12 @@ import { notFound, redirect } from "next/navigation";
 import { CheckCircle2, Plus } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
-import { listarOrdenes, obtenerComprometido } from "@/services/ordenes.service";
+import {
+  contarOrdenesDeObra,
+  listarOrdenes,
+  listarProveedoresConOrdenes,
+  obtenerComprometido,
+} from "@/services/ordenes.service";
 import {
   obtenerPresupuestoVigente,
   SinLineaBaseError,
@@ -13,6 +18,7 @@ import {
 import { puede } from "@/lib/rbac";
 import { Paginacion } from "@/components/ui/Paginacion";
 import { PanelComprometido } from "@/components/ordenes/PanelComprometido";
+import { FiltrosOrdenes } from "@/components/ordenes/FiltrosOrdenes";
 import { HistorialOrdenes } from "@/components/ordenes/HistorialOrdenes";
 
 export const metadata: Metadata = { title: "Ordenes de compra" };
@@ -36,7 +42,13 @@ export default async function OrdenesPage({
     creada?: string;
     aprobada?: string;
     anulada?: string;
+    eliminada?: string;
     p?: string;
+    q?: string;
+    proveedor?: string;
+    desde?: string;
+    hasta?: string;
+    estado?: string;
   }>;
 }) {
   const sesion = await obtenerSesion();
@@ -49,13 +61,37 @@ export default async function OrdenesPage({
   if (!puede(sesion, "orden:leer")) redirect(`/obras/${id}`);
 
   const consulta = await searchParams;
-  const { creada, aprobada, anulada } = consulta;
+  const { creada, aprobada, anulada, eliminada } = consulta;
 
-  // El comprometido se calcula aparte y sobre TODAS las ordenes: paginar el
-  // historial no puede cambiar la cifra de control de la obra.
-  const [ordenes, comprometido] = await Promise.all([
-    listarOrdenes(sesion, id, { pagina: consulta.p }),
+  // Los filtros vigentes, sin los avisos de un solo uso: son los que viajan
+  // con la paginacion.
+  const filtros = {
+    q: consulta.q,
+    proveedor: consulta.proveedor,
+    desde: consulta.desde,
+    hasta: consulta.hasta,
+    estado: consulta.estado,
+  };
+
+  const hayFiltro = Object.values(filtros).some(Boolean);
+
+  // El comprometido se calcula aparte y sobre TODAS las ordenes aprobadas:
+  // ni paginar ni filtrar el historial pueden mover la cifra de control.
+  const [ordenes, comprometido, proveedores, totalDeLaObra] = await Promise.all([
+    listarOrdenes(sesion, id, {
+      pagina: consulta.p,
+      // De cinco en cinco: cada orden ocupa una tarjeta con su reparto, y
+      // veinte de golpe dejan la pantalla imposible de recorrer.
+      porPagina: 5,
+      q: consulta.q,
+      proveedorId: consulta.proveedor,
+      desde: consulta.desde,
+      hasta: consulta.hasta,
+      estado: consulta.estado,
+    }),
     obtenerComprometido(sesion, id),
+    listarProveedoresConOrdenes(sesion, id),
+    contarOrdenesDeObra(sesion, id),
   ]);
 
   // Sin linea base no hay vigente contra el que comparar, y eso no impide
@@ -73,6 +109,7 @@ export default async function OrdenesPage({
     creada && `Orden ${creada} guardada como borrador. Todavia no cuenta en el comprometido: hay que aprobarla.`,
     aprobada && `Orden ${aprobada} aprobada. Ya cuenta en el comprometido.`,
     anulada && `Orden ${anulada} anulada. Deja de contar en el comprometido y se conserva con su motivo.`,
+    eliminada && `Orden ${eliminada} eliminada. No contaba en el comprometido, asi que ninguna cifra cambia.`,
   ].filter(Boolean) as string[];
 
   return (
@@ -112,28 +149,41 @@ export default async function OrdenesPage({
       <PanelComprometido
         comprometido={comprometido}
         presupuesto={presupuesto}
-        // El total de la obra, no el de la pagina: es la cifra que rotula el
-        // panel de control y cambiaria al pasar de pagina.
-        totalOrdenes={ordenes.total}
+        // El total de la obra SIN filtrar. Con el total filtrado, buscar algo
+        // que no coincide dejaba el panel en cero y desaparecia: parecia que
+        // el comprometido se hubiera esfumado por escribir en un buscador.
+        totalOrdenes={totalDeLaObra}
       />
 
-      <HistorialOrdenes
-        ordenes={ordenes.filas}
-        obraId={id}
-        puedeAprobar={puede(sesion, "orden:aprobar")}
-        puedeAnular={puede(sesion, "orden:anular")}
-      />
+      <section className="space-y-4">
+        <h3 className="text-lg font-semibold">Ordenes</h3>
 
-      <Paginacion
-        pagina={ordenes.pagina}
-        totalPaginas={ordenes.totalPaginas}
-        total={ordenes.total}
-        etiqueta="ordenes"
-        // Sin los avisos de `?creada=` y compania: son de un solo uso, y
-        // arrastrarlos haria que «Orden X guardada» reapareciera en cada
-        // pagina que se visite despues.
-        params={{}}
-      />
+        <FiltrosOrdenes proveedores={proveedores} />
+
+        <HistorialOrdenes
+          ordenes={ordenes.filas}
+          obraId={id}
+          puedeAprobar={puede(sesion, "orden:aprobar")}
+          puedeAnular={puede(sesion, "orden:anular")}
+          // El servicio decide el permiso segun el estado; aqui basta con
+          // saber si esta persona puede llegar a borrar algo.
+          puedeEliminar={
+            puede(sesion, "orden:crear") || puede(sesion, "orden:anular")
+          }
+          filtrado={hayFiltro}
+        />
+
+        <Paginacion
+          pagina={ordenes.pagina}
+          totalPaginas={ordenes.totalPaginas}
+          total={ordenes.total}
+          porPagina={5}
+          etiqueta="ordenes"
+          // Los filtros SI viajan —perderlos al pasar de pagina reiniciaria
+          // la busqueda—, los avisos de un solo uso no.
+          params={filtros}
+        />
+      </section>
     </div>
   );
 }

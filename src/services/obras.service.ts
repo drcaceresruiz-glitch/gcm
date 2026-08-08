@@ -2,8 +2,9 @@ import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { sumar } from "@/lib/decimal";
+import { esPositivo, sumar } from "@/lib/decimal";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
+import { estadoDeObra, validarObra } from "@/lib/obras";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -33,6 +34,15 @@ export interface ObraResumen {
   /// precision al viajar del servidor al navegador.
   presupuestoTotal: string;
   totalPartidas: number;
+  /**
+   * Comprometido con proveedores, SIN IGV y solo de ordenes APROBADAS: la
+   * misma definicion que usa `obtenerComprometido` en la pantalla de la obra.
+   * Un borrador todavia no compromete a nadie y una anulada dejo de hacerlo.
+   */
+  comprometido: string;
+  /// Partidas cuyo comprometido supera su parcial. Es la alerta de sobrecosto
+  /// que se puede afirmar hoy; el avance fisico no existe todavia.
+  partidasSobregiradas: number;
 }
 
 export async function listarObras(
@@ -70,12 +80,73 @@ export async function listarObras(
 
   const porObra = new Map(totales.map((t) => [t.projectId, t]));
 
+  /**
+   * Comprometido por obra, con la MISMA definicion que `obtenerComprometido`:
+   * solo ordenes APROBADAS y sobre el importe imputable, que es el neto con
+   * IGV y el total con retencion —de eso ya se encarga la imputacion, que
+   * guarda la cifra que cuenta—.
+   *
+   * Va en su propia consulta y no colgando de la de partidas porque son dos
+   * agregados distintos; juntarlos multiplicaria filas y falsearia ambos.
+   */
+  const comprometidos = await prisma.ordenImputacion.groupBy({
+    by: ["wbsItemId"],
+    where: {
+      ordenCompra: {
+        projectId: { in: obras.map((o) => o.id) },
+        estado: "APROBADA",
+        companyId: sesion.companyId,
+      },
+    },
+    _sum: { importe: true },
+  });
+
+  // Para saber a que obra pertenece cada partida, y su parcial, con el que se
+  // detecta el sobregiro.
+  const partidas = await prisma.wbsItem.findMany({
+    where: { id: { in: comprometidos.map((c) => c.wbsItemId) } },
+    select: { id: true, projectId: true, parcial: true },
+  });
+
+  const partidaPorId = new Map(partidas.map((p) => [p.id, p]));
+
+  const comprometidoPorObra = new Map<string, string[]>();
+  const sobregiradasPorObra = new Map<string, number>();
+
+  for (const fila of comprometidos) {
+    const partida = partidaPorId.get(fila.wbsItemId);
+    if (!partida) continue;
+
+    const importe = fila._sum.importe?.toString() ?? "0";
+
+    const acumulado = comprometidoPorObra.get(partida.projectId) ?? [];
+    acumulado.push(importe);
+    comprometidoPorObra.set(partida.projectId, acumulado);
+
+    // Se compara contra el parcial de la partida. El vigente (base +
+    // movimientos) seria mas fino, pero exige la linea base aprobada y el
+    // panel tiene que servir tambien para obras que aun no la tienen.
+    //
+    // La resta va con `sumar` y no con `Number`: aqui son importes, y en este
+    // sistema el dinero nunca pasa por coma flotante.
+    const exceso = sumar([importe, `-${partida.parcial?.toString() ?? "0"}`]);
+
+    if (esPositivo(exceso)) {
+      sobregiradasPorObra.set(
+        partida.projectId,
+        (sobregiradasPorObra.get(partida.projectId) ?? 0) + 1,
+      );
+    }
+  }
+
   return obras.map((obra) => {
     const agregado = porObra.get(obra.id);
     return {
       ...obra,
       presupuestoTotal: agregado?._sum.parcial?.toString() ?? "0",
       totalPartidas: agregado?._count._all ?? 0,
+      comprometido: sumar(comprometidoPorObra.get(obra.id) ?? ["0"]),
+      partidasSobregiradas: sobregiradasPorObra.get(obra.id) ?? 0,
     };
   });
 }
@@ -133,6 +204,110 @@ export const obtenerObra = cache(async function obtenerObra(
   const { baselines, ...resto } = obra;
   return { ...resto, lineaBaseVersion: baselines[0]?.version ?? null };
 });
+
+// ---------------------------------------------------------------------------
+// Alta de obras
+// ---------------------------------------------------------------------------
+
+export interface DatosObra {
+  nombreObra: string;
+  /// Vacio = sin codigo. La columna es nullable y la UI ya lo contempla.
+  codigoObra?: string;
+  ubicacion?: string;
+  cliente?: string;
+  /// "YYYY-MM-DD", como las manda un <input type="date">.
+  fechaInicio: string;
+  fechaFinProgramada: string;
+  /// Uno de ProjectState. Si no llega o es raro, Planificacion.
+  estado?: string;
+}
+
+export type ResultadoCrearObra =
+  | { ok: true; id: string }
+  | { ok: false; error: string };
+
+/**
+ * Crea una obra en la empresa de la sesion.
+ *
+ * Hasta ahora las obras solo nacian del script de seed: el permiso
+ * `obra:crear` estaba en la matriz pero no habia servicio que lo usara, asi
+ * que en produccion, con la base vacia, no habia forma de arrancar la
+ * primera obra.
+ */
+export async function crearObra(
+  sesion: SesionActiva,
+  datos: DatosObra,
+): Promise<ResultadoCrearObra> {
+  if (!puede(sesion, "obra:crear")) {
+    return { ok: false, error: "No tienes permiso para crear obras." };
+  }
+
+  // Las reglas —nombre, fechas, estado— viven en `lib/obras` para que se
+  // puedan probar sin base de datos.
+  const validacion = validarObra(datos);
+  if (!validacion.ok) return { ok: false, error: validacion.error };
+
+  const { inicio, fin } = validacion.plazo;
+  const estado = estadoDeObra(datos.estado);
+
+  const opcional = (v: string | undefined, largo: number) =>
+    v?.trim() ? v.trim().slice(0, largo) : null;
+
+  const codigoObra = opcional(datos.codigoObra, 40);
+
+  // El codigo repetido se comprueba aqui para poder decir con QUE obra choca,
+  // y no soltar el "Unique constraint failed" crudo de Prisma. La clave
+  // unica de la base lo cierra igual; esto es para que el mensaje sirva.
+  if (codigoObra) {
+    const existente = await prisma.project.findFirst({
+      where: { companyId: sesion.companyId, codigoObra },
+      select: { nombreObra: true },
+    });
+    if (existente) {
+      return {
+        ok: false,
+        error: `Ya existe una obra con el codigo ${codigoObra}: "${existente.nombreObra}".`,
+      };
+    }
+  }
+
+  const campos = {
+    nombreObra: datos.nombreObra.trim().slice(0, 255),
+    codigoObra,
+    ubicacion: opcional(datos.ubicacion, 255),
+    cliente: opcional(datos.cliente, 200),
+    fechaInicio: inicio,
+    fechaFinProgramada: fin,
+    estado,
+  };
+
+  const creada = await prisma.$transaction(async (tx) => {
+    const obra = await tx.project.create({
+      data: { companyId: sesion.companyId, ...campos },
+      select: { id: true },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obra.id,
+        entidad: "Project",
+        entidadId: obra.id,
+        accion: "CREATE",
+        despues: {
+          ...campos,
+          fechaInicio: datos.fechaInicio,
+          fechaFinProgramada: datos.fechaFinProgramada,
+        },
+      },
+    });
+
+    return obra;
+  });
+
+  return { ok: true, id: creada.id };
+}
 
 export interface PartidaFila {
   id: string;

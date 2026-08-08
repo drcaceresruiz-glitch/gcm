@@ -7,6 +7,7 @@ import {
   descuadreDelReparto,
   importeDeOrden,
   importeImputable,
+  permisoParaEliminar,
   sumarLineas,
   type TipoImpuesto,
 } from "@/lib/ordenes";
@@ -23,6 +24,7 @@ import type {
   OrigenRegistro,
   TipoOrden,
 } from "@/generated/prisma/enums";
+import type { Prisma } from "@/generated/prisma/client";
 
 /**
  * Ordenes de compra y de servicio.
@@ -532,6 +534,102 @@ export async function aprobarOrden(
 }
 
 /**
+ * Borra una orden. Solo BORRADOR y ANULADA.
+ *
+ * Ninguna de las dos cuenta en el comprometido —`obtenerComprometido` solo
+ * suma las APROBADAS—, asi que borrarlas **no revierte nada**: ya valian
+ * cero. Lo unico que se pierde es el registro, y por eso el `AuditLog` se
+ * escribe ANTES de borrar, con las cifras dentro: la orden desaparece de la
+ * lista pero queda rastro de que existio y de quien la quito.
+ *
+ * Una APROBADA no se borra: se anula, que revierte el comprometido igual y
+ * conserva la orden con su motivo. Es la regla del modulo —«anular no es
+ * borrar»— y aqui se sostiene.
+ *
+ * El permiso depende del estado: descartar un borrador es parte de
+ * redactarlo (`orden:crear`), pero purgar una anulada es un acto destructivo
+ * sobre el ciclo de vida de la orden (`orden:anular`).
+ */
+export async function eliminarOrden(
+  sesion: SesionActiva,
+  ordenId: string,
+): Promise<{ ok: true; numero: string } | { ok: false; error: string }> {
+  const orden = await prisma.ordenCompra.findFirst({
+    where: { id: ordenId, companyId: sesion.companyId },
+    select: {
+      id: true,
+      projectId: true,
+      numero: true,
+      estado: true,
+      tipo: true,
+      tipoImpuesto: true,
+      neto: true,
+      impuesto: true,
+      total: true,
+      motivoAnulado: true,
+      proveedor: { select: { razonSocial: true, ruc: true } },
+    },
+  });
+
+  if (!orden) return { ok: false, error: "Orden no encontrada." };
+
+  // La regla vive en `lib/ordenes` para poder probarla sin base de datos.
+  const permiso = permisoParaEliminar(orden.estado);
+
+  if (permiso === null) {
+    return {
+      ok: false,
+      error: `La orden ${orden.numero} esta aprobada y no se puede borrar. Anulala: deja de contar en el comprometido y se conserva con su motivo.`,
+    };
+  }
+
+  if (!puede(sesion, permiso)) {
+    return {
+      ok: false,
+      error:
+        orden.estado === "BORRADOR"
+          ? "No tienes permiso para eliminar borradores de orden."
+          : "No tienes permiso para eliminar ordenes anuladas.",
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Primero la auditoria y despues el borrado: al reves, si el borrado
+    // fallara despues de auditar quedaria un registro de algo que sigue ahi.
+    // En este orden, dentro de la transaccion, o se guardan las dos o ninguna.
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: orden.projectId,
+        entidad: "OrdenCompra",
+        entidadId: orden.id,
+        accion: "DELETE",
+        antes: {
+          numero: orden.numero,
+          estado: orden.estado,
+          tipo: orden.tipo,
+          proveedor: orden.proveedor.razonSocial,
+          ruc: orden.proveedor.ruc,
+          tipoImpuesto: orden.tipoImpuesto,
+          neto: orden.neto.toString(),
+          impuesto: orden.impuesto.toString(),
+          total: orden.total.toString(),
+          motivoAnulado: orden.motivoAnulado,
+        },
+      },
+    });
+
+    // Las lineas y las imputaciones se van con ella por la cascada del
+    // esquema. Las partidas no se tocan: la relacion desde la imputacion es
+    // Restrict justamente para que borrar una orden no arrastre presupuesto.
+    await tx.ordenCompra.delete({ where: { id: orden.id } });
+  });
+
+  return { ok: true, numero: orden.numero };
+}
+
+/**
  * Anula una orden. Deja de contar en el comprometido, pero no se borra.
  *
  * El motivo es obligatorio: dentro de seis meses, "por que se anulo la 00117"
@@ -675,21 +773,88 @@ export interface OrdenResumen {
 }
 
 /**
- * Las ordenes de la obra, paginadas.
+ * Los proveedores que TIENEN ordenes en esta obra, para el desplegable del
+ * filtro.
+ *
+ * No es el catalogo entero a proposito: ofrecer proveedores que nunca
+ * trabajaron aqui solo produce filtros que devuelven cero, y en una empresa
+ * con cien proveedores el desplegable seria inservible.
+ */
+export async function listarProveedoresConOrdenes(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<{ id: string; razonSocial: string }[]> {
+  if (!puede(sesion, "orden:leer")) return [];
+
+  const filas = await prisma.ordenCompra.findMany({
+    where: { projectId: obraId, companyId: sesion.companyId },
+    distinct: ["proveedorId"],
+    select: { proveedor: { select: { id: true, razonSocial: true } } },
+    orderBy: { proveedor: { razonSocial: "asc" } },
+  });
+
+  return filas.map((f) => f.proveedor);
+}
+
+/**
+ * Cuantas ordenes tiene la obra, SIN filtrar.
+ *
+ * Existe aparte del total que devuelve `listarOrdenes` porque aquel cuenta lo
+ * que pasa el filtro, y hay cosas que no pueden depender de la busqueda: el
+ * panel del comprometido se esconde cuando la obra no tiene ninguna orden, y
+ * con el total filtrado desaparecia al escribir algo que no coincide, como si
+ * el comprometido se hubiera esfumado.
+ */
+export async function contarOrdenesDeObra(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<number> {
+  if (!puede(sesion, "orden:leer")) return 0;
+
+  return prisma.ordenCompra.count({
+    where: { projectId: obraId, companyId: sesion.companyId },
+  });
+}
+
+export interface FiltrosOrdenes {
+  pagina?: string;
+  porPagina?: number;
+  /// Texto libre sobre numero, descripcion y referencia.
+  q?: string;
+  proveedorId?: string;
+  /// "YYYY-MM-DD". Una fecha concreta es `desde` = `hasta`.
+  desde?: string;
+  hasta?: string;
+  estado?: string;
+}
+
+/** Fecha de filtro, o undefined si no es una fecha utilizable. Lo que no se
+ *  entiende se ignora en vez de romper: viene de la URL. */
+function fechaFiltro(valor: string | undefined): Date | undefined {
+  if (!valor || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return undefined;
+  const fecha = new Date(`${valor}T00:00:00Z`);
+  return Number.isNaN(fecha.getTime()) ? undefined : fecha;
+}
+
+/**
+ * Las ordenes de la obra, filtradas y paginadas.
  *
  * Cada fila arrastra su reparto entre partidas, asi que una obra con
  * doscientas ordenes enviaba al navegador doscientos repartos anidados para
  * ensenar los primeros que caben en pantalla.
  *
- * El `total` que devuelve es el de TODAS las ordenes, no el de la pagina: es
- * lo que tienen que rotular las pantallas. El comprometido no sale de aqui
- * —lo calcula `obtenerComprometido` con su propia consulta sobre todas—, asi
- * que paginar no lo altera.
+ * El `total` es el de las ordenes QUE PASAN EL FILTRO, no el de la pagina ni
+ * el de la obra entera: es lo que rotulan las pantallas y lo que da el numero
+ * de paginas.
+ *
+ * El comprometido no sale de aqui —lo calcula `obtenerComprometido` con su
+ * propia consulta sobre TODAS las aprobadas—, asi que ni paginar ni filtrar
+ * pueden mover la cifra de control de la obra.
  */
 export async function listarOrdenes(
   sesion: SesionActiva,
   obraId: string,
-  opciones: { pagina?: string; porPagina?: number } = {},
+  opciones: FiltrosOrdenes = {},
 ): Promise<Pagina<OrdenResumen>> {
   const porPagina = opciones.porPagina ?? POR_PAGINA;
 
@@ -697,8 +862,37 @@ export async function listarOrdenes(
     return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
   }
 
-  const where = { projectId: obraId, companyId: sesion.companyId };
+  const texto = opciones.q?.trim();
+  const desde = fechaFiltro(opciones.desde);
+  const hasta = fechaFiltro(opciones.hasta);
 
+  const estado = (["BORRADOR", "APROBADA", "ANULADA"] as const).find(
+    (e) => e === opciones.estado,
+  );
+
+  const where: Prisma.OrdenCompraWhereInput = {
+    projectId: obraId,
+    companyId: sesion.companyId,
+    ...(opciones.proveedorId ? { proveedorId: opciones.proveedorId } : {}),
+    ...(estado ? { estado } : {}),
+    // `hasta` incluye el dia entero: la fecha es `@db.Date`, asi que basta con
+    // comparar contra la medianoche de ese mismo dia.
+    ...(desde || hasta
+      ? { fecha: { ...(desde ? { gte: desde } : {}), ...(hasta ? { lte: hasta } : {}) } }
+      : {}),
+    ...(texto
+      ? {
+          OR: [
+            { numero: { contains: texto } },
+            { descripcion: { contains: texto } },
+            { referencia: { contains: texto } },
+          ],
+        }
+      : {}),
+  };
+
+  // El `count` usa el MISMO `where`: si contara el total sin filtrar, el
+  // numero de paginas no corresponderia con lo que hay que recorrer.
   const total = await prisma.ordenCompra.count({ where });
   const totalPaginas = contarPaginas(total, porPagina);
   const pagina = normalizarPagina(opciones.pagina, totalPaginas);

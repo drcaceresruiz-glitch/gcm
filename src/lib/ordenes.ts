@@ -32,6 +32,34 @@ export type TipoImpuesto = "IGV" | "RENTA" | "NINGUNO";
  * que si se paga.
  */
 
+/** Los tres estados por los que pasa una orden. */
+export type EstadoDeOrden = "BORRADOR" | "APROBADA" | "ANULADA";
+
+/**
+ * Que permiso hace falta para BORRAR una orden en cada estado, o `null` si no
+ * se puede borrar.
+ *
+ * La regla que sostiene esto: el comprometido solo cuenta las APROBADAS, asi
+ * que borrar un borrador o una anulada no revierte ninguna cifra —ya valian
+ * cero— y lo unico que se pierde es el registro. Una aprobada SI cuenta, y
+ * para dejar de contar existe anular, que ademas conserva la orden con su
+ * motivo. Por eso una aprobada no se borra nunca.
+ *
+ * El permiso cambia con el estado a proposito: descartar un borrador es parte
+ * de redactarlo, mientras que purgar una anulada destruye historia de la obra
+ * y va con el mismo permiso que anularla.
+ *
+ * Vive aqui, con las demas reglas del modulo, para que se pueda probar sin
+ * base de datos: es una decision, no una consulta.
+ */
+export function permisoParaEliminar(
+  estado: EstadoDeOrden,
+): "orden:crear" | "orden:anular" | null {
+  if (estado === "BORRADOR") return "orden:crear";
+  if (estado === "ANULADA") return "orden:anular";
+  return null;
+}
+
 /** Una linea tal como se teclea, antes de guardarse. */
 export interface LineaOrden {
   /// true si repite la suma de sus hijas. Esas lineas NO suman.
