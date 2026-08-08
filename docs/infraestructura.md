@@ -180,12 +180,38 @@ que el script detecta su ausencia e imprime el SQL para pegarlo en phpMyAdmin.
 
 **El workflow no aplica migraciones.** `prisma migrate deploy` necesita
 alcanzar MariaDB, y en hosting compartido la base no acepta conexiones
-externas. Tras un despliegue que cambie el esquema, desde cPanel → *Terminal*,
-dentro del application root:
+externas. Tras un despliegue que cambie el esquema, desde cPanel → *Terminal*:
 
 ```bash
-npx prisma migrate deploy
+source /home/<usuario>/nodevenv/<app>/22/bin/activate
+cd ~/gcm && export DATABASE_URL="mysql://usuario:clave@localhost:3306/base?charset=utf8mb4"
+npx --yes prisma@7 migrate deploy
 ```
+
+Las tres líneas hacen falta, y saltarse cualquiera da un error que no explica
+lo que pasa:
+
+- **Sin `source`**, el jailshell responde `npx: command not found`. Node no
+  está en el PATH hasta activar el entorno del panel.
+- **Sin `export`**, Prisma no encuentra la base: las variables de entorno de
+  la aplicación viven en la configuración Node de cPanel y el Terminal no las
+  hereda.
+- **`--yes prisma@7`** y no `npx prisma`: Next empaqueta Prisma dentro del
+  código compilado y no queda como módulo suelto que `npx` pueda encontrar.
+
+> **El orden importa cuando el esquema cambia.** `migrate deploy` lee los
+> archivos de migración *del paquete desplegado*, así que no se puede migrar
+> antes de subir: hasta el push no hay nada que aplicar. Y si el código nuevo
+> consulta una tabla que aún no existe, la aplicación se cae ENTERA en cuanto
+> despliega, no solo la pantalla nueva.
+>
+> Para cambios así, la vía sin caída es crear la tabla a mano en phpMyAdmin
+> con el SQL de la migración **antes** del push, y después cuadrar el registro
+> de Prisma para que no intente recrearla:
+>
+> ```bash
+> npx --yes prisma@7 migrate resolve --applied <nombre_de_la_migracion>
+> ```
 
 Validar pronto las migraciones contra MariaDB 10.11: en desarrollo corre 12.3.
 

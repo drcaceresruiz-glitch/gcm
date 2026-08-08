@@ -59,7 +59,7 @@ subir documentos de cliente, credenciales ni datos del servidor.
 |---|---|
 | `npm run typecheck` | Tipos |
 | `npm run lint` | Estilo y reglas de arquitectura |
-| `npx vitest run` | 64 pruebas |
+| `npx vitest run` | 74 pruebas |
 | `npm run build` | Build de producción |
 | `npm run db:studio` | Explorador de la base |
 
@@ -148,13 +148,46 @@ dónde sacar.
   del apunte en vez de por la partida que ajusta, el total habría cuadrado
   igual y el error no se habría visto.
 
-**Motores verificados con 64 pruebas.**
+**Módulo 3 — Permisos por empresa.** La matriz de `src/lib/rbac.ts` deja de ser
+la última palabra y pasa a ser la **plantilla**: cada empresa concede o revoca
+permisos sueltos encima de ella, desde `/empresa/permisos`.
+
+- **Se guardan excepciones, no la matriz.** La ausencia de fila significa «lo
+  que diga la plantilla». Por eso desplegarlo no cambió el permiso de nadie, y
+  devolver una casilla a su valor por defecto **borra** la fila en vez de
+  guardar otra que repita la plantilla.
+- **Se resuelven al abrir la sesión**, una vez por petición, y viven en
+  `SesionActiva.permisos`. De ahí que `puede()` reciba un sujeto con sus
+  permisos ya resueltos y no un rol: desde que son configurables, el rol solo
+  dice de dónde se parte. Efecto secundario útil: un cambio surte efecto en la
+  siguiente petición, **sin cerrar sesiones**.
+- La rejilla se edita entera y se guarda de una vez, enumerando antes qué va a
+  cambiar. Solo viajan las casillas tocadas: si dos administradores editan a la
+  vez, cada uno aplica lo suyo en lugar de pisarse.
+- Cada cambio queda auditado con su antes y su después, incluyendo si el valor
+  venía de la plantilla o era ya una excepción.
+
+> **Límite que no se negocia.** `linea_base:aprobar` y `movimiento:aprobar` son
+> actos contractuales irreversibles que mueven la cifra contra la que se mide
+> la obra. Y `permiso:leer` y `permiso:editar` reparten todos los demás: si se
+> pudieran conceder, un ADMIN se los daría a un CONSULTOR y ese se repartiría
+> el resto a sí mismo. Los cuatro quedan **fuera de la matriz editable**.
+>
+> Se cierra por dos vías independientes: el servicio rechaza guardarlos, y
+> `resolverPermisos` los ignora aunque la fila llegue a existir. La primera
+> puede fallar por un descuido al añadir una ruta nueva; la segunda protege
+> incluso frente a una fila insertada a mano en la base. Es lo que prueba
+> `rbac.test.ts`, y no debe quitarse.
+
+**Motores verificados con 74 pruebas.**
 - `lib/decimal.ts` — aritmética exacta con enteros grandes. Nunca coma
   flotante para dinero.
 - `lib/excel-presupuesto.ts` — lectura de presupuestos.
 - `lib/jerarquia-partidas.ts` — jerarquía de códigos y suma por hojas.
 - `lib/presupuesto.ts` — cascada, comparación de revisiones y conversión
   exacta entre porcentaje y fracción.
+- `lib/rbac.ts` — permisos efectivos por empresa, y que los cuatro
+  innegociables no se puedan reconfigurar por ninguna vía.
 
 ## 4. Decisiones de arquitectura, y por qué
 
@@ -285,24 +318,22 @@ Las reconversiones y los adicionales, que encabezaban esta lista, **ya están
 hechos**: servicio, pantallas y migraciones en producción. Lo que queda de
 ellos es comprobarlos en navegador contra CRIOCORD (§3).
 
-### Inmediato — gestión de permisos por empresa
+La gestión de permisos por empresa, que la encabezaba después, **también está
+hecha**: está en §3. Lo siguiente en el orden acordado son las fases de abajo.
 
-Hoy la matriz de `src/lib/rbac.ts` está **escrita en el código**: cambiar quién
-puede hacer qué exige tocar un archivo y desplegar. Sirve con una empresa; no
-escala a varias, cada una con su organización.
+### Brecha conocida — el rol por obra no se aplica
 
-Pedido por el cliente el 08/08/2026: que los permisos se puedan **asignar,
-editar y quitar por perfil** desde una pantalla. Los cinco roles quedarían como
-plantillas con valores por defecto, y encima se conceden o revocan permisos
-concretos, por empresa.
+`ProjectMembership` existe en el esquema con un `role` por obra, y el
+comentario de `User.role` dice que «tiene prioridad» sobre el rol de empresa.
+**No es cierto hoy**: ningún archivo de `src/` lo consulta, y las
+comprobaciones de permiso resuelven todas con el rol de empresa.
 
-> **Límite que no debe negociarse.** `linea_base:aprobar` y `movimiento:aprobar`
-> son actos contractuales, irreversibles, que mueven la cifra contra la que se
-> mide la obra. Si se vuelven configurables, cualquier día alguien se los
-> concede a quien no debe y el sistema pierde la garantía que lo hace fiable.
-> Deben quedar reservados al administrador, fuera de la matriz editable.
-
-Todo cambio de permisos tiene que quedar auditado, como el resto.
+Cerrarlo obliga a que el permiso deje de depender solo de la sesión y pase a
+depender de la obra que se esté mirando, es decir, a llevar el `obraId` hasta
+cada comprobación y hasta pantallas que hoy no lo tienen. Se dejó fuera de la
+gestión de permisos a propósito, porque el cliente pidió permisos por empresa
+y no roles por obra. Mientras siga así, **el comentario del esquema promete
+algo que no ocurre**: o se implementa o se retira.
 
 ### Fases posteriores
 
