@@ -1,6 +1,13 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import {
+  contarPaginas,
+  normalizarPagina,
+  saltar,
+  POR_PAGINA,
+  type Pagina,
+} from "@/lib/paginacion";
 import type { SesionActiva } from "@/services/sesion.service";
 import type {
   MonedaCuenta,
@@ -49,6 +56,49 @@ export type Resultado =
   | { ok: true; id: string }
   | { ok: false; error: string };
 
+/**
+ * Los campos de un proveedor en las listas. Va en una constante porque lo
+ * comparten la lista completa y la paginada, y son la misma ficha: si se
+ * separan, una de las dos pantallas acaba ensenando menos que la otra sin
+ * que nadie lo decida.
+ */
+const CAMPOS_RESUMEN = {
+  id: true,
+  razonSocial: true,
+  ruc: true,
+  contactoNombre: true,
+  contactoTelefono: true,
+  email: true,
+  banco: true,
+  tipoCuenta: true,
+  monedaCuenta: true,
+  cuentaBancaria: true,
+  cci: true,
+  tipoImpuesto: true,
+  activo: true,
+  origen: true,
+  _count: { select: { ordenes: true } },
+} as const;
+
+function filtroDe(sesion: SesionActiva, incluirInactivos: boolean) {
+  return {
+    companyId: sesion.companyId,
+    ...(incluirInactivos ? {} : { activo: true }),
+  };
+}
+
+/**
+ * TODOS los proveedores, sin paginar.
+ *
+ * No se pagina a proposito: de aqui se llena el desplegable de proveedores
+ * del formulario de ordenes. Recortarla a una pagina dejaria fuera al resto
+ * **sin que fallase nada** —el desplegable seguiria abriendo, solo que sin
+ * el proveedor que se buscaba—, y ese es justo el tipo de error que aqui se
+ * cierra en la estructura y no confiando en que nadie se equivoque.
+ *
+ * Para la pantalla del catalogo, que si se pagina, esta
+ * `listarProveedoresPagina`.
+ */
 export async function listarProveedores(
   sesion: SesionActiva,
   incluirInactivos = false,
@@ -56,34 +106,55 @@ export async function listarProveedores(
   if (!puede(sesion, "proveedor:leer")) return [];
 
   const filas = await prisma.proveedor.findMany({
-    where: {
-      companyId: sesion.companyId,
-      ...(incluirInactivos ? {} : { activo: true }),
-    },
+    where: filtroDe(sesion, incluirInactivos),
     orderBy: { razonSocial: "asc" },
-    select: {
-      id: true,
-      razonSocial: true,
-      ruc: true,
-      contactoNombre: true,
-      contactoTelefono: true,
-      email: true,
-      banco: true,
-      tipoCuenta: true,
-      monedaCuenta: true,
-      cuentaBancaria: true,
-      cci: true,
-      tipoImpuesto: true,
-      activo: true,
-      origen: true,
-      _count: { select: { ordenes: true } },
-    },
+    select: CAMPOS_RESUMEN,
   });
 
   return filas.map(({ _count, ...p }) => ({
     ...p,
     totalOrdenes: _count.ordenes,
   }));
+}
+
+/** El catalogo de `/empresa/proveedores`, de veinte en veinte. */
+export async function listarProveedoresPagina(
+  sesion: SesionActiva,
+  opciones: {
+    incluirInactivos?: boolean;
+    pagina?: string;
+    porPagina?: number;
+  } = {},
+): Promise<Pagina<ProveedorResumen>> {
+  const porPagina = opciones.porPagina ?? POR_PAGINA;
+
+  if (!puede(sesion, "proveedor:leer")) {
+    return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
+  }
+
+  const where = filtroDe(sesion, opciones.incluirInactivos ?? false);
+
+  const total = await prisma.proveedor.count({ where });
+  const totalPaginas = contarPaginas(total, porPagina);
+  const pagina = normalizarPagina(opciones.pagina, totalPaginas);
+
+  const filas = await prisma.proveedor.findMany({
+    where,
+    orderBy: { razonSocial: "asc" },
+    skip: saltar(pagina, porPagina),
+    take: porPagina,
+    select: CAMPOS_RESUMEN,
+  });
+
+  return {
+    filas: filas.map(({ _count, ...p }) => ({
+      ...p,
+      totalOrdenes: _count.ordenes,
+    })),
+    total,
+    pagina,
+    totalPaginas,
+  };
 }
 
 export interface DatosProveedor {

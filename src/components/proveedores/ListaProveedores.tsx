@@ -17,7 +17,12 @@ import { BotonEstadoProveedor } from "@/components/proveedores/BotonEstadoProvee
  */
 
 interface Props {
+  /// Los de esta pagina.
   proveedores: ProveedorResumen[];
+  /// Cuantos hay en total. El recuento se saca de aqui y no de la longitud
+  /// de la lista: rotular «12 proveedores» estando en la pagina 2 de 40
+  /// seria falso, y ademas cambiaria al pasar de pagina.
+  total: number;
   verTodos: boolean;
   puedeCrear: boolean;
   puedeEditar: boolean;
@@ -25,6 +30,7 @@ interface Props {
 
 export function ListaProveedores({
   proveedores,
+  total,
   verTodos,
   puedeCrear,
   puedeEditar,
@@ -41,9 +47,7 @@ export function ListaProveedores({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm opacity-70">
-          {proveedores.length === 1
-            ? "1 proveedor"
-            : `${proveedores.length} proveedores`}
+          {total === 1 ? "1 proveedor" : `${total} proveedores`}
           {!verTodos && " activos"}
         </p>
 

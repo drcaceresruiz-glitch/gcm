@@ -1,17 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  Building2,
-  HardHat,
-  KeyRound,
-  LogOut,
-  Receipt,
-  ShieldCheck,
-  Users,
-} from "lucide-react";
+import { HardHat } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { puede } from "@/lib/rbac";
-import { accionCerrarSesion } from "@/app/(auth)/acciones";
+import {
+  Navegacion,
+  type EnlaceEmpresa,
+} from "@/components/navegacion/Navegacion";
 
 /**
  * Area privada.
@@ -29,20 +24,49 @@ export default async function DashboardLayout({
   // Nadie navega por el sistema con una clave temporal sin estrenar.
   if (sesion.mustChangePassword) redirect("/cambiar-clave");
 
+  // Los permisos se resuelven aqui y no en el componente de navegacion: la
+  // comprobacion se queda en el servidor y al cliente solo viaja la lista de
+  // enlaces que esa persona puede ver.
+  const enlaces = [
+    puede(sesion, "proveedor:leer") && {
+      href: "/empresa/proveedores",
+      etiqueta: "Proveedores",
+      clave: "proveedores",
+    },
+    puede(sesion, "orden:leer") && {
+      href: "/empresa/formas-pago",
+      etiqueta: "Formas de pago",
+      clave: "formasPago",
+    },
+    puede(sesion, "empresa:editar") && {
+      href: "/empresa/datos",
+      etiqueta: "Datos de la empresa",
+      clave: "empresa",
+    },
+    puede(sesion, "permiso:leer") && {
+      href: "/empresa/permisos",
+      etiqueta: "Permisos",
+      clave: "permisos",
+    },
+  ].filter(Boolean) as EnlaceEmpresa[];
+
   return (
     <div className="flex min-h-dvh flex-col">
       {/* `print:hidden` es lo que permite que las pantallas que son
           documentos —la orden que se le manda al proveedor— salgan por la
           impresora sin la barra de navegacion encima. */}
       <header
-        className="sticky top-0 z-10 border-b print:hidden"
+        className="sticky top-0 z-20 border-b print:hidden"
         style={{
           borderColor: "var(--borde)",
           backgroundColor: "var(--superficie)",
         }}
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <div className="flex items-center gap-2.5">
+        <div className="relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          {/* El logotipo era un `div`. Convertirlo en enlace es lo que hace
+              que se pueda volver al panel desde cualquier pantalla, que
+              hasta ahora dependia de que cada pagina se escribiera el suyo. */}
+          <Link href="/panel" className="flex items-center gap-2.5">
             <div
               className="flex size-8 shrink-0 items-center justify-center rounded-lg"
               style={{ backgroundColor: "var(--color-marca-500)" }}
@@ -50,83 +74,15 @@ export default async function DashboardLayout({
               <HardHat className="size-4 text-white" aria-hidden="true" />
             </div>
             <span className="font-semibold">GCM</span>
-          </div>
+          </Link>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-sm leading-tight font-medium">
-                {sesion.nombres} {sesion.apellidos}
-              </p>
-              <p className="text-xs leading-tight opacity-60">{sesion.role}</p>
-            </div>
-
-            {puede(sesion, "orden:leer") && (
-              <Link
-                href="/empresa/formas-pago"
-                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm"
-                style={{ borderColor: "var(--borde)" }}
-              >
-                <Receipt className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Formas de pago</span>
-              </Link>
-            )}
-
-            {puede(sesion, "proveedor:leer") && (
-              <Link
-                href="/empresa/proveedores"
-                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm"
-                style={{ borderColor: "var(--borde)" }}
-              >
-                <Users className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Proveedores</span>
-              </Link>
-            )}
-
-            {puede(sesion, "empresa:editar") && (
-              <Link
-                href="/empresa/datos"
-                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm"
-                style={{ borderColor: "var(--borde)" }}
-              >
-                <Building2 className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Empresa</span>
-              </Link>
-            )}
-
-            {puede(sesion, "permiso:leer") && (
-              <Link
-                href="/empresa/permisos"
-                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm"
-                style={{ borderColor: "var(--borde)" }}
-              >
-                <ShieldCheck className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Permisos</span>
-              </Link>
-            )}
-
-            {/* La pantalla existia desde el modulo 0 pero no estaba
-                enlazada: la unica forma de llegar era escribir la direccion
-                de memoria. Nadie cambia una contrasena asi. */}
-            <Link
-              href="/cambiar-clave"
-              className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm"
-              style={{ borderColor: "var(--borde)" }}
-            >
-              <KeyRound className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Cambiar clave</span>
-            </Link>
-
-            <form action={accionCerrarSesion}>
-              <button
-                type="submit"
-                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm"
-                style={{ borderColor: "var(--borde)" }}
-              >
-                <LogOut className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Salir</span>
-              </button>
-            </form>
-          </div>
+          <Navegacion
+            empresa={enlaces}
+            usuario={{
+              nombre: `${sesion.nombres} ${sesion.apellidos}`,
+              rol: sesion.role,
+            }}
+          />
         </div>
       </header>
 

@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, listarPartidas } from "@/services/obras.service";
 import { analizarRiesgoDeReemplazo } from "@/services/importacion.service";
 import { puede } from "@/lib/rbac";
+import { Volver } from "@/components/ui/Volver";
 import { ImportadorPresupuesto } from "@/components/importador/ImportadorPresupuesto";
 
 export const metadata: Metadata = { title: "Importar presupuesto" };
@@ -36,18 +36,11 @@ export default async function ImportarPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link
-          href={`/obras/${id}`}
-          className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver a la obra
-        </Link>
+        <Volver href={`/obras/${id}`}>Volver al presupuesto</Volver>
 
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight">
+        <h2 className="mt-3 text-xl font-semibold tracking-tight">
           Importar presupuesto
-        </h1>
-        <p className="mt-1 text-sm text-pretty opacity-70">{obra.nombreObra}</p>
+        </h2>
       </div>
 
       {obra.lineaBaseVersion !== null ? (

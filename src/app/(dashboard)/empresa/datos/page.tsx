@@ -4,6 +4,7 @@ import { CheckCircle2 } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerEmpresa } from "@/services/empresa.service";
 import { puede } from "@/lib/rbac";
+import { Volver } from "@/components/ui/Volver";
 import { FormularioEmpresa } from "@/components/empresa/FormularioEmpresa";
 
 export const metadata: Metadata = { title: "Datos de la empresa" };
@@ -32,7 +33,9 @@ export default async function DatosEmpresaPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <Volver href="/panel">Volver al panel</Volver>
+
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight">
           Datos de la empresa
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">

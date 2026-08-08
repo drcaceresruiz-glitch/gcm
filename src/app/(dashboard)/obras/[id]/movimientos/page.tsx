@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
-  ArrowLeft,
   CheckCircle2,
   Lock,
   Plus,
@@ -18,6 +17,7 @@ import {
   type PresupuestoVigente,
 } from "@/services/movimientos.service";
 import { puede } from "@/lib/rbac";
+import { Paginacion } from "@/components/ui/Paginacion";
 import { PanelVigente } from "@/components/movimientos/PanelVigente";
 import { HistorialMovimientos } from "@/components/movimientos/HistorialMovimientos";
 
@@ -42,6 +42,7 @@ export default async function MovimientosPage({
     aprobado?: string;
     eliminado?: string;
     todas?: string;
+    p?: string;
   }>;
 }) {
   const sesion = await obtenerSesion();
@@ -53,7 +54,8 @@ export default async function MovimientosPage({
 
   if (!puede(sesion, "movimiento:leer")) redirect(`/obras/${id}`);
 
-  const { creado, aprobado, eliminado, todas } = await searchParams;
+  const consulta = await searchParams;
+  const { creado, aprobado, eliminado, todas } = consulta;
 
   /**
    * Sin linea base aprobada no existe el concepto de «encima de la base»,
@@ -67,41 +69,28 @@ export default async function MovimientosPage({
     if (!(error instanceof SinLineaBaseError)) throw error;
   }
 
-  const movimientos = presupuesto ? await listarMovimientos(sesion, id) : [];
+  const movimientos = presupuesto
+    ? await listarMovimientos(sesion, id, { pagina: consulta.p })
+    : null;
   const puedeCrear = puede(sesion, "movimiento:crear");
 
   return (
     <div className="space-y-8">
-      <div>
-        <Link
-          href={`/obras/${id}`}
-          className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver a la obra
-        </Link>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <h2 className="text-xl font-semibold tracking-tight">
+          Movimientos presupuestales
+        </h2>
 
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Movimientos presupuestales
-            </h1>
-            <p className="mt-1 text-sm text-pretty opacity-70">
-              {obra.nombreObra}
-            </p>
-          </div>
-
-          {presupuesto && puedeCrear && (
-            <Link
-              href={`/obras/${id}/movimientos/nuevo`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--color-marca-600)" }}
-            >
-              <Plus className="size-4" aria-hidden="true" />
-              Registrar movimiento
-            </Link>
-          )}
-        </div>
+        {presupuesto && puedeCrear && (
+          <Link
+            href={`/obras/${id}/movimientos/nuevo`}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+            style={{ backgroundColor: "var(--color-marca-600)" }}
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            Registrar movimiento
+          </Link>
+        )}
       </div>
 
       {creado && (
@@ -123,7 +112,7 @@ export default async function MovimientosPage({
         </Aviso>
       )}
 
-      {presupuesto ? (
+      {presupuesto && movimientos ? (
         <>
           <PanelVigente
             presupuesto={presupuesto}
@@ -132,10 +121,20 @@ export default async function MovimientosPage({
           />
 
           <HistorialMovimientos
-            movimientos={movimientos}
+            movimientos={movimientos.filas}
             obraId={id}
             puedeAprobar={puede(sesion, "movimiento:aprobar")}
             puedeCrear={puedeCrear}
+          />
+
+          <Paginacion
+            pagina={movimientos.pagina}
+            totalPaginas={movimientos.totalPaginas}
+            total={movimientos.total}
+            etiqueta="movimientos"
+            // Se conserva `todas`, que es un filtro del panel del vigente y
+            // el usuario acaba de ponerlo. No los avisos de un solo uso.
+            params={{ todas }}
           />
         </>
       ) : (

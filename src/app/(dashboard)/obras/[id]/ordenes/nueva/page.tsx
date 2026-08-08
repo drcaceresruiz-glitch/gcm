@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Users } from "lucide-react";
+import { Users } from "lucide-react";
+import { Volver } from "@/components/ui/Volver";
 import { obtenerSesion } from "@/services/sesion.service";
 import { listarPartidas, obtenerObra } from "@/services/obras.service";
 import { listarProveedores } from "@/services/proveedores.service";
@@ -100,18 +101,11 @@ export default async function NuevaOrdenPage({
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          href={`/obras/${id}/ordenes`}
-          className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver a las ordenes
-        </Link>
+        <Volver href={`/obras/${id}/ordenes`}>Volver a las ordenes</Volver>
 
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight">
+        <h2 className="mt-3 text-xl font-semibold tracking-tight">
           Nueva orden
-        </h1>
-        <p className="mt-1 text-sm text-pretty opacity-70">{obra.nombreObra}</p>
+        </h2>
       </div>
 
       {proveedores.length === 0 ? (

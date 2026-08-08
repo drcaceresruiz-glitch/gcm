@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
-import { listarProveedores } from "@/services/proveedores.service";
+import { listarProveedoresPagina } from "@/services/proveedores.service";
 import { puede } from "@/lib/rbac";
+import { Volver } from "@/components/ui/Volver";
+import { Paginacion } from "@/components/ui/Paginacion";
 import { ListaProveedores } from "@/components/proveedores/ListaProveedores";
 
 export const metadata: Metadata = { title: "Proveedores" };
@@ -18,28 +19,34 @@ export const metadata: Metadata = { title: "Proveedores" };
 export default async function ProveedoresPage({
   searchParams,
 }: {
-  searchParams: Promise<{ guardado?: string; estado?: string; todos?: string }>;
+  searchParams: Promise<{
+    guardado?: string;
+    estado?: string;
+    todos?: string;
+    p?: string;
+  }>;
 }) {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
   if (!puede(sesion, "proveedor:leer")) redirect("/panel");
 
-  const { guardado, estado, todos } = await searchParams;
+  const consulta = await searchParams;
+  const { guardado, estado, todos } = consulta;
   const verTodos = todos === "1";
 
-  const proveedores = await listarProveedores(sesion, verTodos);
+  // La version paginada. La lista completa —`listarProveedores`— sigue
+  // existiendo para el desplegable del formulario de ordenes, que no puede
+  // quedarse a veinte.
+  const proveedores = await listarProveedoresPagina(sesion, {
+    incluirInactivos: verTodos,
+    pagina: consulta.p,
+  });
 
   return (
     <div className="space-y-6">
       <div>
-        <Link
-          href="/panel"
-          className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver al panel
-        </Link>
+        <Volver href="/panel">Volver al panel</Volver>
 
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">
           Proveedores
@@ -66,10 +73,22 @@ export default async function ProveedoresPage({
       )}
 
       <ListaProveedores
-        proveedores={proveedores}
+        proveedores={proveedores.filas}
+        total={proveedores.total}
         verTodos={verTodos}
         puedeCrear={puede(sesion, "proveedor:crear")}
         puedeEditar={puede(sesion, "proveedor:editar")}
+      />
+
+      <Paginacion
+        pagina={proveedores.pagina}
+        totalPaginas={proveedores.totalPaginas}
+        total={proveedores.total}
+        etiqueta="proveedores"
+        // Se conserva `todos` —incluir desactivados— porque es el filtro
+        // vigente: perderlo al pasar de pagina cambiaria la lista bajo los
+        // pies. Los avisos de guardado no, que son de un solo uso.
+        params={{ todos }}
       />
     </div>
   );

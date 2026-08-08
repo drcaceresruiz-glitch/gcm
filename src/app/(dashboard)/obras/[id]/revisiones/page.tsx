@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Lock } from "lucide-react";
+import { CheckCircle2, Lock } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import {
@@ -72,20 +72,9 @@ export default async function RevisionesPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <Link
-          href={`/obras/${id}`}
-          className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver a la obra
-        </Link>
-
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight">
-          Revisiones del presupuesto
-        </h1>
-        <p className="mt-1 text-sm text-pretty opacity-70">{obra.nombreObra}</p>
-      </div>
+      <h2 className="text-xl font-semibold tracking-tight">
+        Revisiones del presupuesto
+      </h2>
 
       {creada && (
         <p

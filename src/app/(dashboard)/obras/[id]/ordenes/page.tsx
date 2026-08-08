@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Plus } from "lucide-react";
+import { CheckCircle2, Plus } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import { listarOrdenes, obtenerComprometido } from "@/services/ordenes.service";
@@ -11,6 +11,7 @@ import {
   type PresupuestoVigente,
 } from "@/services/movimientos.service";
 import { puede } from "@/lib/rbac";
+import { Paginacion } from "@/components/ui/Paginacion";
 import { PanelComprometido } from "@/components/ordenes/PanelComprometido";
 import { HistorialOrdenes } from "@/components/ordenes/HistorialOrdenes";
 
@@ -35,6 +36,7 @@ export default async function OrdenesPage({
     creada?: string;
     aprobada?: string;
     anulada?: string;
+    p?: string;
   }>;
 }) {
   const sesion = await obtenerSesion();
@@ -46,10 +48,13 @@ export default async function OrdenesPage({
 
   if (!puede(sesion, "orden:leer")) redirect(`/obras/${id}`);
 
-  const { creada, aprobada, anulada } = await searchParams;
+  const consulta = await searchParams;
+  const { creada, aprobada, anulada } = consulta;
 
+  // El comprometido se calcula aparte y sobre TODAS las ordenes: paginar el
+  // historial no puede cambiar la cifra de control de la obra.
   const [ordenes, comprometido] = await Promise.all([
-    listarOrdenes(sesion, id),
+    listarOrdenes(sesion, id, { pagina: consulta.p }),
     obtenerComprometido(sesion, id),
   ]);
 
@@ -72,36 +77,21 @@ export default async function OrdenesPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <Link
-          href={`/obras/${id}`}
-          className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver a la obra
-        </Link>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <h2 className="text-xl font-semibold tracking-tight">
+          Ordenes de compra
+        </h2>
 
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Ordenes de compra
-            </h1>
-            <p className="mt-1 text-sm text-pretty opacity-70">
-              {obra.nombreObra}
-            </p>
-          </div>
-
-          {puede(sesion, "orden:crear") && (
-            <Link
-              href={`/obras/${id}/ordenes/nueva`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--color-marca-600)" }}
-            >
-              <Plus className="size-4" aria-hidden="true" />
-              Registrar orden
-            </Link>
-          )}
-        </div>
+        {puede(sesion, "orden:crear") && (
+          <Link
+            href={`/obras/${id}/ordenes/nueva`}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+            style={{ backgroundColor: "var(--color-marca-600)" }}
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            Registrar orden
+          </Link>
+        )}
       </div>
 
       {avisos.map((aviso) => (
@@ -122,14 +112,27 @@ export default async function OrdenesPage({
       <PanelComprometido
         comprometido={comprometido}
         presupuesto={presupuesto}
-        totalOrdenes={ordenes.length}
+        // El total de la obra, no el de la pagina: es la cifra que rotula el
+        // panel de control y cambiaria al pasar de pagina.
+        totalOrdenes={ordenes.total}
       />
 
       <HistorialOrdenes
-        ordenes={ordenes}
+        ordenes={ordenes.filas}
         obraId={id}
         puedeAprobar={puede(sesion, "orden:aprobar")}
         puedeAnular={puede(sesion, "orden:anular")}
+      />
+
+      <Paginacion
+        pagina={ordenes.pagina}
+        totalPaginas={ordenes.totalPaginas}
+        total={ordenes.total}
+        etiqueta="ordenes"
+        // Sin los avisos de `?creada=` y compania: son de un solo uso, y
+        // arrastrarlos haria que «Orden X guardada» reapareciera en cada
+        // pagina que se visite despues.
+        params={{}}
       />
     </div>
   );

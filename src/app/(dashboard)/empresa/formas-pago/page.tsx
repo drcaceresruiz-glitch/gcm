@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+import { Volver } from "@/components/ui/Volver";
 import { obtenerSesion } from "@/services/sesion.service";
 import { listarFormasPago } from "@/services/formas-pago.service";
 import { puede } from "@/lib/rbac";
@@ -34,13 +34,7 @@ export default async function FormasPagoPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link
-          href="/panel"
-          className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver al panel
-        </Link>
+        <Volver href="/panel">Volver al panel</Volver>
 
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">
           Formas de pago

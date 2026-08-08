@@ -1,27 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import {
-  ArrowLeft,
-  ArrowLeftRight,
-  CalendarDays,
-  CheckCircle2,
-  FileClock,
-  FileSpreadsheet,
-  Lock,
-  MapPin,
-  Table2,
-  Truck,
-} from "lucide-react";
+import { CheckCircle2, FileSpreadsheet, Lock, Table2 } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, listarPartidas } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
 import { soles } from "@/utils/formato";
-import { fechaCorta } from "@/utils/fechas";
 import { TablaPartidas } from "@/components/partidas/TablaPartidas";
 
 export const metadata: Metadata = { title: "Obra" };
 
+/**
+ * La portada de la obra: su presupuesto por partidas.
+ *
+ * El nombre, las fechas y los enlaces a las demas secciones ya no estan
+ * aqui: viven en `layout.tsx`, que los pinta en todas las subrutas.
+ */
 export default async function ObraPage({
   params,
   searchParams,
@@ -42,98 +36,26 @@ export default async function ObraPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          href="/panel"
-          className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Volver al panel
-        </Link>
-
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium opacity-60">
-              {obra.codigoObra ?? "Sin codigo"}
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-balance">
-              {obra.nombreObra}
-            </h1>
-
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm opacity-70">
-              {obra.ubicacion && (
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
-                  {obra.ubicacion}
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1.5">
-                <CalendarDays className="size-3.5 shrink-0" aria-hidden="true" />
-                {fechaCorta(obra.fechaInicio)} &ndash;{" "}
-                {fechaCorta(obra.fechaFinProgramada)}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {puede(sesion, "linea_base:leer") && (
-              <Link
-                href={`/obras/${id}/revisiones`}
-                className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
-                style={{ borderColor: "var(--borde)" }}
-              >
-                <FileClock className="size-4" aria-hidden="true" />
-                Revisiones y resumen
-              </Link>
-            )}
-
-            {/* Los movimientos van encima de la linea base: sin ella
-                aprobada, la pantalla no tiene nada que ensenar. */}
-            {puede(sesion, "movimiento:leer") &&
-              obra.lineaBaseVersion !== null && (
-                <Link
-                  href={`/obras/${id}/movimientos`}
-                  className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
-                  style={{ borderColor: "var(--borde)" }}
-                >
-                  <ArrowLeftRight className="size-4" aria-hidden="true" />
-                  Movimientos
-                </Link>
-              )}
-
-            {/* Las ordenes no dependen de la linea base: se puede pedir a un
-                proveedor antes de congelar el presupuesto. */}
-            {puede(sesion, "orden:leer") && (
-              <Link
-                href={`/obras/${id}/ordenes`}
-                className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
-                style={{ borderColor: "var(--borde)" }}
-              >
-                <Truck className="size-4" aria-hidden="true" />
-                Ordenes
-              </Link>
-            )}
-
-            {puedeImportar && obra.lineaBaseVersion === null && (
-              <Link
-                href={`/obras/${id}/importar`}
-                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-                style={{ backgroundColor: "var(--color-marca-600)" }}
-              >
-                <FileSpreadsheet className="size-4" aria-hidden="true" />
-                Importar desde Excel
-              </Link>
-            )}
-          </div>
+      {puedeImportar && obra.lineaBaseVersion === null && (
+        <div className="flex justify-end">
+          <Link
+            href={`/obras/${id}/importar`}
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+            style={{ backgroundColor: "var(--color-marca-600)" }}
+          >
+            <FileSpreadsheet className="size-4" aria-hidden="true" />
+            Importar desde Excel
+          </Link>
         </div>
-      </div>
+      )}
 
       {importadas && (
         <p
           role="status"
           className="flex items-center gap-2 rounded-lg px-4 py-3 text-sm"
           style={{
-            backgroundColor: "color-mix(in oklab, var(--color-exito) 15%, transparent)",
+            backgroundColor:
+              "color-mix(in oklab, var(--color-exito) 15%, transparent)",
           }}
         >
           <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />

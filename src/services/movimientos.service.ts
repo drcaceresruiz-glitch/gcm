@@ -4,6 +4,13 @@ import { puede } from "@/lib/rbac";
 import { esCero, esNegativo, esPositivo, normalizarDecimal, sumar } from "@/lib/decimal";
 import { aportantes } from "@/lib/jerarquia-partidas";
 import { calcularCascada, type Cascada } from "@/lib/presupuesto";
+import {
+  contarPaginas,
+  normalizarPagina,
+  saltar,
+  POR_PAGINA,
+  type Pagina,
+} from "@/lib/paginacion";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { ModalidadPartida, TipoMovimiento } from "@/generated/prisma/enums";
 
@@ -860,15 +867,38 @@ export interface MovimientoResumen {
   }[];
 }
 
+/**
+ * El historial de movimientos, paginado. Cada uno arrastra todas sus lineas.
+ *
+ * El `total` es el de todos, no el de la pagina. El vigente por partida no
+ * sale de aqui —lo calcula `obtenerPresupuestoVigente` sobre los movimientos
+ * aprobados—, asi que paginar el historial no toca ninguna cifra.
+ */
 export async function listarMovimientos(
   sesion: SesionActiva,
   obraId: string,
-): Promise<MovimientoResumen[]> {
-  if (!puede(sesion, "movimiento:leer")) return [];
+  opciones: { pagina?: string; porPagina?: number } = {},
+): Promise<Pagina<MovimientoResumen>> {
+  const porPagina = opciones.porPagina ?? POR_PAGINA;
+
+  if (!puede(sesion, "movimiento:leer")) {
+    return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
+  }
+
+  const where = {
+    projectId: obraId,
+    project: { companyId: sesion.companyId },
+  };
+
+  const total = await prisma.movimientoPresupuestal.count({ where });
+  const totalPaginas = contarPaginas(total, porPagina);
+  const pagina = normalizarPagina(opciones.pagina, totalPaginas);
 
   const filas = await prisma.movimientoPresupuestal.findMany({
-    where: { projectId: obraId, project: { companyId: sesion.companyId } },
+    where,
     orderBy: { numero: "desc" },
+    skip: saltar(pagina, porPagina),
+    take: porPagina,
     select: {
       id: true, numero: true, tipo: true, estado: true,
       aprobadoAt: true, aprobadoPor: true, fecha: true,
@@ -885,7 +915,7 @@ export async function listarMovimientos(
     },
   });
 
-  return filas.map((m) => ({
+  const resumenes = filas.map((m) => ({
     id: m.id,
     numero: m.numero,
     tipo: m.tipo,
@@ -906,6 +936,8 @@ export async function listarMovimientos(
       esNueva: l.nuevoCodigo !== null,
     })),
   }));
+
+  return { filas: resumenes, total, pagina, totalPaginas };
 }
 
 /**

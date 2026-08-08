@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { sumar } from "@/lib/decimal";
@@ -92,7 +93,14 @@ export interface ObraDetalle {
   lineaBaseVersion: number | null;
 }
 
-export async function obtenerObra(
+/**
+ * La obra, o null si no existe o no es de esta empresa.
+ *
+ * En `cache()` porque la piden el layout de `obras/[id]` —que pinta el
+ * nombre y las pestanas— y ademas cada una de sus paginas. Sin envolverla
+ * serian dos consultas identicas en cada navegacion dentro de una obra.
+ */
+export const obtenerObra = cache(async function obtenerObra(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<ObraDetalle | null> {
@@ -124,7 +132,7 @@ export async function obtenerObra(
 
   const { baselines, ...resto } = obra;
   return { ...resto, lineaBaseVersion: baselines[0]?.version ?? null };
-}
+});
 
 export interface PartidaFila {
   id: string;

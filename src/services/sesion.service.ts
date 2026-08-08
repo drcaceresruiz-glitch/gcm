@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { generateToken, hashToken } from "@/lib/tokens";
@@ -72,8 +73,14 @@ export async function crearSesion(
  * Verifica en cada peticion que el usuario siga ACTIVO. Esto es lo que hace
  * que desactivar a alguien surta efecto de inmediato, sin esperar a que
  * caduque nada.
+ *
+ * Va envuelta en `cache()` porque la llaman el layout y ademas cada pagina,
+ * y con el layout de obra son ya tres veces por peticion. La deduplicacion
+ * es POR PETICION: no hay memoria entre peticiones y la comprobacion de que
+ * el usuario sigue activo se sigue haciendo en todas, que es de lo que
+ * depende que desactivarlo surta efecto en la siguiente.
  */
-export async function obtenerSesion(): Promise<SesionActiva | null> {
+export const obtenerSesion = cache(async function obtenerSesion(): Promise<SesionActiva | null> {
   const almacen = await cookies();
   const token = almacen.get(COOKIE_SESION)?.value;
   if (!token) return null;
@@ -131,7 +138,7 @@ export async function obtenerSesion(): Promise<SesionActiva | null> {
     email: sesion.user.email,
     mustChangePassword: sesion.user.mustChangePassword,
   };
-}
+});
 
 export async function cerrarSesion(): Promise<void> {
   const almacen = await cookies();

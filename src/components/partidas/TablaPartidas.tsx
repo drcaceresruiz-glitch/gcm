@@ -7,11 +7,19 @@ import {
   ChevronDown,
   ChevronRight,
   LoaderCircle,
+  SearchX,
   Trash2,
 } from "lucide-react";
 import type { PartidaFila } from "@/services/obras.service";
 import { soles, decimal, metrado as fmtMetrado } from "@/utils/formato";
+import { filtrarPartidas } from "@/lib/partidas-filtro";
 import { CeldaEditable } from "@/components/partidas/CeldaEditable";
+import { ControlesPartidas } from "@/components/partidas/ControlesPartidas";
+import {
+  COLUMNAS,
+  OCULTAS_EN_MOVIL,
+  type ClaveColumna,
+} from "@/components/partidas/columnas";
 import {
   accionEditarPartida,
   accionEliminarPartida,
@@ -33,17 +41,23 @@ const ETIQUETA_MODALIDAD: Record<PartidaFila["modalidad"], string> = {
 /** Con presupuestos grandes se abre contraido: 400 filas de golpe no se leen. */
 const UMBRAL_CONTRAER = 60;
 
+/** Las columnas visibles son una preferencia de quien mira, no del
+ *  presupuesto, asi que la clave no lleva la obra. */
+const CLAVE_COLUMNAS = "gcm:columnas-partidas";
+
 export function TablaPartidas({ obraId, filas, editable }: Props) {
   const router = useRouter();
   const [pendiente, iniciarTransicion] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [colapsados, setColapsados] = useState<Set<string>>(new Set());
+  const [ocultas, setOcultas] = useState<Set<ClaveColumna>>(new Set());
+  const [consulta, setConsulta] = useState("");
   const [listo, setListo] = useState(false);
 
   const clave = `gcm:capitulos-colapsados:${obraId}`;
 
   /**
-   * Restaura que capitulos dejo abiertos el usuario.
+   * Restaura que capitulos dejo abiertos el usuario y que columnas escondio.
    *
    * Se hace en un efecto y no en el estado inicial porque `localStorage` no
    * existe durante el renderizado en servidor: leerlo ahi romperia la
@@ -60,6 +74,17 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
       setColapsados(new Set(filas.filter((f) => f.nivel === 0).map((f) => f.id)));
     }
 
+    const columnas = localStorage.getItem(CLAVE_COLUMNAS);
+
+    if (columnas) {
+      setOcultas(new Set(JSON.parse(columnas) as ClaveColumna[]));
+    } else if (window.matchMedia("(max-width: 40rem)").matches) {
+      // En un movil las siete columnas obligan a desplazarse en horizontal
+      // desde la primera fila. Se arranca con lo imprescindible; quien
+      // quiera el resto lo enciende y se le recuerda.
+      setOcultas(new Set(OCULTAS_EN_MOVIL));
+    }
+
     setListo(true);
     // Solo al montar: despues manda el estado del usuario.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,6 +93,16 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
   useEffect(() => {
     if (listo) localStorage.setItem(clave, JSON.stringify([...colapsados]));
   }, [colapsados, clave, listo]);
+
+  useEffect(() => {
+    if (listo) localStorage.setItem(CLAVE_COLUMNAS, JSON.stringify([...ocultas]));
+  }, [ocultas, listo]);
+
+  /** Coincidencias y sus ancestros, o null si no hay busqueda. */
+  const filtro = useMemo(
+    () => filtrarPartidas(filas, consulta),
+    [filas, consulta],
+  );
 
   /**
    * Filas visibles y quien tiene hijos.
@@ -95,11 +130,25 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
     return { visibles, conHijos };
   }, [filas, colapsados]);
 
+  // Mientras se busca manda el filtro y no el colapso: una coincidencia
+  // dentro de un capitulo contraido no puede quedarse escondida, o la
+  // busqueda diria que no hay nada.
+  const aMostrar = filtro ? filtro.visibles : visibles;
+
   function alternar(id: string) {
     setColapsados((previo) => {
       const copia = new Set(previo);
       if (copia.has(id)) copia.delete(id);
       else copia.add(id);
+      return copia;
+    });
+  }
+
+  function alternarColumna(columna: ClaveColumna) {
+    setOcultas((previo) => {
+      const copia = new Set(previo);
+      if (copia.has(columna)) copia.delete(columna);
+      else copia.add(columna);
       return copia;
     });
   }
@@ -128,33 +177,39 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
   const capitulos = filas.filter((f) => conHijos.has(f.id));
   const todosColapsados = capitulos.every((f) => colapsados.has(f.id));
 
+  const ve = (columna: ClaveColumna) => !ocultas.has(columna);
+
+  // El ancho minimo solo hace falta mientras quede alguna columna opcional.
+  // Sin esto la tabla seguiria desplazandose en horizontal con tres columnas
+  // y esconderlas no habria servido de nada, que es justo su motivo.
+  const hayOpcionales = COLUMNAS.some((c) => !c.fija && ve(c.clave));
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() =>
-              setColapsados(
-                todosColapsados ? new Set() : new Set(capitulos.map((f) => f.id)),
-              )
-            }
-            className="rounded-lg border px-3 py-1.5 text-sm"
-            style={{ borderColor: "var(--borde)" }}
-          >
-            {todosColapsados ? "Expandir todo" : "Contraer todo"}
-          </button>
+      <ControlesPartidas
+        consulta={consulta}
+        onConsulta={setConsulta}
+        recuento={filtro ? filtro.coincidencias.size : null}
+        ocultas={ocultas}
+        onAlternarColumna={alternarColumna}
+        todosColapsados={todosColapsados}
+        onAlternarTodos={() =>
+          setColapsados(
+            todosColapsados ? new Set() : new Set(capitulos.map((f) => f.id)),
+          )
+        }
+      />
 
-          {pendiente && (
-            <span className="flex items-center gap-1.5 text-sm opacity-70" role="status">
-              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-              Guardando...
-            </span>
-          )}
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {pendiente && (
+          <span className="flex items-center gap-1.5 text-sm opacity-70" role="status">
+            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+            Guardando...
+          </span>
+        )}
 
         {editable && (
-          <p className="text-xs opacity-60">
+          <p className="ml-auto text-xs opacity-60">
             Pulsa cualquier celda para corregirla. Enter guarda, Escape descarta.
           </p>
         )}
@@ -173,196 +228,226 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
         </p>
       )}
 
-      {/* El desbordamiento se contiene aqui: en movil la tabla se desplaza en
-          horizontal sin arrastrar el ancho de toda la pagina. */}
-      <div
-        className="overflow-x-auto rounded-xl border"
-        style={{ borderColor: "var(--borde)" }}
-      >
-        <table className="w-full min-w-[56rem] text-sm">
-          <caption className="sr-only">
-            Presupuesto por partidas, agrupado en capitulos
-          </caption>
-          <thead>
-            <tr
-              className="text-left text-xs uppercase"
-              style={{
-                backgroundColor: "color-mix(in oklab, var(--borde) 40%, transparent)",
-              }}
-            >
-              <th scope="col" className="px-3 py-2.5 font-medium">Codigo</th>
-              <th scope="col" className="px-3 py-2.5 font-medium">Descripcion</th>
-              <th scope="col" className="px-3 py-2.5 font-medium">Modalidad</th>
-              <th scope="col" className="px-3 py-2.5 font-medium">Und.</th>
-              <th scope="col" className="px-3 py-2.5 text-right font-medium">Metrado</th>
-              <th scope="col" className="px-3 py-2.5 text-right font-medium">P. Unitario</th>
-              <th scope="col" className="px-3 py-2.5 text-right font-medium">Parcial</th>
-              {editable && <th scope="col" className="px-2 py-2.5"><span className="sr-only">Acciones</span></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {filas.filter((f) => visibles.has(f.id)).map((f) => {
-              const esCapitulo = f.tipo === "CAPITULO";
-              const agrupa = conHijos.has(f.id);
-              const contraido = colapsados.has(f.id);
-              // En suma alzada el metrado es referencial y el importe esta
-              // cerrado: recalcularlo alteraria un precio ya pactado.
-              const parcialCalculado = f.modalidad === "PRECIOS_UNITARIOS";
+      {filtro && filtro.visibles.size === 0 ? (
+        <div
+          className="rounded-xl border border-dashed p-10 text-center"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <SearchX className="mx-auto size-8 opacity-40" aria-hidden="true" />
+          <p className="mt-3 text-sm opacity-70">
+            Ninguna partida coincide con «{consulta}».
+          </p>
+        </div>
+      ) : (
+        /* El desbordamiento se contiene aqui: en movil la tabla se desplaza
+           en horizontal sin arrastrar el ancho de toda la pagina. */
+        <div
+          className="overflow-x-auto rounded-xl border"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <table className={`w-full text-sm ${hayOpcionales ? "min-w-[56rem]" : ""}`}>
+            <caption className="sr-only">
+              Presupuesto por partidas, agrupado en capitulos
+            </caption>
+            <thead>
+              <tr
+                className="text-left text-xs uppercase"
+                style={{
+                  backgroundColor: "color-mix(in oklab, var(--borde) 40%, transparent)",
+                }}
+              >
+                {COLUMNAS.filter((c) => ve(c.clave)).map((c) => (
+                  <th
+                    key={c.clave}
+                    scope="col"
+                    className={`px-3 py-2.5 font-medium ${
+                      c.alineadaDerecha ? "text-right" : ""
+                    }`}
+                  >
+                    {c.etiqueta}
+                  </th>
+                ))}
+                {editable && (
+                  <th scope="col" className="px-2 py-2.5">
+                    <span className="sr-only">Acciones</span>
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {filas.filter((f) => aMostrar.has(f.id)).map((f) => {
+                const esCapitulo = f.tipo === "CAPITULO";
+                const agrupa = conHijos.has(f.id);
+                const contraido = colapsados.has(f.id);
+                // En suma alzada el metrado es referencial y el importe esta
+                // cerrado: recalcularlo alteraria un precio ya pactado.
+                const parcialCalculado = f.modalidad === "PRECIOS_UNITARIOS";
 
-              return (
-                <tr
-                  key={f.id}
-                  className="border-t align-top"
-                  style={{
-                    borderColor: "var(--borde)",
-                    backgroundColor: esCapitulo
-                      ? "color-mix(in oklab, var(--color-marca-500) 7%, transparent)"
-                      : undefined,
-                  }}
-                >
-                  <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">
-                    <span className="flex items-center gap-1">
-                      {agrupa ? (
+                return (
+                  <tr
+                    key={f.id}
+                    className="border-t align-top"
+                    style={{
+                      borderColor: "var(--borde)",
+                      backgroundColor: esCapitulo
+                        ? "color-mix(in oklab, var(--color-marca-500) 7%, transparent)"
+                        : undefined,
+                    }}
+                  >
+                    <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">
+                      <span className="flex items-center gap-1">
+                        {/* Con filtro puesto el arbol lo gobierna la
+                            busqueda: plegar aqui esconderia coincidencias. */}
+                        {agrupa && !filtro ? (
+                          <button
+                            type="button"
+                            onClick={() => alternar(f.id)}
+                            aria-expanded={!contraido}
+                            aria-label={`${contraido ? "Expandir" : "Contraer"} ${f.codigoPartida}`}
+                            className="rounded p-0.5 hover:bg-[color-mix(in_oklab,var(--borde)_60%,transparent)]"
+                          >
+                            {contraido ? (
+                              <ChevronRight className="size-3.5" aria-hidden="true" />
+                            ) : (
+                              <ChevronDown className="size-3.5" aria-hidden="true" />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="inline-block size-[1.125rem]" />
+                        )}
+                        {f.codigoPartida}
+                      </span>
+                    </td>
+
+                    <td
+                      className={esCapitulo ? "px-3 py-2 font-semibold" : "px-3 py-2"}
+                      style={{ paddingLeft: `${0.75 + f.nivel * 0.9}rem` }}
+                    >
+                      <CeldaEditable
+                        etiqueta={`descripcion de ${f.codigoPartida}`}
+                        valor={f.descripcion}
+                        mostrar={f.descripcion}
+                        editable={editable}
+                        multilinea
+                        onGuardar={(v) => guardar(f.id, { descripcion: v })}
+                      />
+                    </td>
+
+                    {ve("modalidad") && (
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {esCapitulo ? (
+                          <span className="opacity-40">&mdash;</span>
+                        ) : editable ? (
+                          <select
+                            value={f.modalidad}
+                            aria-label={`Modalidad de ${f.codigoPartida}`}
+                            onChange={(e) => guardar(f.id, { modalidad: e.target.value })}
+                            className="rounded border px-1.5 py-0.5 text-xs"
+                            style={{
+                              borderColor: "var(--borde)",
+                              backgroundColor: "var(--fondo)",
+                            }}
+                          >
+                            {Object.entries(ETIQUETA_MODALIDAD).map(([valor, texto]) => (
+                              <option key={valor} value={valor}>
+                                {texto}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs opacity-70">
+                            {ETIQUETA_MODALIDAD[f.modalidad]}
+                          </span>
+                        )}
+                      </td>
+                    )}
+
+                    {ve("unidad") && (
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {esCapitulo ? null : (
+                          <CeldaEditable
+                            etiqueta={`unidad de ${f.codigoPartida}`}
+                            valor={f.unidad ?? ""}
+                            mostrar={f.unidad ?? ""}
+                            editable={editable}
+                            onGuardar={(v) => guardar(f.id, { unidad: v })}
+                          />
+                        )}
+                      </td>
+                    )}
+
+                    {ve("metrado") && (
+                      <td className="px-3 py-2 tabular-nums whitespace-nowrap">
+                        {esCapitulo ? null : (
+                          <CeldaEditable
+                            etiqueta={`metrado de ${f.codigoPartida}`}
+                            valor={f.metrado ?? ""}
+                            mostrar={f.metrado ? fmtMetrado(f.metrado, "") : ""}
+                            editable={editable}
+                            alineadoDerecha
+                            onGuardar={(v) => guardar(f.id, { metrado: v })}
+                          />
+                        )}
+                      </td>
+                    )}
+
+                    {ve("precioUnitario") && (
+                      <td className="px-3 py-2 tabular-nums whitespace-nowrap">
+                        {esCapitulo ? null : (
+                          <CeldaEditable
+                            etiqueta={`precio unitario de ${f.codigoPartida}`}
+                            valor={f.precioUnitario ?? ""}
+                            mostrar={f.precioUnitario ? decimal(f.precioUnitario, "") : ""}
+                            editable={editable}
+                            alineadoDerecha
+                            onGuardar={(v) => guardar(f.id, { precioUnitario: v })}
+                          />
+                        )}
+                      </td>
+                    )}
+
+                    <td
+                      className={`px-3 py-2 tabular-nums whitespace-nowrap ${esCapitulo ? "font-semibold" : ""}`}
+                    >
+                      {esCapitulo ? (
+                        <span className="block text-right">
+                          {f.parcial ? soles(f.parcial, "") : ""}
+                        </span>
+                      ) : (
+                        <CeldaEditable
+                          etiqueta={`importe de ${f.codigoPartida}`}
+                          valor={f.parcial ?? ""}
+                          mostrar={f.parcial ? soles(f.parcial, "") : ""}
+                          // En precios unitarios el importe es el resultado de
+                          // metrado x precio: se edita cambiando esos dos, no
+                          // el resultado, o quedaria incoherente con ellos.
+                          editable={editable && !parcialCalculado}
+                          alineadoDerecha
+                          onGuardar={(v) => guardar(f.id, { parcial: v })}
+                        />
+                      )}
+                    </td>
+
+                    {editable && (
+                      <td className="px-2 py-2">
                         <button
                           type="button"
-                          onClick={() => alternar(f.id)}
-                          aria-expanded={!contraido}
-                          aria-label={`${contraido ? "Expandir" : "Contraer"} ${f.codigoPartida}`}
-                          className="rounded p-0.5 hover:bg-[color-mix(in_oklab,var(--borde)_60%,transparent)]"
+                          onClick={() => eliminar(f)}
+                          aria-label={`Eliminar ${f.codigoPartida}`}
+                          className="rounded p-1 opacity-50 hover:opacity-100"
+                          style={{ color: "var(--color-peligro)" }}
                         >
-                          {contraido ? (
-                            <ChevronRight className="size-3.5" aria-hidden="true" />
-                          ) : (
-                            <ChevronDown className="size-3.5" aria-hidden="true" />
-                          )}
+                          <Trash2 className="size-4" aria-hidden="true" />
                         </button>
-                      ) : (
-                        <span className="inline-block size-[1.125rem]" />
-                      )}
-                      {f.codigoPartida}
-                    </span>
-                  </td>
-
-                  <td
-                    className={esCapitulo ? "px-3 py-2 font-semibold" : "px-3 py-2"}
-                    style={{ paddingLeft: `${0.75 + f.nivel * 0.9}rem` }}
-                  >
-                    <CeldaEditable
-                      etiqueta={`descripcion de ${f.codigoPartida}`}
-                      valor={f.descripcion}
-                      mostrar={f.descripcion}
-                      editable={editable}
-                      multilinea
-                      onGuardar={(v) => guardar(f.id, { descripcion: v })}
-                    />
-                  </td>
-
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {esCapitulo ? (
-                      <span className="opacity-40">&mdash;</span>
-                    ) : editable ? (
-                      <select
-                        value={f.modalidad}
-                        aria-label={`Modalidad de ${f.codigoPartida}`}
-                        onChange={(e) => guardar(f.id, { modalidad: e.target.value })}
-                        className="rounded border px-1.5 py-0.5 text-xs"
-                        style={{
-                          borderColor: "var(--borde)",
-                          backgroundColor: "var(--fondo)",
-                        }}
-                      >
-                        {Object.entries(ETIQUETA_MODALIDAD).map(([valor, texto]) => (
-                          <option key={valor} value={valor}>
-                            {texto}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-xs opacity-70">
-                        {ETIQUETA_MODALIDAD[f.modalidad]}
-                      </span>
+                      </td>
                     )}
-                  </td>
-
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {esCapitulo ? null : (
-                      <CeldaEditable
-                        etiqueta={`unidad de ${f.codigoPartida}`}
-                        valor={f.unidad ?? ""}
-                        mostrar={f.unidad ?? ""}
-                        editable={editable}
-                        onGuardar={(v) => guardar(f.id, { unidad: v })}
-                      />
-                    )}
-                  </td>
-
-                  <td className="px-3 py-2 tabular-nums whitespace-nowrap">
-                    {esCapitulo ? null : (
-                      <CeldaEditable
-                        etiqueta={`metrado de ${f.codigoPartida}`}
-                        valor={f.metrado ?? ""}
-                        mostrar={f.metrado ? fmtMetrado(f.metrado, "") : ""}
-                        editable={editable}
-                        alineadoDerecha
-                        onGuardar={(v) => guardar(f.id, { metrado: v })}
-                      />
-                    )}
-                  </td>
-
-                  <td className="px-3 py-2 tabular-nums whitespace-nowrap">
-                    {esCapitulo ? null : (
-                      <CeldaEditable
-                        etiqueta={`precio unitario de ${f.codigoPartida}`}
-                        valor={f.precioUnitario ?? ""}
-                        mostrar={f.precioUnitario ? decimal(f.precioUnitario, "") : ""}
-                        editable={editable}
-                        alineadoDerecha
-                        onGuardar={(v) => guardar(f.id, { precioUnitario: v })}
-                      />
-                    )}
-                  </td>
-
-                  <td
-                    className={`px-3 py-2 tabular-nums whitespace-nowrap ${esCapitulo ? "font-semibold" : ""}`}
-                  >
-                    {esCapitulo ? (
-                      <span className="block text-right">
-                        {f.parcial ? soles(f.parcial, "") : ""}
-                      </span>
-                    ) : (
-                      <CeldaEditable
-                        etiqueta={`importe de ${f.codigoPartida}`}
-                        valor={f.parcial ?? ""}
-                        mostrar={f.parcial ? soles(f.parcial, "") : ""}
-                        // En precios unitarios el importe es el resultado de
-                        // metrado x precio: se edita cambiando esos dos, no
-                        // el resultado, o quedaria incoherente con ellos.
-                        editable={editable && !parcialCalculado}
-                        alineadoDerecha
-                        onGuardar={(v) => guardar(f.id, { parcial: v })}
-                      />
-                    )}
-                  </td>
-
-                  {editable && (
-                    <td className="px-2 py-2">
-                      <button
-                        type="button"
-                        onClick={() => eliminar(f)}
-                        aria-label={`Eliminar ${f.codigoPartida}`}
-                        className="rounded p-1 opacity-50 hover:opacity-100"
-                        style={{ color: "var(--color-peligro)" }}
-                      >
-                        <Trash2 className="size-4" aria-hidden="true" />
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

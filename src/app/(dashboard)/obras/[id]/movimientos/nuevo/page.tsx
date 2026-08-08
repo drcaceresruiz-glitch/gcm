@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { Volver } from "@/components/ui/Volver";
 import { obtenerSesion } from "@/services/sesion.service";
 import { listarPartidas, obtenerObra } from "@/services/obras.service";
 import {
@@ -60,19 +59,15 @@ export default async function NuevoMovimientoPage({
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          href={`/obras/${id}/movimientos`}
-          className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
+        <Volver href={`/obras/${id}/movimientos`}>
           Volver a los movimientos
-        </Link>
+        </Volver>
 
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight">
+        <h2 className="mt-3 text-xl font-semibold tracking-tight">
           Nuevo movimiento presupuestal
-        </h1>
+        </h2>
         <p className="mt-1 text-sm text-pretty opacity-70">
-          {obra.nombreObra} · sobre la linea base v{presupuesto.version}
+          Sobre la linea base v{presupuesto.version}
         </p>
       </div>
 

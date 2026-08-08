@@ -10,6 +10,13 @@ import {
   sumarLineas,
   type TipoImpuesto,
 } from "@/lib/ordenes";
+import {
+  contarPaginas,
+  normalizarPagina,
+  saltar,
+  POR_PAGINA,
+  type Pagina,
+} from "@/lib/paginacion";
 import type { SesionActiva } from "@/services/sesion.service";
 import type {
   EstadoOrden,
@@ -667,17 +674,42 @@ export interface OrdenResumen {
   imputaciones: { codigoPartida: string; descripcion: string; importe: string }[];
 }
 
+/**
+ * Las ordenes de la obra, paginadas.
+ *
+ * Cada fila arrastra su reparto entre partidas, asi que una obra con
+ * doscientas ordenes enviaba al navegador doscientos repartos anidados para
+ * ensenar los primeros que caben en pantalla.
+ *
+ * El `total` que devuelve es el de TODAS las ordenes, no el de la pagina: es
+ * lo que tienen que rotular las pantallas. El comprometido no sale de aqui
+ * —lo calcula `obtenerComprometido` con su propia consulta sobre todas—, asi
+ * que paginar no lo altera.
+ */
 export async function listarOrdenes(
   sesion: SesionActiva,
   obraId: string,
-): Promise<OrdenResumen[]> {
-  if (!puede(sesion, "orden:leer")) return [];
+  opciones: { pagina?: string; porPagina?: number } = {},
+): Promise<Pagina<OrdenResumen>> {
+  const porPagina = opciones.porPagina ?? POR_PAGINA;
+
+  if (!puede(sesion, "orden:leer")) {
+    return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
+  }
+
+  const where = { projectId: obraId, companyId: sesion.companyId };
+
+  const total = await prisma.ordenCompra.count({ where });
+  const totalPaginas = contarPaginas(total, porPagina);
+  const pagina = normalizarPagina(opciones.pagina, totalPaginas);
 
   const filas = await prisma.ordenCompra.findMany({
-    where: { projectId: obraId, companyId: sesion.companyId },
+    where,
     // Por fecha y no por numero: el correlativo de las ordenes reales no es
     // cronologico y ordenar por el mentiria sobre la secuencia.
     orderBy: [{ fecha: "desc" }, { createdAt: "desc" }],
+    skip: saltar(pagina, porPagina),
+    take: porPagina,
     select: {
       id: true, numero: true, tipo: true, estado: true, origen: true,
       fecha: true, descripcion: true, referencia: true, formaPago: true,
@@ -696,7 +728,7 @@ export async function listarOrdenes(
     },
   });
 
-  return filas.map((o) => ({
+  const resumenes = filas.map((o) => ({
     id: o.id,
     numero: o.numero,
     tipo: o.tipo,
@@ -729,6 +761,8 @@ export async function listarOrdenes(
       importe: i.importe.toString(),
     })),
   }));
+
+  return { filas: resumenes, total, pagina, totalPaginas };
 }
 
 /**
