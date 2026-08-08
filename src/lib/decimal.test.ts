@@ -3,6 +3,7 @@ import {
   normalizarDecimal,
   multiplicar,
   sumar,
+  restar,
   esPositivo,
   esNegativo,
   esCero,
@@ -131,5 +132,67 @@ describe("esCero", () => {
   it("no confunde el cero con un importe cualquiera", () => {
     expect(esCero("0.01")).toBe(false);
     expect(esCero("-0.01")).toBe(false);
+  });
+});
+
+describe("restar", () => {
+  it("resta con exactitud", () => {
+    expect(restar("100.00", "30.50")).toBe("69.50");
+    expect(restar("0.30", "0.10")).toBe("0.20");
+  });
+
+  it("da negativo cuando el sustraendo es mayor", () => {
+    expect(restar("100", "150")).toBe("-50.00");
+  });
+
+  /**
+   * LA REGRESION QUE MOTIVA ESTA FUNCION.
+   *
+   * Antes se restaba con `sumar([a, `-${b}`])`. Con una `b` ya negativa eso
+   * construye "--26821.60", que `sumar` descarta en silencio y devuelve el
+   * minuendo intacto: la resta se convierte en no hacer nada.
+   *
+   * CRIOCORD tiene una partida de descuento de -26.821,60, asi que restar
+   * sobre un valor negativo no es un caso de laboratorio.
+   */
+  it("resta correctamente un sustraendo NEGATIVO", () => {
+    // Restar un negativo suma. La via vieja devolvia el minuendo sin tocar.
+    expect(restar("1000.00", "-26821.60")).toBe("27821.60");
+
+    const viaVieja = sumar(["1000.00", `-${"-26821.60"}`]);
+    expect(viaVieja).toBe("1000.00");
+    expect(viaVieja).not.toBe(restar("1000.00", "-26821.60"));
+  });
+
+  it("con los dos operandos negativos", () => {
+    expect(restar("-100.00", "-30.00")).toBe("-70.00");
+  });
+
+  it("devuelve null si un operando no es numero, en vez de un cero creible", () => {
+    expect(restar("100.00", "--50")).toBeNull();
+    expect(restar("abc", "10")).toBeNull();
+    expect(restar("100", "")).toBeNull();
+  });
+
+  it("respeta la precision pedida", () => {
+    expect(restar("10.129", "0.004", 2)).toBe("10.13");
+    expect(restar("1.00000", "0.00001", 4)).toBe("1.0000");
+  });
+
+  it("no pasa por coma flotante", () => {
+    // 0.3 - 0.1 da 0.19999999999999998 en aritmetica binaria.
+    expect(restar("0.3", "0.1")).toBe("0.20");
+  });
+});
+
+describe("sumar descarta operandos invalidos", () => {
+  /**
+   * Se prueba el comportamiento actual A PROPOSITO, para dejarlo como
+   * decision consciente y no como sorpresa. Es la razon de que `restar`
+   * exista y de que devuelva null donde `sumar` calla.
+   */
+  it("se salta lo que no puede sumar, sin avisar", () => {
+    expect(sumar(["100.00", "--50.00"])).toBe("100.00");
+    expect(sumar(["100.00", "abc", "25.00"])).toBe("125.00");
   });
 });

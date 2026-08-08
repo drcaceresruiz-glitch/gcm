@@ -182,7 +182,18 @@ export function dividir(
   );
 }
 
-/** Suma exacta de una lista de importes. */
+/**
+ * Suma exacta de una lista de importes.
+ *
+ * DESCARTA EN SILENCIO los valores que no son numeros. Es deliberado —suma lo
+ * que puede sumar y no tumba la pantalla por una celda vacia— pero convierte
+ * cualquier cadena mal construida en un sumando que desaparece sin rastro.
+ *
+ * De ahi que exista `restar`: la forma "natural" de restar aqui era
+ * `sumar([a, \`-${b}\`])`, y con una `b` ya negativa eso produce "--100", que
+ * este bucle se salta y convierte la resta en un cero. Ese fallo llego a
+ * estar en cuatro sitios del sistema. Si tienes que restar, usa `restar`.
+ */
 export function sumar(valores: string[], decimales = 2): string {
   let acumulado: Escalado = { valor: 0n, escala: 0 };
 
@@ -197,6 +208,31 @@ export function sumar(valores: string[], decimales = 2): string {
   }
 
   return formatear(acumulado, decimales);
+}
+
+/**
+ * Resta exacta: `a - b`.
+ *
+ * Existe porque su ausencia costo el mismo fallo cuatro veces. Sin ella, la
+ * forma evidente de restar era `sumar([a, \`-${b}\`])`, y esa cadena se rompe
+ * en cuanto `b` ya es negativa: produce "--26821.60", que `sumar` descarta en
+ * silencio y devuelve el minuendo intacto. En CRIOCORD hay una partida de
+ * descuento de -26.821,60, asi que no era hipotetico.
+ *
+ * A diferencia de `sumar`, devuelve null si algun operando no es un numero:
+ * una resta con un operando corrupto no tiene resultado correcto, y devolver
+ * uno de aspecto normal es justo lo que hay que evitar.
+ */
+export function restar(a: string, b: string, decimales = 2): string | null {
+  const ea = escalar(a);
+  const eb = escalar(b);
+  if (!ea || !eb) return null;
+
+  const escalaComun = Math.max(ea.escala, eb.escala);
+  const va = ea.valor * 10n ** BigInt(escalaComun - ea.escala);
+  const vb = eb.valor * 10n ** BigInt(escalaComun - eb.escala);
+
+  return formatear({ valor: va - vb, escala: escalaComun }, decimales);
 }
 
 /** true si el valor es estrictamente mayor que cero. */
