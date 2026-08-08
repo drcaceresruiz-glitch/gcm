@@ -49,6 +49,8 @@ export interface Perfil {
   tipoDoc: string;
   numDoc: string;
   celular: string | null;
+  /// Foto de perfil como data URL, o null. Libre, sin aprobacion.
+  fotoPerfil: string | null;
   /// Solo lectura: el correo es el identificador de acceso y no se edita.
   email: string;
   role: string;
@@ -70,6 +72,7 @@ export async function obtenerPerfil(sesion: SesionActiva): Promise<Perfil | null
       tipoDoc: true,
       numDoc: true,
       celular: true,
+      fotoPerfil: true,
       email: true,
       role: true,
       company: { select: { razonSocial: true, ruc: true } },
@@ -101,6 +104,7 @@ export async function obtenerPerfil(sesion: SesionActiva): Promise<Perfil | null
     tipoDoc: usuario.tipoDoc,
     numDoc: usuario.numDoc,
     celular: usuario.celular,
+    fotoPerfil: usuario.fotoPerfil,
     email: usuario.email,
     role: usuario.role,
     razonSocial: usuario.company.razonSocial,
@@ -141,6 +145,57 @@ export async function guardarCelular(
         accion: "UPDATE",
         antes: { celular: antes.celular },
         despues: { celular: valor },
+      },
+    });
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Guarda o quita la foto de perfil. Libre, sin aprobacion, como el celular.
+ *
+ * `foto` es un data URL ya recortado y comprimido en el navegador, o null
+ * para quitarla. Se valida que sea una imagen y que no exceda un tamano
+ * razonable: el recorte del cliente deja avatares de pocas decenas de KB, asi
+ * que un data URL muy grande solo puede venir de saltarse la interfaz.
+ */
+const MAX_FOTO = 700_000; // ~500 KB de imagen; el data URL base64 pesa ~1.33x
+
+export async function guardarFotoPerfil(
+  sesion: SesionActiva,
+  foto: string | null,
+): Promise<Resultado> {
+  let valor: string | null = null;
+
+  if (foto && foto.trim() !== "") {
+    const limpio = foto.trim();
+    if (!/^data:image\/(png|jpeg|jpg|webp);base64,/.test(limpio)) {
+      return { ok: false, error: "El archivo no es una imagen valida." };
+    }
+    if (limpio.length > MAX_FOTO) {
+      return {
+        ok: false,
+        error: "La imagen es demasiado grande. Prueba con una mas pequena.",
+      };
+    }
+    valor = limpio;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: sesion.userId },
+      data: { fotoPerfil: valor },
+    });
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        entidad: "User",
+        entidadId: sesion.userId,
+        accion: "UPDATE",
+        // No se guarda la imagen en la auditoria —seria enorme—: solo el hecho.
+        despues: { fotoPerfil: valor === null ? "(quitada)" : "(actualizada)" },
       },
     });
   });

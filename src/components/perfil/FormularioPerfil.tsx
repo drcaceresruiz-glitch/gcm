@@ -13,6 +13,7 @@ import type { Perfil } from "@/services/perfil.service";
 import { TIPOS_DOC, ETIQUETA_TIPO_DOC } from "@/lib/perfil";
 import { CampoTexto } from "@/components/auth/CampoTexto";
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
+import { FotoPerfil } from "@/components/perfil/FotoPerfil";
 
 /**
  * El perfil de la persona, en tres bloques con reglas distintas:
@@ -28,6 +29,19 @@ export function FormularioPerfil({ perfil }: { perfil: Perfil }) {
 
   return (
     <div className="max-w-2xl space-y-6">
+      <Tarjeta>
+        <SeccionTarjeta
+          titulo="Foto"
+          nota="Opcional. Es lo unico, junto al telefono, que se guarda al instante."
+          primera
+        >
+          <FotoPerfil
+            nombre={`${perfil.nombres} ${perfil.apellidos}`.trim()}
+            fotoActual={perfil.fotoPerfil}
+          />
+        </SeccionTarjeta>
+      </Tarjeta>
+
       <BloqueTelefono celular={perfil.celular} />
 
       {hayPendiente ? (

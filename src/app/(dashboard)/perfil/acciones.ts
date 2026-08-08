@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
   guardarCelular,
+  guardarFotoPerfil,
   solicitarCambio,
   cancelarSolicitud,
 } from "@/services/perfil.service";
@@ -28,6 +29,23 @@ export async function accionGuardarCelular(
 
   revalidatePath("/perfil");
   return { ok: "Telefono guardado." };
+}
+
+/** Guarda o quita la foto de perfil. Libre, sin aprobacion. */
+export async function accionGuardarFoto(
+  _previo: EstadoPerfil,
+  datos: FormData,
+): Promise<EstadoPerfil> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  // Cadena vacia = quitar la foto.
+  const foto = String(datos.get("foto") ?? "");
+  const resultado = await guardarFotoPerfil(sesion, foto === "" ? null : foto);
+  if (!resultado.ok) return { error: resultado.error };
+
+  revalidatePath("/perfil");
+  return { ok: foto === "" ? "Foto quitada." : "Foto actualizada." };
 }
 
 /** Pide cambiar los datos controlados. Queda pendiente de aprobacion. */

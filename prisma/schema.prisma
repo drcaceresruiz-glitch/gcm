@@ -177,6 +177,14 @@ model User {
   celular   String? @db.VarChar(30)
   email     String  @unique @db.VarChar(150)
 
+  /// Foto de perfil, opcional. Se guarda como imagen embebida (data URL) y no
+  /// como ruta a un archivo: todavia no hay infraestructura de subida
+  /// (`STORAGE_ROOT` esta sin usar), y el avatar ya se recorta y comprime en
+  /// el navegador a un tamano pequeno antes de llegar aqui. `MediumText` da de
+  /// sobra; el servidor ademas acota el tamano. Es un dato libre, como el
+  /// celular: no identifica legalmente a nadie, asi que no pasa por aprobacion.
+  fotoPerfil String? @db.MediumText
+
   passwordHash String @db.VarChar(255)
 
   /// Rol por defecto a nivel empresa. El rol efectivo en una obra
