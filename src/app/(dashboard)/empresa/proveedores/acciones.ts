@@ -9,6 +9,8 @@ import {
   editarProveedor,
   type DatosProveedor,
 } from "@/services/proveedores.service";
+import { consultarRuc, type ConsultaRuc } from "@/services/sunat.service";
+import { puede } from "@/lib/rbac";
 
 /**
  * Alta, edicion y baja logica de proveedores.
@@ -75,4 +77,31 @@ export async function accionCambiarEstadoProveedor(
 
   revalidatePath("/empresa/proveedores");
   redirect(`/empresa/proveedores?estado=${activo ? "activado" : "desactivado"}`);
+}
+
+/**
+ * Consulta el RUC en SUNAT para rellenar la razon social.
+ *
+ * Va detras del permiso de crear proveedores, no abierta: es una peticion a
+ * un servicio externo con cuota, y sin comprobar quien la hace cualquiera con
+ * sesion podria gastarla entera.
+ *
+ * Nunca lanza. Devuelve siempre algo que la pantalla sabe enseñar, porque
+ * dar de alta un proveedor no puede depender de que SUNAT conteste.
+ */
+export async function accionConsultarRuc(ruc: string): Promise<ConsultaRuc> {
+  const sesion = await obtenerSesion();
+  if (!sesion) {
+    return { ok: false, motivo: "fallo", detalle: "Sesion caducada." };
+  }
+
+  if (!puede(sesion, "proveedor:crear") && !puede(sesion, "proveedor:editar")) {
+    return {
+      ok: false,
+      motivo: "fallo",
+      detalle: "No tienes permiso para consultar el RUC.",
+    };
+  }
+
+  return consultarRuc(ruc);
 }

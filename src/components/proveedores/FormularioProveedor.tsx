@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, LoaderCircle } from "lucide-react";
+import { AlertCircle, LoaderCircle, Search } from "lucide-react";
 import {
+  accionConsultarRuc,
   accionGuardarProveedor,
   type EstadoProveedor,
 } from "@/app/(dashboard)/empresa/proveedores/acciones";
@@ -30,6 +31,43 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
     accionGuardarProveedor,
     {},
   );
+
+  const [ruc, setRuc] = useState(proveedor?.ruc ?? "");
+  const [razonSocial, setRazonSocial] = useState(proveedor?.razonSocial ?? "");
+  const [consulta, setConsulta] = useState<string | null>(null);
+  const [consultando, iniciarConsulta] = useTransition();
+
+  /// El ultimo RUC consultado. Evita repetir la peticion mientras se corrige
+  /// otro campo, que gastaria cuota para nada.
+  const consultado = useRef<string | null>(null);
+
+  /**
+   * Consulta SUNAT y rellena la razon social.
+   *
+   * NO pisa lo que ya haya escrito: si alguien tecleo el nombre y despues
+   * completa el RUC, su texto manda. SUNAT devuelve la razon social formal,
+   * que no siempre es como se conoce al proveedor en obra.
+   */
+  function consultarSiProcede(valor: string) {
+    const limpio = valor.trim();
+    if (!/^\d{11}$/.test(limpio)) return;
+    if (consultado.current === limpio) return;
+
+    consultado.current = limpio;
+    setConsulta(null);
+
+    iniciarConsulta(async () => {
+      const resultado = await accionConsultarRuc(limpio);
+
+      if (resultado.ok) {
+        setConsulta(`SUNAT: ${resultado.razonSocial}`);
+        if (!razonSocial.trim()) setRazonSocial(resultado.razonSocial);
+      } else {
+        // El fallo se cuenta pero no estorba: el campo sigue editable.
+        setConsulta(resultado.detalle);
+      }
+    });
+  }
 
   return (
     <form
@@ -68,25 +106,50 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
       )}
 
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        <div className="sm:col-span-2">
-          <CampoTexto
-            id="razonSocial"
-            name="razonSocial"
-            type="text"
-            etiqueta="Razon social o nombre"
-            defaultValue={proveedor?.razonSocial ?? ""}
-            ayuda="Tal como debe salir en la orden."
-          />
-        </div>
+        {/* El RUC va primero a proposito: es lo que se tiene delante en el
+            papel, y al completarlo trae la razon social sola. */}
         <CampoTexto
           id="ruc"
           name="ruc"
           type="text"
           inputMode="numeric"
           etiqueta="RUC"
-          defaultValue={proveedor?.ruc ?? ""}
-          ayuda="11 digitos. Empieza por 20 si es empresa y por 10 si es persona natural."
+          value={ruc}
+          onChange={(e) => {
+            setRuc(e.target.value);
+            consultarSiProcede(e.target.value);
+          }}
+          onBlur={(e) => consultarSiProcede(e.target.value)}
+          ayuda="11 digitos. Al completarlo se busca la razon social en SUNAT."
         />
+
+        <div className="sm:col-span-2">
+          <CampoTexto
+            id="razonSocial"
+            name="razonSocial"
+            type="text"
+            etiqueta="Razon social o nombre"
+            value={razonSocial}
+            onChange={(e) => setRazonSocial(e.target.value)}
+            ayuda="Tal como debe salir en la orden. Se puede corregir."
+          />
+
+          {(consultando || consulta) && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs opacity-70">
+              {consultando ? (
+                <>
+                  <LoaderCircle className="mt-0.5 size-3 shrink-0 animate-spin" aria-hidden="true" />
+                  Consultando SUNAT...
+                </>
+              ) : (
+                <>
+                  <Search className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+                  {consulta}
+                </>
+              )}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-3">

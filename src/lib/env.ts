@@ -30,6 +30,16 @@ const envSchema = z.object({
   /// directorio de la aplicacion para que un despliegue no pueda borrarla.
   STORAGE_ROOT: z.string().min(1).default("./storage"),
 
+  /**
+   * Token de apis.net.pe para consultar el RUC en SUNAT.
+   *
+   * OPCIONAL a proposito. Sin el, el alta de proveedores sigue funcionando
+   * igual: solo se pierde el autorrelleno de la razon social, que es una
+   * comodidad y no un requisito. Hacerlo obligatorio ataria el arranque de
+   * toda la aplicacion a un servicio de terceros.
+   */
+  APIS_NET_PE_TOKEN: z.string().optional(),
+
   // --- Correo saliente (alta de usuarios y recuperacion de clave) ---
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
