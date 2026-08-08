@@ -23,6 +23,9 @@ export interface EstadoUsuarios {
   claveTemporal?: string;
   /// A quien pertenece la clave mostrada, para el mensaje.
   usuarioClave?: string;
+  /// Si la clave ademas se pudo enviar por correo. Sin SMTP configurado sale
+  /// false y el mensaje pide comunicarla a mano.
+  correoEnviado?: boolean;
 }
 
 function texto(datos: FormData, campo: string): string {
@@ -54,6 +57,7 @@ export async function accionCrearUsuario(
     ok: `Usuario creado: ${texto(datos, "nombres")} ${texto(datos, "apellidos")}.`,
     claveTemporal: resultado.claveTemporal,
     usuarioClave: texto(datos, "email"),
+    correoEnviado: resultado.correoEnviado,
   };
 }
 
@@ -127,5 +131,6 @@ export async function accionResetearClave(
     ok: "Clave restablecida.",
     claveTemporal: resultado.claveTemporal,
     usuarioClave: texto(datos, "email"),
+    correoEnviado: resultado.correoEnviado,
   };
 }

@@ -487,8 +487,10 @@ function BannerClave({ estado }: { estado: EstadoUsuarios }) {
     >
       <p className="text-sm font-medium">{estado.ok}</p>
       <p className="mt-1 text-xs opacity-70">
-        Anota o copia esta clave temporal y comunicala a {estado.usuarioClave}.
-        No volvera a mostrarse. La debera cambiar en su primer acceso.
+        {estado.correoEnviado
+          ? `Se envio por correo a ${estado.usuarioClave}. Si quieres, tambien puedes comunicarsela: no volvera a mostrarse.`
+          : `Anota o copia esta clave temporal y comunicala a ${estado.usuarioClave} (el correo no esta configurado). No volvera a mostrarse.`}
+        {" "}La debera cambiar en su primer acceso.
       </p>
       <div className="mt-3 flex items-center gap-2">
         <code

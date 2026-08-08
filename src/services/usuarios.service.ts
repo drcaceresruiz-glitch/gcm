@@ -5,6 +5,11 @@ import { hashPassword } from "@/lib/password";
 import { generateTemporaryPassword } from "@/lib/tokens";
 import { cerrarTodasLasSesiones } from "@/services/sesion.service";
 import {
+  enviarCorreo,
+  correoBienvenida,
+  correoClaveRestablecida,
+} from "@/services/mailer.service";
+import {
   validarAltaUsuario,
   rolValido,
   type DatosAltaUsuario,
@@ -41,9 +46,14 @@ export class SinPermisoError extends Error {
 
 export type Resultado = { ok: true } | { ok: false; error: string };
 
-/** El alta y el reseteo devuelven la clave temporal para mostrarla UNA vez. */
+/**
+ * El alta y el reseteo devuelven la clave temporal para mostrarla UNA vez, y
+ * si ademas se logro enviar por correo. Se muestra siempre en pantalla —el
+ * correo es un extra, no un sustituto—: si no salio, el admin la comunica a
+ * mano; si salio, ya la tiene el usuario y el admin lo sabe.
+ */
 export type ResultadoConClave =
-  | { ok: true; claveTemporal: string }
+  | { ok: true; claveTemporal: string; correoEnviado: boolean }
   | { ok: false; error: string };
 
 export interface UsuarioLista {
@@ -205,7 +215,18 @@ export async function crearUsuario(
     });
   });
 
-  return { ok: true, claveTemporal };
+  // Correo de bienvenida, best-effort: si el SMTP no esta configurado o falla,
+  // el alta ya ocurrio y la clave se muestra igual en pantalla.
+  const { enviado } = await enviarCorreo({
+    para: d.email,
+    ...correoBienvenida({
+      nombre: `${d.nombres} ${d.apellidos}`.trim(),
+      email: d.email,
+      claveTemporal,
+    }),
+  });
+
+  return { ok: true, claveTemporal, correoEnviado: enviado };
 }
 
 export interface CambiosUsuario {
@@ -405,7 +426,7 @@ export async function resetearClave(
 
   const usuario = await prisma.user.findFirst({
     where: { id: userId, companyId: sesion.companyId },
-    select: { id: true },
+    select: { id: true, nombres: true, apellidos: true, email: true },
   });
   if (!usuario) return { ok: false, error: "No se encontro el usuario." };
 
@@ -430,7 +451,18 @@ export async function resetearClave(
 
   await cerrarTodasLasSesiones(userId);
 
-  return { ok: true, claveTemporal };
+  // La nueva clave tambien va por correo, best-effort: el usuario que la
+  // olvido la recibe sin depender de que el admin se la dicte.
+  const { enviado } = await enviarCorreo({
+    para: usuario.email,
+    ...correoClaveRestablecida({
+      nombre: `${usuario.nombres} ${usuario.apellidos}`.trim(),
+      email: usuario.email,
+      claveTemporal,
+    }),
+  });
+
+  return { ok: true, claveTemporal, correoEnviado: enviado };
 }
 
 /**
