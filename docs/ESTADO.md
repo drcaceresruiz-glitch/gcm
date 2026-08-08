@@ -261,7 +261,7 @@ adicional por vicios ocultos o cambios en el diseño original»*.
 
 | Fase | Contenido |
 |---|---|
-| Despliegue | **GitHub Actions + FTPS** (`.github/workflows/desplegar.yml`): compila en CI y sube solo el resultado. Sustituye a Git Version Control. El 21 está abierto y el servidor admite `AUTH TLS` (comprobado). Falta crear la app Node en cPanel. Migraciones, a mano. Ver `docs/infraestructura.md` |
+| Despliegue | **HECHO.** `gcm.drcaceresruiz.com` en línea. GitHub Actions compila y sube un `gcm.tar.gz` por FTPS; `app.js` lo descomprime al arrancar. Automático en cada push a `main`. **Las migraciones siguen siendo manuales** (`npx prisma migrate deploy` desde el Terminal de cPanel). Ver `docs/infraestructura.md` |
 | Cronograma | Importar desde XML de MS Project (el `.mpp` es binario propietario y no se puede leer). Planificación semanal, ruta crítica |
 | Avance físico | Metrados ejecutados, Curva S, evidencia fotográfica |
 | Proveedores | Órdenes de compra, **anticipos**, recepciones, abonos |

@@ -105,20 +105,35 @@ deja funcionando.
   FTPS explícito sobre el 21. Por eso el workflow usa `protocol: ftps`. Con
   `ftp` a secas la contraseña viajaría en claro.
 
-### Qué se sube
+### Qué se sube: UN archivo, no 1452
 
-`output: "standalone"` genera un servidor autocontenido. El workflow arma un
-paquete con `.next/standalone` + `.next/static` + `public`, y **borra
-explícitamente cualquier `.env`** (el build de Next lo arrastra dentro de
-standalone). Son unos **1450 archivos y 102 MB**: el primer despliegue es
-lento, los siguientes son incrementales porque la acción mantiene un estado de
-sincronización y solo envía lo que cambió.
+`output: "standalone"` genera un servidor autocontenido. El workflow lo empaqueta
+junto con `.next/static` y `public` en **un único `gcm.tar.gz` de ~20 MB**, y
+**borra explícitamente cualquier `.env`** (el build de Next lo arrastra dentro de
+standalone).
 
-### Reinicio
+> **Por qué un solo archivo.** Subir el árbol suelto por FTP resultó inviable y
+> costó varios intentos. FTP manda los archivos de uno en uno y sin
+> transacciones: cualquier corte deja la carpeta a medias. Y `mirror` compara
+> por tamaño y fecha, así que **da por buenos los archivos truncados y los
+> salta**. Eso produjo un despliegue «en verde» sobre una instalación rota, con
+> `SyntaxError: Unexpected end of input` al arrancar. Intentar limpiarla con
+> `rm -rf` por FTP se colgó **cinco horas** borrando archivo por archivo.
+> Un `.tar.gz` o llega entero o no llega.
 
-Passenger reinicia la aplicación cuando cambia `tmp/restart.txt`. El workflow
-lo escribe con la fecha en cada despliegue. Sin eso el servidor seguiría
-sirviendo la versión anterior.
+### Arranque y reinicio
+
+El archivo de inicio en cPanel debe ser **`app.js`**, no `server.js`. `app.js` es
+un arranque propio que se sube aparte del comprimido —no puede sobrescribirse a
+sí mismo mientras se ejecuta— y hace dos cosas: descomprime `gcm.tar.gz` si hay
+uno pendiente, y después cede el control a `server.js`.
+
+Descomprimir en el arranque, y no por FTP, es lo que permite que el despliegue
+sea automático sin entrar a cPanel.
+
+Passenger reinicia al detectar que cambió `tmp/restart.txt`. El workflow lo sube
+**el último**, para que el reinicio nunca se dispare antes de que el paquete esté
+completo.
 
 ### Secretos del repositorio
 
@@ -134,10 +149,10 @@ entorno de la aplicación Node. El workflow usa valores de relleno solo para
 compilar, porque `src/lib/env.ts` valida el entorno al importarse y sin ellos
 el build ni arranca.
 
-> ⚠️ **La acción sincroniza: borra del servidor lo que no esté en el
-> paquete.** Las exclusiones (`.env`, `.env.*`, `storage/**`) son lo único que
-> impide que un despliegue se lleve por delante la configuración y los
-> archivos subidos por los usuarios. No las quites.
+> ⚠️ **No pongas un espejo con borrado sobre esta carpeta.** cPanel administra
+> ahí sus propios archivos (`stderr.log`, su configuración de Passenger). Un
+> `mirror --delete` los borró y dejó la web en 503. El workflow actual solo
+> sube tres archivos y no borra nada.
 
 ### Migraciones — paso MANUAL
 
