@@ -94,15 +94,26 @@ jobs:
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          # lftp la lee del entorno con --env-password, para que no aparezca
-          # en la linea de comandos ni en la lista de procesos.
           LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq lftp
 
-          lftp --env-password -u "$FTP_USERNAME" -e "
+          # Las credenciales van en ~/.netrc y no en la linea de comandos:
+          # asi no aparecen en la lista de procesos del runner. lftp lo lee
+          # solo para resolver el usuario y la clave del `open`.
+          umask 077
+          printf 'machine %s\nlogin %s\npassword %s\n' \
+            "$FTP_SERVER" "$FTP_USERNAME" "$LFTP_PASSWORD" > ~/.netrc
+          chmod 600 ~/.netrc
+
+          # `open` explicito: pasar el host como ultimo argumento de lftp no
+          # llega a abrir la sesion y `mirror` falla con "Not connected".
+          # `cmd:fail-exit` hace que un error corte el script en vez de
+          # seguir y terminar con exito enganoso.
+          lftp -c "
+            set cmd:fail-exit true;
             set ftp:ssl-force true;
             set ftp:ssl-protect-data false;
             set ssl:verify-certificate no;
@@ -111,6 +122,9 @@ jobs:
             set net:timeout 20;
             set net:reconnect-interval-base 5;
             set mirror:parallel-transfer-count 4;
+            open '$FTP_SERVER';
             mirror --reverse --delete --verbose --continue --exclude-glob '.env' --exclude-glob '.env.*' --exclude 'storage/' ./deploy/ '$FTP_SERVER_DIR';
             bye
-          " "$FTP_SERVER"
+          "
+
+          rm -f ~/.netrc
