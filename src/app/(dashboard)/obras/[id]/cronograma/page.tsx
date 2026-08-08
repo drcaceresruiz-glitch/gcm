@@ -15,6 +15,7 @@ import { fechaCorta, fechaCronograma, fechaLarga, haceCuanto } from "@/utils/fec
 import { decimal } from "@/utils/formato";
 import { Mascota } from "@/components/ui/Mascota";
 import { Chip } from "@/components/ui/Chip";
+import { Tarjeta } from "@/components/ui/Tarjeta";
 import { TablaCronograma } from "@/components/cronograma/TablaCronograma";
 
 export const metadata: Metadata = { title: "Cronograma" };
@@ -150,11 +151,8 @@ export default async function CronogramaPage({
             </Mensaje>
           )}
 
-          <section
-            className="rounded-xl border p-5"
-            style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
-          >
-            <h3 className="text-sm font-semibold">Curva de avance</h3>
+          <Tarjeta>
+            <h3 className="text-base font-semibold">Curva de avance</h3>
             <p className="mt-0.5 mb-4 text-sm opacity-70">
               La linea de puntos es el plan repartido dia a dia; la continua, lo
               medido en cada corte. Cada tarea pesa segun su duracion, no todas
@@ -177,7 +175,7 @@ export default async function CronogramaPage({
               el mapeo entre tareas y partidas, pasara a ponderarse por dinero,
               que es lo que hace comparable el avance con lo comprometido.
             </p>
-          </section>
+          </Tarjeta>
 
           <TablaCronograma
             obraId={id}
