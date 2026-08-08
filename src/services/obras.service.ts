@@ -94,44 +94,30 @@ export async function obtenerResumenEmpresa(
 
   const deLaEmpresa = { companyId: sesion.companyId };
 
-  const [
-    obras,
-    obrasEnEjecucion,
-    presupuesto,
-    comprometido,
-    vencidas,
-    partidasSobregiradas,
-  ] = await Promise.all([
-    prisma.project.count({ where: deLaEmpresa }),
+  // Las cifras de sobregiro y plazo vencido salen de `datosAlertasEmpresa`, que
+  // esta cacheada por peticion: el panel tambien pide las alertas para el
+  // popup, asi que ese trabajo se hace una sola vez y aqui solo se leen sus
+  // totales. Lo demas son agregados propios que van en el mismo lote.
+  const [obras, obrasEnEjecucion, presupuesto, comprometido, alertas] =
+    await Promise.all([
+      prisma.project.count({ where: deLaEmpresa }),
 
-    prisma.project.count({
-      where: { ...deLaEmpresa, estado: "EN_EJECUCION" },
-    }),
+      prisma.project.count({
+        where: { ...deLaEmpresa, estado: "EN_EJECUCION" },
+      }),
 
-    prisma.wbsItem.aggregate({
-      where: { tipo: "PARTIDA", project: deLaEmpresa },
-      _sum: { parcial: true },
-    }),
+      prisma.wbsItem.aggregate({
+        where: { tipo: "PARTIDA", project: deLaEmpresa },
+        _sum: { parcial: true },
+      }),
 
-    prisma.ordenImputacion.aggregate({
-      where: { ordenCompra: { ...deLaEmpresa, estado: "APROBADA" } },
-      _sum: { importe: true },
-    }),
+      prisma.ordenImputacion.aggregate({
+        where: { ordenCompra: { ...deLaEmpresa, estado: "APROBADA" } },
+        _sum: { importe: true },
+      }),
 
-    // El plazo vencido solo es una alerta si la obra sigue en ejecucion:
-    // una cerrada que acabo tarde ya no requiere ninguna accion.
-    prisma.project.count({
-      where: {
-        ...deLaEmpresa,
-        estado: "EN_EJECUCION",
-        fechaFinProgramada: { lt: new Date() },
-      },
-    }),
-
-    // Va en el mismo lote y no despues: es otra consulta independiente, y
-    // encadenarla solo sumaba su latencia a la del resto.
-    contarPartidasSobregiradas(sesion),
-  ]);
+      datosAlertasEmpresa(sesion),
+    ]);
 
   const presupuestoTotal = sumar([
     presupuesto._sum.parcial?.toString() ?? "0",
@@ -146,71 +132,35 @@ export async function obtenerResumenEmpresa(
     // Con `sumar` y no con resta de numeros: aqui son importes, y en este
     // sistema el dinero nunca pasa por coma flotante.
     saldo: sumar([presupuestoTotal, `-${comprometidoTotal}`]),
-    partidasSobregiradas,
-    obrasConPlazoVencido: vencidas,
+    partidasSobregiradas: alertas.partidasSobregiradas,
+    obrasConPlazoVencido: alertas.obrasConPlazoVencido,
   };
 }
 
-/**
- * Partidas de la empresa cuyo comprometido supera su parcial.
- *
- * Hay que comparar partida a partida —no valen dos sumas— porque un total
- * holgado puede esconder varias partidas pasadas de largo, que es justo lo
- * que hay que corregir con una reconversion.
- */
-async function contarPartidasSobregiradas(
-  sesion: SesionActiva,
-): Promise<number> {
-  const porPartida = await prisma.ordenImputacion.groupBy({
-    by: ["wbsItemId"],
-    where: {
-      ordenCompra: { companyId: sesion.companyId, estado: "APROBADA" },
-    },
-    _sum: { importe: true },
-  });
-
-  if (porPartida.length === 0) return 0;
-
-  const partidas = await prisma.wbsItem.findMany({
-    where: { id: { in: porPartida.map((p) => p.wbsItemId) } },
-    select: { id: true, parcial: true },
-  });
-
-  const parcialPorId = new Map(
-    partidas.map((p) => [p.id, p.parcial?.toString() ?? "0"]),
-  );
-
-  return porPartida.filter((p) => {
-    const parcial = parcialPorId.get(p.wbsItemId);
-    if (parcial === undefined) return false;
-
-    return esPositivo(
-      sumar([p._sum.importe?.toString() ?? "0", `-${parcial}`]),
-    );
-  }).length;
-}
-
-export interface AlertaEmpresa {
-  obraId: string;
-  obraNombre: string;
-  clave: "sobregiro" | "plazo";
-  texto: string;
+interface DatosAlertas {
+  alertas: AlertaEmpresa[];
+  /// Total de partidas de la empresa por encima de su presupuesto.
+  partidasSobregiradas: number;
+  /// Obras en ejecucion con la fecha de fin ya pasada.
+  obrasConPlazoVencido: number;
 }
 
 /**
- * El detalle de las alertas que `obtenerResumenEmpresa` solo cuenta.
+ * Calcula de UNA sola vez todo lo de alertas: la lista para el popup y los
+ * totales para las cifras del resumen.
  *
- * El resumen dice «1 alerta» pero no dice DE QUE obra ni de que tipo: sin
- * esto, la unica forma de encontrarla era abrir cada tarjeta de obra una por
- * una a ver cual tenia la insignia encendida. Aqui se resuelve la misma
- * pregunta que ya contesta el globo de `FranjaObra`, pero para la empresa
- * entera y con enlace a la obra que corresponde.
+ * Va en `cache()` porque el panel pide, por separado y con el MISMO objeto de
+ * sesion, el resumen (que necesita los totales) y las alertas (para el popup).
+ * Sin esto, el trabajo pesado —dos agregados y sus busquedas de nombres— se
+ * hacia dos veces por carga del panel; con el, una.
+ *
+ * Comparar partida a partida —y no dos sumas— es a proposito: un total holgado
+ * puede esconder varias partidas pasadas de largo, que es justo lo que hay que
+ * corregir con una reconversion.
  */
-export async function listarAlertasEmpresa(
+const datosAlertasEmpresa = cache(async function datosAlertasEmpresa(
   sesion: SesionActiva,
-): Promise<AlertaEmpresa[]> {
-  if (!puede(sesion, "obra:leer")) throw new SinPermisoError();
-
+): Promise<DatosAlertas> {
   const deLaEmpresa = { companyId: sesion.companyId };
 
   const [porPartida, vencidas] = await Promise.all([
@@ -230,10 +180,8 @@ export async function listarAlertasEmpresa(
   ]);
 
   const alertas: AlertaEmpresa[] = [];
+  let partidasSobregiradas = 0;
 
-  // Mismo calculo que `contarPartidasSobregiradas`, pero agrupado por obra
-  // en vez de solo contar: aqui hace falta saber A CUAL obra pertenece cada
-  // partida pasada de largo para poder enlazarla.
   if (porPartida.length > 0) {
     const partidas = await prisma.wbsItem.findMany({
       where: { id: { in: porPartida.map((p) => p.wbsItemId) } },
@@ -241,6 +189,8 @@ export async function listarAlertasEmpresa(
     });
     const partidaPorId = new Map(partidas.map((p) => [p.id, p]));
 
+    // Cuantas partidas se pasan, y de que obra es cada una: el total va al
+    // resumen, el desglose por obra al popup.
     const sobregiroPorObra = new Map<string, number>();
     for (const fila of porPartida) {
       const partida = partidaPorId.get(fila.wbsItemId);
@@ -250,8 +200,8 @@ export async function listarAlertasEmpresa(
         fila._sum.importe?.toString() ?? "0",
         `-${partida.parcial?.toString() ?? "0"}`,
       ]);
-
       if (esPositivo(exceso)) {
+        partidasSobregiradas++;
         sobregiroPorObra.set(
           partida.projectId,
           (sobregiroPorObra.get(partida.projectId) ?? 0) + 1,
@@ -289,7 +239,30 @@ export async function listarAlertasEmpresa(
     });
   }
 
-  return alertas;
+  return { alertas, partidasSobregiradas, obrasConPlazoVencido: vencidas.length };
+});
+
+export interface AlertaEmpresa {
+  obraId: string;
+  obraNombre: string;
+  clave: "sobregiro" | "plazo";
+  texto: string;
+}
+
+/**
+ * El detalle de las alertas que `obtenerResumenEmpresa` solo cuenta.
+ *
+ * El resumen dice «1 alerta» pero no dice DE QUE obra ni de que tipo: sin
+ * esto, la unica forma de encontrarla era abrir cada tarjeta de obra una por
+ * una a ver cual tenia la insignia encendida. Aqui se resuelve la misma
+ * pregunta que ya contesta el globo de `FranjaObra`, pero para la empresa
+ * entera y con enlace a la obra que corresponde.
+ */
+export async function listarAlertasEmpresa(
+  sesion: SesionActiva,
+): Promise<AlertaEmpresa[]> {
+  if (!puede(sesion, "obra:leer")) throw new SinPermisoError();
+  return (await datosAlertasEmpresa(sesion)).alertas;
 }
 
 export interface FiltrosObras {
