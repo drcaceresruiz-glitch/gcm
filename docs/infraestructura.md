@@ -154,6 +154,28 @@ el build ni arranca.
 > `mirror --delete` los borró y dejó la web en 503. El workflow actual solo
 > sube tres archivos y no borra nada.
 
+### Puesta en marcha de una base vacía
+
+Se hizo el 07/08/2026 y quedó apuntado porque no es evidente: la aplicación
+puede estar desplegada y en pie **con la base de datos vacía**. La pantalla de
+acceso no consulta nada, y `/api/health` solo hace `SELECT 1`, que responde
+«conectada» aunque no exista una sola tabla. El fallo aparece al iniciar
+sesión, como error de servidor.
+
+Desde el Terminal de cPanel, activando primero el entorno de Node
+(`source /home/<usuario>/nodevenv/<app>/22/bin/activate`):
+
+```bash
+cd ~/gcm && export DATABASE_URL="mysql://usuario:clave@localhost:3306/base?charset=utf8mb4"
+npx --yes prisma@7 migrate deploy
+node scripts/crear-admin.js correo@ejemplo.com
+```
+
+`crear-admin.js` crea la empresa y un administrador con una clave temporal de
+un solo uso. **Ni el driver `mariadb` ni `@prisma/client` existen como módulos
+sueltos en el paquete** —Next los empaqueta dentro del código compilado—, así
+que el script detecta su ausencia e imprime el SQL para pegarlo en phpMyAdmin.
+
 ### Migraciones — paso MANUAL
 
 **El workflow no aplica migraciones.** `prisma migrate deploy` necesita
