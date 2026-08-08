@@ -54,7 +54,12 @@ jobs:
       - name: Armar el paquete
         run: |
           mkdir -p deploy
-          cp -r .next/standalone/. deploy/
+          # -L dereferencia: el build deja enlaces simbolicos (rimraf y
+          # @prisma/client) dentro de .next/node_modules, y ProFTPD no
+          # soporta SITE SYMLINK. lftp fallaba al recrearlos y terminaba con
+          # codigo 1 aunque el resto hubiera subido bien. Se copian como
+          # archivos reales.
+          cp -rL .next/standalone/. deploy/
           # El build de Next arrastra el .env dentro de standalone. En el
           # runner no deberia existir, pero si alguna vez aparece subiria
           # credenciales y pisaria la configuracion del servidor. Fuera.
@@ -71,6 +76,14 @@ jobs:
           # cambio. Sin esto el servidor seguiria sirviendo la version vieja.
           mkdir -p deploy/tmp
           date -u +"%Y-%m-%dT%H:%M:%SZ" > deploy/tmp/restart.txt
+
+          # El servidor no admite enlaces simbolicos. Si queda alguno, mejor
+          # parar aqui que descubrirlo a mitad de una subida de 60 MB.
+          if [ -n "$(find deploy -type l)" ]; then
+            echo "Quedan enlaces simbolicos en el paquete:"
+            find deploy -type l
+            exit 1
+          fi
 
       # Sin esta guarda, un FTP_SERVER_DIR vacio haria que la accion
       # sincronizara contra la RAIZ del FTP y borrara de alli todo lo que no
