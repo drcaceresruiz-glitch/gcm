@@ -184,20 +184,41 @@ externas. Tras un despliegue que cambie el esquema, desde cPanel → *Terminal*:
 
 ```bash
 source /home/<usuario>/nodevenv/<app>/22/bin/activate
-cd ~/gcm && export DATABASE_URL="mysql://usuario:clave@localhost:3306/base?charset=utf8mb4"
+cd ~/gcm
 npx --yes prisma@7 migrate deploy
 ```
 
-Las tres líneas hacen falta, y saltarse cualquiera da un error que no explica
+Las dos primeras líneas hacen falta, y saltárselas da errores que no explican
 lo que pasa:
 
 - **Sin `source`**, el jailshell responde `npx: command not found`. Node no
   está en el PATH hasta activar el entorno del panel.
-- **Sin `export`**, Prisma no encuentra la base: las variables de entorno de
-  la aplicación viven en la configuración Node de cPanel y el Terminal no las
-  hereda.
 - **`--yes prisma@7`** y no `npx prisma`: Next empaqueta Prisma dentro del
   código compilado y no queda como módulo suelto que `npx` pueda encontrar.
+
+**No hace falta exportar `DATABASE_URL`.** Se comprobó el 08/08/2026: activar
+el entorno con `source` ya deja en el shell las variables que la aplicación
+tiene configuradas en cPanel, y Prisma resuelve la base sin más. Este
+documento pedía exportarla a mano y era un paso de sobra —además con el
+riesgo de pegar mal la cadena y apuntar a otro sitio.
+
+> **El despliegue no se aplica hasta la primera petición.** El workflow sube
+> `gcm.tar.gz` y toca `tmp/restart.txt`, pero quien descomprime el paquete es
+> `app.js` al arrancar, y Passenger no arranca hasta que alguien pide una
+> página. Con el workflow en verde y sin haber abierto el sitio, el servidor
+> **sigue ejecutando el código anterior**: `prisma/migrations/` no tiene la
+> migración nueva y `migrate resolve` responde `P3017`.
+>
+> Antes de tocar el Terminal, **abre `gcm.drcaceresruiz.com`**. Para
+> comprobar en qué estado está:
+>
+> ```bash
+> ls ~/gcm/gcm.tar.gz ~/gcm/gcm.tar.gz.desplegando 2>&1
+> ```
+>
+> Si existe `gcm.tar.gz`, está subido y pendiente de descomprimir. Si existe
+> `.desplegando`, la descompresión murió a medias y hay que mirar el log. Si
+> no existe ninguno, ya se aplicó.
 
 > **El orden importa cuando el esquema cambia.** `migrate deploy` lee los
 > archivos de migración *del paquete desplegado*, así que no se puede migrar
