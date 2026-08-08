@@ -348,9 +348,53 @@ por honorarios. Y eso da la vuelta a la regla del módulo 4.
 - Verificado con **102 pruebas**, con las cifras reales de PEDRO MENDOZA y
   RUBEN DARIO.
 
-**Motores verificados con 102 pruebas.**
+**Arquitectura de navegación.** Con seis módulos, la navegación del primer
+día se quedó corta. Se rehízo entera.
+
+- **Layout de obra con pestañas** (`obras/[id]/layout.tsx`): Presupuesto ·
+  Revisiones · Movimientos · Órdenes, puestas en todas las subrutas. Antes
+  eran botones que solo existían en la portada de la obra, así que ir de las
+  órdenes a los movimientos obligaba a volver primero. El nombre de la obra y
+  «Volver al panel» van una sola vez, en el layout. Todo el marco lleva
+  `print:hidden`: **la vista del documento de la orden cuelga de esta ruta** y
+  el papel que recibe el proveedor no puede salir con pestañas encima.
+- **La cabecera lleva al panel.** El logotipo era un `div`; ahora es un
+  enlace, y eso solo ya resuelve «volver al panel desde cualquier pantalla»,
+  que dependía de que cada página se escribiera su «Volver». Los seis botones
+  se agrupan en un desplegable de empresa y otro de usuario; por debajo de
+  `sm`, un cajón con las etiquetas visibles. El «Volver» repetido en nueve
+  pantallas es ahora `components/ui/Volver.tsx`.
+- **Paginación en el servidor** (`lib/paginacion.ts`) para órdenes,
+  movimientos y proveedores, de 20 en 20, con la página en `?p=`.
+  `normalizarPagina` acota lo que venga: `?p=999` y `?p=abc` caen en una
+  página válida en vez de en una lista vacía. El comprometido y el vigente se
+  calculan **aparte y sobre todo**, no sobre la página.
+  > **`listarProveedores` no se pagina, y es a propósito.** Alimenta el
+  > desplegable del formulario de órdenes; recortarla escondería proveedores
+  > sin que fallara nada. El catálogo usa una función aparte,
+  > `listarProveedoresPagina`, con el `select` compartido para que no se
+  > separen. Es la regresión más fácil de colar al paginar.
+- **Las partidas no se paginan**: son un árbol con subtotales por capítulo y
+  cortarlo por filas los descuadraría. En su lugar, **columnas colapsables**
+  (se recuerdan en `localStorage`, y el ancho mínimo solo se aplica si queda
+  alguna columna ancha, para que en móvil no haya scroll horizontal) y un
+  **filtro** que arrastra los ancestros de cada coincidencia —`11.02.04` sale
+  con su capítulo—, en `lib/partidas-filtro.ts` con pruebas.
+- `obtenerSesion` y `obtenerObra` van en `cache()` de React: el layout y la
+  página las piden por separado y sin esto serían dos consultas. Sigue
+  verificando la sesión en cada petición.
+- **Verificado en navegador contra CRIOCORD** el 08/08/2026: salto entre
+  pestañas sin pasar por la obra, columnas que se recuerdan al recargar,
+  filtro con ancestros, `?p=` acotado, y la vista de impresión sin cabecera
+  ni pestañas.
+
+**Motores verificados con 102 pruebas.** (117 en total con las 15 de
+paginación y filtro.)
 - `lib/decimal.ts` — aritmética exacta con enteros grandes, **división
   incluida**. Nunca coma flotante para dinero.
+- `lib/paginacion.ts` — acotado de la página y cuenta de páginas.
+- `lib/partidas-filtro.ts` — filtrado que conserva los ancestros de cada
+  coincidencia.
 - `lib/excel-presupuesto.ts` — lectura de presupuestos.
 - `lib/jerarquia-partidas.ts` — jerarquía de códigos y suma por hojas.
 - `lib/presupuesto.ts` — cascada, comparación de revisiones y conversión
@@ -501,12 +545,16 @@ ellos es comprobarlos en navegador contra CRIOCORD (§3).
 La gestión de permisos por empresa, que la encabezaba después, **también está
 hecha**: está en §3. Lo siguiente en el orden acordado son las fases de abajo.
 
+La **arquitectura de navegación** —menús responsive, volver al panel en cada
+pantalla, paginación de las listas y columnas colapsables en el presupuesto—
+**está hecha y verificada en navegador**: el detalle está en §3.
+
 > ### ⚠️ Migración pendiente en producción — `20260808120000_impuesto_de_la_orden`
 >
 > **Lo primero que hay que hacer.** La última migración aplicada en
 > `drcacere_gcm` es `20260808113630_datos_de_la_empresa`; la del módulo 6
 > **no está aplicada**, y el código que la necesita **sí está desplegado**
-> (`origin/main` está en `130a4f4` y el despliegue es automático en cada
+> (llegó en `130a4f4`, ya en `main`, y el despliegue es automático en cada
 > push). Producción corre por tanto con un código que busca `impuesto` y
 > `tipoImpuesto` en una base que todavía tiene `igv` y ninguna de las dos
 > columnas nuevas: **las pantallas de órdenes fallan allí hasta que se
