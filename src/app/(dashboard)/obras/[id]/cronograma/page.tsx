@@ -6,6 +6,7 @@ import {
   CalendarClock,
   CheckCircle2,
   FileText,
+  GanttChartSquare,
   Info,
 } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
@@ -71,6 +72,17 @@ export default async function CronogramaPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {cronograma && (
+            <Link
+              href={`/obras/${id}/cronograma/gantt`}
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <GanttChartSquare className="size-4" aria-hidden="true" />
+              Diagrama de Gantt
+            </Link>
+          )}
+
           {cronograma && (
             <Link
               href={`/obras/${id}/cronograma/informe`}
