@@ -84,7 +84,28 @@ export function CurvaEvm({
   }
 
   const marcasY = [0, yMax / 4, yMax / 2, (yMax * 3) / 4, yMax];
-  const ticksX = [inicio, fechaCorte, fin];
+
+  // Etiquetas del eje X: inicio, corte y fin. La del CORTE se oculta si cae muy
+  // cerca del inicio o del fin (obra recien empezada o por terminar) para que no
+  // se encime con esas —la fecha del corte igual se lee arriba, en el texto—.
+  // La linea vertical del corte se dibuja siempre.
+  const xIni = x(inicio);
+  const xCorte = x(fechaCorte);
+  const xFin = x(fin);
+  const GAP = 48;
+  const ticksX: {
+    fecha: Date;
+    anchor: "start" | "middle" | "end";
+    label: boolean;
+  }[] = [
+    { fecha: inicio, anchor: "start", label: true },
+    {
+      fecha: fechaCorte,
+      anchor: "middle",
+      label: xCorte - xIni >= GAP && xFin - xCorte >= GAP,
+    },
+    { fecha: fin, anchor: "end", label: true },
+  ];
 
   return (
     <svg
@@ -118,27 +139,29 @@ export function CurvaEvm({
         </g>
       ))}
 
-      {ticksX.map((f, i) => (
+      {ticksX.map((t, i) => (
         <g key={i}>
           <line
-            x1={x(f)}
-            x2={x(f)}
+            x1={x(t.fecha)}
+            x2={x(t.fecha)}
             y1={ALTO - MARGEN.abajo}
             y2={ALTO - MARGEN.abajo + 4}
             stroke="var(--borde)"
             strokeWidth={1}
           />
-          <text
-            x={x(f)}
-            y={ALTO - MARGEN.abajo + 17}
-            textAnchor={i === 0 ? "start" : i === ticksX.length - 1 ? "end" : "middle"}
-            fontSize={11}
-            fontWeight={600}
-            fill="currentColor"
-            opacity={0.7}
-          >
-            {fechaCorta(f)}
-          </text>
+          {t.label && (
+            <text
+              x={x(t.fecha)}
+              y={ALTO - MARGEN.abajo + 17}
+              textAnchor={t.anchor}
+              fontSize={11}
+              fontWeight={600}
+              fill="currentColor"
+              opacity={0.7}
+            >
+              {fechaCorta(t.fecha)}
+            </text>
+          )}
         </g>
       ))}
 
