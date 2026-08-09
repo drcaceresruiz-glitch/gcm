@@ -30,6 +30,11 @@ const ANCHO = 760;
 const MARGEN = { arriba: 16, derecha: 20, abajo: 34, izquierda: 46 };
 const DIA_MS = 86400000;
 
+// La linea REAL va en un naranja fijo de alto contraste (no depende del tema):
+// es la serie que mas importa leer de un vistazo y debe destacar sobre
+// cualquier fondo, claro u oscuro.
+const NARANJA_REAL = "#ea580c";
+
 type Rango = "semana" | "mes" | "todo" | "personalizado";
 
 interface Punto {
@@ -101,10 +106,19 @@ export function CurvaS({
   // La linea real se dibuja por SEMANAS cuando hay muestreo semanal (cadencia);
   // si no, por corte cargado (comportamiento previo). Son {fecha, valor} en
   // ambos casos, asi que el resto del trazado no cambia.
-  const serieReal: Punto[] =
+  const serieRealBase: Punto[] =
     datos.realSemanal.length > 0
       ? datos.realSemanal
       : datos.cortes.map((c) => ({ fecha: c.fecha, valor: Number(c.real) || 0 }));
+  // La linea real arranca en el INICIO de obra (0%). Sin este ancla, con un
+  // solo corte medido la serie tiene un unico punto y no se dibuja ninguna
+  // linea —solo un punto suelto—; anclando en el inicio se traza continua desde
+  // el 0% del primer dia hasta el ultimo corte.
+  const serieReal: Punto[] =
+    serieRealBase.length > 0 &&
+    serieRealBase[0]!.fecha.getTime() > datos.inicio.getTime()
+      ? [{ fecha: datos.inicio, valor: 0 }, ...serieRealBase]
+      : serieRealBase;
   const finReal = serieReal[serieReal.length - 1]?.fecha ?? ultimoCorte.fecha;
 
   const plan = recortar(datos.plan, desde, hasta);
@@ -353,13 +367,14 @@ export function CurvaS({
           />
         )}
 
-        {/* El real se traza uniendo los cortes: son las unicas fechas en las
-            que de verdad se ha medido algo. */}
+        {/* El real: linea CONTINUA en naranja de alto contraste, del inicio de
+            obra (0%) al ultimo corte medido. No pasa del corte: mas alla no se
+            ha medido nada (de ahi sigue la proyeccion). */}
         <polyline
           points={trazo(reales)}
           fill="none"
-          stroke="var(--color-marca-600)"
-          strokeWidth={4}
+          stroke={NARANJA_REAL}
+          strokeWidth={4.5}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -370,7 +385,7 @@ export function CurvaS({
             cx={x(p.fecha)}
             cy={y(p.valor)}
             r={5}
-            fill="var(--color-marca-600)"
+            fill={NARANJA_REAL}
           />
         ))}
 
@@ -407,7 +422,7 @@ export function CurvaS({
               <circle cx={x(fechaCursor)} cy={y(lectura.plan)} r={4} fill={tinta} />
             )}
             {lectura.real !== null && (
-              <circle cx={x(fechaCursor)} cy={y(lectura.real)} r={4} fill="var(--color-marca-600)" />
+              <circle cx={x(fechaCursor)} cy={y(lectura.real)} r={4} fill={NARANJA_REAL} />
             )}
             {lectura.proyeccion !== null && (
               <circle
@@ -428,7 +443,7 @@ export function CurvaS({
         >
           <span className="font-semibold">{fechaCronograma(fechaCursor)}</span>
 
-          <Leyenda color="var(--color-marca-600)" grosor={5}>
+          <Leyenda color={NARANJA_REAL} grosor={5}>
             Real{" "}
             <strong className="tabular-nums">
               {lectura.real === null ? "sin medir" : `${lectura.real.toFixed(1)}%`}
