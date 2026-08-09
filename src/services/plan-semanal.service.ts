@@ -214,15 +214,34 @@ export async function obtenerPlanSemanal(
     .filter((t) => !t.esResumen)
     .map((t) => ({ uid: t.uid, codigo: t.codigo, nombre: t.nombre }));
 
-  // Sugerencias: las tareas cuyo trabajo cae en la semana del corte. La
-  // pantalla las usa para autocargar los compromisos cuando la semana esta
-  // vacia; el residente confirma o ajusta.
+  // Tareas ya cumplidas en OTRA semana (marcadas cumplido en otro plan de la
+  // obra): una tarea terminada no vuelve a proponerse aunque su rango
+  // programado alcance esta semana.
+  const cumplidasPrevias = await prisma.compromisoSemanal.findMany({
+    where: {
+      cumplido: true,
+      uid: { not: null },
+      planSemanal: { projectId: obraId, id: { not: planId } },
+    },
+    select: { uid: true },
+  });
+  const uidsHechos = new Set<number>(
+    cumplidasPrevias
+      .map((c) => c.uid)
+      .filter((u): u is number => u !== null),
+  );
+
+  // Sugerencias: las tareas cuyo trabajo cae en la semana del corte, menos las
+  // ya cumplidas. La pantalla las usa para autocargar los compromisos cuando la
+  // semana esta vacia; el residente confirma o ajusta.
   const { inicio: iniSemana, fin: finSemana } = rangoSemana(plan.fechaCorte);
-  const sugeridas = tareasDeLaSemana(tareasCron, iniSemana, finSemana).map((t) => ({
-    uid: t.uid,
-    descripcion: `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`.slice(0, 300),
-    metaPorcentaje: null as string | null,
-  }));
+  const sugeridas = tareasDeLaSemana(tareasCron, iniSemana, finSemana)
+    .filter((t) => !uidsHechos.has(t.uid))
+    .map((t) => ({
+      uid: t.uid,
+      descripcion: `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`.slice(0, 300),
+      metaPorcentaje: null as string | null,
+    }));
 
   const compromisos: CompromisoDetalle[] = plan.compromisos.map((c) => ({
     id: c.id,

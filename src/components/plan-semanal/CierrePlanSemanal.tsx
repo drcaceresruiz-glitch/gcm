@@ -33,7 +33,9 @@ export function CierrePlanSemanal({
     compromisos.map((c) => ({
       id: c.id,
       descripcion: c.descripcion,
-      cumplido: true,
+      // Arranca SIN tildar: el residente marca solo lo que de verdad se cumplio.
+      // Dar por cumplido por defecto inflaba el PPC y tildaba hasta tareas al 0%.
+      cumplido: false,
       causa: "PRERREQUISITO",
       nota: "",
     })),
