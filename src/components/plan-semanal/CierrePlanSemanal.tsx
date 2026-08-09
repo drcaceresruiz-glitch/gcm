@@ -27,17 +27,25 @@ export function CierrePlanSemanal({
 }: {
   obraId: string;
   planId: string;
-  compromisos: { id: string; descripcion: string }[];
+  compromisos: {
+    id: string;
+    descripcion: string;
+    cumplido: boolean | null;
+    causa: CausaNoCumplimiento | null;
+    notaCierre: string | null;
+  }[];
 }) {
   const [filas, setFilas] = useState<Fila[]>(() =>
     compromisos.map((c) => ({
       id: c.id,
       descripcion: c.descripcion,
-      // Arranca SIN tildar: el residente marca solo lo que de verdad se cumplio.
-      // Dar por cumplido por defecto inflaba el PPC y tildaba hasta tareas al 0%.
-      cumplido: false,
-      causa: "PRERREQUISITO",
-      nota: "",
+      // Restaura lo YA guardado: al reabrir una semana no se pierde nada. Si el
+      // compromiso nunca se evaluo (cumplido null), recien ahi arranca SIN
+      // tildar —dar por cumplido por defecto inflaba el PPC y tildaba hasta
+      // tareas al 0%—.
+      cumplido: c.cumplido ?? false,
+      causa: c.causa ?? "PRERREQUISITO",
+      nota: c.notaCierre ?? "",
     })),
   );
   const [error, setError] = useState<string | null>(null);

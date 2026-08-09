@@ -125,7 +125,16 @@ export function CurvaS({
   const proyeccion = recortar(datos.proyeccion, desde, hasta);
   const cortes = datos.cortes.filter((c) => c.fecha >= desde && c.fecha <= hasta);
 
-  const reales: Punto[] = serieReal.filter((p) => p.fecha >= desde && p.fecha <= hasta);
+  // La linea real puede tener MUY pocos puntos (ancla al inicio + corte). En
+  // ventanas estrechas (Semana) un filtro seco puede dejar un unico punto y no
+  // dibujar ninguna linea; se recorta interpolando los bordes para que siempre
+  // trace mientras la serie cubra la ventana.
+  const reales: Punto[] = recortarConBordes(serieReal, desde, hasta);
+  // Los circulos marcan SOLO mediciones reales (no el ancla ni los bordes
+  // interpolados), para no aparentar una medida donde no la hubo.
+  const realesMedidos: Punto[] = serieRealBase.filter(
+    (p) => p.fecha >= desde && p.fecha <= hasta,
+  );
 
   // Ampliar = ajustar el eje vertical a lo que hay. Con las dos lineas al 10%
   // y el eje hasta 100, el 90% del grafico esta vacio y las curvas se pisan.
@@ -379,7 +388,7 @@ export function CurvaS({
           strokeLinejoin="round"
         />
 
-        {reales.map((p) => (
+        {realesMedidos.map((p) => (
           <circle
             key={p.fecha.getTime()}
             cx={x(p.fecha)}
@@ -651,6 +660,36 @@ function calcularVentana(
 
 function recortar(puntos: readonly Punto[], desde: Date, hasta: Date): Punto[] {
   return puntos.filter((p) => p.fecha >= desde && p.fecha <= hasta);
+}
+
+/**
+ * Como `recortar`, pero garantiza continuidad: si la serie cubre el borde de la
+ * ventana, anade un punto INTERPOLADO en `desde` y/o `hasta`. Asi una serie de
+ * pocos puntos (la real) no queda reducida a uno solo —y sin linea— al hacer
+ * zoom a una ventana estrecha. No extrapola: si el borde cae fuera del tramo
+ * cubierto, `valorEn` devuelve null y no se anade.
+ */
+function recortarConBordes(serie: readonly Punto[], desde: Date, hasta: Date): Punto[] {
+  const interior = serie.filter((p) => p.fecha >= desde && p.fecha <= hasta);
+  const salida: Punto[] = [];
+
+  const vDesde = valorEn(serie, desde);
+  if (
+    vDesde !== null &&
+    (interior.length === 0 || interior[0]!.fecha.getTime() > desde.getTime())
+  ) {
+    salida.push({ fecha: desde, valor: vDesde });
+  }
+  salida.push(...interior);
+  const vHasta = valorEn(serie, hasta);
+  if (
+    vHasta !== null &&
+    (interior.length === 0 ||
+      interior[interior.length - 1]!.fecha.getTime() < hasta.getTime())
+  ) {
+    salida.push({ fecha: hasta, valor: vHasta });
+  }
+  return salida;
 }
 
 /**
