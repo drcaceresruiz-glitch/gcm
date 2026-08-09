@@ -54,6 +54,12 @@ export default async function ObraLayout({
       etiqueta: "Cronograma",
       clave: "cronograma",
     },
+    // El plan semanal (Last Planner) cuelga del cronograma: es su corto plazo.
+    puede(sesion, "plan_semanal:leer") && {
+      href: `${raiz}/plan-semanal`,
+      etiqueta: "Plan Semanal",
+      clave: "planSemanal",
+    },
     puede(sesion, "linea_base:leer") && {
       href: `${raiz}/revisiones`,
       etiqueta: "Revisiones",

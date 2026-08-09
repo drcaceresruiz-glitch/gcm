@@ -48,6 +48,9 @@ export const PERMISOS = [
   "avance:registrar",
   "cronograma:linea_base",
 
+  "plan_semanal:leer",
+  "plan_semanal:gestionar",
+
   "linea_base:leer",
   "linea_base:crear",
   "linea_base:aprobar",
@@ -112,6 +115,7 @@ const SOLO_LECTURA: Permiso[] = [
   "obra:leer",
   "partida:leer",
   "cronograma:leer",
+  "plan_semanal:leer",
   "linea_base:leer",
   "movimiento:leer",
 ];
@@ -136,6 +140,9 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// presupuesto. ADMIN_OBRA y CONSULTOR solo lo leen.
     "cronograma:importar",
     "avance:registrar",
+    /// El last planner de la obra: arma el plan semanal, compromete tareas y
+    /// cierra la semana midiendo PPC/CNC. Es trabajo de campo, va con el residente.
+    "plan_semanal:gestionar",
     /// Fija la linea base del cronograma (la version congelada contra la que se
     /// mide el EVM). Re-fijable con confirmacion; se audita. No es contractual
     /// como la del presupuesto, asi que no va en INNEGOCIABLES.
@@ -182,6 +189,7 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "encargo:leer",
     "encargo:gestionar",
     "encargo:valorizar",
+    "plan_semanal:gestionar",
   ],
 
   /// Almacen: necesita ver las partidas para imputar movimientos de

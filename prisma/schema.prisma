@@ -379,6 +379,7 @@ model Project {
   avances     AvanceTarea[]
   mapeos      MapeoTareaPartida[]
   encargos    EncargoProveedor[]
+  planesSemanales PlanSemanal[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -1343,6 +1344,25 @@ enum EstadoEncargo {
   ANULADO
 }
 
+enum EstadoPlanSemanal {
+  ABIERTO
+  CERRADO
+}
+
+/// Causas de no cumplimiento (CNC) del Last Planner: por que un compromiso de la
+/// semana no se cumplio. Catalogo FIJO para poder comparar y hacer Pareto.
+enum CausaNoCumplimiento {
+  PRERREQUISITO
+  MATERIALES
+  MANO_OBRA
+  EQUIPOS
+  INFORMACION
+  CLIENTE_TERCEROS
+  CLIMA
+  REPROGRAMACION
+  OTRA
+}
+
 model EncargoProveedor {
   id          String @id @default(cuid())
   projectId   String
@@ -1440,4 +1460,70 @@ model ValorizacionEncargo {
 
   @@index([encargoId, fecha])
   @@map("valorizaciones_encargo")
+}
+
+// ---------------------------------------------------------------------------
+// Plan Semanal (Last Planner): compromisos, PPC y CNC
+// ---------------------------------------------------------------------------
+
+/// El plan semanal (Last Planner): lo que se COMPROMETE hacer en la semana que
+/// cierra en su dia de corte. Al cerrarlo se mide el PPC (cumplidos/total) y las
+/// causas de lo no cumplido (CNC). Correlacion por obra; una semana por corte.
+model PlanSemanal {
+  id        String @id @default(cuid())
+  projectId String
+
+  /// Correlativo por obra ("Semana 1"), para nombrarlo sin recitar el id.
+  numero Int
+
+  /// La semana que cubre, anclada a su dia de corte (la cadencia de la obra).
+  fechaCorte DateTime @db.Date
+
+  estado EstadoPlanSemanal @default(ABIERTO)
+
+  notas String? @db.Text
+
+  creadoPor  String    @db.VarChar(150)
+  cerradoPor String?   @db.VarChar(150)
+  cerradoAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  compromisos CompromisoSemanal[]
+
+  @@unique([projectId, numero])
+  @@unique([projectId, fechaCorte])
+  @@index([projectId, estado])
+  @@map("planes_semanales")
+}
+
+/// Un compromiso de la semana: una tarea del cronograma (por uid) o una linea
+/// libre. Al cerrar se marca cumplido/no y, si no, su causa (CNC).
+model CompromisoSemanal {
+  id            String @id @default(cuid())
+  planSemanalId String
+
+  /// UID de la tarea del cronograma comprometida; null si es una linea libre.
+  uid Int?
+
+  descripcion String @db.VarChar(300)
+
+  /// % al que se compromete llegar en la semana. Opcional.
+  metaPorcentaje Decimal? @db.Decimal(5, 2)
+
+  /// null = sin evaluar; true/false al cerrar la semana. De esto sale el PPC.
+  cumplido Boolean?
+
+  /// Solo cuando `cumplido` es false: por que no se cumplio.
+  causa CausaNoCumplimiento?
+
+  notaCierre String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  plan PlanSemanal @relation(fields: [planSemanalId], references: [id], onDelete: Cascade)
+
+  @@index([planSemanalId])
+  @@map("compromisos_semanales")
 }
