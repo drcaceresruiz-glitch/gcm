@@ -98,13 +98,20 @@ export function CurvaS({
   const ventana = calcularVentana(rango, manual, datos.inicio, datos.fin, ultimoCorte.fecha);
   const { desde, hasta } = ventana;
 
+  // La linea real se dibuja por SEMANAS cuando hay muestreo semanal (cadencia);
+  // si no, por corte cargado (comportamiento previo). Son {fecha, valor} en
+  // ambos casos, asi que el resto del trazado no cambia.
+  const serieReal: Punto[] =
+    datos.realSemanal.length > 0
+      ? datos.realSemanal
+      : datos.cortes.map((c) => ({ fecha: c.fecha, valor: Number(c.real) || 0 }));
+  const finReal = serieReal[serieReal.length - 1]?.fecha ?? ultimoCorte.fecha;
+
   const plan = recortar(datos.plan, desde, hasta);
   const proyeccion = recortar(datos.proyeccion, desde, hasta);
   const cortes = datos.cortes.filter((c) => c.fecha >= desde && c.fecha <= hasta);
 
-  const reales: Punto[] = datos.cortes
-    .filter((c) => c.fecha >= desde && c.fecha <= hasta)
-    .map((c) => ({ fecha: c.fecha, valor: Number(c.real) || 0 }));
+  const reales: Punto[] = serieReal.filter((p) => p.fecha >= desde && p.fecha <= hasta);
 
   // Ampliar = ajustar el eje vertical a lo que hay. Con las dos lineas al 10%
   // y el eje hasta 100, el 90% del grafico esta vacio y las curvas se pisan.
@@ -142,14 +149,11 @@ export function CurvaS({
   const lectura = {
     plan: valorEn(datos.plan, fechaCursor),
     real:
-      fechaCursor.getTime() <= ultimoCorte.fecha.getTime()
-        ? valorEn(
-            datos.cortes.map((c) => ({ fecha: c.fecha, valor: Number(c.real) || 0 })),
-            fechaCursor,
-          )
+      fechaCursor.getTime() <= finReal.getTime()
+        ? valorEn(serieReal, fechaCursor)
         : null,
     proyeccion:
-      fechaCursor.getTime() >= ultimoCorte.fecha.getTime()
+      fechaCursor.getTime() >= finReal.getTime()
         ? valorEn(datos.proyeccion, fechaCursor)
         : null,
   };

@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
-import { registrarAvance, marcarLineaBase } from "@/services/cronograma.service";
+import {
+  registrarAvance,
+  marcarLineaBase,
+  configurarDiaCorte,
+} from "@/services/cronograma.service";
 import { enviarCorreo, correoCurvaAvance } from "@/services/mailer.service";
 import { obtenerObra } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
@@ -76,6 +80,34 @@ export async function accionMarcarLineaBase(
   }
 
   const resultado = await marcarLineaBase(sesion, obraId, cronogramaId);
+  if (!resultado.ok) return { ok: false, error: resultado.error };
+
+  revalidatePath(`/obras/${obraId}/cronograma`);
+  return { ok: true };
+}
+
+export interface EstadoDiaCorte {
+  ok?: boolean;
+  error?: string;
+}
+
+/**
+ * Configura el dia de corte semanal de la obra. El permiso y la validacion
+ * (1..7) viven en el servicio; aqui solo se traduce el FormData y se repinta.
+ */
+export async function accionConfigurarDiaCorte(
+  _previo: EstadoDiaCorte,
+  datos: FormData,
+): Promise<EstadoDiaCorte> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const obraId = String(datos.get("obraId") ?? "");
+  const dia = Number(datos.get("dia"));
+
+  if (!obraId) return { ok: false, error: "Falta la obra." };
+
+  const resultado = await configurarDiaCorte(sesion, obraId, dia);
   if (!resultado.ok) return { ok: false, error: resultado.error };
 
   revalidatePath(`/obras/${obraId}/cronograma`);

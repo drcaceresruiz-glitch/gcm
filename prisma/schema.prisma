@@ -362,6 +362,10 @@ model Project {
 
   estado ProjectState @default(PLANIFICACION)
 
+  /// Dia de la semana en que se espera el corte de avance (cadencia semanal,
+  /// Last Planner). ISO: 1=lunes … 7=domingo. Viernes por defecto.
+  diaCorteSemanal Int @default(5)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

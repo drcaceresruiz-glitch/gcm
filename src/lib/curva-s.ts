@@ -137,6 +137,56 @@ export function serieCurvaS(
 }
 
 /**
+ * Las fechas de corte SEMANAL entre dos fechas: la primera ocurrencia de
+ * `diaSemana` (ISO 1=lunes … 7=domingo) desde `desde`, y de ahi cada 7 dias
+ * hasta `hasta` inclusive. Fechas de calendario (medianoche UTC), como el
+ * resto del modulo. Vacio si `hasta` es anterior a `desde`.
+ */
+export function fechasSemanales(
+  desde: Date,
+  hasta: Date,
+  diaSemana: number,
+): Date[] {
+  const fechas: Date[] = [];
+  if (hasta.getTime() < desde.getTime()) return fechas;
+
+  // getUTCDay da 0=domingo..6=sabado; se pasa a ISO 1=lunes..7=domingo.
+  const iso = (f: Date) => (f.getUTCDay() === 0 ? 7 : f.getUTCDay());
+
+  const salto = (diaSemana - iso(desde) + 7) % 7;
+
+  for (let t = desde.getTime() + salto * DIA_MS; t <= hasta.getTime(); t += 7 * DIA_MS) {
+    fechas.push(new Date(t));
+  }
+  return fechas;
+}
+
+/**
+ * El % real ponderado en cada una de las fechas dadas.
+ *
+ * Para cada fecha se toma el reporte VIGENTE en ella —el ultimo con fecha
+ * menor o igual— y se pondera por duracion, igual que `serieCurvaS` hace por
+ * corte. Sirve para muestrear el avance en las fechas de corte semanal y
+ * dibujar la curva real por semanas.
+ */
+export function serieRealPorFechas(
+  tareas: readonly TareaParaCurva[],
+  avances: readonly AvanceReportado[],
+  fechas: readonly Date[],
+): PuntoDiario[] {
+  return fechas.map((fecha) => {
+    const vigentes = ultimoAvancePorTarea(
+      avances.filter((a) => a.fecha.getTime() <= fecha.getTime()),
+    );
+    const real = ponderarPorDuracion(
+      tareas,
+      (t) => vigentes.get(t.uid)?.porcentaje ?? t.porcentajeArchivo,
+    );
+    return { fecha, valor: Number(real) || 0 };
+  });
+}
+
+/**
  * La curva planeada CONTINUA, dia a dia.
  *
  * Es lo que hace que una curva S sea una curva S. El "% Planeado" del archivo

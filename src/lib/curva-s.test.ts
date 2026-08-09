@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   curvaPlaneada,
+  fechasSemanales,
   planeadoEnFecha,
   ponderarPorDuracion,
   proyectar,
   serieCurvaS,
+  serieRealPorFechas,
   type TareaParaCurva,
 } from "./curva-s";
 import type { AvanceReportado } from "./cronograma";
@@ -261,5 +263,57 @@ describe("proyectar", () => {
 
     expect(factor).toBe(1);
     expect(puntos.every((p) => Number.isFinite(p.valor))).toBe(true);
+  });
+});
+
+const dc = (s: string) => new Date(`${s}T00:00:00Z`);
+const iso = (f: Date) => f.toISOString().slice(0, 10);
+
+describe("fechasSemanales", () => {
+  it("incluye la fecha de inicio si cae en el dia pedido, y va de 7 en 7", () => {
+    const desde = dc("2026-08-03");
+    const dia = desde.getUTCDay() === 0 ? 7 : desde.getUTCDay();
+    const fechas = fechasSemanales(desde, dc("2026-08-20"), dia);
+    expect(fechas.map(iso)).toEqual(["2026-08-03", "2026-08-10", "2026-08-17"]);
+  });
+
+  it("salta a la primera ocurrencia del dia pedido", () => {
+    const desde = dc("2026-08-03");
+    const dia = desde.getUTCDay() === 0 ? 7 : desde.getUTCDay();
+    const siguiente = dia === 7 ? 1 : dia + 1;
+    const fechas = fechasSemanales(desde, dc("2026-08-12"), siguiente);
+    expect(iso(fechas[0]!)).toBe("2026-08-04");
+  });
+
+  it("vacio si hasta es anterior a desde", () => {
+    expect(fechasSemanales(dc("2026-08-10"), dc("2026-08-01"), 5)).toEqual([]);
+  });
+});
+
+describe("serieRealPorFechas", () => {
+  it("muestrea el avance vigente en cada fecha, ponderado por duracion", () => {
+    const tareas = [
+      tarea(1, "10.00", "0.00", "0.00"),
+      tarea(2, "10.00", "0.00", "0.00"),
+    ];
+    const avances = [
+      avance(1, "50.00", "2026-08-05"),
+      avance(1, "100.00", "2026-08-12"),
+      avance(2, "20.00", "2026-08-12"),
+    ];
+    const serie = serieRealPorFechas(tareas, avances, [dc("2026-08-06"), dc("2026-08-13")]);
+    // 06/08: t1=50 (reporte del 05), t2=0 (sin reporte) -> (50+0)/2 = 25.
+    // 13/08: t1=100, t2=20 -> (100+20)/2 = 60. Iguales duraciones => media simple.
+    expect(serie[0]!.valor).toBeCloseTo(25);
+    expect(serie[1]!.valor).toBeCloseTo(60);
+  });
+
+  it("usa el % del archivo cuando la tarea aun no tiene reporte a esa fecha", () => {
+    const serie = serieRealPorFechas(
+      [tarea(1, "10.00", "0.00", "30.00")],
+      [],
+      [dc("2026-08-06")],
+    );
+    expect(serie[0]!.valor).toBeCloseTo(30);
   });
 });

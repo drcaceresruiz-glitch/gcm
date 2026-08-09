@@ -462,6 +462,8 @@ export interface ObraDetalle {
   estado: string;
   fechaInicio: Date;
   fechaFinProgramada: Date;
+  /// Dia de la semana esperado para el corte de avance (ISO 1..7, viernes=5).
+  diaCorteSemanal: number;
   /// Version de la linea base aprobada, o null si el presupuesto sigue abierto.
   lineaBaseVersion: number | null;
 }
@@ -493,6 +495,7 @@ export const obtenerObra = cache(async function obtenerObra(
       estado: true,
       fechaInicio: true,
       fechaFinProgramada: true,
+      diaCorteSemanal: true,
       baselines: {
         where: { aprobadaAt: { not: null } },
         orderBy: { version: "desc" },

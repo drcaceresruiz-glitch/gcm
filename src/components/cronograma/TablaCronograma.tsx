@@ -25,10 +25,14 @@ export function TablaCronograma({
   obraId,
   tareas,
   puedeRegistrar,
+  fechaReporteDefecto,
 }: {
   obraId: string;
   tareas: Fila[];
   puedeRegistrar: boolean;
+  /// Fecha por defecto del reporte: el ultimo dia de corte semanal <= hoy, para
+  /// alinear los reportes a la cadencia. Si falta, se usa hoy.
+  fechaReporteDefecto?: string;
 }) {
   const [abierta, setAbierta] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +99,7 @@ export function TablaCronograma({
               accion={enviar}
               pendiente={pendiente}
               error={abierta === t.uid ? (error ?? undefined) : undefined}
+              fechaDefecto={fechaReporteDefecto}
             />
           ))}
         </tbody>
@@ -113,6 +118,7 @@ function FilaTarea({
   accion,
   pendiente,
   error,
+  fechaDefecto,
 }: {
   tarea: Fila;
   obraId: string;
@@ -123,6 +129,7 @@ function FilaTarea({
   accion: (datos: FormData) => void;
   pendiente: boolean;
   error?: string;
+  fechaDefecto?: string;
 }) {
   return (
     <>
@@ -212,6 +219,7 @@ function FilaTarea({
               accion={accion}
               pendiente={pendiente}
               error={error}
+              fechaDefecto={fechaDefecto}
             />
           </td>
         </tr>
@@ -234,17 +242,23 @@ function FormularioAvance({
   accion,
   pendiente,
   error,
+  fechaDefecto,
 }: {
   tarea: Fila;
   obraId: string;
   accion: (datos: FormData) => void;
   pendiente: boolean;
   error?: string;
+  fechaDefecto?: string;
 }) {
   // Se calcula al abrir el formulario, que solo ocurre tras un clic y por
   // tanto siempre en el navegador: asi la fecha es la del usuario y no la del
   // servidor, sin arriesgar un desajuste de hidratacion.
   const hoy = hoyLocal();
+
+  // Por defecto, el ultimo dia de corte semanal (cadencia); si no llega, hoy.
+  // Nunca en el futuro: si el corte cayera mas alla de hoy, se usa hoy.
+  const porDefecto = fechaDefecto && fechaDefecto <= hoy ? fechaDefecto : hoy;
 
   return (
     <form action={accion} className="space-y-2">
@@ -281,7 +295,7 @@ function FormularioAvance({
             type="date"
             required
             max={hoy}
-            defaultValue={hoy}
+            defaultValue={porDefecto}
             className="mt-1 rounded-lg border px-2 py-1.5 text-sm"
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
           />

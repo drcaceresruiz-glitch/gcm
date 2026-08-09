@@ -10,10 +10,12 @@ import {
 import { normalizarDecimal, restar } from "@/lib/decimal";
 import {
   curvaPlaneada,
+  fechasSemanales,
   planeadoEnFecha,
   ponderarPorDuracion,
   proyectar,
   serieCurvaS,
+  serieRealPorFechas,
   type PuntoCurva,
   type PuntoDiario,
 } from "@/lib/curva-s";
@@ -511,6 +513,59 @@ export async function lineaBaseCronograma(
   };
 }
 
+export type ResultadoDiaCorte = { ok: true } | { ok: false; error: string };
+
+/**
+ * Fija el dia de la semana en que se espera el corte de avance (cadencia
+ * semanal, Last Planner). ISO 1=lunes … 7=domingo.
+ *
+ * Es una preferencia de la obra, no un dato contable: la lleva quien lleva el
+ * cronograma (`cronograma:importar`). Se audita para dejar rastro de cuando y
+ * quien cambio el ritmo de reporte.
+ */
+export async function configurarDiaCorte(
+  sesion: SesionActiva,
+  obraId: string,
+  dia: number,
+): Promise<ResultadoDiaCorte> {
+  if (!puede(sesion, "cronograma:importar")) {
+    return { ok: false, error: "No tienes permiso para configurar el cronograma." };
+  }
+
+  if (!Number.isInteger(dia) || dia < 1 || dia > 7) {
+    return { ok: false, error: "El dia de corte debe estar entre 1 (lunes) y 7 (domingo)." };
+  }
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { id: true, diaCorteSemanal: true },
+  });
+  if (!obra) return { ok: false, error: "Obra no encontrada." };
+
+  if (obra.diaCorteSemanal === dia) return { ok: true };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.project.update({
+      where: { id: obraId },
+      data: { diaCorteSemanal: dia },
+    });
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "Project",
+        entidadId: obraId,
+        accion: "UPDATE",
+        antes: { diaCorteSemanal: obra.diaCorteSemanal },
+        despues: { diaCorteSemanal: dia },
+      },
+    });
+  });
+
+  return { ok: true };
+}
+
 export type ResultadoAvance = { ok: true } | { ok: false; error: string };
 
 /**
@@ -633,6 +688,12 @@ export interface DatosCurva {
   planeadoBaseEnCorte: number | null;
   /// La version marcada como base y cuando se fijo. null si no hay.
   lineaBase: { version: number; fijadaEn: Date | null } | null;
+  /// La linea real muestreada POR SEMANA (cadencia Last Planner). Vacia sin plan.
+  realSemanal: PuntoDiario[];
+  /// Dia ISO de corte semanal (1..7) configurado en la obra.
+  diaCorteSemanal: number;
+  /// Estado de la cadencia: el ultimo corte esperado <= hoy y si falta reporte.
+  cadencia: { ultimoCorteEsperado: Date | null; semanaPendiente: boolean };
 }
 
 /**
@@ -650,11 +711,13 @@ export async function datosCurvaS(
     cortes: [], plan: [], proyeccion: [],
     factor: 1, terminoProyectado: null, inicio: null, fin: null,
     fuentePlan: "vigente", planeadoBaseEnCorte: null, lineaBase: null,
+    realSemanal: [], diaCorteSemanal: 5,
+    cadencia: { ultimoCorteEsperado: null, semanaPendiente: false },
   };
 
   if (!puede(sesion, "cronograma:leer")) return vacio;
 
-  const [cortes, avances] = await Promise.all([
+  const [cortes, avances, obra] = await Promise.all([
     prisma.cronograma.findMany({
       where: { projectId: obraId, project: { companyId: sesion.companyId } },
       orderBy: { fechaCorte: "asc" },
@@ -683,9 +746,15 @@ export async function datosCurvaS(
         createdAt: true, reportadoPor: true, nota: true,
       },
     }),
+    prisma.project.findFirst({
+      where: { id: obraId, companyId: sesion.companyId },
+      select: { diaCorteSemanal: true },
+    }),
   ]);
 
-  if (cortes.length === 0) return vacio;
+  const diaCorteSemanal = obra?.diaCorteSemanal ?? 5;
+
+  if (cortes.length === 0) return { ...vacio, diaCorteSemanal };
 
   const reportes = avances.map((a) => ({ ...a, porcentaje: a.porcentaje.toString() }));
 
@@ -726,7 +795,7 @@ export async function datosCurvaS(
 
   const conDuracion = planificadas.filter((t) => !t.esResumen);
   if (conDuracion.length === 0) {
-    return { ...vacio, cortes: serie, fuentePlan, lineaBase };
+    return { ...vacio, cortes: serie, fuentePlan, lineaBase, diaCorteSemanal };
   }
 
   const inicio = conDuracion.reduce(
@@ -748,10 +817,45 @@ export async function datosCurvaS(
     ? planeadoEnFecha(planificadas, ultimo.fecha)
     : null;
 
+  // La linea real POR SEMANA: se muestrea el avance en cada dia de corte
+  // (cadencia Last Planner) desde el inicio del plan hasta hoy. Usa las tareas
+  // fuente (base o vigente) y los mismos avances, con la tecnica ya probada.
+  const hoy = hoyUtc();
+  const hastaMuestreo = new Date(Math.min(fin.getTime(), hoy.getTime()));
+  const fechasSem = fechasSemanales(inicio, hastaMuestreo, diaCorteSemanal);
+  const tareasCurva = fuente.tareas.map((t) => ({
+    uid: t.uid,
+    esResumen: t.esResumen,
+    duracionDias: t.duracionDias.toString(),
+    porcentajePlaneado: t.porcentajePlaneado.toString(),
+    porcentajeArchivo: t.porcentajeArchivo.toString(),
+  }));
+  const realSemanal = serieRealPorFechas(tareasCurva, reportes, fechasSem);
+
+  // La cadencia: el ultimo corte esperado que ya paso, y si falta reporte (el
+  // ultimo avance es anterior a ese corte, o no hay ninguno todavia).
+  const ultimoCorteEsperado = fechasSem.length
+    ? fechasSem[fechasSem.length - 1]!
+    : null;
+  const ultimaFechaAvance = reportes.reduce<Date | null>(
+    (m, a) => (m === null || a.fecha > m ? a.fecha : m),
+    null,
+  );
+  const semanaPendiente =
+    ultimoCorteEsperado !== null &&
+    (ultimaFechaAvance === null ||
+      ultimaFechaAvance.getTime() < ultimoCorteEsperado.getTime());
+
+  // La proyeccion arranca en el ultimo punto real —el semanal si lo hay, si no
+  // el del corte— para que no salte respecto a lo medido.
+  const anclaReal = realSemanal.length
+    ? realSemanal[realSemanal.length - 1]!
+    : { fecha: ultimo.fecha, valor: Number(ultimo.real) || 0 };
+
   const { puntos, factor, terminoProyectado } = proyectar(
     plan,
-    ultimo.fecha,
-    Number(ultimo.real) || 0,
+    anclaReal.fecha,
+    anclaReal.valor,
   );
 
   return {
@@ -765,6 +869,9 @@ export async function datosCurvaS(
     fuentePlan,
     planeadoBaseEnCorte,
     lineaBase,
+    realSemanal,
+    diaCorteSemanal,
+    cadencia: { ultimoCorteEsperado, semanaPendiente },
   };
 }
 

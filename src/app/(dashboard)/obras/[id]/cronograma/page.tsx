@@ -23,6 +23,7 @@ import { CurvaS } from "@/components/cronograma/CurvaS";
 import { PanelEvm } from "@/components/cronograma/PanelEvm";
 import { Hitos } from "@/components/cronograma/Hitos";
 import { BotonLineaBase } from "@/components/cronograma/BotonLineaBase";
+import { DiaCorteSemanal } from "@/components/cronograma/DiaCorteSemanal";
 import { ControlCapitulos } from "@/components/cronograma/ControlCapitulos";
 import { AlertasAtraso } from "@/components/cronograma/AlertasAtraso";
 import { CadenaCritica } from "@/components/cronograma/CadenaCritica";
@@ -40,6 +41,12 @@ import { Tarjeta } from "@/components/ui/Tarjeta";
 import { TablaCronograma } from "@/components/cronograma/TablaCronograma";
 
 export const metadata: Metadata = { title: "Cronograma" };
+
+/// Nombre del dia de corte por indice ISO (1=lunes … 7=domingo).
+const DIAS_SEMANA: Record<number, string> = {
+  1: "lunes", 2: "martes", 3: "miercoles", 4: "jueves",
+  5: "viernes", 6: "sabado", 7: "domingo",
+};
 
 export default async function CronogramaPage({
   params,
@@ -69,6 +76,11 @@ export default async function CronogramaPage({
 
   const puedeImportar = puede(sesion, "cronograma:importar");
   const puedeLineaBase = puede(sesion, "cronograma:linea_base");
+
+  // La fecha por defecto del reporte se alinea al ultimo dia de corte semanal.
+  const fechaReporteDefecto = curva.cadencia.ultimoCorteEsperado
+    ? curva.cadencia.ultimoCorteEsperado.toISOString().slice(0, 10)
+    : undefined;
 
   // Los hitos vigentes cruzados con los de la base, para la tabla de hitos.
   const filasDeHitos = cronograma
@@ -226,6 +238,31 @@ export default async function CronogramaPage({
               terminar una de veinte.
             </p>
 
+            <div
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <p className="text-sm">
+                Corte semanal los{" "}
+                <strong>{DIAS_SEMANA[obra.diaCorteSemanal] ?? "viernes"}</strong>.
+                {curva.cadencia.ultimoCorteEsperado &&
+                  (curva.cadencia.semanaPendiente ? (
+                    <span style={{ color: "var(--color-peligro)" }}>
+                      {" "}Falta el reporte del corte del{" "}
+                      {fechaCorta(curva.cadencia.ultimoCorteEsperado)}.
+                    </span>
+                  ) : (
+                    <span style={{ color: "var(--color-exito)" }}>
+                      {" "}Al dia (ultimo corte{" "}
+                      {fechaCorta(curva.cadencia.ultimoCorteEsperado)}).
+                    </span>
+                  ))}
+              </p>
+              {puedeImportar && (
+                <DiaCorteSemanal obraId={id} diaActual={obra.diaCorteSemanal} />
+              )}
+            </div>
+
             <CurvaS
               datos={curva}
               obraId={id}
@@ -320,6 +357,7 @@ export default async function CronogramaPage({
             obraId={id}
             tareas={cronograma.tareas}
             puedeRegistrar={puede(sesion, "avance:registrar")}
+            fechaReporteDefecto={fechaReporteDefecto}
           />
 
           <p className="text-xs opacity-60">
