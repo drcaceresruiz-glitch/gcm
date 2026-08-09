@@ -12,7 +12,12 @@ import {
 import { CurvaS } from "@/components/cronograma/CurvaS";
 import { ControlCapitulos } from "@/components/cronograma/ControlCapitulos";
 import { AlertasAtraso } from "@/components/cronograma/AlertasAtraso";
-import { agruparPorCapitulo, alertasDeAtraso } from "@/lib/control-avance";
+import { CadenaCritica } from "@/components/cronograma/CadenaCritica";
+import {
+  agruparPorCapitulo,
+  alertasDeAtraso,
+  cadenaCritica,
+} from "@/lib/control-avance";
 import { puede } from "@/lib/rbac";
 import { fechaCorta, fechaCronograma, fechaLarga, haceCuanto } from "@/utils/fechas";
 import { decimal } from "@/utils/formato";
@@ -201,6 +206,20 @@ export default async function CronogramaPage({
 
             <AlertasAtraso
               alertas={alertasDeAtraso(cronograma.tareas, cronograma.fechaCorte)}
+            />
+          </Tarjeta>
+
+          <Tarjeta>
+            <h3 className="text-base font-semibold">Ruta critica</h3>
+            <p className="mt-0.5 mb-4 text-sm opacity-70">
+              La cadena de tareas cuyo atraso corre la fecha de entrega de toda
+              la obra. No aparecen ni los capitulos ni los hitos que Project
+              tambien marca como criticos: no son trabajo sobre el que se pueda
+              actuar.
+            </p>
+
+            <CadenaCritica
+              cadena={cadenaCritica(cronograma.tareas, cronograma.fechaCorte)}
             />
           </Tarjeta>
 

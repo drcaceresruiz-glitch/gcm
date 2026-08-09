@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   agruparPorCapitulo,
   alertasDeAtraso,
+  cadenaCritica,
   type TareaControlada,
 } from "./control-avance";
 
@@ -15,8 +16,10 @@ function t(
     codigo: null,
     nombre: `Tarea ${datos.uid}`,
     esResumen: false,
+    esHito: false,
     esCritico: false,
     duracionDias: "10.00",
+    inicio: new Date("2026-08-01T00:00:00Z"),
     fin: new Date("2026-08-31T00:00:00Z"),
     porcentajePlaneado: "0.00",
     porcentajeReal: "0.00",
@@ -238,5 +241,122 @@ describe("alertasDeAtraso", () => {
     );
 
     expect(alertas).toEqual([]);
+  });
+});
+
+describe("cadenaCritica", () => {
+  const f = (d: string) => new Date(`${d}T00:00:00Z`);
+
+  it("deja fuera resumenes e hitos aunque Project los marque criticos", async () => {
+    // De las 26 filas criticas del cronograma real, 11 son capitulos y 2 son
+    // hitos. Ninguno es trabajo sobre el que se pueda actuar: meter cuadrilla
+    // en un capitulo no significa nada.
+    fila = 0;
+    const c = cadenaCritica(
+      [
+        t({ uid: 1, nivel: 1, esResumen: true, esCritico: true }),
+        t({ uid: 2, nivel: 2, esResumen: true, esCritico: true, codigo: "11.0" }),
+        t({ uid: 3, nivel: 3, esCritico: true, esHito: true, codigo: "0.9" }),
+        t({ uid: 4, nivel: 3, esCritico: true, codigo: "11.1" }),
+      ],
+      CORTE,
+    );
+
+    expect(c.eslabones.map((e) => e.codigo)).toEqual(["11.1"]);
+  });
+
+  it("ordena por fecha de comienzo y no por el orden del archivo", async () => {
+    // La ruta critica puede tener ramas paralelas, asi que no siempre es una
+    // fila india. Lo que hay que ver es el orden en que hay que atenderlas.
+    fila = 0;
+    const c = cadenaCritica(
+      [
+        t({ uid: 1, nivel: 1, esResumen: true }),
+        t({ uid: 2, nivel: 2, esResumen: true, codigo: "5.0" }),
+        t({ uid: 3, nivel: 3, esCritico: true, codigo: "5.9", inicio: f("2026-09-20") }),
+        t({ uid: 4, nivel: 3, esCritico: true, codigo: "5.1", inicio: f("2026-08-10") }),
+      ],
+      CORTE,
+    );
+
+    expect(c.eslabones.map((e) => e.codigo)).toEqual(["5.1", "5.9"]);
+  });
+
+  it("acumula la duracion de la cadena eslabon a eslabon", async () => {
+    fila = 0;
+    const c = cadenaCritica(
+      [
+        t({ uid: 1, nivel: 1, esResumen: true }),
+        t({ uid: 2, nivel: 2, esResumen: true }),
+        t({ uid: 3, nivel: 3, esCritico: true, duracionDias: "5.00", inicio: f("2026-08-10") }),
+        t({ uid: 4, nivel: 3, esCritico: true, duracionDias: "7.00", inicio: f("2026-08-20") }),
+      ],
+      CORTE,
+    );
+
+    expect(c.eslabones.map((e) => e.acumuladoDias)).toEqual(["5.00", "12.00"]);
+    expect(c.duracionTotal).toBe("12.00");
+  });
+
+  it("dice cuantos dias de la fecha de fin cuesta ya cada eslabon", async () => {
+    // 20 puntos de atraso en una partida de 10 dias son 2 dias de obra, y en
+    // la ruta critica esos 2 dias los pierde la obra entera.
+    fila = 0;
+    const c = cadenaCritica(
+      [
+        t({ uid: 1, nivel: 1, esResumen: true }),
+        t({ uid: 2, nivel: 2, esResumen: true }),
+        t({ uid: 3, nivel: 3, esCritico: true, duracionDias: "10.00", desfase: "-20.00" }),
+        t({ uid: 4, nivel: 3, esCritico: true, duracionDias: "4.00", desfase: "-50.00" }),
+      ],
+      CORTE,
+    );
+
+    expect(c.eslabones.map((e) => e.diasAtraso)).toEqual(["2.0", "2.0"]);
+    expect(c.atrasoAcumulado).toBe("4.0");
+    expect(c.atrasados).toBe(2);
+  });
+
+  it("dice de que capitulo cuelga cada eslabon, por el orden del esquema", async () => {
+    // Por prefijo de codigo fallaria: en el archivo real "7.3.1" es hermana de
+    // "7.3" y no su hija.
+    fila = 0;
+    const c = cadenaCritica(
+      [
+        t({ uid: 1, nivel: 1, esResumen: true, nombre: "PROYECTO" }),
+        t({ uid: 2, nivel: 2, esResumen: true, codigo: "5.0", nombre: "ESTRUCTURAS" }),
+        t({ uid: 3, nivel: 3, esCritico: true, codigo: "5.1", inicio: f("2026-08-10") }),
+        t({ uid: 4, nivel: 2, esResumen: true, codigo: "11.0", nombre: "ACABADOS" }),
+        t({ uid: 5, nivel: 3, esCritico: true, codigo: "11.1", inicio: f("2026-08-19") }),
+        t({ uid: 6, nivel: 3, esCritico: true, codigo: "11.2", inicio: f("2026-09-19") }),
+      ],
+      CORTE,
+    );
+
+    expect(c.eslabones[0]?.capitulo).toBe("5.0 ESTRUCTURAS");
+    expect(c.concentracion[0]).toEqual({ capitulo: "11.0 ACABADOS", tareas: 2 });
+  });
+
+  it("marca lo que ya deberia haber arrancado a la fecha de corte", async () => {
+    fila = 0;
+    const c = cadenaCritica(
+      [
+        t({ uid: 1, nivel: 1, esResumen: true }),
+        t({ uid: 2, nivel: 2, esResumen: true }),
+        t({ uid: 3, nivel: 3, esCritico: true, inicio: f("2026-08-01") }),
+        t({ uid: 4, nivel: 3, esCritico: true, inicio: f("2026-09-15") }),
+      ],
+      CORTE,
+    );
+
+    expect(c.eslabones.map((e) => e.arrancado)).toEqual([true, false]);
+  });
+
+  it("devuelve una cadena vacia si el archivo no marca ninguna critica", async () => {
+    fila = 0;
+    const c = cadenaCritica([t({ uid: 1, nivel: 1 }), t({ uid: 2, nivel: 2 })], CORTE);
+
+    expect(c.eslabones).toEqual([]);
+    expect(c.duracionTotal).toBe("0.00");
   });
 });

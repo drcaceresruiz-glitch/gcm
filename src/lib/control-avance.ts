@@ -1,4 +1,4 @@
-import { restar } from "@/lib/decimal";
+import { restar, sumar } from "@/lib/decimal";
 import { ponderarPorDuracion } from "@/lib/curva-s";
 
 /**
@@ -21,8 +21,10 @@ export interface TareaControlada {
   nombre: string;
   nivel: number;
   esResumen: boolean;
+  esHito: boolean;
   esCritico: boolean;
   duracionDias: string;
+  inicio: Date;
   fin: Date;
   porcentajePlaneado: string;
   porcentajeReal: string;
@@ -224,4 +226,125 @@ export function alertasDeAtraso(
       ORDEN_SEVERIDAD[a.severidad] - ORDEN_SEVERIDAD[b.severidad] ||
       Number(b.diasAtraso) - Number(a.diasAtraso),
   );
+}
+
+export interface EslabonCritico {
+  uid: number;
+  codigo: string | null;
+  nombre: string;
+  /// Capitulo del que cuelga, para ver donde se concentra la cadena.
+  capitulo: string | null;
+  inicio: Date;
+  fin: Date;
+  duracionDias: string;
+  porcentajePlaneado: string;
+  porcentajeReal: string;
+  desfase: string;
+  /// Dias de la fecha de fin que esta costando YA este eslabon.
+  diasAtraso: string;
+  /// Duracion acumulada de la cadena hasta aqui, incluido.
+  acumuladoDias: string;
+  terminado: boolean;
+  /// Ya deberia haber empezado a la fecha de corte.
+  arrancado: boolean;
+}
+
+export interface CadenaCritica {
+  eslabones: EslabonCritico[];
+  /// Suma de las duraciones de la cadena.
+  duracionTotal: string;
+  /// Suma de lo que ya cuesta el atraso de sus eslabones.
+  atrasoAcumulado: string;
+  /// Cuantos eslabones van por detras del plan.
+  atrasados: number;
+  /// Donde se concentra, del capitulo con mas eslabones al que menos.
+  concentracion: { capitulo: string; tareas: number }[];
+}
+
+/**
+ * La ruta critica en secuencia, que es lo unico que la hace accionable.
+ *
+ * Saber que hay «25 tareas criticas» no permite decidir nada. Saber CUALES,
+ * en que orden y cuales ya van tarde, si: un dia perdido en cualquiera de
+ * ellas es un dia perdido de obra, y en las demas no es nada.
+ *
+ * Se dejan fuera los RESUMENES y los HITOS. Project marca como criticos los
+ * capitulos que contienen cadena critica y los hitos de cierre, pero ninguno
+ * de los dos es trabajo sobre el que se pueda actuar: meter cuadrilla en un
+ * capitulo no significa nada. De las 26 filas criticas del cronograma real,
+ * solo 15 son trabajo.
+ *
+ * El orden es por fecha de comienzo. La ruta critica puede tener ramas
+ * paralelas, asi que no siempre es una fila india; ordenar por fecha es lo que
+ * refleja el orden en que hay que atenderlas.
+ */
+export function cadenaCritica(
+  tareas: readonly TareaControlada[],
+  fechaCorte: Date,
+): CadenaCritica {
+  const orden = [...tareas].sort((a, b) => a.fila - b.fila);
+  const nivelRaiz = orden.length > 0 ? Math.min(...orden.map((t) => t.nivel)) : 1;
+  const nivelCapitulo = nivelRaiz + 1;
+
+  // Capitulo vigente segun se recorre el documento: el esquema es un orden, no
+  // un prefijo de codigo.
+  const capitulos = new Map<number, string>();
+  let actual: string | null = null;
+
+  for (const t of orden) {
+    if (t.nivel === nivelCapitulo) {
+      actual = `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`;
+    } else if (t.nivel > nivelCapitulo && actual !== null) {
+      capitulos.set(t.uid, actual);
+    }
+  }
+
+  const criticas = orden
+    .filter((t) => t.esCritico && !t.esResumen && !t.esHito)
+    .sort((a, b) => a.inicio.getTime() - b.inicio.getTime() || a.fila - b.fila);
+
+  const eslabones: EslabonCritico[] = [];
+  const duraciones: string[] = [];
+  const atrasos: string[] = [];
+
+  for (const t of criticas) {
+    duraciones.push(t.duracionDias);
+
+    const desfase = Number(t.desfase) || 0;
+    const dias = ((Number(t.duracionDias) || 0) * Math.max(0, -desfase)) / 100;
+    atrasos.push(dias.toFixed(2));
+
+    eslabones.push({
+      uid: t.uid,
+      codigo: t.codigo,
+      nombre: t.nombre,
+      capitulo: capitulos.get(t.uid) ?? null,
+      inicio: t.inicio,
+      fin: t.fin,
+      duracionDias: t.duracionDias,
+      porcentajePlaneado: t.porcentajePlaneado,
+      porcentajeReal: t.porcentajeReal,
+      desfase: t.desfase,
+      diasAtraso: dias.toFixed(1),
+      acumuladoDias: sumar(duraciones, 2),
+      terminado: Number(t.porcentajeReal) >= 100,
+      arrancado: t.inicio.getTime() <= fechaCorte.getTime(),
+    });
+  }
+
+  const cuenta = new Map<string, number>();
+  for (const e of eslabones) {
+    const c = e.capitulo ?? "Sin capitulo";
+    cuenta.set(c, (cuenta.get(c) ?? 0) + 1);
+  }
+
+  return {
+    eslabones,
+    duracionTotal: sumar(duraciones, 2),
+    atrasoAcumulado: sumar(atrasos, 1),
+    atrasados: eslabones.filter((e) => Number(e.desfase) < 0).length,
+    concentracion: [...cuenta.entries()]
+      .map(([capitulo, tareas]) => ({ capitulo, tareas }))
+      .sort((a, b) => b.tareas - a.tareas),
+  };
 }
