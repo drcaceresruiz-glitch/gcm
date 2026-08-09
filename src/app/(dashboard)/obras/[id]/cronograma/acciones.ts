@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
-import { registrarAvance } from "@/services/cronograma.service";
+import { registrarAvance, marcarLineaBase } from "@/services/cronograma.service";
 import { enviarCorreo, correoCurvaAvance } from "@/services/mailer.service";
 import { obtenerObra } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
@@ -47,6 +47,39 @@ export async function accionRegistrarAvance(
 
   revalidatePath(`/obras/${obraId}/cronograma`);
   return { ok: true, uid };
+}
+
+export interface EstadoLineaBase {
+  ok?: boolean;
+  error?: string;
+}
+
+/**
+ * Fija una version del cronograma como linea base.
+ *
+ * Solo pasa los identificadores; el permiso y la validacion (que el corte sea
+ * de la obra y la empresa) viven en el servicio. `revalidatePath` repinta la
+ * pantalla con el distintivo nuevo y el EVM ya medido contra la base.
+ */
+export async function accionMarcarLineaBase(
+  _previo: EstadoLineaBase,
+  datos: FormData,
+): Promise<EstadoLineaBase> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const obraId = String(datos.get("obraId") ?? "");
+  const cronogramaId = String(datos.get("cronogramaId") ?? "");
+
+  if (!obraId || !cronogramaId) {
+    return { ok: false, error: "Falta la obra o el corte." };
+  }
+
+  const resultado = await marcarLineaBase(sesion, obraId, cronogramaId);
+  if (!resultado.ok) return { ok: false, error: resultado.error };
+
+  revalidatePath(`/obras/${obraId}/cronograma`);
+  return { ok: true };
 }
 
 export interface RespuestaEnvio {

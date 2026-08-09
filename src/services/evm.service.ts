@@ -46,6 +46,10 @@ export interface DatosEvm {
   cortesEv: PuntoEvm[];
   /// El costo real acumulado por fecha de orden. Vacio sin permiso de ordenes.
   costoAc: PuntoEvm[];
+  /// La version de cronograma que hace de linea base (contra la que se mide el
+  /// PV/SPI) y cuando se fijo. null si la obra aun no ha fijado una: entonces el
+  /// PV cae al % del archivo del corte vigente.
+  lineaBase: { version: number; fijadaEn: Date | null } | null;
   inicio: Date | null;
   fin: Date | null;
 }
@@ -97,7 +101,9 @@ export async function datosEvm(
   const bac = sumar([presupuesto._sum.parcial?.toString() ?? "0"]);
 
   const ultimo = curva.cortes[curva.cortes.length - 1]!;
-  const pv = valorDeAvance(bac, Number(ultimo.planeado));
+  // Con linea base fijada, el PV sale del plan CONGELADO a la fecha de corte
+  // (time-phased); sin base cae al % del archivo del ultimo corte, como antes.
+  const pv = valorDeAvance(bac, curva.planeadoBaseEnCorte ?? Number(ultimo.planeado));
   const ev = valorDeAvance(bac, Number(ultimo.real));
 
   // AC total a la fecha: todo lo comprometido y aprobado. Es acumulado por
@@ -152,6 +158,7 @@ export async function datosEvm(
     planPv,
     cortesEv,
     costoAc,
+    lineaBase: curva.lineaBase,
     inicio: curva.inicio,
     fin: curva.fin,
   };

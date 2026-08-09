@@ -15,10 +15,14 @@ import {
   obtenerCronograma,
   historialCronogramas,
   datosCurvaS,
+  lineaBaseCronograma,
 } from "@/services/cronograma.service";
 import { datosEvm } from "@/services/evm.service";
+import { filasHitos } from "@/lib/hitos";
 import { CurvaS } from "@/components/cronograma/CurvaS";
 import { PanelEvm } from "@/components/cronograma/PanelEvm";
+import { Hitos } from "@/components/cronograma/Hitos";
+import { BotonLineaBase } from "@/components/cronograma/BotonLineaBase";
 import { ControlCapitulos } from "@/components/cronograma/ControlCapitulos";
 import { AlertasAtraso } from "@/components/cronograma/AlertasAtraso";
 import { CadenaCritica } from "@/components/cronograma/CadenaCritica";
@@ -55,14 +59,34 @@ export default async function CronogramaPage({
 
   if (!puede(sesion, "cronograma:leer")) redirect(`/obras/${id}`);
 
-  const [cronograma, historial, curva, evm] = await Promise.all([
+  const [cronograma, historial, curva, evm, baseCron] = await Promise.all([
     obtenerCronograma(sesion, id),
     historialCronogramas(sesion, id),
     datosCurvaS(sesion, id),
     datosEvm(sesion, id),
+    lineaBaseCronograma(sesion, id),
   ]);
 
   const puedeImportar = puede(sesion, "cronograma:importar");
+  const puedeLineaBase = puede(sesion, "cronograma:linea_base");
+
+  // Los hitos vigentes cruzados con los de la base, para la tabla de hitos.
+  const filasDeHitos = cronograma
+    ? filasHitos(
+        cronograma.tareas
+          .filter((t) => t.esHito)
+          .map((t) => ({
+            uid: t.uid,
+            nombre: t.nombre,
+            fin: t.fin,
+            avance: Number(t.porcentajeReal) || 0,
+          })),
+        (baseCron?.tareas ?? [])
+          .filter((t) => t.esHito)
+          .map((t) => ({ uid: t.uid, fin: t.fin })),
+        cronograma.fechaCorte,
+      )
+    : [];
 
   return (
     <div className="space-y-6">
@@ -245,6 +269,18 @@ export default async function CronogramaPage({
           )}
 
           <Tarjeta>
+            <h3 className="text-base font-semibold">Hitos</h3>
+            <p className="mt-0.5 mb-4 text-sm opacity-70">
+              Las fechas clave del cronograma.{" "}
+              {baseCron
+                ? "El desvio se mide contra la linea base."
+                : "Fija una linea base para medir su desvio."}
+            </p>
+
+            <Hitos filas={filasDeHitos} hayBase={baseCron !== null} />
+          </Tarjeta>
+
+          <Tarjeta>
             <h3 className="text-base font-semibold">Que esta frenando la obra</h3>
             <p className="mt-0.5 mb-4 text-sm opacity-70">
               Solo partidas de trabajo. Un capitulo atrasado no se lista aparte:
@@ -292,10 +328,10 @@ export default async function CronogramaPage({
             todavia nadie lo ha reportado desde obra.
           </p>
 
-          {historial.length > 1 && (
+          {historial.length >= 1 && (
             <section>
-              <h3 className="mb-2 text-sm font-semibold">Cortes cargados</h3>
-              <ul className="space-y-1.5 text-sm">
+              <h3 className="mb-2 text-sm font-semibold">Cortes y linea base</h3>
+              <ul className="space-y-2 text-sm">
                 {historial.map((c) => (
                   <li key={c.id} className="flex flex-wrap items-center gap-2">
                     <Chip tono={c.version === cronograma.version ? "curso" : "neutro"}>
@@ -305,6 +341,14 @@ export default async function CronogramaPage({
                     <span className="opacity-60">
                       {c.tareas} tareas · {c.archivo} · {c.importadoPor}
                     </span>
+                    <BotonLineaBase
+                      obraId={id}
+                      cronogramaId={c.id}
+                      version={c.version}
+                      fecha={fechaCorta(c.fechaCorte)}
+                      esActual={c.id === baseCron?.id}
+                      puedeFijar={puedeLineaBase}
+                    />
                   </li>
                 ))}
               </ul>

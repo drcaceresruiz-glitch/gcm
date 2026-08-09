@@ -10,6 +10,7 @@ import {
 import { normalizarDecimal, restar } from "@/lib/decimal";
 import {
   curvaPlaneada,
+  planeadoEnFecha,
   ponderarPorDuracion,
   proyectar,
   serieCurvaS,
@@ -382,6 +383,134 @@ export async function historialCronogramas(
   }));
 }
 
+export type ResultadoLineaBase =
+  | { ok: true; version: number }
+  | { ok: false; error: string };
+
+/**
+ * Fija (o re-fija) la linea base del cronograma: marca UNA version como el
+ * plan CONGELADO contra el que se mide el EVM (PV/SPI).
+ *
+ * Re-fijable a proposito —los cronogramas se re-baselinean cuando cambia el
+ * alcance—, pero cada cambio limpia la base anterior (solo una por obra) y se
+ * audita. Espeja a `aprobarRevision` del presupuesto SIN su irreversibilidad:
+ * aqui la base es una herramienta de control, no un acto contractual.
+ */
+export async function marcarLineaBase(
+  sesion: SesionActiva,
+  obraId: string,
+  cronogramaId: string,
+): Promise<ResultadoLineaBase> {
+  if (!puede(sesion, "cronograma:linea_base")) {
+    return { ok: false, error: "No tienes permiso para fijar la linea base." };
+  }
+
+  // El corte tiene que ser de esta obra y de esta empresa: sin esta
+  // comprobacion, con el identificador de un corte ajeno se marcaria base en
+  // la obra de otro.
+  const corte = await prisma.cronograma.findFirst({
+    where: {
+      id: cronogramaId,
+      projectId: obraId,
+      project: { companyId: sesion.companyId },
+    },
+    select: { id: true, version: true },
+  });
+
+  if (!corte) return { ok: false, error: "Ese corte no existe en la obra." };
+
+  const fijadaPor = `${sesion.nombres} ${sesion.apellidos} (${sesion.email})`
+    .trim()
+    .slice(0, 150);
+
+  await prisma.$transaction(async (tx) => {
+    // Solo una base por obra: se limpia la anterior antes de fijar la nueva.
+    await tx.cronograma.updateMany({
+      where: { projectId: obraId, lineaBaseAt: { not: null } },
+      data: { lineaBaseAt: null, lineaBasePor: null },
+    });
+
+    await tx.cronograma.update({
+      where: { id: corte.id },
+      data: { lineaBaseAt: new Date(), lineaBasePor: fijadaPor },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "Cronograma",
+        entidadId: corte.id,
+        accion: "UPDATE",
+        despues: { evento: "linea_base_fijada", version: corte.version, fijadaPor },
+      },
+    });
+  });
+
+  return { ok: true, version: corte.version };
+}
+
+export interface HitoBase {
+  uid: number;
+  nombre: string;
+  esResumen: boolean;
+  esHito: boolean;
+  duracionDias: string;
+  inicio: Date;
+  fin: Date;
+}
+
+export interface LineaBaseCronograma {
+  id: string;
+  version: number;
+  fechaCorte: Date;
+  fijadaEn: Date;
+  fijadaPor: string | null;
+  tareas: HitoBase[];
+}
+
+/**
+ * La version marcada como linea base, con sus tareas —para cruzar hitos y
+ * fechas contra lo vigente—. null si la obra aun no ha fijado una.
+ */
+export async function lineaBaseCronograma(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<LineaBaseCronograma | null> {
+  if (!puede(sesion, "cronograma:leer")) return null;
+
+  const base = await prisma.cronograma.findFirst({
+    where: {
+      projectId: obraId,
+      project: { companyId: sesion.companyId },
+      lineaBaseAt: { not: null },
+    },
+    select: {
+      id: true, version: true, fechaCorte: true,
+      lineaBaseAt: true, lineaBasePor: true,
+      tareas: {
+        orderBy: { fila: "asc" },
+        select: {
+          uid: true, nombre: true, esResumen: true, esHito: true,
+          duracionDias: true, inicio: true, fin: true,
+        },
+      },
+    },
+  });
+
+  if (!base || !base.lineaBaseAt) return null;
+
+  return {
+    id: base.id,
+    version: base.version,
+    fechaCorte: base.fechaCorte,
+    fijadaEn: base.lineaBaseAt,
+    fijadaPor: base.lineaBasePor,
+    tareas: base.tareas.map((t) => ({ ...t, duracionDias: t.duracionDias.toString() })),
+  };
+}
+
 export type ResultadoAvance = { ok: true } | { ok: false; error: string };
 
 /**
@@ -496,6 +625,14 @@ export interface DatosCurva {
   terminoProyectado: Date | null;
   inicio: Date | null;
   fin: Date | null;
+  /// De donde sale el PLAN (PV): la version base congelada, o el corte vigente
+  /// si la obra aun no ha fijado base.
+  fuentePlan: "base" | "vigente";
+  /// % planeado a la fecha del ultimo corte segun la base congelada. null sin
+  /// base: entonces el PV puntual usa el % del archivo del ultimo corte.
+  planeadoBaseEnCorte: number | null;
+  /// La version marcada como base y cuando se fijo. null si no hay.
+  lineaBase: { version: number; fijadaEn: Date | null } | null;
 }
 
 /**
@@ -512,6 +649,7 @@ export async function datosCurvaS(
   const vacio: DatosCurva = {
     cortes: [], plan: [], proyeccion: [],
     factor: 1, terminoProyectado: null, inicio: null, fin: null,
+    fuentePlan: "vigente", planeadoBaseEnCorte: null, lineaBase: null,
   };
 
   if (!puede(sesion, "cronograma:leer")) return vacio;
@@ -523,6 +661,7 @@ export async function datosCurvaS(
       select: {
         version: true,
         fechaCorte: true,
+        lineaBaseAt: true,
         tareas: {
           select: {
             uid: true,
@@ -565,11 +704,14 @@ export async function datosCurvaS(
     reportes,
   );
 
-  // El plan continuo se dibuja con las tareas del corte MAS RECIENTE: es la
-  // reprogramacion vigente, y es contra ella contra la que se mide hoy.
+  // La fuente del PLAN: la version marcada como linea base si existe, y si no
+  // el corte mas reciente (comportamiento previo). Congelar la base es lo que
+  // impide que reprogramar mueva los postes del PV/SPI.
+  const base = cortes.find((c) => c.lineaBaseAt !== null);
   const vigente = cortes[cortes.length - 1]!;
+  const fuente = base ?? vigente;
 
-  const planificadas = vigente.tareas.map((t) => ({
+  const planificadas = fuente.tareas.map((t) => ({
     uid: t.uid,
     esResumen: t.esResumen,
     duracionDias: t.duracionDias.toString(),
@@ -577,8 +719,15 @@ export async function datosCurvaS(
     fin: t.fin,
   }));
 
+  const fuentePlan = base ? ("base" as const) : ("vigente" as const);
+  const lineaBase = base
+    ? { version: base.version, fijadaEn: base.lineaBaseAt }
+    : null;
+
   const conDuracion = planificadas.filter((t) => !t.esResumen);
-  if (conDuracion.length === 0) return { ...vacio, cortes: serie };
+  if (conDuracion.length === 0) {
+    return { ...vacio, cortes: serie, fuentePlan, lineaBase };
+  }
 
   const inicio = conDuracion.reduce(
     (m, t) => (t.inicio < m ? t.inicio : m),
@@ -592,6 +741,13 @@ export async function datosCurvaS(
   const plan = curvaPlaneada(planificadas, inicio, fin);
 
   const ultimo = serie[serie.length - 1]!;
+
+  // El PV puntual contra la base: el % planeado a la fecha del ultimo corte
+  // segun el plan congelado. Sin base es null y el EVM cae al % del archivo.
+  const planeadoBaseEnCorte = base
+    ? planeadoEnFecha(planificadas, ultimo.fecha)
+    : null;
+
   const { puntos, factor, terminoProyectado } = proyectar(
     plan,
     ultimo.fecha,
@@ -606,6 +762,9 @@ export async function datosCurvaS(
     terminoProyectado,
     inicio,
     fin,
+    fuentePlan,
+    planeadoBaseEnCorte,
+    lineaBase,
   };
 }
 

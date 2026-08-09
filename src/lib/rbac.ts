@@ -46,6 +46,7 @@ export const PERMISOS = [
   "cronograma:leer",
   "cronograma:importar",
   "avance:registrar",
+  "cronograma:linea_base",
 
   "linea_base:leer",
   "linea_base:crear",
@@ -135,6 +136,10 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// presupuesto. ADMIN_OBRA y CONSULTOR solo lo leen.
     "cronograma:importar",
     "avance:registrar",
+    /// Fija la linea base del cronograma (la version congelada contra la que se
+    /// mide el EVM). Re-fijable con confirmacion; se audita. No es contractual
+    /// como la del presupuesto, asi que no va en INNEGOCIABLES.
+    "cronograma:linea_base",
     "linea_base:crear",
     "movimiento:crear",
     /// Ve a quien se le compra y cuanto se ha comprometido contra SU

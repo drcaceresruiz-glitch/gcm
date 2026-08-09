@@ -1098,6 +1098,13 @@ model Cronograma {
   importadoAt  DateTime @default(now())
   importadoPor String   @db.VarChar(150)
 
+  /// Linea base: con fecha, esta version es el plan CONGELADO contra el que se
+  /// mide el EVM (PV/SPI). null = no es la base. Solo una version por obra la
+  /// tiene a la vez; la unicidad se garantiza en el servicio (MariaDB no tiene
+  /// indice unico parcial). Re-fijable: fijar otra version limpia esta.
+  lineaBaseAt  DateTime?
+  lineaBasePor String?   @db.VarChar(150)
+
   project      Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tareas       TareaCronograma[]
   dependencias DependenciaTarea[]

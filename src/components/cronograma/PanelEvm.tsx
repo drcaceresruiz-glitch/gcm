@@ -50,6 +50,23 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         )}
       </div>
 
+      {/* Contra que se mide el EVM: la linea base congelada, o el corte vigente. */}
+      {datos.lineaBase ? (
+        <p className="text-xs opacity-70">
+          PV y SPI medidos contra la{" "}
+          <strong>linea base v{datos.lineaBase.version}</strong>
+          {datos.lineaBase.fijadaEn
+            ? ` (fijada el ${fechaLarga(datos.lineaBase.fijadaEn)})`
+            : ""}
+          .
+        </p>
+      ) : (
+        <p className="text-xs opacity-60">
+          Sin linea base fijada: el PV sale del corte vigente. Fija una en
+          «Cortes y linea base» para congelar la referencia.
+        </p>
+      )}
+
       {/* La lectura en palabras. */}
       <p className="text-sm">
         Al corte del <strong>{fechaLarga(datos.fechaCorte)}</strong> se ha ganado{" "}
