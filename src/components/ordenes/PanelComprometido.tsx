@@ -1,7 +1,7 @@
 import { AlertTriangle, HandCoins } from "lucide-react";
 import type { ComprometidoPorPartida } from "@/services/ordenes.service";
 import type { PresupuestoVigente } from "@/services/movimientos.service";
-import { esNegativo, multiplicar, sumar } from "@/lib/decimal";
+import { esNegativo, restar, sumar } from "@/lib/decimal";
 import { soles } from "@/utils/formato";
 
 /**
@@ -16,12 +16,6 @@ import { soles } from "@/utils/formato";
  * presupuesto sin IGV: compararlos con el total del banco mezclaria dos cosas
  * distintas y daria un sobrecosto que no existe.
  */
-
-/** Resta exacta: `lib/decimal` no tiene resta y anteponer "-" al texto falla
- *  sobre valores ya negativos, que `sumar` descarta en silencio. */
-function restar(a: string, b: string): string {
-  return sumar([a, multiplicar(b, "-1", 2) ?? "0"]);
-}
 
 interface Props {
   comprometido: ComprometidoPorPartida[];
@@ -52,7 +46,9 @@ export function PanelComprometido({
         descripcion: p.descripcion,
         vigente: p.vigente,
         comprometido: suyo,
-        saldo: restar(p.vigente, suyo),
+        // Con el `restar` de decimal, que es el unico de la aplicacion desde
+        // que existe: este componente traia su propia copia.
+        saldo: restar(p.vigente, suyo) ?? "0.00",
       };
     });
 
@@ -60,7 +56,7 @@ export function PanelComprometido({
   // si se imputo a una partida y despues desaparecio. Se avisa en vez de
   // dejar que el total de la tabla no cuadre con el total de arriba.
   const enTabla = sumar(filas.map((f) => f.comprometido));
-  const huerfano = restar(total, enTabla);
+  const huerfano = restar(total, enTabla) ?? "0.00";
   const excedidas = filas.filter((f) => esNegativo(f.saldo));
 
   return (

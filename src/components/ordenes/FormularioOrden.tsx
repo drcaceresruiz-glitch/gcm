@@ -24,7 +24,13 @@ import {
   type TipoImpuesto,
 } from "@/lib/ordenes";
 import { porcentajeAFraccion } from "@/lib/presupuesto";
-import { esNegativo, esPositivo, multiplicar, sumar } from "@/lib/decimal";
+import {
+  esNegativo,
+  esPositivo,
+  multiplicar,
+  restar,
+  sumar,
+} from "@/lib/decimal";
 import { soles } from "@/utils/formato";
 import { CampoTexto } from "@/components/auth/CampoTexto";
 import {
@@ -819,7 +825,14 @@ function FilaImputacion({
       {/* Aviso, no bloqueo: comprometer por encima del presupuesto es algo
           que pasa, y se corrige con una reconversion o un adicional. Lo que
           no puede es pasar desapercibido. */}
-      {elegida && esNegativo(restar(elegida.referencia, imputacion.importe)) && (
+      {/* Con el `restar` de decimal. El importe puede venir vacio mientras se
+          teclea, y `restar` no acepta cadena vacia: se sustituye por cero
+          antes, en vez de dejarlo caer en un null que se leeria como "no se
+          pasa". */}
+      {elegida &&
+        esNegativo(
+          restar(elegida.referencia, imputacion.importe || "0") ?? "0",
+        ) && (
         <p className="mt-2 text-sm opacity-80">
           Esta partida tiene {soles(elegida.referencia)} de presupuesto:
           imputarle mas la dejara por encima.
@@ -827,15 +840,6 @@ function FilaImputacion({
       )}
     </div>
   );
-}
-
-/**
- * Resta exacta. `lib/decimal` no tiene resta: se niega multiplicando por -1.
- * Anteponer un "-" al texto produce "--100" cuando el valor ya es negativo, y
- * `sumar` lo descarta EN SILENCIO, convirtiendo la resta en un cero.
- */
-function restar(a: string, b: string): string {
-  return sumar([a, multiplicar(b || "0", "-1", 2) ?? "0"]);
 }
 
 /**

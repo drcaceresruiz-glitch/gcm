@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
 import type { PresupuestoVigente } from "@/services/movimientos.service";
-import { esCero, esNegativo, multiplicar, sumar } from "@/lib/decimal";
+import { esCero, esNegativo, restar } from "@/lib/decimal";
 import { soles } from "@/utils/formato";
 import { CuadroCascada } from "@/components/revisiones/CuadroCascada";
 
@@ -14,16 +14,6 @@ import { CuadroCascada } from "@/components/revisiones/CuadroCascada";
  * el Excel al lado y compara linea por linea. Ensenar solo la diferencia
  * obligaria a abrir otra pantalla para saber sobre que se aplica.
  */
-
-/**
- * Resta exacta. `lib/decimal` no tiene resta: se niega el sustraendo
- * multiplicando por -1 y se suma. Anteponer un "-" al texto no sirve,
- * porque sobre un valor ya negativo produce "--100", que `sumar` descarta
- * EN SILENCIO y convierte la resta en un cero.
- */
-function restar(a: string, b: string): string {
-  return sumar([a, multiplicar(b, "-1", 2) ?? "0"]);
-}
 
 interface Props {
   presupuesto: PresupuestoVigente;
@@ -45,10 +35,11 @@ export function PanelVigente({ presupuesto, obraId, mostrarTodas }: Props) {
     codigosSinPartida,
   } = presupuesto;
 
-  const diferencia = restar(
-    cascadaVigente.presupuesto,
-    cascadaBase.presupuesto,
-  );
+  // Con el `restar` de decimal. Este componente traia su propia resta porque
+  // el modulo no tenia ninguna; habia tres copias distintas repartidas por la
+  // aplicacion, que es como acaban divergiendo.
+  const diferencia =
+    restar(cascadaVigente.presupuesto, cascadaBase.presupuesto) ?? "0.00";
 
   const movidas = partidas.filter((p) => !esCero(p.ajustes) || p.esAdicional);
   const visibles = mostrarTodas ? partidas : movidas;

@@ -1,7 +1,14 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { esCero, esNegativo, esPositivo, normalizarDecimal, sumar } from "@/lib/decimal";
+import {
+  esCero,
+  esNegativo,
+  esPositivo,
+  normalizarDecimal,
+  restar,
+  sumar,
+} from "@/lib/decimal";
 import { aportantes } from "@/lib/jerarquia-partidas";
 import { calcularCascada, type Cascada } from "@/lib/presupuesto";
 import {
@@ -72,17 +79,6 @@ export interface PresupuestoVigente {
   /// Codigos de la linea base cuya partida ya no existe en el arbol vivo.
   /// Su dinero cuenta en la base pero nadie puede reconvertirlo.
   codigosSinPartida: string[];
-}
-
-/**
- * Cambia el signo de un importe.
- *
- * `lib/decimal` no tiene resta: se resta sumando el negativo. Anteponer un
- * "-" a secas no vale, porque con un valor ya negativo produce "--100", que
- * `sumar` descarta EN SILENCIO y convierte una resta en un cero.
- */
-function negar(valor: string): string {
-  return valor.startsWith("-") ? valor.slice(1) : `-${valor}`;
 }
 
 /** La linea base aprobada de la obra, o null si todavia no hay ninguna. */
@@ -259,7 +255,10 @@ export async function obtenerPresupuestoVigente(
     base.costoDirecto.toString(),
     base.descuentos.toString(),
   ]);
-  const descuadreBase = sumar([sumaDeBases, negar(guardadoEnLineaBase)]);
+  // Con el `restar` de decimal. Antes se negaba a mano el sustraendo para
+  // sumarlo, porque el modulo no tenia resta; ya la tiene, y una sola
+  // implementacion es lo que evita que cada sitio la resuelva a su manera.
+  const descuadreBase = restar(sumaDeBases, guardadoEnLineaBase) ?? "0.00";
 
   return {
     baselineId: base.id,

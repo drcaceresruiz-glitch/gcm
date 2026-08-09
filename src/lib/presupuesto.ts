@@ -1,4 +1,10 @@
-import { multiplicar, normalizarDecimal, sumar } from "@/lib/decimal";
+import {
+  esNegativo,
+  multiplicar,
+  normalizarDecimal,
+  restar,
+  sumar,
+} from "@/lib/decimal";
 
 /**
  * Cascada del presupuesto de obra.
@@ -107,8 +113,26 @@ export function compararRevisiones(
   actual: string,
   tipoCambio?: string | null,
 ): ComparacionRevisiones {
-  const diferencia = sumar([anterior, `-${actual}`], PRECISION_MONEDA);
-  const encarece = diferencia.startsWith("-");
+  /**
+   * Con `restar` y no con `sumar([anterior, \`-${actual}\`])`.
+   *
+   * Esa forma produce "--26821.60" en cuanto `actual` ya es negativo —y en el
+   * presupuesto de CRIOCORD hay un descuento comercial de -26.821,60—, `sumar`
+   * la descarta en silencio y devuelve el minuendo intacto. Aqui eso no solo
+   * daria una diferencia falsa: alimenta `encarece`, o sea que INVIERTE UN
+   * BOOLEANO y la pantalla diria que una revision abarata cuando encarece.
+   */
+  const diferencia = restar(anterior, actual, PRECISION_MONEDA);
+
+  // Un operando corrupto no tiene diferencia correcta, y devolver una de
+  // aspecto normal es justo lo que hay que evitar: se declara sin diferencia.
+  if (diferencia === null) {
+    return { diferenciaSoles: "0.00", diferenciaDolares: null, encarece: false };
+  }
+
+  // `esNegativo` y no `startsWith("-")`: una diferencia de "-0.00" empieza por
+  // signo y no es ningun encarecimiento.
+  const encarece = esNegativo(diferencia);
 
   let diferenciaDolares: string | null = null;
   if (tipoCambio && tipoCambio !== "0") {

@@ -95,6 +95,26 @@ describe("compararRevisiones", () => {
     expect(compararRevisiones("100.00", "50.00").diferenciaDolares).toBeNull();
     expect(compararRevisiones("100.00", "50.00", "0").diferenciaDolares).toBeNull();
   });
+
+  it("no invierte 'encarece' cuando la cifra nueva es negativa", async () => {
+    // Antes se restaba con `sumar([anterior, `-${actual}`])`. Con un `actual`
+    // negativo eso produce "--26821.60", que `sumar` DESCARTA en silencio y
+    // devuelve el minuendo intacto: la diferencia salia 1000 en vez de
+    // 27821,60 y, peor, `encarece` se calculaba sobre esa cifra falsa. Como
+    // alimenta un booleano, el cuadro decia lo contrario de lo que pasaba.
+    const r = compararRevisiones("1000.00", "-26821.60");
+
+    expect(r.diferenciaSoles).toBe("27821.60");
+    expect(r.encarece).toBe(false);
+  });
+
+  it("no da por encarecimiento una diferencia de cero", async () => {
+    // `diferencia.startsWith("-")` daba true para "-0.00", que no es ningun
+    // encarecimiento. Ahora se pregunta por el signo del numero, no del texto.
+    const r = compararRevisiones("500.00", "500.00");
+
+    expect(r.encarece).toBe(false);
+  });
 });
 
 describe("porcentajeAFraccion", () => {

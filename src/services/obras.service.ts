@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { esPositivo, sumar } from "@/lib/decimal";
+import { esPositivo, restar, sumar } from "@/lib/decimal";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
 import {
   estadoDeObra,
@@ -132,9 +132,12 @@ export async function obtenerResumenEmpresa(
     obrasEnEjecucion,
     presupuestoTotal,
     comprometido: comprometidoTotal,
-    // Con `sumar` y no con resta de numeros: aqui son importes, y en este
-    // sistema el dinero nunca pasa por coma flotante.
-    saldo: sumar([presupuestoTotal, `-${comprometidoTotal}`]),
+    // Con aritmetica decimal y no con resta de numeros: aqui son importes, y
+    // en este sistema el dinero nunca pasa por coma flotante.
+    // Con `restar` y no con `sumar([a, `-${b}`])`: esa forma produce "--100"
+    // en cuanto el sustraendo ya es negativo, y `sumar` la descarta en
+    // silencio devolviendo el minuendo intacto —o sea, el saldo entero—.
+    saldo: restar(presupuestoTotal, comprometidoTotal) ?? "0.00",
     partidasSobregiradas: alertas.partidasSobregiradas,
     obrasConPlazoVencido: alertas.obrasConPlazoVencido,
   };
@@ -199,11 +202,21 @@ const datosAlertasEmpresa = cache(async function datosAlertasEmpresa(
       const partida = partidaPorId.get(fila.wbsItemId);
       if (!partida) continue;
 
-      const exceso = sumar([
+      /**
+       * Con `restar`, y aqui importa de verdad.
+       *
+       * `sumar([importe, \`-${parcial}\`])` se rompe cuando el parcial ya es
+       * negativo —el descuento comercial de CRIOCORD es -26.821,60—: produce
+       * "--26821.60", `sumar` lo descarta en silencio y el exceso queda igual
+       * al importe comprometido, que es positivo. Resultado: la partida se
+       * marcaba SOBREGIRADA sin estarlo, y saltaba una alerta falsa.
+       */
+      const exceso = restar(
         fila._sum.importe?.toString() ?? "0",
-        `-${partida.parcial?.toString() ?? "0"}`,
-      ]);
-      if (esPositivo(exceso)) {
+        partida.parcial?.toString() ?? "0",
+      );
+
+      if (exceso !== null && esPositivo(exceso)) {
         partidasSobregiradas++;
         sobregiroPorObra.set(
           partida.projectId,
@@ -406,11 +419,14 @@ export async function listarObras(
     // movimientos) seria mas fino, pero exige la linea base aprobada y el
     // panel tiene que servir tambien para obras que aun no la tienen.
     //
-    // La resta va con `sumar` y no con `Number`: aqui son importes, y en este
-    // sistema el dinero nunca pasa por coma flotante.
-    const exceso = sumar([importe, `-${partida.parcial?.toString() ?? "0"}`]);
+    // La resta va con `restar` y no con `Number`: aqui son importes y el
+    // dinero nunca pasa por coma flotante. Y con `restar` y no con
+    // `sumar([importe, `-${parcial}`])`, que con un parcial negativo produce
+    // "--26821.60" —lo hay en CRIOCORD—, `sumar` lo descarta en silencio y la
+    // partida sale marcada como sobregirada sin estarlo.
+    const exceso = restar(importe, partida.parcial?.toString() ?? "0");
 
-    if (esPositivo(exceso)) {
+    if (exceso !== null && esPositivo(exceso)) {
       sobregiradasPorObra.set(
         partida.projectId,
         (sobregiradasPorObra.get(partida.projectId) ?? 0) + 1,
