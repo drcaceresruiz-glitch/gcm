@@ -21,12 +21,21 @@ import { ultimoAvancePorTarea, type AvanceReportado } from "@/lib/cronograma";
  * que parecerse al total interno de Project, que usa su propio metodo.
  */
 
-export interface TareaParaCurva {
-  uid: number;
+/**
+ * Lo minimo para poder ponderar: si cuenta, y cuanto pesa.
+ *
+ * Se pide solo esto —y no una tarea entera— para que la misma ponderacion
+ * sirva a la curva y al control por capitulos, que traen tareas distintas.
+ */
+export interface Ponderable {
   /// Las tareas resumen se excluyen: su porcentaje ya es el de sus hijas y
   /// contarlas seria sumar dos veces el mismo trabajo.
   esResumen: boolean;
   duracionDias: string;
+}
+
+export interface TareaParaCurva extends Ponderable {
+  uid: number;
   porcentajePlaneado: string;
   porcentajeArchivo: string;
 }
@@ -53,9 +62,9 @@ export interface PuntoCurva {
  * puros hitos no tiene avance ponderable, y ese caso debe dar cero y no
  * reventar la pantalla.
  */
-export function ponderarPorDuracion(
-  tareas: readonly TareaParaCurva[],
-  porcentajeDe: (t: TareaParaCurva) => string,
+export function ponderarPorDuracion<T extends Ponderable>(
+  tareas: readonly T[],
+  porcentajeDe: (t: T) => string,
 ): string {
   const hojas = tareas.filter((t) => !t.esResumen);
 

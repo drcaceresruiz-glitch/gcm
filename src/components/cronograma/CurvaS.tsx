@@ -37,6 +37,33 @@ interface Punto {
   valor: number;
 }
 
+/**
+ * Fondos entre los que elegir.
+ *
+ * No es solo estetica: el fondo elegido viaja al PNG y al PDF, que es donde
+ * de verdad importa. «Sin fondo» da una imagen transparente, util para pegarla
+ * sobre una diapositiva; pero sobre el fondo oscuro de WhatsApp el texto
+ * desaparece, y por eso no es el que viene puesto.
+ *
+ * Los que fijan `tinta` traen su propio color de texto: si no, al elegir un
+ * fondo oscuro estando en tema claro, el grafico saldria negro sobre negro.
+ */
+const FONDOS = [
+  { id: "papel", etiqueta: "Papel", color: "var(--superficie)", tinta: null },
+  { id: "blanco", etiqueta: "Blanco", color: "#ffffff", tinta: "#12232e" },
+  { id: "crema", etiqueta: "Crema", color: "#fbf7ef", tinta: "#3d3524" },
+  { id: "oscuro", etiqueta: "Oscuro", color: "#101b26", tinta: "#e8eef3" },
+  {
+    id: "marca",
+    etiqueta: "Marca",
+    color: "color-mix(in oklab, var(--color-marca-600) 14%, var(--superficie))",
+    tinta: null,
+  },
+  { id: "sin", etiqueta: "Sin fondo", color: null, tinta: null },
+] as const;
+
+type IdFondo = (typeof FONDOS)[number]["id"];
+
 export function CurvaS({
   datos,
   obraId,
@@ -54,7 +81,14 @@ export function CurvaS({
   const [ampliada, setAmpliada] = useState(false);
   const [cursor, setCursor] = useState<Date | null>(null);
   const [manual, setManual] = useState<{ desde: string; hasta: string } | null>(null);
+  const [fondoId, setFondoId] = useState<IdFondo>("papel");
   const svgRef = useRef<SVGSVGElement>(null);
+
+  const fondo = FONDOS.find((f) => f.id === fondoId) ?? FONDOS[0];
+  const tinta = fondo.tinta ?? "var(--texto)";
+  const rejilla = fondo.tinta
+    ? `color-mix(in oklab, ${fondo.tinta} 28%, transparent)`
+    : "var(--borde)";
 
   if (datos.cortes.length === 0 || datos.plan.length === 0 || !datos.inicio || !datos.fin) {
     return null;
@@ -159,6 +193,36 @@ export function CurvaS({
           </Opcion>
         </Grupo>
 
+        <span className="flex items-center gap-1.5">
+          <span className="text-xs opacity-70">Fondo</span>
+          {FONDOS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFondoId(f.id)}
+              aria-pressed={fondoId === f.id}
+              title={
+                f.id === "sin"
+                  ? "Sin fondo: la imagen sale transparente. Sobre fondo oscuro el texto puede perderse."
+                  : f.etiqueta
+              }
+              className="size-6 rounded-md border"
+              style={{
+                borderColor:
+                  fondoId === f.id ? "var(--color-marca-600)" : "var(--borde)",
+                borderWidth: fondoId === f.id ? 2 : 1,
+                // El transparente se dibuja con el tablero de ajedrez con que
+                // se representa siempre, para que se entienda sin leer nada.
+                background:
+                  f.color ??
+                  "repeating-conic-gradient(color-mix(in oklab, var(--borde) 60%, transparent) 0% 25%, transparent 0% 50%) 0 0 / 8px 8px",
+              }}
+            >
+              <span className="sr-only">{f.etiqueta}</span>
+            </button>
+          ))}
+        </span>
+
         <label className="flex items-center gap-1.5 text-xs">
           <span className="opacity-70">Del</span>
           <input
@@ -205,7 +269,15 @@ export function CurvaS({
           }
         }}
         onPointerLeave={() => setCursor(null)}
+        // `color` gobierna todo lo que usa `currentColor`, que es como el
+        // grafico sigue al tema. Al elegir un fondo con tinta propia se
+        // sustituye aqui, y con eso el texto no queda negro sobre negro.
+        style={{ color: tinta }}
       >
+        {/* El fondo va DENTRO del SVG y no en el contenedor: asi viaja al PNG
+            y al PDF, que es donde de verdad hace falta. */}
+        {fondo.color && <rect width="100%" height="100%" fill={fondo.color} />}
+
         {marcas.map((v) => (
           <g key={v}>
             <line
@@ -213,7 +285,7 @@ export function CurvaS({
               x2={ANCHO - MARGEN.derecha}
               y1={y(v)}
               y2={y(v)}
-              stroke="var(--borde)"
+              stroke={rejilla}
               strokeWidth={1}
             />
             <text
@@ -237,7 +309,7 @@ export function CurvaS({
               x2={x(t.fecha)}
               y1={alto - MARGEN.abajo}
               y2={alto - MARGEN.abajo + 4}
-              stroke="var(--borde)"
+              stroke={rejilla}
               strokeWidth={1}
             />
             {t.etiqueta && (
@@ -259,7 +331,7 @@ export function CurvaS({
         <polyline
           points={trazo(plan)}
           fill="none"
-          stroke="var(--texto)"
+          stroke={tinta}
           strokeWidth={3.5}
           strokeDasharray="8 5"
           strokeLinecap="round"
@@ -309,8 +381,8 @@ export function CurvaS({
             cx={x(c.fecha)}
             cy={y(Number(c.planeado) || 0)}
             r={4}
-            fill="var(--superficie)"
-            stroke="var(--texto)"
+            fill={fondo.color ?? "var(--superficie)"}
+            stroke={tinta}
             strokeWidth={2}
             opacity={0.8}
           />
@@ -328,7 +400,7 @@ export function CurvaS({
               strokeDasharray="4 3"
             />
             {lectura.plan !== null && (
-              <circle cx={x(fechaCursor)} cy={y(lectura.plan)} r={4} fill="var(--texto)" />
+              <circle cx={x(fechaCursor)} cy={y(lectura.plan)} r={4} fill={tinta} />
             )}
             {lectura.real !== null && (
               <circle cx={x(fechaCursor)} cy={y(lectura.real)} r={4} fill="var(--color-marca-600)" />
@@ -464,6 +536,18 @@ export function CurvaS({
   );
 }
 
+/**
+ * Una cifra de la cabecera.
+ *
+ * El degradado va del color propio del dato a la superficie de la tarjeta, en
+ * una diagonal: asi la cifra queda sobre la parte mas saturada y la etiqueta
+ * sobre la mas clara, que es lo que le da el contraste. Cuando el dato no
+ * tiene color propio se tine con el de marca, para que la rejilla se lea como
+ * un bloque y no como nueve cajas sueltas.
+ *
+ * La sombra se proyecta a la derecha y abajo, con el borde superior claro:
+ * es lo que hace que la tarjeta parezca levantada y no pegada.
+ */
 function Dato({
   etiqueta,
   valor,
@@ -475,14 +559,21 @@ function Dato({
   destacado?: boolean;
   color?: string;
 }) {
+  const tinte = color ?? "var(--color-marca-600)";
+
   return (
     <div
-      className="rounded-lg border px-3 py-2"
-      style={{ borderColor: "var(--borde)" }}
+      className="rounded-xl border px-3 py-2.5"
+      style={{
+        borderColor: `color-mix(in oklab, ${tinte} 35%, var(--borde))`,
+        backgroundImage: `linear-gradient(135deg, color-mix(in oklab, ${tinte} 18%, var(--superficie)) 0%, var(--superficie) 75%)`,
+        boxShadow:
+          "3px 4px 10px -2px color-mix(in oklab, #000 35%, transparent), inset 0 1px 0 color-mix(in oklab, #fff 25%, transparent)",
+      }}
     >
-      <dt className="text-xs opacity-60">{etiqueta}</dt>
+      <dt className="text-xs font-medium opacity-75">{etiqueta}</dt>
       <dd
-        className={`mt-0.5 tabular-nums ${destacado ? "text-lg font-bold" : "text-sm font-semibold"}`}
+        className={`mt-0.5 tabular-nums ${destacado ? "text-xl font-bold" : "text-base font-bold"}`}
         style={color ? { color } : undefined}
       >
         {valor}

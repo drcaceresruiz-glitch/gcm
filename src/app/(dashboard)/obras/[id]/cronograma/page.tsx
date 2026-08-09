@@ -10,6 +10,9 @@ import {
   datosCurvaS,
 } from "@/services/cronograma.service";
 import { CurvaS } from "@/components/cronograma/CurvaS";
+import { ControlCapitulos } from "@/components/cronograma/ControlCapitulos";
+import { AlertasAtraso } from "@/components/cronograma/AlertasAtraso";
+import { agruparPorCapitulo, alertasDeAtraso } from "@/lib/control-avance";
 import { puede } from "@/lib/rbac";
 import { fechaCorta, fechaCronograma, fechaLarga, haceCuanto } from "@/utils/fechas";
 import { decimal } from "@/utils/formato";
@@ -181,6 +184,28 @@ export default async function CronogramaPage({
               el mapeo entre tareas y partidas, pasara a ponderarse por dinero,
               que es lo que hace comparable el avance con lo comprometido.
             </p>
+          </Tarjeta>
+
+          <Tarjeta>
+            <h3 className="text-base font-semibold">Que esta frenando la obra</h3>
+            <p className="mt-0.5 mb-4 text-sm opacity-70">
+              Solo partidas de trabajo. Un capitulo atrasado no se lista aparte:
+              lo esta porque lo estan sus partidas.
+            </p>
+
+            <AlertasAtraso
+              alertas={alertasDeAtraso(cronograma.tareas, cronograma.fechaCorte)}
+            />
+          </Tarjeta>
+
+          <Tarjeta>
+            <h3 className="text-base font-semibold">Avance por capitulo</h3>
+            <p className="mt-0.5 mb-4 text-sm opacity-70">
+              La lectura que falta entre la curva —una cifra para toda la obra— y
+              la tabla de {cronograma.tareas.length} filas.
+            </p>
+
+            <ControlCapitulos capitulos={agruparPorCapitulo(cronograma.tareas)} />
           </Tarjeta>
 
           <TablaCronograma

@@ -33,14 +33,10 @@ export function svgAutonomo(svg: SVGSVGElement): string {
   copia.setAttribute("width", String(ancho));
   copia.setAttribute("height", String(alto));
 
-  // Un fondo propio: sin el, un PNG sale con transparencia y en WhatsApp —que
-  // lo muestra sobre fondo oscuro— el texto desaparece.
-  const fondo = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  fondo.setAttribute("width", "100%");
-  fondo.setAttribute("height", "100%");
-  fondo.setAttribute("fill", estilo.getPropertyValue("--superficie").trim() || "#ffffff");
-  copia.insertBefore(fondo, copia.firstChild);
-
+  // No se anade ningun fondo aqui: el fondo lo elige el propio grafico y ya
+  // viene dibujado dentro. Forzar uno pisaria la eleccion del usuario, y le
+  // quitaria el sentido a la opcion «sin fondo», que existe justo para poder
+  // pegar la imagen sobre una diapositiva.
   const marcado = new XMLSerializer().serializeToString(copia);
 
   return marcado
