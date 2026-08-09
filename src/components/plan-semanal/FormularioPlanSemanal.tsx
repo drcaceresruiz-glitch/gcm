@@ -78,7 +78,11 @@ export function FormularioPlanSemanal({
   }
 
   function cambiarMeta(key: string, meta: string) {
-    setItems((p) => p.map((it) => (it.key === key ? { ...it, meta } : it)));
+    // La meta es un porcentaje: se topa en 100 al teclear. Deja pasar lo demas
+    // (vacio, decimales a medio escribir) y el servidor valida el resto.
+    const n = Number(meta.replace(",", "."));
+    const v = Number.isFinite(n) && n > 100 ? "100" : meta;
+    setItems((p) => p.map((it) => (it.key === key ? { ...it, meta: v } : it)));
     setOk(false);
   }
 
@@ -175,7 +179,8 @@ export function FormularioPlanSemanal({
                   value={it.meta}
                   onChange={(e) => cambiarMeta(it.key, e.target.value)}
                   inputMode="decimal"
-                  placeholder="%"
+                  placeholder="0-100"
+                  title="Porcentaje de 0 a 100"
                   className="ml-1 w-16 rounded border px-1.5 py-1 text-xs tabular-nums"
                   style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
                 />

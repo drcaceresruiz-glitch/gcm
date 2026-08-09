@@ -368,6 +368,22 @@ export async function guardarCompromisos(
     return { ok: false, error: "La semana esta cerrada. Reabrela para cambiar los compromisos." };
   }
 
+  // La meta es un PORCENTAJE de 0 a 100. Sin este control, un valor como 1000
+  // desbordaba la columna Decimal(5,2) (tope 999.99) y la accion caia con un
+  // 500 que dejaba la pagina en error. Se valida antes de tocar la base.
+  for (const c of compromisos) {
+    const m = c.metaPorcentaje?.trim();
+    if (m) {
+      const n = Number(m.replace(",", "."));
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return {
+          ok: false,
+          error: "La meta de cada compromiso es un porcentaje entre 0 y 100.",
+        };
+      }
+    }
+  }
+
   const limpios = compromisos
     .map((c) => ({
       uid:
