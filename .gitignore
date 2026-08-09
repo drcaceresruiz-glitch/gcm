@@ -54,7 +54,7 @@ coverage/
 # Se regenera sola y son ~200 archivos de ruido en el repositorio.
 /.agents/
 /.windsurf/
-/.claude/skills/
+/.claude/
 /skills-lock.json
 
 # Documentos de negocio y de clientes. El repositorio es publico: los
