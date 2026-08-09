@@ -1235,10 +1235,17 @@ model AvanceTarea {
   reportadoPor String   @db.VarChar(150)
   createdAt    DateTime @default(now())
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// Si el avance nacio al cerrar un Plan Semanal, apunta a ese plan: permite
+  /// reemplazarlo al reabrir/re-cerrar y saber que vino del PTS. Los avances
+  /// manuales (reportados a mano en el cronograma) lo dejan en null.
+  planSemanalId String?
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  planSemanal PlanSemanal? @relation(fields: [planSemanalId], references: [id], onDelete: SetNull)
 
   @@index([projectId, uid])
   @@index([projectId, fecha])
+  @@index([planSemanalId])
   @@map("avances_tarea")
 }
 
@@ -1491,6 +1498,7 @@ model PlanSemanal {
 
   project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   compromisos CompromisoSemanal[]
+  avances     AvanceTarea[]
 
   @@unique([projectId, numero])
   @@unique([projectId, fechaCorte])

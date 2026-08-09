@@ -9,10 +9,13 @@ import {
   tendenciaPpc,
   rangoSemana,
   tareasDeLaSemana,
+  restriccionDeTarea,
   CAUSAS_CNC,
   type FilaPareto,
   type PuntoPpc,
+  type EnlacePredecesora,
 } from "@/lib/plan-semanal";
+import { ultimoAvancePorTarea } from "@/lib/cronograma";
 import type {
   EstadoPlanSemanal,
   CausaNoCumplimiento,
@@ -36,6 +39,12 @@ function quien(sesion: SesionActiva): string {
 
 function fechaDeObra(texto: string): Date {
   return new Date(`${texto}T00:00:00Z`);
+}
+
+/** Hoy a medianoche UTC (para anclar fechas @db.Date sin desfase de zona). */
+function hoyUtc(): Date {
+  const n = new Date();
+  return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()));
 }
 
 // ---------------------------------------------------------------------------
@@ -120,12 +129,21 @@ export interface CompromisoDetalle {
   notaCierre: string | null;
   /// Nombre/codigo de la tarea si el compromiso es una tarea del cronograma.
   tarea: { codigo: string | null; nombre: string } | null;
+  /// % de avance ya registrado por ESTE plan para la tarea (para pre-llenar el
+  /// cierre al reabrir). null si es linea libre o aun no se registro.
+  porcentajeReal: string | null;
 }
 
 export interface TareaOpcionPlan {
   uid: number;
   codigo: string | null;
   nombre: string;
+  /// La tarea esta programada dentro de la semana del corte.
+  enSemana: boolean;
+  /// Tiene una predecesora pendiente (se puede adelantar igual, con aviso).
+  conRestriccion: boolean;
+  /// Texto de la restriccion, si la hay.
+  restriccion: string | null;
 }
 
 export interface CompromisoSugerido {
@@ -191,6 +209,7 @@ export async function obtenerPlanSemanal(
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
     orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
     select: {
+      id: true,
       tareas: {
         select: {
           uid: true,
@@ -199,20 +218,77 @@ export async function obtenerPlanSemanal(
           inicio: true,
           fin: true,
           esResumen: true,
+          porcentajeArchivo: true,
         },
       },
     },
   });
   const tareasCron = cronograma?.tareas ?? [];
   const porUid = new Map<number, { codigo: string | null; nombre: string }>();
+  const nombrePorUid = new Map<number, string>();
   for (const t of tareasCron) {
     porUid.set(t.uid, { codigo: t.codigo, nombre: t.nombre });
+    nombrePorUid.set(t.uid, `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`);
   }
 
-  // Para el desplegable: todas las tareas de trabajo (sin resumenes).
-  const tareas = tareasCron
+  // Dependencias (predecesoras) y avance vigente por tarea: para saber que se
+  // puede ADELANTAR (libre) y que tiene una predecesora pendiente.
+  const dependencias: EnlacePredecesora[] = cronograma?.id
+    ? await prisma.dependenciaTarea.findMany({
+        where: { cronogramaId: cronograma.id },
+        select: { tareaUid: true, predecesoraUid: true, tipo: true },
+      })
+    : [];
+
+  const avances = await prisma.avanceTarea.findMany({
+    where: { projectId: obraId },
+    select: {
+      uid: true,
+      fecha: true,
+      porcentaje: true,
+      createdAt: true,
+      nota: true,
+      reportadoPor: true,
+    },
+  });
+  const ultimos = ultimoAvancePorTarea(
+    avances.map((a) => ({ ...a, porcentaje: a.porcentaje.toString() })),
+  );
+  // Lo reportado gana; si una tarea no tiene reporte, el % del archivo (la
+  // siembra de la unica importacion).
+  const avancePorUid = new Map<number, number>();
+  for (const t of tareasCron) avancePorUid.set(t.uid, Number(t.porcentajeArchivo));
+  for (const [uid, a] of ultimos) avancePorUid.set(uid, Number(a.porcentaje));
+
+  // Avances ya registrados por ESTE plan (para pre-llenar el cierre al reabrir).
+  const avancesDelPlan = await prisma.avanceTarea.findMany({
+    where: { projectId: obraId, planSemanalId: planId },
+    select: { uid: true, porcentaje: true },
+  });
+  const realDelPlanPorUid = new Map<number, string>();
+  for (const a of avancesDelPlan) realDelPlanPorUid.set(a.uid, a.porcentaje.toString());
+
+  // Que tareas caen dentro de la semana del corte (para agrupar el desplegable).
+  const { inicio: iniSemana, fin: finSemana } = rangoSemana(plan.fechaCorte);
+  const enSemanaUids = new Set(
+    tareasDeLaSemana(tareasCron, iniSemana, finSemana).map((t) => t.uid),
+  );
+
+  // Para el desplegable: todas las tareas de trabajo (sin resumenes), con su
+  // estado de semana y su restriccion.
+  const tareas: TareaOpcionPlan[] = tareasCron
     .filter((t) => !t.esResumen)
-    .map((t) => ({ uid: t.uid, codigo: t.codigo, nombre: t.nombre }));
+    .map((t) => {
+      const r = restriccionDeTarea(t.uid, dependencias, avancePorUid, nombrePorUid);
+      return {
+        uid: t.uid,
+        codigo: t.codigo,
+        nombre: t.nombre,
+        enSemana: enSemanaUids.has(t.uid),
+        conRestriccion: !r.libre,
+        restriccion: r.motivo,
+      };
+    });
 
   // Tareas ya cumplidas en OTRA semana (marcadas cumplido en otro plan de la
   // obra): una tarea terminada no vuelve a proponerse aunque su rango
@@ -235,7 +311,6 @@ export async function obtenerPlanSemanal(
   // Sugerencias: las tareas cuyo trabajo cae en la semana del corte, menos las
   // ya cumplidas. La pantalla las usa para autocargar los compromisos cuando la
   // semana esta vacia; el residente confirma o ajusta.
-  const { inicio: iniSemana, fin: finSemana } = rangoSemana(plan.fechaCorte);
   const sugeridas = tareasDeLaSemana(tareasCron, iniSemana, finSemana)
     .filter((t) => !uidsHechos.has(t.uid))
     .map((t) => ({
@@ -253,6 +328,7 @@ export async function obtenerPlanSemanal(
     causa: c.causa,
     notaCierre: c.notaCierre,
     tarea: c.uid !== null ? (porUid.get(c.uid) ?? null) : null,
+    porcentajeReal: c.uid !== null ? (realDelPlanPorUid.get(c.uid) ?? null) : null,
   }));
 
   const { total, cumplidos, ppc } = ppcDePlan(plan.compromisos);
@@ -451,6 +527,9 @@ export interface Evaluacion {
   cumplido: boolean;
   causa?: CausaNoCumplimiento | null;
   nota?: string | null;
+  /// % de avance real ALCANZADO por la tarea (acumulado 0-100). Solo aplica a
+  /// compromisos con tarea (uid); se propaga a AvanceTarea al cerrar.
+  porcentajeReal?: string | null;
 }
 
 /**
@@ -472,7 +551,13 @@ export async function cerrarPlanSemanal(
 
   const plan = await prisma.planSemanal.findFirst({
     where: { id: planId, projectId: obraId, project: { companyId: sesion.companyId } },
-    select: { id: true, estado: true, compromisos: { select: { id: true } } },
+    select: {
+      id: true,
+      estado: true,
+      numero: true,
+      fechaCorte: true,
+      compromisos: { select: { id: true, uid: true, metaPorcentaje: true } },
+    },
   });
   if (!plan) return { ok: false, error: "Plan no encontrado." };
   if (plan.estado !== "ABIERTO") {
@@ -488,6 +573,12 @@ export async function cerrarPlanSemanal(
     if (!e.cumplido) {
       if (!e.causa || !CAUSAS_CNC.includes(e.causa)) {
         return { ok: false, error: "Cada compromiso no cumplido necesita una causa." };
+      }
+    }
+    if (e.porcentajeReal != null && e.porcentajeReal.trim()) {
+      const n = Number(e.porcentajeReal.replace(",", "."));
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        return { ok: false, error: "El % alcanzado de cada tarea es un porcentaje entre 0 y 100." };
       }
     }
     porId.set(e.compromisoId, e);
@@ -514,6 +605,45 @@ export async function cerrarPlanSemanal(
       data: { estado: "CERRADO", cerradoPor: quien(sesion), cerradoAt: new Date() },
     });
 
+    // Propagar el avance REAL a las tareas: se registra el % alcanzado de cada
+    // compromiso CON tarea. Primero se borran los avances que ESTE plan habia
+    // registrado, para que reabrir/re-cerrar reemplace y no duplique. Los
+    // avances manuales (planSemanalId null) no se tocan.
+    await tx.avanceTarea.deleteMany({
+      where: { projectId: obraId, planSemanalId: planId },
+    });
+
+    const fechaAvance = new Date(
+      Math.min(plan.fechaCorte.getTime(), hoyUtc().getTime()),
+    );
+    let avancesRegistrados = 0;
+    for (const c of plan.compromisos) {
+      if (c.uid == null) continue;
+      const e = porId.get(c.id);
+      // El % alcanzado que manda la pantalla; si no viene y se cumplio, su meta
+      // (o 100% si no tenia meta). Si no se cumplio y no hay %, no se registra.
+      const bruto = e?.porcentajeReal?.trim()
+        ? e.porcentajeReal
+        : e?.cumplido
+          ? (c.metaPorcentaje?.toString() ?? "100")
+          : null;
+      if (bruto == null) continue;
+      const pct = normalizarDecimal(bruto, 2);
+      if (pct == null) continue;
+      await tx.avanceTarea.create({
+        data: {
+          projectId: obraId,
+          uid: c.uid,
+          fecha: fechaAvance,
+          porcentaje: pct,
+          reportadoPor: quien(sesion),
+          nota: `Plan semanal ${plan.numero}`,
+          planSemanalId: planId,
+        },
+      });
+      avancesRegistrados += 1;
+    }
+
     await tx.auditLog.create({
       data: {
         companyId: sesion.companyId,
@@ -522,7 +652,11 @@ export async function cerrarPlanSemanal(
         entidad: "PlanSemanal",
         entidadId: planId,
         accion: "UPDATE",
-        despues: { evento: "cierre", compromisos: plan.compromisos.length },
+        despues: {
+          evento: "cierre",
+          compromisos: plan.compromisos.length,
+          avancesRegistrados,
+        },
       },
     });
   });

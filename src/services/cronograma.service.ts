@@ -694,6 +694,10 @@ export interface DatosCurva {
   diaCorteSemanal: number;
   /// Estado de la cadencia: el ultimo corte esperado <= hoy y si falta reporte.
   cadencia: { ultimoCorteEsperado: Date | null; semanaPendiente: boolean };
+  /// El punto "actual" para los indicadores: el ultimo real semanal (o el ultimo
+  /// corte si no hay), con su planeado a esa fecha. De aqui salen EV/PV puntuales
+  /// del EVM y el "avance al corte" del panel, sin depender de reimportar.
+  puntoActual: { fecha: Date; real: number; planeado: number } | null;
 }
 
 /**
@@ -713,6 +717,7 @@ export async function datosCurvaS(
     fuentePlan: "vigente", planeadoBaseEnCorte: null, lineaBase: null,
     realSemanal: [], diaCorteSemanal: 5,
     cadencia: { ultimoCorteEsperado: null, semanaPendiente: false },
+    puntoActual: null,
   };
 
   if (!puede(sesion, "cronograma:leer")) return vacio;
@@ -858,6 +863,15 @@ export async function datosCurvaS(
     anclaReal.valor,
   );
 
+  // El punto actual para los indicadores: el ultimo real (semanal si lo hay),
+  // con su planeado a esa fecha. Hace que EVM y el panel avancen desde GCM
+  // (los avances) sin necesidad de reimportar un cronograma.
+  const puntoActual = {
+    fecha: anclaReal.fecha,
+    real: anclaReal.valor,
+    planeado: Number(planeadoEnFecha(planificadas, anclaReal.fecha)),
+  };
+
   return {
     cortes: serie,
     plan,
@@ -872,6 +886,7 @@ export async function datosCurvaS(
     realSemanal,
     diaCorteSemanal,
     cadencia: { ultimoCorteEsperado, semanaPendiente },
+    puntoActual,
   };
 }
 
@@ -963,9 +978,11 @@ export async function avanceFisicoPorObra(
     const suyas = porCronograma.get(vigente.id) ?? [];
     if (suyas.length === 0) continue;
 
-    // El reporte vigente EN LA FECHA DEL CORTE, no el de hoy: el mismo
-    // criterio que la curva, para que las dos cifras coincidan.
-    const hasta = vigente.fechaCorte.getTime();
+    // El reporte vigente A HOY: el avance real de GCM manda y avanza sin
+    // reimportar, igual que la linea real semanal de la curva. (Antes se
+    // anclaba a la fecha del ultimo import y el panel quedaba congelado.)
+    const hoyPanel = hoyUtc();
+    const hasta = hoyPanel.getTime();
     const ultimos = ultimoAvancePorTarea(
       avances
         .filter((a) => a.projectId === projectId && a.fecha.getTime() <= hasta)
@@ -986,7 +1003,7 @@ export async function avanceFisicoPorObra(
       real,
       planeado,
       desfase: restar(real, planeado) ?? "0.00",
-      fechaCorte: vigente.fechaCorte,
+      fechaCorte: hoyPanel,
       finPlan: suyas.reduce((m, t) => (t.fin > m ? t.fin : m), suyas[0]!.fin),
     });
   }

@@ -15,9 +15,13 @@ import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 interface Fila {
   id: string;
   descripcion: string;
+  /// uid de la tarea del cronograma; null si es una linea libre (no propaga avance).
+  uid: number | null;
   cumplido: boolean;
   causa: CausaNoCumplimiento;
   nota: string;
+  /// % alcanzado (acumulado 0-100) de la tarea; se propaga a su avance al cerrar.
+  porcentajeReal: string;
 }
 
 export function CierrePlanSemanal({
@@ -30,15 +34,19 @@ export function CierrePlanSemanal({
   compromisos: {
     id: string;
     descripcion: string;
+    uid: number | null;
+    metaPorcentaje: string | null;
     cumplido: boolean | null;
     causa: CausaNoCumplimiento | null;
     notaCierre: string | null;
+    porcentajeReal: string | null;
   }[];
 }) {
   const [filas, setFilas] = useState<Fila[]>(() =>
     compromisos.map((c) => ({
       id: c.id,
       descripcion: c.descripcion,
+      uid: c.uid,
       // Restaura lo YA guardado: al reabrir una semana no se pierde nada. Si el
       // compromiso nunca se evaluo (cumplido null), recien ahi arranca SIN
       // tildar —dar por cumplido por defecto inflaba el PPC y tildaba hasta
@@ -46,6 +54,9 @@ export function CierrePlanSemanal({
       cumplido: c.cumplido ?? false,
       causa: c.causa ?? "PRERREQUISITO",
       nota: c.notaCierre ?? "",
+      // % alcanzado: lo ya registrado por este plan al reabrir; si no, la meta
+      // como punto de partida editable.
+      porcentajeReal: c.porcentajeReal ?? c.metaPorcentaje ?? "",
     })),
   );
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +77,8 @@ export function CierrePlanSemanal({
           cumplido: f.cumplido,
           causa: f.cumplido ? null : f.causa,
           nota: f.nota.trim() || null,
+          porcentajeReal:
+            f.uid !== null ? (f.porcentajeReal.trim() || null) : null,
         })),
       );
       if (!r.ok) setError(r.error ?? "No se pudo cerrar la semana.");
@@ -96,6 +109,22 @@ export function CierrePlanSemanal({
                 <span>Cumplido</span>
               </label>
               <span className="flex-1">{f.descripcion}</span>
+              {f.uid !== null && (
+                <label className="inline-flex items-center gap-1 text-xs opacity-80">
+                  % alcanzado
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.01"
+                    value={f.porcentajeReal}
+                    onChange={(e) => set(f.id, { porcentajeReal: e.target.value })}
+                    title="Avance acumulado de la tarea (0-100)"
+                    className="w-16 rounded border px-1.5 py-1 text-xs tabular-nums"
+                    style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+                  />
+                </label>
+              )}
             </div>
             {!f.cumplido && (
               <div className="mt-2 flex flex-wrap items-center gap-2">

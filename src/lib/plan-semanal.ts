@@ -163,3 +163,54 @@ export function tareasDeLaSemana(
         (a.codigo ?? "").localeCompare(b.codigo ?? ""),
     );
 }
+
+export interface EnlacePredecesora {
+  tareaUid: number;
+  predecesoraUid: number;
+  /// FC (fin-comienzo), CC (comienzo-comienzo), FF (fin-fin), CF (comienzo-fin).
+  tipo: string;
+}
+
+export interface RestriccionTarea {
+  /// true = se puede iniciar/adelantar; false = tiene una predecesora pendiente.
+  libre: boolean;
+  /// Descripcion de la restriccion cuando no esta libre (para el aviso).
+  motivo: string | null;
+}
+
+/**
+ * Si una tarea se puede INICIAR (o adelantar) segun sus predecesoras.
+ *
+ * Solo miran al INICIO de la tarea (que es lo que se adelanta):
+ *   - FC (fin->comienzo): la predecesora debe TERMINAR antes -> restringe si &lt; 100%.
+ *   - CC (comienzo->comienzo): debe haber ARRANCADO -> restringe si esta en 0%.
+ *   - FF / CF: gobiernan el fin, no el inicio -> no restringen adelantar.
+ *
+ * Sin predecesoras, o con todas las que gobiernan el inicio satisfechas, la
+ * tarea esta LIBRE. Es la logica Last Planner de "liberar restricciones": no
+ * bloquea, solo avisa.
+ */
+export function restriccionDeTarea(
+  uid: number,
+  dependencias: readonly EnlacePredecesora[],
+  avancePorUid: ReadonlyMap<number, number>,
+  nombrePorUid?: ReadonlyMap<number, string>,
+): RestriccionTarea {
+  for (const d of dependencias) {
+    if (d.tareaUid !== uid) continue;
+
+    const avance = avancePorUid.get(d.predecesoraUid) ?? 0;
+    const tipo = d.tipo.toUpperCase();
+
+    const gobierna =
+      tipo === "FC" ? avance < 100 : tipo === "CC" ? avance <= 0 : false;
+
+    if (gobierna) {
+      const nombre =
+        nombrePorUid?.get(d.predecesoraUid) ?? `tarea ${d.predecesoraUid}`;
+      return { libre: false, motivo: `${nombre} al ${Math.round(avance)}%` };
+    }
+  }
+
+  return { libre: true, motivo: null };
+}

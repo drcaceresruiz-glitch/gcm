@@ -6,8 +6,10 @@ import {
   proximoCorte,
   rangoSemana,
   tareasDeLaSemana,
+  restriccionDeTarea,
   type CompromisoEvaluado,
   type TareaProgramada,
+  type EnlacePredecesora,
 } from "./plan-semanal";
 
 const dc = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -143,5 +145,60 @@ describe("tareasDeLaSemana", () => {
       t(3, "b", "2026-08-02", "2026-08-04"),
     ];
     expect(tareasDeLaSemana(tareas, ini, fin).map((x) => x.codigo)).toEqual(["a", "b", "z"]);
+  });
+});
+
+describe("restriccionDeTarea", () => {
+  const dep = (tareaUid: number, predecesoraUid: number, tipo: string): EnlacePredecesora => ({
+    tareaUid,
+    predecesoraUid,
+    tipo,
+  });
+
+  it("sin predecesoras: libre", () => {
+    expect(restriccionDeTarea(5, [], new Map()).libre).toBe(true);
+  });
+
+  it("FC con predecesora al 100%: libre", () => {
+    const r = restriccionDeTarea(5, [dep(5, 4, "FC")], new Map([[4, 100]]));
+    expect(r.libre).toBe(true);
+  });
+
+  it("FC con predecesora al 50%: con restriccion y motivo", () => {
+    const r = restriccionDeTarea(
+      5,
+      [dep(5, 4, "FC")],
+      new Map([[4, 50]]),
+      new Map([[4, "2.1 Movilizacion"]]),
+    );
+    expect(r.libre).toBe(false);
+    expect(r.motivo).toBe("2.1 Movilizacion al 50%");
+  });
+
+  it("CC restringe solo si la predecesora esta en 0", () => {
+    expect(restriccionDeTarea(5, [dep(5, 4, "CC")], new Map([[4, 0]])).libre).toBe(false);
+    expect(restriccionDeTarea(5, [dep(5, 4, "CC")], new Map([[4, 20]])).libre).toBe(true);
+  });
+
+  it("FF y CF no restringen el inicio (adelantar)", () => {
+    expect(restriccionDeTarea(5, [dep(5, 4, "FF")], new Map([[4, 0]])).libre).toBe(true);
+    expect(restriccionDeTarea(5, [dep(5, 4, "CF")], new Map([[4, 0]])).libre).toBe(true);
+  });
+
+  it("varias predecesoras: la primera pendiente manda", () => {
+    const r = restriccionDeTarea(
+      5,
+      [dep(5, 3, "FC"), dep(5, 4, "FC")],
+      new Map([[3, 100], [4, 30]]),
+      new Map([[4, "2.4 Trazo"]]),
+    );
+    expect(r.libre).toBe(false);
+    expect(r.motivo).toBe("2.4 Trazo al 30%");
+  });
+
+  it("una predecesora sin avance registrado cuenta como 0%", () => {
+    const r = restriccionDeTarea(5, [dep(5, 4, "FC")], new Map());
+    expect(r.libre).toBe(false);
+    expect(r.motivo).toBe("tarea 4 al 0%");
   });
 });

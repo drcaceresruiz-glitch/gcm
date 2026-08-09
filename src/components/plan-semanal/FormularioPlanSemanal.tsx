@@ -21,6 +21,12 @@ interface TareaOpcion {
   uid: number;
   codigo: string | null;
   nombre: string;
+  /// Programada dentro de la semana del corte.
+  enSemana: boolean;
+  /// Tiene una predecesora pendiente (se puede adelantar igual, con aviso).
+  conRestriccion: boolean;
+  /// Texto de la restriccion, si la hay.
+  restriccion: string | null;
 }
 
 export function FormularioPlanSemanal({
@@ -116,12 +122,40 @@ export function FormularioPlanSemanal({
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
           >
             <option value="">— elegir —</option>
-            {tareas.map((t) => (
-              <option key={t.uid} value={t.uid}>
-                {t.codigo ? `${t.codigo} ` : ""}
-                {t.nombre}
-              </option>
-            ))}
+            {(() => {
+              const etiqueta = (t: TareaOpcion) =>
+                `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`;
+              const deSemana = tareas.filter((t) => t.enSemana);
+              const adelantar = tareas.filter((t) => !t.enSemana && !t.conRestriccion);
+              const restringidas = tareas.filter((t) => !t.enSemana && t.conRestriccion);
+              return (
+                <>
+                  {deSemana.length > 0 && (
+                    <optgroup label="De esta semana">
+                      {deSemana.map((t) => (
+                        <option key={t.uid} value={t.uid}>{etiqueta(t)}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {adelantar.length > 0 && (
+                    <optgroup label="Se pueden adelantar">
+                      {adelantar.map((t) => (
+                        <option key={t.uid} value={t.uid}>{etiqueta(t)}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {restringidas.length > 0 && (
+                    <optgroup label="Con restriccion (predecesora pendiente)">
+                      {restringidas.map((t) => (
+                        <option key={t.uid} value={t.uid}>
+                          {etiqueta(t)} — ⚠ {t.restriccion}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </>
+              );
+            })()}
           </select>
         </label>
         <button

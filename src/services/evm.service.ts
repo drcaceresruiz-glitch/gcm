@@ -101,10 +101,16 @@ export async function datosEvm(
   const bac = sumar([presupuesto._sum.parcial?.toString() ?? "0"]);
 
   const ultimo = curva.cortes[curva.cortes.length - 1]!;
-  // Con linea base fijada, el PV sale del plan CONGELADO a la fecha de corte
-  // (time-phased); sin base cae al % del archivo del ultimo corte, como antes.
-  const pv = valorDeAvance(bac, curva.planeadoBaseEnCorte ?? Number(ultimo.planeado));
-  const ev = valorDeAvance(bac, Number(ultimo.real));
+  // El punto ACTUAL: el ultimo avance semanal de GCM (o el ultimo corte si aun
+  // no hay avances). Asi el EVM avanza sin reimportar. El PV es el plan
+  // (congelado si hay linea base) a esa misma fecha; el EV, el % real medido.
+  const actual = curva.puntoActual ?? {
+    fecha: ultimo.fecha,
+    real: Number(ultimo.real),
+    planeado: curva.planeadoBaseEnCorte ?? Number(ultimo.planeado),
+  };
+  const pv = valorDeAvance(bac, actual.planeado);
+  const ev = valorDeAvance(bac, actual.real);
 
   // AC total a la fecha: todo lo comprometido y aprobado. Es acumulado por
   // definicion —una orden aprobada sigue comprometida—.
@@ -127,10 +133,18 @@ export async function datosEvm(
     fecha: p.fecha,
     valor: Number(valorDeAvance(bac, p.valor)),
   }));
-  const cortesEv: PuntoEvm[] = curva.cortes.map((c) => ({
-    fecha: c.fecha,
-    valor: Number(valorDeAvance(bac, Number(c.real))),
-  }));
+  // La serie de valor ganado sale del real SEMANAL (avanza con GCM); si aun no
+  // hay muestreo semanal, cae a los cortes importados.
+  const cortesEv: PuntoEvm[] =
+    curva.realSemanal.length > 0
+      ? curva.realSemanal.map((p) => ({
+          fecha: p.fecha,
+          valor: Number(valorDeAvance(bac, p.valor)),
+        }))
+      : curva.cortes.map((c) => ({
+          fecha: c.fecha,
+          valor: Number(valorDeAvance(bac, Number(c.real))),
+        }));
 
   // AC acumulado por fecha de orden: se agrupan las imputaciones por su fecha,
   // se ordenan y se van sumando. Con una sola orden es un escalon; con varias,
@@ -151,7 +165,7 @@ export async function datosEvm(
 
   return {
     bac,
-    fechaCorte: ultimo.fecha,
+    fechaCorte: actual.fecha,
     verCosto,
     coberturaMapeo: cob.porcentaje,
     metricas,

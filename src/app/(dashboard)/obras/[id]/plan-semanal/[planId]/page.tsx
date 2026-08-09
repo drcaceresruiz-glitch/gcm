@@ -123,9 +123,12 @@ export default async function DetallePlanSemanalPage({
             compromisos={plan.compromisos.map((c) => ({
               id: c.id,
               descripcion: c.descripcion,
+              uid: c.uid,
+              metaPorcentaje: c.metaPorcentaje,
               cumplido: c.cumplido,
               causa: c.causa,
               notaCierre: c.notaCierre,
+              porcentajeReal: c.porcentajeReal,
             }))}
           />
         </Seccion>
