@@ -59,6 +59,10 @@ export const PERMISOS = [
   "proveedor:crear",
   "proveedor:editar",
 
+  "encargo:leer",
+  "encargo:gestionar",
+  "encargo:valorizar",
+
   "orden:leer",
   "orden:crear",
   "orden:aprobar",
@@ -137,6 +141,12 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// presupuesto, pero no pide ni aprueba: eso es administracion.
     "proveedor:leer",
     "orden:leer",
+    /// Los encargos son el frente de cada proveedor en la obra. El residente
+    /// los ve y VALORIZA el avance —esta en obra, es quien lo sabe, como con
+    /// el avance de las tareas—, pero no reparte alcances ni pacta montos: eso
+    /// es administracion, y va en ADMIN_OBRA.
+    "encargo:leer",
+    "encargo:valorizar",
   ],
 
   /// Administrador de obra: perfil economico-administrativo. Consulta el
@@ -161,6 +171,12 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "proveedor:editar",
     "orden:leer",
     "orden:crear",
+    /// Reparte la obra entre proveedores: crea encargos, les asigna el frente
+    /// y su monto, y tambien valoriza. Es el trabajo economico-administrativo
+    /// previo a emitir las ordenes.
+    "encargo:leer",
+    "encargo:gestionar",
+    "encargo:valorizar",
   ],
 
   /// Almacen: necesita ver las partidas para imputar movimientos de

@@ -67,6 +67,13 @@ export default async function ObraLayout({
         etiqueta: "Movimientos",
         clave: "movimientos",
       },
+    // Los proveedores van antes que las ordenes: primero repartes la obra en
+    // frentes —quien hace que, por cuanto— y luego les emites los pedidos.
+    puede(sesion, "encargo:leer") && {
+      href: `${raiz}/proveedores`,
+      etiqueta: "Proveedores",
+      clave: "proveedores",
+    },
     // Las ordenes no dependen de la linea base: se puede pedir a un proveedor
     // antes de congelar el presupuesto.
     puede(sesion, "orden:leer") && {

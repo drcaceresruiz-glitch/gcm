@@ -6,6 +6,7 @@ import {
   ArrowLeftRight,
   CalendarClock,
   FileClock,
+  Handshake,
   Table2,
   Truck,
 } from "lucide-react";
@@ -23,6 +24,7 @@ const ICONOS = {
   cronograma: CalendarClock,
   revisiones: FileClock,
   movimientos: ArrowLeftRight,
+  proveedores: Handshake,
   ordenes: Truck,
 } as const;
 

@@ -374,6 +374,7 @@ model Project {
   cronogramas Cronograma[]
   avances     AvanceTarea[]
   mapeos      MapeoTareaPartida[]
+  encargos    EncargoProveedor[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -470,6 +471,7 @@ model WbsItem {
   lineasMovimiento MovimientoLinea[]
   imputaciones     OrdenImputacion[]
   proveedores      ProveedorPartida[]
+  encargos         EncargoPartida[]
 
   @@unique([projectId, codigoPartida])
   @@index([projectId, parentId])
@@ -840,6 +842,7 @@ model Proveedor {
   company   Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
   ordenes   OrdenCompra[]
   habituales ProveedorPartida[]
+  encargos  EncargoProveedor[]
 
   @@unique([companyId, ruc])
   @@index([companyId])
@@ -1303,4 +1306,127 @@ model AuditLog {
   @@index([entidad, entidadId])
   @@index([userId, createdAt])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Encargos a proveedores (subcontratos por obra)
+//
+// Distinto de `ProveedorPartida`, que es un ATAJO —las partidas que un
+// proveedor suele imputar, para que salgan primero al redactar una orden, y
+// que NO limita nada—. Un encargo es lo contrario: el compromiso de que un
+// proveedor se hace cargo de un FRENTE de la obra, con su precio pactado y su
+// avance. Es el paso previo a las ordenes: primero repartes la obra entre
+// proveedores, luego les vas emitiendo pedidos contra ese alcance.
+//
+// El precio del encargo (`montoContratado`) es el del PROVEEDOR y puede no
+// coincidir con el parcial del presupuesto, que es TU costo estimado. Son dos
+// cifras distintas y el modulo las compara sin mezclarlas.
+// ---------------------------------------------------------------------------
+
+/// VIGENTE mientras el proveedor trabaja; CERRADO cuando se liquida; ANULADO
+/// si el encargo se deshizo. No se borra: un encargo con valorizaciones es
+/// historia de la obra, igual que una orden anulada se conserva con su motivo.
+enum EstadoEncargo {
+  VIGENTE
+  CERRADO
+  ANULADO
+}
+
+model EncargoProveedor {
+  id          String @id @default(cuid())
+  projectId   String
+  proveedorId String
+
+  /// Correlativo por obra ("E-001"), para nombrarlo en obra sin recitar el id.
+  numero Int
+
+  /// El frente en una linea, para leerlo sin abrir. "Estructura metalica ZONA 1".
+  descripcion String @db.VarChar(300)
+
+  /// Lo pactado con el proveedor por este frente, sin IGV para poder
+  /// compararlo con el parcial del presupuesto, que tambien va sin IGV. Es SU
+  /// precio, no el tuyo: puede quedar por encima o por debajo de tu costo.
+  montoContratado Decimal @db.Decimal(14, 2)
+
+  /// Que impuesto emite este proveedor. Se hereda del proveedor al crear el
+  /// encargo y se guarda aqui para que el importe con impuesto no dependa de
+  /// que el proveedor no cambie despues.
+  tipoImpuesto TipoImpuesto @default(IGV)
+
+  estado EstadoEncargo @default(VIGENTE)
+
+  /// Fechas del encargo, si se pactaron. De calendario (`@db.Date`), como el
+  /// resto de fechas de obra.
+  fechaInicio DateTime? @db.Date
+  fechaFin    DateTime? @db.Date
+
+  notas String? @db.Text
+
+  creadoPor String   @db.VarChar(150)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  proveedor      Proveedor             @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  partidas       EncargoPartida[]
+  valorizaciones ValorizacionEncargo[]
+
+  @@unique([projectId, numero])
+  @@index([projectId, estado])
+  @@index([proveedorId])
+  @@map("encargos_proveedor")
+}
+
+/// Que partidas —y que fraccion de cada una— entran en el encargo.
+///
+/// La fraccion existe porque, como pasa a menudo, una partida se reparte entre
+/// dos proveedores: cada encargo lleva su parte y entre todos no deben pasar
+/// del 100 % de la partida. Lo normal es 100 (la partida entera a un solo
+/// proveedor), y ese es el valor por defecto.
+model EncargoPartida {
+  id        String @id @default(cuid())
+  encargoId String
+  wbsItemId String
+
+  /// 0..100. Porcentaje del parcial de la partida asignado a ESTE encargo.
+  fraccion Decimal @default(100) @db.Decimal(6, 3)
+
+  encargo EncargoProveedor @relation(fields: [encargoId], references: [id], onDelete: Cascade)
+  /// Restrict y no Cascade: una partida con encargo no se borra a la ligera
+  /// —hay un compromiso con un proveedor colgando—; primero se quita del
+  /// encargo. La linea base ya bloquea el borrado de partidas por su lado.
+  partida WbsItem @relation(fields: [wbsItemId], references: [id], onDelete: Restrict)
+
+  @@unique([encargoId, wbsItemId])
+  @@index([wbsItemId])
+  @@map("encargo_partidas")
+}
+
+/// El avance del proveedor contra su encargo, con fecha y autor.
+///
+/// APPEND-ONLY, igual que el avance de las tareas: cada valorizacion es un
+/// corte con su fecha, y la vigente es la mas reciente. Guardar la serie —y no
+/// sobrescribir un unico porcentaje— es lo que permite ver el ritmo del
+/// proveedor y saber quien reporto que, y cuando.
+model ValorizacionEncargo {
+  id        String @id @default(cuid())
+  encargoId String
+
+  /// Fecha del corte de la valorizacion (calendario).
+  fecha DateTime @db.Date
+
+  /// Avance ACUMULADO del proveedor, 0..100, sobre su monto contratado.
+  /// Acumulado y no incremental: es como se lee una valorizacion ("vamos al
+  /// 45 %"), y restar dos cortes da el avance del periodo.
+  porcentaje Decimal @db.Decimal(6, 3)
+
+  nota String? @db.Text
+
+  registradoPor String   @db.VarChar(150)
+  createdAt     DateTime @default(now())
+
+  encargo EncargoProveedor @relation(fields: [encargoId], references: [id], onDelete: Cascade)
+
+  @@index([encargoId, fecha])
+  @@map("valorizaciones_encargo")
 }
