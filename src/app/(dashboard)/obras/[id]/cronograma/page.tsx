@@ -16,7 +16,9 @@ import {
   historialCronogramas,
   datosCurvaS,
 } from "@/services/cronograma.service";
+import { datosEvm } from "@/services/evm.service";
 import { CurvaS } from "@/components/cronograma/CurvaS";
+import { PanelEvm } from "@/components/cronograma/PanelEvm";
 import { ControlCapitulos } from "@/components/cronograma/ControlCapitulos";
 import { AlertasAtraso } from "@/components/cronograma/AlertasAtraso";
 import { CadenaCritica } from "@/components/cronograma/CadenaCritica";
@@ -53,10 +55,11 @@ export default async function CronogramaPage({
 
   if (!puede(sesion, "cronograma:leer")) redirect(`/obras/${id}`);
 
-  const [cronograma, historial, curva] = await Promise.all([
+  const [cronograma, historial, curva, evm] = await Promise.all([
     obtenerCronograma(sesion, id),
     historialCronogramas(sesion, id),
     datosCurvaS(sesion, id),
+    datosEvm(sesion, id),
   ]);
 
   const puedeImportar = puede(sesion, "cronograma:importar");
@@ -227,6 +230,19 @@ export default async function CronogramaPage({
               avance con lo comprometido.
             </p>
           </Tarjeta>
+
+          {evm && (
+            <Tarjeta>
+              <h3 className="text-base font-semibold">Valor ganado (EVM)</h3>
+              <p className="mt-0.5 mb-4 text-sm opacity-70">
+                El avance y el gasto en la misma escala de dinero: el control
+                integrado de plazo y costo. El SPI dice como se va de plazo; el
+                CPI, de costo.
+              </p>
+
+              <PanelEvm datos={evm} />
+            </Tarjeta>
+          )}
 
           <Tarjeta>
             <h3 className="text-base font-semibold">Que esta frenando la obra</h3>
