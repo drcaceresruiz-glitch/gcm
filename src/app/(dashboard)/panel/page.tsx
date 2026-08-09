@@ -238,7 +238,10 @@ export default async function PanelPage({
               alertas.push({
                 clave: "presupuesto",
                 texto: "El comprometido supera el presupuesto de la obra",
-                detalle: `${soles(obra.comprometido)} sobre ${soles(obra.presupuestoTotal)}, sin IGV.`,
+                // Sin el «sin IGV» que ponia antes: el comprometido es el
+                // importe imputable de cada orden, y en las de retencion ese
+                // importe es el total, no el neto.
+                detalle: `${soles(obra.comprometido)} sobre ${soles(obra.presupuestoTotal)}.`,
               });
             }
 

@@ -780,8 +780,9 @@ model MovimientoLinea {
 //
 // De aqui sale el COMPROMETIDO, la primera columna del control de obra: lo
 // que ya se pactó con proveedores aunque todavia no se haya recibido ni
-// pagado. Se mide SIN IGV, como todo lo demas: el IGV que factura el
-// proveedor es credito fiscal, no costo.
+// pagado. Se mide contra el IMPORTE IMPUTABLE de cada orden: el neto en las
+// que llevan IGV —que es credito fiscal y no costo—, y el total en las de
+// retencion de renta o sin impuesto, donde no hay nada que recuperar.
 // ---------------------------------------------------------------------------
 
 model Proveedor {
@@ -1019,15 +1020,19 @@ model OrdenLinea {
   @@map("orden_lineas")
 }
 
-/// El reparto de la orden contra el presupuesto, SIN IGV.
+/// El reparto de la orden contra el presupuesto.
 ///
 /// Existe porque las ordenes reales cruzan varias partidas: los S/ 159,450 de
 /// SIV AIRE se reparten entre laboratorios, bunker y administracion. Con una
 /// sola partida por orden, la desviacion de esa partida dejaria de significar
 /// nada.
 ///
-/// INVARIANTE: la suma de las imputaciones es igual al NETO de la orden. Se
-/// comprueba al aprobar, como que una reconversion sume cero.
+/// INVARIANTE: la suma de las imputaciones es igual al IMPORTE IMPUTABLE de la
+/// orden, que NO siempre es el neto. Lo decide `lib/ordenes.importeImputable`:
+/// con IGV es el neto —el IGV es credito fiscal y no costo de obra—, y con
+/// retencion de renta o sin impuesto es el total, porque ahi no hay nada que
+/// recuperar y quitarlo dejaria fuera un 8% de dinero comprometido de verdad.
+/// Se comprueba al aprobar, como que una reconversion sume cero.
 model OrdenImputacion {
   id        String @id @default(cuid())
   ordenId   String

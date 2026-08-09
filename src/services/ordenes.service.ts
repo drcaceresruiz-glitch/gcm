@@ -30,15 +30,27 @@ import type { Prisma } from "@/generated/prisma/client";
  * Ordenes de compra y de servicio.
  *
  * De aqui sale el COMPROMETIDO: lo que ya se pacto con proveedores aunque
- * todavia no se haya recibido ni pagado. Se mide contra el NETO, sin IGV,
- * porque el IGV que factura el proveedor es credito fiscal y no costo de
- * obra. Repartir el total inflaria la obra con dinero que se recupera.
+ * todavia no se haya recibido ni pagado.
+ *
+ * SE MIDE CONTRA EL IMPORTE IMPUTABLE, que no siempre es el neto. La regla la
+ * fija `lib/ordenes.importeImputable` y depende del impuesto de la orden:
+ *
+ *   - Con IGV: cuenta el NETO. El IGV que factura el proveedor es credito
+ *     fiscal y no costo de obra; repartir el total inflaria la obra con
+ *     dinero que se recupera.
+ *   - Con retencion de renta, o sin impuesto: cuenta el TOTAL. Ahi no hay
+ *     nada que recuperar —lo retenido se paga igual, solo que a SUNAT en vez
+ *     de al proveedor—, asi que descontarlo dejaria fuera un 8% de dinero
+ *     realmente comprometido.
+ *
+ * De ahi que decir «el comprometido va sin IGV» sea correcto solo para las
+ * ordenes con IGV. En las demas no hay IGV que quitar y la cifra es el total.
  *
  * Dos reglas gobiernan el modulo, y las dos se comprueban al APROBAR, que es
  * cuando la orden empieza a contar:
  *
- *   1. La suma de las imputaciones es igual al neto. Sin eso, el comprometido
- *      de las partidas no cuadra con lo que se pidio de verdad.
+ *   1. La suma de las imputaciones es igual al importe imputable. Sin eso, el
+ *      comprometido de las partidas no cuadra con lo que se pidio de verdad.
  *   2. La suma de las lineas que no son agrupadoras es igual al subtotal. Las
  *      ordenes reales abren cada bloque con una linea que repite la suma de
  *      sus hijas, y contarla otra vez duplica el importe.
@@ -518,7 +530,20 @@ export async function aprobarOrden(
             numero: orden.numero,
             estado: "APROBADA",
             aprobadaPor,
-            comprometido: orden.neto.toString(),
+            /**
+             * Lo que se compromete es el IMPUTABLE, no el neto.
+             *
+             * En una orden con retencion de renta lo que cuenta contra el
+             * presupuesto es el total, no el neto: el impuesto retenido se
+             * paga igual, solo que a SUNAT en vez de al proveedor. Anotar el
+             * neto subestimaba el apunte un 8% justo en esas ordenes.
+             *
+             * No afectaba a ninguna cifra de control —esas salen de
+             * `OrdenImputacion`, no del registro—, pero un historial que no
+             * cuadra con la realidad no sirve para auditar nada.
+             */
+            comprometido: imputable,
+            neto: orden.neto.toString(),
           },
         },
       });
@@ -655,13 +680,24 @@ export async function anularOrden(
 
   const orden = await prisma.ordenCompra.findFirst({
     where: { id: ordenId, companyId: sesion.companyId },
-    select: { id: true, projectId: true, numero: true, estado: true, neto: true },
+    select: {
+      id: true, projectId: true, numero: true, estado: true,
+      // El total y el tipo de impuesto hacen falta para saber cuanto se
+      // libera de verdad: en una orden con retencion no es el neto.
+      neto: true, total: true, tipoImpuesto: true,
+    },
   });
 
   if (!orden) return { ok: false, error: "Orden no encontrada." };
   if (orden.estado === "ANULADA") {
     return { ok: false, error: `La orden ${orden.numero} ya estaba anulada.` };
   }
+
+  const imputable = importeImputable({
+    tipoImpuesto: orden.tipoImpuesto,
+    neto: orden.neto.toString(),
+    total: orden.total.toString(),
+  });
 
   await prisma.$transaction(async (tx) => {
     await tx.ordenCompra.update({
@@ -689,8 +725,11 @@ export async function anularOrden(
           anuladaPor,
           motivo: motivo.trim(),
           // Se deja constancia de cuanto dejo de estar comprometido: es la
-          // cifra que cambia en el control al anular.
-          liberado: orden.estado === "APROBADA" ? orden.neto.toString() : "0.00",
+          // cifra que cambia en el control al anular. Y es el IMPUTABLE, no el
+          // neto: en una orden con retencion lo comprometido era el total, asi
+          // que anotar el neto decia que se libera un 8% menos de lo que de
+          // verdad se libera.
+          liberado: orden.estado === "APROBADA" ? imputable : "0.00",
         },
       },
     });
@@ -715,7 +754,10 @@ export interface ComprometidoPorPartida {
  * nadie, y una anulada dejo de serlo. Ese filtro es la definicion de la
  * columna, no una optimizacion.
  *
- * Devuelve importes SIN IGV, que es como se mide el costo de obra.
+ * Devuelve el IMPORTE IMPUTABLE de cada orden, que es el neto en las que
+ * llevan IGV y el total en las de retencion o sin impuesto. No es «sin IGV» a
+ * secas: eso solo describe al primer caso. Lo que tienen en comun las tres
+ * reglas es que ninguna cuenta dinero que la obra vaya a recuperar.
  */
 export async function obtenerComprometido(
   sesion: SesionActiva,

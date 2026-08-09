@@ -54,13 +54,16 @@ export interface ObraResumen {
   presupuestoTotal: string;
   totalPartidas: number;
   /**
-   * Comprometido con proveedores, SIN IGV y solo de ordenes APROBADAS: la
-   * misma definicion que usa `obtenerComprometido` en la pantalla de la obra.
-   * Un borrador todavia no compromete a nadie y una anulada dejo de hacerlo.
+   * Comprometido con proveedores, solo de ordenes APROBADAS: la misma
+   * definicion que usa `obtenerComprometido` en la pantalla de la obra. Un
+   * borrador todavia no compromete a nadie y una anulada dejo de hacerlo.
+   *
+   * Cuenta el importe IMPUTABLE de cada orden, que es el neto en las que
+   * llevan IGV y el total en las de retencion o sin impuesto. No es «sin IGV»
+   * a secas: eso solo describe al primer caso.
    */
   comprometido: string;
-  /// Partidas cuyo comprometido supera su parcial. Es la alerta de sobrecosto
-  /// que se puede afirmar hoy; el avance fisico no existe todavia.
+  /// Partidas cuyo comprometido supera su parcial.
   partidasSobregiradas: number;
 }
 
@@ -69,7 +72,8 @@ export interface ResumenEmpresa {
   obrasEnEjecucion: number;
   /// Suma de las partidas de TODAS las obras de la empresa.
   presupuestoTotal: string;
-  /// Comprometido con proveedores, sin IGV y solo de ordenes aprobadas.
+  /// Comprometido con proveedores, solo de ordenes aprobadas. Es el importe
+  /// imputable de cada una: neto con IGV, total con retencion o sin impuesto.
   comprometido: string;
   /// Presupuesto menos comprometido. Puede salir negativo, y entonces hay que
   /// verlo: significa que se ha pedido mas de lo que hay presupuestado.

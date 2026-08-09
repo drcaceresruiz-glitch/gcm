@@ -11,7 +11,10 @@ import { AlertasEmpresa } from "@/components/obras/AlertasEmpresa";
  * solo se veian obra por obra, asi que «cuanto tengo comprometido en total»
  * no se podia responder sin sumar a mano.
  *
- * Todas son SIN IGV, que es como se mide el costo de obra en este sistema.
+ * El presupuesto va SIN IGV, que es la cifra de control. El comprometido va
+ * por el importe IMPUTABLE de cada orden —neto con IGV, total con retencion—,
+ * que no es lo mismo: decir «todo sin IGV» describia mal justo la columna que
+ * se compara contra el presupuesto.
  */
 export function ResumenEmpresaPanel({
   resumen,

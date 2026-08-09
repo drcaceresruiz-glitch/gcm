@@ -12,9 +12,14 @@ import { soles } from "@/utils/formato";
  * partida y ensenar el saldo. Por eso esta tabla solo aparece entera cuando
  * hay linea base: sin ella no hay vigente contra el que comparar.
  *
- * Todo SIN IGV. El comprometido sale del neto de las ordenes, y el vigente es
- * presupuesto sin IGV: compararlos con el total del banco mezclaria dos cosas
- * distintas y daria un sobrecosto que no existe.
+ * Ninguna de las dos cifras cuenta dinero que la obra vaya a recuperar, que
+ * es lo que las hace comparables. El vigente es presupuesto SIN IGV. El
+ * comprometido es el importe IMPUTABLE de cada orden: el neto en las que
+ * llevan IGV —credito fiscal, no costo— y el total en las de retencion de
+ * renta, donde lo retenido se paga igual, solo que a SUNAT.
+ *
+ * Decir «todo sin IGV» era comodo y falso: en una orden con retencion no hay
+ * IGV que quitar, y la cifra que cuenta es el total.
  */
 
 interface Props {
