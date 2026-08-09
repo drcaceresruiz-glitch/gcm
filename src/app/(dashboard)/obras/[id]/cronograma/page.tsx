@@ -180,9 +180,15 @@ export default async function CronogramaPage({
 
             <p className="mt-3 text-xs opacity-60">
               La ponderacion es por duracion porque es el unico peso que trae el
-              archivo —no lleva costes ni horas de trabajo—. Cuando se confirme
-              el mapeo entre tareas y partidas, pasara a ponderarse por dinero,
-              que es lo que hace comparable el avance con lo comprometido.
+              archivo —no lleva costes ni horas de trabajo—.{" "}
+              <Link
+                href={`/obras/${id}/cronograma/mapeo`}
+                className="font-medium underline"
+              >
+                Enlaza las tareas con las partidas del presupuesto
+              </Link>{" "}
+              y pasara a ponderarse por dinero, que es lo que hace comparable el
+              avance con lo comprometido.
             </p>
           </Tarjeta>
 

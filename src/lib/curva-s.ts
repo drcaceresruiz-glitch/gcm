@@ -66,17 +66,32 @@ export function ponderarPorDuracion<T extends Ponderable>(
   tareas: readonly T[],
   porcentajeDe: (t: T) => string,
 ): string {
-  const hojas = tareas.filter((t) => !t.esResumen);
+  return ponderar(
+    tareas.filter((t) => !t.esResumen),
+    (t) => t.duracionDias,
+    porcentajeDe,
+  );
+}
 
-  const pesos = hojas.map((t) => t.duracionDias);
-  const total = sumar(pesos, 4);
+/**
+ * Media ponderada exacta con el peso que se le diga.
+ *
+ * El peso es la duracion mientras no haya mapeo tarea-partida, y el DINERO en
+ * cuanto lo hay. La cuenta es la misma; lo unico que cambia es con que se
+ * pesa, y por eso vive en un solo sitio: dos copias acabarian redondeando
+ * distinto y dando dos cifras de avance para la misma obra.
+ */
+export function ponderar<T>(
+  items: readonly T[],
+  pesoDe: (t: T) => string,
+  valorDe: (t: T) => string,
+): string {
+  const total = sumar(items.map(pesoDe), 4);
   if (total === "0.0000") return "0.00";
 
   // Se acumula en cuatro decimales y solo al final se redondea a dos: con dos
   // desde el principio, ciento y pico redondeos arrastran varias decimas.
-  const aportes = hojas.map(
-    (t) => multiplicar(t.duracionDias, porcentajeDe(t), 4) ?? "0",
-  );
+  const aportes = items.map((t) => multiplicar(pesoDe(t), valorDe(t), 4) ?? "0");
 
   return dividir(sumar(aportes, 4), total, 2) ?? "0.00";
 }
