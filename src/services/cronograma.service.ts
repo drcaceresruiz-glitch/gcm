@@ -1,10 +1,16 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { medirAvance, type AvanceReportado, type Medida } from "@/lib/cronograma";
-import { normalizarDecimal } from "@/lib/decimal";
+import {
+  medirAvance,
+  ultimoAvancePorTarea,
+  type AvanceReportado,
+  type Medida,
+} from "@/lib/cronograma";
+import { normalizarDecimal, restar } from "@/lib/decimal";
 import {
   curvaPlaneada,
+  ponderarPorDuracion,
   proyectar,
   serieCurvaS,
   type PuntoCurva,
@@ -601,4 +607,123 @@ export async function datosCurvaS(
     inicio,
     fin,
   };
+}
+
+export interface AvanceFisico {
+  real: string;
+  planeado: string;
+  desfase: string;
+  fechaCorte: Date;
+  /// Fin de obra SEGUN EL CRONOGRAMA, que puede no ser el de la ficha: las
+  /// fechas de la ficha las teclea alguien al dar de alta la obra y se quedan
+  /// viejas en cuanto el planificador reprograma.
+  finPlan: Date;
+}
+
+/**
+ * El avance fisico de varias obras a la vez, para el panel.
+ *
+ * Se calcula EXACTAMENTE igual que el ultimo punto de la curva —misma
+ * ponderacion por duracion, mismo criterio de reporte vigente—. Si el panel
+ * usara otra formula, la tarjeta y la pantalla del cronograma dirian cifras
+ * distintas de la misma obra, y ninguna de las dos seria creible.
+ *
+ * Va en tres consultas y no en una por obra: el panel pinta una tarjeta por
+ * obra y una consulta dentro del bucle multiplicaria el trabajo por el numero
+ * de obras de la empresa.
+ */
+export async function avanceFisicoPorObra(
+  sesion: SesionActiva,
+  obraIds: readonly string[],
+): Promise<Map<string, AvanceFisico>> {
+  const resultado = new Map<string, AvanceFisico>();
+
+  if (obraIds.length === 0 || !puede(sesion, "cronograma:leer")) return resultado;
+
+  // Los cronogramas de todas las obras, del corte mas reciente al mas
+  // antiguo. Se queda el primero de cada obra, que es el vigente.
+  const cronogramas = await prisma.cronograma.findMany({
+    where: {
+      projectId: { in: [...obraIds] },
+      project: { companyId: sesion.companyId },
+    },
+    orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
+    select: { id: true, projectId: true, fechaCorte: true },
+  });
+
+  const vigentes = new Map<string, { id: string; fechaCorte: Date }>();
+  for (const c of cronogramas) {
+    if (!vigentes.has(c.projectId)) {
+      vigentes.set(c.projectId, { id: c.id, fechaCorte: c.fechaCorte });
+    }
+  }
+
+  if (vigentes.size === 0) return resultado;
+
+  const idsVigentes = [...vigentes.values()].map((v) => v.id);
+  const proyectosConPlan = [...vigentes.keys()];
+
+  const [tareas, avances] = await Promise.all([
+    prisma.tareaCronograma.findMany({
+      where: { cronogramaId: { in: idsVigentes } },
+      select: {
+        cronogramaId: true,
+        uid: true,
+        esResumen: true,
+        duracionDias: true,
+        porcentajePlaneado: true,
+        porcentajeArchivo: true,
+        fin: true,
+      },
+    }),
+    prisma.avanceTarea.findMany({
+      where: { projectId: { in: proyectosConPlan } },
+      orderBy: [{ fecha: "asc" }, { createdAt: "asc" }],
+      select: {
+        projectId: true, uid: true, porcentaje: true,
+        fecha: true, createdAt: true, reportadoPor: true, nota: true,
+      },
+    }),
+  ]);
+
+  const porCronograma = new Map<string, typeof tareas>();
+  for (const t of tareas) {
+    const lista = porCronograma.get(t.cronogramaId) ?? [];
+    lista.push(t);
+    porCronograma.set(t.cronogramaId, lista);
+  }
+
+  for (const [projectId, vigente] of vigentes) {
+    const suyas = porCronograma.get(vigente.id) ?? [];
+    if (suyas.length === 0) continue;
+
+    // El reporte vigente EN LA FECHA DEL CORTE, no el de hoy: el mismo
+    // criterio que la curva, para que las dos cifras coincidan.
+    const hasta = vigente.fechaCorte.getTime();
+    const ultimos = ultimoAvancePorTarea(
+      avances
+        .filter((a) => a.projectId === projectId && a.fecha.getTime() <= hasta)
+        .map((a) => ({ ...a, porcentaje: a.porcentaje.toString() })),
+    );
+
+    const medibles = suyas.map((t) => ({
+      esResumen: t.esResumen,
+      duracionDias: t.duracionDias.toString(),
+      planeado: t.porcentajePlaneado.toString(),
+      real: ultimos.get(t.uid)?.porcentaje ?? t.porcentajeArchivo.toString(),
+    }));
+
+    const planeado = ponderarPorDuracion(medibles, (t) => t.planeado);
+    const real = ponderarPorDuracion(medibles, (t) => t.real);
+
+    resultado.set(projectId, {
+      real,
+      planeado,
+      desfase: restar(real, planeado) ?? "0.00",
+      fechaCorte: vigente.fechaCorte,
+      finPlan: suyas.reduce((m, t) => (t.fin > m ? t.fin : m), suyas[0]!.fin),
+    });
+  }
+
+  return resultado;
 }

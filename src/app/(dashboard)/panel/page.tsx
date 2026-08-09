@@ -9,6 +9,7 @@ import {
   obtenerResumenEmpresa,
 } from "@/services/obras.service";
 import { listarActividad } from "@/services/actividad.service";
+import { avanceFisicoPorObra } from "@/services/cronograma.service";
 import { puede } from "@/lib/rbac";
 import {
   ETIQUETA_ESTADO_OBRA,
@@ -56,6 +57,14 @@ export default async function PanelPage({
     listarAlertasEmpresa(sesion),
     listarActividad(sesion),
   ]);
+
+  // El avance fisico se pide DESPUES y solo para las obras de esta pagina:
+  // depende de cuales sean, asi que no puede ir en el bloque paralelo de
+  // arriba. Son tres consultas para todas ellas, no una por tarjeta.
+  const avanceFisico = await avanceFisicoPorObra(
+    sesion,
+    obras.filas.map((o) => o.id),
+  );
 
   const puedeCrear = puede(sesion, "obra:crear");
 
@@ -153,11 +162,54 @@ export default async function PanelPage({
               presupuesto > 0 ? (comprometido / presupuesto) * 100 : 0;
 
             /**
-             * Solo alertas con dato real. El avance fisico y la ruta critica
-             * no existen todavia en el sistema, asi que no se inventan: el
-             * globo lo dice explicitamente.
+             * Solo alertas con dato real. Las obras sin cronograma cargado no
+             * generan aviso de avance: el globo dice que falta el dato en vez
+             * de callar, para que la ausencia de avisos no se lea como que
+             * todo va bien.
              */
             const alertas: AlertaObra[] = [];
+
+            // El avance fisico del ultimo corte del cronograma, si la obra
+            // tiene uno cargado.
+            const fisico = avanceFisico.get(obra.id);
+
+            if (fisico) {
+              const desfase = Number(fisico.desfase);
+
+              // Solo se avisa a partir de cinco puntos: por debajo es ruido de
+              // redondeo del reparto diario, no un atraso que nadie deba
+              // corregir.
+              if (desfase <= -5) {
+                alertas.push({
+                  clave: "avance",
+                  texto: `La obra va ${Math.abs(desfase).toFixed(1)} puntos por detras del plan`,
+                  detalle: `Avance real ${Number(fisico.real).toFixed(1)}% frente al ${Number(fisico.planeado).toFixed(1)}% previsto en el corte del ${fechaCorta(fisico.fechaCorte)}.`,
+                });
+              }
+
+              /**
+               * La ficha de la obra y el cronograma no cuentan el mismo plazo.
+               *
+               * Son dos registros distintos: la fecha de la ficha la teclea
+               * alguien al dar de alta la obra, y la del cronograma la calcula
+               * Project. Cuando el planificador reprograma, la ficha se queda
+               * vieja y nadie se entera —y de esa fecha salen la barra de
+               * calendario y el aviso de plazo vencido, asi que arrastra el
+               * error a todo lo demas—.
+               */
+              const desvio = diasEntre(obra.fechaFinProgramada, fisico.finPlan);
+
+              if (Math.abs(desvio) > 2) {
+                alertas.push({
+                  clave: "plazo-cronograma",
+                  texto:
+                    desvio < 0
+                      ? `El cronograma termina ${Math.abs(desvio)} dia(s) antes que la ficha`
+                      : `El cronograma termina ${desvio} dia(s) despues que la ficha`,
+                  detalle: `Cronograma: ${fechaCorta(fisico.finPlan)}. Ficha de la obra: ${fechaCorta(obra.fechaFinProgramada)}. De la ficha salen la barra de calendario y el aviso de plazo vencido.`,
+                });
+              }
+            }
 
             if (obra.partidasSobregiradas > 0) {
               alertas.push({
@@ -263,6 +315,15 @@ export default async function PanelPage({
                     presupuesto > 0
                       ? `${soles(obra.comprometido)} de ${soles(obra.presupuestoTotal)}`
                       : "sin presupuesto cargado"
+                  }
+                  avanceFisico={
+                    fisico
+                      ? {
+                          real: Number(fisico.real),
+                          planeado: Number(fisico.planeado),
+                          corte: fechaCorta(fisico.fechaCorte),
+                        }
+                      : undefined
                   }
                   alertas={alertas}
                 />
