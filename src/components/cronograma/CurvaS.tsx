@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { DatosCurva } from "@/services/cronograma.service";
+import { ExportarCurva } from "@/components/cronograma/ExportarCurva";
 import { fechaCorta, fechaCronograma, fechaLarga } from "@/utils/fechas";
 import { decimal } from "@/utils/formato";
 
@@ -36,7 +37,19 @@ interface Punto {
   valor: number;
 }
 
-export function CurvaS({ datos }: { datos: DatosCurva }) {
+export function CurvaS({
+  datos,
+  obraId,
+  nombreObra,
+  totalTareas,
+  totalCriticas,
+}: {
+  datos: DatosCurva;
+  obraId: string;
+  nombreObra: string;
+  totalTareas: number;
+  totalCriticas: number;
+}) {
   const [rango, setRango] = useState<Rango>("todo");
   const [ampliada, setAmpliada] = useState(false);
   const [cursor, setCursor] = useState<Date | null>(null);
@@ -393,14 +406,88 @@ export function CurvaS({ datos }: { datos: DatosCurva }) {
           )}
         </p>
 
+        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <Dato etiqueta="Avance real" valor={`${decimal(ultimoCorte.real)}%`} destacado />
+          <Dato etiqueta="Planeado" valor={`${decimal(ultimoCorte.planeado)}%`} />
+          <Dato
+            etiqueta="Desfase"
+            valor={`${Number(ultimoCorte.desfase) > 0 ? "+" : ""}${decimal(ultimoCorte.desfase)}%`}
+            color={atrasado ? "var(--color-peligro)" : "var(--color-exito)"}
+          />
+          <Dato etiqueta="Ritmo" valor={`${(datos.factor * 100).toFixed(0)}%`} />
+          <Dato
+            etiqueta="Termino proyectado"
+            valor={
+              datos.terminoProyectado
+                ? fechaCorta(datos.terminoProyectado)
+                : "fuera de plazo"
+            }
+            color={
+              datos.terminoProyectado && datos.terminoProyectado <= datos.fin
+                ? "var(--color-exito)"
+                : "var(--color-peligro)"
+            }
+          />
+          <Dato
+            etiqueta="Plazo"
+            valor={`${fechaCorta(datos.inicio)} a ${fechaCorta(datos.fin)}`}
+          />
+          <Dato etiqueta="Tareas" valor={String(totalTareas)} />
+          <Dato etiqueta="Ruta critica" valor={`${totalCriticas} tareas`} />
+          <Dato etiqueta="Cortes cargados" valor={String(datos.cortes.length)} />
+        </dl>
+
         <p className="text-xs opacity-60">
           Los circulos huecos son el «% Planeado» que trae el archivo en cada
           corte. La linea de puntos es ese mismo plan reconstruido dia a dia
           para poder dibujarlo entero, asi que pueden no coincidir del todo: son
           dos formas de repartir el mismo trabajo en el tiempo.
         </p>
+
+        <ExportarCurva
+          obraId={obraId}
+          grafico={svgRef}
+          resumen={{
+            obra: nombreObra,
+            corte: fechaCorta(ultimoCorte.fecha),
+            planeado: decimal(ultimoCorte.planeado),
+            real: decimal(ultimoCorte.real),
+            desfase: `${Number(ultimoCorte.desfase) > 0 ? "+" : ""}${decimal(ultimoCorte.desfase)}`,
+            ritmo: `${(datos.factor * 100).toFixed(0)}%`,
+            termino: datos.terminoProyectado
+              ? fechaCorta(datos.terminoProyectado)
+              : `no se llega al 100% antes del ${fechaCorta(datos.fin)}`,
+          }}
+        />
       </figcaption>
     </figure>
+  );
+}
+
+function Dato({
+  etiqueta,
+  valor,
+  destacado,
+  color,
+}: {
+  etiqueta: string;
+  valor: string;
+  destacado?: boolean;
+  color?: string;
+}) {
+  return (
+    <div
+      className="rounded-lg border px-3 py-2"
+      style={{ borderColor: "var(--borde)" }}
+    >
+      <dt className="text-xs opacity-60">{etiqueta}</dt>
+      <dd
+        className={`mt-0.5 tabular-nums ${destacado ? "text-lg font-bold" : "text-sm font-semibold"}`}
+        style={color ? { color } : undefined}
+      >
+        {valor}
+      </dd>
+    </div>
   );
 }
 

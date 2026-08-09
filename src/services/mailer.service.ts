@@ -39,12 +39,20 @@ function obtenerTransporte(): Transporter | null {
   return transporte;
 }
 
+export interface Adjunto {
+  nombre: string;
+  /// Contenido en base64, sin la cabecera `data:`.
+  contenido: string;
+  tipo: string;
+}
+
 export interface Correo {
   para: string;
   asunto: string;
   /// Version en texto plano, para clientes que no muestran HTML.
   texto: string;
   html: string;
+  adjuntos?: Adjunto[];
 }
 
 export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }> {
@@ -69,6 +77,12 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
       subject: correo.asunto,
       text: correo.texto,
       html: correo.html,
+      attachments: correo.adjuntos?.map((a) => ({
+        filename: a.nombre,
+        content: a.contenido,
+        encoding: "base64",
+        contentType: a.tipo,
+      })),
     });
     return { enviado: true };
   } catch (error) {
@@ -261,4 +275,67 @@ export function correoCodigoAcceso(datos: {
   );
 
   return { asunto: `Codigo de acceso: ${datos.codigo}`, texto, html };
+}
+
+/**
+ * Correo con la curva de avance de una obra.
+ *
+ * La imagen va como ADJUNTO y no incrustada en el HTML: casi todos los
+ * clientes de correo bloquean las imagenes remotas, y las incrustadas en
+ * base64 dentro del cuerpo las descarta Gmail. Como adjunto llega siempre.
+ *
+ * Las cifras van ademas en el texto, para que el correo sirva aunque quien lo
+ * reciba no abra el adjunto: es lo que se lee de un vistazo en el movil.
+ */
+export function correoCurvaAvance(datos: {
+  obra: string;
+  corte: string;
+  planeado: string;
+  real: string;
+  desfase: string;
+  ritmo: string;
+  termino: string;
+  nota?: string;
+  remitente: string;
+}): Omit<Correo, "para"> {
+  const atrasado = datos.desfase.trim().startsWith("-");
+  const color = atrasado ? "#b42318" : "#0b804b";
+
+  const texto = [
+    `Curva de avance — ${datos.obra}`,
+    ``,
+    `Corte: ${datos.corte}`,
+    `Avance real: ${datos.real}%`,
+    `Avance planeado: ${datos.planeado}%`,
+    `Desfase: ${datos.desfase}%`,
+    `Ritmo actual: ${datos.ritmo} de lo previsto`,
+    `Termino proyectado: ${datos.termino}`,
+    ...(datos.nota ? ["", `Nota: ${datos.nota}`] : []),
+    ``,
+    `Enviado por ${datos.remitente} desde ${MARCA}.`,
+    `El grafico va adjunto a este correo.`,
+  ].join("\n");
+
+  const fila = (etiqueta: string, valor: string, destacado = false) =>
+    `<tr>
+       <td style="padding:7px 0;color:#6b7a82;">${etiqueta}</td>
+       <td style="padding:7px 0;text-align:right;font-weight:bold;${destacado ? `color:${color};` : ""}">${valor}</td>
+     </tr>`;
+
+  const html = plantilla(
+    `Curva de avance — ${datos.obra}`,
+    `<p style="margin:0 0 4px;color:#6b7a82;">Corte del ${datos.corte}</p>
+     <table style="width:100%;border-collapse:collapse;margin:12px 0;">
+       ${fila("Avance real", `${datos.real}%`)}
+       ${fila("Avance planeado", `${datos.planeado}%`)}
+       ${fila("Desfase", `${datos.desfase}%`, true)}
+       ${fila("Ritmo actual", `${datos.ritmo} de lo previsto`)}
+       ${fila("Termino proyectado", datos.termino)}
+     </table>
+     ${datos.nota ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${datos.nota}</p>` : ""}
+     <p style="color:#6b7a82;font-size:13px;">El grafico va adjunto a este correo.</p>
+     <p style="color:#6b7a82;font-size:13px;">Enviado por ${datos.remitente}.</p>`,
+  );
+
+  return { asunto: `Curva de avance — ${datos.obra} (corte ${datos.corte})`, texto, html };
 }

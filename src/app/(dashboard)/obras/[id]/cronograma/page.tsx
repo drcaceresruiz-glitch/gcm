@@ -160,7 +160,13 @@ export default async function CronogramaPage({
               terminar una de veinte.
             </p>
 
-            <CurvaS datos={curva} />
+            <CurvaS
+              datos={curva}
+              obraId={id}
+              nombreObra={obra.nombreObra}
+              totalTareas={cronograma.tareas.length}
+              totalCriticas={cronograma.tareas.filter((t) => t.esCritico).length}
+            />
 
             {curva.cortes.length === 1 && (
               <p className="mt-3 text-xs opacity-60">
