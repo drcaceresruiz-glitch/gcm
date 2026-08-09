@@ -74,6 +74,29 @@ jobs:
           cp -r .next/static/. deploy/.next/static/
           if [ -d public ]; then cp -r public deploy/public; fi
 
+          # Estaticos servidos por APACHE (no por el proceso Node): evita los
+          # 503 del limite de concurrencia cuando el navegador pide muchos
+          # chunks a la vez en la primera carga. Se exponen en rutas reales
+          # `_next/static` con un .htaccess propio que apaga Passenger SOLO en
+          # esa carpeta; NO se toca el .htaccess raiz de cPanel. Se cubren las
+          # dos ubicaciones posibles del document root (raiz del app y public/).
+          # El server Node sigue sirviendo `.next/static` como respaldo.
+          htaccess_estaticos() {
+            printf '%s\n' \
+              '<IfModule mod_passenger.c>' \
+              '  PassengerEnabled off' \
+              '</IfModule>' \
+              '<IfModule mod_headers.c>' \
+              '  Header set Cache-Control "public, max-age=31536000, immutable"' \
+              '</IfModule>' > "$1/.htaccess"
+          }
+          mkdir -p deploy/_next/static
+          cp -r .next/static/. deploy/_next/static/
+          htaccess_estaticos deploy/_next/static
+          mkdir -p deploy/public/_next/static
+          cp -r .next/static/. deploy/public/_next/static/
+          htaccess_estaticos deploy/public/_next/static
+
           # El esquema y las migraciones viajan con el paquete: sin ellos no
           # se pueden crear las tablas en el servidor, y la base de produccion
           # no acepta conexiones desde fuera, asi que `prisma migrate deploy`
