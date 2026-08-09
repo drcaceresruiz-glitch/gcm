@@ -357,6 +357,79 @@ export async function partidasAsignables(
   });
 }
 
+export interface CapituloAsignable {
+  id: string;
+  codigoPartida: string;
+  descripcion: string;
+  nivel: number;
+  /// Todas las partidas HOJA que cuelgan del capitulo, a cualquier profundidad.
+  partidaIds: string[];
+}
+
+/**
+ * Los capitulos de la obra con las partidas que agrupan.
+ *
+ * El frente de un encargo suele SER un capitulo entero —"toda la estructura
+ * metalica"—, asi que la pantalla ofrece elegirlo de un golpe: al escogerlo se
+ * rellena la descripcion y se marcan sus partidas, y desde ahi se edita. Las
+ * partidas hoja salen recorriendo el arbol por `parentId`, no por prefijo de
+ * codigo: el codigo es una etiqueta y "7.3.1" es hermana de "7.3", no su hija.
+ */
+export async function capitulosConPartidas(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<CapituloAsignable[]> {
+  if (!puede(sesion, "encargo:leer")) return [];
+
+  const items = await prisma.wbsItem.findMany({
+    where: { projectId: obraId, project: { companyId: sesion.companyId } },
+    orderBy: { orden: "asc" },
+    select: {
+      id: true,
+      parentId: true,
+      tipo: true,
+      codigoPartida: true,
+      descripcion: true,
+      nivel: true,
+      parcial: true,
+    },
+  });
+
+  const hijosDe = new Map<string, typeof items>();
+  for (const it of items) {
+    if (it.parentId === null) continue;
+    const lista = hijosDe.get(it.parentId) ?? [];
+    lista.push(it);
+    hijosDe.set(it.parentId, lista);
+  }
+
+  // Partidas hoja con importe que cuelgan de un nodo, bajando por el arbol.
+  function partidasDe(nodoId: string): string[] {
+    const salida: string[] = [];
+    const pila = [...(hijosDe.get(nodoId) ?? [])];
+    while (pila.length > 0) {
+      const n = pila.pop()!;
+      if (n.tipo === "PARTIDA" && n.parcial !== null) salida.push(n.id);
+      const suyos = hijosDe.get(n.id);
+      if (suyos) pila.push(...suyos);
+    }
+    return salida;
+  }
+
+  return items
+    .filter((i) => i.tipo === "CAPITULO")
+    .map((c) => ({
+      id: c.id,
+      codigoPartida: c.codigoPartida,
+      descripcion: c.descripcion,
+      nivel: c.nivel,
+      partidaIds: partidasDe(c.id),
+    }))
+    // Sin partidas medibles no hay nada que asignar: un capitulo de puros
+    // subtitulos no es un frente.
+    .filter((c) => c.partidaIds.length > 0);
+}
+
 // ---------------------------------------------------------------------------
 // Escritura
 // ---------------------------------------------------------------------------

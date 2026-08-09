@@ -3,8 +3,11 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, Plus, ExternalLink } from "lucide-react";
-import type { PartidaAsignable } from "@/services/encargos.service";
+import { Search, Plus, ExternalLink, Layers } from "lucide-react";
+import type {
+  PartidaAsignable,
+  CapituloAsignable,
+} from "@/services/encargos.service";
 import { soles } from "@/utils/formato";
 import {
   accionCrearEncargo,
@@ -40,12 +43,15 @@ export function FormularioEncargo({
   obraId,
   proveedores,
   partidas,
+  capitulos,
   inicial,
   encargoId,
 }: {
   obraId: string;
   proveedores: ProveedorOpcion[];
   partidas: PartidaAsignable[];
+  /// Los capitulos de la obra, para elegir un frente entero de un golpe.
+  capitulos: CapituloAsignable[];
   /// Presente al editar. Ausente al crear.
   inicial?: EncargoInicial;
   encargoId?: string;
@@ -109,6 +115,33 @@ export function FormularioEncargo({
     setSeleccion((previo) => {
       const copia = new Map(previo);
       copia.set(id, valor);
+      return copia;
+    });
+  }
+
+  /**
+   * Elegir un capitulo trae su frente entero: rellena la descripcion (si esta
+   * vacia, para no pisar lo que ya escribiste) y MARCA todas sus partidas,
+   * cada una con la fraccion que le queda libre. Desde ahi se edita —quitar
+   * una partida, bajar una fraccion, sumar otro capitulo—. Es un atajo del
+   * caso habitual, no una jaula.
+   */
+  function elegirCapitulo(capId: string) {
+    const cap = capitulos.find((c) => c.id === capId);
+    if (!cap) return;
+
+    if (!descripcion.trim()) {
+      setDescripcion(`${cap.codigoPartida} ${cap.descripcion}`.trim());
+    }
+
+    setSeleccion((previo) => {
+      const copia = new Map(previo);
+      for (const pid of cap.partidaIds) {
+        if (copia.has(pid)) continue; // ya marcada: se respeta su fraccion
+        const p = partidas.find((x) => x.id === pid);
+        const libre = p ? Math.max(0, 100 - p.asignadoPorcentaje) : 100;
+        copia.set(pid, String(libre > 0 ? libre : 100));
+      }
       return copia;
     });
   }
@@ -179,6 +212,43 @@ export function FormularioEncargo({
           </Link>
         </div>
       </div>
+
+      {/* El atajo del caso habitual: el frente ES un capitulo. Elegirlo
+          rellena la descripcion y marca sus partidas; desde ahi se edita. No
+          guarda el capitulo como tal —el frente sigue siendo una lista de
+          partidas—, solo ahorra marcarlas una a una. */}
+      {capitulos.length > 0 && (
+        <div>
+          <label htmlFor="enc-cap" className="mb-1 block text-sm font-medium">
+            <span className="inline-flex items-center gap-1.5">
+              <Layers className="size-4" aria-hidden="true" />
+              Traer un capitulo como frente (opcional)
+            </span>
+          </label>
+          <select
+            id="enc-cap"
+            value=""
+            onChange={(e) => {
+              elegirCapitulo(e.target.value);
+              e.currentTarget.value = "";
+            }}
+            className="w-full rounded-lg border px-3 py-2 text-sm"
+            style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+          >
+            <option value="">— Elige un capitulo para marcarlo entero —</option>
+            {capitulos.map((c) => (
+              <option key={c.id} value={c.id}>
+                {" ".repeat(Math.max(0, (c.nivel - 1) * 2))}
+                {c.codigoPartida} {c.descripcion} ({c.partidaIds.length} partidas)
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs opacity-60">
+            Marca todas sus partidas de una vez. Luego puedes quitar, fraccionar
+            o sumar otro capitulo.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">

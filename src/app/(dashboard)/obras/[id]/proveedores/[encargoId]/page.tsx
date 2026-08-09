@@ -6,6 +6,7 @@ import { listarProveedores } from "@/services/proveedores.service";
 import {
   obtenerEncargo,
   partidasAsignables,
+  capitulosConPartidas,
 } from "@/services/encargos.service";
 import { puede } from "@/lib/rbac";
 import { fechaCorta } from "@/utils/fechas";
@@ -40,10 +41,11 @@ export default async function EditarEncargoPage({
     );
   }
 
-  const [encargo, proveedores, partidas] = await Promise.all([
+  const [encargo, proveedores, partidas, capitulos] = await Promise.all([
     obtenerEncargo(sesion, id, encargoId),
     listarProveedores(sesion),
     partidasAsignables(sesion, id),
+    capitulosConPartidas(sesion, id),
   ]);
 
   if (!encargo) notFound();
@@ -69,6 +71,7 @@ export default async function EditarEncargoPage({
             ruc: p.ruc,
           }))}
           partidas={partidas}
+          capitulos={capitulos}
           inicial={{
             proveedorId: encargo.proveedor.id,
             descripcion: encargo.descripcion,

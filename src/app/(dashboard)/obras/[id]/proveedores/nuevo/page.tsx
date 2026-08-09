@@ -3,7 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import { listarProveedores } from "@/services/proveedores.service";
-import { partidasAsignables } from "@/services/encargos.service";
+import {
+  partidasAsignables,
+  capitulosConPartidas,
+} from "@/services/encargos.service";
 import { puede } from "@/lib/rbac";
 import { Volver } from "@/components/ui/Volver";
 import { Tarjeta } from "@/components/ui/Tarjeta";
@@ -31,9 +34,10 @@ export default async function NuevoEncargoPage({
     );
   }
 
-  const [proveedores, partidas] = await Promise.all([
+  const [proveedores, partidas, capitulos] = await Promise.all([
     listarProveedores(sesion),
     partidasAsignables(sesion, id),
+    capitulosConPartidas(sesion, id),
   ]);
 
   return (
@@ -57,6 +61,7 @@ export default async function NuevoEncargoPage({
             ruc: p.ruc,
           }))}
           partidas={partidas}
+          capitulos={capitulos}
         />
       </Tarjeta>
     </div>
