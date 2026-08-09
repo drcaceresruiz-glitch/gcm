@@ -221,7 +221,8 @@ export async function obtenerPlanSemanal(
     where: {
       cumplido: true,
       uid: { not: null },
-      planSemanal: { projectId: obraId, id: { not: planId } },
+      // La relacion en CompromisoSemanal se llama `plan` (no `planSemanal`).
+      plan: { projectId: obraId, id: { not: planId } },
     },
     select: { uid: true },
   });
