@@ -7,6 +7,8 @@ import {
   ppcDePlan,
   paretoCausas,
   tendenciaPpc,
+  rangoSemana,
+  tareasDeLaSemana,
   CAUSAS_CNC,
   type FilaPareto,
   type PuntoPpc,
@@ -120,6 +122,18 @@ export interface CompromisoDetalle {
   tarea: { codigo: string | null; nombre: string } | null;
 }
 
+export interface TareaOpcionPlan {
+  uid: number;
+  codigo: string | null;
+  nombre: string;
+}
+
+export interface CompromisoSugerido {
+  uid: number;
+  descripcion: string;
+  metaPorcentaje: string | null;
+}
+
 export interface PlanSemanalDetalle {
   id: string;
   numero: number;
@@ -133,6 +147,11 @@ export interface PlanSemanalDetalle {
   total: number;
   cumplidos: number;
   ppc: number | null;
+  /// Tareas de trabajo (sin resumenes) para el desplegable al planificar.
+  tareas: TareaOpcionPlan[];
+  /// Tareas cuyo trabajo cae en la semana del corte, para autocargar cuando la
+  /// semana no tiene compromisos aun.
+  sugeridas: CompromisoSugerido[];
 }
 
 /**
@@ -163,16 +182,47 @@ export async function obtenerPlanSemanal(
 
   if (!plan) return null;
 
-  // Nombres de tarea desde el corte vigente, para los compromisos con uid.
+  // Nombres y fechas de tarea desde el corte vigente. Consulta LIGERA (solo
+  // estos campos): antes esta pantalla cargaba el cronograma completo —con
+  // curva S, EVM y ruta critica—, y bajo los limites de recursos de produccion
+  // eso mataba el render a mitad. Con esto basta para el desplegable y para
+  // autosugerir las tareas de la semana.
   const cronograma = await prisma.cronograma.findFirst({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
     orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
-    select: { tareas: { select: { uid: true, codigo: true, nombre: true } } },
+    select: {
+      tareas: {
+        select: {
+          uid: true,
+          codigo: true,
+          nombre: true,
+          inicio: true,
+          fin: true,
+          esResumen: true,
+        },
+      },
+    },
   });
+  const tareasCron = cronograma?.tareas ?? [];
   const porUid = new Map<number, { codigo: string | null; nombre: string }>();
-  for (const t of cronograma?.tareas ?? []) {
+  for (const t of tareasCron) {
     porUid.set(t.uid, { codigo: t.codigo, nombre: t.nombre });
   }
+
+  // Para el desplegable: todas las tareas de trabajo (sin resumenes).
+  const tareas = tareasCron
+    .filter((t) => !t.esResumen)
+    .map((t) => ({ uid: t.uid, codigo: t.codigo, nombre: t.nombre }));
+
+  // Sugerencias: las tareas cuyo trabajo cae en la semana del corte. La
+  // pantalla las usa para autocargar los compromisos cuando la semana esta
+  // vacia; el residente confirma o ajusta.
+  const { inicio: iniSemana, fin: finSemana } = rangoSemana(plan.fechaCorte);
+  const sugeridas = tareasDeLaSemana(tareasCron, iniSemana, finSemana).map((t) => ({
+    uid: t.uid,
+    descripcion: `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`.slice(0, 300),
+    metaPorcentaje: null as string | null,
+  }));
 
   const compromisos: CompromisoDetalle[] = plan.compromisos.map((c) => ({
     id: c.id,
@@ -200,6 +250,8 @@ export async function obtenerPlanSemanal(
     total,
     cumplidos,
     ppc,
+    tareas,
+    sugeridas,
   };
 }
 

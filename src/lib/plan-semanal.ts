@@ -114,3 +114,52 @@ export function proximoCorte(diaSemana: number, hoy: Date): Date {
   const salto = (diaSemana - iso + 7) % 7;
   return new Date(hoy.getTime() + salto * DIA_MS);
 }
+
+export interface RangoSemana {
+  inicio: Date;
+  fin: Date;
+}
+
+/**
+ * La semana que representa un plan: los 7 dias que TERMINAN en el corte, es
+ * decir [corte - 6 dias, corte]. El corte es el dia en que se cierra y mide la
+ * semana; el trabajo comprometido es el de esos siete dias.
+ */
+export function rangoSemana(fechaCorte: Date): RangoSemana {
+  return { inicio: new Date(fechaCorte.getTime() - 6 * DIA_MS), fin: fechaCorte };
+}
+
+export interface TareaProgramada {
+  uid: number;
+  codigo: string | null;
+  nombre: string;
+  inicio: Date;
+  fin: Date;
+  esResumen: boolean;
+}
+
+/**
+ * Las tareas del cronograma cuyo trabajo programado SOLAPA la semana: su
+ * periodo [inicio, fin] toca el rango [inicioSemana, finSemana]. Incluye las
+ * que vienen de antes y siguen en curso. Se excluyen los resumenes (son
+ * agrupadores, no trabajo). Ordenadas por fecha de inicio y luego por codigo.
+ *
+ * Es la base del autocargado del Plan Semanal: al abrir una semana sin
+ * compromisos, se proponen estas tareas para que el residente solo confirme.
+ */
+export function tareasDeLaSemana(
+  tareas: readonly TareaProgramada[],
+  inicioSemana: Date,
+  finSemana: Date,
+): TareaProgramada[] {
+  const ini = inicioSemana.getTime();
+  const fin = finSemana.getTime();
+  return tareas
+    .filter((t) => !t.esResumen && t.inicio.getTime() <= fin && t.fin.getTime() >= ini)
+    .slice()
+    .sort(
+      (a, b) =>
+        a.inicio.getTime() - b.inicio.getTime() ||
+        (a.codigo ?? "").localeCompare(b.codigo ?? ""),
+    );
+}

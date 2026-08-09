@@ -4,7 +4,10 @@ import {
   paretoCausas,
   tendenciaPpc,
   proximoCorte,
+  rangoSemana,
+  tareasDeLaSemana,
   type CompromisoEvaluado,
+  type TareaProgramada,
 } from "./plan-semanal";
 
 const dc = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -80,5 +83,65 @@ describe("proximoCorte", () => {
     const dia = hoy.getUTCDay() === 0 ? 7 : hoy.getUTCDay();
     const siguiente = dia === 7 ? 1 : dia + 1;
     expect(proximoCorte(siguiente, hoy)).toEqual(dc("2026-08-04"));
+  });
+});
+
+describe("rangoSemana", () => {
+  it("los 7 dias que terminan en el corte", () => {
+    const { inicio, fin } = rangoSemana(dc("2026-08-07"));
+    expect(fin).toEqual(dc("2026-08-07"));
+    expect(inicio).toEqual(dc("2026-08-01"));
+  });
+});
+
+describe("tareasDeLaSemana", () => {
+  const t = (
+    uid: number,
+    codigo: string,
+    ini: string,
+    f: string,
+    esResumen = false,
+  ): TareaProgramada => ({
+    uid,
+    codigo,
+    nombre: `T${uid}`,
+    inicio: dc(ini),
+    fin: dc(f),
+    esResumen,
+  });
+  const ini = dc("2026-08-01");
+  const fin = dc("2026-08-07");
+
+  it("incluye las que solapan el rango, incluidos los bordes", () => {
+    const tareas = [
+      t(1, "1.1", "2026-08-02", "2026-08-05"), // dentro
+      t(2, "1.2", "2026-07-28", "2026-08-02"), // empieza antes, entra
+      t(3, "1.3", "2026-08-06", "2026-08-12"), // empieza dentro, sigue despues
+      t(4, "1.4", "2026-08-01", "2026-08-01"), // borde inicio
+      t(5, "1.5", "2026-08-07", "2026-08-07"), // borde fin
+    ];
+    expect(tareasDeLaSemana(tareas, ini, fin).map((x) => x.uid).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("excluye las que quedan fuera del rango", () => {
+    const tareas = [
+      t(10, "a", "2026-07-20", "2026-07-31"), // termina antes
+      t(11, "b", "2026-08-08", "2026-08-10"), // empieza despues
+    ];
+    expect(tareasDeLaSemana(tareas, ini, fin)).toEqual([]);
+  });
+
+  it("excluye resumenes aunque solapen", () => {
+    const tareas = [t(20, "R", "2026-08-01", "2026-08-07", true)];
+    expect(tareasDeLaSemana(tareas, ini, fin)).toEqual([]);
+  });
+
+  it("ordena por inicio y luego por codigo", () => {
+    const tareas = [
+      t(1, "z", "2026-08-05", "2026-08-06"),
+      t(2, "a", "2026-08-02", "2026-08-03"),
+      t(3, "b", "2026-08-02", "2026-08-04"),
+    ];
+    expect(tareasDeLaSemana(tareas, ini, fin).map((x) => x.codigo)).toEqual(["a", "b", "z"]);
   });
 });

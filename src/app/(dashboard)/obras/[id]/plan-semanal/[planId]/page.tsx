@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { redirect, notFound } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerPlanSemanal } from "@/services/plan-semanal.service";
-import { obtenerCronograma } from "@/services/cronograma.service";
 import { puede } from "@/lib/rbac";
 import { fechaLarga } from "@/utils/fechas";
 import { ETIQUETA_CNC } from "@/lib/plan-semanal";
@@ -42,12 +41,26 @@ export default async function DetallePlanSemanalPage({
   const puedeGestionar = puede(sesion, "plan_semanal:gestionar");
   const abierto = plan.estado === "ABIERTO";
 
-  // Las tareas para elegir solo hacen falta al planificar una semana abierta.
-  const cronograma =
-    abierto && puedeGestionar ? await obtenerCronograma(sesion, id) : null;
-  const tareas = (cronograma?.tareas ?? [])
-    .filter((t) => !t.esResumen)
-    .map((t) => ({ uid: t.uid, codigo: t.codigo, nombre: t.nombre }));
+  // El desplegable de tareas y las sugerencias de la semana llegan del servicio
+  // (consulta ligera; ya no se carga el cronograma completo).
+  const tareas = plan.tareas;
+
+  // Al planificar una semana AUN vacia, se arranca con las tareas cuyo trabajo
+  // programado cae en el rango del corte; si ya hay compromisos guardados,
+  // mandan esos.
+  const autocargado = plan.compromisos.length === 0 && plan.sugeridas.length > 0;
+  const inicial =
+    plan.compromisos.length > 0
+      ? plan.compromisos.map((c) => ({
+          uid: c.uid,
+          descripcion: c.descripcion,
+          metaPorcentaje: c.metaPorcentaje,
+        }))
+      : plan.sugeridas.map((s) => ({
+          uid: s.uid,
+          descripcion: s.descripcion,
+          metaPorcentaje: s.metaPorcentaje,
+        }));
 
   return (
     <div className="space-y-6">
@@ -77,16 +90,23 @@ export default async function DetallePlanSemanalPage({
 
       {abierto && puedeGestionar && (
         <Seccion>
-          <h3 className="mb-3 text-base font-semibold">Compromisos de la semana</h3>
+          <h3 className="mb-1 text-base font-semibold">Compromisos de la semana</h3>
+          {autocargado ? (
+            <p className="mb-3 text-sm opacity-70">
+              Se cargaron automaticamente las <strong>{plan.sugeridas.length}</strong>{" "}
+              tarea(s) programadas para esta semana. Quita las que no correspondan,
+              ajusta metas o anade lineas libres, y guarda.
+            </p>
+          ) : (
+            <p className="mb-3 text-sm opacity-70">
+              Elige tareas del cronograma o anade lineas libres para esta semana.
+            </p>
+          )}
           <FormularioPlanSemanal
             obraId={id}
             planId={planId}
             tareas={tareas}
-            inicial={plan.compromisos.map((c) => ({
-              uid: c.uid,
-              descripcion: c.descripcion,
-              metaPorcentaje: c.metaPorcentaje,
-            }))}
+            inicial={inicial}
           />
         </Seccion>
       )}
