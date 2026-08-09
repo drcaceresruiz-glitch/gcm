@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { MapPin, CalendarDays, Plus } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
@@ -10,6 +11,16 @@ import {
 } from "@/services/obras.service";
 import { listarActividad } from "@/services/actividad.service";
 import { avanceFisicoPorObra } from "@/services/cronograma.service";
+import {
+  listarObrasParaTablero,
+  datosTablero,
+} from "@/services/tablero.service";
+import {
+  COOKIE_TABLERO,
+  COOKIE_TABLERO_OBRA,
+  modulosValidos,
+} from "@/lib/tablero";
+import { Tablero } from "@/components/tablero/Tablero";
 import { puede } from "@/lib/rbac";
 import {
   ETIQUETA_ESTADO_OBRA,
@@ -32,7 +43,12 @@ export const metadata: Metadata = { title: "Panel" };
 export default async function PanelPage({
   searchParams,
 }: {
-  searchParams: Promise<{ p?: string; q?: string; estado?: string }>;
+  searchParams: Promise<{
+    p?: string;
+    q?: string;
+    estado?: string;
+    obra?: string;
+  }>;
 }) {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
@@ -72,6 +88,33 @@ export default async function PanelPage({
   // filtros solo significa que ninguna coincide. Son dos pantallas distintas.
   const vacioDeVerdad = obras.total === 0 && !hayFiltro;
 
+  // El tablero: obras para el selector, la seleccion guardada y los modulos
+  // encendidos. La obra elegida sale de la URL, si no de la cookie, y si no de
+  // la primera obra que haya. Se resuelve aparte de la lista de arriba porque
+  // esa esta paginada y filtrada, y la obra supervisada puede no estar en la
+  // pagina visible.
+  const almacen = await cookies();
+  const modulosTablero = modulosValidos(almacen.get(COOKIE_TABLERO)?.value);
+  const obrasTablero = vacioDeVerdad
+    ? []
+    : await listarObrasParaTablero(sesion);
+
+  const obraElegida =
+    consulta.obra ??
+    almacen.get(COOKIE_TABLERO_OBRA)?.value ??
+    obrasTablero[0]?.id;
+
+  // Si la cookie apunta a una obra que ya no existe —borrada, o de otra
+  // empresa tras cambiar de contexto—, se cae a la primera disponible en vez
+  // de dejar el tablero en blanco.
+  const obraValida = obrasTablero.some((o) => o.id === obraElegida)
+    ? obraElegida
+    : obrasTablero[0]?.id;
+
+  const datosDelTablero = obraValida
+    ? await datosTablero(sesion, obraValida)
+    : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -96,8 +139,20 @@ export default async function PanelPage({
         )}
       </div>
 
-      {/* Las cifras encabezan porque son la lectura de un vistazo; la lista
-          de obras es el detalle. Con la empresa vacia no se pintan: cuatro
+      {/* El tablero encabeza todo: es la obra que se supervisa, con sus
+          indicadores juntos. Debajo van las cifras de la empresa entera y la
+          lista. Con la empresa vacia no se pinta: no hay obra que supervisar. */}
+      {!vacioDeVerdad && (
+        <Tablero
+          obras={obrasTablero}
+          datos={datosDelTablero}
+          modulosIniciales={modulosTablero}
+          alertas={alertasEmpresa}
+        />
+      )}
+
+      {/* Las cifras de empresa: lectura de gerencia de un vistazo, por debajo
+          del tablero de la obra. Con la empresa vacia no se pintan: cuatro
           ceros no informan de nada. */}
       {!vacioDeVerdad && (
         <ResumenEmpresaPanel resumen={resumen} alertas={alertasEmpresa} />

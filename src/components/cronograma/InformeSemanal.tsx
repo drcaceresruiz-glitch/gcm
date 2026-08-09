@@ -319,10 +319,14 @@ function Rosco({ real }: { real: number }) {
         transform="rotate(-90 70 70)"
       />
       <text
-        x={70} y={68} textAnchor="middle" fontSize={26} fontWeight={300}
+        x={70} y={68} textAnchor="middle" fontSize={22} fontWeight={300}
         fill="var(--color-marca-600)"
       >
-        {real.toFixed(0)}%
+        {/* Un decimal, no entero: redondear 10.85 a "11%" lo hacia parecer
+            identico al 11% que Project totaliza por su cuenta, y son cifras
+            distintas —GCM pondera por duracion, Project por su metodo—.
+            Ademas cuadra con la desviacion, que ya va a un decimal. */}
+        {real.toFixed(1)}%
       </text>
       <text
         x={70} y={84} textAnchor="middle" fontSize={9}
