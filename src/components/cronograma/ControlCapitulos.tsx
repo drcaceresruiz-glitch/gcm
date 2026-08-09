@@ -12,7 +12,11 @@ import { decimal } from "@/utils/formato";
  * un capitulo de veinte partidas cortas no vale mas que uno de tres largas.
  */
 export function ControlCapitulos({ capitulos }: { capitulos: Capitulo[] }) {
-  if (capitulos.length === 0) return null;
+  // Los capitulos de puros hitos se quedan fuera: su real ponderado sale cero
+  // por construccion —los hitos no duran—, y junto a un planeado del 100%
+  // describirian un atraso que no existe.
+  const medibles = capitulos.filter((c) => c.medible);
+  if (medibles.length === 0) return null;
 
   return (
     <div
@@ -35,7 +39,7 @@ export function ControlCapitulos({ capitulos }: { capitulos: Capitulo[] }) {
           </tr>
         </thead>
         <tbody>
-          {capitulos.map((c) => {
+          {medibles.map((c) => {
             const desfase = Number(c.desfase) || 0;
             const atrasado = desfase < 0;
 

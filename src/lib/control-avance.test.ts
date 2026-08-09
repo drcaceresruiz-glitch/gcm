@@ -3,6 +3,7 @@ import {
   agruparPorCapitulo,
   alertasDeAtraso,
   cadenaCritica,
+  partidasActivas,
   type TareaControlada,
 } from "./control-avance";
 
@@ -38,7 +39,7 @@ describe("agruparPorCapitulo", () => {
     fila = 0;
     const capitulos = agruparPorCapitulo([
       t({ uid: 1, nivel: 1, nombre: "PROYECTO", esResumen: true }),
-      t({ uid: 2, nivel: 2, codigo: "7.0", nombre: "SANITARIAS", esResumen: true }),
+      t({ uid: 2, nivel: 2, codigo: "7.0", nombre: "SANITARIAS", esResumen: true, porcentajePlaneado: "16.00" }),
       t({ uid: 3, nivel: 3, codigo: "7.3", porcentajePlaneado: "100.00", porcentajeReal: "100.00" }),
       t({ uid: 4, nivel: 3, codigo: "7.3.1", porcentajePlaneado: "0.00", porcentajeReal: "0.00" }),
       t({ uid: 5, nivel: 2, codigo: "8.0", nombre: "ELECTRICAS", esResumen: true }),
@@ -47,9 +48,27 @@ describe("agruparPorCapitulo", () => {
 
     expect(capitulos.map((c) => c.codigo)).toEqual(["7.0", "8.0"]);
     expect(capitulos[0]?.hojas).toBe(2);
-    expect(capitulos[0]?.planeado).toBe("50.00");
+    expect(capitulos[0]?.real).toBe("50.00");
     expect(capitulos[1]?.hojas).toBe(1);
-    expect(capitulos[1]?.planeado).toBe("50.00");
+    expect(capitulos[1]?.real).toBe("50.00");
+  });
+
+  it("LEE el planeado del capitulo y CALCULA el real", async () => {
+    // El plan lo manda Project y el archivo ya trae el «% Planeado»
+    // consolidado de cada capitulo: calcularlo por nuestra cuenta daba 50%
+    // donde el informe del cliente dice 16%, y descuadraba el documento que ya
+    // se entrega. El real, en cambio, lo manda GCM y sale de las hijas.
+    fila = 0;
+    const capitulos = agruparPorCapitulo([
+      t({ uid: 1, nivel: 1, esResumen: true }),
+      t({ uid: 2, nivel: 2, codigo: "7.0", esResumen: true, porcentajePlaneado: "16.00" }),
+      t({ uid: 3, nivel: 3, porcentajePlaneado: "100.00", porcentajeReal: "80.00" }),
+      t({ uid: 4, nivel: 3, porcentajePlaneado: "0.00", porcentajeReal: "20.00" }),
+    ]);
+
+    expect(capitulos[0]?.planeado).toBe("16.00");
+    expect(capitulos[0]?.real).toBe("50.00");
+    expect(capitulos[0]?.desfase).toBe("34.00");
   });
 
   it("pondera dentro del capitulo por duracion", async () => {
@@ -358,5 +377,78 @@ describe("cadenaCritica", () => {
 
     expect(c.eslabones).toEqual([]);
     expect(c.duracionTotal).toBe("0.00");
+  });
+});
+
+describe("partidasActivas", () => {
+  const f = (d: string) => new Date(`${d}T00:00:00Z`);
+
+  it("recoge lo que sigue vivo y lo que arranca en la semana", async () => {
+    fila = 0;
+    const r = partidasActivas(
+      [
+        // Empezo antes del corte y sigue.
+        t({ uid: 1, nivel: 3, inicio: f("2026-08-06"), fin: f("2026-08-10") }),
+        // Arranca dentro de la semana.
+        t({ uid: 2, nivel: 3, inicio: f("2026-08-12"), fin: f("2026-08-20") }),
+        // Termino antes del corte.
+        t({ uid: 3, nivel: 3, inicio: f("2026-08-01"), fin: f("2026-08-05") }),
+        // Empieza dentro de un mes.
+        t({ uid: 4, nivel: 3, inicio: f("2026-09-10"), fin: f("2026-09-20") }),
+      ],
+      CORTE,
+    );
+
+    expect(r.map((p) => p.uid).sort()).toEqual([1, 2]);
+  });
+
+  it("deja fuera lo terminado aunque caiga dentro de la semana", async () => {
+    // En un informe semanal lo que interesa es lo que queda por hacer; una
+    // lista con lo ya cerrado diluye lo que hay que mirar.
+    fila = 0;
+    const r = partidasActivas(
+      [
+        t({
+          uid: 1, nivel: 3, porcentajeReal: "100.00",
+          inicio: f("2026-08-06"), fin: f("2026-08-10"),
+        }),
+        t({
+          uid: 2, nivel: 3, porcentajeReal: "40.00",
+          inicio: f("2026-08-06"), fin: f("2026-08-10"),
+        }),
+      ],
+      CORTE,
+    );
+
+    expect(r.map((p) => p.uid)).toEqual([2]);
+  });
+
+  it("no lista resumenes ni hitos", async () => {
+    fila = 0;
+    const r = partidasActivas(
+      [
+        t({ uid: 1, nivel: 2, esResumen: true, inicio: f("2026-08-06"), fin: f("2026-08-10") }),
+        t({ uid: 2, nivel: 3, esHito: true, inicio: f("2026-08-08"), fin: f("2026-08-08") }),
+        t({ uid: 3, nivel: 3, inicio: f("2026-08-06"), fin: f("2026-08-10") }),
+      ],
+      CORTE,
+    );
+
+    expect(r.map((p) => p.uid)).toEqual([3]);
+  });
+
+  it("pone primero las que van peor", async () => {
+    // Es el orden en que se leen en una reunion de obra.
+    fila = 0;
+    const r = partidasActivas(
+      [
+        t({ uid: 1, nivel: 3, desfase: "10.00", inicio: f("2026-08-06"), fin: f("2026-08-10") }),
+        t({ uid: 2, nivel: 3, desfase: "-53.00", inicio: f("2026-08-06"), fin: f("2026-08-10") }),
+        t({ uid: 3, nivel: 3, desfase: "-5.00", inicio: f("2026-08-06"), fin: f("2026-08-10") }),
+      ],
+      CORTE,
+    );
+
+    expect(r.map((p) => p.uid)).toEqual([2, 3, 1]);
   });
 });

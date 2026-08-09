@@ -40,6 +40,16 @@ export interface Capitulo {
   desfase: string;
   /// Partidas de trabajo que cuelgan de el, sin contar subcapitulos.
   hojas: number;
+  /**
+   * Tiene trabajo con duracion que medir.
+   *
+   * Falso en los capitulos de puros hitos —el «0.0 HITOS CLAVE» del archivo
+   * real, o el capitulo de gestion, cuyas partidas duran cero dias—. Ahi el
+   * real ponderado sale 0 por construccion, y ensenarlo junto a un planeado
+   * del 100% describe un atraso que no existe. Por eso el informe los deja
+   * fuera, igual que hace el que ya se entrega al cliente.
+   */
+  medible: boolean;
   /// Cuantas de ellas van por detras del plan.
   atrasadas: number;
   criticas: number;
@@ -84,7 +94,20 @@ export function agruparPorCapitulo(
     const medibles = descendientes.length > 0 ? descendientes : [cabecera];
     const hojas = medibles.filter((t) => !t.esResumen);
 
-    const planeado = ponderarPorDuracion(medibles, (t) => t.porcentajePlaneado);
+    /**
+     * El PLANEADO del capitulo SE LEE de su propia fila; el REAL se calcula.
+     *
+     * No es una asimetria caprichosa, es el reparto que gobierna el modulo.
+     * El plan lo manda MS Project, y el archivo ya trae el «% Planeado»
+     * consolidado de cada capitulo: calcularlo por nuestra cuenta daba otra
+     * cifra —67,82% donde el informe del cliente dice 64%— y descuadraba el
+     * documento que ya se entrega.
+     *
+     * El real, en cambio, lo manda GCM: sale de las partidas hijas, cuyo
+     * porcentaje es el reportado desde obra cuando lo hay. Leerlo del archivo
+     * congelaria el avance en lo que dijera el ultimo export de Project.
+     */
+    const planeado = cabecera.porcentajePlaneado;
     const real = ponderarPorDuracion(medibles, (t) => t.porcentajeReal);
 
     capitulos.push({
@@ -95,6 +118,7 @@ export function agruparPorCapitulo(
       real,
       desfase: restar(real, planeado) ?? "0.00",
       hojas: hojas.length,
+      medible: hojas.some((t) => Number(t.duracionDias) > 0),
       atrasadas: hojas.filter((t) => Number(t.desfase) < 0).length,
       criticas: hojas.filter((t) => t.esCritico).length,
     });
@@ -347,4 +371,67 @@ export function cadenaCritica(
       .map(([capitulo, tareas]) => ({ capitulo, tareas }))
       .sort((a, b) => b.tareas - a.tareas),
   };
+}
+
+export interface PartidaActiva {
+  uid: number;
+  codigo: string | null;
+  nombre: string;
+  fila: number;
+  inicio: Date;
+  fin: Date;
+  porcentajePlaneado: string;
+  porcentajeReal: string;
+  desfase: string;
+  esCritico: boolean;
+}
+
+/**
+ * Las partidas vivas en la semana del corte.
+ *
+ * Es el bloque «partidas activas destacadas» del informe: lo que se esta
+ * ejecutando ahora mismo o arranca en los proximos dias. Sin este recorte, el
+ * informe listaria las ciento y pico tareas del cronograma, la mayoria de
+ * ellas ni empezadas ni previstas para semanas.
+ *
+ * Entra una tarea si su ventana toca la semana y no esta terminada. Las
+ * terminadas se quedan fuera aunque caigan dentro: en un informe semanal lo
+ * que interesa es lo que queda por hacer, y una lista con lo ya cerrado
+ * diluye lo que hay que mirar.
+ *
+ * Se ordenan por desfase: primero las que van peor, que es el orden en que se
+ * leen en una reunion de obra.
+ */
+export function partidasActivas(
+  tareas: readonly TareaControlada[],
+  fechaCorte: Date,
+  diasVista = 7,
+): PartidaActiva[] {
+  const desde = fechaCorte.getTime();
+  const hasta = desde + diasVista * 86400000;
+
+  return tareas
+    .filter((t) => {
+      if (t.esResumen || t.esHito) return false;
+      if (Number(t.porcentajeReal) >= 100) return false;
+
+      // Su ventana se solapa con la semana: o empezo antes y sigue viva, o
+      // arranca dentro de los proximos dias.
+      return t.fin.getTime() >= desde && t.inicio.getTime() <= hasta;
+    })
+    .map((t) => ({
+      uid: t.uid,
+      codigo: t.codigo,
+      nombre: t.nombre,
+      fila: t.fila,
+      inicio: t.inicio,
+      fin: t.fin,
+      porcentajePlaneado: t.porcentajePlaneado,
+      porcentajeReal: t.porcentajeReal,
+      desfase: t.desfase,
+      esCritico: t.esCritico,
+    }))
+    .sort(
+      (a, b) => Number(a.desfase) - Number(b.desfase) || a.fila - b.fila,
+    );
 }

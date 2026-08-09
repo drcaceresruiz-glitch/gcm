@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AlertTriangle, CalendarClock, CheckCircle2, Info } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  FileText,
+  Info,
+} from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import {
@@ -64,16 +70,29 @@ export default async function CronogramaPage({
           </p>
         </div>
 
-        {puedeImportar && (
-          <Link
-            href={`/obras/${id}/cronograma/importar`}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-            style={{ backgroundColor: "var(--color-marca-600)" }}
-          >
-            <CalendarClock className="size-4" aria-hidden="true" />
-            {cronograma ? "Cargar un corte nuevo" : "Cargar cronograma"}
-          </Link>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {cronograma && (
+            <Link
+              href={`/obras/${id}/cronograma/informe`}
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <FileText className="size-4" aria-hidden="true" />
+              Informe semanal
+            </Link>
+          )}
+
+          {puedeImportar && (
+            <Link
+              href={`/obras/${id}/cronograma/importar`}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: "var(--color-marca-600)" }}
+            >
+              <CalendarClock className="size-4" aria-hidden="true" />
+              {cronograma ? "Cargar un corte nuevo" : "Cargar cronograma"}
+            </Link>
+          )}
+        </div>
       </div>
 
       {cargado && (
