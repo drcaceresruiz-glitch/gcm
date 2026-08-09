@@ -15,9 +15,16 @@ interface Props {
   /// Fechas de corte ya cargadas, en texto "YYYY-MM-DD". Sirven para avisar
   /// antes de subir de que ese corte ya estaba.
   cortesCargados: string[];
+  /// El servidor tiene Java y MPXJ, y puede convertir el .mpp por su cuenta.
+  /// En desarrollo no los hay, y entonces solo se acepta el .xml.
+  admiteMpp: boolean;
 }
 
-export function ImportadorCronograma({ obraId, cortesCargados }: Props) {
+export function ImportadorCronograma({
+  obraId,
+  cortesCargados,
+  admiteMpp,
+}: Props) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [analisis, setAnalisis] = useState<ResultadoAnalisisCronograma | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +84,18 @@ export function ImportadorCronograma({ obraId, cortesCargados }: Props) {
     <div className="space-y-6">
       <Seccion titulo="1. Elige el archivo">
         <p className="mt-1 text-sm opacity-70">
-          El XML que exporta MS Project (Archivo &gt; Guardar como &gt; XML).
+          {admiteMpp ? (
+            <>
+              El <strong>.mpp</strong> de MS Project directamente, o su
+              exportacion a <strong>.xml</strong>. El .mpp lo convierte el
+              servidor: el de esta obra tarda unos cinco segundos.
+            </>
+          ) : (
+            <>
+              El XML que exporta MS Project (Archivo &gt; Guardar como &gt;
+              XML). Este servidor no puede convertir archivos .mpp.
+            </>
+          )}{" "}
           Se lee el plan tal como esta en el archivo: tareas, fechas,
           duraciones, predecesoras y el <strong>% Planeado</strong>, que no se
           calcula sino que se toma del campo personalizado, para que las cifras
@@ -98,7 +116,7 @@ export function ImportadorCronograma({ obraId, cortesCargados }: Props) {
             id="archivo"
             name="archivo"
             type="file"
-            accept=".xml"
+            accept={admiteMpp ? ".mpp,.xml" : ".xml"}
             onChange={alElegirArchivo}
             className="sr-only"
           />
@@ -122,7 +140,11 @@ export function ImportadorCronograma({ obraId, cortesCargados }: Props) {
         {pendiente && !analisis && (
           <p className="mt-3 flex items-center gap-2 text-sm opacity-70" role="status">
             <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-            Leyendo el archivo...
+            {/* Convertir el .mpp tarda unos segundos, y un «leyendo...» que se
+                queda quieto tanto rato parece que se colgo. */}
+            {archivo?.name.toLowerCase().endsWith(".mpp")
+              ? "Convirtiendo el archivo de MS Project..."
+              : "Leyendo el archivo..."}
           </p>
         )}
 

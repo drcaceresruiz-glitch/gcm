@@ -9,6 +9,7 @@ import {
   type ResultadoAnalisisCronograma,
 } from "@/lib/msproject-xml";
 import { importarCronograma } from "@/services/cronograma.service";
+import { convertirMppAXml, puedeConvertirMpp } from "@/services/mpp.service";
 
 /**
  * Flujo en dos pasos: analizar y luego confirmar.
@@ -29,6 +30,31 @@ import { importarCronograma } from "@/services/cronograma.service";
  */
 const TAMANO_MAXIMO = 20 * 1024 * 1024;
 
+const EXTENSIONES = [".xml", ".mpp"];
+
+/**
+ * Deja el contenido en XML, convirtiendo antes si hace falta.
+ *
+ * El .mpp es binario y propietario; lo convierte MPXJ en el servidor. Si el
+ * servidor no puede —en desarrollo no hay Java—, se dice y se pide el .xml,
+ * que sigue funcionando igual. Nunca se falla en silencio ni se intenta leer
+ * un binario como si fuera XML.
+ */
+async function comoXml(
+  archivo: File,
+): Promise<{ ok: true; xml: ArrayBuffer } | { ok: false; error: string }> {
+  const contenido = await archivo.arrayBuffer();
+
+  if (!archivo.name.toLowerCase().endsWith(".mpp")) {
+    return { ok: true, xml: contenido };
+  }
+
+  const convertido = await convertirMppAXml(contenido, archivo.name);
+  return convertido.ok
+    ? { ok: true, xml: convertido.xml }
+    : { ok: false, error: convertido.error };
+}
+
 export interface EstadoAnalisisCronograma {
   analisis?: ResultadoAnalisisCronograma;
   nombreArchivo?: string;
@@ -39,15 +65,26 @@ type Validacion = { ok: true; archivo: File } | { ok: false; error: string };
 
 function validarArchivo(archivo: unknown): Validacion {
   if (!(archivo instanceof File) || archivo.size === 0) {
-    return { ok: false, error: "Selecciona el XML del cronograma." };
+    return { ok: false, error: "Selecciona el cronograma de MS Project." };
   }
 
-  if (!archivo.name.toLowerCase().endsWith(".xml")) {
+  const nombre = archivo.name.toLowerCase();
+
+  if (!EXTENSIONES.some((e) => nombre.endsWith(e))) {
+    return {
+      ok: false,
+      error: "Formato no admitido. Sube el .mpp de MS Project o su exportacion a .xml.",
+    };
+  }
+
+  // Se rechaza aqui y no despues de subirlo: decirle a alguien que su archivo
+  // no vale cuando ya ha esperado a que suban 8 MB es peor que no aceptarlo.
+  if (nombre.endsWith(".mpp") && !puedeConvertirMpp()) {
     return {
       ok: false,
       error:
-        "Formato no admitido. En MS Project usa Archivo > Guardar como y elige " +
-        "XML (.xml). Si tienes un .mpp, conviertelo antes con scripts/mpp-a-xml.bat.",
+        "Este servidor no puede convertir archivos .mpp. Exporta el cronograma " +
+        "a XML desde MS Project (Archivo > Guardar como > XML) y sube ese archivo.",
     };
   }
 
@@ -77,8 +114,11 @@ export async function accionAnalizar(
   const validacion = validarArchivo(datos.get("archivo"));
   if (!validacion.ok) return { error: validacion.error };
 
+  const contenido = await comoXml(validacion.archivo);
+  if (!contenido.ok) return { error: contenido.error };
+
   try {
-    const analisis = await analizarProjectXml(await validacion.archivo.arrayBuffer());
+    const analisis = await analizarProjectXml(contenido.xml);
     return { analisis, nombreArchivo: validacion.archivo.name };
   } catch {
     // No se expone el error interno: un archivo corrupto no debe revelar
@@ -107,9 +147,14 @@ export async function accionImportar(
   const validacion = validarArchivo(datos.get("archivo"));
   if (!validacion.ok) return { error: validacion.error };
 
+  // Se vuelve a convertir y a analizar en el servidor: la vista previa del
+  // navegador es solo para mirar, y estas son las tareas que se guardan.
+  const contenido = await comoXml(validacion.archivo);
+  if (!contenido.ok) return { error: contenido.error };
+
   let analisis: ResultadoAnalisisCronograma;
   try {
-    analisis = await analizarProjectXml(await validacion.archivo.arrayBuffer());
+    analisis = await analizarProjectXml(contenido.xml);
   } catch {
     return { error: "No se pudo leer el archivo." };
   }

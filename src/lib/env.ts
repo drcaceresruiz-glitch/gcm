@@ -43,6 +43,21 @@ const envSchema = z.object({
    */
   DECOLECTA_TOKEN: z.string().optional(),
 
+  /**
+   * Conversion de archivos .mpp de MS Project a XML, con MPXJ.
+   *
+   * Las dos son OPCIONALES a proposito, igual que el SMTP. Sin ellas el
+   * importador sigue funcionando: solo deja de aceptar .mpp y pide el .xml,
+   * que es lo que pasa en desarrollo, donde no hay Java instalado. Hacerlas
+   * obligatorias ataria el arranque de toda la aplicacion a una herramienta
+   * que solo usa una pantalla.
+   *
+   * MPXJ_JAVA es la ruta al ejecutable `java` (en el servidor, `~/java/bin/java`
+   * de un Temurin 21) y MPXJ_HOME el directorio con los JAR de MPXJ.
+   */
+  MPXJ_JAVA: z.string().optional(),
+  MPXJ_HOME: z.string().optional(),
+
   // --- Correo saliente (alta de usuarios y recuperacion de clave) ---
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
