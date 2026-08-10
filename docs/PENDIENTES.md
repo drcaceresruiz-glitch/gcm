@@ -92,6 +92,32 @@ y probar en prod el ciclo de la plantilla (descargar - llenar - importar).
 
 ---
 
+## 0. LO PRIMERO DE MANANA: el candado de despliegue no caduca
+
+La noche del 10 de agosto, **seis despliegues seguidos salieron VERDES en
+GitHub Actions y ninguno se aplico**. La causa: `tmp/candado-despliegue`
+—que `app.js` crea como DIRECTORIO, porque `mkdir` es atomico y sirve de
+candado— quedo abandonado a las 16:43 y seguia ahi mas de media hora despues.
+Cada despliegue llegaba, veia el candado y se retiraba sin descomprimir.
+
+`app.js` dice que un candado de mas de tres minutos (`CADUCA_MS`) lo puede
+quitar cualquiera. **Eso no ocurrio.** O la comprobacion de caducidad esta
+mal, o el proceso que deberia ejecutarla —el cron cada minuto— no esta
+corriendo. Hay que averiguar cual de las dos.
+
+Se desbloqueo a mano: `rm -rf ~/gcm/tmp/candado-despliegue` y relanzar el
+workflow.
+
+**Segunda trampa aprendida esa misma noche**: al relanzar en Actions una
+ejecucion que NO es la ultima, se sube el `gcm.tar.gz` de ESE commit —todos
+los despliegues sobrescriben el mismo archivo—. Se descomprimio un paquete
+intermedio: cambio el CSS (parecia que habia entrado lo nuevo) pero sin la
+migracion del pase. **Para desplegar lo ultimo hay que relanzar la ejecucion
+de ARRIBA, o empujar un commit nuevo.**
+
+Mientras esto no se entienda, cualquier despliegue puede volver a quedarse
+colgado saliendo verde: es el mismo patron que costo dos horas de caida.
+
 ## 1. Deuda del incidente del 10 de agosto
 
 ### ~~Devolver los esqueletos de carga~~ HECHO
