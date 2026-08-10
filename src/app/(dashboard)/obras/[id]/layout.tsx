@@ -60,10 +60,14 @@ export default async function ObraLayout({
       href: `${raiz}/cronograma`,
       hecho: hitos.cronograma,
     },
+    // OJO con el nombre: en la app conviven DOS "lineas base" (la del
+    // presupuesto —revision aprobada— y la del cronograma —contra la que se
+    // mide el PV—). Este paso apunta a Revisiones, asi que se titula como su
+    // destino; llamarlo "Linea base" a secas hizo esperar el cronograma.
     puede(sesion, "linea_base:leer") && {
       clave: "lineaBase",
-      titulo: "Linea base",
-      pregunta: "la referencia congelada",
+      titulo: "Revisiones",
+      pregunta: "presupuesto congelado",
       href: `${raiz}/revisiones`,
       hecho: hitos.lineaBase,
     },

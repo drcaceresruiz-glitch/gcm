@@ -9,6 +9,7 @@ import {
   cadenaCritica,
 } from "@/lib/control-avance";
 import { diasLaborablesEntre } from "@/lib/calendario";
+import { metricasEvm, valorDeAvance, type MetricasEvm } from "@/lib/evm";
 import { obtenerObra } from "@/services/obras.service";
 import { datosCurvaS, obtenerCronograma } from "@/services/cronograma.service";
 import { obtenerCalendario } from "@/services/calendario.service";
@@ -129,6 +130,9 @@ export interface DatosTablero {
   planSemanal: DatosPlanSemanalTablero | null;
   /// Null sin permiso `lookahead:leer`.
   lookahead: DatosLookaheadTablero | null;
+  /// El EVM en resumen. Null sin cronograma con cortes o sin presupuesto:
+  /// sin esas dos patas no hay valor ganado que medir.
+  valorGanado: { metricas: MetricasEvm; corte: string } | null;
 }
 
 /**
@@ -164,6 +168,9 @@ export interface DatosLookaheadTablero {
   total: number;
   porcentaje: number;
   semanas: number;
+  /// Restricciones resueltas en toda la ventana. Cero = nadie ha usado la
+  /// matriz: la tarjeta lo dice en neutro en vez de gritar 0% en rojo.
+  restriccionesResueltas: number;
   /// Tareas de la ventana que aun no se han traido: sin ellas el % engaña.
   sinSincronizar: number;
 }
@@ -279,13 +286,14 @@ export async function datosTablero(
     encendido("atrasos") ||
     encendido("criticas") ||
     encendido("capitulos") ||
-    encendido("confiabilidad");
+    encendido("confiabilidad") ||
+    encendido("valorGanado");
 
   const necesitaPlanes = encendido("ppc") || encendido("causas");
 
   const [presupuesto, ordenes, cronograma, curva, calendario, planes] =
     await Promise.all([
-      encendido("presupuesto")
+      encendido("presupuesto") || encendido("valorGanado")
         ? presupuestoDeObra(sesion, obraId)
         : PRESUPUESTO_VACIO,
       encendido("presupuesto") || encendido("ordenes")
@@ -303,6 +311,37 @@ export async function datosTablero(
     encendido("confiabilidad") && cronograma
       ? await confiabilidadDeVentana(sesion, obraId, cronograma.tareas)
       : null;
+
+  // Valor ganado con lo YA cargado (curva + presupuesto): cero consultas
+  // nuevas, y con `metricasEvm`, la MISMA regla que la pantalla del EVM —el
+  // punto actual, los mismos respaldos y las mismas compuertas—. Si el numero
+  // de aqui y el de alla divergen, alguien duplico la regla.
+  const valorGanado = (() => {
+    if (!encendido("valorGanado") || !curva || curva.cortes.length === 0) {
+      return null;
+    }
+    const bac = presupuesto.total;
+    if (!(Number(bac) > 0)) return null;
+
+    const ultimo = curva.cortes[curva.cortes.length - 1]!;
+    const actual = curva.puntoActual ?? {
+      fecha: ultimo.fecha,
+      real: Number(ultimo.real),
+      planeado: curva.planeadoBaseEnCorte ?? Number(ultimo.planeado),
+    };
+
+    return {
+      metricas: metricasEvm({
+        bac,
+        pv: valorDeAvance(bac, actual.planeado),
+        ev: valorDeAvance(bac, actual.real),
+        // Sin permiso de ordenes el AC no existe para esta persona: la
+        // metrica lo marca como `sin_permiso` y la tarjeta lo explica.
+        ac: puede(sesion, "orden:leer") ? presupuesto.comprometido : null,
+      }),
+      corte: fechaCorta(actual.fecha),
+    };
+  })();
 
   const diasTotales = diasEntre(obra.fechaInicio, obra.fechaFinProgramada);
   const transcurridos = diasEntre(obra.fechaInicio, hoy());
@@ -347,6 +386,7 @@ export async function datosTablero(
       cronograma && curva ? armarCronograma(cronograma, curva) : null,
     planSemanal: planes,
     lookahead,
+    valorGanado,
   };
 }
 

@@ -248,6 +248,10 @@ export interface ConfiabilidadVentana extends Confiabilidad {
   /// Tareas de la ventana sin analizar. Cuentan como NO listas, y sin decirlo
   /// el porcentaje engana: parece mala ejecucion cuando es falta de analisis.
   sinSincronizar: number;
+  /// Restricciones marcadas como resueltas en toda la ventana. Cero significa
+  /// que NADIE ha usado la matriz todavia: un 0% de confiabilidad en rojo ahi
+  /// seria un artefacto de adopcion, no una foto de la obra.
+  restriccionesResueltas: number;
 }
 
 /**
@@ -306,6 +310,10 @@ export async function confiabilidadDeVentana(
     ...confiabilidad(filas),
     semanas,
     sinSincronizar: tareas.filter((t) => !porUid.has(t.uid)).length,
+    restriccionesResueltas: analizadas.reduce(
+      (n, l) => n + l.restricciones.filter((r) => r.resuelta).length,
+      0,
+    ),
   };
 }
 

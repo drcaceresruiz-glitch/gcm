@@ -11,13 +11,16 @@ import {
   ClipboardCheck,
   Telescope,
   Ban,
+  Gauge,
 } from "lucide-react";
 import type { DefinicionModulo } from "@/lib/tablero";
 import {
   COLOR_SEMAFORO,
   semaforoDesfase,
+  semaforoIndice,
   type Semaforo,
 } from "@/lib/tablero";
+import { textoSinCosto } from "@/lib/evm";
 import type {
   DatosTablero,
   DatosCronogramaTablero,
@@ -71,6 +74,8 @@ export function moduloConDatos(
       return datos.planSemanal !== null;
     case "confiabilidad":
       return datos.lookahead !== null;
+    case "valorGanado":
+      return datos.valorGanado !== null;
     default:
       // Plazo y presupuesto salen de la propia obra: siempre hay algo.
       return true;
@@ -98,6 +103,9 @@ export function ModuloContenido({
       {modulo.clave === "plazo" && <Plazo datos={datos} obraId={obraId} />}
       {modulo.clave === "presupuesto" && (
         <Presupuesto datos={datos} obraId={obraId} />
+      )}
+      {modulo.clave === "valorGanado" && datos.valorGanado && (
+        <ValorGanado vg={datos.valorGanado} obraId={obraId} />
       )}
       {modulo.clave === "ppc" && datos.planSemanal && (
         <Ppc plan={datos.planSemanal} obraId={obraId} />
@@ -201,7 +209,7 @@ function Avance({
         <p className="text-xs opacity-60">
           Plan {crono.planeado.toFixed(1)}% ·{" "}
           <span style={{ color: COLOR_SEMAFORO[semaforo] }}>
-            {desfase === 0 ? "al dia" : `${conSignoFijo(desfase, 1)} pts`}
+            {desfase === 0 ? "al dia" : `${conSignoFijo(desfase, 1)} puntos`}
           </span>
         </p>
       </div>
@@ -480,8 +488,8 @@ function Plazo({ datos, obraId }: { datos: DatosTablero; obraId: string }) {
         </p>
         <p className="text-xs opacity-60">
           {vencido
-            ? "pasados del plazo de la ficha"
-            : "restantes segun la ficha"}
+            ? "pasados del plazo de la obra"
+            : "restantes del plazo de la obra"}
           {/* Los dias que de verdad se trabaja. Un plazo de 56 dias con 42
               laborables no da 56 jornadas de cuadrilla, y es sobre esas
               jornadas sobre las que se planifica. */}
@@ -597,6 +605,99 @@ function Presupuesto({
 }
 
 // ---------------------------------------------------------------------------
+// Valor ganado (EVM) en resumen
+// ---------------------------------------------------------------------------
+
+/**
+ * SPI y CPI de un vistazo: la unica cifra del tablero que junta plazo y
+ * COSTO. Vivia escondida en Cronograma → EVM, y es justo la que un gerente
+ * quiere ver al abrir el panel.
+ *
+ * Con la misma compuerta honesta del panel EVM: sin base de costo, el CPI no
+ * se inventa —se explica el hueco con `textoSinCosto`—.
+ */
+function ValorGanado({
+  vg,
+  obraId,
+}: {
+  vg: NonNullable<DatosTablero["valorGanado"]>;
+  obraId: string;
+}) {
+  const m = vg.metricas;
+  const svNum = Number(m.sv);
+
+  return (
+    <>
+      <Titulo icono={Gauge}>Valor ganado (EVM)</Titulo>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Indice etiqueta="SPI" nota="plazo" valor={m.spi} />
+        <Indice etiqueta="CPI" nota="costo" valor={m.cpi} />
+      </div>
+
+      <p className="mt-2 text-xs opacity-70">
+        SV{" "}
+        <span
+          className="font-semibold tabular-nums"
+          style={{
+            color:
+              svNum === 0
+                ? undefined
+                : svNum > 0
+                  ? "var(--color-exito)"
+                  : "var(--color-peligro)",
+          }}
+        >
+          {svNum > 0 ? "+" : ""}
+          {soles(m.sv)}
+        </span>{" "}
+        al corte del {vg.corte}.
+      </p>
+
+      {m.cpi === null && m.motivoSinCosto !== null && (
+        <p className="mt-1 text-xs opacity-50">
+          {textoSinCosto(m.motivoSinCosto)}
+        </p>
+      )}
+
+      <EnlaceModulo href={`/obras/${obraId}/cronograma`}>
+        Ver EVM completo
+      </EnlaceModulo>
+    </>
+  );
+}
+
+/** Un indice (SPI/CPI) con su semaforo, o un guion honesto si no lo hay. */
+function Indice({
+  etiqueta,
+  nota,
+  valor,
+}: {
+  etiqueta: string;
+  nota: string;
+  valor: number | null;
+}) {
+  const semaforo = semaforoIndice(valor);
+
+  return (
+    <div
+      className="rounded-lg border px-2 py-1.5"
+      style={{ borderColor: "var(--borde)" }}
+    >
+      <p className="text-xs opacity-60">
+        {etiqueta} <span className="opacity-70">· {nota}</span>
+      </p>
+      <p
+        className="text-lg font-semibold tabular-nums"
+        style={semaforo ? { color: COLOR_SEMAFORO[semaforo] } : undefined}
+      >
+        {valor === null ? "—" : valor.toFixed(2)}
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // PPC: si se cumple lo prometido
 // ---------------------------------------------------------------------------
 
@@ -666,7 +767,7 @@ function Ppc({
                         : "var(--color-peligro)",
                 }}
               >
-                {delta === 0 ? "igual" : `${conSignoFijo(delta, 0)} pts`}
+                {delta === 0 ? "igual" : `${conSignoFijo(delta, 0)} puntos`}
               </span>
             </>
           )}
@@ -761,6 +862,26 @@ function Confiabilidad({
         <Titulo icono={Telescope}>Lookahead</Titulo>
         <p className="mt-2 text-sm opacity-60">
           No hay tareas del cronograma en las proximas {lk.semanas} semanas.
+        </p>
+        <EnlaceModulo href={href}>Ver lookahead</EnlaceModulo>
+      </>
+    );
+  }
+
+  // Sin UNA sola restriccion marcada, el 0% no es una foto de la obra: es que
+  // nadie ha usado la matriz todavia. Gritarlo en rojo junto a un avance "al
+  // dia" se lee como catastrofe; se dice en neutro y se invita a empezar.
+  if (lk.restriccionesResueltas === 0) {
+    return (
+      <>
+        <Titulo icono={Telescope}>Lookahead</Titulo>
+        <p className="mt-2 text-sm opacity-60">
+          Aun sin analisis de restricciones.
+        </p>
+        <p className="mt-1 text-xs opacity-50">
+          {lk.total} {lk.total === 1 ? "tarea" : "tareas"} en la ventana de{" "}
+          {lk.semanas} semanas. Entra y marca lo que ya este resuelto: el
+          porcentaje aparecera con la primera restriccion.
         </p>
         <EnlaceModulo href={href}>Ver lookahead</EnlaceModulo>
       </>
@@ -862,6 +983,14 @@ function Causas({
           {redondearA(porcentaje, 0)}% de los {plan.fallosConCausa}{" "}
           incumplimientos con causa
         </p>
+        {/* Junto al PPC, que solo cuenta semanas CERRADAS, este total parece
+            contradecirlo. No es error: el Pareto suma tambien las abiertas a
+            proposito, y hay que decirlo donde se lee. */}
+        {plan.abiertas > 0 && (
+          <p className="mt-0.5 text-xs opacity-50">
+            Cuenta todas las semanas, incluidas las {plan.abiertas} abiertas.
+          </p>
+        )}
       </div>
 
       <div
@@ -913,7 +1042,8 @@ function Atrasos({
       {atrasos.primera && (
         <p className="mt-2 line-clamp-2 text-xs opacity-70">
           <span style={{ color: "var(--color-peligro)" }}>▸</span>{" "}
-          {atrasos.primera.nombre} ({atrasos.primera.desfase.toFixed(0)} pts)
+          {atrasos.primera.nombre} ({Math.abs(atrasos.primera.desfase).toFixed(0)}{" "}
+          puntos por detras del plan)
         </p>
       )}
 
@@ -973,7 +1103,7 @@ function Criticas({
           {criticas.atrasados}
         </p>
         <p className="pb-1 text-xs opacity-60">
-          de {criticas.eslabones} eslabones atrasados
+          de {criticas.eslabones} tareas de la cadena atrasadas
         </p>
       </div>
 
@@ -1071,6 +1201,28 @@ function Ordenes({
   ordenes: NonNullable<DatosTablero["ordenes"]>;
   obraId: string;
 }) {
+  // Sin ordenes vivas, la tabla de tres ceros gastaba una tarjeta entera en
+  // decir "no hay nada" —y peor: "1 en total" con la unica anulada parecia
+  // actividad—. Se dice en una frase.
+  if (ordenes.aprobadas === 0 && ordenes.borradores === 0) {
+    return (
+      <>
+        <Titulo icono={FileText}>Ordenes de compra</Titulo>
+        <p className="mt-2 text-sm opacity-60">
+          {ordenes.anuladas === 0
+            ? "Aun no se ha emitido ninguna orden."
+            : `Sin ordenes vivas (${ordenes.anuladas} ${ordenes.anuladas === 1 ? "anulada" : "anuladas"}).`}
+        </p>
+        <p className="mt-1 text-xs opacity-50">
+          El comprometido del presupuesto sale de las ordenes aprobadas.
+        </p>
+        <EnlaceModulo href={`/obras/${obraId}/ordenes`}>
+          Ver ordenes
+        </EnlaceModulo>
+      </>
+    );
+  }
+
   return (
     <>
       <Titulo icono={FileText}>Ordenes de compra</Titulo>

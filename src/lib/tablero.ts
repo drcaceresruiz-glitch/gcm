@@ -63,6 +63,15 @@ export const MODULOS = [
     requiereCronograma: false,
   },
   {
+    // El EVM en resumen. Se calcula con lo que el tablero YA carga (curva +
+    // presupuesto): encenderlo no cuesta ninguna consulta extra.
+    clave: "valorGanado",
+    etiqueta: "Valor ganado (EVM)",
+    nota: "SPI y CPI: plazo y costo contra el plan",
+    ancho: 1,
+    requiereCronograma: true,
+  },
+  {
     clave: "ppc",
     etiqueta: "PPC (Last Planner)",
     nota: "Que parte de lo prometido se cumplio",
