@@ -24,7 +24,7 @@ import {
 } from "@/lib/obras";
 import { Chip } from "@/components/ui/Chip";
 import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
-import { ModuloContenido } from "@/components/tablero/modulos";
+import { ModuloContenido, moduloConDatos } from "@/components/tablero/modulos";
 
 /**
  * El tablero de supervision, a todo lo ancho encima de las obras.
@@ -74,13 +74,20 @@ export function Tablero({
   // Un modulo que necesita cronograma no se pinta si la obra no tiene: en su
   // sitio quedaria un hueco que parece un error. Se filtra aqui y no en el
   // estado para que, al cargar un cronograma, el modulo reaparezca solo.
+  //
+  // Y lo mismo con los datos: `requiereCronograma` no bastaba. Sin permiso de
+  // ordenes, o con un modulo cuyos datos no vienen, se pintaba la caja VACIA
+  // —borde y nada dentro—, que no se lee como "no hay datos" sino como "esto
+  // se ha roto".
   const aPintar = useMemo(
     () =>
       MODULOS.filter(
         (m) =>
-          visibles.has(m.clave) && (!m.requiereCronograma || hayCronograma),
+          visibles.has(m.clave) &&
+          (!m.requiereCronograma || hayCronograma) &&
+          (datos === null || moduloConDatos(m.clave, datos)),
       ),
-    [visibles, hayCronograma],
+    [visibles, hayCronograma, datos],
   );
 
   function alternar(clave: ModuloTablero) {

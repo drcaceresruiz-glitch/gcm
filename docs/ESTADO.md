@@ -11,6 +11,72 @@ qué está construido así, y qué falta.
 
 ---
 
+## Incidente del 10 de agosto de 2026 — leer antes de tocar el despliegue
+
+Produccion estuvo unas dos horas sirviendo pantallas inservibles. Dos causas
+independientes, y ninguna era la que parecia.
+
+### 1. Ningun despliegue del dia llegaba a aplicarse
+
+`app.js` descomprimia el `gcm.tar.gz` **dentro del proceso que atiende la
+peticion**, y eso tarda **16 segundos** (medidos: 0,5 s de CPU, el resto
+esperando al disco). LiteSpeed mata el arranque mucho antes. Resultado: el
+paquete quedaba renombrado a `.desplegando` y a medio extraer, con lo que el
+arbol mezclaba ficheros de dos compilaciones. De ahi los sintomas del log que
+nos tuvieron horas persiguiendo fantasmas:
+
+- `Failed to load external module ...wasm-base64.mjs: SyntaxError` — un fichero
+  leido a medio escribir.
+- `Failed to find Server Action ... from an older or newer deployment`.
+- `PrismaClientValidationError` sobre consultas que en el codigo actual son
+  correctas: eran de un build anterior mezclado.
+
+**Arreglado con un cron cada minuto** que descomprime desde fuera y toca
+`tmp/restart.txt`. El arranque ya no hace trabajo pesado. `app.js` conserva
+ademas un candado atomico por si dos instancias coinciden.
+
+**No vuelvas a poner trabajo lento en el arranque.** Este hosting lo corta.
+
+### 2. Las pantallas se quedaban en el esqueleto de carga, para siempre
+
+El servidor respondia **200 con el HTML completo** (145 KB en 590 ms). El
+contenido llegaba al navegador dentro de un `<div hidden id="S:1">` y no se
+colocaba nunca.
+
+La causa, en el codigo de React 19.2: **`$RC` ya no revela nada**. Marca el
+hueco como `$~`, mete el par en una cola `$RB`, y programa el revelado real
+—`$RV`— con **`requestAnimationFrame`**. Y `requestAnimationFrame` no corre en
+una pestana en segundo plano. Todo el revelado de la pagina cuelga de esa
+unica llamada, sin segunda oportunidad.
+
+Fallaban **exactamente** las rutas con `loading.tsx` y funcionaban
+**exactamente** las que no lo tienen —el grupo `(auth)` no tiene ninguno—.
+Correlacion perfecta; no tenia nada que ver con la sesion ni con la base.
+
+**Arreglado apagando los dos `loading.tsx`** (movidos a `_esqueletos/`, que Next
+excluye del enrutado por el guion bajo). Sin ellos la respuesta no se parte en
+dos: el servidor manda la pagina entera y el navegador la pinta aunque la
+hidratacion falle. Verificado con `document.hidden === true`: renderiza igual.
+
+Para reactivarlos hace falta una red de seguridad que drene `$RB` si `$RV` no
+se ha ejecutado. Ver `src/app/(dashboard)/_esqueletos/LEEME.md`.
+
+### 3. Y una leccion de metodo
+
+Buena parte del tiempo se perdio midiendo mal: se comprobaba si la pagina
+tenia contenido contando **caracteres de texto**, y un esqueleto de carga son
+rectangulos grises **sin texto**. La pantalla parecia vacia cuando estaba
+cargando. Ademas se inspeccionaba desde una pestana en segundo plano, que es
+justo la condicion que disparaba el fallo. Se dieron por buenas cuatro
+hipotesis falsas antes de la correcta: pool de conexiones, bloqueo de tabla,
+cuota de disco y un bug de Prisma inexistente.
+
+Para la proxima: **mirar la pantalla** (captura o `.animate-pulse`) antes de
+teorizar, y comprobar `document.hidden` antes de creerse nada de lo que diga
+un navegador automatizado.
+
+---
+
 ## Anexo — estado al 10 de agosto de 2026
 
 ### Multiempresa real: ya se puede vender a otras constructoras
@@ -55,7 +121,15 @@ constructoras están suspendidas para cualquiera que supiera un correo.
 - **Cierre por cantidad**: la semana pregunta cuánto se EJECUTÓ, y la semana
   cerrada muestra «90 / 120 m2».
 
-### El tablero ya habla de Last Planner
+### El tablero ya habla de Last Planner (APAGADO, ver incidente)
+
+> **Los tres modulos estan apagados** con `CARGAR_LAST_PLANNER = false` en
+> `tablero.service.ts`, como precaucion durante el incidente del 10 de agosto.
+> Al final no eran la causa, pero antes de reencenderlos hay que hacer las dos
+> cosas que faltaban: cargar solo los modulos ENCENDIDOS (el servidor ya lee la
+> cookie) y compartir la lectura del cronograma en vez de que
+> `obtenerLookahead` la repita.
+
 
 Enseñaba avance, plazo y dinero —las tres cifras del control clasico— y ni una
 del sistema que la obra usa para decidir la semana. Tres modulos nuevos:

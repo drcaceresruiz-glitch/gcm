@@ -37,7 +37,47 @@ import { EnlaceModulo } from "@/components/tablero/Tablero";
  * rejilla se lea como una rejilla y no como ocho recuadros distintos. El
  * ancho lo decide el catalogo: la curva ocupa dos columnas porque una linea
  * en una sola es ilegible.
+ *
+ * Que modulos llegan a pintarse lo decide antes `moduloConDatos`, aqui debajo.
  */
+
+/**
+ * Si un modulo tiene con que pintarse.
+ *
+ * Sin esto se dibujaba la CAJA VACIA: un recuadro con borde y nada dentro,
+ * que no se lee como "aqui no hay datos" sino como "esto se ha roto". Pasaba
+ * con quien no tiene permiso de ordenes, y volvio a pasar al apagar los
+ * modulos de Last Planner.
+ *
+ * Vive aqui, pegado a las guardas de `ModuloContenido`, para que las dos no
+ * puedan discrepar: si una dice que hay datos y la otra no los pinta, se
+ * vuelve al recuadro vacio.
+ */
+export function moduloConDatos(
+  clave: DefinicionModulo["clave"],
+  datos: DatosTablero,
+): boolean {
+  switch (clave) {
+    case "avance":
+    case "curva":
+    case "atrasos":
+    case "criticas":
+    case "capitulos":
+      return datos.cronograma !== null;
+    case "ordenes":
+      return datos.ordenes !== null;
+    case "ppc":
+    case "causas":
+      return datos.planSemanal !== null;
+    case "confiabilidad":
+      return datos.lookahead !== null;
+    default:
+      // Plazo y presupuesto salen de la propia obra: siempre hay algo.
+      return true;
+  }
+}
+
+/** El contenido de un modulo, elegido por su clave. */
 export function ModuloContenido({
   modulo,
   datos,
