@@ -49,17 +49,25 @@ export default async function DetallePlanSemanalPage({
   // programado cae en el rango del corte; si ya hay compromisos guardados,
   // mandan esos.
   const autocargado = plan.compromisos.length === 0 && plan.sugeridas.length > 0;
+  // OJO: guardar REEMPLAZA la semana, asi que todo lo que no viaje de ida y
+  // vuelta por aqui se borraria (cantidad, unidad y el enlace al Lookahead).
   const inicial =
     plan.compromisos.length > 0
       ? plan.compromisos.map((c) => ({
           uid: c.uid,
           descripcion: c.descripcion,
           metaPorcentaje: c.metaPorcentaje,
+          cantidadPlan: c.cantidadPlan,
+          unidad: c.unidad,
+          lookaheadTaskId: c.lookaheadTaskId,
         }))
       : plan.sugeridas.map((s) => ({
           uid: s.uid,
           descripcion: s.descripcion,
           metaPorcentaje: s.metaPorcentaje,
+          cantidadPlan: s.cantidadPlan,
+          unidad: s.unidad,
+          lookaheadTaskId: null,
         }));
 
   return (
@@ -162,7 +170,24 @@ export default async function DetallePlanSemanalPage({
                       {c.cumplido ? "✓" : "✗"}
                     </span>
                   )}
-                  <span className="flex-1">{c.descripcion}</span>
+                  <span className="flex-1">
+                    {c.descripcion}
+                    {c.cantidadPlan && (
+                      <span className="ml-2 text-xs opacity-70 tabular-nums">
+                        {c.cantidadPlan}
+                        {c.unidad ? ` ${c.unidad}` : ""}
+                      </span>
+                    )}
+                    {abierto && c.uid !== null && c.estadoLookahead !== "LISTO" && (
+                      <span
+                        className="ml-2 text-xs"
+                        style={{ color: "var(--color-alerta)" }}
+                        title="Se comprometio sin liberar sus restricciones en el Lookahead"
+                      >
+                        sin liberar
+                      </span>
+                    )}
+                  </span>
                   {!abierto && c.cumplido === false && c.causa && (
                     <span className="text-xs" style={{ color: "var(--color-peligro)" }}>
                       {ETIQUETA_CNC[c.causa]}

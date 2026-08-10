@@ -7,6 +7,11 @@ import {
   sincronizarLookahead,
   alternarRestriccion,
 } from "@/services/lookahead.service";
+import {
+  comprometerAlPts,
+  type DatosComprometer,
+  type ResultadoComprometer,
+} from "@/services/plan-semanal.service";
 
 /**
  * Acciones del Lookahead. Las reglas y el aislamiento por empresa viven en el
@@ -32,4 +37,32 @@ export async function accionAlternarRestriccion(
 
   await alternarRestriccion(sesion, obraId, restriccionId, resuelta);
   revalidatePath(`/obras/${obraId}/lookahead`);
+}
+
+
+/**
+ * Lleva las tareas elegidas del Lookahead al Plan Semanal.
+ *
+ * Devuelve el resultado (no es void como las otras) porque la pantalla necesita
+ * saber si el servidor pide confirmacion —hay tareas sin liberar o ya
+ * comprometidas— y cuantas entraron de verdad.
+ */
+export async function accionComprometerAlPts(
+  obraId: string,
+  datos: DatosComprometer,
+): Promise<ResultadoComprometer> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await comprometerAlPts(sesion, obraId, datos);
+
+  if (r.ok) {
+    // La tarea pasa a verse en los dos sitios: la matriz la marca como
+    // comprometida y la semana gana el compromiso.
+    revalidatePath(`/obras/${obraId}/lookahead`);
+    revalidatePath(`/obras/${obraId}/plan-semanal`);
+    revalidatePath(`/obras/${obraId}/plan-semanal/${r.planId}`);
+  }
+
+  return r;
 }

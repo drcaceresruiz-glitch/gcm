@@ -9,8 +9,13 @@ import {
   paretoCausas,
   tendenciaPpc,
   rangoSemana,
+  proximoCorte,
   tareasDeLaSemana,
   restriccionDeTarea,
+  sugerirCantidad,
+  mapaPreservablePorUid,
+  validarCantidadPlan,
+  uidsDuplicados,
   CAUSAS_CNC,
   type FilaPareto,
   type PuntoPpc,
@@ -20,6 +25,7 @@ import { ultimoAvancePorTarea } from "@/lib/cronograma";
 import type {
   EstadoPlanSemanal,
   CausaNoCumplimiento,
+  EstadoLookahead,
 } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -127,6 +133,15 @@ export interface CompromisoDetalle {
   /// % de avance ya registrado por ESTE plan para la tarea (para pre-llenar el
   /// cierre al reabrir). null si es linea libre o aun no se registro.
   porcentajeReal: string | null;
+  /// Cantidad comprometida y su unidad (PTS por cantidad).
+  cantidadPlan: string | null;
+  unidad: string | null;
+  /// De que tarea del Lookahead nacio, si vino de ahi.
+  lookaheadTaskId: string | null;
+  /// Estado en el Lookahead HOY (no congelado): si no esta LISTO, la pantalla
+  /// avisa de que se comprometio algo sin liberar. Si se libera despues, el
+  /// aviso desaparece solo.
+  estadoLookahead: EstadoLookahead | null;
 }
 
 export interface TareaOpcionPlan {
@@ -139,12 +154,20 @@ export interface TareaOpcionPlan {
   conRestriccion: boolean;
   /// Texto de la restriccion, si la hay.
   restriccion: string | null;
+  /// Estado en el Lookahead: LISTO = sus 7 flujos estan resueltos. null = la
+  /// tarea aun no se analizo (no esta en la ventana o no se sincronizo).
+  estadoLookahead: EstadoLookahead | null;
+  /// Cantidad y unidad que propone la partida mapeada, si se puede.
+  cantidadSugerida: string | null;
+  unidadSugerida: string | null;
 }
 
 export interface CompromisoSugerido {
   uid: number;
   descripcion: string;
   metaPorcentaje: string | null;
+  cantidadPlan: string | null;
+  unidad: string | null;
 }
 
 export interface PlanSemanalDetalle {
@@ -188,6 +211,7 @@ export async function obtenerPlanSemanal(
         select: {
           id: true, uid: true, descripcion: true, metaPorcentaje: true,
           cumplido: true, causa: true, notaCierre: true,
+          cantidadPlan: true, unidad: true, lookaheadTaskId: true,
         },
       },
     },
@@ -269,12 +293,28 @@ export async function obtenerPlanSemanal(
     tareasDeLaSemana(tareasCron, iniSemana, finSemana).map((t) => t.uid),
   );
 
+  // El analisis del Lookahead, para que el desplegable ponga primero lo LISTO
+  // y avise de lo que no lo esta. Se lee al vuelo (no se congela): si las
+  // restricciones se liberan luego, el aviso desaparece solo.
+  const deLookahead = await prisma.lookaheadTask.findMany({
+    where: { projectId: obraId },
+    select: { uid: true, estado: true },
+  });
+  const estadoLkPorUid = new Map(deLookahead.map((l) => [l.uid, l.estado]));
+
+  // Cantidad y unidad que propone la partida mapeada de cada tarea.
+  const sugerenciaPorUid = await sugerenciasPorTarea(
+    obraId,
+    tareasCron.filter((t) => !t.esResumen).map((t) => t.uid),
+  );
+
   // Para el desplegable: todas las tareas de trabajo (sin resumenes), con su
   // estado de semana y su restriccion.
   const tareas: TareaOpcionPlan[] = tareasCron
     .filter((t) => !t.esResumen)
     .map((t) => {
       const r = restriccionDeTarea(t.uid, dependencias, avancePorUid, nombrePorUid);
+      const s = sugerenciaPorUid.get(t.uid);
       return {
         uid: t.uid,
         codigo: t.codigo,
@@ -282,6 +322,9 @@ export async function obtenerPlanSemanal(
         enSemana: enSemanaUids.has(t.uid),
         conRestriccion: !r.libre,
         restriccion: r.motivo,
+        estadoLookahead: estadoLkPorUid.get(t.uid) ?? null,
+        cantidadSugerida: s?.cantidad ?? null,
+        unidadSugerida: s?.unidad ?? null,
       };
     });
 
@@ -312,6 +355,8 @@ export async function obtenerPlanSemanal(
       uid: t.uid,
       descripcion: `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`.slice(0, 300),
       metaPorcentaje: null as string | null,
+      cantidadPlan: sugerenciaPorUid.get(t.uid)?.cantidad ?? null,
+      unidad: sugerenciaPorUid.get(t.uid)?.unidad ?? null,
     }));
 
   const compromisos: CompromisoDetalle[] = plan.compromisos.map((c) => ({
@@ -324,6 +369,10 @@ export async function obtenerPlanSemanal(
     notaCierre: c.notaCierre,
     tarea: c.uid !== null ? (porUid.get(c.uid) ?? null) : null,
     porcentajeReal: c.uid !== null ? (realDelPlanPorUid.get(c.uid) ?? null) : null,
+    cantidadPlan: c.cantidadPlan?.toString() ?? null,
+    unidad: c.unidad,
+    lookaheadTaskId: c.lookaheadTaskId,
+    estadoLookahead: c.uid !== null ? (estadoLkPorUid.get(c.uid) ?? null) : null,
   }));
 
   const { total, cumplidos, ppc } = ppcDePlan(plan.compromisos);
@@ -434,6 +483,11 @@ export interface DatosCompromiso {
   uid?: number | null;
   descripcion: string;
   metaPorcentaje?: string | null;
+  /// Cantidad planificada y su unidad (el PTS por cantidad del Last Planner).
+  cantidadPlan?: string | null;
+  unidad?: string | null;
+  /// De que tarea del Lookahead nace (trazabilidad); se conserva al reeditar.
+  lookaheadTaskId?: string | null;
 }
 
 /**
@@ -475,8 +529,17 @@ export async function guardarCompromisos(
     }
   }
 
+  // La cantidad va a un Decimal(14,4): se valida igual que la meta, antes de
+  // tocar la base, para no caer con un 500 por un numero mal escrito.
+  const cantidades: (string | null)[] = [];
+  for (const c of compromisos) {
+    const v = validarCantidadPlan(c.cantidadPlan);
+    if (!v.ok) return { ok: false, error: v.error };
+    cantidades.push(v.valor);
+  }
+
   const limpios = compromisos
-    .map((c) => ({
+    .map((c, i) => ({
       uid:
         c.uid === null || c.uid === undefined || !Number.isSafeInteger(c.uid)
           ? null
@@ -486,19 +549,58 @@ export async function guardarCompromisos(
         c.metaPorcentaje && c.metaPorcentaje.trim()
           ? normalizarDecimal(c.metaPorcentaje, 2)
           : null,
+      cantidadPlan: cantidades[i],
+      unidad: c.unidad?.trim() ? c.unidad.trim().slice(0, 20) : null,
+      lookaheadTaskId: c.lookaheadTaskId ?? null,
     }))
     .filter((c) => c.descripcion.length > 0);
 
+  // La misma tarea dos veces en una semana no es un compromiso, es un descuido:
+  // se avisa en vez de descartar en silencio una linea que el usuario escribio.
+  const repetidos = uidsDuplicados(limpios);
+  if (repetidos.length > 0) {
+    return {
+      ok: false,
+      error: `Hay una tarea repetida en la semana (uid ${repetidos.join(", ")}). Dejala una sola vez.`,
+    };
+  }
+
   await prisma.$transaction(async (tx) => {
+    // Planificar REEMPLAZA la semana, asi que lo que esta pantalla no edita
+    // (zona, subcontratista, color, protocolo) se perderia en cada guardado.
+    // Se rescata por uid ANTES de borrar; `mapaPreservablePorUid` se abstiene
+    // cuando hay ambiguedad.
+    const previos = await tx.compromisoSemanal.findMany({
+      where: { planSemanalId: planId },
+      select: {
+        uid: true,
+        zona: true,
+        proveedorId: true,
+        color: true,
+        protocoloCalidad: true,
+      },
+    });
+    const preservar = mapaPreservablePorUid(previos, limpios);
+
     await tx.compromisoSemanal.deleteMany({ where: { planSemanalId: planId } });
     if (limpios.length > 0) {
       await tx.compromisoSemanal.createMany({
-        data: limpios.map((c) => ({
-          planSemanalId: planId,
-          uid: c.uid,
-          descripcion: c.descripcion,
-          metaPorcentaje: c.metaPorcentaje,
-        })),
+        data: limpios.map((c) => {
+          const guardado = c.uid !== null ? preservar.get(c.uid) : undefined;
+          return {
+            planSemanalId: planId,
+            uid: c.uid,
+            descripcion: c.descripcion,
+            metaPorcentaje: c.metaPorcentaje,
+            cantidadPlan: c.cantidadPlan,
+            unidad: c.unidad,
+            lookaheadTaskId: c.lookaheadTaskId,
+            zona: guardado?.zona ?? null,
+            proveedorId: guardado?.proveedorId ?? null,
+            color: guardado?.color ?? null,
+            protocoloCalidad: guardado?.protocoloCalidad ?? false,
+          };
+        }),
       });
     }
     await tx.auditLog.create({
@@ -733,4 +835,292 @@ export async function eliminarPlanSemanal(
   });
 
   return { ok: true, id: planId };
+}
+
+
+// ---------------------------------------------------------------------------
+// Del Lookahead al PTS
+// ---------------------------------------------------------------------------
+
+export interface SemanaAbierta {
+  id: string;
+  numero: number;
+  fechaCorte: Date;
+}
+
+/// Las semanas que todavia admiten compromisos (para elegir destino).
+export async function planesAbiertos(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<SemanaAbierta[]> {
+  if (!puede(sesion, "plan_semanal:leer")) return [];
+
+  return prisma.planSemanal.findMany({
+    where: {
+      projectId: obraId,
+      estado: "ABIERTO",
+      project: { companyId: sesion.companyId },
+    },
+    orderBy: { fechaCorte: "asc" },
+    select: { id: true, numero: true, fechaCorte: true },
+  });
+}
+
+/**
+ * La cantidad y unidad que se pueden proponer para cada tarea, sacadas de las
+ * partidas que tiene mapeadas. Dos consultas planas y el cruce en memoria (el
+ * mismo patron de `obtenerMapeo`): nada de cargar el presupuesto entero.
+ */
+async function sugerenciasPorTarea(
+  obraId: string,
+  uids: number[],
+): Promise<Map<number, { unidad: string | null; cantidad: string | null }>> {
+  const vacio = new Map<number, { unidad: string | null; cantidad: string | null }>();
+  if (uids.length === 0) return vacio;
+
+  const mapeos = await prisma.mapeoTareaPartida.findMany({
+    where: { projectId: obraId, uid: { in: uids } },
+    select: { uid: true, codigoPartida: true },
+  });
+  if (mapeos.length === 0) return vacio;
+
+  const partidas = await prisma.wbsItem.findMany({
+    where: {
+      projectId: obraId,
+      codigoPartida: { in: [...new Set(mapeos.map((m) => m.codigoPartida))] },
+    },
+    select: { codigoPartida: true, unidad: true, metrado: true },
+  });
+  const porCodigo = new Map(partidas.map((p) => [p.codigoPartida, p] as const));
+
+  const porUid = new Map<number, { unidad: string | null; metrado: string | null }[]>();
+  for (const m of mapeos) {
+    const p = porCodigo.get(m.codigoPartida);
+    if (!p) continue;
+    const lista = porUid.get(m.uid) ?? [];
+    lista.push({ unidad: p.unidad, metrado: p.metrado?.toString() ?? null });
+    porUid.set(m.uid, lista);
+  }
+
+  for (const [uid, lista] of porUid) {
+    const s = sugerirCantidad(lista);
+    vacio.set(uid, { unidad: s.unidad, cantidad: s.cantidad });
+  }
+  return vacio;
+}
+
+
+export interface DatosComprometer {
+  /// Semana destino; null = crear la del proximo corte.
+  planId: string | null;
+  uids: number[];
+  /// El usuario ya vio y acepto los avisos (tareas no listas, repetidas).
+  confirmado: boolean;
+}
+
+export interface AvisoComprometer {
+  uid: number;
+  nombre: string;
+  /// En que otra semana ya esta comprometida, si es el caso.
+  semana?: number;
+}
+
+export type ResultadoComprometer =
+  | {
+      ok: true;
+      planId: string;
+      numero: number;
+      agregados: number;
+      /// Ya estaban en esa misma semana: se omiten sin ruido.
+      omitidos: number;
+    }
+  | {
+      ok: false;
+      error?: string;
+      /// El servidor exige una vuelta mas: hay que confirmar estos avisos.
+      requiereConfirmacion?: {
+        noListas: AvisoComprometer[];
+        enOtraSemana: AvisoComprometer[];
+      };
+    };
+
+
+/**
+ * Lleva tareas del Lookahead al PTS: crea sus compromisos en una semana.
+ *
+ * A diferencia de `guardarCompromisos` (que reemplaza la semana entera), esto
+ * AÑADE: comprometer desde el Lookahead no puede arrasar lo que el residente ya
+ * habia planificado.
+ *
+ * El Last Planner dice que solo lo LISTO se compromete, pero la obra a veces
+ * arranca igual: no se prohibe, se avisa. Si hay tareas sin liberar o ya
+ * comprometidas en otra semana, la primera llamada NO escribe nada y devuelve
+ * los avisos; el usuario confirma y se repite con `confirmado`.
+ */
+export async function comprometerAlPts(
+  sesion: SesionActiva,
+  obraId: string,
+  datos: DatosComprometer,
+): Promise<ResultadoComprometer> {
+  if (!puede(sesion, "plan_semanal:gestionar")) {
+    return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
+  }
+
+  const uids = [...new Set(datos.uids.filter((u) => Number.isSafeInteger(u)))];
+  if (uids.length === 0) return { ok: false, error: "No elegiste ninguna tarea." };
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { id: true, diaCorteSemanal: true },
+  });
+  if (!obra) return { ok: false, error: "Obra no encontrada." };
+
+  // Las tareas deben existir en el cronograma vigente de ESTA obra: el uid
+  // llega del cliente y no se puede creer sin comprobarlo.
+  const cronograma = await prisma.cronograma.findFirst({
+    where: { projectId: obraId },
+    orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
+    select: {
+      tareas: {
+        where: { uid: { in: uids } },
+        select: { uid: true, codigo: true, nombre: true, esResumen: true },
+      },
+    },
+  });
+  const tareas = (cronograma?.tareas ?? []).filter((t) => !t.esResumen);
+  if (tareas.length === 0) {
+    return { ok: false, error: "Las tareas no estan en el cronograma vigente." };
+  }
+  const nombreDe = (t: { codigo: string | null; nombre: string }) =>
+    `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`.slice(0, 300);
+
+
+  // Semana destino: la pedida (debe estar abierta) o la del proximo corte.
+  const abiertas = await planesAbiertos(sesion, obraId);
+  let planId = datos.planId;
+  if (planId !== null && !abiertas.some((p) => p.id === planId)) {
+    return { ok: false, error: "Esa semana ya no esta abierta. Vuelve a elegir." };
+  }
+
+  // Avisos: lo que no esta LISTO y lo que ya vive en otra semana.
+  const lookahead = await prisma.lookaheadTask.findMany({
+    where: { projectId: obraId, uid: { in: uids } },
+    select: { uid: true, id: true, estado: true },
+  });
+  const lkPorUid = new Map(lookahead.map((l) => [l.uid, l]));
+
+  const yaEnAlguna = await prisma.compromisoSemanal.findMany({
+    where: { uid: { in: uids }, plan: { projectId: obraId } },
+    select: { uid: true, plan: { select: { id: true, numero: true } } },
+  });
+
+  const noListas: AvisoComprometer[] = [];
+  const enOtraSemana: AvisoComprometer[] = [];
+  for (const t of tareas) {
+    if (lkPorUid.get(t.uid)?.estado !== "LISTO") {
+      noListas.push({ uid: t.uid, nombre: nombreDe(t) });
+    }
+    const otra = yaEnAlguna.find((c) => c.uid === t.uid && c.plan.id !== planId);
+    if (otra) {
+      enOtraSemana.push({ uid: t.uid, nombre: nombreDe(t), semana: otra.plan.numero });
+    }
+  }
+
+  if (!datos.confirmado && (noListas.length > 0 || enOtraSemana.length > 0)) {
+    return { ok: false, requiereConfirmacion: { noListas, enOtraSemana } };
+  }
+
+  const sugerencias = await sugerenciasPorTarea(obraId, uids);
+
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Sin semana elegida se abre la del proximo corte, con el mismo
+      // correlativo dentro de transaccion que usa `crearPlanSemanal`.
+      let numero: number;
+      if (planId === null) {
+        const fechaCorte = proximoCorte(obra.diaCorteSemanal, hoy());
+        const existente = await tx.planSemanal.findFirst({
+          where: { projectId: obraId, fechaCorte },
+          select: { id: true, numero: true, estado: true },
+        });
+        if (existente && existente.estado !== "ABIERTO") {
+          return {
+            ok: false as const,
+            error: "La semana de esa fecha esta cerrada. Reabrela o elige otra.",
+          };
+        }
+        if (existente) {
+          planId = existente.id;
+          numero = existente.numero;
+        } else {
+          const ultimo = await tx.planSemanal.aggregate({
+            where: { projectId: obraId },
+            _max: { numero: true },
+          });
+          numero = (ultimo._max.numero ?? 0) + 1;
+          const creado = await tx.planSemanal.create({
+            data: { projectId: obraId, numero, fechaCorte, creadoPor: quien(sesion) },
+            select: { id: true },
+          });
+          planId = creado.id;
+        }
+      } else {
+        numero = abiertas.find((p) => p.id === planId)?.numero ?? 0;
+      }
+
+
+      // Lo que ya esta en ESTA semana se omite: comprometer dos veces la misma
+      // tarea en la misma semana no significa nada. Se relee dentro de la
+      // transaccion para que dos usuarios a la vez no la dupliquen.
+      const yaEnEsta = await tx.compromisoSemanal.findMany({
+        where: { planSemanalId: planId, uid: { in: uids } },
+        select: { uid: true },
+      });
+      const presentes = new Set(yaEnEsta.map((c) => c.uid));
+      const nuevas = tareas.filter((t) => !presentes.has(t.uid));
+
+      if (nuevas.length > 0) {
+        await tx.compromisoSemanal.createMany({
+          data: nuevas.map((t) => {
+            const s = sugerencias.get(t.uid);
+            return {
+              planSemanalId: planId as string,
+              uid: t.uid,
+              descripcion: nombreDe(t),
+              cantidadPlan: s?.cantidad ?? null,
+              unidad: s?.unidad ?? null,
+              lookaheadTaskId: lkPorUid.get(t.uid)?.id ?? null,
+            };
+          }),
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          companyId: sesion.companyId,
+          userId: sesion.userId,
+          projectId: obraId,
+          entidad: "PlanSemanal",
+          entidadId: planId,
+          accion: "UPDATE",
+          despues: {
+            evento: "comprometer",
+            uids: nuevas.map((t) => t.uid),
+            noListas: noListas.map((a) => a.uid),
+          },
+        },
+      });
+
+      return {
+        ok: true as const,
+        planId: planId as string,
+        numero,
+        agregados: nuevas.length,
+        omitidos: tareas.length - nuevas.length,
+      };
+    });
+  } catch {
+    return { ok: false, error: "No se pudo comprometer. Vuelve a intentarlo." };
+  }
 }

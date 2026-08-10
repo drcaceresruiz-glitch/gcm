@@ -1,4 +1,5 @@
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
+import { normalizarDecimal, sumar } from "@/lib/decimal";
 
 /**
  * Plan Semanal (Last Planner): las cuentas del corto plazo, en logica pura.
@@ -213,4 +214,181 @@ export function restriccionDeTarea(
   }
 
   return { libre: true, motivo: null };
+}
+
+
+export interface PartidaMedible {
+  unidad: string | null;
+  /// Metrado como texto decimal (viene de un Decimal de la BD).
+  metrado: string | null;
+}
+
+export type OrigenCantidad =
+  | "SIN_PARTIDA"
+  | "PARTIDA"
+  | "PARTIDAS_HOMOGENEAS"
+  | "UNIDADES_MIXTAS";
+
+export interface SugerenciaCantidad {
+  unidad: string | null;
+  cantidad: string | null;
+  origen: OrigenCantidad;
+  /// Texto para la pantalla cuando no se puede proponer nada.
+  aviso: string | null;
+}
+
+/**
+ * Que cantidad y unidad proponer al comprometer una tarea, a partir de las
+ * partidas del presupuesto que tiene mapeadas.
+ *
+ * Una tarea puede mapear a VARIAS partidas (el mapeo es N:N). Sumar metrados de
+ * unidades distintas (m2 + kg) no significa nada: en ese caso no se propone
+ * nada y se dice por que, para que lo escriba el residente, que es quien sabe.
+ * La suma va con `sumar` (exacta, sin coma flotante) porque es una cantidad de
+ * obra, no un adorno.
+ */
+export function sugerirCantidad(
+  partidas: readonly PartidaMedible[],
+): SugerenciaCantidad {
+  const conUnidad = partidas.filter(
+    (p): p is PartidaMedible & { unidad: string } =>
+      typeof p.unidad === "string" && p.unidad.trim().length > 0,
+  );
+  const primera = conUnidad[0];
+  if (!primera) {
+    return {
+      unidad: null,
+      cantidad: null,
+      origen: "SIN_PARTIDA",
+      aviso: "La tarea no tiene partida mapeada: indica cantidad y unidad.",
+    };
+  }
+
+  const unidad = primera.unidad.trim();
+  const mixtas = conUnidad.some(
+    (p) => p.unidad.trim().toLowerCase() !== unidad.toLowerCase(),
+  );
+  if (mixtas) {
+    return {
+      unidad: null,
+      cantidad: null,
+      origen: "UNIDADES_MIXTAS",
+      aviso: "Varias partidas con unidades distintas: indicala a mano.",
+    };
+  }
+
+  const metrados = conUnidad
+    .map((p) => p.metrado)
+    .filter((m): m is string => typeof m === "string" && m.trim().length > 0);
+
+  return {
+    unidad,
+    cantidad: metrados.length > 0 ? sumar(metrados, 4) : null,
+    origen: conUnidad.length === 1 ? "PARTIDA" : "PARTIDAS_HOMOGENEAS",
+    aviso: null,
+  };
+}
+
+
+/**
+ * Los campos operativos del compromiso que la pantalla de planificar NO edita
+ * todavia (zona, subcontratista, color, protocolo). Se conservan al reemplazar.
+ *
+ * OJO al ampliar el PTS: si anades aqui un campo que la pantalla SI edita,
+ * quedara congelado para siempre (se preservaria el viejo en cada guardado).
+ * Los que la pantalla edita viajan en `DatosCompromiso`, no aqui.
+ */
+export interface CamposPreservables {
+  zona: string | null;
+  proveedorId: string | null;
+  color: string | null;
+  protocoloCalidad: boolean;
+}
+
+/**
+ * Que conservar de cada compromiso cuando se reemplaza la semana entera.
+ *
+ * Planificar REEMPLAZA los compromisos (se borran y se recrean), asi que todo
+ * lo que la pantalla no reenvie se perderia. Se rescata por `uid`, pero SOLO
+ * cuando no hay ambiguedad: si un uid aparece dos veces (en lo viejo o en lo
+ * nuevo) no se sabe a que fila pertenecia el proveedor, y adivinar es peor que
+ * no proponer. Las lineas libres (uid null) no se pueden emparejar.
+ */
+export function mapaPreservablePorUid(
+  existentes: readonly ({ uid: number | null } & CamposPreservables)[],
+  entrantes: readonly { uid: number | null }[],
+): Map<number, CamposPreservables> {
+  const contar = (filas: readonly { uid: number | null }[]) => {
+    const veces = new Map<number, number>();
+    for (const f of filas) {
+      if (f.uid === null) continue;
+      veces.set(f.uid, (veces.get(f.uid) ?? 0) + 1);
+    }
+    return veces;
+  };
+
+  const vecesViejo = contar(existentes);
+  const vecesNuevo = contar(entrantes);
+
+  const mapa = new Map<number, CamposPreservables>();
+  for (const e of existentes) {
+    if (e.uid === null) continue;
+    if (vecesViejo.get(e.uid) !== 1 || vecesNuevo.get(e.uid) !== 1) continue;
+    mapa.set(e.uid, {
+      zona: e.zona,
+      proveedorId: e.proveedorId,
+      color: e.color,
+      protocoloCalidad: e.protocoloCalidad,
+    });
+  }
+  return mapa;
+}
+
+/// Tope de `Decimal(14,4)`: 10 enteros + 4 decimales.
+const CANTIDAD_MAXIMA = 9_999_999_999.9999;
+
+export type CantidadValidada =
+  | { ok: true; valor: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Valida y normaliza la cantidad planificada de un compromiso.
+ *
+ * Vacio es valido (no toda tarea se mide por cantidad). Se rechaza lo negativo
+ * y lo que desborda la columna. Acepta coma decimal, pero `normalizarDecimal`
+ * rechaza casos ambiguos como "12,500" (?12.5 o 12500?): mejor preguntar que
+ * guardar una cantidad de obra equivocada.
+ */
+export function validarCantidadPlan(
+  texto: string | null | undefined,
+): CantidadValidada {
+  if (texto === null || texto === undefined || texto.trim() === "") {
+    return { ok: true, valor: null };
+  }
+
+  const normal = normalizarDecimal(texto, 4);
+  if (normal === null) {
+    return {
+      ok: false,
+      error: `Cantidad no valida: "${texto.trim()}". Usa punto decimal (por ejemplo 12.5).`,
+    };
+  }
+  const n = Number(normal);
+  if (n < 0) return { ok: false, error: "La cantidad no puede ser negativa." };
+  if (n > CANTIDAD_MAXIMA) {
+    return { ok: false, error: "La cantidad es demasiado grande." };
+  }
+  return { ok: true, valor: normal };
+}
+
+/// Los uid que aparecen mas de una vez. Las lineas libres (null) no cuentan.
+export function uidsDuplicados(
+  filas: readonly { uid: number | null }[],
+): number[] {
+  const veces = new Map<number, number>();
+  for (const f of filas) {
+    if (f.uid === null) continue;
+    veces.set(f.uid, (veces.get(f.uid) ?? 0) + 1);
+  }
+  return [...veces.entries()].filter(([, n]) => n > 1).map(([uid]) => uid);
 }

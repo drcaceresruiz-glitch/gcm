@@ -1,9 +1,17 @@
 "use client";
 
-import { useTransition } from "react";
-import { CircleCheck, CircleDashed, Ban, RefreshCw, LoaderCircle } from "lucide-react";
+import { useState, useTransition } from "react";
+import {
+  CircleCheck,
+  CircleDashed,
+  Ban,
+  RefreshCw,
+  LoaderCircle,
+  CalendarPlus,
+} from "lucide-react";
 import { Chip, type TonoChip } from "@/components/ui/Chip";
 import { FLUJOS_RESTRICCION } from "@/lib/lookahead";
+import { PanelComprometer } from "@/components/lookahead/PanelComprometer";
 import {
   accionSincronizar,
   accionAlternarRestriccion,
@@ -42,13 +50,51 @@ const ETIQUETA_FLUJO = new Map(
 export function MatrizLookahead({
   obraId,
   datos,
+  fechaProximoCorte,
 }: {
   obraId: string;
   datos: LookaheadDatos;
+  /// Fecha ISO del corte que se abriria si no hay ninguna semana abierta.
+  fechaProximoCorte: string;
 }) {
   const [pendiente, iniciar] = useTransition();
-  const { filas, confiabilidad: conf, pendientesDeSincronizar, puedeGestionar } =
-    datos;
+  const [elegidas, setElegidas] = useState<Set<number>>(new Set());
+  const [abrirPanel, setAbrirPanel] = useState(false);
+  const {
+    filas,
+    confiabilidad: conf,
+    pendientesDeSincronizar,
+    puedeGestionar,
+    semanasAbiertas,
+    puedeComprometer,
+  } = datos;
+
+  function alternarEleccion(uid: number) {
+    setElegidas((p) => {
+      const s = new Set(p);
+      if (s.has(uid)) s.delete(uid);
+      else s.add(uid);
+      return s;
+    });
+    setAbrirPanel(false);
+  }
+
+  // Atajo del Last Planner: lo normal es comprometer todo lo que quedo listo.
+  const listasSinComprometer = filas.filter(
+    (f) => f.estado === "LISTO" && f.comprometida.length === 0,
+  );
+  function elegirListas() {
+    setElegidas(new Set(listasSinComprometer.map((f) => f.uid)));
+    setAbrirPanel(false);
+  }
+
+  const seleccionadas = filas
+    .filter((f) => elegidas.has(f.uid))
+    .map((f) => ({
+      uid: f.uid,
+      nombre: `${f.codigo ? `${f.codigo} ` : ""}${f.nombre}`,
+      lista: f.estado === "LISTO",
+    }));
 
   function alternar(restriccionId: string, resuelta: boolean) {
     iniciar(async () => {
@@ -115,6 +161,51 @@ export function MatrizLookahead({
         )}
       </div>
 
+      {/* Llevar al PTS: aparece solo cuando hay algo elegido. */}
+      {puedeComprometer && (elegidas.size > 0 || listasSinComprometer.length > 0) && (
+        <div className="flex flex-wrap items-center gap-3">
+          {elegidas.size > 0 ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setAbrirPanel(true)}
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white"
+                style={{ backgroundColor: "var(--color-marca-600)" }}
+              >
+                <CalendarPlus className="size-4" aria-hidden="true" />
+                Comprometer al PTS ({elegidas.size})
+              </button>
+              <button
+                type="button"
+                onClick={() => setElegidas(new Set())}
+                className="text-sm opacity-70 underline"
+              >
+                Quitar seleccion
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={elegirListas}
+              className="text-sm underline"
+            >
+              Elegir las {listasSinComprometer.length} listas sin comprometer
+            </button>
+          )}
+        </div>
+      )}
+
+      {abrirPanel && seleccionadas.length > 0 && (
+        <PanelComprometer
+          obraId={obraId}
+          seleccionadas={seleccionadas}
+          semanasAbiertas={semanasAbiertas}
+          fechaProximoCorte={fechaProximoCorte}
+          onCerrar={() => setAbrirPanel(false)}
+          onHecho={() => setElegidas(new Set())}
+        />
+      )}
+
       {/* Matriz. Scroll horizontal propio: son 7 columnas de restriccion. */}
       <div
         className="overflow-x-auto rounded-lg border"
@@ -152,13 +243,38 @@ export function MatrizLookahead({
                   className="sticky left-0 z-10 px-3 py-2"
                   style={{ backgroundColor: "var(--fondo)" }}
                 >
-                  <div className="max-w-xs truncate font-medium" title={fila.nombre}>
-                    {fila.codigo ? `${fila.codigo} ` : ""}
-                    {fila.nombre}
+                  <div className="flex items-start gap-2">
+                    {puedeComprometer && (
+                      <input
+                        type="checkbox"
+                        checked={elegidas.has(fila.uid)}
+                        onChange={() => alternarEleccion(fila.uid)}
+                        aria-label={`Elegir ${fila.nombre} para el Plan Semanal`}
+                        className="mt-0.5 size-4 shrink-0"
+                        style={{ accentColor: "var(--color-marca-600)" }}
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <div
+                        className="max-w-xs truncate font-medium"
+                        title={fila.nombre}
+                      >
+                        {fila.codigo ? `${fila.codigo} ` : ""}
+                        {fila.nombre}
+                      </div>
+                      {!fila.sincronizada && (
+                        <div className="text-xs opacity-60">Sin analizar</div>
+                      )}
+                      {fila.comprometida.length > 0 && (
+                        <div className="text-xs opacity-70">
+                          En{" "}
+                          {fila.comprometida
+                            .map((c) => `S-${c.numero}`)
+                            .join(", ")}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  {!fila.sincronizada && (
-                    <div className="text-xs opacity-60">Sin analizar</div>
-                  )}
                 </td>
 
                 {fila.restricciones.map((c) => (

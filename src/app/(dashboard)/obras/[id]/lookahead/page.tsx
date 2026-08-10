@@ -4,7 +4,8 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import { obtenerLookahead } from "@/services/lookahead.service";
 import { puede } from "@/lib/rbac";
-import { fechaCorta } from "@/utils/fechas";
+import { fechaCorta, hoy } from "@/utils/fechas";
+import { proximoCorte } from "@/lib/plan-semanal";
 import { MatrizLookahead } from "@/components/lookahead/MatrizLookahead";
 
 export const metadata: Metadata = { title: "Lookahead" };
@@ -48,7 +49,15 @@ export default async function LookaheadPage({
         </p>
       </div>
 
-      {datos && <MatrizLookahead obraId={id} datos={datos} />}
+      {datos && (
+        <MatrizLookahead
+          obraId={id}
+          datos={datos}
+          fechaProximoCorte={proximoCorte(obra.diaCorteSemanal, hoy())
+            .toISOString()
+            .slice(0, 10)}
+        />
+      )}
     </div>
   );
 }

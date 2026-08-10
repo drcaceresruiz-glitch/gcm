@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Plus, Trash2, LoaderCircle } from "lucide-react";
 import { accionGuardarCompromisos } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
+import type { EstadoLookahead } from "@/generated/prisma/enums";
 
 /**
  * Planificar la semana: elegir tareas del cronograma (por uid) y/o anadir
@@ -15,6 +16,12 @@ interface Item {
   uid: number | null;
   descripcion: string;
   meta: string;
+  /// El PTS por cantidad: cuanto se compromete y en que unidad.
+  cantidad: string;
+  unidad: string;
+  /// Trazabilidad al Lookahead. Viaja de ida y vuelta para no perderse al
+  /// guardar (planificar REEMPLAZA la semana entera).
+  lookaheadTaskId: string | null;
 }
 
 interface TareaOpcion {
@@ -27,6 +34,10 @@ interface TareaOpcion {
   conRestriccion: boolean;
   /// Texto de la restriccion, si la hay.
   restriccion: string | null;
+  /// LISTO = sus 7 flujos del Lookahead estan resueltos.
+  estadoLookahead: EstadoLookahead | null;
+  cantidadSugerida: string | null;
+  unidadSugerida: string | null;
 }
 
 export function FormularioPlanSemanal({
@@ -38,7 +49,14 @@ export function FormularioPlanSemanal({
   obraId: string;
   planId: string;
   tareas: TareaOpcion[];
-  inicial: { uid: number | null; descripcion: string; metaPorcentaje: string | null }[];
+  inicial: {
+    uid: number | null;
+    descripcion: string;
+    metaPorcentaje: string | null;
+    cantidadPlan: string | null;
+    unidad: string | null;
+    lookaheadTaskId: string | null;
+  }[];
 }) {
   const [items, setItems] = useState<Item[]>(() =>
     inicial.map((c, i) => ({
@@ -46,6 +64,9 @@ export function FormularioPlanSemanal({
       uid: c.uid,
       descripcion: c.descripcion,
       meta: c.metaPorcentaje ?? "",
+      cantidad: c.cantidadPlan ?? "",
+      unidad: c.unidad ?? "",
+      lookaheadTaskId: c.lookaheadTaskId,
     })),
   );
   const [uidSel, setUidSel] = useState("");
@@ -64,7 +85,16 @@ export function FormularioPlanSemanal({
     if (items.some((it) => it.uid === uid)) return; // no duplicar la misma tarea
     setItems((p) => [
       ...p,
-      { key: nuevaKey(), uid, descripcion: `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`, meta: "" },
+      {
+        key: nuevaKey(),
+        uid,
+        descripcion: `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`,
+        meta: "",
+        // La partida mapeada propone la cantidad; si no se puede, queda vacio.
+        cantidad: t.cantidadSugerida ?? "",
+        unidad: t.unidadSugerida ?? "",
+        lookaheadTaskId: null,
+      },
     ]);
     setUidSel("");
     setOk(false);
@@ -73,13 +103,29 @@ export function FormularioPlanSemanal({
   function agregarLibre() {
     const d = libre.trim();
     if (!d) return;
-    setItems((p) => [...p, { key: nuevaKey(), uid: null, descripcion: d, meta: "" }]);
+    setItems((p) => [
+      ...p,
+      {
+        key: nuevaKey(),
+        uid: null,
+        descripcion: d,
+        meta: "",
+        cantidad: "",
+        unidad: "",
+        lookaheadTaskId: null,
+      },
+    ]);
     setLibre("");
     setOk(false);
   }
 
   function quitar(key: string) {
     setItems((p) => p.filter((it) => it.key !== key));
+    setOk(false);
+  }
+
+  function cambiarCampo(key: string, campo: "cantidad" | "unidad", valor: string) {
+    setItems((p) => p.map((it) => (it.key === key ? { ...it, [campo]: valor } : it)));
     setOk(false);
   }
 
@@ -103,6 +149,11 @@ export function FormularioPlanSemanal({
           uid: it.uid,
           descripcion: it.descripcion,
           metaPorcentaje: it.meta.trim() || null,
+          // Se reenvian siempre: al reemplazar la semana, lo que no viaja se
+          // pierde. Vacio se manda como null (borrar a proposito).
+          cantidadPlan: it.cantidad.trim() || null,
+          unidad: it.unidad.trim() || null,
+          lookaheadTaskId: it.lookaheadTaskId,
         })),
       );
       if (r.ok) setOk(true);
@@ -125,13 +176,24 @@ export function FormularioPlanSemanal({
             {(() => {
               const etiqueta = (t: TareaOpcion) =>
                 `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`;
-              const deSemana = tareas.filter((t) => t.enSemana);
-              const adelantar = tareas.filter((t) => !t.enSemana && !t.conRestriccion);
-              const restringidas = tareas.filter((t) => !t.enSemana && t.conRestriccion);
+              // Lo LISTO del Lookahead va primero: es lo unico que, segun Last
+              // Planner, deberia comprometerse. El resto sigue disponible.
+              const listas = tareas.filter((t) => t.estadoLookahead === "LISTO");
+              const resto = tareas.filter((t) => t.estadoLookahead !== "LISTO");
+              const deSemana = resto.filter((t) => t.enSemana);
+              const adelantar = resto.filter((t) => !t.enSemana && !t.conRestriccion);
+              const restringidas = resto.filter((t) => !t.enSemana && t.conRestriccion);
               return (
                 <>
+                  {listas.length > 0 && (
+                    <optgroup label="Listas (Lookahead)">
+                      {listas.map((t) => (
+                        <option key={t.uid} value={t.uid}>{etiqueta(t)}</option>
+                      ))}
+                    </optgroup>
+                  )}
                   {deSemana.length > 0 && (
-                    <optgroup label="De esta semana">
+                    <optgroup label="De esta semana (sin liberar)">
                       {deSemana.map((t) => (
                         <option key={t.uid} value={t.uid}>{etiqueta(t)}</option>
                       ))}
@@ -207,6 +269,30 @@ export function FormularioPlanSemanal({
                 )}
                 {it.descripcion}
               </span>
+              <label className="text-xs opacity-70">
+                cant.
+                <input
+                  value={it.cantidad}
+                  onChange={(e) => cambiarCampo(it.key, "cantidad", e.target.value)}
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  title="Cantidad comprometida. Usa punto decimal (12.5)."
+                  className="ml-1 w-20 rounded border px-1.5 py-1 text-xs tabular-nums"
+                  style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+                />
+              </label>
+              <label className="text-xs opacity-70">
+                und.
+                <input
+                  value={it.unidad}
+                  onChange={(e) => cambiarCampo(it.key, "unidad", e.target.value)}
+                  maxLength={20}
+                  placeholder="m2"
+                  title="Unidad de medida"
+                  className="ml-1 w-16 rounded border px-1.5 py-1 text-xs"
+                  style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+                />
+              </label>
               <label className="text-xs opacity-70">
                 meta
                 <input

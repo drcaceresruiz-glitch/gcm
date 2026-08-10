@@ -11,6 +11,7 @@ import {
   TIPOS_RESTRICCION,
   type Confiabilidad,
 } from "@/lib/lookahead";
+import { planesAbiertos, type SemanaAbierta } from "@/services/plan-semanal.service";
 import type { EstadoLookahead, TipoRestriccion } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -36,6 +37,13 @@ export interface CeldaRestriccion {
   resuelta: boolean;
 }
 
+/// En que semana del PTS esta ya comprometida una tarea.
+export interface CompromisoDeTarea {
+  planId: string;
+  numero: number;
+  abierta: boolean;
+}
+
 export interface FilaLookahead {
   uid: number;
   codigo: string | null;
@@ -47,8 +55,12 @@ export interface FilaLookahead {
   estado: EstadoLookahead;
   /// Tiene ya `LookaheadTask` + restricciones (se sincronizo).
   sincronizada: boolean;
+  /// Para enlazar el compromiso con la tarea que lo origino (trazabilidad).
+  lookaheadTaskId: string | null;
   /// Las 7 restricciones, en el orden de `TIPOS_RESTRICCION`.
   restricciones: CeldaRestriccion[];
+  /// Semanas del PTS donde ya se comprometio (para no duplicar a ciegas).
+  comprometida: CompromisoDeTarea[];
 }
 
 export interface LookaheadDatos {
@@ -59,6 +71,10 @@ export interface LookaheadDatos {
   /// Tareas de la ventana que aun no tienen `LookaheadTask` (a sincronizar).
   pendientesDeSincronizar: number;
   puedeGestionar: boolean;
+  /// Semanas del PTS que admiten compromisos (destino al comprometer).
+  semanasAbiertas: SemanaAbierta[];
+  /// Comprometer escribe el PTS, asi que manda el permiso del plan semanal.
+  puedeComprometer: boolean;
 }
 
 export type ResultadoLookahead = { ok: true } | { ok: false; error: string };
@@ -123,6 +139,7 @@ export async function obtenerLookahead(
     ? await prisma.lookaheadTask.findMany({
         where: { projectId: obraId, uid: { in: uids } },
         select: {
+          id: true,
           uid: true,
           faseBloque: true,
           zona: true,
@@ -131,6 +148,30 @@ export async function obtenerLookahead(
       })
     : [];
   const porUid = new Map(lookaheadTareas.map((l) => [l.uid, l]));
+
+  // En que semanas del PTS esta ya cada tarea: cierra el ciclo (el Lookahead
+  // muestra lo que ya se comprometio) y evita comprometer dos veces sin verlo.
+  const compromisos = uids.length
+    ? await prisma.compromisoSemanal.findMany({
+        where: { uid: { in: uids }, plan: { projectId: obraId } },
+        select: {
+          uid: true,
+          plan: { select: { id: true, numero: true, estado: true } },
+        },
+        orderBy: { plan: { numero: "asc" } },
+      })
+    : [];
+  const comprometidaPorUid = new Map<number, CompromisoDeTarea[]>();
+  for (const c of compromisos) {
+    if (c.uid === null) continue;
+    const lista = comprometidaPorUid.get(c.uid) ?? [];
+    lista.push({
+      planId: c.plan.id,
+      numero: c.plan.numero,
+      abierta: c.plan.estado === "ABIERTO",
+    });
+    comprometidaPorUid.set(c.uid, lista);
+  }
 
   const filas: FilaLookahead[] = tareas.map((t) => {
     const lk = porUid.get(t.uid);
@@ -145,11 +186,13 @@ export async function obtenerLookahead(
         zona: null,
         estado: "PENDIENTE",
         sincronizada: false,
+        lookaheadTaskId: null,
         restricciones: TIPOS_RESTRICCION.map((tipo) => ({
           id: null,
           tipo,
           resuelta: false,
         })),
+        comprometida: comprometidaPorUid.get(t.uid) ?? [],
       };
     }
     const porTipo = new Map(lk.restricciones.map((r) => [r.tipo, r]));
@@ -169,9 +212,15 @@ export async function obtenerLookahead(
       // `estado` guardado se mantiene en sincronia al alternar una restriccion.
       estado: estadoDeTarea(restricciones),
       sincronizada: true,
+      lookaheadTaskId: lk.id,
       restricciones,
+      comprometida: comprometidaPorUid.get(t.uid) ?? [],
     };
   });
+
+  // Comprometer escribe el PTS: el permiso que manda es el del plan semanal,
+  // no el del Lookahead (un consultor ve la matriz pero no compromete).
+  const puedeComprometer = puede(sesion, "plan_semanal:gestionar");
 
   return {
     desde,
@@ -180,6 +229,8 @@ export async function obtenerLookahead(
     confiabilidad: confiabilidad(filas),
     pendientesDeSincronizar: filas.filter((f) => !f.sincronizada).length,
     puedeGestionar: puede(sesion, "lookahead:gestionar"),
+    semanasAbiertas: puedeComprometer ? await planesAbiertos(sesion, obraId) : [],
+    puedeComprometer,
   };
 }
 

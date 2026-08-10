@@ -7,6 +7,10 @@ import {
   rangoSemana,
   tareasDeLaSemana,
   restriccionDeTarea,
+  sugerirCantidad,
+  mapaPreservablePorUid,
+  validarCantidadPlan,
+  uidsDuplicados,
   type CompromisoEvaluado,
   type TareaProgramada,
   type EnlacePredecesora,
@@ -200,5 +204,136 @@ describe("restriccionDeTarea", () => {
     const r = restriccionDeTarea(5, [dep(5, 4, "FC")], new Map());
     expect(r.libre).toBe(false);
     expect(r.motivo).toBe("tarea 4 al 0%");
+  });
+});
+
+
+describe("sugerirCantidad", () => {
+  it("sin partidas mapeadas no propone nada y lo explica", () => {
+    const r = sugerirCantidad([]);
+    expect(r.origen).toBe("SIN_PARTIDA");
+    expect(r.unidad).toBeNull();
+    expect(r.cantidad).toBeNull();
+    expect(r.aviso).toBeTruthy();
+  });
+
+  it("una partida: su unidad y su metrado", () => {
+    const r = sugerirCantidad([{ unidad: "m2", metrado: "120.5" }]);
+    expect(r.origen).toBe("PARTIDA");
+    expect(r.unidad).toBe("m2");
+    expect(r.cantidad).toBe("120.5000");
+  });
+
+  it("varias partidas de la misma unidad: suma exacta", () => {
+    const r = sugerirCantidad([
+      { unidad: "m3", metrado: "12.5" },
+      { unidad: "m3", metrado: "0.25" },
+    ]);
+    expect(r.origen).toBe("PARTIDAS_HOMOGENEAS");
+    expect(r.cantidad).toBe("12.7500");
+  });
+
+  it("unidades distintas: no inventa una suma sin sentido", () => {
+    const r = sugerirCantidad([
+      { unidad: "m2", metrado: "10" },
+      { unidad: "kg", metrado: "80" },
+    ]);
+    expect(r.origen).toBe("UNIDADES_MIXTAS");
+    expect(r.unidad).toBeNull();
+    expect(r.cantidad).toBeNull();
+    expect(r.aviso).toBeTruthy();
+  });
+
+  it("con unidad pero sin metrado propone la unidad sola", () => {
+    const r = sugerirCantidad([{ unidad: "und", metrado: null }]);
+    expect(r.unidad).toBe("und");
+    expect(r.cantidad).toBeNull();
+  });
+});
+
+
+describe("mapaPreservablePorUid", () => {
+  const campos = {
+    zona: "Z1",
+    proveedorId: "prov1",
+    color: null,
+    protocoloCalidad: true,
+  };
+
+  it("conserva lo que la pantalla no reenvia", () => {
+    const m = mapaPreservablePorUid(
+      [{ uid: 7, ...campos }],
+      [{ uid: 7 }],
+    );
+    expect(m.get(7)).toEqual(campos);
+  });
+
+  it("no adivina si el uid estaba dos veces", () => {
+    const m = mapaPreservablePorUid(
+      [
+        { uid: 7, ...campos },
+        { uid: 7, ...campos, zona: "Z2" },
+      ],
+      [{ uid: 7 }],
+    );
+    expect(m.has(7)).toBe(false);
+  });
+
+  it("no adivina si el uid llega dos veces", () => {
+    const m = mapaPreservablePorUid(
+      [{ uid: 7, ...campos }],
+      [{ uid: 7 }, { uid: 7 }],
+    );
+    expect(m.has(7)).toBe(false);
+  });
+
+  it("ignora las lineas libres y las tareas que ya no vienen", () => {
+    const m = mapaPreservablePorUid(
+      [
+        { uid: null, ...campos },
+        { uid: 9, ...campos },
+      ],
+      [{ uid: null }],
+    );
+    expect(m.size).toBe(0);
+  });
+});
+
+
+describe("validarCantidadPlan", () => {
+  it("vacio es valido: no toda tarea se mide por cantidad", () => {
+    expect(validarCantidadPlan("")).toEqual({ ok: true, valor: null });
+    expect(validarCantidadPlan(null)).toEqual({ ok: true, valor: null });
+    expect(validarCantidadPlan(undefined)).toEqual({ ok: true, valor: null });
+  });
+
+  it("normaliza a 4 decimales y acepta coma", () => {
+    expect(validarCantidadPlan("12,5")).toEqual({ ok: true, valor: "12.5000" });
+    expect(validarCantidadPlan("120")).toEqual({ ok: true, valor: "120.0000" });
+  });
+
+  it("rechaza negativos, texto y desbordes", () => {
+    expect(validarCantidadPlan("-3").ok).toBe(false);
+    expect(validarCantidadPlan("abc").ok).toBe(false);
+    expect(validarCantidadPlan("99999999999999").ok).toBe(false);
+  });
+
+  it("rechaza el separador ambiguo en vez de adivinar", () => {
+    // "12,500" puede ser 12.5 o 12500: se pregunta, no se supone.
+    expect(validarCantidadPlan("12,500").ok).toBe(false);
+  });
+});
+
+describe("uidsDuplicados", () => {
+  it("sin repetidos devuelve vacio", () => {
+    expect(uidsDuplicados([{ uid: 1 }, { uid: 2 }])).toEqual([]);
+  });
+
+  it("detecta la tarea puesta dos veces", () => {
+    expect(uidsDuplicados([{ uid: 1 }, { uid: 2 }, { uid: 1 }])).toEqual([1]);
+  });
+
+  it("dos lineas libres no son un duplicado", () => {
+    expect(uidsDuplicados([{ uid: null }, { uid: null }])).toEqual([]);
   });
 });
