@@ -11,6 +11,7 @@ import {
 import { diasLaborablesEntre } from "@/lib/calendario";
 import { metricasEvm, valorDeAvance, type MetricasEvm } from "@/lib/evm";
 import { obtenerObra } from "@/services/obras.service";
+import { totalDeObra } from "@/services/presupuesto-obra";
 import { datosCurvaS, obtenerCronograma } from "@/services/cronograma.service";
 import { obtenerCalendario } from "@/services/calendario.service";
 import { listarPlanesSemanales } from "@/services/plan-semanal.service";
@@ -592,12 +593,18 @@ async function presupuestoDeObra(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<DatosTablero["presupuesto"]> {
+  const obraDeLaEmpresa = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { id: true },
+  });
+  if (!obraDeLaEmpresa) return PRESUPUESTO_VACIO;
+
   const [partidas, comprometido, porPartida] = await Promise.all([
-    prisma.wbsItem.aggregate({
-      where: { tipo: "PARTIDA", projectId: obraId, project: { companyId: sesion.companyId } },
-      _sum: { parcial: true },
-      _count: true,
-    }),
+    // `totalDeObra` y no un `SUM(parcial)` plano: un grupo a suma alzada con
+    // hijas costeadas tambien es tipo PARTIDA, y sumarlos a los dos contaba el
+    // mismo dinero dos veces. Este total ademas alimenta la tarjeta de VALOR
+    // GANADO de mas abajo, o sea el BAC.
+    totalDeObra(obraId),
 
     prisma.ordenImputacion.aggregate({
       where: {
@@ -623,7 +630,7 @@ async function presupuestoDeObra(
     }),
   ]);
 
-  const total = partidas._sum.parcial?.toString() ?? "0.00";
+  const total = partidas.costoDirecto;
   const gastado = comprometido._sum.importe?.toString() ?? "0.00";
 
   // Partida a partida y no dos sumas: un total holgado puede esconder varias
@@ -657,7 +664,7 @@ async function presupuestoDeObra(
     comprometido: gastado,
     saldo: restar(total, gastado) ?? "0.00",
     porcentaje: numeroTotal > 0 ? (Number(gastado) / numeroTotal) * 100 : 0,
-    partidas: partidas._count,
+    partidas: partidas.partidas,
     sobregiradas,
   };
 }

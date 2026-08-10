@@ -12,6 +12,7 @@ import {
   type Cobertura,
 } from "@/lib/encargos";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
+import { totalDeObra } from "@/services/presupuesto-obra";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { EstadoEncargo, TipoImpuesto } from "@/generated/prisma/enums";
 
@@ -129,10 +130,10 @@ export async function listarEncargos(
         ordenCompra: { select: { proveedorId: true } },
       },
     }),
-    prisma.wbsItem.aggregate({
-      where: { tipo: "PARTIDA", projectId: obraId },
-      _sum: { parcial: true },
-    }),
+    // El denominador de la cobertura, con la regla de hojas: una suma plana
+    // por tipo cuenta dos veces los grupos a suma alzada con hijas costeadas,
+    // y la cobertura saldria artificialmente baja.
+    totalDeObra(obraId),
   ]);
 
   // Comprometido por (proveedor, partida): la clave es el par, porque el mismo
@@ -192,7 +193,7 @@ export async function listarEncargos(
     };
   });
 
-  const total = presupuesto._sum.parcial?.toString() ?? "0.00";
+  const total = presupuesto.costoDirecto;
 
   return {
     encargos: filas,

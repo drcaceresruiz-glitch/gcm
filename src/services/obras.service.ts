@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { esPositivo, restar, sumar } from "@/lib/decimal";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
+import { totalDeEmpresa, totalesPorObra } from "@/services/presupuesto-obra";
 import {
   estadoDeObra,
   validarObra,
@@ -117,10 +118,10 @@ export async function obtenerResumenEmpresa(
         where: { ...deLaEmpresa, estado: "EN_EJECUCION" },
       }),
 
-      prisma.wbsItem.aggregate({
-        where: { tipo: "PARTIDA", project: deLaEmpresa },
-        _sum: { parcial: true },
-      }),
+      // Con la regla de hojas y no con un `SUM` plano: filtrar por `tipo` no
+      // protege del doble conteo, porque un grupo a suma alzada con hijas
+      // costeadas tambien es PARTIDA.
+      totalDeEmpresa(sesion.companyId),
 
       prisma.ordenImputacion.aggregate({
         where: { ordenCompra: { ...deLaEmpresa, estado: "APROBADA" } },
@@ -130,9 +131,7 @@ export async function obtenerResumenEmpresa(
       datosAlertasEmpresa(sesion),
     ]);
 
-  const presupuestoTotal = sumar([
-    presupuesto._sum.parcial?.toString() ?? "0",
-  ]);
+  const presupuestoTotal = presupuesto;
   const comprometidoTotal = sumar([comprometido._sum.importe?.toString() ?? "0"]);
 
   return {
@@ -370,12 +369,8 @@ export async function listarObras(
   // sumaba una ida y vuelta a la base de mas por cada carga del panel.
   const idsObras = obras.map((o) => o.id);
   const [totales, comprometidos] = await Promise.all([
-    prisma.wbsItem.groupBy({
-      by: ["projectId"],
-      where: { projectId: { in: idsObras }, tipo: "PARTIDA" },
-      _sum: { parcial: true },
-      _count: { _all: true },
-    }),
+    // Igual que arriba: la regla de hojas, no una suma plana por tipo.
+    totalesPorObra(idsObras),
 
     /**
      * Comprometido por obra, con la MISMA definicion que `obtenerComprometido`:
@@ -399,7 +394,7 @@ export async function listarObras(
     }),
   ]);
 
-  const porObra = new Map(totales.map((t) => [t.projectId, t]));
+  const porObra = totales;
 
   // Para saber a que obra pertenece cada partida, y su parcial, con el que se
   // detecta el sobregiro.
@@ -446,8 +441,8 @@ export async function listarObras(
     const agregado = porObra.get(obra.id);
     return {
       ...obra,
-      presupuestoTotal: agregado?._sum.parcial?.toString() ?? "0",
-      totalPartidas: agregado?._count._all ?? 0,
+      presupuestoTotal: agregado?.costoDirecto ?? "0",
+      totalPartidas: agregado?.partidas ?? 0,
       comprometido: sumar(comprometidoPorObra.get(obra.id) ?? ["0"]),
       partidasSobregiradas: sobregiradasPorObra.get(obra.id) ?? 0,
     };

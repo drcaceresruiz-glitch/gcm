@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { sumar } from "@/lib/decimal";
+import { bacDeObra } from "@/services/presupuesto-obra";
 import { metricasEvm, valorDeAvance, type MetricasEvm } from "@/lib/evm";
 import { cobertura } from "@/lib/mapeo-partidas";
 import { datosCurvaS } from "@/services/cronograma.service";
@@ -33,6 +34,10 @@ export interface PuntoEvm {
 
 export interface DatosEvm {
   bac: string;
+  /// De que se compone el BAC, para poder explicarlo en pantalla: el
+  /// presupuesto contratado y los adicionales aprobados encima.
+  baseBac: string;
+  ajustesBac: string;
   fechaCorte: Date;
   /// Se puede ver el costo (AC/CPI/CV): exige permiso de ordenes.
   verCosto: boolean;
@@ -65,10 +70,9 @@ export async function datosEvm(
 
   const [curva, presupuesto, items, enlaces, imputaciones] = await Promise.all([
     datosCurvaS(sesion, obraId),
-    prisma.wbsItem.aggregate({
-      where: { tipo: "PARTIDA", ...deLaObra },
-      _sum: { parcial: true },
-    }),
+    // El BAC: base con la regla de hojas MAS los adicionales aprobados.
+    bacDeObra(obraId),
+    // Estas filas ya solo alimentan la cobertura del mapeo.
     prisma.wbsItem.findMany({
       where: { ...deLaObra },
       select: { codigoPartida: true, parcial: true },
@@ -98,7 +102,10 @@ export async function datosEvm(
   // EVM sobre cero.
   if (curva.cortes.length === 0) return null;
 
-  const bac = sumar([presupuesto._sum.parcial?.toString() ?? "0"]);
+  // El BAC lo resuelve `bacDeObra`, que arregla dos cosas de golpe: cuenta el
+  // presupuesto UNA vez (regla de hojas) y suma los adicionales aprobados,
+  // que antes quedaban fuera mientras su gasto SI contaba en el AC.
+  const bac = presupuesto.bac;
 
   const ultimo = curva.cortes[curva.cortes.length - 1]!;
   // El punto ACTUAL: el ultimo avance semanal de GCM (o el ultimo corte si aun
@@ -165,6 +172,8 @@ export async function datosEvm(
 
   return {
     bac,
+    baseBac: presupuesto.base,
+    ajustesBac: presupuesto.ajustes,
     fechaCorte: actual.fecha,
     verCosto,
     coberturaMapeo: cob.porcentaje,

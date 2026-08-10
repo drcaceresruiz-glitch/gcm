@@ -305,7 +305,15 @@ estaba armado pero no se habia disparado.
 
 ### Lo que la auditoria dejo PENDIENTE, por dano
 
-1. **Doble conteo del presupuesto** (CRITICO, dinero). Cuatro sitios suman
+1. ~~**Doble conteo del presupuesto**~~ **ARREGLADO el 10 de agosto.** Los
+   cuatro sitios usan ya `@/services/presupuesto-obra`, que resuelve el costo
+   directo con la regla de hojas. Hay UNA sola definicion de "presupuesto
+   total" en el sistema, asi que no pueden volver a discrepar. Comprobado en
+   produccion ANTES de tocar: la consulta que busca grupos con importe propio
+   y ademas hijas costeadas devolvio **cero filas**, o sea que ninguna cifra
+   actual cambia; esto es red de seguridad para el proximo presupuesto que
+   entre con ese patron —y para la primera constructora cliente—.
+   *El defecto era*: cuatro sitios sumaban
    `SUM(parcial) WHERE tipo="PARTIDA"` sin la regla de hojas: `evm.service`
    (el **BAC**), `tablero.service`, `obras.service` (cartera y por obra) y
    `encargos.service` (cobertura). No protege filtrar por `tipo`, porque
@@ -315,10 +323,16 @@ estaba armado pero no se habia disparado.
    ahorro**; el saldo del tablero ensena dinero que no existe. El SPI y el %
    de avance NO se afectan (son ratios sobre el mismo BAC), por eso no da
    sintoma. La regla correcta ya existe: `sumarHojas`/`aportantes`.
-2. **El BAC ignora el VIGENTE** (ALTO). Las partidas de adicional nacen con
-   `parcial: null` a proposito, pero el AC si incluye sus ordenes: **el CPI
-   se degrada solo** conforme se aprueban adicionales. Ya existe
-   `obtenerPresupuestoVigente`, solo falta que el EVM la use.
+2. ~~**El BAC ignora el VIGENTE**~~ **ARREGLADO el 10 de agosto.** `bacDeObra`
+   suma la base (arbol vivo, regla de hojas) mas los ajustes APROBADOS de la
+   linea base vigente. Los deductivos restan solos porque los importes ya
+   traen signo, y una reconversion suma cero. `DatosEvm` devuelve ademas
+   `baseBac` y `ajustesBac` para poder explicar en pantalla de que se compone.
+   No se reuso `obtenerPresupuestoVigente` porque exige `movimiento:leer` y
+   lanza sin linea base, y el EVM lo mira gente con solo `cronograma:leer`.
+   *El defecto era*: las partidas de adicional nacen con `parcial: null` a
+   proposito, pero el AC si contaba sus ordenes, asi que **el CPI se degradaba
+   solo** conforme se aprobaban adicionales legitimos.
 3. **Reabrir + reguardar borra cumplido/causa/notaCierre** (ALTO):
    `mapaPreservablePorUid` rescata los campos operativos pero no los del
    cierre. PPC a 0 y Pareto sin causas, mientras el avance escrito se queda.
@@ -354,9 +368,16 @@ estaba armado pero no se habia disparado.
     El peor: la pantalla de mapeo, cuyo proposito es ensenar la diferencia,
     dice «sus partidas hijas» donde debe decir «sus tareas hijas».
 
-**Orden acordado**: 1 y 2 (el dinero), luego 7, luego el resto. La pagina de
-control economico NO se construye antes de 1 y 2: darle autoridad visual a
-un BAC inflado es peor que no tenerla.
+**Orden acordado**: 1 y 2 (el dinero) —HECHOS—, luego 7, luego el resto. Con
+el BAC ya sano, la **pagina de control economico** deja de estar bloqueada:
+era lo que faltaba para no darle autoridad visual a cifras infladas.
+
+**Al retomar el dinero, lo siguiente es** el 7 (rendija del ALCANCE) y
+despues decidir si se construye la pagina de control economico o se ataca
+primero lo que NO existe: pagos, anticipos, recepciones y deuda —media cadena
+contable—. Recordar el aviso ya escrito: **lo pagado lleva IGV y el resto no**,
+asi que esas columnas no son homogeneas y hay que normalizar ANTES de
+construir los pagos, no despues.
 
 ## 7. Defectos conocidos, sin arreglar
 
