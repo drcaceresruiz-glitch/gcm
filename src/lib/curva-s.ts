@@ -296,6 +296,15 @@ export function curvaPlaneada(
  * salto entre lo medido y lo estimado.
  *
  * Es una extrapolacion, no una promesa: vale mientras no cambien los medios.
+ *
+ * OJO CON EL FINAL. Multiplicar el plan por el factor responde "cuanto habre
+ * hecho", no "cuando termino", y con un factor por debajo de 1 la curva NUNCA
+ * alcanza el 100 —100 x 0,999 = 99,9—. Tal cual, un ritmo del 99,9% se leia
+ * como "no se llega al 100% dentro del plazo", que es alarmante y falso: a ese
+ * ritmo se termina un par de dias tarde. Por eso, cuando la curva se queda
+ * corta, el termino se estima ESTIRANDO EL TIEMPO restante por 1/factor, que
+ * es la misma hipotesis dicha al derecho: si rindes al 99,9% del plan, tardas
+ * un 0,1% mas.
  */
 export function proyectar(
   plan: readonly PuntoDiario[],
@@ -325,5 +334,33 @@ export function proyectar(
 
   if (puntos.length > 0) puntos[0] = { fecha: corte, valor: realEnCorte };
 
+  // La curva no llego al 100 dentro del plazo: se termina despues. Se estima
+  // estirando lo que queda de plazo por 1/factor.
+  //
+  // Con factor 0 no se estima nada y queda null: no haber avanzado NADA si es
+  // "a este paso no se llega", porque a ese paso no se llega nunca.
+  if (terminoProyectado === null && factor > 0) {
+    const finPlan = plan[plan.length - 1]?.fecha;
+    if (finPlan && finPlan.getTime() > corte.getTime()) {
+      const restante = finPlan.getTime() - corte.getTime();
+      terminoProyectado = new Date(corte.getTime() + restante / factor);
+    }
+  }
+
   return { puntos, factor, terminoProyectado };
+}
+
+/**
+ * El ritmo, en texto, para ensenarlo junto al termino proyectado.
+ *
+ * Cerca del 100 se ensena un decimal. Redondear 99,6 a "100%" y ponerlo al
+ * lado de "termina tarde" es lo que hace dudar de la cifra: parecen dos datos
+ * que se contradicen cuando en realidad el redondeo se comio la diferencia.
+ * Lejos del 100 el decimal solo es ruido.
+ */
+export function textoRitmo(factor: number): string {
+  const porcentaje = factor * 100;
+  return porcentaje > 99 && porcentaje < 101
+    ? porcentaje.toFixed(1)
+    : porcentaje.toFixed(0);
 }

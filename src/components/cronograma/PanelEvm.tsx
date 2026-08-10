@@ -1,5 +1,6 @@
-import { Info, Lock } from "lucide-react";
+import { Info, Lock, TriangleAlert } from "lucide-react";
 import type { DatosEvm } from "@/services/evm.service";
+import { textoSinCosto } from "@/lib/evm";
 import { GaugeIndice } from "@/components/cronograma/GaugeIndice";
 import { CurvaEvm } from "@/components/cronograma/CurvaEvm";
 import { soles } from "@/utils/formato";
@@ -17,6 +18,11 @@ import { fechaLarga } from "@/utils/fechas";
  * (SPI, SV). El costo (CPI, CV, EAC, AC) exige `orden:leer`, y en su lugar se
  * explica por que no esta. Ensenar medio EVM es correcto; inventar la otra
  * mitad, no.
+ *
+ * Y por la misma razon, las PROYECCIONES de costo (CPI, EAC, VAC) desaparecen
+ * cuando el costo registrado no da para sostenerlas —`motivoSinCosto`—, con el
+ * motivo escrito en su sitio. Aqui llego a anunciarse un ahorro de 634 mil
+ * soles porque habia una sola orden aprobada.
  */
 export function PanelEvm({ datos }: { datos: DatosEvm }) {
   const { metricas: m, verCosto } = datos;
@@ -30,12 +36,25 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
           etiqueta="SPI"
           descripcion="Indice de plazo (EV/PV). Sobre 1, adelantado."
         />
-        {verCosto ? (
+        {verCosto && m.cpi !== null ? (
           <GaugeIndice
             indice={m.cpi}
             etiqueta="CPI"
             descripcion="Indice de costo (EV/AC). Sobre 1, por debajo de lo previsto."
           />
+        ) : verCosto && m.motivoSinCosto !== null ? (
+          <div
+            className="elevacion-1 flex flex-col items-center justify-center rounded-xl border p-4 text-center"
+            style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
+          >
+            <TriangleAlert className="size-6 opacity-40" aria-hidden="true" />
+            <p className="mt-2 text-xs font-medium opacity-80">
+              CPI todavia no disponible
+            </p>
+            <p className="mt-1 text-xs opacity-60">
+              {textoSinCosto(m.motivoSinCosto)}
+            </p>
+          </div>
         ) : (
           <div
             className="elevacion-1 flex flex-col items-center justify-center rounded-xl border p-4 text-center"
@@ -132,12 +151,17 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
               valor={conSigno(m.cv)}
               color={colorImporte(m.cv)}
             />
-            <Dato etiqueta="Costo estimado al final (EAC)" valor={soles(m.eac)} />
-            <Dato
-              etiqueta="Variacion al final (VAC)"
-              valor={conSigno(m.vac)}
-              color={colorImporte(m.vac)}
-            />
+            {/* EAC y VAC solo con base: son proyecciones, no hechos. */}
+            {m.eac !== null && (
+              <>
+                <Dato etiqueta="Costo estimado al final (EAC)" valor={soles(m.eac)} />
+                <Dato
+                  etiqueta="Variacion al final (VAC)"
+                  valor={conSigno(m.vac)}
+                  color={colorImporte(m.vac)}
+                />
+              </>
+            )}
           </>
         ) : null}
       </dl>
@@ -167,8 +191,22 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
             El costo real es el <strong>comprometido en ordenes aprobadas</strong>,
-            no lo devengado: se compromete antes de ejecutar, asi que al principio
-            de la obra el CPI puede salir mas bajo de lo que sera.
+            no lo devengado. Al principio de la obra suele ir{" "}
+            <strong>por detras</strong> de lo ejecutado —se trabaja y la orden se
+            aprueba despues—, y dividir por el daria un CPI y un ahorro
+            enganosamente buenos; por eso esas cifras no aparecen hasta que el
+            costo registrado respalde lo ganado.
+          </span>
+        </p>
+      )}
+
+      {verCosto && m.motivoSinCosto !== null && (
+        <p className="flex items-start gap-2 text-xs opacity-70">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>
+            <strong>Sin proyeccion de resultado (EAC, VAC, CPI).</strong>{" "}
+            {textoSinCosto(m.motivoSinCosto)} La mitad de plazo —SPI, SV y la
+            curva— no depende del costo y es valida hoy.
           </span>
         </p>
       )}

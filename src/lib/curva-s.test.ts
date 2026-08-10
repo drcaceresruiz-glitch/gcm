@@ -5,6 +5,7 @@ import {
   planeadoEnFecha,
   ponderarPorDuracion,
   proyectar,
+  textoRitmo,
   serieCurvaS,
   serieRealPorFechas,
   type TareaParaCurva,
@@ -253,6 +254,45 @@ describe("proyectar", () => {
     expect(terminoProyectado!.getTime()).toBeLessThan(f("2026-08-11").getTime());
   });
 
+  it("un ritmo apenas por debajo del plan termina TARDE, no nunca", async () => {
+    // El fallo que tenia: 100 x 0,999 = 99,9, la curva no tocaba el 100 y se
+    // decia "no se llega al 100% dentro del plazo" con un ritmo del 99,9%.
+    const tareas = [planificada(1, "10.00", "2026-08-01", "2026-08-11")];
+    const plan = curvaPlaneada(tareas, f("2026-08-01"), f("2026-08-11"));
+    const corte = f("2026-08-06");
+
+    // Al corte tocaba 50 y se lleva 49,95: ritmo 99,9%.
+    const { factor, terminoProyectado } = proyectar(plan, corte, 49.95);
+
+    expect(factor).toBeLessThan(1);
+    expect(terminoProyectado).not.toBeNull();
+    // Termina despues del plazo, pero por poco: no en el infinito.
+    expect(terminoProyectado!.getTime()).toBeGreaterThan(f("2026-08-11").getTime());
+    const diasTarde =
+      (terminoProyectado!.getTime() - f("2026-08-11").getTime()) / 86400000;
+    expect(diasTarde).toBeLessThan(1);
+  });
+
+  it("a la mitad de ritmo tarda el doble de lo que queda", async () => {
+    const tareas = [planificada(1, "10.00", "2026-08-01", "2026-08-11")];
+    const plan = curvaPlaneada(tareas, f("2026-08-01"), f("2026-08-11"));
+    const corte = f("2026-08-06");
+
+    const { terminoProyectado } = proyectar(plan, corte, 25);
+
+    // Quedan 5 dias de plazo; al 50% se tardan 10, o sea el 16.
+    expect(terminoProyectado?.toISOString().slice(0, 10)).toBe("2026-08-16");
+  });
+
+  it("sin ningun avance si es 'no se llega'", async () => {
+    const tareas = [planificada(1, "10.00", "2026-08-01", "2026-08-11")];
+    const plan = curvaPlaneada(tareas, f("2026-08-01"), f("2026-08-11"));
+
+    const { terminoProyectado } = proyectar(plan, f("2026-08-06"), 0);
+
+    expect(terminoProyectado).toBeNull();
+  });
+
   it("no dispara la curva cuando todavia no habia nada planeado", async () => {
     // Dividir por un planeado de cero daria infinito y la proyeccion se
     // saldria del grafico el primer dia de obra.
@@ -263,6 +303,24 @@ describe("proyectar", () => {
 
     expect(factor).toBe(1);
     expect(puntos.every((p) => Number.isFinite(p.valor))).toBe(true);
+  });
+});
+
+describe("textoRitmo", () => {
+  it("cerca del 100 ensena el decimal, para no esconder la diferencia", () => {
+    // Un 99,6 redondeado a "100%" al lado de "termina tarde" es justo lo que
+    // hace dudar de la cifra.
+    expect(textoRitmo(0.996)).toBe("99.6");
+    expect(textoRitmo(1.004)).toBe("100.4");
+  });
+
+  it("el 100 exacto se ensena redondo", () => {
+    expect(textoRitmo(1)).toBe("100.0");
+  });
+
+  it("lejos del 100 el decimal solo es ruido", () => {
+    expect(textoRitmo(0.5)).toBe("50");
+    expect(textoRitmo(1.34)).toBe("134");
   });
 });
 

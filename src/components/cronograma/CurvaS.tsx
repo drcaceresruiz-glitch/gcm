@@ -5,6 +5,7 @@ import type { DatosCurva } from "@/services/cronograma.service";
 import { ExportarCurva } from "@/components/cronograma/ExportarCurva";
 import { fechaCorta, fechaCronograma, fechaLarga } from "@/utils/fechas";
 import { decimal } from "@/utils/formato";
+import { textoRitmo } from "@/lib/curva-s";
 
 /**
  * La curva de avance, dibujada a mano en SVG.
@@ -491,7 +492,7 @@ export function CurvaS({
             {decimal(ultimoCorte.desfase)}%
           </strong>{" "}
           respecto al plan. Ritmo actual:{" "}
-          <strong>{(datos.factor * 100).toFixed(0)}%</strong> de lo previsto.{" "}
+          <strong>{textoRitmo(datos.factor)}%</strong> de lo previsto.{" "}
           {datos.terminoProyectado ? (
             <>
               A este paso la obra terminaria el{" "}
@@ -514,7 +515,7 @@ export function CurvaS({
             valor={`${Number(ultimoCorte.desfase) > 0 ? "+" : ""}${decimal(ultimoCorte.desfase)}%`}
             color={atrasado ? "var(--color-peligro)" : "var(--color-exito)"}
           />
-          <Dato etiqueta="Ritmo" valor={`${(datos.factor * 100).toFixed(0)}%`} />
+          <Dato etiqueta="Ritmo" valor={`${textoRitmo(datos.factor)}%`} />
           <Dato
             etiqueta="Termino proyectado"
             valor={
@@ -553,7 +554,7 @@ export function CurvaS({
             planeado: decimal(ultimoCorte.planeado),
             real: decimal(ultimoCorte.real),
             desfase: `${Number(ultimoCorte.desfase) > 0 ? "+" : ""}${decimal(ultimoCorte.desfase)}`,
-            ritmo: `${(datos.factor * 100).toFixed(0)}%`,
+            ritmo: `${textoRitmo(datos.factor)}%`,
             termino: datos.terminoProyectado
               ? fechaCorta(datos.terminoProyectado)
               : `no se llega al 100% antes del ${fechaCorta(datos.fin)}`,
