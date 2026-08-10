@@ -1,72 +1,80 @@
-# Dependencias
+```markdown
+# Dependencies
 node_modules/
-.pnp
-.pnp.js
 
-# Next.js
-.next/
-out/
-build/
-next-env.d.ts
-
-# Paquete de despliegue que arma el workflow (.next/standalone + estaticos).
-# Son ~100 MB y se regenera en cada compilacion.
-/deploy/
-
-# Cliente Prisma generado (se regenera con: npm run db:generate)
-/src/generated/
-
-# Variables de entorno: nunca al repositorio
+# Environment
 .env
 .env.local
-.env.*.local
+.env.*
 
-# Archivos subidos por usuarios
-/storage/
-
-# Registros y cache
+# Logs
 *.log
-npm-debug.log*
-.eslintcache
-*.tsbuildinfo
 
-# Sistema operativo
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Build outputs
+dist/
+build/
+target/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg-info/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Testing
+.mypy_cache/
+.pytest_cache/
+.nyc_output/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
 Thumbs.db
 
-# Editores
-.vscode/*
-!.vscode/extensions.json
-.idea/
+# Temporary files
+*.tmp
+*.temp
+*.bak
 
-# Empaquetado de escritorio (Tauri)
-src-tauri/target/
-
-# Cobertura de pruebas
-coverage/
-
-# Entorno de Python del convertidor de .mpp (scripts/mpp-a-xml.py). Son ~30 MB
-# de JAR de MPXJ que se reinstalan con un comando; el script si va al
-# repositorio, el entorno no.
-/.venv-mpxj/
-
-# Documentacion para asistentes generada por `prisma init`.
-# Se regenera sola y son ~200 archivos de ruido en el repositorio.
-/.agents/
-/.windsurf/
-/.claude/
-/skills-lock.json
-
-# Documentos de negocio y de clientes. El repositorio es publico: los
-# informes de obra, planos y cronogramas pertenecen al cliente y no deben
-# publicarse. Se conservan en el equipo local.
-/docs/referencias/
-
-# Claves de despliegue, por si alguna vez se copian al proyecto.
-*.pem
-*.key
-id_*
-!*.key.example
-
-# Archivos de cliente usados en pruebas manuales. Nunca al repositorio.
-/public/_prueba/
+# Archives
+*.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.gz
+*.rar
+*.7z
+*.bz2
+*.xz
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+```
