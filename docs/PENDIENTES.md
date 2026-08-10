@@ -17,24 +17,27 @@ test de ida y vuelta (`/plantilla-presupuesto`); y el cimiento de la
 evidencia fotografica (ver seccion 4). Decisiones tomadas: sin LLM local
 (6b), plan de Notas (5), plan de evidencia con QR (4).
 
-> **AVISO DE DESPLIEGUE — leer antes del proximo push.** La UI de evidencia
-> (seccion 4, commit 2) hace que el Lookahead y el Plan Semanal CONSULTEN la
-> tabla `fotos_evidencia` en cada carga. Esa tabla existe en la base local
-> pero **todavia no en produccion**, y cada push a `main` despliega solo.
+> **RECETA PARA EL PROXIMO CAMBIO DE ESQUEMA** (se uso el 10 de agosto para
+> `fotos_evidencia` y funciono sin un minuto de caida).
 >
 > **No sirve correr `migrate deploy` antes del push**: las migraciones
 > viajan DENTRO del paquete desplegado, asi que hasta que el deploy entre no
-> hay ningun archivo que aplicar en el servidor (se comprobo el 10 de
-> agosto: `Could not find Prisma Schema`). La via sin caida es la que ya
-> describe `infraestructura.md`: crear la tabla a mano en phpMyAdmin con el
-> SQL de `prisma/migrations/20260810195703_evidencia_fotografica/`
-> **antes** del push —el codigo viejo no la mira, no rompe nada— y despues
-> del despliegue cuadrar el registro de Prisma para que no intente
-> recrearla:
+> hay ningun archivo que aplicar en el servidor —se intento y respondio
+> `Could not find Prisma Schema`—. Y no se puede empujar primero: si el
+> codigo nuevo consulta una tabla que aun no existe, se cae la app ENTERA,
+> no solo la pantalla nueva.
 >
-> ```
-> npx --yes prisma@7 migrate resolve --applied 20260810195703_evidencia_fotografica
-> ```
+> La salida, como dice `infraestructura.md`, es romper el empate a mano:
+>
+> 1. Crear la tabla en phpMyAdmin con el SQL de `prisma/migrations/<la
+>    migracion>/migration.sql`, **antes** del push. El codigo viejo no la
+>    mira, asi que no rompe nada.
+> 2. Empujar y esperar el deploy.
+> 3. Cuadrar el registro de Prisma para que no intente recrearla:
+>    `npx --yes prisma@7 migrate resolve --applied <nombre_de_la_migracion>`
+>    (antes: `source ~/nodevenv/gcm/22/bin/activate && cd ~/gcm`).
+> 4. Comprobar en prod que el CSS y los chunks de JS responden 200, no solo
+>    que la pagina carga: el deploy tiene el vicio de dejar caer archivos.
 
 **Sigue pendiente del usuario**: fotos para `public/portada/` (1.jpg-12.jpg),
 las frases de "Frases sobre el deber.docx" (pasar a .txt o pegar en el chat),
@@ -164,14 +167,25 @@ primero ortografia tanda 2 y plantilla Excel, luego esto.
     restriccion), y en el cierre va en la fila de arriba y NO junto a la
     causa (colgado de la causa, marcar «cumplido» esconderia fotos ya
     subidas).
-  - **AL RETOMAR, EN ESTE ORDEN**: (1) correr `npx prisma migrate deploy` EN
-    EL SERVIDOR (jailshell) para crear la tabla en produccion —sin eso, la
-    pantalla del Lookahead en prod REVIENTA, porque ahora si consulta la
-    tabla en cada carga; ya no es un riesgo dormido como cuando solo estaba
-    el cimiento—; (2) definir `STORAGE_ROOT` en las variables de cPanel
-    apuntando FUERA del arbol (p. ej. /home/drcacere/gcm-archivos);
-    (3) commit 3: la hoja de codigos QR (necesita `npm install qrcode`) con
-    enlace profundo por restriccion, siempre con sesion.
+  - **Produccion, al cierre del 10 de agosto: DESPLEGADO Y EN PIE.** La
+    tabla se creo a mano en phpMyAdmin ANTES del push (el codigo viejo no la
+    miraba) y despues del deploy se cuadro el registro con
+    `migrate resolve --applied 20260810195703_evidencia_fotografica`.
+    Comprobado tras el despliegue: `/login` 200, el CSS y los once chunks de
+    JS en 200 —esta vez el deploy no dejo caer ningun archivo—. El unico 404
+    es `portada/1.jpg`, que es el pendiente de las fotos del carrusel.
+  - `STORAGE_ROOT` **ya estaba definida** en cPanel desde antes, con valor
+    `/home/drcacere/gcm-storage`, y es correcta: la app vive en `~/gcm`, asi
+    que esa carpeta queda FUERA del arbol y el deploy no la toca. **No
+    anadir una segunda variable con otro nombre de carpeta**: duplicar la
+    clave deja en el aire cual gana. La carpeta no se crea a mano; el
+    servicio la crea con `mkdir` recursivo en la primera subida.
+  - **AL RETOMAR**: (1) la prueba de punta a punta en prod —subir una foto
+    desde el clip del Lookahead y desde el cierre del PTS, y ver que la
+    miniatura aparece sola—, que es lo unico que no se pudo verificar por
+    falta de sesion; (2) commit 3: la hoja de codigos QR (necesita
+    `npm install qrcode`) con enlace profundo por restriccion, siempre con
+    sesion.
 - **Fase B**: pestana Evidencia de la obra: vista agregada con filtros.
 - **Fase C**: estandares visuales (quality gates), dentro de Fase 2 documental.
 - **Fase D**: rol cliente solo lectura + reconocimiento de cuadrillas.
