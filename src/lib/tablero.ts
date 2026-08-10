@@ -63,6 +63,27 @@ export const MODULOS = [
     requiereCronograma: false,
   },
   {
+    clave: "ppc",
+    etiqueta: "PPC (Last Planner)",
+    nota: "Que parte de lo prometido se cumplio",
+    ancho: 1,
+    requiereCronograma: false,
+  },
+  {
+    clave: "confiabilidad",
+    etiqueta: "Lookahead",
+    nota: "Cuantas tareas de la ventana estan LISTAS",
+    ancho: 1,
+    requiereCronograma: true,
+  },
+  {
+    clave: "causas",
+    etiqueta: "Causa que mas frena",
+    nota: "El cuello de botella que mas se repite",
+    ancho: 1,
+    requiereCronograma: false,
+  },
+  {
     clave: "atrasos",
     etiqueta: "Partidas atrasadas",
     nota: "Cuantas van por detras y cual urge",
@@ -106,31 +127,45 @@ export const MODULOS_POR_DEFECTO: readonly ModuloTablero[] = MODULOS.map(
  * en cada carga con la seleccion equivocada.
  *
  * Los dos puntos no valen en el nombre de una cookie, de ahi el guion.
+ *
+ * SE GUARDAN LOS MODULOS APAGADOS, no los encendidos.
+ *
+ * Al reves —que es como estaba— cada modulo nuevo nacia invisible para todo
+ * el que hubiera tocado el configurador alguna vez: su cookie no lo nombraba,
+ * asi que quedaba fuera del filtro. Se descubrio al añadir los tres de Last
+ * Planner, que no habrian aparecido en la unica pantalla donde importaban.
+ * Guardando lo apagado, lo nuevo entra encendido para siempre.
+ *
+ * El nombre lleva el sufijo `-off` a proposito: una cookie vieja con la lista
+ * de encendidos significaria justo lo contrario si se leyera con esta regla,
+ * y renombrarla es mas barato que migrarla. Se pierde una vez la seleccion de
+ * quien la tuviera; a cambio, no vuelve a pasar.
  */
-export const COOKIE_TABLERO = "gcm-tablero";
+export const COOKIE_TABLERO = "gcm-tablero-off";
 export const COOKIE_TABLERO_OBRA = "gcm-tablero-obra";
 
 /// Un año: es una preferencia, no una sesion.
 const DURACION_COOKIE = 60 * 60 * 24 * 365;
 
 /**
- * Los modulos que hay que pintar.
+ * Los modulos que hay que pintar: el catalogo menos los apagados.
  *
- * Se filtra el CATALOGO por lo pedido, y no al reves. Asi se cae solo lo que
- * ya no existe —una clave de una version anterior— sin tener que migrar nada,
- * y el orden sale del catalogo y no del texto guardado.
+ * Se filtra el CATALOGO, y no al reves. Asi se cae solo lo que ya no existe
+ * —una clave de una version anterior— sin tener que migrar nada, el orden sale
+ * del catalogo y no del texto guardado, y un modulo nuevo aparece encendido
+ * sin que nadie tenga que ir a buscarlo al configurador.
  *
- * La cadena VACIA no es lo mismo que la ausencia de cookie: significa que
- * alguien apago todos los modulos a proposito, y hay que respetarlo. Solo
- * cuando no hay cookie se aplican los valores por defecto.
+ * La cadena VACIA significa "no hay ninguno apagado", que es lo mismo que no
+ * tener cookie. Apagarlos todos si se representa: la lista con las ocho o las
+ * once claves.
  */
 export function modulosValidos(
   valor: string | null | undefined,
 ): ModuloTablero[] {
-  if (valor === null || valor === undefined) return [...MODULOS_POR_DEFECTO];
+  if (!valor) return [...MODULOS_POR_DEFECTO];
 
-  const pedidos = new Set(valor.split(",").map((c) => c.trim()));
-  return MODULOS.filter((m) => pedidos.has(m.clave)).map((m) => m.clave);
+  const apagados = new Set(valor.split(",").map((c) => c.trim()));
+  return MODULOS.filter((m) => !apagados.has(m.clave)).map((m) => m.clave);
 }
 
 /**
@@ -150,8 +185,16 @@ export function guardarTablero(
 ): void {
   if (typeof document === "undefined") return;
 
+  // Se recibe lo VISIBLE, que es lo que maneja la interfaz, y se guarda su
+  // complemento. La conversion vive aqui para que ningun componente tenga que
+  // acordarse de invertir la lista.
+  const visibles = new Set<string>(modulos);
+  const apagados = MODULOS.filter((m) => !visibles.has(m.clave)).map(
+    (m) => m.clave,
+  );
+
   const comun = `path=/; max-age=${DURACION_COOKIE}; SameSite=Lax`;
-  document.cookie = `${COOKIE_TABLERO}=${modulos.join(",")}; ${comun}`;
+  document.cookie = `${COOKIE_TABLERO}=${apagados.join(",")}; ${comun}`;
   if (obraId) document.cookie = `${COOKIE_TABLERO_OBRA}=${obraId}; ${comun}`;
 }
 

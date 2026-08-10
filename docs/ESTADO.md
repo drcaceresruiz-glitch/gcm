@@ -55,6 +55,31 @@ constructoras están suspendidas para cualquiera que supiera un correo.
 - **Cierre por cantidad**: la semana pregunta cuánto se EJECUTÓ, y la semana
   cerrada muestra «90 / 120 m2».
 
+### El tablero ya habla de Last Planner
+
+Enseñaba avance, plazo y dinero —las tres cifras del control clasico— y ni una
+del sistema que la obra usa para decidir la semana. Tres modulos nuevos:
+**PPC** (ultima semana cerrada, variacion contra la anterior, tendencia en
+barras con la linea del 80%), **Lookahead** (% de tareas LISTAS, avisando de
+las que faltan por sincronizar porque cuentan como no listas) y **Causa que
+mas frena** (primer puesto del Pareto, sobre todas las semanas). Y `Plazo`
+añade los dias laborables via `diasLaborablesEntre`, que estaba escrito y sin
+consumir; sin calendario sembrado se calla en vez de suponer lunes-a-viernes.
+
+Los datos salen de `listarPlanesSemanales` y `obtenerLookahead`, las mismas
+funciones que pintan sus pantallas. `obtenerLookahead` relee el cronograma que
+el tablero ya leyo: es una consulta de mas y se acepta a sabiendas —que el
+tablero diga una confiabilidad distinta de la de su propia pantalla seria
+mucho peor—.
+
+**La cookie del tablero cambio de significado y hay que saberlo.** Guardaba los
+modulos ENCENDIDOS, asi que todo modulo nuevo nacia invisible para cualquiera
+que hubiera tocado el configurador: su cookie no lo nombraba y quedaba fuera
+del filtro. Se descubrio justo con estos tres. Ahora guarda los APAGADOS
+(`gcm-tablero-off`), y lo nuevo entra encendido para siempre. Costo reiniciar
+una vez la seleccion de quien la tuviera. `src/lib/tablero.test.ts` —que no
+existia— fija la regla.
+
 ### Indicadores: no prometer lo que el dato no sostiene
 
 Dos arreglos del mismo mal, ambos vistos en pantalla con datos de CRIOCORD.
@@ -78,6 +103,19 @@ Se quedan **SPI, SV, %avance y la curva**: no dependen del AC. Y **CV
 también**: ganado menos gastado es un hecho de hoy, no una proyección. Si algún
 día el AC pasa a ser devengado real, revisar `RESPALDO_MINIMO_COSTO`, que
 existe solo por el desfase de las órdenes.
+
+**Y la palabra contradecia a la cifra de al lado.** En prod: «se ha ganado
+S/ 79,775.23 de un plan de S/ 79,859.05 — ATRASADO (SPI 1.00)». El SPI era
+0.99895, asi que `spi >= 1` daba falso; pero el numero, ya redondeado para
+enseñarlo, decia 1.00. Igual en el tablero: un desfase de -0.04 puntos se
+escribia «-0.0 pts» en ambar.
+
+La regla vive en `src/lib/redondeo.ts`: **la palabra, el color y el signo se
+deciden sobre el valor redondeado a los decimales que se ven**. Aparece un
+tercer estado que faltaba —«justo en el plan»—; antes el empate se resolvia
+arbitrariamente hacia un lado. `textoRitmo` se queda como esta: ahi no hay
+palabra que contradiga nada, y un 99,6% informa mas que un «al dia». La regla
+es para veredictos, no para magnitudes.
 
 **La curva S decía «no se llega» a quien va al 96% del ritmo.** `proyectar()`
 solo daba fecha de término si la curva alcanzaba el 100% dentro del plazo; si

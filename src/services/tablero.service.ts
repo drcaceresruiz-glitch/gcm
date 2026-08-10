@@ -8,9 +8,14 @@ import {
   alertasDeAtraso,
   cadenaCritica,
 } from "@/lib/control-avance";
+import { diasLaborablesEntre } from "@/lib/calendario";
 import { obtenerObra } from "@/services/obras.service";
 import { datosCurvaS, obtenerCronograma } from "@/services/cronograma.service";
+import { obtenerCalendario } from "@/services/calendario.service";
+import { listarPlanesSemanales } from "@/services/plan-semanal.service";
+import { obtenerLookahead } from "@/services/lookahead.service";
 import { diasEntre, fechaCorta, hoy } from "@/utils/fechas";
+import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -97,6 +102,9 @@ export interface DatosTablero {
     transcurridos: number;
     /// Negativo si el plazo ya vencio.
     restantes: number;
+    /// De los restantes, cuantos se trabaja de verdad segun el calendario de
+    /// la obra. Null si la obra no tiene calendario sembrado.
+    laborablesRestantes: number | null;
     porcentaje: number;
   };
   presupuesto: {
@@ -116,6 +124,47 @@ export interface DatosTablero {
   } | null;
   /// Null si la obra no tiene cronograma cargado, o sin `cronograma:leer`.
   cronograma: DatosCronogramaTablero | null;
+  /// Null sin permiso `plan_semanal:leer`.
+  planSemanal: DatosPlanSemanalTablero | null;
+  /// Null sin permiso `lookahead:leer`.
+  lookahead: DatosLookaheadTablero | null;
+}
+
+/**
+ * Last Planner en el tablero: si se CUMPLE lo prometido, no cuanto se avanza.
+ *
+ * El tablero enseñaba avance, plazo y dinero —las tres cifras del control
+ * clasico— y ni una del sistema que la obra usa para decidir la semana. Se
+ * puede ir al dia en la curva con un PPC del 50%: significa que el ritmo tapa
+ * una planificacion que no se cumple, y eso se paga mas adelante.
+ */
+export interface DatosPlanSemanalTablero {
+  /// La ultima semana CERRADA. Una abierta aun no tiene PPC que signifique algo.
+  ultima: { numero: number; ppc: number; fechaCorte: string } | null;
+  /// El PPC de la semana cerrada anterior, para saber si sube o baja.
+  anterior: number | null;
+  cerradas: number;
+  abiertas: number;
+  /// PPC de cada semana cerrada, de la mas antigua a la mas nueva (0..100).
+  tendencia: number[];
+  /// La causa que mas veces ha frenado un compromiso, en TODAS las semanas.
+  causaTop: {
+    causa: CausaNoCumplimiento;
+    veces: number;
+    /// Que parte de todos los incumplimientos con causa se lleva esta.
+    porcentaje: number;
+  } | null;
+  /// Incumplimientos con causa anotada, el denominador del porcentaje.
+  fallosConCausa: number;
+}
+
+export interface DatosLookaheadTablero {
+  listas: number;
+  total: number;
+  porcentaje: number;
+  semanas: number;
+  /// Tareas de la ventana que aun no se han traido: sin ellas el % engaña.
+  sinSincronizar: number;
 }
 
 export interface DatosCronogramaTablero {
@@ -193,12 +242,21 @@ export async function datosTablero(
   const obra = await obtenerObra(sesion, obraId);
   if (!obra) return null;
 
-  const [presupuesto, ordenes, cronograma, curva] = await Promise.all([
-    presupuestoDeObra(sesion, obraId),
-    ordenesDeObra(sesion, obraId),
-    obtenerCronograma(sesion, obraId),
-    datosCurvaS(sesion, obraId),
-  ]);
+  // En paralelo: son consultas independientes y el tablero es una sola
+  // pantalla. `obtenerLookahead` relee el cronograma por su cuenta —lo mismo
+  // que `obtenerCronograma` de aqui al lado—, y se acepta: que el tablero diga
+  // una confiabilidad distinta de la que dice la pantalla del Lookahead seria
+  // mucho peor que una consulta de mas.
+  const [presupuesto, ordenes, cronograma, curva, calendario, planes, lookahead] =
+    await Promise.all([
+      presupuestoDeObra(sesion, obraId),
+      ordenesDeObra(sesion, obraId),
+      obtenerCronograma(sesion, obraId),
+      datosCurvaS(sesion, obraId),
+      obtenerCalendario(sesion, obraId),
+      planSemanalDeObra(sesion, obraId),
+      obtenerLookahead(sesion, obraId),
+    ]);
 
   const diasTotales = diasEntre(obra.fechaInicio, obra.fechaFinProgramada);
   const transcurridos = diasEntre(obra.fechaInicio, hoy());
@@ -228,11 +286,78 @@ export async function datosTablero(
       diasTotales,
       transcurridos: Math.max(0, transcurridos),
       restantes: diasEntre(hoy(), obra.fechaFinProgramada),
+      // "56 dias" y "42 laborables" no son el mismo plazo, y la cuadrilla solo
+      // aparece en los segundos. Sin calendario sembrado se calla en vez de
+      // suponer un lunes-a-viernes que en obra casi nunca es cierto.
+      laborablesRestantes:
+        calendario.length > 0
+          ? diasLaborablesEntre(hoy(), obra.fechaFinProgramada, calendario)
+          : null,
       porcentaje,
     },
     presupuesto,
     ordenes,
     cronograma: cronograma && armarCronograma(cronograma, curva),
+    planSemanal: planes,
+    lookahead: lookahead && {
+      listas: lookahead.confiabilidad.listas,
+      total: lookahead.confiabilidad.total,
+      porcentaje: lookahead.confiabilidad.porcentaje,
+      semanas: lookahead.semanas,
+      sinSincronizar: lookahead.pendientesDeSincronizar,
+    },
+  };
+}
+
+/**
+ * El PPC y las causas para el tablero.
+ *
+ * Sale de `listarPlanesSemanales`, la misma funcion que pinta la pantalla del
+ * Plan Semanal —incluido su filtro de "solo semanas CERRADAS" para la
+ * tendencia—, para que las dos no puedan discrepar.
+ */
+async function planSemanalDeObra(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<DatosPlanSemanalTablero | null> {
+  if (!puede(sesion, "plan_semanal:leer")) return null;
+
+  const { semanas, tendencia, pareto } = await listarPlanesSemanales(
+    sesion,
+    obraId,
+  );
+
+  // `tendencia` viene de la mas antigua a la mas nueva; la ultima cerrada es
+  // la de la derecha del todo.
+  const serie = tendencia.map((p) => p.ppc);
+  const cerradas = semanas.filter((s) => s.estado === "CERRADO");
+  const ultimaCerrada = cerradas[0]; // `semanas` viene por fechaCorte desc
+
+  const fallosConCausa = pareto.reduce((suma, f) => suma + f.conteo, 0);
+  const top = pareto[0];
+
+  return {
+    ultima:
+      ultimaCerrada && ultimaCerrada.ppc !== null
+        ? {
+            numero: ultimaCerrada.numero,
+            ppc: ultimaCerrada.ppc,
+            fechaCorte: fechaCorta(ultimaCerrada.fechaCorte),
+          }
+        : null,
+    anterior: serie.length >= 2 ? (serie[serie.length - 2] ?? null) : null,
+    cerradas: cerradas.length,
+    abiertas: semanas.filter((s) => s.estado === "ABIERTO").length,
+    tendencia: serie,
+    causaTop:
+      top && fallosConCausa > 0
+        ? {
+            causa: top.causa,
+            veces: top.conteo,
+            porcentaje: (top.conteo / fallosConCausa) * 100,
+          }
+        : null,
+    fallosConCausa,
   };
 }
 

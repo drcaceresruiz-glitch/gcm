@@ -8,6 +8,9 @@ import {
   Link2,
   Layers,
   FileText,
+  ClipboardCheck,
+  Telescope,
+  Ban,
 } from "lucide-react";
 import type { DefinicionModulo } from "@/lib/tablero";
 import {
@@ -18,8 +21,11 @@ import {
 import type {
   DatosTablero,
   DatosCronogramaTablero,
+  DatosPlanSemanalTablero,
+  DatosLookaheadTablero,
   PuntoMini,
 } from "@/services/tablero.service";
+import { ETIQUETA_CNC } from "@/lib/plan-semanal";
 import { soles } from "@/utils/formato";
 import { conSignoFijo, redondearA } from "@/lib/redondeo";
 import { EnlaceModulo } from "@/components/tablero/Tablero";
@@ -52,6 +58,15 @@ export function ModuloContenido({
       {modulo.clave === "plazo" && <Plazo datos={datos} obraId={obraId} />}
       {modulo.clave === "presupuesto" && (
         <Presupuesto datos={datos} obraId={obraId} />
+      )}
+      {modulo.clave === "ppc" && datos.planSemanal && (
+        <Ppc plan={datos.planSemanal} obraId={obraId} />
+      )}
+      {modulo.clave === "confiabilidad" && datos.lookahead && (
+        <Confiabilidad lk={datos.lookahead} obraId={obraId} />
+      )}
+      {modulo.clave === "causas" && datos.planSemanal && (
+        <Causas plan={datos.planSemanal} obraId={obraId} />
       )}
       {modulo.clave === "atrasos" && datos.cronograma && (
         <Atrasos crono={datos.cronograma} obraId={obraId} />
@@ -427,6 +442,18 @@ function Plazo({ datos, obraId }: { datos: DatosTablero; obraId: string }) {
           {vencido
             ? "pasados del plazo de la ficha"
             : "restantes segun la ficha"}
+          {/* Los dias que de verdad se trabaja. Un plazo de 56 dias con 42
+              laborables no da 56 jornadas de cuadrilla, y es sobre esas
+              jornadas sobre las que se planifica. */}
+          {!vencido && plazo.laborablesRestantes !== null && (
+            <>
+              {" · "}
+              <strong className="tabular-nums">
+                {plazo.laborablesRestantes}
+              </strong>{" "}
+              laborables
+            </>
+          )}
         </p>
       </div>
 
@@ -525,6 +552,292 @@ function Presupuesto({
       <EnlaceModulo href={`/obras/${obraId}/ordenes`}>
         Ver ordenes
       </EnlaceModulo>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PPC: si se cumple lo prometido
+// ---------------------------------------------------------------------------
+
+/**
+ * El PPC de la ultima semana CERRADA, con su tendencia.
+ *
+ * No es avance: es fiabilidad. Se puede ir al dia en la curva con un PPC del
+ * 50% —el ritmo tapa una planificacion que no se cumple— y eso se paga mas
+ * adelante, cuando ya no queda holgura que gastar.
+ *
+ * El umbral del 80% es el de la practica del Last Planner: por debajo, la
+ * planificacion semanal no esta funcionando todavia.
+ */
+function Ppc({
+  plan,
+  obraId,
+}: {
+  plan: DatosPlanSemanalTablero;
+  obraId: string;
+}) {
+  const href = `/obras/${obraId}/plan-semanal`;
+
+  if (!plan.ultima) {
+    return (
+      <>
+        <Titulo icono={ClipboardCheck}>PPC</Titulo>
+        <p className="mt-2 text-sm opacity-60">
+          {plan.abiertas > 0
+            ? `${plan.abiertas === 1 ? "Una semana abierta" : `${plan.abiertas} semanas abiertas`} sin cerrar todavia.`
+            : "Aun no hay ninguna semana cerrada."}
+        </p>
+        <p className="mt-1 text-xs opacity-50">
+          El PPC aparece al cerrar la primera semana.
+        </p>
+        <EnlaceModulo href={href}>Ver plan semanal</EnlaceModulo>
+      </>
+    );
+  }
+
+  const ppc = redondearA(plan.ultima.ppc, 0);
+  const semaforo: Semaforo = ppc >= 80 ? "verde" : ppc >= 60 ? "ambar" : "rojo";
+  const delta = plan.anterior === null ? null : redondearA(ppc - plan.anterior, 0);
+
+  return (
+    <>
+      <Titulo icono={ClipboardCheck}>PPC</Titulo>
+
+      <div className="mt-2">
+        <p
+          className="text-2xl font-semibold tabular-nums"
+          style={{ color: COLOR_SEMAFORO[semaforo] }}
+        >
+          {ppc}%
+        </p>
+        <p className="text-xs opacity-60">
+          Semana {plan.ultima.numero} ({plan.ultima.fechaCorte})
+          {delta !== null && (
+            <>
+              {" · "}
+              <span
+                style={{
+                  color:
+                    delta === 0
+                      ? undefined
+                      : delta > 0
+                        ? "var(--color-exito)"
+                        : "var(--color-peligro)",
+                }}
+              >
+                {delta === 0 ? "igual" : `${conSignoFijo(delta, 0)} pts`}
+              </span>
+            </>
+          )}
+        </p>
+      </div>
+
+      <BarraConMarca valor={ppc} marca={80} color={COLOR_SEMAFORO[semaforo]} />
+
+      {plan.tendencia.length > 1 ? (
+        <MiniBarras serie={plan.tendencia} umbral={80} />
+      ) : (
+        <p className="mt-2 text-xs opacity-50">
+          Con una sola semana no hay tendencia: el PPC se lee comparandolo
+          consigo mismo.
+        </p>
+      )}
+
+      <EnlaceModulo href={href}>Ver plan semanal</EnlaceModulo>
+    </>
+  );
+}
+
+/**
+ * La tendencia del PPC en barras, una por semana cerrada.
+ *
+ * Barras y no linea: son valores de periodos discretos —no hay PPC "entre"
+ * dos semanas que interpolar— y ademas se distingue mejor cual cruza el
+ * umbral.
+ */
+function MiniBarras({
+  serie,
+  umbral,
+}: {
+  serie: readonly number[];
+  umbral: number;
+}) {
+  // Las ultimas doce como mucho: mas barras en este ancho serian rayas.
+  const ultimas = serie.slice(-12);
+
+  return (
+    <div
+      className="relative mt-2 flex h-10 items-end gap-0.5"
+      role="img"
+      aria-label={`Tendencia del PPC en las ultimas ${ultimas.length} semanas cerradas`}
+    >
+      <span
+        aria-hidden="true"
+        className="absolute inset-x-0 border-t border-dashed"
+        style={{ bottom: `${umbral}%`, borderColor: "var(--borde)" }}
+      />
+      {ultimas.map((v, i) => (
+        <span
+          key={i}
+          className="flex-1 rounded-t"
+          style={{
+            // Un minimo visible: una semana de PPC 0 es informacion, y sin
+            // altura ninguna se leeria como "esa semana no existe".
+            height: `${Math.max(4, v)}%`,
+            backgroundColor:
+              v >= umbral ? "var(--color-exito)" : "var(--color-alerta)",
+            opacity: i === ultimas.length - 1 ? 1 : 0.45,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Confiabilidad del Lookahead
+// ---------------------------------------------------------------------------
+
+/**
+ * Cuantas tareas de la ventana estan LISTAS (sus 7 restricciones resueltas).
+ *
+ * Es el indicador que anticipa al PPC: lo que se compromete sin liberar es lo
+ * que se incumple la semana que viene. Por eso vive al lado y no dentro del
+ * Lookahead.
+ */
+function Confiabilidad({
+  lk,
+  obraId,
+}: {
+  lk: DatosLookaheadTablero;
+  obraId: string;
+}) {
+  const href = `/obras/${obraId}/lookahead`;
+
+  if (lk.total === 0) {
+    return (
+      <>
+        <Titulo icono={Telescope}>Lookahead</Titulo>
+        <p className="mt-2 text-sm opacity-60">
+          No hay tareas del cronograma en las proximas {lk.semanas} semanas.
+        </p>
+        <EnlaceModulo href={href}>Ver lookahead</EnlaceModulo>
+      </>
+    );
+  }
+
+  const semaforo: Semaforo =
+    lk.porcentaje >= 70 ? "verde" : lk.porcentaje >= 40 ? "ambar" : "rojo";
+
+  return (
+    <>
+      <Titulo icono={Telescope}>Lookahead</Titulo>
+
+      <div className="mt-2">
+        <p
+          className="text-2xl font-semibold tabular-nums"
+          style={{ color: COLOR_SEMAFORO[semaforo] }}
+        >
+          {lk.porcentaje}%
+        </p>
+        <p className="text-xs opacity-60">
+          {lk.listas} de {lk.total} listas · ventana de {lk.semanas} semanas
+        </p>
+      </div>
+
+      <div
+        className="mt-2 h-2 overflow-hidden rounded-full"
+        style={{ backgroundColor: "var(--borde)" }}
+      >
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${lk.porcentaje}%`,
+            backgroundColor: COLOR_SEMAFORO[semaforo],
+          }}
+        />
+      </div>
+
+      {lk.sinSincronizar > 0 && (
+        <p className="mt-1.5 text-xs" style={{ color: "var(--color-alerta)" }}>
+          {lk.sinSincronizar}{" "}
+          {lk.sinSincronizar === 1 ? "tarea" : "tareas"} sin analizar: el
+          porcentaje las cuenta como no listas.
+        </p>
+      )}
+
+      <EnlaceModulo href={href}>Ver lookahead</EnlaceModulo>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// La causa que mas frena
+// ---------------------------------------------------------------------------
+
+/**
+ * El primer puesto del Pareto de causas de no cumplimiento.
+ *
+ * Una sola causa y no la lista entera: el tablero sirve para decidir que se
+ * ataca esta semana, y el Pareto completo esta a un clic. Cuenta TODAS las
+ * semanas, no solo la ultima: lo que importa es lo que se repite.
+ */
+function Causas({
+  plan,
+  obraId,
+}: {
+  plan: DatosPlanSemanalTablero;
+  obraId: string;
+}) {
+  const href = `/obras/${obraId}/plan-semanal`;
+
+  if (!plan.causaTop) {
+    return (
+      <>
+        <Titulo icono={Ban}>Causa que mas frena</Titulo>
+        <p className="mt-2 text-sm opacity-60">
+          {plan.cerradas === 0
+            ? "Aun no hay semanas cerradas."
+            : "Ningun incumplimiento con causa anotada."}
+        </p>
+        <p className="mt-1 text-xs opacity-50">
+          Sin causa, cerrar la semana no ensena nada.
+        </p>
+        <EnlaceModulo href={href}>Ver causas</EnlaceModulo>
+      </>
+    );
+  }
+
+  const { causa, veces, porcentaje } = plan.causaTop;
+
+  return (
+    <>
+      <Titulo icono={Ban}>Causa que mas frena</Titulo>
+
+      <div className="mt-2">
+        <p className="text-base font-semibold">{ETIQUETA_CNC[causa]}</p>
+        <p className="text-xs opacity-60">
+          {veces} {veces === 1 ? "vez" : "veces"} ·{" "}
+          {redondearA(porcentaje, 0)}% de los {plan.fallosConCausa}{" "}
+          incumplimientos con causa
+        </p>
+      </div>
+
+      <div
+        className="mt-2 h-2 overflow-hidden rounded-full"
+        style={{ backgroundColor: "var(--borde)" }}
+      >
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${Math.min(100, porcentaje)}%`,
+            backgroundColor: "var(--color-peligro)",
+          }}
+        />
+      </div>
+
+      <EnlaceModulo href={href}>Ver causas</EnlaceModulo>
     </>
   );
 }

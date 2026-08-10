@@ -23,6 +23,44 @@ de verdad, qué se prometió y qué se cumplió.**
 
 ---
 
+## El panel: los once indicadores
+
+Lo primero que ves al entrar. Eliges una obra arriba y debajo salen sus
+indicadores. Con **Configurar** enciendes y apagas los que quieras; el orden no
+cambia nunca, para que cada cosa esté siempre en el mismo sitio.
+
+| Indicador | Contesta a… |
+|---|---|
+| Avance físico | ¿Voy por delante o por detrás del plan? |
+| Curva de avance | ¿Cómo he llegado hasta aquí y dónde acabo a este paso? |
+| Plazo | ¿Cuántos días quedan, y cuántos de esos se trabaja? |
+| Presupuesto | ¿Cuánto queda por comprometer? |
+| **PPC** | ¿Se cumple lo que prometemos cada semana? |
+| **Lookahead** | ¿Cuánto del trabajo que viene está liberado? |
+| **Causa que más frena** | ¿Cuál es el cuello de botella que se repite? |
+| Partidas atrasadas | ¿Cuál urge? |
+| Cadena crítica | ¿Qué mueve la fecha de fin? |
+| Capítulos | ¿Cuáles se desvían más? |
+| Órdenes de compra | ¿Cuántas hay y en qué estado? |
+
+Los tres en negrita son de Last Planner, y son los que avisan **antes**. Los
+otros cuentan lo que ya pasó.
+
+**La pareja que hay que leer junta es PPC y Lookahead.** El Lookahead dice
+cuánto del trabajo que viene está liberado; el PPC, cuánto de lo prometido se
+cumplió. Un Lookahead bajo hoy es un PPC bajo dentro de dos semanas, porque lo
+que se compromete sin liberar es exactamente lo que se incumple.
+
+Y se puede ir **al día en la curva con un PPC del 50 %**: significa que el ritmo
+está tapando una planificación que no se cumple. Se paga más adelante, cuando
+ya no queda holgura.
+
+> Los avisos de arriba **no** se filtran por la obra elegida: son de toda la
+> empresa. El problema que hay que ver es justo el de la obra que no estás
+> mirando.
+
+---
+
 ## 1. Cronograma
 
 **Qué es.** El plan de fechas que sale de MS Project.
@@ -243,6 +281,16 @@ avanzar nada, no se llega nunca.
 Y el porcentaje de ritmo ya no redondea: un 99,6 % se muestra como 99,6 %, no
 como «100 %». Decirle «vas al día» a quien no va es la peor ayuda posible.
 
+### Aparecieron módulos nuevos en el panel y perdí mi configuración
+
+Pasó una sola vez, y a propósito. El panel recordaba **qué módulos tenías
+encendidos**, así que cualquier módulo que se añadiera después nacía apagado
+para ti: tu preferencia no lo nombraba. Los tres de Last Planner —justo los
+más importantes— no habrían aparecido nunca sin ir a buscarlos.
+
+Ahora recuerda los que tienes **apagados**, así que lo nuevo entra encendido
+solo. El precio fue reiniciar la selección una vez. No vuelve a ocurrir.
+
 ### Desplegué un cambio y no aparece
 
 Espera a que termine el despliegue (alrededor de un minuto y medio) y **recién
@@ -267,6 +315,7 @@ vieja, y la pantalla nueva da «404».
 | **EAC** | Lo que costará la obra al final si sigues rindiendo igual |
 | **VAC** | Lo que sobrará (o faltará) del presupuesto al terminar |
 | **Ritmo** | A qué porcentaje del avance previsto vas realmente |
+| **Días laborables** | De los días que quedan, los que se trabaja según el calendario |
 | **EDT** | El árbol del presupuesto: capítulos y partidas |
 | **UID** | El número que identifica una tarea entre versiones del cronograma |
 
