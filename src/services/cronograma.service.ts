@@ -8,6 +8,7 @@ import {
   type Medida,
 } from "@/lib/cronograma";
 import { normalizarDecimal, restar } from "@/lib/decimal";
+import { hoy as hoyCalendario } from "@/utils/fechas";
 import {
   curvaPlaneada,
   fechasSemanales,
@@ -660,12 +661,9 @@ export async function registrarAvance(
   return { ok: true };
 }
 
-/** Hoy como fecha de calendario en UTC, comparable con las columnas `@db.Date`. */
+/** Hoy como fecha de calendario. Fuente unica: `hoy()` de `@/utils/fechas`. */
 function hoyUtc(): Date {
-  const ahora = new Date();
-  return new Date(
-    Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()),
-  );
+  return hoyCalendario();
 }
 
 export interface DatosCurva {
@@ -835,7 +833,16 @@ export async function datosCurvaS(
     porcentajePlaneado: t.porcentajePlaneado.toString(),
     porcentajeArchivo: t.porcentajeArchivo.toString(),
   }));
-  const realSemanal = serieRealPorFechas(tareasCurva, reportes, fechasSem);
+  // Ademas de los cortes semanales, incluir HOY como punto final (la semana en
+  // curso) para que la linea real, el puntoActual y el EVM reflejen el avance
+  // del dia y no se queden en el ultimo corte semanal ya cerrado. `fechasSem`
+  // (solo cortes) se mantiene intacta para la cadencia (ultimoCorteEsperado).
+  const fechasReal =
+    fechasSem.length &&
+    fechasSem[fechasSem.length - 1]!.getTime() >= hastaMuestreo.getTime()
+      ? fechasSem
+      : [...fechasSem, hastaMuestreo];
+  const realSemanal = serieRealPorFechas(tareasCurva, reportes, fechasReal);
 
   // La cadencia: el ultimo corte esperado que ya paso, y si falta reporte (el
   // ultimo avance es anterior a ese corte, o no hay ninguno todavia).

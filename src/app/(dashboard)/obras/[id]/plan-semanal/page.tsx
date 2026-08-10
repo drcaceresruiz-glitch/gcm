@@ -5,17 +5,12 @@ import { obtenerObra } from "@/services/obras.service";
 import { listarPlanesSemanales } from "@/services/plan-semanal.service";
 import { puede } from "@/lib/rbac";
 import { proximoCorte } from "@/lib/plan-semanal";
+import { hoy } from "@/utils/fechas";
 import { NuevaSemana } from "@/components/plan-semanal/NuevaSemana";
 import { GraficosPpc } from "@/components/plan-semanal/GraficosPpc";
 import { TarjetaSemana } from "@/components/plan-semanal/TarjetaSemana";
 
 export const metadata: Metadata = { title: "Plan Semanal" };
-
-/** Hoy como fecha de calendario en UTC, para proponer el proximo corte. */
-function hoyUtc(): Date {
-  const a = new Date();
-  return new Date(Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()));
-}
 
 export default async function PlanSemanalPage({
   params,
@@ -32,7 +27,7 @@ export default async function PlanSemanalPage({
 
   const datos = await listarPlanesSemanales(sesion, id);
   const puedeGestionar = puede(sesion, "plan_semanal:gestionar");
-  const fechaSugerida = proximoCorte(obra.diaCorteSemanal, hoyUtc())
+  const fechaSugerida = proximoCorte(obra.diaCorteSemanal, hoy())
     .toISOString()
     .slice(0, 10);
 

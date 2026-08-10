@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { normalizarDecimal } from "@/lib/decimal";
+import { hoy } from "@/utils/fechas";
 import {
   ppcDePlan,
   paretoCausas,
@@ -39,12 +40,6 @@ function quien(sesion: SesionActiva): string {
 
 function fechaDeObra(texto: string): Date {
   return new Date(`${texto}T00:00:00Z`);
-}
-
-/** Hoy a medianoche UTC (para anclar fechas @db.Date sin desfase de zona). */
-function hoyUtc(): Date {
-  const n = new Date();
-  return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()));
 }
 
 // ---------------------------------------------------------------------------
@@ -614,7 +609,7 @@ export async function cerrarPlanSemanal(
     });
 
     const fechaAvance = new Date(
-      Math.min(plan.fechaCorte.getTime(), hoyUtc().getTime()),
+      Math.min(plan.fechaCorte.getTime(), hoy().getTime()),
     );
     let avancesRegistrados = 0;
     for (const c of plan.compromisos) {

@@ -255,16 +255,20 @@ function armarCronograma(
     .sort((a, b) => Number(a.desfase) - Number(b.desfase))
     .slice(0, 3);
 
+  // El avance VIVO a hoy (`puntoActual`: ultimo avance semanal de GCM, ya
+  // incluyendo la semana en curso), no el ultimo corte de import: asi el
+  // Tablero avanza al cerrar una semana igual que la tarjeta de la lista, sin
+  // reimportar. Cae al ultimo corte solo si aun no hay ningun avance.
   const ultimo = curva.cortes[curva.cortes.length - 1];
-  const real = Number(ultimo?.real ?? 0);
-  const planeado = Number(ultimo?.planeado ?? 0);
+  const real = Number(curva.puntoActual?.real ?? ultimo?.real ?? 0);
+  const planeado = Number(curva.puntoActual?.planeado ?? ultimo?.planeado ?? 0);
 
   return {
     version: cronograma.version,
     corte: fechaCorta(corte),
     real,
     planeado,
-    desfase: Number(ultimo?.desfase ?? 0),
+    desfase: Number((real - planeado).toFixed(2)),
     curva: armarCurva(curva, corte),
     atrasos: {
       alta: alertas.filter((a) => a.severidad === "alta").length,
@@ -345,6 +349,12 @@ function armarCurva(
   const real: PuntoMini[] = [
     { t: 0, v: 0 },
     ...curva.cortes.map((c) => ({ t: t(c.fecha), v: Number(c.real) })),
+    // Punto final VIVO a hoy: prolonga la linea real hasta el avance actual de
+    // GCM (no solo hasta el ultimo corte de import), en linea con el numero
+    // grande del modulo. Se omite si no hay avance vigente.
+    ...(curva.puntoActual
+      ? [{ t: t(curva.puntoActual.fecha), v: curva.puntoActual.real }]
+      : []),
   ];
 
   return {
