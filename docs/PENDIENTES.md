@@ -248,6 +248,7 @@ Anotado antes del 10 de agosto, sin tocar:
 | — | Ventana del Lookahead **por obra** (hoy solo en la URL) | Si, una columna |
 | — | Empresa de demostracion para el tutorial | No: identificarla por variable de entorno |
 | — | Sombrear el area entre plan y real en la curva S | No |
+| — | Exportar tablas a Excel (presupuesto y órdenes) —pedido del 10 de agosto al revisar una lista de librerías de R: es lo único de esa lista que GCM no cubre aún— | No |
 | **Fase 2** | Documental: planos, protocolos y guias, con validacion automatica de restricciones | Si |
 | **Fase 3** | Sectores de color en el PTS y aviso cuando dos cuadrillas coinciden en el mismo sitio | Si |
 | **Fase 4** | «Cumplio» calculado desde la cantidad ejecutada, linea de meta, causa raiz | No |
