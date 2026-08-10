@@ -17,6 +17,8 @@ import { obtenerCalendario } from "@/services/calendario.service";
 import { listarPlanesSemanales } from "@/services/plan-semanal.service";
 import { confiabilidadDeVentana } from "@/services/lookahead.service";
 import { MODULOS_POR_DEFECTO, type ModuloTablero } from "@/lib/tablero";
+import { pendientesDeObra, type Pendiente } from "@/lib/pendientes";
+import { cobertura } from "@/lib/mapeo-partidas";
 import { diasEntre, fechaCorta, hoy } from "@/utils/fechas";
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
@@ -134,6 +136,8 @@ export interface DatosTablero {
   /// El EVM en resumen. Null sin cronograma con cortes o sin presupuesto:
   /// sin esas dos patas no hay valor ganado que medir.
   valorGanado: { metricas: MetricasEvm; corte: string } | null;
+  /// Que falta por hacer, ordenado por lo que rompe. Vacio = obra al dia.
+  pendientes: Pendiente[];
 }
 
 /**
@@ -228,6 +232,15 @@ export interface DatosCronogramaTablero {
 const PUNTOS_MINI = 80;
 
 /**
+ * Con cuanta antelacion se avisa de lo que viene.
+ *
+ * Catorce dias: lo que tarda de verdad cerrar un subcontrato o liberar un
+ * plano. Avisar a siete ya no deja margen para reaccionar, que es lo unico
+ * que hace util un aviso.
+ */
+const DIAS_PROXIMAS = 14;
+
+/**
  * El presupuesto cuando su modulo esta apagado.
  *
  * Se devuelve la forma completa en ceros en vez de `null` para no obligar a
@@ -282,6 +295,7 @@ export async function datosTablero(
   // El cronograma se lee UNA vez y se reparte; la confiabilidad del Lookahead
   // sale de estas mismas tareas.
   const necesitaCronograma =
+    encendido("pendientes") ||
     encendido("avance") ||
     encendido("curva") ||
     encendido("atrasos") ||
@@ -290,11 +304,14 @@ export async function datosTablero(
     encendido("confiabilidad") ||
     encendido("valorGanado");
 
-  const necesitaPlanes = encendido("ppc") || encendido("causas");
+  const necesitaPlanes =
+    encendido("ppc") || encendido("causas") || encendido("pendientes");
 
   const [presupuesto, ordenes, cronograma, curva, calendario, planes] =
     await Promise.all([
-      encendido("presupuesto") || encendido("valorGanado")
+      encendido("presupuesto") ||
+      encendido("valorGanado") ||
+      encendido("pendientes")
         ? presupuestoDeObra(sesion, obraId)
         : PRESUPUESTO_VACIO,
       encendido("presupuesto") || encendido("ordenes")
@@ -309,9 +326,22 @@ export async function datosTablero(
   // Segunda tanda, y una sola consulta: la confiabilidad se calcula con las
   // tareas que ya estan en memoria. Antes esto releia el cronograma entero.
   const lookahead =
-    encendido("confiabilidad") && cronograma
+    (encendido("confiabilidad") || encendido("pendientes")) && cronograma
       ? await confiabilidadDeVentana(sesion, obraId, cronograma.tareas)
       : null;
+
+  // Los pendientes van al final: necesitan lo que ya cargaron los demas, y
+  // solo consultan de mas lo que cruza dinero con tiempo.
+  const pendientes = encendido("pendientes")
+    ? await pendientesDeLaObra(
+        sesion,
+        obraId,
+        cronograma,
+        lookahead,
+        planes,
+        presupuesto.sobregiradas,
+      )
+    : [];
 
   // Valor ganado con lo YA cargado (curva + presupuesto): cero consultas
   // nuevas, y con `metricasEvm`, la MISMA regla que la pantalla del EVM —el
@@ -388,6 +418,7 @@ export async function datosTablero(
     planSemanal: planes,
     lookahead,
     valorGanado,
+    pendientes,
   };
 }
 
@@ -667,6 +698,139 @@ async function presupuestoDeObra(
     partidas: partidas.partidas,
     sobregiradas,
   };
+}
+
+/**
+ * Que le falta al residente, contado.
+ *
+ * La decision —que es pendiente, con que gravedad y en que orden— vive en
+ * `@/lib/pendientes`, probada. Aqui solo se cuentan filas.
+ *
+ * Casi todo sale de lo que el tablero YA tiene en memoria: el cronograma
+ * medido trae en cada tarea si alguien reporto avance, y la confiabilidad y
+ * el PPC vienen de sus modulos. Solo se consulta de mas lo que cruza dinero
+ * con tiempo, que es precisamente el aviso que nadie mas puede dar.
+ */
+async function pendientesDeLaObra(
+  sesion: SesionActiva,
+  obraId: string,
+  cronograma: Cronograma | null,
+  lookahead: DatosLookaheadTablero | null,
+  planes: DatosPlanSemanalTablero | null,
+  sobregiradas: number,
+): Promise<Pendiente[]> {
+  const ahora = hoy();
+  const limite = new Date(ahora.getTime() + DIAS_PROXIMAS * 86_400_000);
+
+  // Solo trabajo real: un resumen agrupa y un hito dura cero dias, asi que
+  // ninguno de los dos se "empieza" ni se contrata.
+  const trabajo = (cronograma?.tareas ?? []).filter(
+    (t) => !t.esResumen && !t.esHito,
+  );
+
+  // Empezadas y sin que nadie haya reportado nada. `avance` es null cuando no
+  // hay ningun `AvanceTarea`, que es distinto de haber reportado un 0%.
+  const tareasEmpezadasSinAvance = trabajo.filter(
+    (t) => t.inicio <= ahora && t.avance === null,
+  ).length;
+
+  const proximas = trabajo.filter(
+    (t) => t.inicio > ahora && t.inicio <= limite,
+  );
+  const uidsProximos = proximas.map((t) => t.uid);
+
+  const [lkProximas, mapeos, partidas, planesCerrados] = await Promise.all([
+    uidsProximos.length > 0
+      ? prisma.lookaheadTask.findMany({
+          where: { projectId: obraId, uid: { in: uidsProximos } },
+          select: { uid: true, estado: true },
+        })
+      : Promise.resolve([]),
+
+    prisma.mapeoTareaPartida.findMany({
+      where: { projectId: obraId },
+      select: { uid: true, codigoPartida: true },
+    }),
+
+    // Con sus encargos VIGENTES: una partida sin encargo vivo no tiene a
+    // nadie contratado para ejecutarla.
+    prisma.wbsItem.findMany({
+      where: { projectId: obraId, project: { companyId: sesion.companyId } },
+      select: {
+        codigoPartida: true,
+        parcial: true,
+        encargos: {
+          where: { encargo: { estado: "VIGENTE" } },
+          select: { fraccion: true },
+        },
+      },
+    }),
+
+    // Semanas cerradas que no dejaron ningun avance fisico: sus compromisos
+    // con tarea contaron para el PPC y no movieron la curva.
+    prisma.planSemanal.findMany({
+      where: { projectId: obraId, estado: "CERRADO" },
+      select: {
+        id: true,
+        _count: { select: { avances: true } },
+        compromisos: { where: { uid: { not: null } }, select: { id: true } },
+      },
+    }),
+  ]);
+
+  const estadoLk = new Map(lkProximas.map((l) => [l.uid, l.estado]));
+  const tareasProximasBloqueadas = proximas.filter(
+    (t) => (estadoLk.get(t.uid) ?? "PENDIENTE") !== "LISTO",
+  ).length;
+
+  // Cobertura: que partidas tienen ya a alguien contratado.
+  const conEncargo = new Set(
+    partidas
+      .filter((p) => p.encargos.length > 0)
+      .map((p) => p.codigoPartida),
+  );
+  const partidasDeTarea = new Map<number, string[]>();
+  for (const m of mapeos) {
+    partidasDeTarea.set(m.uid, [
+      ...(partidasDeTarea.get(m.uid) ?? []),
+      m.codigoPartida,
+    ]);
+  }
+
+  // Sin nadie contratado = ninguna de sus partidas tiene encargo vigente. Las
+  // tareas SIN mapear no cuentan aqui: de esas ya avisa la cobertura del
+  // mapeo, y senalarlas dos veces seria ruido.
+  const tareasProximasSinCobertura = proximas.filter((t) => {
+    const codigos = partidasDeTarea.get(t.uid);
+    return codigos !== undefined && !codigos.some((c) => conEncargo.has(c));
+  }).length;
+
+  const semanasSinPorcentaje = planesCerrados.filter(
+    (p) => p.compromisos.length > 0 && p._count.avances === 0,
+  ).length;
+
+  const cob = cobertura(
+    mapeos,
+    partidas.map((p) => ({
+      codigo: p.codigoPartida,
+      descripcion: "",
+      parcial: p.parcial?.toString() ?? null,
+    })),
+  );
+
+  return pendientesDeObra({
+    tareasEmpezadasSinAvance,
+    semanasSinPorcentaje,
+    lookaheadSinAnalizar: lookahead?.sinSincronizar ?? 0,
+    confiabilidadMostrada: lookahead?.porcentaje ?? null,
+    tareasProximasBloqueadas,
+    diasVentana: DIAS_PROXIMAS,
+    tareasProximasSinCobertura,
+    partidasSobregiradas: sobregiradas,
+    ppcUltimo: planes?.ultima?.ppc ?? null,
+    ppcAnterior: planes?.anterior ?? null,
+    coberturaMapeo: mapeos.length > 0 ? cob.porcentaje : null,
+  });
 }
 
 /** Las ordenes de la obra por estado. Null sin permiso para verlas. */

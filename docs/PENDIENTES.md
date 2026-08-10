@@ -379,6 +379,40 @@ contable—. Recordar el aviso ya escrito: **lo pagado lleva IGV y el resto no**
 asi que esas columnas no son homogeneas y hay que normalizar ANTES de
 construir los pagos, no despues.
 
+## 6d. Panel «Que falta» (10 de agosto)
+
+La ayuda visual permanente que pidio el usuario: un modulo del tablero que
+dice que hay que completar y QUE SE ROMPE si no. Decidido con el: panel
+resumen (no avisos dispersos) e **informa, no bloquea**.
+
+GCM sabia muchas cosas que no decia. Ocho reglas, en
+`src/lib/pendientes.ts` (puro, 18 pruebas) + `pendientesDeLaObra` en
+`tablero.service`:
+
+- Tareas empezadas sin avance reportado -> la curva las cuenta al 0%.
+- Semanas cerradas sin % alcanzado -> contaron para el PPC y no movieron la
+  curva (el defecto que se arreglo hoy dejaba de escribir el 100 falso, pero
+  el hueco hay que verlo).
+- Tareas que arrancan en 14 dias sin nadie contratado -> **la idea del
+  usuario**: cruza el mapeo con los encargos vigentes. Es el aviso que
+  ninguna hoja de calculo puede dar.
+- Tareas que arrancan con restricciones sin liberar.
+- Tareas de la ventana sin analizar -> la confiabilidad miente.
+- Partidas sobregiradas, PPC bajo o cayendo, cobertura de mapeo baja.
+
+Decisiones de forma: **nada parpadea** (lo que parpadea se ignora a los tres
+dias); color + icono + texto, nunca color solo; cada linea con enlace a donde
+se arregla; y con la obra al dia el modulo se pinta en VERDE en vez de
+desaparecer —si desapareciera, nadie sabria si esta al dia o roto—.
+
+Casi todo sale de lo que el tablero YA tiene en memoria (`medirAvance` deja
+en cada tarea si hay avance reportado). Solo se consulta de mas lo que cruza
+dinero con tiempo. **Ojo al ampliarlo**: el peso de `datosTablero` tumbo
+produccion el 10 de agosto.
+
+**Pendiente**: probarlo con datos reales en pantalla; los textos de las ocho
+reglas solo se han visto en pruebas.
+
 ## 7. Defectos conocidos, sin arreglar
 
 - **Ortografía: el sitio entero se escribió sin tildes** (convención heredada

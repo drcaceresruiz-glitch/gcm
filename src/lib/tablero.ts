@@ -35,6 +35,16 @@ export interface DefinicionModulo {
  */
 export const MODULOS = [
   {
+    // Va PRIMERO a proposito: es lo unico del tablero que no describe la obra
+    // sino lo que hay que hacer con ella. Ancho 2 porque es una lista, no una
+    // cifra, y en una columna las consecuencias quedarian ilegibles.
+    clave: "pendientes",
+    etiqueta: "Qué falta",
+    nota: "Lo que hay que completar, y qué se rompe si no",
+    ancho: 2,
+    requiereCronograma: false,
+  },
+  {
     clave: "avance",
     etiqueta: "Avance físico",
     nota: "Ejecutado contra plan en el último corte",

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   TrendingUp,
   CalendarClock,
@@ -12,8 +13,13 @@ import {
   Telescope,
   Ban,
   Gauge,
+  ListChecks,
+  TriangleAlert,
+  Info,
+  CircleCheck,
 } from "lucide-react";
 import type { DefinicionModulo } from "@/lib/tablero";
+import { resumirPendientes } from "@/lib/pendientes";
 import {
   COLOR_SEMAFORO,
   semaforoDesfase,
@@ -76,6 +82,11 @@ export function moduloConDatos(
       return datos.lookahead !== null;
     case "valorGanado":
       return datos.valorGanado !== null;
+    case "pendientes":
+      // Con la obra al dia se pinta igual, en verde: es la unica forma de
+      // que "no hay nada" signifique algo. Si desapareciera cuando todo esta
+      // bien, nadie sabria si esta al dia o si el modulo se rompio.
+      return true;
     default:
       // Plazo y presupuesto salen de la propia obra: siempre hay algo.
       return true;
@@ -124,6 +135,9 @@ export function ModuloContenido({
       )}
       {modulo.clave === "capitulos" && datos.cronograma && (
         <Capitulos crono={datos.cronograma} obraId={obraId} />
+      )}
+      {modulo.clave === "pendientes" && (
+        <Pendientes lista={datos.pendientes} obraId={obraId} />
       )}
       {modulo.clave === "ordenes" && datos.ordenes && (
         <Ordenes ordenes={datos.ordenes} obraId={obraId} />
@@ -1186,6 +1200,105 @@ function Capitulos({
       <EnlaceModulo href={`/obras/${obraId}/cronograma/informe`}>
         Ver informe
       </EnlaceModulo>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ordenes de compra
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Que falta
+// ---------------------------------------------------------------------------
+
+/**
+ * Lo que el residente tiene que completar, y que se rompe si no.
+ *
+ * Tres decisiones de forma:
+ *
+ * - **Nada parpadea.** Lo que parpadea se ignora a los tres dias y molesta
+ *   desde el primero. La urgencia va en el ORDEN —lo critico arriba— y en el
+ *   contador de la cabecera.
+ * - **Color, icono y texto**, nunca color solo: quien no distingue el rojo
+ *   del ambar tiene que poder leer lo mismo.
+ * - **Cada linea lleva su enlace.** Un aviso del que no se puede salir a
+ *   arreglar la cosa es solo una queja.
+ */
+function Pendientes({
+  lista,
+  obraId,
+}: {
+  lista: DatosTablero["pendientes"];
+  obraId: string;
+}) {
+  const { criticas, total } = resumirPendientes(lista);
+
+  if (total === 0) {
+    return (
+      <>
+        <Titulo icono={ListChecks}>Qué falta</Titulo>
+        <p
+          className="mt-2 flex items-center gap-1.5 text-sm"
+          style={{ color: "var(--color-exito)" }}
+        >
+          <CircleCheck className="size-4 shrink-0" aria-hidden="true" />
+          Nada pendiente: la obra está al día.
+        </p>
+        <p className="mt-1 text-xs opacity-50">
+          Se revisan los datos de campo, las restricciones de las próximas dos
+          semanas y los indicadores.
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-2">
+        <Titulo icono={ListChecks}>Qué falta</Titulo>
+        <span className="text-xs tabular-nums opacity-70">
+          {criticas > 0 && (
+            <strong style={{ color: "var(--color-peligro)" }}>
+              {criticas} urgente{criticas === 1 ? "" : "s"}
+            </strong>
+          )}
+          {criticas > 0 && total > criticas && " · "}
+          {total > criticas && `${total - criticas} por mirar`}
+        </span>
+      </div>
+
+      <ul className="mt-2 space-y-2">
+        {lista.map((p) => (
+          <li key={p.clave} className="flex items-start gap-2">
+            {p.gravedad === "critica" ? (
+              <TriangleAlert
+                className="mt-0.5 size-4 shrink-0"
+                style={{ color: "var(--color-peligro)" }}
+                aria-label="Urgente"
+              />
+            ) : (
+              <Info
+                className="mt-0.5 size-4 shrink-0"
+                style={{ color: "var(--color-alerta)" }}
+                aria-label="Por mirar"
+              />
+            )}
+            <div className="min-w-0">
+              <Link
+                href={`/obras/${obraId}${p.camino}`}
+                className="text-sm font-medium underline decoration-transparent underline-offset-2 hover:decoration-inherit"
+              >
+                {p.titulo}
+              </Link>
+              {/* La consecuencia es lo que mueve a alguien: "12 tareas sin
+                  analizar" no significa nada hasta que se dice que por eso la
+                  confiabilidad esta mintiendo. */}
+              <p className="text-xs opacity-70">{p.consecuencia}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
