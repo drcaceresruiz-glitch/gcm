@@ -46,6 +46,7 @@ export default async function ObraLayout({
       href: raiz,
       etiqueta: "Presupuesto",
       clave: "presupuesto",
+      grupo: "plan",
     },
     // Va junto al presupuesto y antes que las revisiones: el cronograma es
     // la otra mitad del plan de la obra —el presupuesto dice cuanto y este
@@ -54,6 +55,7 @@ export default async function ObraLayout({
       href: `${raiz}/cronograma`,
       etiqueta: "Cronograma",
       clave: "cronograma",
+      grupo: "plan",
     },
     // El Lookahead (mediano plazo) va entre cronograma y plan semanal: prepara
     // con analisis de restricciones lo que luego se comprometera en el PTS.
@@ -61,17 +63,20 @@ export default async function ObraLayout({
       href: `${raiz}/lookahead`,
       etiqueta: "Lookahead",
       clave: "lookahead",
+      grupo: "ejecucion",
     },
     // El plan semanal (Last Planner) cuelga del cronograma: es su corto plazo.
     puede(sesion, "plan_semanal:leer") && {
       href: `${raiz}/plan-semanal`,
       etiqueta: "Plan Semanal",
       clave: "planSemanal",
+      grupo: "ejecucion",
     },
     puede(sesion, "linea_base:leer") && {
       href: `${raiz}/revisiones`,
       etiqueta: "Revisiones",
       clave: "revisiones",
+      grupo: "plan",
     },
     // Los movimientos van encima de la linea base: sin ella aprobada, la
     // pantalla no tiene nada que ensenar.
@@ -80,6 +85,7 @@ export default async function ObraLayout({
         href: `${raiz}/movimientos`,
         etiqueta: "Movimientos",
         clave: "movimientos",
+        grupo: "ejecucion",
       },
     // Los proveedores van antes que las ordenes: primero repartes la obra en
     // frentes —quien hace que, por cuanto— y luego les emites los pedidos.
@@ -87,6 +93,7 @@ export default async function ObraLayout({
       href: `${raiz}/proveedores`,
       etiqueta: "Proveedores",
       clave: "proveedores",
+      grupo: "compras",
     },
     // Las ordenes no dependen de la linea base: se puede pedir a un proveedor
     // antes de congelar el presupuesto.
@@ -94,6 +101,7 @@ export default async function ObraLayout({
       href: `${raiz}/ordenes`,
       etiqueta: "Ordenes",
       clave: "ordenes",
+      grupo: "compras",
     },
   ].filter(Boolean) as Pestana[];
 
