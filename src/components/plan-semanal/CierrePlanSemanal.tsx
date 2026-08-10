@@ -4,6 +4,11 @@ import { useState, useTransition } from "react";
 import { Check, LoaderCircle } from "lucide-react";
 import { accionCerrarPlanSemanal } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
 import { CAUSAS_CNC, ETIQUETA_CNC } from "@/lib/plan-semanal";
+import {
+  BotonEvidencia,
+  PanelEvidencia,
+} from "@/components/evidencia/PanelEvidencia";
+import type { FotoResumen } from "@/services/evidencia.service";
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 
 /**
@@ -29,6 +34,13 @@ interface Fila {
   unidad: string | null;
 }
 
+/**
+ * Las fotos NO entran en `Fila`: esa es la parte editable, que se manda al
+ * cerrar. La evidencia se sube por su propia accion y llega ya guardada desde
+ * el servidor, asi que se lee de las props —y por eso la foto recien subida
+ * aparece sola cuando la accion repinta la pantalla—.
+ */
+
 export function CierrePlanSemanal({
   obraId,
   planId,
@@ -48,6 +60,7 @@ export function CierrePlanSemanal({
     cantidadPlan: string | null;
     unidad: string | null;
     cantidadEjec: string | null;
+    fotos: FotoResumen[];
   }[];
 }) {
   const [filas, setFilas] = useState<Fila[]>(() =>
@@ -74,6 +87,8 @@ export function CierrePlanSemanal({
   );
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
+  /// Compromiso con la evidencia abierta (uno a la vez).
+  const [evidenciaEn, setEvidenciaEn] = useState<string | null>(null);
 
   function set(id: string, cambios: Partial<Fila>) {
     setFilas((p) => p.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
@@ -107,7 +122,9 @@ export function CierrePlanSemanal({
   return (
     <div className="space-y-3">
       <ul className="space-y-2">
-        {filas.map((f) => (
+        {filas.map((f) => {
+          const fotos = compromisos.find((c) => c.id === f.id)?.fotos ?? [];
+          return (
           <li
             key={f.id}
             className="rounded-lg border p-2.5 text-sm"
@@ -157,6 +174,18 @@ export function CierrePlanSemanal({
                   />
                 </label>
               )}
+              {/* El clip va en la fila de arriba y no junto a la causa: si
+                  colgara del bloque de causa, marcar "cumplido" escondera las
+                  fotos ya subidas. La evidencia no puede desaparecer al
+                  cambiar una casilla. */}
+              <BotonEvidencia
+                cantidad={fotos.length}
+                abierto={evidenciaEn === f.id}
+                etiqueta={f.descripcion}
+                onClick={() =>
+                  setEvidenciaEn((p) => (p === f.id ? null : f.id))
+                }
+              />
             </div>
             {!f.cumplido && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -181,8 +210,22 @@ export function CierrePlanSemanal({
                 />
               </div>
             )}
+
+            {evidenciaEn === f.id && (
+              <PanelEvidencia
+                obraId={obraId}
+                destino={{ compromisoId: f.id }}
+                titulo={f.descripcion}
+                fotos={fotos}
+                // Quien puede cerrar la semana puede documentarla: esta
+                // pantalla solo se pinta con `plan_semanal:gestionar`.
+                puedeSubir
+                onCerrar={() => setEvidenciaEn(null)}
+              />
+            )}
           </li>
-        ))}
+          );
+        })}
       </ul>
       <div className="flex items-center gap-3">
         <button

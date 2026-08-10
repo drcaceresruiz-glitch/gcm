@@ -17,6 +17,25 @@ test de ida y vuelta (`/plantilla-presupuesto`); y el cimiento de la
 evidencia fotografica (ver seccion 4). Decisiones tomadas: sin LLM local
 (6b), plan de Notas (5), plan de evidencia con QR (4).
 
+> **AVISO DE DESPLIEGUE — leer antes del proximo push.** La UI de evidencia
+> (seccion 4, commit 2) hace que el Lookahead y el Plan Semanal CONSULTEN la
+> tabla `fotos_evidencia` en cada carga. Esa tabla existe en la base local
+> pero **todavia no en produccion**, y cada push a `main` despliega solo.
+>
+> **No sirve correr `migrate deploy` antes del push**: las migraciones
+> viajan DENTRO del paquete desplegado, asi que hasta que el deploy entre no
+> hay ningun archivo que aplicar en el servidor (se comprobo el 10 de
+> agosto: `Could not find Prisma Schema`). La via sin caida es la que ya
+> describe `infraestructura.md`: crear la tabla a mano en phpMyAdmin con el
+> SQL de `prisma/migrations/20260810195703_evidencia_fotografica/`
+> **antes** del push —el codigo viejo no la mira, no rompe nada— y despues
+> del despliegue cuadrar el registro de Prisma para que no intente
+> recrearla:
+>
+> ```
+> npx --yes prisma@7 migrate resolve --applied 20260810195703_evidencia_fotografica
+> ```
+
 **Sigue pendiente del usuario**: fotos para `public/portada/` (1.jpg-12.jpg),
 las frases de "Frases sobre el deber.docx" (pasar a .txt o pegar en el chat),
 y probar en prod el ciclo de la plantilla (descargar - llenar - importar).
@@ -118,23 +137,41 @@ decide (la restriccion que se libera, la causa de no cumplimiento)— y la
 galeria es una VISTA sobre esa evidencia. Orden acordado con el usuario:
 primero ortografia tanda 2 y plantilla Excel, luego esto.
 
-- **Fase A — ESTADO al cierre del 10 de agosto: el CIMIENTO esta hecho y
-  subido**: modelo `FotoEvidencia` (migracion
-  `20260810195703_evidencia_fotografica`, YA aplicada en la base LOCAL),
-  `evidencia.service.ts` (subir con hash SHA-256, permisos por destino,
-  candado CERRADA, 5 MB, JPG/PNG/WebP, auditLog; listar agrupado; servir
-  validando empresa) y la ruta `/api/evidencia/[id]` (401/404/410). Los
-  archivos van a `STORAGE_ROOT/evidencia/<obra>/` —fuera del arbol—.
-  **AL RETOMAR, EN ESTE ORDEN**: (1) correr `npx prisma migrate deploy` EN EL
-  SERVIDOR (jailshell) para crear la tabla en produccion —hasta entonces la
-  ruta de la API fallaria si alguien la tocara; ninguna UI la llama aun—;
-  (2) commit 2: la UI —componente de subida con compresion en el navegador
-  (canvas ~1600 px, JPEG 0.8), clip en la celda de restriccion de
-  `MatrizLookahead` y adjunto junto a la causa en `CierrePlanSemanal`, visor
-  simple—; (3) commit 3: la hoja de codigos QR (necesita `npm install
-  qrcode`) con enlace profundo por restriccion, siempre con sesion.
-  En prod ademas: definir `STORAGE_ROOT` en las variables de cPanel
-  apuntando FUERA del arbol (p. ej. /home/drcacere/gcm-archivos).
+- **Fase A — cimiento (commit 1) y UI (commit 2): HECHOS y subidos.**
+  - *Commit 1*: modelo `FotoEvidencia` (migracion
+    `20260810195703_evidencia_fotografica`, YA aplicada en la base LOCAL),
+    `evidencia.service.ts` (subir con hash SHA-256, permisos por destino,
+    candado CERRADA, 5 MB, JPG/PNG/WebP, auditLog; listar agrupado; servir
+    validando empresa) y la ruta `/api/evidencia/[id]` (401/404/410). Los
+    archivos van a `STORAGE_ROOT/evidencia/<obra>/` —fuera del arbol—.
+  - *Commit 2 (10 de agosto, tarde)*: la UI.
+    `components/evidencia/PanelEvidencia.tsx` (clip con contador +
+    panel en linea, compresion en el navegador a 1600 px / JPEG 0.8) y
+    `GaleriaEvidencia.tsx` (miniaturas, sin estado, sirve en servidor y en
+    cliente). La accion es UNA sola para los dos destinos:
+    `obras/[id]/evidencia/acciones.ts`, y viaja por `FormData` porque un
+    `File` no se serializa de otra forma. Los servicios de Lookahead y Plan
+    Semanal traen las fotos **en una sola consulta por pantalla** (son 7
+    restricciones por tarea: una consulta por celda mataria la pagina). Se
+    ve en tres sitios: celda de restriccion del Lookahead (escritorio y
+    movil), cierre del Plan Semanal, y la semana ya cerrada en solo lectura
+    —que es donde la evidencia de verdad se usa—.
+    Verificado con `tsc --noEmit`, `eslint`, `vitest` (495 pruebas) y
+    `next build`, los cuatro limpios. **Falta la prueba visual con sesion
+    real: subir una foto de punta a punta.**
+  - Dos decisiones de la UI que no se deben deshacer sin pensarlo: el clip
+    del movil va FUERA del `<label>` (dentro, tocarlo marcaria tambien la
+    restriccion), y en el cierre va en la fila de arriba y NO junto a la
+    causa (colgado de la causa, marcar «cumplido» esconderia fotos ya
+    subidas).
+  - **AL RETOMAR, EN ESTE ORDEN**: (1) correr `npx prisma migrate deploy` EN
+    EL SERVIDOR (jailshell) para crear la tabla en produccion —sin eso, la
+    pantalla del Lookahead en prod REVIENTA, porque ahora si consulta la
+    tabla en cada carga; ya no es un riesgo dormido como cuando solo estaba
+    el cimiento—; (2) definir `STORAGE_ROOT` en las variables de cPanel
+    apuntando FUERA del arbol (p. ej. /home/drcacere/gcm-archivos);
+    (3) commit 3: la hoja de codigos QR (necesita `npm install qrcode`) con
+    enlace profundo por restriccion, siempre con sesion.
 - **Fase B**: pestana Evidencia de la obra: vista agregada con filtros.
 - **Fase C**: estandares visuales (quality gates), dentro de Fase 2 documental.
 - **Fase D**: rol cliente solo lectura + reconocimiento de cuadrillas.
@@ -287,10 +324,29 @@ Para que ninguna sesion futura pierda tiempo redescubriendolas:
 - **No hay acceso de escritura fuera de la carpeta del proyecto.** Los
   archivos de memoria del perfil (`~/.claude/.../memory/`) no se pueden
   actualizar desde aqui. Por eso la continuidad vive en `docs/`.
-- **No se pueden ejecutar `tsc`, `vitest` ni `lint`.** Las herramientas de
-  shell se cayeron a mitad de la sesion del 10 de agosto. Hay que pedirle al
-  usuario que los corra y pegue la salida. **No empujar nada sin esa
-  verificacion.**
+- ~~No se pueden ejecutar `tsc`, `vitest` ni `lint`.~~ **RESUELTO el 10 de
+  agosto: SI se pueden.** La causa nunca fue que faltaran las herramientas,
+  sino la directiva de ejecucion de PowerShell, que bloquea los envoltorios
+  `.ps1` (`npx.ps1`, `npm.ps1`) con `UnauthorizedAccess`. Se esquiva
+  llamando a Node directamente, sin pasar por el `.ps1`:
+
+  ```
+  node node_modules/typescript/bin/tsc --noEmit
+  node node_modules/vitest/vitest.mjs run
+  node node_modules/eslint/bin/eslint.js .
+  node node_modules/next/dist/bin/next build
+  ```
+
+  El `build` es el mas valioso de los cuatro y conviene correrlo antes de
+  empujar: es el UNICO que detecta que un modulo `server-only` se filtro al
+  paquete del navegador, cosa que `tsc` no ve. **Sigue en pie no empujar
+  nada sin verificar**; lo que cambia es que ya no hace falta pedirselo al
+  usuario.
+
+  Lo que sigue sin poderse: **entrar a la app en local**, porque la clave se
+  genera al sembrar la base y el asistente no la tiene. Todo lo que exija
+  sesion (subir una foto, ver una pantalla por dentro) hay que pedirselo al
+  usuario o que comparta credenciales de prueba.
 - **Cuidado con el navegador automatizado.** Comprobar `document.hidden`
   antes de creerse lo que se ve: una pestana en segundo plano estrangula los
   temporizadores y no ejecuta `requestAnimationFrame`. El 10 de agosto eso

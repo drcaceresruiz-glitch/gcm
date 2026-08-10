@@ -13,6 +13,7 @@ import {
   type Confiabilidad,
 } from "@/lib/lookahead";
 import { planesAbiertos, type SemanaAbierta } from "@/services/plan-semanal.service";
+import { fotosPorDestino, type FotoResumen } from "@/services/evidencia.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { EstadoLookahead, TipoRestriccion } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
@@ -37,6 +38,9 @@ export interface CeldaRestriccion {
   id: string | null;
   tipo: TipoRestriccion;
   resuelta: boolean;
+  /// Fotos que demuestran que este flujo quedo liberado. Vacio si no hay, y
+  /// siempre vacio en las celdas sin sincronizar (no existe a que colgarlas).
+  fotos: FotoResumen[];
 }
 
 /// En que semana del PTS esta ya comprometida una tarea.
@@ -180,6 +184,16 @@ export async function obtenerLookahead(
     comprometidaPorUid.set(c.uid, lista);
   }
 
+  // La evidencia de TODA la ventana en una consulta, no una por celda: son 7
+  // restricciones por tarea y una consulta por celda pondria de rodillas a la
+  // pantalla en cuanto la ventana pase de unas pocas tareas.
+  const idsRestriccion = lookaheadTareas.flatMap((l) =>
+    l.restricciones.map((r) => r.id),
+  );
+  const fotosPorRestriccion = idsRestriccion.length
+    ? await fotosPorDestino(sesion, obraId, { restricciones: idsRestriccion })
+    : new Map<string, FotoResumen[]>();
+
   const filas: FilaLookahead[] = tareas.map((t) => {
     const lk = porUid.get(t.uid);
     if (!lk) {
@@ -198,6 +212,7 @@ export async function obtenerLookahead(
           id: null,
           tipo,
           resuelta: false,
+          fotos: [],
         })),
         comprometida: comprometidaPorUid.get(t.uid) ?? [],
       };
@@ -205,7 +220,12 @@ export async function obtenerLookahead(
     const porTipo = new Map(lk.restricciones.map((r) => [r.tipo, r]));
     const restricciones: CeldaRestriccion[] = TIPOS_RESTRICCION.map((tipo) => {
       const r = porTipo.get(tipo);
-      return { id: r?.id ?? null, tipo, resuelta: r?.resuelta ?? false };
+      return {
+        id: r?.id ?? null,
+        tipo,
+        resuelta: r?.resuelta ?? false,
+        fotos: r ? (fotosPorRestriccion.get(r.id) ?? []) : [],
+      };
     });
     return {
       uid: t.uid,

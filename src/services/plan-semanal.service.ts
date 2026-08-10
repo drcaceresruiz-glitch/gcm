@@ -28,6 +28,7 @@ import type {
   EstadoLookahead,
 } from "@/generated/prisma/enums";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
+import { fotosPorDestino, type FotoResumen } from "@/services/evidencia.service";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -141,6 +142,9 @@ export interface CompromisoDetalle {
   cantidadEjec: string | null;
   /// De que tarea del Lookahead nacio, si vino de ahi.
   lookaheadTaskId: string | null;
+  /// Fotos adosadas al compromiso: documentan la causa de no cumplimiento (o
+  /// lo ejecutado). Vacio si no hay ninguna.
+  fotos: FotoResumen[];
   /// Estado en el Lookahead HOY (no congelado): si no esta LISTO, la pantalla
   /// avisa de que se comprometio algo sin liberar. Si se libera despues, el
   /// aviso desaparece solo.
@@ -363,6 +367,13 @@ export async function obtenerPlanSemanal(
       unidad: sugerenciaPorUid.get(t.uid)?.unidad ?? null,
     }));
 
+  // La evidencia de todos los compromisos en una consulta, no una por fila.
+  const fotosPorCompromiso = plan.compromisos.length
+    ? await fotosPorDestino(sesion, obraId, {
+        compromisos: plan.compromisos.map((c) => c.id),
+      })
+    : new Map<string, FotoResumen[]>();
+
   const compromisos: CompromisoDetalle[] = plan.compromisos.map((c) => ({
     id: c.id,
     uid: c.uid,
@@ -378,6 +389,7 @@ export async function obtenerPlanSemanal(
     cantidadEjec: c.cantidadEjec?.toString() ?? null,
     lookaheadTaskId: c.lookaheadTaskId,
     estadoLookahead: c.uid !== null ? (estadoLkPorUid.get(c.uid) ?? null) : null,
+    fotos: fotosPorCompromiso.get(c.id) ?? [],
   }));
 
   const { total, cumplidos, ppc } = ppcDePlan(plan.compromisos);

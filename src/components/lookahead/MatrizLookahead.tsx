@@ -14,6 +14,10 @@ import { Chip, type TonoChip } from "@/components/ui/Chip";
 import { FLUJOS_RESTRICCION, SEMANAS_SUGERIDAS } from "@/lib/lookahead";
 import { PanelComprometer } from "@/components/lookahead/PanelComprometer";
 import {
+  BotonEvidencia,
+  PanelEvidencia,
+} from "@/components/evidencia/PanelEvidencia";
+import {
   accionSincronizar,
   accionAlternarRestriccion,
 } from "@/app/(dashboard)/obras/[id]/lookahead/acciones";
@@ -61,6 +65,10 @@ export function MatrizLookahead({
   const [pendiente, iniciar] = useTransition();
   const [elegidas, setElegidas] = useState<Set<number>>(new Set());
   const [abrirPanel, setAbrirPanel] = useState(false);
+  // Que celda tiene la evidencia abierta. Se guarda el ID de la restriccion y
+  // no la celda entera: asi, cuando la accion de subir repinta la pantalla, el
+  // panel se vuelve a leer de los datos NUEVOS y ensena la foto recien subida.
+  const [evidenciaEn, setEvidenciaEn] = useState<string | null>(null);
   const router = useRouter();
   const ruta = usePathname();
   const {
@@ -114,6 +122,38 @@ export function MatrizLookahead({
       await accionAlternarRestriccion(obraId, restriccionId, resuelta);
     });
   }
+
+  // La celda cuya evidencia esta abierta, RELEIDA de `filas` en cada render:
+  // si se guardara la celda en el estado, la foto recien subida no aparecería
+  // hasta cerrar y volver a abrir el panel.
+  const evidencia = (() => {
+    if (!evidenciaEn) return null;
+    for (const fila of filas) {
+      for (const celda of fila.restricciones) {
+        if (celda.id && celda.id === evidenciaEn) {
+          return { fila, celda, id: celda.id };
+        }
+      }
+    }
+    // La restriccion ya no esta a la vista (cambio la ventana): el panel se
+    // va con ella en vez de quedarse colgado.
+    return null;
+  })();
+
+  // Se calcula UNA vez y se pinta donde toque: bajo la tabla en escritorio,
+  // dentro de la tarjeta en movil. Solo una de las dos esta visible.
+  const panelEvidencia = evidencia ? (
+    <PanelEvidencia
+      obraId={obraId}
+      destino={{ restriccionId: evidencia.id }}
+      titulo={`${ETIQUETA_FLUJO.get(evidencia.celda.tipo) ?? evidencia.celda.tipo} · ${
+        evidencia.fila.codigo ? `${evidencia.fila.codigo} ` : ""
+      }${evidencia.fila.nombre}`}
+      fotos={evidencia.celda.fotos}
+      puedeSubir={puedeGestionar}
+      onCerrar={() => setEvidenciaEn(null)}
+    />
+  ) : null;
 
   function sincronizar() {
     iniciar(async () => {
@@ -330,22 +370,36 @@ export function MatrizLookahead({
 
                 {fila.restricciones.map((c) => (
                   <td key={c.tipo} className="px-2 py-2 text-center">
-                    <input
-                      type="checkbox"
-                      checked={c.resuelta}
-                      disabled={
-                        !puedeGestionar ||
-                        !fila.sincronizada ||
-                        c.id === null ||
-                        pendiente
-                      }
-                      onChange={(e) => {
-                        if (c.id) alternar(c.id, e.target.checked);
-                      }}
-                      aria-label={`${ETIQUETA_FLUJO.get(c.tipo) ?? c.tipo} de ${fila.nombre}`}
-                      className="size-4"
-                      style={{ accentColor: "var(--color-exito)" }}
-                    />
+                    <div className="flex flex-col items-center">
+                      <input
+                        type="checkbox"
+                        checked={c.resuelta}
+                        disabled={
+                          !puedeGestionar ||
+                          !fila.sincronizada ||
+                          c.id === null ||
+                          pendiente
+                        }
+                        onChange={(e) => {
+                          if (c.id) alternar(c.id, e.target.checked);
+                        }}
+                        aria-label={`${ETIQUETA_FLUJO.get(c.tipo) ?? c.tipo} de ${fila.nombre}`}
+                        className="size-4"
+                        style={{ accentColor: "var(--color-exito)" }}
+                      />
+                      {/* El clip solo donde hay a que colgar la foto, y solo
+                          a quien puede subirla o tiene algo que mirar. */}
+                      {c.id !== null && (c.fotos.length > 0 || puedeGestionar) && (
+                        <BotonEvidencia
+                          cantidad={c.fotos.length}
+                          abierto={evidenciaEn === c.id}
+                          etiqueta={`${ETIQUETA_FLUJO.get(c.tipo) ?? c.tipo} de ${fila.nombre}`}
+                          onClick={() =>
+                            setEvidenciaEn((p) => (p === c.id ? null : c.id))
+                          }
+                        />
+                      )}
+                    </div>
                   </td>
                 ))}
 
@@ -360,6 +414,11 @@ export function MatrizLookahead({
         </table>
       </div>
 
+      {/* Escritorio: la evidencia se abre bajo la tabla, no flotando sobre la
+          celda; con scroll horizontal, un globo anclado a la casilla acabaria
+          recortado o fuera de la pantalla. */}
+      <div className="hidden md:block">{panelEvidencia}</div>
+
       {/* Movil: una tarjeta por tarea, con las restricciones desplegables. */}
       <ul className="space-y-2 md:hidden">
         {filas.map((fila) => (
@@ -372,6 +431,9 @@ export function MatrizLookahead({
             pendiente={pendiente}
             onElegir={() => alternarEleccion(fila.uid)}
             onAlternar={alternar}
+            evidenciaEn={evidenciaEn}
+            onEvidencia={(id) => setEvidenciaEn((p) => (p === id ? null : id))}
+            panelEvidencia={panelEvidencia}
           />
         ))}
       </ul>
@@ -404,6 +466,9 @@ function TarjetaTarea({
   pendiente,
   onElegir,
   onAlternar,
+  evidenciaEn,
+  onEvidencia,
+  panelEvidencia,
 }: {
   fila: LookaheadDatos["filas"][number];
   elegida: boolean;
@@ -412,6 +477,13 @@ function TarjetaTarea({
   pendiente: boolean;
   onElegir: () => void;
   onAlternar: (restriccionId: string, resuelta: boolean) => void;
+  /// ID de la restriccion con la evidencia abierta, en toda la matriz.
+  evidenciaEn: string | null;
+  onEvidencia: (restriccionId: string) => void;
+  /// El panel ya construido por la matriz. La tarjeta solo decide DONDE va:
+  /// bajo la restriccion que le corresponde, para no perderlo de vista en una
+  /// lista larga.
+  panelEvidencia: React.ReactNode;
 }) {
   const [abierta, setAbierta] = useState(false);
   const resueltas = fila.restricciones.filter((r) => r.resuelta).length;
@@ -480,22 +552,37 @@ function TarjetaTarea({
               !puedeGestionar || !fila.sincronizada || c.id === null || pendiente;
             return (
               <li key={c.tipo} className="border-t" style={{ borderColor: "var(--borde)" }}>
-                {/* El label entero es el area tocable, no solo la casilla:
-                    apuntar a 16px con el dedo, con guantes, no funciona. */}
-                <label className="flex min-h-11 items-center gap-3 py-1 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={c.resuelta}
-                    disabled={bloqueada}
-                    onChange={(e) => {
-                      if (c.id) onAlternar(c.id, e.target.checked);
-                    }}
-                    aria-label={`${etiqueta} de ${fila.nombre}`}
-                    className="size-5 shrink-0"
-                    style={{ accentColor: "var(--color-exito)" }}
-                  />
-                  <span className={c.resuelta ? "" : "opacity-80"}>{etiqueta}</span>
-                </label>
+                <div className="flex items-center gap-2">
+                  {/* El label entero es el area tocable, no solo la casilla:
+                      apuntar a 16px con el dedo, con guantes, no funciona.
+                      El clip queda FUERA del label a proposito: dentro, tocarlo
+                      marcaria tambien la restriccion. */}
+                  <label className="flex min-h-11 flex-1 items-center gap-3 py-1 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={c.resuelta}
+                      disabled={bloqueada}
+                      onChange={(e) => {
+                        if (c.id) onAlternar(c.id, e.target.checked);
+                      }}
+                      aria-label={`${etiqueta} de ${fila.nombre}`}
+                      className="size-5 shrink-0"
+                      style={{ accentColor: "var(--color-exito)" }}
+                    />
+                    <span className={c.resuelta ? "" : "opacity-80"}>{etiqueta}</span>
+                  </label>
+                  {c.id !== null && (c.fotos.length > 0 || puedeGestionar) && (
+                    <BotonEvidencia
+                      cantidad={c.fotos.length}
+                      abierto={evidenciaEn === c.id}
+                      etiqueta={`${etiqueta} de ${fila.nombre}`}
+                      onClick={() => onEvidencia(c.id as string)}
+                    />
+                  )}
+                </div>
+                {evidenciaEn !== null && evidenciaEn === c.id && (
+                  <div className="pb-2">{panelEvidencia}</div>
+                )}
               </li>
             );
           })}

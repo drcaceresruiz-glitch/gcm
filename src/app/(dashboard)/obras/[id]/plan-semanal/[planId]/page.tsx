@@ -10,6 +10,7 @@ import { FormularioPlanSemanal } from "@/components/plan-semanal/FormularioPlanS
 import { CierrePlanSemanal } from "@/components/plan-semanal/CierrePlanSemanal";
 import { BotonReabrir } from "@/components/plan-semanal/BotonReabrir";
 import { BotonEliminarPlan } from "@/components/plan-semanal/BotonEliminarPlan";
+import { GaleriaEvidencia } from "@/components/evidencia/GaleriaEvidencia";
 
 export const metadata: Metadata = { title: "Plan Semanal" };
 
@@ -140,6 +141,7 @@ export default async function DetallePlanSemanalPage({
               cantidadPlan: c.cantidadPlan,
               unidad: c.unidad,
               cantidadEjec: c.cantidadEjec,
+              fotos: c.fotos,
             }))}
           />
         </Seccion>
@@ -199,6 +201,12 @@ export default async function DetallePlanSemanalPage({
                     <span className="text-xs" style={{ color: "var(--color-peligro)" }}>
                       {ETIQUETA_CNC[c.causa]}
                     </span>
+                  )}
+                  {/* La semana cerrada es donde la evidencia sirve de verdad:
+                      al revisar por que algo no se cumplio. Aqui solo se mira
+                      —adjuntar se hace en el cierre—. */}
+                  {c.fotos.length > 0 && (
+                    <GaleriaEvidencia fotos={c.fotos} tamano="size-14" />
                   )}
                 </li>
               ))}
