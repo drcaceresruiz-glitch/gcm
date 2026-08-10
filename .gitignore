@@ -1,72 +1,105 @@
-# Dependencias
+```
+# Dependencies
 node_modules/
-.pnp
-.pnp.js
+.pnpm-store/
 
-# Next.js
-.next/
-out/
+# Build outputs
+dist/
 build/
-next-env.d.ts
+.next/
+.nuxt/
+public/build/
 
-# Paquete de despliegue que arma el workflow (.next/standalone + estaticos).
-# Son ~100 MB y se regenera en cada compilacion.
-/deploy/
+# Runtime data
+.prisma/
+lib/
+generated/
 
-# Cliente Prisma generado (se regenera con: npm run db:generate)
-/src/generated/
+# Environment variables
+.env*
+!.env.example
 
-# Variables de entorno: nunca al repositorio
-.env
-.env.local
-.env.*.local
-
-# Archivos subidos por usuarios
-/storage/
-
-# Registros y cache
+# Logs
 *.log
-npm-debug.log*
-.eslintcache
-*.tsbuildinfo
 
-# Sistema operativo
+# OS generated files
 .DS_Store
 Thumbs.db
 
-# Editores
-.vscode/*
-!.vscode/extensions.json
+# IDE files
+.vscode/
 .idea/
+*.swp
+*.swo
 
-# Empaquetado de escritorio (Tauri)
-src-tauri/target/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
 
-# Cobertura de pruebas
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+node_modules/
+jspm_packages/
+typings/
+.nyc_output
 coverage/
+*.lcov
+.nyc_output/
+!.nyc_output
+istanbul.yml
+.nyc_output
+coverage/
+*.lcov
+.nyc_output/
+!.nyc_output
+istanbul.yml
 
-# Entorno de Python del convertidor de .mpp (scripts/mpp-a-xml.py). Son ~30 MB
-# de JAR de MPXJ que se reinstalan con un comando; el script si va al
-# repositorio, el entorno no.
-/.venv-mpxj/
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
 
-# Documentacion para asistentes generada por `prisma init`.
-# Se regenera sola y son ~200 archivos de ruido en el repositorio.
-/.agents/
-/.windsurf/
-/.claude/
-/skills-lock.json
-
-# Documentos de negocio y de clientes. El repositorio es publico: los
-# informes de obra, planos y cronogramas pertenecen al cliente y no deben
-# publicarse. Se conservan en el equipo local.
-/docs/referencias/
-
-# Claves de despliegue, por si alguna vez se copian al proyecto.
-*.pem
-*.key
-id_*
-!*.key.example
-
-# Archivos de cliente usados en pruebas manuales. Nunca al repositorio.
-/public/_prueba/
+# Archives
+*.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.rar
+*.7z
+*.gz
+*.bz2
+*.xz
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+```

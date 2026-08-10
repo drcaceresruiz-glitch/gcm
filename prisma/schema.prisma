@@ -482,6 +482,9 @@ model WbsItem {
   @@index([projectId, parentId])
   @@index([projectId, orden])
   @@index([origenMovimientoId])
+  @@index([projectId, tipo])
+  @@index([projectId, modalidad])
+  @@index([parentId, orden])
   @@map("wbs_items")
 }
 
@@ -732,6 +735,9 @@ model MovimientoPresupuestal {
   @@unique([projectId, numero])
   @@index([projectId, estado])
   @@index([baselineId, estado])
+  @@index([projectId, fecha])
+  @@index([tipo, estado])
+  @@index([aprobadoAt])
   @@map("movimientos_presupuestales")
 }
 
@@ -851,6 +857,8 @@ model Proveedor {
 
   @@unique([companyId, ruc])
   @@index([companyId])
+  @@index([companyId, razonSocial])
+  @@index([companyId, activo])
   @@map("proveedores")
 }
 
@@ -991,6 +999,9 @@ model OrdenCompra {
   @@unique([companyId, numero])
   @@index([projectId, estado])
   @@index([proveedorId])
+  @@index([fecha])
+  @@index([estado, fecha])
+  @@index([total])
   @@map("ordenes_compra")
 }
 
@@ -1324,6 +1335,9 @@ model AuditLog {
   @@index([companyId, createdAt])
   @@index([entidad, entidadId])
   @@index([userId, createdAt])
+  @@index([companyId, entidad, createdAt])
+  @@index([projectId, createdAt])
+  @@index([accion, createdAt])
   @@map("audit_logs")
 }
 
@@ -1412,6 +1426,8 @@ model EncargoProveedor {
   @@unique([projectId, numero])
   @@index([projectId, estado])
   @@index([proveedorId])
+  @@index([projectId, fechaInicio])
+  @@index([estado, fechaInicio])
   @@map("encargos_proveedor")
 }
 
@@ -1503,6 +1519,8 @@ model PlanSemanal {
   @@unique([projectId, numero])
   @@unique([projectId, fechaCorte])
   @@index([projectId, estado])
+  @@index([projectId, fechaCorte])
+  @@index([estado, fechaCorte])
   @@map("planes_semanales")
 }
 
