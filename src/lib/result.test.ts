@@ -83,7 +83,7 @@ describe("Result", () => {
     });
 
     it("propaga el segundo error", () => {
-      const result = andThen(success(5), (_x: number) => failure("segundo"));
+      const result = andThen(success(5), () => failure("segundo"));
       expect(result).toEqual({ ok: false, error: "segundo" });
     });
   });

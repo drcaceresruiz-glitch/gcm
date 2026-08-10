@@ -515,6 +515,59 @@ export const obtenerObra = cache(async function obtenerObra(
   return { ...resto, lineaBaseVersion: baselines[0]?.version ?? null };
 });
 
+/**
+ * Que pasos del ciclo de la obra tienen ya algo cargado.
+ *
+ * Alimenta la ruta de la obra (el riel de ubicacion del layout): cinco
+ * `findFirst` que solo piden el id, en paralelo. No cuenta nada —no importa
+ * CUANTO hay, solo si el paso se dio—.
+ *
+ * En `cache()` por lo mismo que `obtenerObra`: la pide el layout en cada
+ * navegacion dentro de la obra.
+ */
+export interface HitosObra {
+  presupuesto: boolean;
+  cronograma: boolean;
+  /// Linea base del PRESUPUESTO aprobada (la referencia congelada).
+  lineaBase: boolean;
+  /// Hay tareas sincronizadas en el Lookahead (se hizo analisis de restricciones).
+  lookahead: boolean;
+  /// Existe al menos una semana del PTS.
+  planSemanal: boolean;
+}
+
+export const hitosDeObra = cache(async function hitosDeObra(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<HitosObra> {
+  if (!puede(sesion, "obra:leer")) throw new SinPermisoError();
+
+  // El companyId sale de la sesion, como en toda consulta de obra.
+  const deLaObra = {
+    projectId: obraId,
+    project: { companyId: sesion.companyId },
+  };
+
+  const [partida, cronograma, base, lookahead, plan] = await Promise.all([
+    prisma.wbsItem.findFirst({ where: deLaObra, select: { id: true } }),
+    prisma.cronograma.findFirst({ where: deLaObra, select: { id: true } }),
+    prisma.baseline.findFirst({
+      where: { ...deLaObra, aprobadaAt: { not: null } },
+      select: { id: true },
+    }),
+    prisma.lookaheadTask.findFirst({ where: deLaObra, select: { id: true } }),
+    prisma.planSemanal.findFirst({ where: deLaObra, select: { id: true } }),
+  ]);
+
+  return {
+    presupuesto: partida !== null,
+    cronograma: cronograma !== null,
+    lineaBase: base !== null,
+    lookahead: lookahead !== null,
+    planSemanal: plan !== null,
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Alta de obras
 // ---------------------------------------------------------------------------

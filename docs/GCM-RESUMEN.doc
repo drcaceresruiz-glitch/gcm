@@ -1,0 +1,114 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="utf-8">
+<title>GCM — Resumen del proyecto</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+<style>
+  @page { size: A4; margin: 2.2cm 2cm; }
+  body { font-family: "Segoe UI", Calibri, sans-serif; font-size: 11pt; color: #1a2733; line-height: 1.45; }
+  h1 { font-size: 22pt; color: #0d5c56; margin: 0 0 4pt; }
+  h2 { font-size: 15pt; color: #0d5c56; border-bottom: 1.5pt solid #0d5c56; padding-bottom: 3pt; margin: 22pt 0 8pt; }
+  h3 { font-size: 12pt; color: #14746c; margin: 14pt 0 4pt; }
+  p { margin: 0 0 8pt; }
+  .sub { color: #5a6a76; font-size: 11pt; margin-bottom: 18pt; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0 12pt; font-size: 10pt; }
+  th { background: #0d5c56; color: #fff; text-align: left; padding: 5pt 7pt; }
+  td { border: 0.75pt solid #c3ccd2; padding: 5pt 7pt; vertical-align: top; }
+  tr:nth-child(even) td { background: #f2f6f5; }
+  .flujo { background: #eef5f4; border-left: 3pt solid #0d5c56; padding: 8pt 10pt; margin: 6pt 0 12pt; }
+  .nota { background: #fdf6e8; border-left: 3pt solid #c9992e; padding: 8pt 10pt; margin: 6pt 0 12pt; font-size: 10pt; }
+  li { margin-bottom: 3pt; }
+  code { font-family: Consolas, monospace; font-size: 9.5pt; background: #eef1f3; padding: 0 2pt; }
+</style>
+</head>
+<body>
+
+<h1>GCM — Gestión en Construcción Moderna</h1>
+<p class="sub">Resumen de diseño, procesos, módulos, entradas y salidas · LARQUITECTURA STUDIO SAC · 10 de agosto de 2026</p>
+
+<h2>1. Qué es</h2>
+<p>GCM es una aplicación web de gestión de obras de construcción. Une en un solo sistema lo que normalmente vive repartido entre Excel, MS Project y el correo: el <b>presupuesto</b> (cuánto cuesta), el <b>cronograma</b> (cuándo se hace), las <b>compras</b> (a quién se le pide y por cuánto) y el <b>ciclo semanal Last Planner</b> (qué se prepara, qué se compromete y qué se cumplió). Obra piloto: LABORATORIO INSTITUTO DE CRIOPRESERVACIÓN Y TERAPIA CELULAR (CRIOCORD). El objetivo de producto es venderla a otras constructoras como servicio multiempresa.</p>
+
+<h2>2. Diseño y arquitectura</h2>
+<table>
+<tr><th>Capa</th><th>Tecnología</th><th>Notas de diseño</th></tr>
+<tr><td>Interfaz</td><td>Next.js 16 (App Router, React 19, Server Components), Tailwind 4</td><td>Gráficos SVG dibujados a mano (sin librería): siguen el tema claro/oscuro solos. Componentes con explicaciones desplegables en cada concepto delicado.</td></tr>
+<tr><td>Servidor</td><td>Server Actions + capa de servicios (<code>src/services</code>)</td><td>Toda escritura pasa por un servicio que valida permiso, empresa y estado de la obra. La aritmética vive en <code>src/lib</code>, pura y con 491 pruebas.</td></tr>
+<tr><td>Datos</td><td>Prisma 7 + MariaDB</td><td>El dinero nunca es número flotante: viaja como texto y se opera con aritmética decimal propia (<code>src/lib/decimal</code>).</td></tr>
+<tr><td>Despliegue</td><td>GitHub Actions → FTPS → cPanel/LiteSpeed</td><td>Cada push a <code>main</code> compila y publica en <code>gcm.drcaceresruiz.com</code>; un cron aplica el paquete cada minuto.</td></tr>
+<tr><td>Seguridad</td><td>Sesión + RBAC + aislamiento multiempresa</td><td>Permisos por acción (<code>partida:leer</code>, <code>orden:aprobar</code>…). El identificador de empresa sale SIEMPRE de la sesión, nunca de la URL. Login con segundo factor opcional. Auditoría de cada escritura.</td></tr>
+</table>
+
+<h3>Decisiones de diseño que gobiernan todo</h3>
+<ul>
+<li><b>Dos árboles unidos por un mapeo.</b> El presupuesto (capítulos → partidas) y el cronograma (tareas de MS Project) son estructuras distintas; el <i>mapeo tarea–partida</i> las une y permite pasar de avance físico a valor ganado en soles.</li>
+<li><b>La línea base se congela.</b> El presupuesto aprobado se copia y se sella; los cambios posteriores son <i>movimientos</i> aprobados encima, nunca ediciones del original. Así siempre se sabe contra qué se compara.</li>
+<li><b>Una obra cerrada no admite cambios.</b> Todos los servicios de escritura comprueban el estado antes de tocar nada, con un mismo mensaje.</li>
+<li><b>Sin datos no se proyecta.</b> Los indicadores que necesitan respaldo (CPI, EAC, VAC) no aparecen hasta que el costo registrado sostiene la proyección, con el motivo explicado en pantalla.</li>
+<li><b>Ninguna obra ejecuta sin presupuesto.</b> El paso a "En ejecución" se bloquea si no hay presupuesto cargado y avisa de lo demás que falte.</li>
+</ul>
+
+<h2>3. Procesos (los flujos de trabajo)</h2>
+
+<h3>3.1 Ciclo de vida de la obra</h3>
+<p class="flujo"><b>Planificación</b> (se carga presupuesto y cronograma, se fija línea base) → <b>En ejecución</b> (ciclo semanal, compras, avance) → <b>Suspendida</b> (si hace falta) → <b>Cerrada</b> (solo lectura, para siempre).</p>
+
+<h3>3.2 Ciclo semanal Last Planner</h3>
+<p class="flujo"><b>Cronograma</b> (el plan maestro) → <b>Lookahead</b> (ventana de 3 semanas: cada tarea pasa por 7 restricciones —material, mano de obra, equipos, información, prerrequisitos, espacio, permisos— y solo queda LISTA al resolverlas) → <b>Plan de Trabajo Semanal</b> (se comprometen las tareas listas, con cantidad y unidad) → <b>Cierre de semana</b> (qué se cumplió → <b>PPC</b>; por qué no → <b>causas CNC</b> y su Pareto) → aprender y repetir.</p>
+
+<h3>3.3 Compras y control de costo</h3>
+<p class="flujo"><b>Proveedores</b> (se reparte la obra en encargos: quién hace qué y por cuánto) → <b>Órdenes de compra</b> (borrador → aprobada → el importe queda comprometido contra sus partidas) → el comprometido alimenta el <b>costo real (AC)</b> del valor ganado y los saldos por partida, con alerta de sobregiro.</p>
+
+<h3>3.4 Medición y valor ganado (EVM)</h3>
+<p>Con el avance físico medido y el mapeo tarea–partida, GCM calcula PV (lo planeado), EV (lo ganado) y AC (lo comprometido) y de ahí SPI, SV, CPI, CV, EAC y VAC. La curva S (en %) y la curva EVM (en soles) tienen cursor arrastrable para leer cualquier fecha.</p>
+
+<h2>4. Módulos y funciones</h2>
+<table>
+<tr><th>Módulo</th><th>Qué hace</th></tr>
+<tr><td><b>Panel / Tablero de supervisión</b></td><td>Los indicadores de la obra elegida de un vistazo: avance físico, curva de avance, plazo, presupuesto y saldo, PPC, Lookahead, causas que más frenan, partidas atrasadas, cadena crítica, capítulos críticos, órdenes. Cada módulo se puede encender o apagar por usuario; un módulo sin datos no se pinta.</td></tr>
+<tr><td><b>Presupuesto</b></td><td>Árbol capítulos → partidas con modalidad por partida (precios unitarios, suma alzada, alcance). Importación desde Excel, edición, filtros, totales en cascada.</td></tr>
+<tr><td><b>Revisiones y línea base</b></td><td>Versiones del presupuesto; la aprobada se congela como referencia contra la que se mide todo.</td></tr>
+<tr><td><b>Movimientos presupuestales</b></td><td>Adicionales y deductivos aprobados ENCIMA de la línea base; de aquí sale el presupuesto vigente (base + ajustes).</td></tr>
+<tr><td><b>Cronograma</b></td><td>Importa el XML de MS Project (tareas, dependencias, ruta crítica), cortes semanales, registro de avance, curva S con proyección de término, Gantt, informe semanal, mapeo tarea–partida y panel EVM.</td></tr>
+<tr><td><b>Lookahead</b></td><td>Ventana de mediano plazo (2–6 semanas) con la matriz de 7 restricciones por tarea, confiabilidad de la ventana y compromiso directo al PTS.</td></tr>
+<tr><td><b>Plan semanal (PTS)</b></td><td>Semanas con correlativo, compromisos por cantidad, cierre con PPC, causas de no cumplimiento y su Pareto, tendencia del PPC.</td></tr>
+<tr><td><b>Proveedores / Encargos</b></td><td>Frentes de trabajo por proveedor con importe encargado, valorizaciones y estado.</td></tr>
+<tr><td><b>Órdenes de compra</b></td><td>Ciclo borrador → aprobada → anulada; imputación a partidas, IGV/retención, formas de pago, documento imprimible para el proveedor.</td></tr>
+<tr><td><b>Calendario laboral</b></td><td>Días laborables y horas por día de la obra (base del Lookahead y, a futuro, del recálculo de fechas).</td></tr>
+<tr><td><b>Usuarios y permisos</b></td><td>Roles con matriz de permisos por acción, alta de usuarios, perfil con solicitudes de cambio aprobables, segundo factor.</td></tr>
+<tr><td><b>Operador GCM (multiempresa)</b></td><td>Alta de constructoras por invitación y suspensión. El operador NO ve obras, presupuestos ni órdenes de sus clientes: solo crea y da de alta.</td></tr>
+<tr><td><b>Actividad / Auditoría</b></td><td>Registro de quién hizo qué y cuándo, en cada escritura del sistema.</td></tr>
+</table>
+
+<h2>5. Entradas</h2>
+<table>
+<tr><th>Entrada</th><th>Formato</th><th>Alimenta</th></tr>
+<tr><td>Presupuesto de obra</td><td>Excel (.xlsx)</td><td>Árbol de capítulos y partidas con metrados, precios y parciales.</td></tr>
+<tr><td>Cronograma</td><td>XML de MS Project</td><td>Tareas, fechas, dependencias, ruta crítica, % planeado por corte. (Decidido: Project solo siembra; después el plan se edita y se corta desde la app.)</td></tr>
+<tr><td>Avance físico</td><td>Formulario en obra</td><td>% real por tarea a la fecha de corte → curva S, EVM, alertas.</td></tr>
+<tr><td>Restricciones del Lookahead</td><td>Casillas en la matriz</td><td>Estado LISTA/PENDIENTE de cada tarea de la ventana.</td></tr>
+<tr><td>Compromisos y cierre semanal</td><td>Formulario del PTS</td><td>PPC, causas CNC, tendencia.</td></tr>
+<tr><td>Órdenes, proveedores, encargos</td><td>Formularios</td><td>Comprometido, saldos, costo real (AC). El RUC se valida contra SUNAT.</td></tr>
+<tr><td>Movimientos presupuestales</td><td>Formulario con líneas</td><td>Presupuesto vigente.</td></tr>
+</table>
+
+<h2>6. Salidas</h2>
+<table>
+<tr><th>Salida</th><th>Para qué</th></tr>
+<tr><td>Tablero de indicadores</td><td>La foto diaria de la obra para dirección.</td></tr>
+<tr><td>Curva S exportable (PNG/PDF, con fondo a elegir)</td><td>Reporte de avance para el cliente o el grupo de WhatsApp.</td></tr>
+<tr><td>Panel EVM (SPI, CPI, SV, CV, EAC, VAC + curva en soles)</td><td>Saber si la obra va a costar más de lo presupuestado, con proyección honesta.</td></tr>
+<tr><td>Informe semanal del cronograma</td><td>El corte de la semana en un documento.</td></tr>
+<tr><td>Orden de compra imprimible</td><td>El papel que recibe el proveedor.</td></tr>
+<tr><td>PPC y Pareto de causas</td><td>Cuánto se cumple de lo que se promete y qué es lo que más frena.</td></tr>
+<tr><td>Alertas (sobregiro, plazo vencido, partidas atrasadas)</td><td>Avisar antes de que duela.</td></tr>
+<tr><td>Auditoría</td><td>Trazabilidad completa de cambios.</td></tr>
+</table>
+
+<h2>7. Estado y hoja de ruta</h2>
+<p><b>En producción hoy:</b> todo lo listado arriba, con 491 pruebas automáticas de la aritmética. <b>En construcción:</b> plantilla ideal de Excel descargable; edición del cronograma dentro de la app con dependencias y recálculo (motor de fechas con calendario laboral, camino crítico propio); requisitos y acta de cierre de obra con repositorio de cerradas; documental de restricciones (Fase 2); sectores y cuadrillas en el PTS (Fase 3); cumplimiento por cantidad ejecutada (Fase 4); motor de reglas (Fase 5).</p>
+
+<p class="nota"><b>Nota:</b> este documento es una foto del 10 de agosto de 2026. El detalle vivo está en el repositorio: <code>docs/MANUAL.md</code> (uso), <code>docs/ESTADO.md</code> (arquitectura y decisiones) y <code>docs/PENDIENTES.md</code> (lo que falta).</p>
+
+</body>
+</html>

@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { CalendarDays, MapPin, Pencil } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
-import { obtenerObra } from "@/services/obras.service";
+import { obtenerObra, hitosDeObra } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
 import { fechaCorta } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
@@ -11,6 +11,7 @@ import {
   type Pestana,
 } from "@/components/obras/PestanasObra";
 import { EliminarObra } from "@/components/obras/EliminarObra";
+import { RutaObra, type PasoRuta } from "@/components/obras/RutaObra";
 import { EstadoObra } from "@/components/obras/EstadoObra";
 import type { EstadoObra as EstadoObraTipo } from "@/lib/obras";
 
@@ -40,6 +41,47 @@ export default async function ObraLayout({
   if (!obra) notFound();
 
   const raiz = `/obras/${id}`;
+  const hitos = await hitosDeObra(sesion, id);
+
+  // La ruta de la obra: el ciclo en orden, solo los pasos que la persona
+  // puede ver. Los estados (hecho / estas aqui) los pinta el componente.
+  const pasos = [
+    puede(sesion, "partida:leer") && {
+      clave: "presupuesto",
+      titulo: "Presupuesto",
+      pregunta: "cuanto cuesta",
+      href: raiz,
+      hecho: hitos.presupuesto,
+    },
+    puede(sesion, "cronograma:leer") && {
+      clave: "cronograma",
+      titulo: "Cronograma",
+      pregunta: "cuando se hace",
+      href: `${raiz}/cronograma`,
+      hecho: hitos.cronograma,
+    },
+    puede(sesion, "linea_base:leer") && {
+      clave: "lineaBase",
+      titulo: "Linea base",
+      pregunta: "la referencia congelada",
+      href: `${raiz}/revisiones`,
+      hecho: hitos.lineaBase,
+    },
+    puede(sesion, "lookahead:leer") && {
+      clave: "lookahead",
+      titulo: "Lookahead",
+      pregunta: "que se prepara",
+      href: `${raiz}/lookahead`,
+      hecho: hitos.lookahead,
+    },
+    puede(sesion, "plan_semanal:leer") && {
+      clave: "planSemanal",
+      titulo: "Plan semanal",
+      pregunta: "que se compromete",
+      href: `${raiz}/plan-semanal`,
+      hecho: hitos.planSemanal,
+    },
+  ].filter(Boolean) as PasoRuta[];
 
   const pestanas = [
     puede(sesion, "partida:leer") && {
@@ -106,7 +148,15 @@ export default async function ObraLayout({
   ].filter(Boolean) as Pestana[];
 
   return (
-    <div className="space-y-6">
+    // El riel de ubicacion vive a la izquierda de TODO el marco de la obra
+    // (cabecera incluida) y es pegajoso: siempre a la vista, que es el
+    // encargo. En pantallas angostas se pliega a una fila arriba del todo.
+    // `print:block` deshace la rejilla al imprimir: el riel va oculto y su
+    // columna vacia correria el documento de la orden hacia la derecha.
+    <div className="space-y-4 lg:grid lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-8 lg:space-y-0 print:block">
+      <RutaObra pasos={pasos} raiz={raiz} />
+
+      <div className="space-y-6">
       {/* Todo el marco desaparece al imprimir: la vista del documento de la
           orden cuelga de esta ruta, y el papel que recibe el proveedor no
           puede salir con pestanas encima. */}
@@ -172,6 +222,7 @@ export default async function ObraLayout({
       </div>
 
       {children}
+      </div>
     </div>
   );
 }

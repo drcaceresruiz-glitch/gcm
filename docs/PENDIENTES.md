@@ -115,15 +115,15 @@ que hoy lee del archivo:
   con causa». No es un error de calculo —el Pareto cuenta TODAS las semanas a
   proposito, incluidas las abiertas— pero leidos juntos no se entienden. Se
   arregla con una palabra en el subtitulo del modulo de causas.
-- **Sin migas de pan en las subpaginas profundas.** Desde
-  `cronograma/mapeo`, `ordenes/nueva` o `plan-semanal/[planId]` no se ve donde
-  estas dentro de la obra.
+- ~~Sin migas de pan en las subpaginas profundas~~ Resuelto el 10 de agosto
+  con la **ruta de la obra** (`RutaObra` + `hitosDeObra`): el ciclo
+  Presupuesto → Cronograma → Linea base → Lookahead → Plan semanal como riel
+  fijo a la izquierda, con hecho / estas aqui por paso. Pedido por el usuario
+  como "diagrama de ubicacion siempre visible".
 - **`EnlaceBoton` solo esta en el tablero y en «Editar datos de la obra».**
   Falta decidir los casos raros: pestanas de navegacion, tarjetas enteras que
   son enlace, y enlaces dentro de un parrafo. Convertirlo TODO en boton hace
   que nada destaque.
-- **Aviso de lint**: `_x` definido y sin usar en `src/lib/result.test.ts:86`.
-  Una linea.
 - **La cookie vieja `gcm-tablero`** sigue en los navegadores, ignorada desde
   que se paso a `gcm-tablero-off`. Inofensiva; caduca sola dentro de un ano.
 
