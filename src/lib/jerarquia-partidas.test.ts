@@ -3,6 +3,7 @@ import {
   aportantes,
   codigoPadre,
   sumarHojas,
+  subtotalesPorRama,
   type NodoImporte,
 } from "./jerarquia-partidas";
 
@@ -134,5 +135,93 @@ describe("sumarHojas y aportantes", () => {
     expect(codigos(nodos)).toEqual(["1.01", "1.02", "2.01"]);
     expect(sumarHojas(nodos)).toBe("37.34");
     expect(sumarHojas(aportantes(nodos))).toBe("37.34");
+  });
+});
+
+describe("subtotalesPorRama", () => {
+  it("da al capitulo el valor de lo que cuelga de el", () => {
+    // Un capitulo no tiene precio propio, pero "Estructuras cuesta 150.50"
+    // es justo lo que uno quiere leer en el presupuesto.
+    const sub = subtotalesPorRama([
+      { codigo: "1", parcial: null },
+      { codigo: "1.01", parcial: "100.00" },
+      { codigo: "1.02", parcial: "50.50" },
+    ]);
+    expect(sub.get("1")).toBe("150.50");
+    expect(sub.get("1.01")).toBe("100.00");
+  });
+
+  it("un capitulo sin nada dentro vale cero, no vacio", () => {
+    // En blanco parece que el dato falta; cero dice que no hay presupuesto.
+    const sub = subtotalesPorRama([{ codigo: "9", parcial: null }]);
+    expect(sub.get("9")).toBe("0.00");
+  });
+
+  it("NO cuenta dos veces cuando el grupo lleva importe propio", () => {
+    // El caso que inflo CRIOCORD de 754 mil a 1,8 millones. `aportantes` ya
+    // decidio que manda: aqui se respeta esa decision, no se toma otra.
+    const sub = subtotalesPorRama([
+      { codigo: "3", parcial: "9999.00" },
+      { codigo: "3.1", parcial: "600.00" },
+      { codigo: "3.2", parcial: "400.00" },
+    ]);
+    expect(sub.get("3")).toBe("1000.00");
+  });
+
+  it("un descuento resta del subtotal de su capitulo", () => {
+    // "7.09.00 GASTOS VARIOS" a suma alzada con un descuento comercial
+    // colgando: el descuento ajusta al padre, no lo sustituye.
+    const sub = subtotalesPorRama([
+      { codigo: "7.09.00", parcial: "779.10" },
+      { codigo: "7.09.01", parcial: "-100.00" },
+    ]);
+    expect(sub.get("7.09.00")).toBe("679.10");
+  });
+
+  it("acumula por toda la cadena, no solo un nivel", () => {
+    const sub = subtotalesPorRama([
+      { codigo: "2", parcial: null },
+      { codigo: "2.01", parcial: null },
+      { codigo: "2.01.001", parcial: "300.00" },
+      { codigo: "2.01.002", parcial: "200.00" },
+    ]);
+    expect(sub.get("2.01")).toBe("500.00");
+    expect(sub.get("2")).toBe("500.00");
+  });
+
+  it("recoge a las huerfanas que cuelgan de un ancestro lejano", () => {
+    // En CRIOCORD existen "11.11.02"... sin su cabecera "11.11". Si el
+    // subtotal cortara el codigo por los puntos en vez de usar la cadena
+    // real de padres, esas partidas caerian fuera de su capitulo.
+    const sub = subtotalesPorRama([
+      { codigo: "11", parcial: null },
+      { codigo: "11.11.02", parcial: "120.00" },
+      { codigo: "11.11.19", parcial: "80.00" },
+    ]);
+    expect(sub.get("11")).toBe("200.00");
+  });
+
+  it("INVARIANTE: los subtotales raiz suman exactamente el costo directo", () => {
+    // Si esto se rompe, el presupuesto muestra unos capitulos que no cuadran
+    // con su propio total, y no hay forma de saber cual de los dos miente.
+    const nodos: NodoImporte[] = [
+      { codigo: "1", parcial: null },
+      { codigo: "1.01", parcial: "100.00" },
+      { codigo: "1.02", parcial: "50.50" },
+      { codigo: "2", parcial: "9999.00" },
+      { codigo: "2.01", parcial: "600.00" },
+      { codigo: "2.02", parcial: "-100.00" },
+      { codigo: "3", parcial: null },
+      { codigo: "3.01", parcial: "25.25" },
+    ];
+
+    const sub = subtotalesPorRama(nodos);
+    const raices = ["1", "2", "3"];
+    const suma = raices.reduce(
+      (t, c) => t + Number(sub.get(c) ?? "0"),
+      0,
+    );
+
+    expect(suma.toFixed(2)).toBe(sumarHojas(nodos));
   });
 });

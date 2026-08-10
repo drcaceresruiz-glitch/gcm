@@ -111,6 +111,103 @@ export async function subirEvidencia(
   const cerrada = await motivoSiObraCerrada(sesion, objetivo.obraId);
   if (cerrada) return { ok: false, error: cerrada };
 
+  return guardarFoto(
+    {
+      companyId: sesion.companyId,
+      obraId: objetivo.obraId,
+      autor: quien(sesion),
+      userId: sesion.userId,
+      paseId: null,
+    },
+    destino,
+    archivo,
+    nota,
+  );
+}
+
+/**
+ * Sube evidencia con un PASE DE OBRA, no con una sesion de usuario.
+ *
+ * Es una puerta aparte a proposito. El pase no tiene rol ni permisos —ni
+ * siquiera encaja en `puede()`—, asi que aqui no se comprueba ninguno: su
+ * derecho ES adjuntar fotos, y lo unico que hay que verificar es que el
+ * destino pertenezca a SU obra. Compartir la funcion con la de arriba
+ * obligaria a mezclar dos modelos de autorizacion en el mismo `if`, que es
+ * como se cuelan los agujeros.
+ */
+export async function subirEvidenciaConPase(
+  pase: { paseId: string; obraId: string; companyId: string; nombre: string },
+  destino: DestinoEvidencia,
+  archivo: File,
+  nota?: string,
+): Promise<ResultadoSubida> {
+  // Que el destino sea de SU obra. El `projectId` sale de la fila del pase,
+  // nunca de la peticion: es lo unico que impide que un pase de una obra
+  // adjunte en otra cambiando un id en el formulario.
+  const suyo =
+    "restriccionId" in destino
+      ? await prisma.restriccion.findFirst({
+          where: {
+            id: destino.restriccionId,
+            tarea: { projectId: pase.obraId },
+          },
+          select: { id: true },
+        })
+      : await prisma.compromisoSemanal.findFirst({
+          where: {
+            id: destino.compromisoId,
+            plan: { projectId: pase.obraId },
+          },
+          select: { id: true },
+        });
+
+  if (!suyo) {
+    return { ok: false, error: "Esa tarea no es de tu obra." };
+  }
+
+  const obra = await prisma.project.findFirst({
+    where: { id: pase.obraId },
+    select: { estado: true },
+  });
+  if (obra?.estado === "CERRADA") {
+    return { ok: false, error: "La obra esta cerrada: ya no admite cambios." };
+  }
+
+  return guardarFoto(
+    {
+      companyId: pase.companyId,
+      obraId: pase.obraId,
+      autor: pase.nombre,
+      userId: null,
+      paseId: pase.paseId,
+    },
+    destino,
+    archivo,
+    nota,
+  );
+}
+
+/**
+ * El nucleo compartido: validar el archivo, guardarlo fuera del arbol y
+ * dejar el rastro. Quien llama ya comprobo que puede.
+ */
+async function guardarFoto(
+  autor: {
+    companyId: string;
+    obraId: string;
+    /// Nombre que queda firmando la foto.
+    autor: string;
+    /// Uno de los dos, nunca los dos.
+    userId: string | null;
+    paseId: string | null;
+  },
+  destino: DestinoEvidencia,
+  archivo: File,
+  nota?: string,
+): Promise<ResultadoSubida> {
+  const objetivo = { obraId: autor.obraId };
+  const sesion = { companyId: autor.companyId, userId: autor.userId };
+
   const extension = MIMES_PERMITIDOS.get(archivo.type);
   if (!extension) {
     return {
@@ -147,7 +244,8 @@ export async function subirEvidencia(
       tamano: archivo.size,
       hash,
       nota: nota?.trim().slice(0, 300) || null,
-      subidaPor: quien(sesion),
+      subidaPor: autor.autor,
+      paseId: autor.paseId,
     },
   });
 
@@ -175,6 +273,9 @@ export async function subirEvidencia(
   await prisma.auditLog.create({
     data: {
       companyId: sesion.companyId,
+      // Vacio cuando la subio un pase de obra: no es un usuario. La columna
+      // no tiene clave foranea, asi que es legitimo, y el nombre queda en
+      // `despues` y en `subidaPor`.
       userId: sesion.userId,
       projectId: objetivo.obraId,
       entidad: "FotoEvidencia",
@@ -184,6 +285,9 @@ export async function subirEvidencia(
         destino: "restriccionId" in destino ? "restriccion" : "compromiso",
         hash,
         tamano: archivo.size,
+        ...(autor.paseId
+          ? { paseId: autor.paseId, subidaPor: autor.autor }
+          : {}),
       },
     },
   });
@@ -200,8 +304,6 @@ export async function fotosPorDestino(
   obraId: string,
   destinos: { restricciones?: string[]; compromisos?: string[] },
 ): Promise<Map<string, FotoResumen[]>> {
-  const salida = new Map<string, FotoResumen[]>();
-
   const fotos = await prisma.fotoEvidencia.findMany({
     where: {
       projectId: obraId,
@@ -217,6 +319,19 @@ export async function fotosPorDestino(
       nombreOriginal: true, subidaPor: true, createdAt: true, purgadaAt: true,
     },
   });
+
+  return agrupar(fotos);
+}
+
+/** Agrupa por su ancla (restriccion o compromiso). */
+function agrupar(
+  fotos: readonly {
+    id: string; restriccionId: string | null; compromisoId: string | null;
+    nota: string | null; nombreOriginal: string; subidaPor: string;
+    createdAt: Date; purgadaAt: Date | null;
+  }[],
+): Map<string, FotoResumen[]> {
+  const salida = new Map<string, FotoResumen[]>();
 
   for (const f of fotos) {
     const clave = f.restriccionId ?? f.compromisoId;
@@ -237,6 +352,54 @@ export async function fotosPorDestino(
 }
 
 /**
+ * Las fotos de un conjunto de destinos, para un PASE.
+ *
+ * Sin comprobar permisos y filtrando por la obra del pase, que sale de su
+ * fila y no de la peticion. Se decidio con el usuario que el personal de
+ * campo vea tambien lo que subieron otros: evita que cuatro personas
+ * fotografien el mismo frente y deja comprobar que la suya entro.
+ */
+export async function fotosPorDestinoDePase(
+  obraId: string,
+  destinos: { restricciones?: string[]; compromisos?: string[] },
+): Promise<Map<string, FotoResumen[]>> {
+  const fotos = await prisma.fotoEvidencia.findMany({
+    where: {
+      projectId: obraId,
+      OR: [
+        { restriccionId: { in: destinos.restricciones ?? [] } },
+        { compromisoId: { in: destinos.compromisos ?? [] } },
+      ],
+    },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true, restriccionId: true, compromisoId: true, nota: true,
+      nombreOriginal: true, subidaPor: true, createdAt: true, purgadaAt: true,
+    },
+  });
+
+  return agrupar(fotos);
+}
+
+/**
+ * El archivo de una foto para un PASE: solo si es de SU obra.
+ *
+ * Puerta aparte por lo mismo que la subida: el pase no tiene permisos que
+ * comprobar, tiene una obra.
+ */
+export async function archivoEvidenciaDePase(
+  obraId: string,
+  fotoId: string,
+): Promise<{ contenido: Buffer; mimeType: string } | { error: "no" | "purgada" }> {
+  const foto = await prisma.fotoEvidencia.findFirst({
+    where: { id: fotoId, projectId: obraId },
+    select: { ruta: true, mimeType: true, purgadaAt: true },
+  });
+
+  return leerArchivo(foto, fotoId);
+}
+
+/**
  * El archivo de una foto, para servirlo. Valida sesion implicita (quien
  * llama ya la tiene), EMPRESA y existencia fisica. Ver la evidencia solo
  * exige poder LEER el Lookahead o el plan semanal.
@@ -254,6 +417,14 @@ export async function archivoEvidencia(
     select: { ruta: true, mimeType: true, purgadaAt: true },
   });
 
+  return leerArchivo(foto, fotoId);
+}
+
+/** Lee el archivo de disco. Comun a la sesion y al pase. */
+async function leerArchivo(
+  foto: { ruta: string; mimeType: string; purgadaAt: Date | null } | null,
+  fotoId: string,
+): Promise<{ contenido: Buffer; mimeType: string } | { error: "no" | "purgada" }> {
   if (!foto || !foto.ruta) return { error: "no" };
   if (foto.purgadaAt) return { error: "purgada" };
 

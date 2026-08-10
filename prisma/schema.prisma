@@ -383,6 +383,7 @@ model Project {
   calendariosLaborales WorkCalendar[]
   lookaheadTareas      LookaheadTask[]
   fotosEvidencia       FotoEvidencia[]
+  pasesObra            PaseObra[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -1736,6 +1737,12 @@ model FotoEvidencia {
   restriccionId String?
   compromisoId  String?
 
+  /// Pase de obra que la subio, si no la subio un usuario de GCM. Permite
+  /// revisar de golpe todo lo que aporto una persona si su pase se revoca.
+  /// `subidaPor` sigue guardando su nombre como texto: el registro tiene que
+  /// seguir diciendo quien fue aunque el pase desaparezca.
+  paseId String?
+
   /// Ruta RELATIVA dentro de STORAGE_ROOT (ej. "evidencia/<obra>/<id>.jpg").
   ruta String @db.VarChar(255)
 
@@ -1758,9 +1765,115 @@ model FotoEvidencia {
   project     Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   restriccion Restriccion?       @relation(fields: [restriccionId], references: [id], onDelete: SetNull)
   compromiso  CompromisoSemanal? @relation(fields: [compromisoId], references: [id], onDelete: SetNull)
+  pase        PaseObra?          @relation(fields: [paseId], references: [id], onDelete: SetNull)
 
   @@index([projectId, createdAt])
   @@index([restriccionId])
   @@index([compromisoId])
+  @@index([paseId])
   @@map("fotos_evidencia")
+}
+
+// ---------------------------------------------------------------------------
+// Pase de obra: quien documenta en campo SIN ser usuario de GCM
+//
+// El maestro, el capataz o el subcontratista no van a tener cuenta con
+// contrasena: no la recordarian, y darles un `User` les abriria la puerta a
+// un sistema que maneja dinero. El pase es deliberadamente otra cosa, y por
+// eso vive en sus propias tablas: aunque alguien se equivoque, un pase NO
+// puede hacer nada que un usuario pueda.
+//
+// Lo unico que permite es adjuntar fotos de evidencia, y solo en SU obra.
+// ---------------------------------------------------------------------------
+
+/// Una persona autorizada a documentar en una obra. La da de alta el
+/// residente con los datos que ya toma de quien entra a la obra.
+model PaseObra {
+  id        String @id @default(cuid())
+  projectId String
+
+  nombres   String  @db.VarChar(100)
+  apellidos String  @db.VarChar(100)
+  cargo     String? @db.VarChar(100)
+  /// Empresa a la que pertenece, si es de un subcontratista.
+  empresa   String? @db.VarChar(150)
+
+  /// Por donde se le hace llegar el codigo. Hace falta AL MENOS uno; lo
+  /// valida el servicio. Un pase sin contacto no podria autenticarse nunca.
+  celular String? @db.VarChar(30)
+  email   String? @db.VarChar(150)
+
+  /// Revocar NO borra: las fotos que subio siguen siendo evidencia y su
+  /// autoria tiene que poder rastrearse. Solo deja de poder entrar.
+  activo      Boolean   @default(true)
+  revocadoAt  DateTime?
+  revocadoPor String?   @db.VarChar(150)
+
+  creadoPor String   @db.VarChar(150)
+  createdAt DateTime @default(now())
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  codigos  CodigoPase[]
+  sesiones SesionPase[]
+  fotos    FotoEvidencia[]
+
+  /// Un mismo contacto no se repite dentro de la obra: si no, pedir codigo
+  /// seria ambiguo y no se sabria a que pase pertenece la foto. MySQL admite
+  /// varios NULL en un indice unico, asi que quien no tenga correo (o no
+  /// tenga celular) no choca con los demas.
+  @@unique([projectId, email])
+  @@unique([projectId, celular])
+  @@index([projectId, activo])
+  @@map("pases_obra")
+}
+
+/// El codigo de un solo uso que se envia al pase. Calcado de `CodigoAcceso`
+/// (la verificacion en dos pasos), que ya resolvio el problema: el codigo se
+/// guarda HASHEADO, caduca pronto y se acaba a los cinco intentos.
+model CodigoPase {
+  id     String @id @default(cuid())
+  paseId String
+
+  /// Identifica el desafio; su token viaja en una cookie. No se guarda el
+  /// id del pase en la cookie: si se guardara, cualquiera podria escribir el
+  /// de otro y ponerse a probar seis cifras contra quien quisiera.
+  tokenHash String @unique @db.Char(64)
+  /// SHA-256 del codigo de seis cifras. Nunca en claro.
+  codigoHash String @db.Char(64)
+
+  intentos  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  pase PaseObra @relation(fields: [paseId], references: [id], onDelete: Cascade)
+
+  @@index([paseId])
+  @@index([expiresAt])
+  @@map("codigos_pase")
+}
+
+/// El telefono ya reconocido. Dura mucho a proposito: quien esta en obra con
+/// las manos sucias no va a teclear un codigo cada media hora, y la friccion
+/// es lo que mata la adopcion en campo.
+///
+/// Que dure tanto solo es aceptable porque lo que concede es minusculo:
+/// anadir fotos a UNA obra. El control real no es la caducidad sino
+/// `PaseObra.activo` y el estado de la obra, que se comprueban en cada
+/// peticion; `expiresAt` es solo un techo para que una cookie olvidada no
+/// viva para siempre.
+model SesionPase {
+  id     String @id @default(cuid())
+  paseId String
+
+  tokenHash String   @unique @db.Char(64)
+  expiresAt DateTime
+  ip        String?  @db.VarChar(45)
+  userAgent String?  @db.VarChar(255)
+  createdAt DateTime @default(now())
+
+  pase PaseObra @relation(fields: [paseId], references: [id], onDelete: Cascade)
+
+  @@index([paseId])
+  @@index([expiresAt])
+  @@map("sesiones_pase")
 }

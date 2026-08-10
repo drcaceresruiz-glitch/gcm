@@ -71,6 +71,18 @@ const envSchema = z.object({
    */
   GCM_OPERADORES: z.string().optional(),
 
+  /**
+   * Token de json.pe para enviar SMS (pases de obra).
+   *
+   * OPCIONAL, como el SMTP. Sin el, el codigo del pase sale por correo o lo
+   * dicta el residente desde su pantalla, y todo lo demas funciona igual.
+   *
+   * OJO: json.pe NO envia desde la nube, envia desde un movil Android con su
+   * app instalada y vinculada. Ese telefono tiene que estar encendido, con
+   * saldo y con cobertura, o no sale ningun SMS.
+   */
+  SMS_TOKEN: z.string().optional(),
+
   // --- Correo saliente (alta de usuarios y recuperacion de clave) ---
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),

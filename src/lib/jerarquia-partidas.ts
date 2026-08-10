@@ -125,6 +125,61 @@ export function aportantes<T extends NodoImporte>(
   return nodos.filter((n) => n.parcial !== null && !cubiertos.has(n.codigo));
 }
 
+/**
+ * Cuanto vale cada rama: el subtotal de un capitulo, de un subcapitulo o de
+ * cualquier nodo que agrupe.
+ *
+ * Un capitulo no tiene precio propio —es un titulo—, pero la suma de lo que
+ * cuelga de el si significa algo, y es lo que uno quiere leer al mirar el
+ * presupuesto: "Estructuras cuesta 340 mil".
+ *
+ * Se CALCULA, nunca se guarda. Un subtotal almacenado en una columna
+ * empezaria a mentir en cuanto entrara un adicional, se corrigiera un
+ * metrado o se reimportara el Excel; y un numero de dinero que miente es
+ * peor que no tener el numero.
+ *
+ * Se apoya en `aportantes` a proposito: asi el subtotal NO PUEDE contradecir
+ * al total de la obra. Si un capitulo lleva importe propio a suma alzada y
+ * ademas sus hijas tienen importes, `aportantes` ya decidio cual de los dos
+ * cuenta, y aqui se respeta esa decision en vez de tomar otra.
+ *
+ * Invariante del que depende todo: la suma de los subtotales de los nodos
+ * raiz es exactamente `sumarHojas` de la lista entera. Esta fijado por un
+ * test.
+ */
+export function subtotalesPorRama(
+  nodos: readonly NodoImporte[],
+): Map<string, string> {
+  const existentes = new Set(nodos.map((n) => n.codigo));
+
+  // Se parte de cero para TODOS, tambien para los que no reciben nada: un
+  // capitulo vacio debe leerse "0.00", no quedarse en blanco como si el dato
+  // no existiera.
+  const partes = new Map<string, string[]>();
+  for (const codigo of existentes) partes.set(codigo, []);
+
+  for (const nodo of aportantes(nodos)) {
+    // El nodo aporta a su propia rama...
+    partes.get(nodo.codigo)?.push(nodo.parcial!);
+
+    // ...y a la de cada uno de sus ancestros. Se sube por la cadena real de
+    // padres (`codigoPadre`), no cortando el codigo por los puntos: en los
+    // presupuestos de verdad faltan filas intermedias y hay cabeceras de
+    // grupo terminadas en ceros.
+    const vistos = new Set<string>([nodo.codigo]);
+    let padre = codigoPadre(nodo.codigo, existentes);
+    while (padre && !vistos.has(padre)) {
+      partes.get(padre)?.push(nodo.parcial!);
+      vistos.add(padre);
+      padre = codigoPadre(padre, existentes);
+    }
+  }
+
+  const salida = new Map<string, string>();
+  for (const [codigo, valores] of partes) salida.set(codigo, sumar(valores));
+  return salida;
+}
+
 export interface NodoRepetible extends NodoImporte {
   fila: number;
   precioUnitario: string | null;

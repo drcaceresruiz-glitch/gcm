@@ -379,6 +379,54 @@ contable—. Recordar el aviso ya escrito: **lo pagado lleva IGV y el resto no**
 asi que esas columnas no son homogeneas y hay que normalizar ANTES de
 construir los pagos, no despues.
 
+## 6e. Pase de obra con OTP (10 de agosto) — BACKEND HECHO, FALTAN PANTALLAS
+
+El personal de campo documenta SIN ser usuario de GCM: se identifica con su
+celular o correo, recibe un codigo de un solo uso y entra. Decidido con el
+usuario: dura **mientras dure la obra**, **ve todas las fotos** de la obra, y
+solo puede **adjuntar**.
+
+**Por que un modelo aparte y no un `User` reducido**: `User.passwordHash` es
+obligatorio y `email` es unico GLOBAL. Ademas, separado, un pase no puede
+hacer nada de usuario aunque alguien se equivoque: `PaseActivo` **no tiene
+`permisos` ni `role`**, asi que no encaja en `puede()` ni por accidente.
+
+Hecho y verificado (migracion `20260810214500_pase_de_obra`, aplicada en
+LOCAL):
+
+- `PaseObra`, `CodigoPase`, `SesionPase` + `FotoEvidencia.paseId`.
+- `src/lib/pase.ts` (16 pruebas): normaliza el celular peruano como lo
+  escribe la gente (+51, guiones, espacios) y exige AL MENOS un contacto.
+- `pase.service.ts`: alta, revocar (que tira sus sesiones en el acto),
+  pedir codigo con **silencio deliberado** y limite de 3 por 15 min, generar
+  codigo para dictar, verificar con `timingSafeEqual`, y `obtenerPase`, que
+  revalida TODO en cada peticion porque la cookie dura un ano.
+- `sms.service.ts` para json.pe. **OJO: no es un proveedor en la nube**, el
+  SMS sale de un movil Android con su app instalada y vinculada; si ese
+  telefono se apaga o se queda sin saldo, no sale ningun codigo. Por eso el
+  codigo se manda por SMS **y** correo a la vez, y el residente puede
+  generarlo en pantalla para dictarlo. `SMS_TOKEN` es opcional como el SMTP.
+- `evidencia.service`: `subirEvidenciaConPase`, `fotosPorDestinoDePase` y
+  `archivoEvidenciaDePase`, puertas APARTE de las de sesion —mezclar dos
+  modelos de autorizacion en el mismo `if` es como se cuelan los agujeros—.
+
+**FALTA, y sin esto no se puede usar**:
+
+1. Grupo de rutas `(pase)` con layout minimo (el de `(dashboard)` arrastra
+   cabecera, riel y pestanas, que en un movil en obra sobran).
+2. `/pase/[obraId]`: identificarse + codigo. **Anadir `/pase` a
+   `RUTAS_PUBLICAS` en `proxy.ts`**, y que si trae `gcm_sesion` redirija a
+   `/obras/[id]/evidencia`.
+3. `/pase/[obraId]/cargar`: el menu (reutilizar `MenuEvidencia` con una
+   interfaz mas estrecha que `LookaheadDatos`).
+4. `/api/evidencia/[id]` que acepte pase.
+5. Pantalla **Personal** de la obra: alta, lista, revocar y «generar codigo».
+6. `enlaceEvidencia({obra:true})` debe apuntar a `/pase/[obraId]`, no a
+   `/obras/[id]/evidencia`.
+
+**Del usuario**: contratar el producto SMS en json.pe, generar el token y
+decidir QUE telefono hace de emisor.
+
 ## 6d. Panel «Que falta» (10 de agosto)
 
 La ayuda visual permanente que pidio el usuario: un modulo del tablero que
