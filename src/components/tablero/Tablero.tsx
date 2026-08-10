@@ -23,6 +23,7 @@ import {
   type EstadoObra,
 } from "@/lib/obras";
 import { Chip } from "@/components/ui/Chip";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 import { ModuloContenido } from "@/components/tablero/modulos";
 
 /**
@@ -333,14 +334,13 @@ export function EnlaceModulo({
   href: string;
   children: React.ReactNode;
 }) {
+  // `mt-auto` en el envoltorio y no en el boton: asi el pie queda pegado abajo
+  // y los ocho modulos alinean su enlace aunque tengan distinto alto.
   return (
-    <Link
-      href={href}
-      className="mt-auto inline-flex items-center gap-0.5 pt-2 text-xs font-medium hover:underline"
-      style={{ color: "var(--color-marca-600)" }}
-    >
-      {children}
-      <ChevronRight className="size-3.5" aria-hidden="true" />
-    </Link>
+    <div className="mt-auto pt-3">
+      <EnlaceBoton href={href} icono={ChevronRight} tamano="sm">
+        {children}
+      </EnlaceBoton>
+    </div>
   );
 }
