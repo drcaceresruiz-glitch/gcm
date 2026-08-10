@@ -123,9 +123,9 @@ export default async function DashboardLayout({
               es en Peru tiene que estar a la vista, no a un clic.
               Debajo, la frase de la casa rotando; solo en pantalla ancha,
               porque en un movil ese espacio no existe. */}
-          <div className="flex min-w-0 flex-col items-center gap-0.5">
+          <div className="flex min-w-0 flex-col items-center gap-2">
             <RelojPeru />
-            <FraseRotativa className="hidden lg:block" />
+            <FraseRotativa className="hidden lg:flex" />
           </div>
 
           <Navegacion
