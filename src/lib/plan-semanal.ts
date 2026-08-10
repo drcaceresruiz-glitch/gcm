@@ -58,6 +58,46 @@ export function ppcDePlan(compromisos: readonly CompromisoEvaluado[]): PpcResult
   return { total, cumplidos, ppc: total === 0 ? null : (cumplidos / total) * 100 };
 }
 
+/**
+ * Que porcentaje de avance fisico se registra al cerrar un compromiso.
+ *
+ * **Esta funcion existe por un fallo real que falsificaba la curva S.** La
+ * regla anterior era: si el campo viene vacio y esta marcado como cumplido,
+ * escribir `100`. Parece razonable y no lo es, porque el caso normal del Last
+ * Planner es comprometer el TRAMO de esta semana de una tarea que dura tres:
+ * el residente marca cumplido —que es verdad—, no toca un campo que no le pide
+ * nada, y la tarea entera quedaba al 100 %.
+ *
+ * `AvanceTarea` es la fuente unica del real de la curva S, del EV, del SPI,
+ * del Gantt y de las alertas de atraso. Es decir: un PPC honesto producia una
+ * obra que se veia al dia. El peor fallo posible en una herramienta de
+ * control, porque aparecia justo cuando el PTS se usaba bien.
+ *
+ * La regla nueva no adivina:
+ *
+ * - Si hay un porcentaje escrito, ese manda —tambien si no se cumplio: se
+ *   pudo avanzar sin llegar a la meta, y eso es informacion buena—.
+ * - Si no lo hay pero se cumplio y habia META pactada, se registra la meta:
+ *   cumplir un compromiso es alcanzar lo que se prometio.
+ * - Si no hay ni porcentaje ni meta, NO SE REGISTRA NADA. Callar es correcto;
+ *   inventar un 100 no lo es. La pantalla avisa de que no se registrara.
+ */
+export function porcentajeARegistrar(entrada: {
+  /// Lo que tecleo quien cierra la semana. Vacio = no dijo nada.
+  porcentajeReal: string | null | undefined;
+  cumplido: boolean | null | undefined;
+  /// La meta acumulada pactada al comprometer, si la hubo.
+  metaPorcentaje: string | null | undefined;
+}): string | null {
+  const escrito = entrada.porcentajeReal?.trim();
+  if (escrito) return escrito;
+
+  if (!entrada.cumplido) return null;
+
+  const meta = entrada.metaPorcentaje?.trim();
+  return meta ? meta : null;
+}
+
 export interface FilaPareto {
   causa: CausaNoCumplimiento;
   conteo: number;

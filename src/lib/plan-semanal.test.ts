@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   ppcDePlan,
   paretoCausas,
+  porcentajeARegistrar,
   tendenciaPpc,
   proximoCorte,
   rangoSemana,
@@ -17,6 +18,92 @@ import {
 } from "./plan-semanal";
 
 const dc = (s: string) => new Date(`${s}T00:00:00Z`);
+
+describe("porcentajeARegistrar", () => {
+  it("NUNCA inventa un 100 cuando no hay porcentaje ni meta", () => {
+    // ESTE es el fallo que falsificaba la curva S. Un compromiso venido del
+    // Lookahead nace sin meta, la pantalla deja el campo vacio, y antes se
+    // escribia 100: una tarea de tres semanas quedaba terminada por haber
+    // cumplido el tramo de una.
+    expect(
+      porcentajeARegistrar({
+        porcentajeReal: "",
+        cumplido: true,
+        metaPorcentaje: null,
+      }),
+    ).toBeNull();
+
+    expect(
+      porcentajeARegistrar({
+        porcentajeReal: "   ",
+        cumplido: true,
+        metaPorcentaje: undefined,
+      }),
+    ).toBeNull();
+  });
+
+  it("lo que se teclea manda siempre", () => {
+    expect(
+      porcentajeARegistrar({
+        porcentajeReal: "35",
+        cumplido: true,
+        metaPorcentaje: "80",
+      }),
+    ).toBe("35");
+  });
+
+  it("registra el avance aunque NO se haya cumplido", () => {
+    // Se pudo avanzar sin llegar a la meta, y eso es informacion buena: el
+    // PPC dira que no se cumplio y la curva S reflejara lo que si se hizo.
+    expect(
+      porcentajeARegistrar({
+        porcentajeReal: "40",
+        cumplido: false,
+        metaPorcentaje: "80",
+      }),
+    ).toBe("40");
+  });
+
+  it("cumplir sin teclear nada registra la META pactada", () => {
+    // Cumplir un compromiso es alcanzar lo que se prometio. Con meta si se
+    // puede deducir; sin meta, no.
+    expect(
+      porcentajeARegistrar({
+        porcentajeReal: "",
+        cumplido: true,
+        metaPorcentaje: "60",
+      }),
+    ).toBe("60");
+  });
+
+  it("no cumplido y sin teclear nada no registra nada", () => {
+    expect(
+      porcentajeARegistrar({
+        porcentajeReal: "",
+        cumplido: false,
+        metaPorcentaje: "60",
+      }),
+    ).toBeNull();
+
+    expect(
+      porcentajeARegistrar({
+        porcentajeReal: null,
+        cumplido: null,
+        metaPorcentaje: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("una meta en blanco no cuenta como meta", () => {
+    expect(
+      porcentajeARegistrar({
+        porcentajeReal: "",
+        cumplido: true,
+        metaPorcentaje: "  ",
+      }),
+    ).toBeNull();
+  });
+});
 
 describe("ppcDePlan", () => {
   it("cumplidos entre el total, en %", () => {

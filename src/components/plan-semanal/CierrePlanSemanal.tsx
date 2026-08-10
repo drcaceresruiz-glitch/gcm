@@ -168,7 +168,7 @@ export function CierrePlanSemanal({
                     step="0.01"
                     value={f.porcentajeReal}
                     onChange={(e) => set(f.id, { porcentajeReal: e.target.value })}
-                    title="Avance acumulado de la tarea (0-100)"
+                    title="Avance ACUMULADO de la tarea (0-100), no lo hecho esta semana"
                     className="w-16 rounded border px-1.5 py-1 text-xs tabular-nums"
                     style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
                   />
@@ -187,6 +187,18 @@ export function CierrePlanSemanal({
                 }
               />
             </div>
+            {/* Cumplido y sin porcentaje: NO se registrara avance fisico. Se
+                dice, en vez de inventar un 100 como se hacia antes —que daba
+                por terminada una tarea de tres semanas por haber cumplido el
+                tramo de una, y falsificaba la curva S—. */}
+            {f.uid !== null && f.cumplido && !f.porcentajeReal.trim() && (
+              <p className="mt-1.5 text-xs" style={{ color: "var(--color-alerta)" }}>
+                Sin <strong>% alcanzado</strong> no se registrará avance físico de
+                esta tarea. Cuenta para el PPC igual. Escribe el acumulado si
+                quieres que la curva S lo recoja.
+              </p>
+            )}
+
             {!f.cumplido && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <select

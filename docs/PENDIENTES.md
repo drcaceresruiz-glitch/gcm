@@ -273,6 +273,91 @@ Lo que SI se hara, en este orden:
 
 ---
 
+## 6c. Auditoria del 10 de agosto: las costuras, no las formulas
+
+Tres auditorias cruzadas (vocabulario del dominio, cadena Last Planner y
+puente dinero-tiempo) sobre si el codigo respeta el modelo conceptual
+(capitulo/partida = dinero; tarea/hito = tiempo; el mapeo como unico puente).
+
+**El diagnostico de fondo, que es lo que mas sirve**: las formulas estan bien
+y centralizadas —PPC, Pareto, ponderacion y estado LISTO tienen UNA sola
+implementacion y se reutilizan, no pueden divergir—. Lo que falla son las
+COSTURAS: que valor se escribe por defecto, que sobrevive a reabrir o
+eliminar, y QUE CONJUNTO de tareas alimenta cada numero.
+
+### ~~Cerrar una semana escribia 100% de avance~~ ARREGLADO
+
+El mas grave de todo el sistema, corregido el 10 de agosto. La regla era
+«cumplido y sin porcentaje -> escribir 100», y los compromisos venidos del
+Lookahead nacen SIN meta (`comprometerAlPts` no la setea) con la pantalla
+prellenando vacio. O sea: el residente cumplia el tramo semanal de una tarea
+de tres semanas, marcaba cumplido —que es verdad— y la tarea entera quedaba
+al 100%. Como `AvanceTarea` es la fuente unica del real de la curva S, del
+EV, del SPI, del Gantt y de las alertas, **un PPC honesto producia una obra
+que se veia al dia**.
+
+Ahora la regla vive en `porcentajeARegistrar` (`src/lib/plan-semanal.ts`),
+probada con 6 casos: lo tecleado manda siempre (tambien si NO se cumplio,
+que es informacion buena); cumplir sin teclear registra la META pactada; y
+sin porcentaje ni meta **no se registra nada**, con aviso en pantalla.
+Comprobado en produccion antes de tocar: **0 avances sospechosos**, el fallo
+estaba armado pero no se habia disparado.
+
+### Lo que la auditoria dejo PENDIENTE, por dano
+
+1. **Doble conteo del presupuesto** (CRITICO, dinero). Cuatro sitios suman
+   `SUM(parcial) WHERE tipo="PARTIDA"` sin la regla de hojas: `evm.service`
+   (el **BAC**), `tablero.service`, `obras.service` (cartera y por obra) y
+   `encargos.service` (cobertura). No protege filtrar por `tipo`, porque
+   `clasificarCodigo` (`excel-presupuesto.ts`) marca como PARTIDA cualquier
+   fila con importe propio, incluidas las cabeceras de grupo con hijas
+   costeadas. Efecto: BAC inflado -> `EV = BAC x %` sube -> **el CPI parece
+   ahorro**; el saldo del tablero ensena dinero que no existe. El SPI y el %
+   de avance NO se afectan (son ratios sobre el mismo BAC), por eso no da
+   sintoma. La regla correcta ya existe: `sumarHojas`/`aportantes`.
+2. **El BAC ignora el VIGENTE** (ALTO). Las partidas de adicional nacen con
+   `parcial: null` a proposito, pero el AC si incluye sus ordenes: **el CPI
+   se degrada solo** conforme se aprueban adicionales. Ya existe
+   `obtenerPresupuestoVigente`, solo falta que el EVM la use.
+3. **Reabrir + reguardar borra cumplido/causa/notaCierre** (ALTO):
+   `mapaPreservablePorUid` rescata los campos operativos pero no los del
+   cierre. PPC a 0 y Pareto sin causas, mientras el avance escrito se queda.
+4. **Eliminar una semana deja avances huerfanos** (ALTO): `onDelete: SetNull`
+   sobre `planSemanalId`; quedan indistinguibles de un reporte manual y
+   **nadie los puede reemplazar nunca** (la limpieza filtra por plan).
+5. **Curva S / EVM leen otro conjunto de tareas** que la pantalla de avance
+   (base vs vigente): dos cifras con el mismo nombre en la misma pantalla.
+6. **Los hitos entran al Lookahead y al PPC**: `tareasDeLaSemana` filtra
+   `esResumen` pero no `esHito`, y `TareaProgramada` ni declara el campo. Se
+   siembran 7 restricciones a un evento de duracion cero y entra al
+   denominador del PPC. Otros modulos (`mapeo.service`, `control-avance`) SI
+   lo excluyen, con el razonamiento escrito.
+7. **Celda de importe editable en filas ALCANCE** (`TablaPartidas.tsx`):
+   `parcialCalculado` solo es true para PRECIOS_UNITARIOS, y
+   `actualizarPartida` no comprueba `tipo` ni `modalidad`. Un ALCANCE con
+   importe suma por encima del dinero de su partida padre.
+8. **El avance puede retroceder** sin aviso (no hay control de monotonia).
+9. **`cantidadEjec` no alimenta nada**: es la medicion mas precisa que hay
+   —m2 reales contra comprometidos— y muere ahi. Se puede cerrar con 60 de
+   120 y marcar cumplido.
+10. **`MapeoTareaPartida` no tiene `fraccion`** (su hermano `EncargoPartida`
+    si). Hoy `importePorTarea` cuenta la partida entera en cada tarea que la
+    mapea y la pantalla de mapeo ya suma de mas. **Bloqueante antes de
+    activar la ponderacion por dinero**, que la UI promete y `curva-s` no
+    implementa (pondera siempre por duracion).
+11. **`subtotalesPorRama`** (`jerarquia-partidas.ts`, nuevo y probado con el
+    invariante «la suma de los subtotales raiz == costo directo») todavia NO
+    lo usa `listarPartidas`, que mantiene su propio rollup por `parentId`.
+12. **Vocabulario**: «partida» significa `WbsItem` en presupuesto y
+    `TareaCronograma` en cronograma, a veces en la misma pantalla; «frente de
+    trabajo» es una tarea en evidencia y un paquete de partidas en encargos.
+    El peor: la pantalla de mapeo, cuyo proposito es ensenar la diferencia,
+    dice «sus partidas hijas» donde debe decir «sus tareas hijas».
+
+**Orden acordado**: 1 y 2 (el dinero), luego 7, luego el resto. La pagina de
+control economico NO se construye antes de 1 y 2: darle autoridad visual a
+un BAC inflado es peor que no tenerla.
+
 ## 7. Defectos conocidos, sin arreglar
 
 - **Ortografía: el sitio entero se escribió sin tildes** (convención heredada

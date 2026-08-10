@@ -7,6 +7,7 @@ import { hoy } from "@/utils/fechas";
 import {
   ppcDePlan,
   paretoCausas,
+  porcentajeARegistrar,
   tendenciaPpc,
   rangoSemana,
   proximoCorte,
@@ -762,13 +763,14 @@ export async function cerrarPlanSemanal(
     for (const c of plan.compromisos) {
       if (c.uid == null) continue;
       const e = porId.get(c.id);
-      // El % alcanzado que manda la pantalla; si no viene y se cumplio, su meta
-      // (o 100% si no tenia meta). Si no se cumplio y no hay %, no se registra.
-      const bruto = e?.porcentajeReal?.trim()
-        ? e.porcentajeReal
-        : e?.cumplido
-          ? (c.metaPorcentaje?.toString() ?? "100")
-          : null;
+      // La regla vive en `@/lib/plan-semanal` y esta probada: sin porcentaje
+      // escrito y sin meta pactada NO se registra avance. Antes se escribia un
+      // 100 que daba por terminada la tarea entera y falsificaba la curva S.
+      const bruto = porcentajeARegistrar({
+        porcentajeReal: e?.porcentajeReal,
+        cumplido: e?.cumplido,
+        metaPorcentaje: c.metaPorcentaje?.toString(),
+      });
       if (bruto == null) continue;
       const pct = normalizarDecimal(bruto, 2);
       if (pct == null) continue;
