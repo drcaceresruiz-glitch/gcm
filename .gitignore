@@ -78,3 +78,22 @@ Thumbs.db
 *.lz
 *.lzo
 ```
+# Next.js build + TS artefactos
+/.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# Cliente Prisma generado (se regenera con `prisma generate`)
+/src/generated/
+
+# Volcados de base de datos: NUNCA versionar (datos sensibles)
+/storage/*.sql
+
+# Documentos de referencia (binarios pesados; se guardan en local)
+/docs/referencias/
+
+# Andamiaje de skills/agentes (no es codigo de la app)
+/.agents/
+/.claude/
+/.windsurf/
+skills-lock.json
