@@ -3,7 +3,50 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 10 de agosto de 2026 (cierre de la sesion de la tarde).
+Ultima revision: 10 de agosto de 2026 (cierre de la sesion de la NOCHE).
+
+## Lo que dejo la sesion de la noche del 10 de agosto
+
+Empezo por la evidencia fotografica y acabo siendo, sobre todo, una
+**auditoria del sistema entero**. Cinco commits, todos verificados con `tsc`,
+`eslint`, `vitest` y `next build` antes de empujar:
+
+| Commit | Que |
+|---|---|
+| `5fb2971` | Evidencia: el clip adosado al dato (Lookahead, cierre del PTS y semana cerrada) |
+| `04ca086` | UN solo QR por obra + menu para el telefono de campo, y visor emergente de fotos |
+| `694cbe6` | **El cierre de semana ya no da la tarea entera por terminada** |
+| `002f8bd` | **Una sola definicion de presupuesto**, y el BAC cuenta los adicionales |
+| `93b1ee0` | Panel «Que falta» en el tablero |
+| `a8092a8` | Pase de obra con OTP (backend; faltan pantallas) |
+
+**El hallazgo de la noche**, y la frase que resume las tres auditorias:
+
+> Las formulas estan bien y centralizadas. Lo que falla son las COSTURAS:
+> que valor se escribe por defecto, que sobrevive a reabrir o eliminar, y que
+> conjunto de tareas alimenta cada numero.
+
+De ahi salio el peor defecto que ha tenido el sistema: cerrar una semana
+escribia **100 % de avance fisico** cuando el campo iba vacio, con lo que un
+PPC honesto producia una curva S falsificada al alza. Comprobado en
+produccion antes de tocar: cero avances afectados. Detalle en 6c.
+
+Se comprobo tambien, ANTES de cambiar nada, que el doble conteo del
+presupuesto **no afecta a los datos actuales** (la consulta de grupos con
+importe propio e hijas costeadas devolvio cero filas). Las correcciones son
+red de seguridad para el proximo presupuesto y para la primera constructora
+cliente.
+
+**Lo que sigue, en el orden acordado con el usuario**: (1) terminar las
+pantallas del pase con correo + codigo en pantalla —ver 6e—; (2) la cola de
+SMS con la linea propia; (3) el **parte diario**, que no existe y es el
+Bloque 1 entero de la matriz de control que el usuario describio —mano de
+obra, equipos, metrado del dia—, y lo que le falta a GCM frente a Foco en
+Obra.
+
+**Sin conectar todavia**: `subtotalesPorRama` (`jerarquia-partidas.ts`), que
+resulta ser el «costo por frente de obra» del esquema del usuario. Ver 6c,
+punto 11.
 
 **Lo que esta sesion dejo EN PRODUCCION, verificado**: candados de obra
 CERRADA en todos los servicios de escritura; requisitos para pasar a
@@ -424,8 +467,41 @@ LOCAL):
 6. `enlaceEvidencia({obra:true})` debe apuntar a `/pase/[obraId]`, no a
    `/obras/[id]/evidencia`.
 
-**Del usuario**: contratar el producto SMS en json.pe, generar el token y
-decidir QUE telefono hace de emisor.
+**Del usuario**: decidir QUE telefono hace de emisor si se activa el SMS.
+
+### SMS con la linea propia, SIN json.pe (decision del usuario)
+
+El usuario quiere prescindir de json.pe y usar los SMS de su propia linea.
+Se le explico que json.pe no es un proveedor en la nube sino una app Android
+que manda desde su telefono, y que construir esa app es OTRO producto (Kotlin,
+Play restringe el permiso SEND_SMS, y lo dificil no es enviar sino mantener
+la app viva contra el gestor de bateria de cada fabricante).
+
+**La via que si se puede construir aqui, y que hace lo mismo**: invertir el
+sentido. En vez de que GCM llame al telefono, el telefono pregunta a GCM.
+
+1. GCM guarda los SMS pendientes en una cola y los expone en una ruta
+   protegida por un token largo (variable de entorno, nunca en el repo).
+2. En el celular emisor se configura **MacroDroid o Tasker** —apps que ya
+   existen en Play— para consultar esa ruta cada ~20 s, enviar lo que haya
+   con su SIM y avisar a GCM de que salio. **Cero desarrollo movil**: es
+   configuracion.
+3. `sms.service.ts` ya aisla el canal: cambiar json.pe por la cola es
+   sustituir `enviarSms`, nada mas.
+
+**Riesgos que hay que decir en voz alta, no esconder**:
+
+- **La cola lleva los codigos OTP en claro.** Quien obtenga el token lee los
+  codigos del personal antes que ellos. Mitigacion: secreto largo, HTTPS,
+  borrar el mensaje en cuanto se marca enviado, y la caducidad de 10 min que
+  ya tiene el codigo. Aun asi, es el punto debil del diseno.
+- El telefono sigue siendo punto unico de fallo (bateria, saldo, cobertura,
+  el gestor de bateria de Android).
+- La operadora puede cortar por antispam el envio repetitivo desde una SIM
+  personal. Eso no lo arregla ningun software.
+
+**Orden acordado**: primero las pantallas con correo + codigo en pantalla
+—que no cuestan nada y dejan el pase usable—, y la cola de SMS despues.
 
 ## 6d. Panel «Que falta» (10 de agosto)
 
