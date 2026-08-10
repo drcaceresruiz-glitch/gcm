@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
-import { CalendarDays, MapPin } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, MapPin, Pencil } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
@@ -129,6 +130,19 @@ export default async function ObraLayout({
               puedeEditar={puede(sesion, "obra:editar")}
             />
           </div>
+
+          {/* Editar los datos de la obra (nombre, plazo, codigo...). Nace para
+              poder corregir la fecha fin, que gobierna el plazo del panel. */}
+          {puede(sesion, "obra:editar") && (
+            <Link
+              href={`/obras/${obra.id}/editar`}
+              className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium"
+              style={{ color: "var(--color-marca-600)" }}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Editar datos de la obra
+            </Link>
+          )}
 
           {/* Eliminar la obra solo tiene sentido en planificacion: aun no ha
               comprometido nada. El servicio lo vuelve a comprobar. */}

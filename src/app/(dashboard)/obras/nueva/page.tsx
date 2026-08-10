@@ -7,6 +7,7 @@ import { Volver } from "@/components/ui/Volver";
 import { PanelAyuda } from "@/components/ui/PanelAyuda";
 import { IlustracionPlano } from "@/components/ui/IlustracionPlano";
 import { FormularioObra } from "@/components/obras/FormularioObra";
+import { accionCrearObra } from "@/app/(dashboard)/obras/nueva/acciones";
 
 export const metadata: Metadata = { title: "Nueva obra" };
 
@@ -41,6 +42,8 @@ export default async function NuevaObraPage() {
           izquierda, semaforo de requisitos y ayuda a la derecha—, porque el
           semaforo tiene que reaccionar en vivo a lo que se escribe. */}
       <FormularioObra
+        accion={accionCrearObra}
+        modo="crear"
         fechaHoy={hoy().toISOString().slice(0, 10)}
         ayuda={
           <PanelAyuda

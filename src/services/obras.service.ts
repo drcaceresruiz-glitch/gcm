@@ -629,6 +629,111 @@ export async function crearObra(
   return { ok: true, id: creada.id };
 }
 
+export type ResultadoActualizarObra =
+  | { ok: true; id: string }
+  | { ok: false; error: string };
+
+/**
+ * Edita los datos de una obra de la empresa de la sesion.
+ *
+ * Antes no habia forma de corregir una obra ya creada: nombre, cliente,
+ * ubicacion, codigo y —lo que mas duele— el PLAZO quedaban fijos desde el alta.
+ * Una fecha fin mal tecleada se arrastraba a todo el panel (dias restantes,
+ * avance de calendario) sin forma de enmendarla desde la UI.
+ *
+ * Espeja a `crearObra`: mismas reglas puras (`validarObra`), mismo aislamiento
+ * por empresa y mismo control de codigo unico —excluyendo la propia obra—, con
+ * un apunte de auditoria del antes y el despues. NO toca el `estado`: ese cambia
+ * por la maquina de transiciones (`cambiarEstadoObra`), no por este formulario.
+ */
+export async function actualizarObra(
+  sesion: SesionActiva,
+  obraId: string,
+  datos: DatosObra,
+): Promise<ResultadoActualizarObra> {
+  if (!puede(sesion, "obra:editar")) {
+    return { ok: false, error: "No tienes permiso para editar obras." };
+  }
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: {
+      id: true,
+      nombreObra: true,
+      codigoObra: true,
+      ubicacion: true,
+      cliente: true,
+      fechaInicio: true,
+      fechaFinProgramada: true,
+    },
+  });
+  if (!obra) return { ok: false, error: "No se encontro la obra." };
+
+  const validacion = validarObra(datos);
+  if (!validacion.ok) return { ok: false, error: validacion.error };
+
+  const { inicio, fin } = validacion.plazo;
+
+  const opcional = (v: string | undefined, largo: number) =>
+    v?.trim() ? v.trim().slice(0, largo) : null;
+
+  const codigoObra = opcional(datos.codigoObra, 40);
+
+  // Codigo unico dentro de la empresa, EXCLUYENDO esta misma obra: sin el
+  // `id: { not }`, guardar sin cambiar el codigo chocaria contra si mismo.
+  if (codigoObra) {
+    const existente = await prisma.project.findFirst({
+      where: { companyId: sesion.companyId, codigoObra, id: { not: obraId } },
+      select: { nombreObra: true },
+    });
+    if (existente) {
+      return {
+        ok: false,
+        error: `Ya existe otra obra con el codigo ${codigoObra}: "${existente.nombreObra}".`,
+      };
+    }
+  }
+
+  const campos = {
+    nombreObra: datos.nombreObra.trim().slice(0, 255),
+    codigoObra,
+    ubicacion: opcional(datos.ubicacion, 255),
+    cliente: opcional(datos.cliente, 200),
+    fechaInicio: inicio,
+    fechaFinProgramada: fin,
+  };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.project.update({ where: { id: obraId }, data: campos });
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "Project",
+        entidadId: obraId,
+        accion: "UPDATE",
+        antes: {
+          nombreObra: obra.nombreObra,
+          codigoObra: obra.codigoObra,
+          ubicacion: obra.ubicacion,
+          cliente: obra.cliente,
+          fechaInicio: obra.fechaInicio.toISOString().slice(0, 10),
+          fechaFinProgramada: obra.fechaFinProgramada.toISOString().slice(0, 10),
+        },
+        despues: {
+          ...campos,
+          fechaInicio: datos.fechaInicio,
+          fechaFinProgramada: datos.fechaFinProgramada,
+        },
+      },
+    });
+  });
+
+  return { ok: true, id: obraId };
+}
+
 // ---------------------------------------------------------------------------
 // Baja de obras
 // ---------------------------------------------------------------------------

@@ -2,11 +2,8 @@
 
 import { useActionState, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, HardHat, LoaderCircle } from "lucide-react";
-import {
-  accionCrearObra,
-  type EstadoObra,
-} from "@/app/(dashboard)/obras/nueva/acciones";
+import { AlertCircle, HardHat, LoaderCircle, Save } from "lucide-react";
+import { type EstadoObra } from "@/app/(dashboard)/obras/nueva/acciones";
 import { fechaDeObra } from "@/lib/obras";
 import { CampoTexto } from "@/components/auth/CampoTexto";
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
@@ -17,15 +14,17 @@ import {
 } from "@/components/ui/ChecklistRequisitos";
 
 /**
- * Alta de una obra.
+ * Alta y edicion de una obra.
  *
- * Solo el nombre y las dos fechas son obligatorios: una obra se abre en
- * cuanto se sabe cuando empieza y cuando deberia acabar, y el resto —codigo,
- * cliente, ubicacion— se conoce a veces mas tarde.
+ * Un mismo formulario para crear y para editar: recibe la `accion` de servidor
+ * (crear, o editar ya ligada al id de la obra) y los `valores` iniciales. Asi
+ * no se duplican los campos, la validacion en vivo ni el semaforo de
+ * requisitos —lo que garantiza que crear y editar apliquen las MISMAS reglas—.
  *
- * Al lado va un semaforo de requisitos que se actualiza mientras se escribe y
- * gobierna el boton de crear. Los tres campos que vigila estan controlados por
- * estado; los demas siguen sueltos, porque no condicionan el alta.
+ * Solo el nombre y las dos fechas son obligatorios; el resto —codigo, cliente,
+ * ubicacion— es opcional. El `estado` solo aparece al crear: una vez creada,
+ * el estado cambia por sus botones de transicion (iniciar, paralizar, cerrar),
+ * que respetan la maquina de estados; editarlo aqui a mano la saltaria.
  */
 
 const ESTADOS = [
@@ -35,21 +34,38 @@ const ESTADOS = [
   { valor: "CERRADA", etiqueta: "Cerrada" },
 ] as const;
 
+export interface ValoresObra {
+  nombreObra: string;
+  codigoObra: string;
+  cliente: string;
+  ubicacion: string;
+  fechaInicio: string;
+  fechaFinProgramada: string;
+}
+
 export function FormularioObra({
+  accion,
+  modo = "crear",
+  valores,
   fechaHoy,
   ayuda,
 }: {
-  fechaHoy: string;
+  /// Accion de servidor: `accionCrearObra`, o `accionEditarObra` ya ligada al id.
+  accion: (previo: EstadoObra, datos: FormData) => Promise<EstadoObra>;
+  modo?: "crear" | "editar";
+  valores?: Partial<ValoresObra>;
+  /// Solo para crear: fecha por defecto del campo de inicio.
+  fechaHoy?: string;
   ayuda?: ReactNode;
 }) {
-  const [estado, accion] = useActionState<EstadoObra, FormData>(
-    accionCrearObra,
-    {},
-  );
+  const editar = modo === "editar";
+  const [estado, accionForm] = useActionState<EstadoObra, FormData>(accion, {});
 
-  const [nombre, setNombre] = useState("");
-  const [inicio, setInicio] = useState(fechaHoy);
-  const [fin, setFin] = useState("");
+  const [nombre, setNombre] = useState(valores?.nombreObra ?? "");
+  const [inicio, setInicio] = useState(
+    valores?.fechaInicio ?? fechaHoy ?? "",
+  );
+  const [fin, setFin] = useState(valores?.fechaFinProgramada ?? "");
 
   // Los mismos criterios que valida el servidor con `validarObra`, evaluados
   // aqui campo a campo con las funciones puras para que el semaforo no diga
@@ -69,7 +85,7 @@ export function FormularioObra({
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
-      <form action={accion}>
+      <form action={accionForm}>
         <Tarjeta>
           <SeccionTarjeta titulo="Identificacion" primera>
             <CampoTexto
@@ -87,15 +103,28 @@ export function FormularioObra({
               name="codigoObra"
               etiqueta="Codigo"
               maxLength={40}
+              defaultValue={valores?.codigoObra ?? ""}
               ayuda="Opcional, pero no se puede repetir dentro de la empresa. El sistema le asigna ademas un correlativo propio (OB-000001)."
             />
-            <CampoTexto id="cliente" name="cliente" etiqueta="Cliente" maxLength={200} />
-            <CampoTexto id="ubicacion" name="ubicacion" etiqueta="Ubicacion" maxLength={255} />
+            <CampoTexto
+              id="cliente"
+              name="cliente"
+              etiqueta="Cliente"
+              maxLength={200}
+              defaultValue={valores?.cliente ?? ""}
+            />
+            <CampoTexto
+              id="ubicacion"
+              name="ubicacion"
+              etiqueta="Ubicacion"
+              maxLength={255}
+              defaultValue={valores?.ubicacion ?? ""}
+            />
           </SeccionTarjeta>
 
           <SeccionTarjeta
             titulo="Plazo"
-            nota="De aqui sale el avance de calendario que se ve en el panel."
+            nota="De aqui salen los dias restantes y el avance de calendario del panel."
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <CampoTexto
@@ -119,30 +148,34 @@ export function FormularioObra({
             </div>
           </SeccionTarjeta>
 
-          <SeccionTarjeta titulo="Estado">
-            <div className="space-y-1.5">
-              <label htmlFor="estado" className="block text-sm font-medium">
-                Estado inicial
-              </label>
-              <select
-                id="estado"
-                name="estado"
-                defaultValue="PLANIFICACION"
-                className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
-                style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
-              >
-                {ESTADOS.map((e) => (
-                  <option key={e.valor} value={e.valor}>
-                    {e.etiqueta}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs opacity-60">
-                Lo normal es abrirla en planificacion y pasarla a ejecucion
-                cuando arranque.
-              </p>
-            </div>
-          </SeccionTarjeta>
+          {/* El estado solo se elige al crear. Ya creada, cambia por sus
+              botones de transicion, que respetan la maquina de estados. */}
+          {!editar && (
+            <SeccionTarjeta titulo="Estado">
+              <div className="space-y-1.5">
+                <label htmlFor="estado" className="block text-sm font-medium">
+                  Estado inicial
+                </label>
+                <select
+                  id="estado"
+                  name="estado"
+                  defaultValue="PLANIFICACION"
+                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                  style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+                >
+                  {ESTADOS.map((e) => (
+                    <option key={e.valor} value={e.valor}>
+                      {e.etiqueta}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs opacity-60">
+                  Lo normal es abrirla en planificacion y pasarla a ejecucion
+                  cuando arranque.
+                </p>
+              </div>
+            </SeccionTarjeta>
+          )}
 
           {estado.error && (
             <p
@@ -159,7 +192,7 @@ export function FormularioObra({
           )}
 
           <div className="mt-8 border-t pt-5" style={{ borderColor: "var(--borde)" }}>
-            <BotonCrear bloqueado={!listo} />
+            <BotonGuardar bloqueado={!listo} editar={editar} />
           </div>
         </Tarjeta>
       </form>
@@ -168,16 +201,29 @@ export function FormularioObra({
           ayuda debajo. `sticky` para que el semaforo siga a la vista al
           desplazarse por un formulario largo. */}
       <div className="space-y-6 lg:sticky lg:top-24">
-        <ChecklistRequisitos requisitos={requisitos} titulo="Para crear la obra" />
+        <ChecklistRequisitos
+          requisitos={requisitos}
+          titulo={editar ? "Para guardar la obra" : "Para crear la obra"}
+        />
         {ayuda}
       </div>
     </div>
   );
 }
 
-function BotonCrear({ bloqueado }: { bloqueado: boolean }) {
+function BotonGuardar({
+  bloqueado,
+  editar,
+}: {
+  bloqueado: boolean;
+  editar: boolean;
+}) {
   const { pending } = useFormStatus();
   const inhabilitado = bloqueado || pending;
+
+  const Icono = editar ? Save : HardHat;
+  const textoAccion = editar ? "Guardar cambios" : "Crear la obra";
+  const textoPendiente = editar ? "Guardando..." : "Creando...";
 
   return (
     <div className="space-y-2">
@@ -190,14 +236,16 @@ function BotonCrear({ bloqueado }: { bloqueado: boolean }) {
         {pending ? (
           <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
         ) : (
-          <HardHat className="size-4" aria-hidden="true" />
+          <Icono className="size-4" aria-hidden="true" />
         )}
-        {pending ? "Creando..." : "Crear la obra"}
+        {pending ? textoPendiente : textoAccion}
       </button>
       <p className="text-xs opacity-60">
         {bloqueado
-          ? "Completa los requisitos de la derecha para habilitar la creacion."
-          : "Al crearla se abre vacia: el paso siguiente es cargarle el presupuesto."}
+          ? "Completa los requisitos de la derecha para habilitar el guardado."
+          : editar
+            ? "Los cambios se aplican al panel y a la obra al guardar."
+            : "Al crearla se abre vacia: el paso siguiente es cargarle el presupuesto."}
       </p>
     </div>
   );
