@@ -184,12 +184,14 @@ Lo que SI se hara, en este orden:
   por miedo a la codificación, que ya no aplica: UTF-8 de punta a punta y
   prod lo sirve bien). El usuario lo señaló el 10 de agosto. **Tandas 1 y 2
   hechas y verificadas en prod** (portada, login, tablero, riel, pestañas, y
-  las 109 páginas/componentes: ~440 cadenas). Faltan: **tanda 3** mensajes de
-  los servicios y textos de `src/lib` —OJO: están fijados por tests;
-  cambiarlos exige actualizar los tests en el MISMO commit; incluye el "Sin
-  capitulo" que se dejó a propósito en dos páginas para no divergir de
-  `control-avance.ts:361`—; **tanda 4** MANUAL.md y docs. Regla: solo texto
-  visible —no tocar claves internas, rutas, enums de Prisma ni cookies—.
+  las 109 páginas/componentes: ~440 cadenas). Las tandas **3** (servicios y
+  `src/lib` + tests) y **4** (docs) quedaron DETENIDAS el mismo día por
+  decisión del usuario ("es suficiente lo de ortografía"): lo que el usuario
+  ve en pantalla ya está correcto; los mensajes de error y los docs pueden
+  esperar. Si algún día se retoman: los textos de lib están fijados por
+  tests (cambiarlos JUNTOS), incluye el "Sin capitulo" de
+  `control-avance.ts:361` duplicado en dos páginas, y la regla es solo texto
+  visible —no tocar claves, rutas, enums de Prisma ni cookies—.
 
 - **`moduloConDatos` duplica las guardas de `ModuloContenido`**
   (`components/tablero/modulos.tsx`). Estan pegadas y comentadas a proposito,
