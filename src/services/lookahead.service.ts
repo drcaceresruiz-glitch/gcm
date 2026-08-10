@@ -8,6 +8,7 @@ import {
   ventanaLookahead,
   estadoDeTarea,
   confiabilidad,
+  normalizarSemanas,
   TIPOS_RESTRICCION,
   type Confiabilidad,
 } from "@/lib/lookahead";
@@ -70,6 +71,8 @@ export interface LookaheadDatos {
   confiabilidad: Confiabilidad;
   /// Tareas de la ventana que aun no tienen `LookaheadTask` (a sincronizar).
   pendientesDeSincronizar: number;
+  /// Cuantas semanas mira esta ventana (ya acotado).
+  semanas: number;
   puedeGestionar: boolean;
   /// Semanas del PTS que admiten compromisos (destino al comprometer).
   semanasAbiertas: SemanaAbierta[];
@@ -107,8 +110,9 @@ async function cronogramaVigente(sesion: SesionActiva, obraId: string) {
 async function tareasDeLaVentana(
   sesion: SesionActiva,
   obraId: string,
+  semanas: number,
 ): Promise<{ desde: Date; hasta: Date; tareas: TareaProgramada[] }> {
-  const { desde, hasta } = ventanaLookahead(hoy());
+  const { desde, hasta } = ventanaLookahead(hoy(), semanas);
   const cronograma = await cronogramaVigente(sesion, obraId);
   const tareasCron: TareaProgramada[] = (cronograma?.tareas ?? []).map((t) => ({
     uid: t.uid,
@@ -129,10 +133,12 @@ async function tareasDeLaVentana(
 export async function obtenerLookahead(
   sesion: SesionActiva,
   obraId: string,
+  semanasPedidas?: string | number,
 ): Promise<LookaheadDatos | null> {
   if (!puede(sesion, "lookahead:leer")) return null;
 
-  const { desde, hasta, tareas } = await tareasDeLaVentana(sesion, obraId);
+  const semanas = normalizarSemanas(semanasPedidas);
+  const { desde, hasta, tareas } = await tareasDeLaVentana(sesion, obraId, semanas);
 
   const uids = tareas.map((t) => t.uid);
   const lookaheadTareas = uids.length
@@ -228,6 +234,7 @@ export async function obtenerLookahead(
     filas,
     confiabilidad: confiabilidad(filas),
     pendientesDeSincronizar: filas.filter((f) => !f.sincronizada).length,
+    semanas,
     puedeGestionar: puede(sesion, "lookahead:gestionar"),
     semanasAbiertas: puedeComprometer ? await planesAbiertos(sesion, obraId) : [],
     puedeComprometer,
@@ -242,6 +249,10 @@ export async function obtenerLookahead(
 export async function sincronizarLookahead(
   sesion: SesionActiva,
   obraId: string,
+  /// LAS MISMAS semanas que se estan viendo. Si aqui se usara otra cifra, el
+  /// boton dejaria sin analizar tareas que la pantalla si muestra, y no habria
+  /// forma de entender por que.
+  semanasPedidas?: string | number,
 ): Promise<ResultadoSync> {
   if (!puede(sesion, "lookahead:gestionar")) {
     return { ok: false, error: "No tienes permiso para gestionar el Lookahead." };
@@ -253,7 +264,11 @@ export async function sincronizarLookahead(
   });
   if (!obra) return { ok: false, error: "Obra no encontrada." };
 
-  const { tareas } = await tareasDeLaVentana(sesion, obraId);
+  const { tareas } = await tareasDeLaVentana(
+    sesion,
+    obraId,
+    normalizarSemanas(semanasPedidas),
+  );
   if (tareas.length === 0) return { ok: true, creadas: 0 };
 
   const existentes = await prisma.lookaheadTask.findMany({

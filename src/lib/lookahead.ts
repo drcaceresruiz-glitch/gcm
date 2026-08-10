@@ -22,8 +22,49 @@ export interface VentanaLookahead {
  * `hoy` se recibe —no se lee dentro— para poder probarla. Fechas de calendario
  * comparables con las columnas `@db.Date` de las tareas.
  */
-export function ventanaLookahead(hoy: Date, semanas = 3): VentanaLookahead {
+export function ventanaLookahead(hoy: Date, semanas = SEMANAS_POR_DEFECTO): VentanaLookahead {
   return { desde: hoy, hasta: new Date(hoy.getTime() + semanas * 7 * DIA_MS) };
+}
+
+/**
+ * Cuantas semanas mira el Lookahead.
+ *
+ * El Last Planner no fija un numero: tres semanas es el minimo util y lo
+ * habitual son cuatro a seis. Depende de los plazos de entrega de la obra —una
+ * con acero importado necesita mirar mas lejos que una de acabados—, asi que
+ * se elige por obra en vez de imponerlo.
+ *
+ * Se mantiene 3 por defecto para no cambiarle la ventana a nadie en silencio.
+ */
+export const SEMANAS_POR_DEFECTO = 3;
+export const SEMANAS_MINIMO = 1;
+/// Mas alla de esto el cronograma deja de ser fiable y el analisis es humo.
+export const SEMANAS_MAXIMO = 12;
+
+/// Las opciones del selector. Se puede pedir cualquier numero por la URL.
+export const SEMANAS_SUGERIDAS: readonly number[] = [3, 4, 6, 8, 12];
+
+/**
+ * El numero de semanas que pide la pantalla, acotado.
+ *
+ * Llega de la URL, asi que puede ser cualquier cosa: se ignora lo que no sea
+ * un entero y se recorta al rango en vez de fallar. Una ventana rara no es
+ * motivo para no ensenar el Lookahead.
+ */
+export function normalizarSemanas(valor: string | number | undefined | null): number {
+  // "Sin valor" se descarta ANTES de convertir: `Number(null)` y `Number("")`
+  // valen 0, no NaN, asi que se colarian por el guardian de abajo y acabarian
+  // recortados al minimo. Una URL con `?semanas=` daria una ventana de una
+  // semana en vez del defecto.
+  if (valor === null || valor === undefined) return SEMANAS_POR_DEFECTO;
+  if (typeof valor === "string" && valor.trim() === "") return SEMANAS_POR_DEFECTO;
+
+  const n = Number(valor);
+  if (!Number.isFinite(n)) return SEMANAS_POR_DEFECTO;
+  const entero = Math.floor(n);
+  if (entero < SEMANAS_MINIMO) return SEMANAS_MINIMO;
+  if (entero > SEMANAS_MAXIMO) return SEMANAS_MAXIMO;
+  return entero;
 }
 
 /**

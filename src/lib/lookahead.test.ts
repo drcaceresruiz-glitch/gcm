@@ -3,8 +3,12 @@ import {
   ventanaLookahead,
   estadoDeTarea,
   confiabilidad,
+  normalizarSemanas,
   FLUJOS_RESTRICCION,
   TIPOS_RESTRICCION,
+  SEMANAS_POR_DEFECTO,
+  SEMANAS_MINIMO,
+  SEMANAS_MAXIMO,
 } from "./lookahead";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -19,6 +23,37 @@ describe("ventanaLookahead", () => {
   it("respeta el numero de semanas indicado", () => {
     const { hasta } = ventanaLookahead(d("2026-08-10"), 6);
     expect(hasta).toEqual(d("2026-09-21"));
+  });
+});
+
+describe("normalizarSemanas", () => {
+  it("sin valor usa el defecto, que sigue siendo 3", () => {
+    // Cambiar el defecto le movería la ventana a todo el mundo en silencio.
+    expect(SEMANAS_POR_DEFECTO).toBe(3);
+    expect(normalizarSemanas(undefined)).toBe(3);
+    expect(normalizarSemanas(null)).toBe(3);
+    expect(normalizarSemanas("")).toBe(3);
+  });
+
+  it("acepta el numero venga como texto o como numero", () => {
+    expect(normalizarSemanas("6")).toBe(6);
+    expect(normalizarSemanas(6)).toBe(6);
+  });
+
+  it("lo que no es un numero cae al defecto en vez de fallar", () => {
+    // Llega de la URL: una ventana rara no puede tumbar la pantalla.
+    expect(normalizarSemanas("seis")).toBe(3);
+    expect(normalizarSemanas("<script>")).toBe(3);
+  });
+
+  it("recorta al rango en vez de rechazar", () => {
+    expect(normalizarSemanas(0)).toBe(SEMANAS_MINIMO);
+    expect(normalizarSemanas(-4)).toBe(SEMANAS_MINIMO);
+    expect(normalizarSemanas(99)).toBe(SEMANAS_MAXIMO);
+  });
+
+  it("trunca los decimales: media semana no significa nada aqui", () => {
+    expect(normalizarSemanas("4.7")).toBe(4);
   });
 });
 

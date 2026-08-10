@@ -19,11 +19,16 @@ import {
  * el cambio se vea al instante.
  */
 
-export async function accionSincronizar(obraId: string): Promise<void> {
+export async function accionSincronizar(
+  obraId: string,
+  /// Las semanas que la pantalla esta mostrando, para no sincronizar una
+  /// ventana distinta de la que se ve.
+  semanas?: number,
+): Promise<void> {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
-  await sincronizarLookahead(sesion, obraId);
+  await sincronizarLookahead(sesion, obraId, semanas);
   revalidatePath(`/obras/${obraId}/lookahead`);
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import {
   CircleCheck,
   CircleDashed,
@@ -10,7 +11,7 @@ import {
   CalendarPlus,
 } from "lucide-react";
 import { Chip, type TonoChip } from "@/components/ui/Chip";
-import { FLUJOS_RESTRICCION } from "@/lib/lookahead";
+import { FLUJOS_RESTRICCION, SEMANAS_SUGERIDAS } from "@/lib/lookahead";
 import { PanelComprometer } from "@/components/lookahead/PanelComprometer";
 import {
   accionSincronizar,
@@ -60,14 +61,26 @@ export function MatrizLookahead({
   const [pendiente, iniciar] = useTransition();
   const [elegidas, setElegidas] = useState<Set<number>>(new Set());
   const [abrirPanel, setAbrirPanel] = useState(false);
+  const router = useRouter();
+  const ruta = usePathname();
   const {
     filas,
     confiabilidad: conf,
     pendientesDeSincronizar,
+    semanas,
     puedeGestionar,
     semanasAbiertas,
     puedeComprometer,
   } = datos;
+
+  // La ventana viaja en la URL: se comparte por enlace y vuelve atras con el
+  // boton del navegador. Al cambiarla se pierde la seleccion a proposito, que
+  // ya no tiene por que referirse a tareas que sigan a la vista.
+  function cambiarSemanas(valor: string) {
+    setElegidas(new Set());
+    setAbrirPanel(false);
+    router.push(`${ruta}?semanas=${valor}`);
+  }
 
   function alternarEleccion(uid: number) {
     setElegidas((p) => {
@@ -104,16 +117,46 @@ export function MatrizLookahead({
 
   function sincronizar() {
     iniciar(async () => {
-      await accionSincronizar(obraId);
+      // Con las MISMAS semanas que se estan viendo: si no, quedarian tareas a
+      // la vista sin analizar y sin explicacion.
+      await accionSincronizar(obraId, semanas);
     });
   }
 
+  // El selector se pinta tambien cuando la ventana sale vacia: si no, quien
+  // eligiera una ventana corta sin tareas se quedaria sin forma de volver.
+  const selectorSemanas = (
+    <label className="flex items-center gap-1.5 text-sm">
+      <span className="opacity-70">Ventana</span>
+      <select
+        value={semanas}
+        onChange={(e) => cambiarSemanas(e.target.value)}
+        className="rounded-lg border px-2 py-1 text-sm"
+        style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+      >
+        {/* Si llega por URL un valor fuera de la lista, se anade para que el
+            desplegable no mienta sobre lo que se esta viendo. */}
+        {(SEMANAS_SUGERIDAS.includes(semanas)
+          ? SEMANAS_SUGERIDAS
+          : [...SEMANAS_SUGERIDAS, semanas].sort((a, b) => a - b)
+        ).map((s) => (
+          <option key={s} value={s}>
+            {s} semanas
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   if (filas.length === 0) {
     return (
-      <p className="text-sm opacity-60">
-        No hay tareas del cronograma en la ventana de las proximas 3 semanas.
-        Cuando el cronograma programe trabajo en ese rango, aparecera aqui.
-      </p>
+      <div className="space-y-3">
+        {selectorSemanas}
+        <p className="text-sm opacity-60">
+          No hay tareas del cronograma en las proximas {semanas} semanas. Amplia
+          la ventana o espera a que el cronograma programe trabajo en ese rango.
+        </p>
+      </div>
     );
   }
 
@@ -141,6 +184,7 @@ export function MatrizLookahead({
               }}
             />
           </div>
+          {selectorSemanas}
         </div>
 
         {puedeGestionar && pendientesDeSincronizar > 0 && (

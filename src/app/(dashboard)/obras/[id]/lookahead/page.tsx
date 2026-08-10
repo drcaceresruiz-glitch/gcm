@@ -11,25 +11,31 @@ import { MatrizLookahead } from "@/components/lookahead/MatrizLookahead";
 export const metadata: Metadata = { title: "Lookahead" };
 
 /**
- * Lookahead (Last Planner): la ventana de mediano plazo (3 semanas) con el
+ * Lookahead (Last Planner): la ventana de mediano plazo (3 semanas por
+ * defecto, configurable de 1 a 12) con el
  * analisis de las 7 restricciones por tarea y el semaforo de confiabilidad. Es
  * el paso entre el cronograma (largo plazo) y el Plan Semanal (corto plazo): de
  * aqui saldran las tareas LISTAS que se pueden comprometer.
  */
 export default async function LookaheadPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  /// La ventana vive en la URL: se comparte por enlace y se cambia al vuelo,
+  /// sin necesidad de guardarla ni de migrar la base.
+  searchParams: Promise<{ semanas?: string }>;
 }) {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
   const { id } = await params;
+  const { semanas } = await searchParams;
   const obra = await obtenerObra(sesion, id);
   if (!obra) redirect("/panel");
   if (!puede(sesion, "lookahead:leer")) redirect(`/obras/${id}`);
 
-  const datos = await obtenerLookahead(sesion, id);
+  const datos = await obtenerLookahead(sesion, id, semanas);
 
   return (
     <div className="space-y-6">
