@@ -3,7 +3,23 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 10 de agosto de 2026.
+Ultima revision: 10 de agosto de 2026 (cierre de la sesion de la tarde).
+
+**Lo que esta sesion dejo EN PRODUCCION, verificado**: candados de obra
+CERRADA en todos los servicios de escritura; requisitos para pasar a
+EN_EJECUCION; curva EVM con cursor arrastrable y lectura en soles; la RUTA DE
+LA OBRA (riel de ubicacion, `RutaObra` + `hitosDeObra`); tablero corregido
+(Lookahead en neutro, PPC/Causas reconciliados, jerga fuera, ordenes
+compacta) + tarjeta nueva de VALOR GANADO (SPI/CPI); portada del login con
+carrusel de frases; frase rotativa en la cabecera (color de paleta, sombra);
+ortografia tandas 1-2 (109 archivos); plantilla de Excel descargable con
+test de ida y vuelta (`/plantilla-presupuesto`); y el cimiento de la
+evidencia fotografica (ver seccion 4). Decisiones tomadas: sin LLM local
+(6b), plan de Notas (5), plan de evidencia con QR (4).
+
+**Sigue pendiente del usuario**: fotos para `public/portada/` (1.jpg-12.jpg),
+las frases de "Frases sobre el deber.docx" (pasar a .txt o pegar en el chat),
+y probar en prod el ciclo de la plantilla (descargar - llenar - importar).
 
 > **Antes de tocar el despliegue, lee el incidente del 10 de agosto en
 > `ESTADO.md`.** Dos horas de caida por dos causas que no eran las que
@@ -102,15 +118,23 @@ decide (la restriccion que se libera, la causa de no cumplimiento)— y la
 galeria es una VISTA sobre esa evidencia. Orden acordado con el usuario:
 primero ortografia tanda 2 y plantilla Excel, luego esto.
 
-- **Fase A (nucleo)**: modelo FotoEvidencia (obra, empresa, restriccionId |
-  compromisoId, ruta, miniatura, nota, quien, cuando). Subida desde el
-  telefono con compresion EN EL NAVEGADOR (~1600 px, JPEG 80 → 150-400 KB).
-  Permisos: lookahead:gestionar / plan_semanal:gestionar; candado CERRADA;
-  auditoria. UI: clip en la celda de restriccion y en el cierre de semana.
-  **QR por tarea**: boton "Imprimir codigos" en PTS/Lookahead → hoja
-  imprimible con QR por fila que abre el enlace profundo de subida de ESA
-  restriccion (la sesion sigue mandando: sin login no se ve nada; sin enlaces
-  magicos). QR generado en servidor, sin CDN.
+- **Fase A — ESTADO al cierre del 10 de agosto: el CIMIENTO esta hecho y
+  subido**: modelo `FotoEvidencia` (migracion
+  `20260810195703_evidencia_fotografica`, YA aplicada en la base LOCAL),
+  `evidencia.service.ts` (subir con hash SHA-256, permisos por destino,
+  candado CERRADA, 5 MB, JPG/PNG/WebP, auditLog; listar agrupado; servir
+  validando empresa) y la ruta `/api/evidencia/[id]` (401/404/410). Los
+  archivos van a `STORAGE_ROOT/evidencia/<obra>/` —fuera del arbol—.
+  **AL RETOMAR, EN ESTE ORDEN**: (1) correr `npx prisma migrate deploy` EN EL
+  SERVIDOR (jailshell) para crear la tabla en produccion —hasta entonces la
+  ruta de la API fallaria si alguien la tocara; ninguna UI la llama aun—;
+  (2) commit 2: la UI —componente de subida con compresion en el navegador
+  (canvas ~1600 px, JPEG 0.8), clip en la celda de restriccion de
+  `MatrizLookahead` y adjunto junto a la causa en `CierrePlanSemanal`, visor
+  simple—; (3) commit 3: la hoja de codigos QR (necesita `npm install
+  qrcode`) con enlace profundo por restriccion, siempre con sesion.
+  En prod ademas: definir `STORAGE_ROOT` en las variables de cPanel
+  apuntando FUERA del arbol (p. ej. /home/drcacere/gcm-archivos).
 - **Fase B**: pestana Evidencia de la obra: vista agregada con filtros.
 - **Fase C**: estandares visuales (quality gates), dentro de Fase 2 documental.
 - **Fase D**: rol cliente solo lectura + reconocimiento de cuadrillas.

@@ -89,6 +89,9 @@ next-env.d.ts
 # Volcados de base de datos: NUNCA versionar (datos sensibles)
 /storage/*.sql
 
+# Evidencia fotografica subida en desarrollo (en prod vive fuera del arbol)
+/storage/evidencia/
+
 # Documentos de referencia (binarios pesados; se guardan en local)
 /docs/referencias/
 

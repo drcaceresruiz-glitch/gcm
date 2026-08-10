@@ -382,6 +382,7 @@ model Project {
   planesSemanales PlanSemanal[]
   calendariosLaborales WorkCalendar[]
   lookaheadTareas      LookaheadTask[]
+  fotosEvidencia       FotoEvidencia[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -1579,6 +1580,7 @@ model CompromisoSemanal {
 
   plan      PlanSemanal @relation(fields: [planSemanalId], references: [id], onDelete: Cascade)
   proveedor Proveedor?  @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  fotos     FotoEvidencia[]
 
   @@index([planSemanalId])
   @@index([proveedorId])
@@ -1709,7 +1711,56 @@ model Restriccion {
   createdAt DateTime @default(now())
 
   tarea LookaheadTask @relation(fields: [lookaheadTaskId], references: [id], onDelete: Cascade)
+  fotos FotoEvidencia[]
 
   @@index([lookaheadTaskId])
   @@map("restricciones_tarea")
+}
+
+/// Evidencia fotografica (Last Planner): la foto adosada al dato donde se
+/// decide, no una galeria suelta. Fase A: restricciones del Lookahead
+/// (demostrar que se libero) y compromisos del PTS (documentar la causa de
+/// no cumplimiento).
+///
+/// El archivo fisico vive FUERA del arbol de la app (STORAGE_ROOT); este
+/// registro es la evidencia de auditoria y NUNCA se borra. La purga futura
+/// eliminara el archivo del disco y marcara `purgadaAt`, dejando intactos
+/// nombre, hash, tamano, quien y cuando.
+model FotoEvidencia {
+  id        String @id @default(cuid())
+  projectId String
+
+  /// A que se adosa: exactamente UNO de los dos. Lo valida el servicio; la
+  /// FK va con SetNull para que la evidencia sobreviva aunque el objetivo
+  /// desaparezca (el registro es inmutable, su ancla no).
+  restriccionId String?
+  compromisoId  String?
+
+  /// Ruta RELATIVA dentro de STORAGE_ROOT (ej. "evidencia/<obra>/<id>.jpg").
+  ruta String @db.VarChar(255)
+
+  nombreOriginal String @db.VarChar(255)
+  mimeType       String @db.VarChar(100)
+  /// Bytes del archivo tal como se guardo.
+  tamano         Int
+  /// SHA-256 del contenido: la huella que sobrevive a la purga.
+  hash           String @db.VarChar(64)
+
+  /// Nota corta de quien sube ("llego el fierro de 3/8", "frente vacio").
+  nota String? @db.VarChar(300)
+
+  /// null = el archivo fisico existe. Con fecha = purgado del disco.
+  purgadaAt DateTime?
+
+  subidaPor String   @db.VarChar(150)
+  createdAt DateTime @default(now())
+
+  project     Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  restriccion Restriccion?       @relation(fields: [restriccionId], references: [id], onDelete: SetNull)
+  compromiso  CompromisoSemanal? @relation(fields: [compromisoId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([restriccionId])
+  @@index([compromisoId])
+  @@map("fotos_evidencia")
 }
