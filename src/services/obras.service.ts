@@ -533,6 +533,23 @@ export type ResultadoCrearObra =
   | { ok: false; error: string };
 
 /**
+ * Calendario laboral por defecto de una obra nueva (Last Planner).
+ *
+ * L-V 8h, sabado 5h, domingo descanso: la cadencia habitual de las obras del
+ * cliente (el sabado laborable de CRIOCORD son 5h). Es editable despues; da al
+ * Lookahead una base de dias habiles desde el primer dia. ISO 1..7 (lunes=1).
+ */
+const CALENDARIO_POR_DEFECTO = [
+  { diaSemana: 1, laborable: true, horas: "8" },
+  { diaSemana: 2, laborable: true, horas: "8" },
+  { diaSemana: 3, laborable: true, horas: "8" },
+  { diaSemana: 4, laborable: true, horas: "8" },
+  { diaSemana: 5, laborable: true, horas: "8" },
+  { diaSemana: 6, laborable: true, horas: "5" },
+  { diaSemana: 7, laborable: false, horas: "0" },
+] as const;
+
+/**
  * Crea una obra en la empresa de la sesion.
  *
  * Hasta ahora las obras solo nacian del script de seed: el permiso
@@ -604,6 +621,11 @@ export async function crearObra(
     const obra = await tx.project.create({
       data: { companyId: sesion.companyId, correlativo, ...campos },
       select: { id: true },
+    });
+
+    // Siembra el calendario laboral por defecto de la obra (Last Planner).
+    await tx.workCalendar.createMany({
+      data: CALENDARIO_POR_DEFECTO.map((d) => ({ projectId: obra.id, ...d })),
     });
 
     await tx.auditLog.create({

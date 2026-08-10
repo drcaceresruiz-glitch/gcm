@@ -380,6 +380,8 @@ model Project {
   mapeos      MapeoTareaPartida[]
   encargos    EncargoProveedor[]
   planesSemanales PlanSemanal[]
+  calendariosLaborales WorkCalendar[]
+  lookaheadTareas      LookaheadTask[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -854,6 +856,8 @@ model Proveedor {
   ordenes   OrdenCompra[]
   habituales ProveedorPartida[]
   encargos  EncargoProveedor[]
+  lookaheadTareas LookaheadTask[]
+  compromisos     CompromisoSemanal[]
 
   @@unique([companyId, ruc])
   @@index([companyId])
@@ -1548,8 +1552,164 @@ model CompromisoSemanal {
 
   createdAt DateTime @default(now())
 
-  plan PlanSemanal @relation(fields: [planSemanalId], references: [id], onDelete: Cascade)
+  // --- PTS operativo (Last Planner Fase 1): cantidad + zonificacion ---
+  // El avance en % (metaPorcentaje + AvanceTarea) se MANTIENE; la cantidad es
+  // complementaria y mas precisa (cantidad ejecutada vs planificada).
+
+  /// De que tarea del Lookahead nace este compromiso (trazabilidad del PTS).
+  /// Referencia suelta por valor; no FK dura para no atar su ciclo de vida.
+  lookaheadTaskId String?
+
+  /// Subcontratista asignado (proveedor de la empresa), si aplica.
+  proveedorId String?
+
+  /// Zona fina del trabajo ("P2-S1").
+  zona String? @db.VarChar(40)
+
+  /// Color (hex) para la vista de zonificacion del PTS.
+  color String? @db.VarChar(9)
+
+  /// Doble registro por CANTIDAD. `unidad` como el metrado de la partida.
+  cantidadPlan Decimal? @db.Decimal(14, 4)
+  cantidadEjec Decimal? @db.Decimal(14, 4)
+  unidad       String?  @db.VarChar(20)
+
+  /// Protocolo de calidad subido al completar (gate de calidad, Fase 4).
+  protocoloCalidad Boolean @default(false)
+
+  plan      PlanSemanal @relation(fields: [planSemanalId], references: [id], onDelete: Cascade)
+  proveedor Proveedor?  @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
 
   @@index([planSemanalId])
+  @@index([proveedorId])
   @@map("compromisos_semanales")
+}
+
+// ---------------------------------------------------------------------------
+// Last Planner: Lookahead (mediano plazo) y analisis de restricciones
+// ---------------------------------------------------------------------------
+
+enum TipoTurno {
+  NORMAL
+  NOCHE
+  TURNOS
+}
+
+/// Estado de confiabilidad de una tarea del Lookahead. LISTO = sin restricciones
+/// pendientes: es lo unico que se puede comprometer en el PTS.
+enum EstadoLookahead {
+  PENDIENTE
+  LISTO
+  BLOQUEADO
+}
+
+/// Los 7 flujos del analisis de restricciones (Last Planner).
+enum TipoRestriccion {
+  SEGURIDAD
+  INFORMACION
+  ESPACIO
+  MATERIALES
+  MANO_OBRA
+  REQUISITOS
+  EQUIPOS
+}
+
+/// Calendario laboral POR OBRA: que dias se trabaja y cuantas horas. Hasta ahora
+/// solo existia `Project.diaCorteSemanal` (un dia de corte). El Lookahead
+/// necesita los dias laborables para repartir tareas y contar plazos. Es por
+/// obra —no por empresa— porque el sabado laborable de CRIOCORD (5h) puede no
+/// aplicar a otra obra. ISO 1..7 (lunes=1), como `diaCorteSemanal`.
+model WorkCalendar {
+  id        String @id @default(cuid())
+  projectId String
+
+  /// Dia de la semana en ISO: 1=lunes … 7=domingo.
+  diaSemana Int
+
+  laborable Boolean @default(true)
+
+  /// Horas del dia (8 de L a V, 5 el sabado de CRIOCORD, 0 si descanso).
+  horas Decimal @db.Decimal(4, 2) @default(8)
+
+  turno TipoTurno @default(NORMAL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, diaSemana])
+  @@index([projectId])
+  @@map("calendarios_laborales")
+}
+
+/// Una tarea en la ventana de mediano plazo (Lookahead, ~3-6 semanas).
+///
+/// Se ancla a la tarea del cronograma por (projectId, uid) —igual que
+/// `AvanceTarea`—: el uid es lo unico estable entre versiones. NO copia nombre
+/// ni fechas (se leen de `TareaCronograma`). Solo guarda lo que ANADE la
+/// planificacion operativa: fase, zona, subcontratista y las restricciones. La
+/// partida se alcanza via `MapeoTareaPartida` por el mismo uid.
+model LookaheadTask {
+  id        String @id @default(cuid())
+  projectId String
+
+  /// UID de la tarea del cronograma (ancla estable entre versiones).
+  uid Int
+
+  /// Bloque/fase operativa para agrupar en la matriz ("FASE 2: ESTRUCTURAS").
+  faseBloque String? @db.VarChar(120)
+
+  /// Zona/sector de trabajo ("PISO 1", "ZONA A").
+  zona String? @db.VarChar(80)
+
+  /// Subcontratista responsable, si aplica.
+  proveedorId String?
+
+  /// GUID del elemento BIM, para el futuro enlace 4D. Sin uso todavia.
+  bimGuid String? @db.VarChar(255)
+
+  /// Estado de confiabilidad; LISTO lo calcula el backend desde `restricciones`.
+  estado EstadoLookahead @default(PENDIENTE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  proveedor     Proveedor?    @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  restricciones Restriccion[]
+
+  @@unique([projectId, uid])
+  @@index([projectId, estado])
+  @@map("lookahead_tareas")
+}
+
+/// Una restriccion (analisis de restricciones) sobre una tarea del Lookahead.
+/// Mientras alguna siga sin resolver, la tarea no esta LISTA y no puede
+/// comprometerse: es el "filtro de confiabilidad" del Last Planner.
+model Restriccion {
+  id              String @id @default(cuid())
+  lookaheadTaskId String
+
+  tipo    TipoRestriccion
+  detalle String? @db.VarChar(300)
+
+  /// Si exige un documento aprobado para resolverse (MATERIALES -> guia,
+  /// INFORMACION -> RFI/plano). La validacion automatica es logica de backend.
+  requiereDoc Boolean @default(false)
+
+  /// Documento que la levanta, si `requiereDoc`. Sera FK a ProjectDocument en
+  /// la Fase 4 (cuando exista la infra de subida de archivos).
+  documentoId String?
+
+  resuelta    Boolean   @default(false)
+  resueltaAt  DateTime?
+  resueltaPor String?   @db.VarChar(150)
+
+  createdAt DateTime @default(now())
+
+  tarea LookaheadTask @relation(fields: [lookaheadTaskId], references: [id], onDelete: Cascade)
+
+  @@index([lookaheadTaskId])
+  @@map("restricciones_tarea")
 }
