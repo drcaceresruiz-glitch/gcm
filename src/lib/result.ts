@@ -89,11 +89,14 @@ export function tryCatch<T>(
  * // { ok: true, value: 10 }
  * ```
  */
-export function map<T, U>(result: Result<T>, fn: (value: T) => U): Result<U, typeof result extends Result<unknown, infer E> ? E : never> {
+export function map<T, U, E = string>(
+  result: Result<T, E>,
+  fn: (value: T) => U,
+): Result<U, E> {
   if (result.ok) {
     return { ok: true, value: fn(result.value) };
   }
-  return result as Result<U, any>;
+  return result;
 }
 
 /**

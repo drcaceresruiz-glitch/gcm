@@ -51,6 +51,9 @@ export const PERMISOS = [
   "plan_semanal:leer",
   "plan_semanal:gestionar",
 
+  "lookahead:leer",
+  "lookahead:gestionar",
+
   "linea_base:leer",
   "linea_base:crear",
   "linea_base:aprobar",
@@ -116,6 +119,7 @@ const SOLO_LECTURA: Permiso[] = [
   "partida:leer",
   "cronograma:leer",
   "plan_semanal:leer",
+  "lookahead:leer",
   "linea_base:leer",
   "movimiento:leer",
 ];
@@ -143,6 +147,9 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// El last planner de la obra: arma el plan semanal, compromete tareas y
     /// cierra la semana midiendo PPC/CNC. Es trabajo de campo, va con el residente.
     "plan_semanal:gestionar",
+    /// El Lookahead (mediano plazo): analiza restricciones y prepara lo que se
+    /// podra comprometer en el PTS. Es trabajo de campo, va con el residente.
+    "lookahead:gestionar",
     /// Fija la linea base del cronograma (la version congelada contra la que se
     /// mide el EVM). Re-fijable con confirmacion; se audita. No es contractual
     /// como la del presupuesto, asi que no va en INNEGOCIABLES.
@@ -190,6 +197,7 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "encargo:gestionar",
     "encargo:valorizar",
     "plan_semanal:gestionar",
+    "lookahead:gestionar",
   ],
 
   /// Almacen: necesita ver las partidas para imputar movimientos de

@@ -55,6 +55,13 @@ export default async function ObraLayout({
       etiqueta: "Cronograma",
       clave: "cronograma",
     },
+    // El Lookahead (mediano plazo) va entre cronograma y plan semanal: prepara
+    // con analisis de restricciones lo que luego se comprometera en el PTS.
+    puede(sesion, "lookahead:leer") && {
+      href: `${raiz}/lookahead`,
+      etiqueta: "Lookahead",
+      clave: "lookahead",
+    },
     // El plan semanal (Last Planner) cuelga del cronograma: es su corto plazo.
     puede(sesion, "plan_semanal:leer") && {
       href: `${raiz}/plan-semanal`,

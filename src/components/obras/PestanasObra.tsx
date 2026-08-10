@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   ArrowLeftRight,
   CalendarClock,
+  CalendarRange,
   ClipboardList,
   FileClock,
   Handshake,
@@ -23,6 +24,7 @@ import {
 const ICONOS = {
   presupuesto: Table2,
   cronograma: CalendarClock,
+  lookahead: CalendarRange,
   planSemanal: ClipboardList,
   revisiones: FileClock,
   movimientos: ArrowLeftRight,
