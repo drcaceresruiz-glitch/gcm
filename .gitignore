@@ -1,36 +1,24 @@
-```
+```markdown
 # Dependencies
 node_modules/
-.pnpm-store/
 
-# Build outputs
-dist/
-build/
-.next/
-.nuxt/
-public/build/
-
-# Runtime data
-.prisma/
-lib/
-generated/
-
-# Environment variables
-.env*
-!.env.example
+# Environment
+.env
+.env.local
+.env.*
 
 # Logs
 *.log
 
-# OS generated files
-.DS_Store
-Thumbs.db
+# Coverage
+coverage/
+htmlcov/
+.coverage
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
+# Build outputs
+dist/
+build/
+target/
 
 # Python
 __pycache__/
@@ -38,58 +26,45 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
-env/
+*.so
+*.egg-info/
+.eggs/
+
+# Virtual environments
 venv/
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/
+env/
+ENV/
+
+# Testing
 .mypy_cache/
 .pytest_cache/
-.hypothesis/
+.nyc_output/
+coverage/
 
-# Node.js
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-node_modules/
-jspm_packages/
-typings/
-.nyc_output
-coverage/
-*.lcov
-.nyc_output/
-!.nyc_output
-istanbul.yml
-.nyc_output
-coverage/
-*.lcov
-.nyc_output/
-!.nyc_output
-istanbul.yml
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Temporary files
 *.tmp
 *.temp
 *.bak
-*.backup
 
 # Archives
 *.zip
 *.tar.gz
 *.tar.bz2
 *.tar.xz
+*.gz
 *.rar
 *.7z
-*.gz
 *.bz2
 *.xz
 *.zst
