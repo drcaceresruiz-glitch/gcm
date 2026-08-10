@@ -141,6 +141,12 @@ export async function accionImportar(
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
+  // Antes de tocar el archivo, como en `accionAnalizar`: convertir un .mpp
+  // LANZA UN PROCESO JAVA, y eso no puede dispararlo quien no puede importar.
+  if (!puede(sesion, "cronograma:importar")) {
+    return { error: "No tienes permiso para importar el cronograma." };
+  }
+
   const obraId = String(datos.get("obraId") ?? "");
   if (!obraId) return { error: "Falta la obra de destino." };
 

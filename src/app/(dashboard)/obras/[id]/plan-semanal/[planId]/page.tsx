@@ -137,6 +137,9 @@ export default async function DetallePlanSemanalPage({
               causa: c.causa,
               notaCierre: c.notaCierre,
               porcentajeReal: c.porcentajeReal,
+              cantidadPlan: c.cantidadPlan,
+              unidad: c.unidad,
+              cantidadEjec: c.cantidadEjec,
             }))}
           />
         </Seccion>
@@ -174,7 +177,11 @@ export default async function DetallePlanSemanalPage({
                     {c.descripcion}
                     {c.cantidadPlan && (
                       <span className="ml-2 text-xs opacity-70 tabular-nums">
-                        {c.cantidadPlan}
+                        {/* Cerrada: lo ejecutado CONTRA lo comprometido, que es
+                            la comparacion que interesa. Abierta: solo el plan. */}
+                        {!abierto && c.cantidadEjec
+                          ? `${c.cantidadEjec} / ${c.cantidadPlan}`
+                          : c.cantidadPlan}
                         {c.unidad ? ` ${c.unidad}` : ""}
                       </span>
                     )}

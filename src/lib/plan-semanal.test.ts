@@ -258,6 +258,9 @@ describe("mapaPreservablePorUid", () => {
     proveedorId: "prov1",
     color: null,
     protocoloCalidad: true,
+    // Se anota al cerrar la semana: si no se preservara, reabrir y volver a
+    // guardar borraria lo que de verdad se ejecuto.
+    cantidadEjec: "90.0000",
   };
 
   it("conserva lo que la pantalla no reenvia", () => {

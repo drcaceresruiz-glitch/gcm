@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
+import { puede } from "@/lib/rbac";
 import { analizarExcel, type ResultadoAnalisis } from "@/lib/excel-presupuesto";
 import { aplicarImportacion } from "@/services/importacion.service";
 
@@ -55,6 +56,13 @@ export async function accionAnalizar(
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
+  // El permiso se comprueba ANTES de leer el archivo, no solo al guardar: si no,
+  // cualquiera con sesion —un CONSULTOR de solo lectura— podia hacer que el
+  // servidor parseara 8 MB de Excel, que es memoria que pagan los demas.
+  if (!puede(sesion, "partida:importar")) {
+    return { error: "No tienes permiso para importar el presupuesto." };
+  }
+
   const validacion = validarArchivo(datos.get("archivo"));
   if (!validacion.ok) return { error: validacion.error };
 
@@ -81,6 +89,12 @@ export async function accionImportar(
 ): Promise<EstadoImportacion> {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
+
+  // Igual que al analizar: el servicio lo revalida al guardar, pero para
+  // entonces ya se habria parseado el archivo.
+  if (!puede(sesion, "partida:importar")) {
+    return { error: "No tienes permiso para importar el presupuesto." };
+  }
 
   const obraId = String(datos.get("obraId") ?? "");
   if (!obraId) return { error: "Falta la obra de destino." };

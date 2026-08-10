@@ -303,6 +303,9 @@ export interface CamposPreservables {
   proveedorId: string | null;
   color: string | null;
   protocoloCalidad: boolean;
+  /// Se anota al CERRAR la semana, no al planificar. Si no se preservara,
+  /// reabrir y volver a guardar borraria lo que de verdad se ejecuto.
+  cantidadEjec: string | null;
 }
 
 /**
@@ -339,6 +342,7 @@ export function mapaPreservablePorUid(
       proveedorId: e.proveedorId,
       color: e.color,
       protocoloCalidad: e.protocoloCalidad,
+      cantidadEjec: e.cantidadEjec,
     });
   }
   return mapa;

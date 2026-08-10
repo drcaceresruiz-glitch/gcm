@@ -136,6 +136,8 @@ export interface CompromisoDetalle {
   /// Cantidad comprometida y su unidad (PTS por cantidad).
   cantidadPlan: string | null;
   unidad: string | null;
+  /// Cuanto se ejecuto, anotado al cerrar la semana.
+  cantidadEjec: string | null;
   /// De que tarea del Lookahead nacio, si vino de ahi.
   lookaheadTaskId: string | null;
   /// Estado en el Lookahead HOY (no congelado): si no esta LISTO, la pantalla
@@ -211,7 +213,8 @@ export async function obtenerPlanSemanal(
         select: {
           id: true, uid: true, descripcion: true, metaPorcentaje: true,
           cumplido: true, causa: true, notaCierre: true,
-          cantidadPlan: true, unidad: true, lookaheadTaskId: true,
+          cantidadPlan: true, unidad: true, cantidadEjec: true,
+          lookaheadTaskId: true,
         },
       },
     },
@@ -371,6 +374,7 @@ export async function obtenerPlanSemanal(
     porcentajeReal: c.uid !== null ? (realDelPlanPorUid.get(c.uid) ?? null) : null,
     cantidadPlan: c.cantidadPlan?.toString() ?? null,
     unidad: c.unidad,
+    cantidadEjec: c.cantidadEjec?.toString() ?? null,
     lookaheadTaskId: c.lookaheadTaskId,
     estadoLookahead: c.uid !== null ? (estadoLkPorUid.get(c.uid) ?? null) : null,
   }));
@@ -578,9 +582,13 @@ export async function guardarCompromisos(
         proveedorId: true,
         color: true,
         protocoloCalidad: true,
+        cantidadEjec: true,
       },
     });
-    const preservar = mapaPreservablePorUid(previos, limpios);
+    const preservar = mapaPreservablePorUid(
+      previos.map((p) => ({ ...p, cantidadEjec: p.cantidadEjec?.toString() ?? null })),
+      limpios,
+    );
 
     await tx.compromisoSemanal.deleteMany({ where: { planSemanalId: planId } });
     if (limpios.length > 0) {
@@ -599,6 +607,7 @@ export async function guardarCompromisos(
             proveedorId: guardado?.proveedorId ?? null,
             color: guardado?.color ?? null,
             protocoloCalidad: guardado?.protocoloCalidad ?? false,
+            cantidadEjec: guardado?.cantidadEjec ?? null,
           };
         }),
       });
@@ -627,6 +636,10 @@ export interface Evaluacion {
   /// % de avance real ALCANZADO por la tarea (acumulado 0-100). Solo aplica a
   /// compromisos con tarea (uid); se propaga a AvanceTarea al cerrar.
   porcentajeReal?: string | null;
+  /// Cuanto se EJECUTO de verdad, en la unidad del compromiso. Es la otra
+  /// mitad del PTS por cantidad: sin esto se compromete "120 m2" y al cerrar
+  /// solo se puede decir "cumplido", que es justo lo que no se queria medir.
+  cantidadEjec?: string | null;
 }
 
 /**
@@ -678,6 +691,10 @@ export async function cerrarPlanSemanal(
         return { ok: false, error: "El % alcanzado de cada tarea es un porcentaje entre 0 y 100." };
       }
     }
+    // La cantidad ejecutada usa la MISMA validacion que la planificada: misma
+    // columna, mismas reglas (nada de negativos ni de comas ambiguas).
+    const ejec = validarCantidadPlan(e.cantidadEjec);
+    if (!ejec.ok) return { ok: false, error: ejec.error };
     porId.set(e.compromisoId, e);
   }
 
@@ -693,6 +710,12 @@ export async function cerrarPlanSemanal(
           cumplido,
           causa: cumplido ? null : (e?.causa ?? "OTRA"),
           notaCierre: e?.nota?.trim() ? e.nota.trim() : null,
+          // Lo ejecutado de verdad. Si no se anota, se deja como estaba en vez
+          // de borrarlo: reabrir y cerrar otra vez no debe perder la medicion.
+          ...(() => {
+            const v = validarCantidadPlan(e?.cantidadEjec);
+            return v.ok && v.valor !== null ? { cantidadEjec: v.valor } : {};
+          })(),
         },
       });
     }

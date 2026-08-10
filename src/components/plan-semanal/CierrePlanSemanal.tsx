@@ -22,6 +22,11 @@ interface Fila {
   nota: string;
   /// % alcanzado (acumulado 0-100) de la tarea; se propaga a su avance al cerrar.
   porcentajeReal: string;
+  /// Cuanto se ejecuto, en la unidad del compromiso. Solo se pide si se
+  /// comprometio por cantidad.
+  cantidadEjec: string;
+  cantidadPlan: string | null;
+  unidad: string | null;
 }
 
 export function CierrePlanSemanal({
@@ -40,6 +45,9 @@ export function CierrePlanSemanal({
     causa: CausaNoCumplimiento | null;
     notaCierre: string | null;
     porcentajeReal: string | null;
+    cantidadPlan: string | null;
+    unidad: string | null;
+    cantidadEjec: string | null;
   }[];
 }) {
   const [filas, setFilas] = useState<Fila[]>(() =>
@@ -57,6 +65,11 @@ export function CierrePlanSemanal({
       // % alcanzado: lo ya registrado por este plan al reabrir; si no, la meta
       // como punto de partida editable.
       porcentajeReal: c.porcentajeReal ?? c.metaPorcentaje ?? "",
+      // Lo ya anotado al cerrar; si no, se arranca de lo comprometido, que es
+      // la respuesta mas probable ("se hizo lo previsto") y se corrige encima.
+      cantidadEjec: c.cantidadEjec ?? c.cantidadPlan ?? "",
+      cantidadPlan: c.cantidadPlan,
+      unidad: c.unidad,
     })),
   );
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +92,7 @@ export function CierrePlanSemanal({
           nota: f.nota.trim() || null,
           porcentajeReal:
             f.uid !== null ? (f.porcentajeReal.trim() || null) : null,
+          cantidadEjec: f.cantidadEjec.trim() || null,
         })),
       );
       if (!r.ok) setError(r.error ?? "No se pudo cerrar la semana.");
@@ -109,6 +123,24 @@ export function CierrePlanSemanal({
                 <span>Cumplido</span>
               </label>
               <span className="flex-1">{f.descripcion}</span>
+              {/* Solo si se comprometio por cantidad: preguntar "cuantos m2"
+                  donde no se pacto ninguna cantidad no significa nada. */}
+              {f.cantidadPlan !== null && (
+                <label className="inline-flex items-center gap-1 text-xs opacity-80">
+                  ejecutado
+                  <input
+                    value={f.cantidadEjec}
+                    onChange={(e) => set(f.id, { cantidadEjec: e.target.value })}
+                    inputMode="decimal"
+                    title={`Cantidad ejecutada de ${f.cantidadPlan} ${f.unidad ?? ""} comprometidos`}
+                    className="w-20 rounded border px-1.5 py-1 text-xs tabular-nums"
+                    style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+                  />
+                  <span className="opacity-60">
+                    / {f.cantidadPlan} {f.unidad ?? ""}
+                  </span>
+                </label>
+              )}
               {f.uid !== null && (
                 <label className="inline-flex items-center gap-1 text-xs opacity-80">
                   % alcanzado
