@@ -7,6 +7,9 @@ import { Volver } from "@/components/ui/Volver";
 import { PanelAyuda } from "@/components/ui/PanelAyuda";
 import { IlustracionPlano } from "@/components/ui/IlustracionPlano";
 import { FormularioObra } from "@/components/obras/FormularioObra";
+import { CalendarioLaboral } from "@/components/obras/CalendarioLaboral";
+import { obtenerCalendario } from "@/services/calendario.service";
+import { DIAS_ISO, type DiaLaboral } from "@/lib/calendario";
 import { accionEditarObra } from "./acciones";
 
 export const metadata: Metadata = { title: "Editar obra" };
@@ -39,6 +42,16 @@ export default async function EditarObraPage({
 
   // El id se liga a la accion en el servidor: no viaja como campo manipulable.
   const accion = accionEditarObra.bind(null, id);
+
+  // Las obras creadas antes de que existiera la siembra no tienen calendario:
+  // se rellena con el regimen habitual para que la pantalla no salga vacia.
+  const guardado = await obtenerCalendario(sesion, id);
+  const calendario: DiaLaboral[] = DIAS_ISO.map((dia) => {
+    const y = guardado.find((g) => g.diaSemana === dia);
+    if (y) return y;
+    if (dia === 7) return { diaSemana: dia, laborable: false, horas: "0" };
+    return { diaSemana: dia, laborable: true, horas: dia === 6 ? "5" : "8" };
+  });
 
   return (
     <div className="space-y-6">
@@ -92,6 +105,19 @@ export default async function EditarObraPage({
           />
         }
       />
+
+      <section
+        className="rounded-xl border p-4"
+        style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
+      >
+        <h2 className="text-base font-semibold">Regimen laboral</h2>
+        <p className="mt-0.5 mb-3 max-w-2xl text-sm opacity-70">
+          Que dias se trabaja en esta obra y cuantas horas. De aqui salen los
+          dias laborables que quedan de plazo. Una edificacion urbana suele ir
+          de lunes a sabado; una obra vial de turno corrido, los siete dias.
+        </p>
+        <CalendarioLaboral obraId={id} inicial={calendario} />
+      </section>
     </div>
   );
 }

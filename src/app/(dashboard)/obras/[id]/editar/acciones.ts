@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { actualizarObra } from "@/services/obras.service";
+import {
+  guardarCalendario,
+  type ResultadoCalendario,
+} from "@/services/calendario.service";
+import type { DiaLaboral } from "@/lib/calendario";
 import type { EstadoObra } from "@/app/(dashboard)/obras/nueva/acciones";
 
 /**
@@ -41,4 +46,30 @@ export async function accionEditarObra(
   revalidatePath(`/obras/${obraId}`);
 
   redirect(`/obras/${obraId}`);
+}
+
+/**
+ * Guarda el regimen laboral de la obra.
+ *
+ * Va aparte del formulario de datos y sin redirigir: se toca varias veces
+ * seguidas hasta dejarlo como es la obra, y mandar a otra pantalla despues de
+ * cada cambio seria pelearse con quien lo configura.
+ */
+export async function accionGuardarCalendario(
+  obraId: string,
+  dias: DiaLaboral[],
+): Promise<ResultadoCalendario> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await guardarCalendario(sesion, obraId, dias);
+
+  if (r.ok) {
+    // Los dias laborables se ensenan en la ficha de la obra y en el panel.
+    revalidatePath("/panel");
+    revalidatePath(`/obras/${obraId}`);
+    revalidatePath(`/obras/${obraId}/editar`);
+  }
+
+  return r;
 }

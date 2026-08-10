@@ -255,9 +255,11 @@ export function MatrizLookahead({
         />
       )}
 
-      {/* Matriz. Scroll horizontal propio: son 7 columnas de restriccion. */}
+      {/* Escritorio: la matriz entera, con scroll horizontal propio.
+          En un movil de obra no cabe —siete columnas en 400px no se pueden
+          tocar—, asi que por debajo de `md` se cambia por tarjetas. */}
       <div
-        className="overflow-x-auto rounded-lg border"
+        className="hidden overflow-x-auto rounded-lg border md:block"
         style={{ borderColor: "var(--borde)" }}
       >
         <table className="w-full border-collapse text-sm">
@@ -358,11 +360,147 @@ export function MatrizLookahead({
         </table>
       </div>
 
+      {/* Movil: una tarjeta por tarea, con las restricciones desplegables. */}
+      <ul className="space-y-2 md:hidden">
+        {filas.map((fila) => (
+          <TarjetaTarea
+            key={fila.uid}
+            fila={fila}
+            elegida={elegidas.has(fila.uid)}
+            puedeElegir={puedeComprometer}
+            puedeGestionar={puedeGestionar}
+            pendiente={pendiente}
+            onElegir={() => alternarEleccion(fila.uid)}
+            onAlternar={alternar}
+          />
+        ))}
+      </ul>
+
       <p className="text-xs opacity-60">
         Marca cada restriccion cuando quede resuelta. Cuando las 7 estan
         resueltas, la tarea pasa a <strong>Lista</strong> y podra comprometerse
         en el Plan Semanal.
       </p>
     </div>
+  );
+}
+
+/**
+ * Una tarea de la ventana, para movil.
+ *
+ * La matriz de escritorio no se puede encoger: siete casillas en 400px quedan
+ * por debajo del tamano minimo que un dedo acierta. Aqui cada tarea es una
+ * tarjeta y sus restricciones se despliegan como filas de 44px, que es el
+ * minimo recomendado para tocar.
+ *
+ * Arranca plegada y ensena "3/7 resueltas": en obra lo que se mira primero es
+ * cuanto falta, no cual falta.
+ */
+function TarjetaTarea({
+  fila,
+  elegida,
+  puedeElegir,
+  puedeGestionar,
+  pendiente,
+  onElegir,
+  onAlternar,
+}: {
+  fila: LookaheadDatos["filas"][number];
+  elegida: boolean;
+  puedeElegir: boolean;
+  puedeGestionar: boolean;
+  pendiente: boolean;
+  onElegir: () => void;
+  onAlternar: (restriccionId: string, resuelta: boolean) => void;
+}) {
+  const [abierta, setAbierta] = useState(false);
+  const resueltas = fila.restricciones.filter((r) => r.resuelta).length;
+  const total = fila.restricciones.length;
+  const Icono = ICONO_ESTADO[fila.estado];
+
+  return (
+    <li
+      className="rounded-lg border"
+      style={{ borderColor: "var(--borde)" }}
+    >
+      <div className="flex items-start gap-2 p-3">
+        {puedeElegir && (
+          <input
+            type="checkbox"
+            checked={elegida}
+            onChange={onElegir}
+            aria-label={`Elegir ${fila.nombre} para el Plan Semanal`}
+            className="mt-1 size-5 shrink-0"
+            style={{ accentColor: "var(--color-marca-600)" }}
+          />
+        )}
+
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">
+            {fila.codigo ? `${fila.codigo} ` : ""}
+            {fila.nombre}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs opacity-70">
+            {!fila.sincronizada && <span>Sin analizar</span>}
+            {fila.comprometida.length > 0 && (
+              <span>
+                En {fila.comprometida.map((c) => `S-${c.numero}`).join(", ")}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <Chip tono={TONO_ESTADO[fila.estado]} icono={Icono}>
+          {ETIQUETA_ESTADO[fila.estado]}
+        </Chip>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setAbierta((p) => !p)}
+        aria-expanded={abierta}
+        className="flex w-full items-center justify-between border-t px-3 py-2.5 text-sm"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <span className="tabular-nums">
+          Restricciones{" "}
+          <strong>
+            {resueltas}/{total}
+          </strong>{" "}
+          resueltas
+        </span>
+        <span className="opacity-60">{abierta ? "▾" : "▸"}</span>
+      </button>
+
+      {abierta && (
+        <ul className="px-3 pb-2">
+          {fila.restricciones.map((c) => {
+            const etiqueta = ETIQUETA_FLUJO.get(c.tipo) ?? c.tipo;
+            const bloqueada =
+              !puedeGestionar || !fila.sincronizada || c.id === null || pendiente;
+            return (
+              <li key={c.tipo} className="border-t" style={{ borderColor: "var(--borde)" }}>
+                {/* El label entero es el area tocable, no solo la casilla:
+                    apuntar a 16px con el dedo, con guantes, no funciona. */}
+                <label className="flex min-h-11 items-center gap-3 py-1 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={c.resuelta}
+                    disabled={bloqueada}
+                    onChange={(e) => {
+                      if (c.id) onAlternar(c.id, e.target.checked);
+                    }}
+                    aria-label={`${etiqueta} de ${fila.nombre}`}
+                    className="size-5 shrink-0"
+                    style={{ accentColor: "var(--color-exito)" }}
+                  />
+                  <span className={c.resuelta ? "" : "opacity-80"}>{etiqueta}</span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </li>
   );
 }

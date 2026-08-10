@@ -16,6 +16,21 @@ export const metadata: Metadata = {
   description:
     "Control de obra multiproyecto: presupuesto, avance fisico y resultado economico.",
   robots: { index: false, follow: false },
+  /**
+   * Instalable en el movil.
+   *
+   * Con esto el residente puede anadir GCM a su pantalla de inicio y abrirlo
+   * sin la barra del navegador, que en un telefono son dos centimetros de
+   * pantalla que se recuperan para la matriz.
+   *
+   * NO hay trabajador de servicio ni funcionamiento sin conexion: cachear la
+   * lectura seria facil, pero escribir sin senal —marcar cumplido en obra— abre
+   * el problema de resolver conflictos cuando dos personas editan la misma
+   * semana desde moviles distintos. Eso es un proyecto aparte, no una casilla.
+   */
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "GCM", statusBarStyle: "default" },
+  icons: { icon: "/icono.svg", apple: "/icono.svg" },
 };
 
 export const viewport: Viewport = {

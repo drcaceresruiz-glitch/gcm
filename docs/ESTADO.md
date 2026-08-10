@@ -3,7 +3,113 @@
 Documento de traspaso. Léelo antes de tocar nada: recoge lo construido, por
 qué está construido así, y qué falta.
 
-Última actualización: 8 de agosto de 2026.
+Última actualización: 10 de agosto de 2026.
+
+> **Las secciones 3 y 6 de abajo se escribieron el 8 de agosto.** Lo ocurrido
+> desde entonces está en el anexo que sigue; ante una contradicción, manda el
+> anexo.
+
+---
+
+## Anexo — estado al 10 de agosto de 2026
+
+### Multiempresa real: ya se puede vender a otras constructoras
+
+Hasta ahora crear una empresa exigía entrar a la base a mano. Ya hay pantalla:
+`/operador` lista las constructoras (solo contadores de usuarios y obras, nunca
+su contenido) y `/operador/nueva` crea la empresa y su primer ADMIN en una
+sola transacción, con clave temporal y correo de bienvenida.
+
+**Quién opera GCM vive en la variable de entorno `GCM_OPERADORES`** (lista de
+correos separados por coma), no en la base. Un valor nuevo en el enum `Role`
+habría exigido migración y una fila en la MATRIZ de permisos —que describe lo
+que se puede hacer DENTRO de una empresa—, y una columna booleana habría sido
+concedible desde la propia aplicación. Así solo se concede con acceso al
+servidor. Ausente = nadie es operador, que es el fallo seguro.
+
+Ser operador **no concede ni un permiso del dominio** y **no permite entrar en
+los datos de un cliente**: no existe esa pantalla, y `listarConstructoras` es
+la única consulta del sistema sin filtro por empresa —lleva `select` explícito
+de contadores y un comentario advirtiéndolo—.
+
+`Company.activa` estaba muerto y ahora suspende clientes. Se comprueba en el
+login **y** en `obtenerSesion`, porque con solo lo primero quien ya estuviera
+dentro seguiría trabajando hasta que caducara su cookie. En el login va
+DESPUÉS de validar la clave: antes, el formulario sería un detector de qué
+constructoras están suspendidas para cualquiera que supiera un correo.
+
+### Last Planner: el ciclo está cerrado
+
+- **Lookahead** (`/obras/[id]/lookahead`): matriz de tareas × los 7 flujos de
+  restricción. El enum ya deletrea SIEMPRE (Seguridad, Información, Espacio,
+  Materiales, Mano de obra, Requisitos, Equipos). Semáforo LISTO/PENDIENTE y %
+  de confiabilidad. Las tareas se DERIVAN del cronograma vigente por `uid`; se
+  materializan con el botón «Sincronizar ventana».
+- **Ventana configurable de 1 a 12 semanas**, 3 por defecto, en la URL
+  (`?semanas=6`). Sincronizar usa las mismas semanas que se están viendo: con
+  otra cifra quedarían tareas a la vista sin analizar y sin explicación.
+- **Del Lookahead al PTS**: selección múltiple y «Comprometer al PTS», con
+  cantidad y unidad tomadas de la partida mapeada. Si algo no está LISTO o ya
+  está en otra semana, **el servidor no escribe** y devuelve los avisos; hace
+  falta confirmar de forma explícita. La decisión no queda en el cliente.
+- **Cierre por cantidad**: la semana pregunta cuánto se EJECUTÓ, y la semana
+  cerrada muestra «90 / 120 m2».
+
+### Dos defectos reparados que conviene no reintroducir
+
+1. **Fuga de datos en el plan semanal.** Guardar la semana REEMPLAZA sus
+   compromisos. Escribía solo descripción y meta, así que en cuanto hubo
+   cantidad y trazabilidad, la siguiente edición las borraba en silencio. Ahora
+   el formulario reenvía lo que edita y el servicio conserva por uid lo que no
+   (`zona`, `proveedorId`, `color`, `protocoloCalidad`, `cantidadEjec`),
+   absteniéndose cuando el uid está repetido y no se sabe de qué fila era.
+2. **Permiso de los importadores.** `accionAnalizar` del presupuesto y
+   `accionImportar` del cronograma no comprobaban permiso antes de tocar el
+   archivo —y convertir un `.mpp` lanza un proceso Java—. Las cuatro acciones
+   lo exigen ya antes de leer nada.
+
+### Deuda conocida, por orden de lo que muerde
+
+- **Cinco consultas sin filtro por empresa**: `obras.service` (196, 233, 402),
+  `tablero.service` (427) y `actividad.service` (76). Correctas hoy porque los
+  identificadores vienen de consultas ya filtradas; con clientes reales, un
+  reordenamiento del código filtraría datos entre constructoras.
+- **Sin límite de frecuencia** en el login por IP (el bloqueo es por cuenta) ni
+  en la API de SUNAT: un cliente puede agotar la cuota de todos.
+- **`WorkCalendar` se escribe y nadie lo lee.** Se siembra al crear la obra
+  (L-V 8h, sábado 5h, domingo libre, ISO 1-7) y ningún cálculo lo consulta.
+- La ventana del Lookahead **no se guarda por obra**: al recargar sin
+  parámetro vuelve a 3.
+- El mismo mensaje delator del correo repetido sigue en el alta de usuarios
+  normal: dice «ya existe», lo que confirma que esa persona es cliente.
+
+### Plan acordado — las 8 capas, en 5 fases
+
+| Fase | Contenido | Migración |
+|---|---|---|
+| 1 | Matriz del Lookahead en móvil · calendario laboral editable y leído · PWA instalable | No |
+| 2 | Control documental: subida de archivos, repositorio por categorías, metadatos, validador | Sí |
+| 3 | PTS avanzado: sectores reales, bloques de color, jerarquía subcontratista→sector→tarea, interferencias | Sí |
+| 4 | Cierre por cantidad automático (regla del 100%), meta configurable, causa raíz y plan de recuperación | No |
+| 5 | Motor de reglas CNC→acción y borradores de alerta temprana | No |
+
+Descartado: **un LLM local en cPanel compartido no es viable** (memoria y CPU).
+Un motor de reglas da la mayor parte del valor sin depender de nada.
+
+No se añade librería de gráficos: los de PPC y Pareto son SVG a mano y pesan
+cero. **No existe `tailwind.config.ts`** — Tailwind 4 configura por CSS, con
+cinco paletas y modo claro/oscuro en `globals.css`; meter hexadecimales fijos
+rompería el tema.
+
+### Operativa del despliegue (esto ha fallado ya)
+
+1. `git push` a `main` lanza la Action (~1 min 20 s).
+2. **Espera a que termine** y solo entonces reinicia en cPanel → Setup Node.js
+   App. Reiniciar mientras suben los archivos deja a Passenger con el build
+   viejo: la ruta nueva da 404 aunque Actions salga verde.
+3. Si además hay migración, córrela **el mismo día** o el panel entero cae.
+4. Si tras el reinicio faltan estilos o hay 500, es la caída de archivos por
+   FTP: relanzar el despliegue con *Re-run all jobs*.
 
 ---
 

@@ -1,0 +1,30 @@
+{
+  "name": "GCM - Gestion en Construccion Moderna",
+  "short_name": "GCM",
+  "description": "Control de obra: presupuesto, avance fisico y Last Planner.",
+  "start_url": "/panel",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "lang": "es-PE",
+  "background_color": "#f2f7f8",
+  "theme_color": "#0f7186",
+  "icons": [
+    {
+      "src": "/icono.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icono.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Panel", "url": "/panel" },
+    { "name": "Mi perfil", "url": "/perfil" }
+  ]
+}
