@@ -241,6 +241,73 @@ export async function obtenerLookahead(
   };
 }
 
+export interface ConfiabilidadVentana extends Confiabilidad {
+  /// Cuantas semanas mira la ventana.
+  semanas: number;
+  /// Tareas de la ventana sin analizar. Cuentan como NO listas, y sin decirlo
+  /// el porcentaje engana: parece mala ejecucion cuando es falta de analisis.
+  sinSincronizar: number;
+}
+
+/**
+ * Solo la confiabilidad, a partir de tareas QUE YA TIENE QUIEN LLAMA.
+ *
+ * `obtenerLookahead` hace cuatro consultas, y la primera es el cronograma
+ * entero. Para el tablero eso era releer lo que el propio tablero acababa de
+ * leer: se acepto "a sabiendas" y el 10 de agosto de 2026 costo una caida
+ * —esta escrito en `plan-semanal.service` que cargar el cronograma completo en
+ * una pantalla ya habia matado el render a mitad bajo los limites de
+ * produccion, y volvio a pasar—.
+ *
+ * Esta version recibe las tareas ya leidas y hace UNA consulta. No devuelve
+ * las filas ni las semanas abiertas porque quien solo quiere el porcentaje no
+ * debe pagar por ellas.
+ *
+ * El numero que sale es el MISMO que el de la pantalla del Lookahead: ambos
+ * derivan el estado de las restricciones con `estadoDeTarea` y lo agregan con
+ * `confiabilidad`. Si algun dia divergen, es que alguien duplico la regla en
+ * vez de reutilizarla.
+ */
+export async function confiabilidadDeVentana(
+  sesion: SesionActiva,
+  obraId: string,
+  tareasCronograma: readonly TareaProgramada[],
+  semanasPedidas?: string | number,
+): Promise<ConfiabilidadVentana | null> {
+  if (!puede(sesion, "lookahead:leer")) return null;
+
+  const semanas = normalizarSemanas(semanasPedidas);
+  const { desde, hasta } = ventanaLookahead(hoy(), semanas);
+  const tareas = tareasDeLaSemana([...tareasCronograma], desde, hasta);
+
+  const uids = tareas.map((t) => t.uid);
+  const analizadas = uids.length
+    ? await prisma.lookaheadTask.findMany({
+        where: {
+          projectId: obraId,
+          uid: { in: uids },
+          project: { companyId: sesion.companyId },
+        },
+        select: { uid: true, restricciones: { select: { resuelta: true } } },
+      })
+    : [];
+
+  const porUid = new Map(analizadas.map((l) => [l.uid, l.restricciones]));
+
+  // Una tarea sin sincronizar no tiene restricciones, y `estadoDeTarea`
+  // devuelve PENDIENTE con la lista vacia: cuenta como no lista, igual que en
+  // la matriz.
+  const filas = tareas.map((t) => ({
+    estado: estadoDeTarea(porUid.get(t.uid) ?? []),
+  }));
+
+  return {
+    ...confiabilidad(filas),
+    semanas,
+    sinSincronizar: tareas.filter((t) => !porUid.has(t.uid)).length,
+  };
+}
+
 /**
  * Trae al Lookahead las tareas de la ventana que aun no estan: crea su
  * `LookaheadTask` y siembra sus 7 restricciones (sin resolver). Idempotente: no

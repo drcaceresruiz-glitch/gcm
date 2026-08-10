@@ -111,8 +111,10 @@ export default async function PanelPage({
     ? obraElegida
     : obrasTablero[0]?.id;
 
+  // Se le pasan los modulos encendidos: el tablero carga SOLO lo que se ve.
+  // Antes traia los datos de todos, y con once modulos eso tumbo produccion.
   const datosDelTablero = obraValida
-    ? await datosTablero(sesion, obraValida)
+    ? await datosTablero(sesion, obraValida, modulosTablero)
     : null;
 
   return (

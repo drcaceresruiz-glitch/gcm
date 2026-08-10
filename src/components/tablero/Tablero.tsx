@@ -37,9 +37,11 @@ import { ModuloContenido, moduloConDatos } from "@/components/tablero/modulos";
  * tablero ya configurado sin parpadeo:
  *   - QUE obra se supervisa. Cambiarla es traer cifras nuevas, asi que navega
  *     —el servidor recalcula—.
- *   - QUE modulos se ven. Encender uno no necesita datos nuevos, porque el
- *     servidor ya mando los de todos: es enseñar u ocultar, y se hace aqui
- *     mismo sin ir al servidor.
+ *   - QUE modulos se ven. APAGAR uno es instantaneo: solo se oculta. ENCENDER
+ *     uno que estaba apagado si va al servidor, porque desde el 10 de agosto
+ *     de 2026 el tablero carga unicamente los datos de los modulos
+ *     encendidos: traerlos todos, con once modulos, tumbo produccion. Lo paga
+ *     quien enciende, una vez, en vez de cobrarselo a todos en cada carga.
  *
  * Los avisos son la excepcion: NO se filtran por la obra elegida. Son los de
  * la empresa entera, porque el problema que hay que ver es justo el de la obra
@@ -91,13 +93,22 @@ export function Tablero({
   );
 
   function alternar(clave: ModuloTablero) {
-    setVisibles((previo) => {
-      const copia = new Set(previo);
-      if (copia.has(clave)) copia.delete(clave);
-      else copia.add(clave);
-      guardarTablero([...copia], datos?.obra.id);
-      return copia;
-    });
+    const encendiendo = !visibles.has(clave);
+    const copia = new Set(visibles);
+    if (encendiendo) copia.add(clave);
+    else copia.delete(clave);
+
+    setVisibles(copia);
+    guardarTablero([...copia], datos?.obra.id);
+
+    // Si se enciende un modulo cuyos datos no vinieron, hay que pedirlos: sin
+    // esto el modulo no apareceria —`moduloConDatos` lo filtra— y encenderlo
+    // no haria nada visible, que es la peor respuesta posible a un clic.
+    // `refresh` reaprovecha la cookie que se acaba de guardar y solo repinta
+    // la parte de servidor, sin perder el resto del estado de la pantalla.
+    if (encendiendo && datos !== null && !moduloConDatos(clave, datos)) {
+      iniciar(() => router.refresh());
+    }
   }
 
   function elegirObra(obraId: string) {

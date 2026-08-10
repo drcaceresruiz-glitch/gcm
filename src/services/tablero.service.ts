@@ -13,7 +13,8 @@ import { obtenerObra } from "@/services/obras.service";
 import { datosCurvaS, obtenerCronograma } from "@/services/cronograma.service";
 import { obtenerCalendario } from "@/services/calendario.service";
 import { listarPlanesSemanales } from "@/services/plan-semanal.service";
-import { obtenerLookahead } from "@/services/lookahead.service";
+import { confiabilidadDeVentana } from "@/services/lookahead.service";
+import { MODULOS_POR_DEFECTO, type ModuloTablero } from "@/lib/tablero";
 import { diasEntre, fechaCorta, hoy } from "@/utils/fechas";
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
@@ -218,6 +219,22 @@ export interface DatosCronogramaTablero {
  */
 const PUNTOS_MINI = 80;
 
+/**
+ * El presupuesto cuando su modulo esta apagado.
+ *
+ * Se devuelve la forma completa en ceros en vez de `null` para no obligar a
+ * todo lo de abajo a comprobarlo: el modulo no se pinta igualmente, porque
+ * `moduloConDatos` lo filtra antes.
+ */
+const PRESUPUESTO_VACIO: DatosTablero["presupuesto"] = {
+  total: "0.00",
+  comprometido: "0.00",
+  saldo: "0.00",
+  porcentaje: 0,
+  partidas: 0,
+  sobregiradas: 0,
+};
+
 function muestrear(puntos: readonly PuntoMini[]): PuntoMini[] {
   if (puntos.length <= PUNTOS_MINI) return [...puntos];
 
@@ -230,57 +247,62 @@ function muestrear(puntos: readonly PuntoMini[]): PuntoMini[] {
 }
 
 /**
- * Interruptor de emergencia de los modulos de Last Planner del tablero.
- *
- * Apagado el 10 de agosto de 2026 con produccion caida. Se anota el tipo
- * `boolean` a proposito y no se deja inferir `false`: asi ni el compilador ni
- * el linter tratan el resto como codigo muerto, y volver a encenderlo es
- * cambiar una palabra.
- */
-const CARGAR_LAST_PLANNER: boolean = false;
-
-/**
  * El tablero de una obra, o null si no existe o no es de esta empresa.
  *
  * El `companyId` sale de la sesion en cada consulta: manipular el `?obra=` de
  * la URL no alcanza la obra de otra empresa, simplemente devuelve null.
+ *
+ * SE CARGA SOLO LO DE LOS MODULOS ENCENDIDOS. El diseno original traia los
+ * datos de TODOS para que encender uno no costara una vuelta al servidor.
+ * Con ocho modulos ligeros era defendible; con once, y tres de ellos
+ * consultando Last Planner, dejo de serlo: el 10 de agosto de 2026 el peso de
+ * esta funcion tumbo produccion. Ahora quien enciende un modulo apagado paga
+ * una recarga —y solo el, y solo esa vez—, que es mucho mejor reparto que
+ * cobrarle a todo el mundo, en cada carga, los modulos que tiene apagados.
  */
 export async function datosTablero(
   sesion: SesionActiva,
   obraId: string,
+  modulos: readonly ModuloTablero[] = MODULOS_POR_DEFECTO,
 ): Promise<DatosTablero | null> {
   const obra = await obtenerObra(sesion, obraId);
   if (!obra) return null;
 
-  // APAGADO TRAS LA CAIDA DEL 10 DE AGOSTO DE 2026. No borrar el codigo ni el
-  // motivo: hay que volver a encenderlo, pero no asi.
-  //
-  // El tablero cargaba ademas el calendario, los planes semanales y el
-  // Lookahead. Ese ultimo RELEE EL CRONOGRAMA ENTERO que la linea de al lado
-  // acaba de leer; se acepto "a sabiendas" a cambio de coherencia, y fue un
-  // error: unas lineas mas arriba, en `plan-semanal.service`, esta escrito que
-  // cargar el cronograma completo en una pantalla ya habia MATADO EL RENDER A
-  // MITAD bajo los limites de recursos de produccion. El mismo sintoma
-  // —"destination stream closed early"— volvio el mismo dia que esto se
-  // desplego.
-  //
-  // Para volver a encenderlo hacen falta dos cosas, no una: cargar SOLO los
-  // modulos encendidos (el servidor ya lee la cookie) y compartir la lectura
-  // del cronograma en vez de repetirla.
-  const [presupuesto, ordenes, cronograma, curva] = await Promise.all([
-    presupuestoDeObra(sesion, obraId),
-    ordenesDeObra(sesion, obraId),
-    obtenerCronograma(sesion, obraId),
-    datosCurvaS(sesion, obraId),
-  ]);
+  const encendido = (clave: ModuloTablero) => modulos.includes(clave);
 
-  const [calendario, planes, lookahead] = CARGAR_LAST_PLANNER
-    ? await Promise.all([
-        obtenerCalendario(sesion, obraId),
-        planSemanalDeObra(sesion, obraId),
-        obtenerLookahead(sesion, obraId),
-      ])
-    : ([[], null, null] as const);
+  // Primera tanda: lo que casi siempre hace falta y no depende de nada mas.
+  // El cronograma se lee UNA vez y se reparte; la confiabilidad del Lookahead
+  // sale de estas mismas tareas.
+  const necesitaCronograma =
+    encendido("avance") ||
+    encendido("curva") ||
+    encendido("atrasos") ||
+    encendido("criticas") ||
+    encendido("capitulos") ||
+    encendido("confiabilidad");
+
+  const necesitaPlanes = encendido("ppc") || encendido("causas");
+
+  const [presupuesto, ordenes, cronograma, curva, calendario, planes] =
+    await Promise.all([
+      encendido("presupuesto")
+        ? presupuestoDeObra(sesion, obraId)
+        : PRESUPUESTO_VACIO,
+      encendido("presupuesto") || encendido("ordenes")
+        ? ordenesDeObra(sesion, obraId)
+        : null,
+      necesitaCronograma ? obtenerCronograma(sesion, obraId) : null,
+      necesitaCronograma ? datosCurvaS(sesion, obraId) : null,
+      encendido("plazo") ? obtenerCalendario(sesion, obraId) : [],
+      necesitaPlanes ? planSemanalDeObra(sesion, obraId) : null,
+    ]);
+
+  // Segunda tanda, y una sola consulta: la confiabilidad se calcula con las
+  // tareas que ya estan en memoria. Antes esto releia el cronograma entero.
+  const lookahead =
+    encendido("confiabilidad") && cronograma
+      ? await confiabilidadDeVentana(sesion, obraId, cronograma.tareas)
+      : null;
 
   const diasTotales = diasEntre(obra.fechaInicio, obra.fechaFinProgramada);
   const transcurridos = diasEntre(obra.fechaInicio, hoy());
@@ -303,8 +325,8 @@ export async function datosTablero(
     plazo: {
       inicio: fechaCorta(obra.fechaInicio),
       fin: fechaCorta(obra.fechaFinProgramada),
-      finCronograma: curva.fin ? fechaCorta(curva.fin) : null,
-      desvioFicha: curva.fin
+      finCronograma: curva?.fin ? fechaCorta(curva.fin) : null,
+      desvioFicha: curva?.fin
         ? diasEntre(obra.fechaFinProgramada, curva.fin)
         : null,
       diasTotales,
@@ -321,15 +343,10 @@ export async function datosTablero(
     },
     presupuesto,
     ordenes,
-    cronograma: cronograma && armarCronograma(cronograma, curva),
+    cronograma:
+      cronograma && curva ? armarCronograma(cronograma, curva) : null,
     planSemanal: planes,
-    lookahead: lookahead && {
-      listas: lookahead.confiabilidad.listas,
-      total: lookahead.confiabilidad.total,
-      porcentaje: lookahead.confiabilidad.porcentaje,
-      semanas: lookahead.semanas,
-      sinSincronizar: lookahead.pendientesDeSincronizar,
-    },
+    lookahead,
   };
 }
 
