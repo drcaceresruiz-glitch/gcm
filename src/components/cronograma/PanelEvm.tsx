@@ -1,6 +1,7 @@
 import { Info, Lock, TriangleAlert } from "lucide-react";
 import type { DatosEvm } from "@/services/evm.service";
 import { textoSinCosto } from "@/lib/evm";
+import { comparadoCon } from "@/lib/redondeo";
 import { GaugeIndice } from "@/components/cronograma/GaugeIndice";
 import { CurvaEvm } from "@/components/cronograma/CurvaEvm";
 import { soles } from "@/utils/formato";
@@ -26,6 +27,12 @@ import { fechaLarga } from "@/utils/fechas";
  */
 export function PanelEvm({ datos }: { datos: DatosEvm }) {
   const { metricas: m, verCosto } = datos;
+
+  // Los indices se muestran con dos decimales, asi que la palabra tiene que
+  // salir de esos dos decimales. Un SPI de 0.99895 se ensena como 1.00: decir
+  // "atrasado" al lado de un 1.00 es contradecirse en la misma linea.
+  const plazo = m.spi === null ? null : comparadoCon(m.spi, 1, 2);
+  const costo = m.cpi === null ? null : comparadoCon(m.cpi, 1, 2);
 
   return (
     <div className="space-y-5">
@@ -91,11 +98,13 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         Al corte del <strong>{fechaLarga(datos.fechaCorte)}</strong> se ha ganado{" "}
         <strong>{soles(m.ev)}</strong> de un plan de <strong>{soles(m.pv)}</strong>{" "}
         —{" "}
-        {m.spi === null ? (
+        {m.spi === null || plazo === null ? (
           <>aun no toca nada del plan</>
-        ) : m.spi >= 1 ? (
+        ) : plazo === 0 ? (
+          <span>justo en el plan (SPI {m.spi.toFixed(2)})</span>
+        ) : plazo > 0 ? (
           <span style={{ color: "var(--color-exito)" }}>
-            al dia o adelantado (SPI {m.spi.toFixed(2)})
+            adelantado (SPI {m.spi.toFixed(2)})
           </span>
         ) : (
           <span style={{ color: "var(--color-peligro)" }}>
@@ -105,10 +114,12 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         {verCosto && m.ac !== null && (
           <>
             {" "}y ha costado <strong>{soles(m.ac)}</strong>
-            {m.cpi !== null && (
+            {m.cpi !== null && costo !== null && (
               <>
                 {" "}—{" "}
-                {m.cpi >= 1 ? (
+                {costo === 0 ? (
+                  <span>lo mismo que lo ganado (CPI {m.cpi.toFixed(2)})</span>
+                ) : costo > 0 ? (
                   <span style={{ color: "var(--color-exito)" }}>
                     por debajo de lo ganado (CPI {m.cpi.toFixed(2)})
                   </span>

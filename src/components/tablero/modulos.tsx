@@ -21,6 +21,7 @@ import type {
   PuntoMini,
 } from "@/services/tablero.service";
 import { soles } from "@/utils/formato";
+import { conSignoFijo, redondearA } from "@/lib/redondeo";
 import { EnlaceModulo } from "@/components/tablero/Tablero";
 
 /**
@@ -125,7 +126,11 @@ function Avance({
   crono: DatosCronogramaTablero;
   obraId: string;
 }) {
-  const semaforo = semaforoDesfase(crono.desfase);
+  // El semaforo y el texto se deciden sobre el desfase REDONDEADO al decimal
+  // que se ensena: -0.04 puntos salia "-0.0 pts" en ambar, que es pintar de
+  // aviso una diferencia que la propia cifra dice que no existe.
+  const desfase = redondearA(crono.desfase, 1);
+  const semaforo = semaforoDesfase(desfase);
 
   return (
     <>
@@ -141,8 +146,7 @@ function Avance({
         <p className="text-xs opacity-60">
           Plan {crono.planeado.toFixed(1)}% ·{" "}
           <span style={{ color: COLOR_SEMAFORO[semaforo] }}>
-            {crono.desfase >= 0 ? "+" : ""}
-            {crono.desfase.toFixed(1)} pts
+            {desfase === 0 ? "al dia" : `${conSignoFijo(desfase, 1)} pts`}
           </span>
         </p>
       </div>

@@ -7,6 +7,8 @@
  * paso, el de mostrar.
  */
 
+import { conSignoFijo, redondearA } from "@/lib/redondeo";
+
 type Importe = string | number | { toString(): string };
 
 const MONEDA = new Intl.NumberFormat("es-PE", {
@@ -84,12 +86,16 @@ export function precio(valor: Importe | null | undefined, vacio = "—"): string
 /** "12.5%" */
 export function porcentaje(valor: number | null | undefined, decimales = 1): string {
   if (valor === null || valor === undefined || !Number.isFinite(valor)) return "—";
-  return `${valor.toFixed(decimales)}%`;
+  return `${redondearA(valor, decimales).toFixed(decimales)}%`;
 }
 
-/** Desviacion con signo explicito: "+1.0%" / "-2.3%". */
+/**
+ * Desviacion con signo explicito: "+1.0%" / "-2.3%".
+ *
+ * Pasa por `conSignoFijo` para no escribir nunca "-0.0%": un cero con signo
+ * menos no significa nada y hace dudar de la cifra entera.
+ */
 export function desviacion(valor: number | null | undefined, decimales = 1): string {
   if (valor === null || valor === undefined || !Number.isFinite(valor)) return "—";
-  const signo = valor > 0 ? "+" : "";
-  return `${signo}${valor.toFixed(decimales)}%`;
+  return `${conSignoFijo(valor, decimales)}%`;
 }
