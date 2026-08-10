@@ -49,14 +49,14 @@ export default async function ObraLayout({
     puede(sesion, "partida:leer") && {
       clave: "presupuesto",
       titulo: "Presupuesto",
-      pregunta: "cuanto cuesta",
+      pregunta: "cuánto cuesta",
       href: raiz,
       hecho: hitos.presupuesto,
     },
     puede(sesion, "cronograma:leer") && {
       clave: "cronograma",
       titulo: "Cronograma",
-      pregunta: "cuando se hace",
+      pregunta: "cuándo se hace",
       href: `${raiz}/cronograma`,
       hecho: hitos.cronograma,
     },
@@ -74,14 +74,14 @@ export default async function ObraLayout({
     puede(sesion, "lookahead:leer") && {
       clave: "lookahead",
       titulo: "Lookahead",
-      pregunta: "que se prepara",
+      pregunta: "qué se prepara",
       href: `${raiz}/lookahead`,
       hecho: hitos.lookahead,
     },
     puede(sesion, "plan_semanal:leer") && {
       clave: "planSemanal",
       titulo: "Plan semanal",
-      pregunta: "que se compromete",
+      pregunta: "qué se compromete",
       href: `${raiz}/plan-semanal`,
       hecho: hitos.planSemanal,
     },
@@ -145,7 +145,7 @@ export default async function ObraLayout({
     // antes de congelar el presupuesto.
     puede(sesion, "orden:leer") && {
       href: `${raiz}/ordenes`,
-      etiqueta: "Ordenes",
+      etiqueta: "Órdenes",
       clave: "ordenes",
       grupo: "compras",
     },

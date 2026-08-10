@@ -25,7 +25,7 @@ export const DIAPOSITIVAS_PORTADA: readonly DiapositivaPortada[] = [
     imagen: "/portada/1.jpg",
   },
   {
-    frase: "Pasar del «deberia» al «puede» es el puente hacia el compromiso real.",
+    frase: "Pasar del «debería» al «puede» es el puente hacia el compromiso real.",
     imagen: "/portada/2.jpg",
   },
   {
@@ -34,7 +34,7 @@ export const DIAPOSITIVAS_PORTADA: readonly DiapositivaPortada[] = [
   },
   {
     frase:
-      "Una restriccion no identificada es un obstaculo que detendra la obra manana.",
+      "Una restricción no identificada es un obstáculo que detendrá la obra mañana.",
     imagen: "/portada/4.jpg",
   },
   {
@@ -43,7 +43,7 @@ export const DIAPOSITIVAS_PORTADA: readonly DiapositivaPortada[] = [
     imagen: "/portada/5.jpg",
   },
   {
-    frase: "No hay nada tan inutil como hacer eficientemente lo que no deberia hacerse.",
+    frase: "No hay nada tan inútil como hacer eficientemente lo que no debería hacerse.",
     autor: "Peter Drucker",
     imagen: "/portada/6.jpg",
   },
@@ -56,15 +56,15 @@ export const DIAPOSITIVAS_PORTADA: readonly DiapositivaPortada[] = [
     imagen: "/portada/8.jpg",
   },
   {
-    frase: "Prometer poco y cumplirlo vale mas que prometer todo y fallar la mitad.",
+    frase: "Prometer poco y cumplirlo vale más que prometer todo y fallar la mitad.",
     imagen: "/portada/9.jpg",
   },
   {
-    frase: "Cada causa de no cumplimiento anotada es una leccion que la obra no repetira.",
+    frase: "Cada causa de no cumplimiento anotada es una lección que la obra no repetirá.",
     imagen: "/portada/10.jpg",
   },
   {
-    frase: "El desperdicio mas peligroso es el que no vemos.",
+    frase: "El desperdicio más peligroso es el que no vemos.",
     autor: "Shigeo Shingo",
     imagen: "/portada/11.jpg",
   },

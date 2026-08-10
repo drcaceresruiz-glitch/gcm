@@ -96,7 +96,7 @@ export function RutaObra({ pasos, raiz }: { pasos: PasoRuta[]; raiz: string }) {
                     {p.titulo}
                   </span>
                   <span className="block text-xs leading-4 opacity-60">
-                    {aqui ? "estas aqui" : p.pregunta}
+                    {aqui ? "estás aquí" : p.pregunta}
                   </span>
                 </span>
               </Link>

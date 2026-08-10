@@ -54,7 +54,7 @@ const ICONOS = {
  */
 export const GRUPOS_OBRA = [
   { clave: "plan", titulo: "Plan" },
-  { clave: "ejecucion", titulo: "Ejecucion" },
+  { clave: "ejecucion", titulo: "Ejecución" },
   { clave: "compras", titulo: "Compras" },
 ] as const;
 

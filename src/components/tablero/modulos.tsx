@@ -197,7 +197,7 @@ function Avance({
 
   return (
     <>
-      <Titulo icono={TrendingUp}>Avance fisico</Titulo>
+      <Titulo icono={TrendingUp}>Avance físico</Titulo>
 
       <div className="mt-2">
         <p
@@ -209,7 +209,7 @@ function Avance({
         <p className="text-xs opacity-60">
           Plan {crono.planeado.toFixed(1)}% ·{" "}
           <span style={{ color: COLOR_SEMAFORO[semaforo] }}>
-            {desfase === 0 ? "al dia" : `${conSignoFijo(desfase, 1)} puntos`}
+            {desfase === 0 ? "al día" : `${conSignoFijo(desfase, 1)} puntos`}
           </span>
         </p>
       </div>
@@ -294,7 +294,7 @@ function Curva({
 
       {crono.curva.termino && crono.curva.diasDeMas !== null && (
         <p className="text-xs opacity-60">
-          Termino proyectado {crono.curva.termino}
+          Término proyectado {crono.curva.termino}
           {crono.curva.diasDeMas !== 0 && (
             <span
               style={{
@@ -314,7 +314,7 @@ function Curva({
 
       {plan.length === 0 && (
         <p className="mt-1 text-xs opacity-50">
-          Sin plan continuo: el corte no trae tareas con duracion.
+          Sin plan continuo: el corte no trae tareas con duración.
         </p>
       )}
 
@@ -598,7 +598,7 @@ function Presupuesto({
       )}
 
       <EnlaceModulo href={`/obras/${obraId}/ordenes`}>
-        Ver ordenes
+        Ver órdenes
       </EnlaceModulo>
     </>
   );
@@ -726,8 +726,8 @@ function Ppc({
         <Titulo icono={ClipboardCheck}>PPC</Titulo>
         <p className="mt-2 text-sm opacity-60">
           {plan.abiertas > 0
-            ? `${plan.abiertas === 1 ? "Una semana abierta" : `${plan.abiertas} semanas abiertas`} sin cerrar todavia.`
-            : "Aun no hay ninguna semana cerrada."}
+            ? `${plan.abiertas === 1 ? "Una semana abierta" : `${plan.abiertas} semanas abiertas`} sin cerrar todavía.`
+            : "Aún no hay ninguna semana cerrada."}
         </p>
         <p className="mt-1 text-xs opacity-50">
           El PPC aparece al cerrar la primera semana.
@@ -780,7 +780,7 @@ function Ppc({
         <MiniBarras serie={plan.tendencia} umbral={80} />
       ) : (
         <p className="mt-2 text-xs opacity-50">
-          Con una sola semana no hay tendencia: el PPC se lee comparandolo
+          Con una sola semana no hay tendencia: el PPC se lee comparándolo
           consigo mismo.
         </p>
       )}
@@ -861,7 +861,7 @@ function Confiabilidad({
       <>
         <Titulo icono={Telescope}>Lookahead</Titulo>
         <p className="mt-2 text-sm opacity-60">
-          No hay tareas del cronograma en las proximas {lk.semanas} semanas.
+          No hay tareas del cronograma en las próximas {lk.semanas} semanas.
         </p>
         <EnlaceModulo href={href}>Ver lookahead</EnlaceModulo>
       </>
@@ -876,12 +876,12 @@ function Confiabilidad({
       <>
         <Titulo icono={Telescope}>Lookahead</Titulo>
         <p className="mt-2 text-sm opacity-60">
-          Aun sin analisis de restricciones.
+          Aún sin análisis de restricciones.
         </p>
         <p className="mt-1 text-xs opacity-50">
           {lk.total} {lk.total === 1 ? "tarea" : "tareas"} en la ventana de{" "}
-          {lk.semanas} semanas. Entra y marca lo que ya este resuelto: el
-          porcentaje aparecera con la primera restriccion.
+          {lk.semanas} semanas. Entra y marca lo que ya esté resuelto: el
+          porcentaje aparecerá con la primera restricción.
         </p>
         <EnlaceModulo href={href}>Ver lookahead</EnlaceModulo>
       </>
@@ -956,14 +956,14 @@ function Causas({
   if (!plan.causaTop) {
     return (
       <>
-        <Titulo icono={Ban}>Causa que mas frena</Titulo>
+        <Titulo icono={Ban}>Causa que más frena</Titulo>
         <p className="mt-2 text-sm opacity-60">
           {plan.cerradas === 0
-            ? "Aun no hay semanas cerradas."
-            : "Ningun incumplimiento con causa anotada."}
+            ? "Aún no hay semanas cerradas."
+            : "Ningún incumplimiento con causa anotada."}
         </p>
         <p className="mt-1 text-xs opacity-50">
-          Sin causa, cerrar la semana no ensena nada.
+          Sin causa, cerrar la semana no enseña nada.
         </p>
         <EnlaceModulo href={href}>Ver causas</EnlaceModulo>
       </>
@@ -974,7 +974,7 @@ function Causas({
 
   return (
     <>
-      <Titulo icono={Ban}>Causa que mas frena</Titulo>
+      <Titulo icono={Ban}>Causa que más frena</Titulo>
 
       <div className="mt-2">
         <p className="text-base font-semibold">{ETIQUETA_CNC[causa]}</p>
@@ -1030,12 +1030,12 @@ function Atrasos({
 
       <div className="mt-2 flex items-end gap-1">
         <p className="text-2xl font-semibold tabular-nums">{atrasos.total}</p>
-        <p className="pb-1 text-xs opacity-60">por detras del plan</p>
+        <p className="pb-1 text-xs opacity-60">por detrás del plan</p>
       </div>
 
       <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
         <Cuenta n={atrasos.alta} color="var(--color-peligro)" etiqueta="urgentes" />
-        <Cuenta n={atrasos.media} color="var(--color-alerta)" etiqueta="atencion" />
+        <Cuenta n={atrasos.media} color="var(--color-alerta)" etiqueta="atención" />
         <Cuenta n={atrasos.baja} color="var(--color-marca-500)" etiqueta="leves" />
       </div>
 
@@ -1043,7 +1043,7 @@ function Atrasos({
         <p className="mt-2 line-clamp-2 text-xs opacity-70">
           <span style={{ color: "var(--color-peligro)" }}>▸</span>{" "}
           {atrasos.primera.nombre} ({Math.abs(atrasos.primera.desfase).toFixed(0)}{" "}
-          puntos por detras del plan)
+          puntos por detrás del plan)
         </p>
       )}
 
@@ -1093,7 +1093,7 @@ function Criticas({
 
   return (
     <>
-      <Titulo icono={Link2}>Cadena critica</Titulo>
+      <Titulo icono={Link2}>Cadena crítica</Titulo>
 
       <div className="mt-2 flex items-end gap-1">
         <p
@@ -1109,7 +1109,7 @@ function Criticas({
 
       {criticas.atrasoAcumulado > 0 && (
         <p className="mt-1 text-xs" style={{ color: "var(--color-peligro)" }}>
-          {criticas.atrasoAcumulado.toFixed(0)} dias de atraso acumulado en la
+          {criticas.atrasoAcumulado.toFixed(0)} días de atraso acumulado en la
           cadena.
         </p>
       )}
@@ -1121,7 +1121,7 @@ function Criticas({
       )}
 
       <EnlaceModulo href={`/obras/${obraId}/cronograma`}>
-        Ver cadena critica
+        Ver cadena crítica
       </EnlaceModulo>
     </>
   );
@@ -1140,11 +1140,11 @@ function Capitulos({
 }) {
   return (
     <>
-      <Titulo icono={Layers}>Capitulos criticos</Titulo>
+      <Titulo icono={Layers}>Capítulos críticos</Titulo>
 
       {crono.capitulos.length === 0 ? (
         <p className="mt-2 text-xs opacity-60">
-          Ningun capitulo medible por ahora.
+          Ningún capítulo medible por ahora.
         </p>
       ) : (
         <ul className="mt-2 space-y-1.5">
@@ -1207,17 +1207,17 @@ function Ordenes({
   if (ordenes.aprobadas === 0 && ordenes.borradores === 0) {
     return (
       <>
-        <Titulo icono={FileText}>Ordenes de compra</Titulo>
+        <Titulo icono={FileText}>Órdenes de compra</Titulo>
         <p className="mt-2 text-sm opacity-60">
           {ordenes.anuladas === 0
-            ? "Aun no se ha emitido ninguna orden."
-            : `Sin ordenes vivas (${ordenes.anuladas} ${ordenes.anuladas === 1 ? "anulada" : "anuladas"}).`}
+            ? "Aún no se ha emitido ninguna orden."
+            : `Sin órdenes vivas (${ordenes.anuladas} ${ordenes.anuladas === 1 ? "anulada" : "anuladas"}).`}
         </p>
         <p className="mt-1 text-xs opacity-50">
-          El comprometido del presupuesto sale de las ordenes aprobadas.
+          El comprometido del presupuesto sale de las órdenes aprobadas.
         </p>
         <EnlaceModulo href={`/obras/${obraId}/ordenes`}>
-          Ver ordenes
+          Ver órdenes
         </EnlaceModulo>
       </>
     );
@@ -1225,7 +1225,7 @@ function Ordenes({
 
   return (
     <>
-      <Titulo icono={FileText}>Ordenes de compra</Titulo>
+      <Titulo icono={FileText}>Órdenes de compra</Titulo>
 
       <div className="mt-2 flex items-end gap-1">
         <p className="text-2xl font-semibold tabular-nums">{ordenes.total}</p>
@@ -1239,7 +1239,7 @@ function Ordenes({
       </dl>
 
       <EnlaceModulo href={`/obras/${obraId}/ordenes`}>
-        Ver ordenes
+        Ver órdenes
       </EnlaceModulo>
     </>
   );

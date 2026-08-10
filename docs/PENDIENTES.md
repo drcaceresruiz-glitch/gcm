@@ -106,6 +106,18 @@ que hoy lee del archivo:
 
 ## 5. Defectos conocidos, sin arreglar
 
+- **Ortografía: el sitio entero se escribió sin tildes** (convención heredada
+  por miedo a la codificación, que ya no aplica: UTF-8 de punta a punta y
+  prod lo sirve bien). El usuario lo señaló el 10 de agosto. Tanda 1 hecha:
+  portada, lema del login, tablero completo (etiquetas, notas y tarjetas),
+  riel de la obra y pestañas. Faltan: **tanda 2** formularios y páginas de
+  obra (presupuesto, cronograma, órdenes, plan semanal, lookahead,
+  proveedores, movimientos, revisiones, empresa, perfil); **tanda 3**
+  mensajes de error de los servicios —OJO: los textos de `src/lib` están
+  fijados por tests; cambiarlos exige actualizar los tests en el MISMO
+  commit—; **tanda 4** MANUAL.md y docs. Regla: solo texto visible —no tocar
+  claves internas, rutas, enums de Prisma ni nombres de cookies—.
+
 - **`moduloConDatos` duplica las guardas de `ModuloContenido`**
   (`components/tablero/modulos.tsx`). Estan pegadas y comentadas a proposito,
   pero si algun dia se separan vuelve la caja vacia. Lo correcto es que cada
