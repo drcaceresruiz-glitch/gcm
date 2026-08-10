@@ -230,6 +230,16 @@ function muestrear(puntos: readonly PuntoMini[]): PuntoMini[] {
 }
 
 /**
+ * Interruptor de emergencia de los modulos de Last Planner del tablero.
+ *
+ * Apagado el 10 de agosto de 2026 con produccion caida. Se anota el tipo
+ * `boolean` a proposito y no se deja inferir `false`: asi ni el compilador ni
+ * el linter tratan el resto como codigo muerto, y volver a encenderlo es
+ * cambiar una palabra.
+ */
+const CARGAR_LAST_PLANNER: boolean = false;
+
+/**
  * El tablero de una obra, o null si no existe o no es de esta empresa.
  *
  * El `companyId` sale de la sesion en cada consulta: manipular el `?obra=` de
@@ -242,21 +252,35 @@ export async function datosTablero(
   const obra = await obtenerObra(sesion, obraId);
   if (!obra) return null;
 
-  // En paralelo: son consultas independientes y el tablero es una sola
-  // pantalla. `obtenerLookahead` relee el cronograma por su cuenta —lo mismo
-  // que `obtenerCronograma` de aqui al lado—, y se acepta: que el tablero diga
-  // una confiabilidad distinta de la que dice la pantalla del Lookahead seria
-  // mucho peor que una consulta de mas.
-  const [presupuesto, ordenes, cronograma, curva, calendario, planes, lookahead] =
-    await Promise.all([
-      presupuestoDeObra(sesion, obraId),
-      ordenesDeObra(sesion, obraId),
-      obtenerCronograma(sesion, obraId),
-      datosCurvaS(sesion, obraId),
-      obtenerCalendario(sesion, obraId),
-      planSemanalDeObra(sesion, obraId),
-      obtenerLookahead(sesion, obraId),
-    ]);
+  // APAGADO TRAS LA CAIDA DEL 10 DE AGOSTO DE 2026. No borrar el codigo ni el
+  // motivo: hay que volver a encenderlo, pero no asi.
+  //
+  // El tablero cargaba ademas el calendario, los planes semanales y el
+  // Lookahead. Ese ultimo RELEE EL CRONOGRAMA ENTERO que la linea de al lado
+  // acaba de leer; se acepto "a sabiendas" a cambio de coherencia, y fue un
+  // error: unas lineas mas arriba, en `plan-semanal.service`, esta escrito que
+  // cargar el cronograma completo en una pantalla ya habia MATADO EL RENDER A
+  // MITAD bajo los limites de recursos de produccion. El mismo sintoma
+  // —"destination stream closed early"— volvio el mismo dia que esto se
+  // desplego.
+  //
+  // Para volver a encenderlo hacen falta dos cosas, no una: cargar SOLO los
+  // modulos encendidos (el servidor ya lee la cookie) y compartir la lectura
+  // del cronograma en vez de repetirla.
+  const [presupuesto, ordenes, cronograma, curva] = await Promise.all([
+    presupuestoDeObra(sesion, obraId),
+    ordenesDeObra(sesion, obraId),
+    obtenerCronograma(sesion, obraId),
+    datosCurvaS(sesion, obraId),
+  ]);
+
+  const [calendario, planes, lookahead] = CARGAR_LAST_PLANNER
+    ? await Promise.all([
+        obtenerCalendario(sesion, obraId),
+        planSemanalDeObra(sesion, obraId),
+        obtenerLookahead(sesion, obraId),
+      ])
+    : ([[], null, null] as const);
 
   const diasTotales = diasEntre(obra.fechaInicio, obra.fechaFinProgramada);
   const transcurridos = diasEntre(obra.fechaInicio, hoy());

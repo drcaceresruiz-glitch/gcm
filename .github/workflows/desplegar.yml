@@ -131,34 +131,109 @@ jobs:
       - name: Escribir el arranque
         run: |
           cat > envio/app.js <<'FIN'
-          // Punto de entrada en cPanel/Passenger.
+          // Punto de entrada en cPanel/LiteSpeed.
           //
-          // El despliegue sube un unico gcm.tar.gz y toca tmp/restart.txt.
-          // Passenger reinicia, y este archivo descomprime el paquete antes
-          // de ceder el control al servidor de Next.
+          // El despliegue sube un unico gcm.tar.gz y toca tmp/restart.txt. El
+          // servidor reinicia, y este archivo descomprime el paquete antes de
+          // ceder el control al servidor de Next.
           //
           // Se descomprime aqui y no por FTP porque subir los 1452 archivos
           // sueltos dejaba la instalacion a medias en cuanto se cortaba una
           // conexion, y los archivos truncados pasaban desapercibidos.
-          const { existsSync, renameSync, unlinkSync } = require("fs");
+          //
+          // CANDADO (10 de agosto de 2026, tras una caida de produccion).
+          // LiteSpeed levanta VARIAS instancias de la aplicacion. Sin candado,
+          // una descomprimia sobre el mismo arbol que otra estaba leyendo, y
+          // Node se encontraba los archivos cambiando bajo los pies. Sintomas
+          // observados: "Failed to load external module ...wasm-base64.mjs:
+          // SyntaxError: Invalid or unexpected token" (un archivo leido a
+          // medio escribir), "Failed to find Server Action ... from an older
+          // or newer deployment" (mitad de una version y mitad de otra) y
+          // "The destination stream closed early". Ahora solo UNA instancia
+          // descomprime y las demas esperan a que termine.
+          const fs = require("fs");
           const { execFileSync } = require("child_process");
           const { join } = require("path");
 
-          const paquete = join(__dirname, "gcm.tar.gz");
-          const enCurso = join(__dirname, "gcm.tar.gz.desplegando");
+          const raiz = __dirname;
+          const paquete = join(raiz, "gcm.tar.gz");
+          const enCurso = join(raiz, "gcm.tar.gz.desplegando");
+          const candado = join(raiz, "tmp", "candado-despliegue");
 
-          if (existsSync(paquete)) {
+          // Un candado abandonado no puede bloquear la aplicacion para
+          // siempre: si la instancia que lo cogio murio, a los tres minutos
+          // cualquiera puede quitarlo.
+          const CADUCA_MS = 3 * 60 * 1000;
+          const ESPERA_MAX_MS = 2 * 60 * 1000;
+
+          function dormir(ms) {
+            // Sincrono a proposito: esto ocurre ANTES de servir nada, y no
+            // puede continuarse de forma asincrona sin arrancar el servidor.
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+          }
+
+          function cogerCandado() {
+            try {
+              fs.mkdirSync(candado); // atomico: solo uno gana
+              return true;
+            } catch (e) {
+              if (e.code !== "EEXIST") throw e;
+            }
+            try {
+              const edad = Date.now() - fs.statSync(candado).mtimeMs;
+              if (edad > CADUCA_MS) {
+                console.error("[gcm] Candado caducado (" + Math.round(edad / 1000) + "s). Se retoma.");
+                fs.rmSync(candado, { recursive: true, force: true });
+                fs.mkdirSync(candado);
+                return true;
+              }
+            } catch (e) {
+              // Otra instancia lo solto justo ahora: se reintenta en el bucle.
+            }
+            return false;
+          }
+
+          function descomprimir() {
             // Se renombra antes de tocarlo: si el proceso muere a mitad, el
             // siguiente arranque no reintenta sobre un archivo incompleto y
             // el fallo queda visible en el log en vez de repetirse en bucle.
-            renameSync(paquete, enCurso);
-            try {
-              execFileSync("tar", ["-xzf", enCurso], { cwd: __dirname });
-              unlinkSync(enCurso);
-              console.log("[gcm] Paquete desplegado.");
-            } catch (e) {
-              console.error("[gcm] No se pudo descomprimir:", e.message);
-              throw e;
+            fs.renameSync(paquete, enCurso);
+            execFileSync("tar", ["-xzf", enCurso], { cwd: raiz });
+            fs.unlinkSync(enCurso);
+            console.log("[gcm] Paquete desplegado.");
+          }
+
+          if (fs.existsSync(paquete)) {
+            fs.mkdirSync(join(raiz, "tmp"), { recursive: true });
+            const hasta = Date.now() + ESPERA_MAX_MS;
+            let hecho = false;
+
+            while (!hecho && Date.now() < hasta) {
+              if (cogerCandado()) {
+                try {
+                  // Puede haberlo descomprimido otra instancia mientras se
+                  // esperaba: si ya no esta el paquete, no hay nada que hacer.
+                  if (fs.existsSync(paquete)) descomprimir();
+                  hecho = true;
+                } catch (e) {
+                  console.error("[gcm] No se pudo descomprimir:", e.message);
+                  throw e;
+                } finally {
+                  fs.rmSync(candado, { recursive: true, force: true });
+                }
+              } else if (!fs.existsSync(paquete)) {
+                console.log("[gcm] Otra instancia ya desplego el paquete.");
+                hecho = true;
+              } else {
+                dormir(250);
+              }
+            }
+
+            if (!hecho) {
+              // Arrancar con el arbol a medias es peor que no arrancar: se
+              // veria media version y media otra, que es justo lo que se
+              // quiere evitar.
+              throw new Error("[gcm] Se agoto la espera del candado de despliegue.");
             }
           }
 
