@@ -3,9 +3,9 @@
 Cómo se usa el sistema, en lenguaje de obra. No hace falta saber de informática.
 
 Si eres desarrollador y buscas el estado técnico del proyecto, ese documento es
-`docs/ESTADO.md`.
+`docs/ESTADO.md`. Lo que falta por hacer está en `docs/PENDIENTES.md`.
 
-Última actualización: 10 de agosto de 2026.
+Última actualización: 10 de agosto de 2026 (tarde).
 
 ---
 
@@ -58,6 +58,39 @@ ya no queda holgura.
 > Los avisos de arriba **no** se filtran por la obra elegida: son de toda la
 > empresa. El problema que hay que ver es justo el de la obra que no estás
 > mirando.
+
+**Enciendes solo lo que quieres ver.** El panel trae únicamente los datos de
+los módulos que tienes encendidos, así que apagar los que no miras hace que
+cargue más rápido. Apagar un módulo es inmediato. Encender uno que estaba
+apagado tarda un instante más la primera vez —tiene que ir a buscar sus datos—
+y luego ya queda.
+
+---
+
+## Moverse por el sistema
+
+**Dentro de una obra, las secciones van en dos filas.** Arriba, tres grupos;
+debajo, las secciones del grupo que estés mirando:
+
+| Grupo | Secciones |
+|---|---|
+| **Plan** | Presupuesto · Cronograma · Revisiones |
+| **Ejecución** | Lookahead · Plan Semanal · Movimientos |
+| **Compras** | Proveedores · Órdenes |
+
+Elegir un grupo **no te saca de donde estás**: despliega sus secciones para que
+las veas, y la pantalla no cambia hasta que pulsas una. Un puntito marca el
+grupo donde está la sección que tienes abierta, para no perderte al curiosear.
+Saltar de un grupo a otro cuesta un clic de más; dentro del ciclo diario
+—Lookahead y Plan Semanal, que son el mismo grupo— sigues yendo de un clic.
+
+**Arriba a la derecha, el menú de la empresa** reúne lo que se toca de vez en
+cuando, en tres grupos: *Compras* (proveedores, formas de pago), *Personas*
+(usuarios, permisos, solicitudes) y *Empresa* (datos). Si operas GCM para
+varias constructoras, **Constructoras** es un botón aparte —dar de alta otra
+empresa no es cosa de la tuya—.
+
+**El logotipo GCM, arriba a la izquierda, te lleva siempre al panel.**
 
 ---
 
@@ -293,9 +326,13 @@ solo. El precio fue reiniciar la selección una vez. No vuelve a ocurrir.
 
 ### Desplegué un cambio y no aparece
 
-Espera a que termine el despliegue (alrededor de un minuto y medio) y **recién
-entonces** reinicia en cPanel. Reiniciar antes deja el programa con la versión
-vieja, y la pantalla nueva da «404».
+Desde el 10 de agosto de 2026 el despliegue es **automático**: al subir un
+cambio, en menos de un minuto el servidor toma la versión nueva sin que nadie
+toque nada. Da un margen de dos o tres minutos y recarga.
+
+Si después de ese rato sigue sin aparecer, mira los detalles técnicos en
+`docs/ESTADO.md` —sección del incidente del 10 de agosto—: ahí está cómo
+comprobar que el paquete se aplicó.
 
 ---
 
@@ -323,8 +360,9 @@ vieja, y la pantalla nueva da «404».
 
 ## Qué falta por construir
 
-**Fase 1** (en curso): calendario laboral editable · instalar GCM en el móvil
-como una aplicación.
+**Fase 1** (hecha): calendario laboral editable · GCM se instala en el móvil
+como una aplicación · Lookahead y PTS usables en obra · tablero con los
+indicadores de Last Planner.
 
 **Fase 2**: documentos — planos, protocolos y guías, con validación automática
 de restricciones.
@@ -336,3 +374,6 @@ en el mismo sitio el mismo día.
 formulario de causa raíz y plan de recuperación.
 
 **Fase 5**: sugerencias automáticas según la causa que más se repite.
+
+> La lista completa y al día de lo que falta —con lo pendiente técnico, la
+> seguridad y los defectos conocidos— vive en `docs/PENDIENTES.md`.
