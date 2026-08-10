@@ -145,10 +145,36 @@ de proximos recordatorios) → Notas con adjuntos → Notificaciones.
 
 ## 6. Importacion de presupuesto (Excel)
 
+- ~~Plantilla ideal descargable~~ HECHA el 10 de agosto: se genera desde
+  codigo (`src/lib/plantilla-presupuesto.ts`), con test de ida y vuelta
+  contra `analizarExcel` para que plantilla e importador no diverjan.
+  Descarga en `/plantilla-presupuesto` y boton en la pagina de importar.
+  **Falta que el usuario pruebe el ciclo completo en prod** (descargar →
+  llenar → importar → vista previa → confirmar).
 - Verificar de punta a punta que importa TODO correctamente.
-- Plantilla ideal descargable para llenar e importar al crear la obra.
 - Permitir corregir, editar, eliminar y crear partidas tras importar (la
   edicion existe; falta revisarla contra la importacion).
+
+## 6b. Ayuda en la app (decidido el 10 de agosto: sin LLM local)
+
+Se evaluo integrar un chatbot de IA local/gratuito (WebLLM, Gemini Nano,
+Ollama en backend) y se DESCARTO con el usuario de acuerdo:
+
+- Ollama en backend: inviable —cPanel/LiteSpeed mata procesos pesados—.
+- WebLLM: descarga de 0.5–2 GB y GPU en maquinas de obra que no la tienen;
+  y los modelos que caben (0.5–1.5B) alucinan cifras, justo lo que la
+  filosofia de GCM prohibe (ninguna cifra sin respaldo).
+- Gemini Nano: solo Chrome, disponibilidad variable; no se vende algo que
+  funciona "a veces".
+
+Lo que SI se hara, en este orden:
+1. Seguir extendiendo la asistencia determinista (componente `Explicacion`,
+   riel de ubicacion, textos tipo `textoSinCosto`) a cada concepto delicado.
+2. **Busqueda en el manual dentro de la app**: panel de ayuda que busca
+   sobre MANUAL.md. Entra despues de la evidencia con QR.
+3. IA conversacional solo si algun dia es requisito de venta, y entonces
+   via API de pago (p. ej. Claude Haiku) anclada a los datos de la obra
+   —decision de producto para ese momento—.
 
 ---
 
