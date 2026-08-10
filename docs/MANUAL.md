@@ -205,6 +205,44 @@ Eso era un fallo y está corregido. Guardar la semana reemplaza los compromisos,
 y antes se llevaba por delante lo que la pantalla no reenviaba. Ahora la
 cantidad, la unidad y la zona sobreviven.
 
+### El valor ganado no me muestra el EAC ni el VAC
+
+Es a propósito, y llegó después de un susto: la pantalla llegó a anunciar en
+verde un ahorro de **S/ 633.873** en CRIOCORD. Falso.
+
+El «costo estimado al final» se calcula con lo que llevas gastado. Pero en GCM
+el gasto son las **órdenes de compra aprobadas**, y las órdenes se aprueban
+*después* del trabajo: cuando llevabas S/ 62.000 ganados solo había una orden
+de S/ 11.000. Divide una cosa por la otra y sale que la obra costará la quinta
+parte de lo presupuestado. Nadie construye tan barato.
+
+Así que esas tres cifras —CPI, EAC y VAC— **no se muestran hasta que haya con
+qué sostenerlas**: al menos un 15 % de obra ejecutada y que el costo registrado
+cubra la mitad de lo ganado. Mientras tanto la pantalla dice por qué falta cada
+una, en vez de dejar un guion.
+
+Lo que **sí** puedes leer desde el primer día:
+
+- **SPI y SV** — vas adelantado o atrasado. No dependen del gasto.
+- **CV** (ganado menos gastado) — es un hecho de hoy, no una predicción.
+- **La curva** de las tres líneas.
+
+**Para que aparezcan antes:** registra las órdenes de compra al día. Cuanto
+menos se retrase el papeleo respecto de la obra, antes sirve la proyección.
+
+### La curva S dice que «no se llega». ¿Nunca?
+
+Antes sí lo decía mal. Si ibas al 96 % del ritmo previsto, la curva no tocaba
+el 100 % dentro del plazo y el sistema se rendía: ponía «no se llega», que se
+lee como *jamás*. Ahora estima **cuánto te vas a pasar**: a mitad de ritmo,
+tardas el doble de lo que queda.
+
+Solo dice «no se llega» cuando el ritmo es **cero**. Ahí es literal: sin
+avanzar nada, no se llega nunca.
+
+Y el porcentaje de ritmo ya no redondea: un 99,6 % se muestra como 99,6 %, no
+como «100 %». Decirle «vas al día» a quien no va es la peor ayuda posible.
+
 ### Desplegué un cambio y no aparece
 
 Espera a que termine el despliegue (alrededor de un minuto y medio) y **recién
@@ -226,6 +264,9 @@ vieja, y la pantalla nueva da «404».
 | **Confiabilidad** | Qué porcentaje de las tareas de la ventana está LISTA |
 | **EVM / Valor ganado** | Compara lo planificado, lo ejecutado y lo gastado |
 | **SPI / CPI** | Índices de rendimiento de plazo y de costo |
+| **EAC** | Lo que costará la obra al final si sigues rindiendo igual |
+| **VAC** | Lo que sobrará (o faltará) del presupuesto al terminar |
+| **Ritmo** | A qué porcentaje del avance previsto vas realmente |
 | **EDT** | El árbol del presupuesto: capítulos y partidas |
 | **UID** | El número que identifica una tarea entre versiones del cronograma |
 

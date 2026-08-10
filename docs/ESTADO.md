@@ -55,6 +55,37 @@ constructoras están suspendidas para cualquiera que supiera un correo.
 - **Cierre por cantidad**: la semana pregunta cuánto se EJECUTÓ, y la semana
   cerrada muestra «90 / 120 m2».
 
+### Indicadores: no prometer lo que el dato no sostiene
+
+Dos arreglos del mismo mal, ambos vistos en pantalla con datos de CRIOCORD.
+
+**El valor ganado anunciaba un ahorro de S/ 633,873.12** —el 82% del
+presupuesto, en verde—. El EAC es `BAC × AC/EV`, y el AC de GCM es *lo
+comprometido en órdenes aprobadas*: con una sola orden de 11 mil frente a 62
+mil ya ganados, el CPI salía 5,6. El comentario del módulo predecía el sesgo
+contrario («el CPI puede salir más bajo al principio») porque se supuso que se
+ordena antes de ejecutar; en esta obra se ejecuta y se ordena después.
+
+Ahora `hayBaseParaProyectar()` (en `src/lib/evm.ts`) decide si hay con qué
+proyectar, con **dos umbrales con nombre**: `AVANCE_MINIMO_PROYECCION = 15`
+(por debajo, cada orden mueve el índice entero) y `RESPALDO_MINIMO_COSTO = 0.5`
+(el costo registrado debe cubrir al menos la mitad de lo ganado). Sin base,
+`cpi`, `eac` y `vac` son `null` y viaja **`motivoSinCosto`** —`sin_permiso`,
+`sin_gasto`, `avance_insuficiente`, `costo_rezagado`—, que el panel escribe en
+el hueco con `textoSinCosto()`.
+
+Se quedan **SPI, SV, %avance y la curva**: no dependen del AC. Y **CV
+también**: ganado menos gastado es un hecho de hoy, no una proyección. Si algún
+día el AC pasa a ser devengado real, revisar `RESPALDO_MINIMO_COSTO`, que
+existe solo por el desfase de las órdenes.
+
+**La curva S decía «no se llega» a quien va al 96% del ritmo.** `proyectar()`
+solo daba fecha de término si la curva alcanzaba el 100% dentro del plazo; si
+no, devolvía nulo, que la pantalla leía como *nunca*. Ahora se estira el plazo
+restante por `1/factor`: a mitad de ritmo, el doble de lo que queda. Con factor
+cero sí es nunca, porque a ese paso no se llega. Y `textoRitmo()` deja de
+redondear 99,6% a «100%», que era decir «vas al día» a quien no va.
+
 ### Dos defectos reparados que conviene no reintroducir
 
 1. **Fuga de datos en el plan semanal.** Guardar la semana REEMPLAZA sus
