@@ -92,6 +92,9 @@ next-env.d.ts
 # Documentos de referencia (binarios pesados; se guardan en local)
 /docs/referencias/
 
+# Archivos de bloqueo de Word/Office (aparecen al tener un .doc abierto)
+**/~$*
+
 # Andamiaje de skills/agentes (no es codigo de la app)
 /.agents/
 /.claude/
