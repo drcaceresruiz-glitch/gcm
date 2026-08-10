@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
   CircleCheck,
@@ -56,11 +56,17 @@ export function MatrizLookahead({
   obraId,
   datos,
   fechaProximoCorte,
+  abrirEvidencia = null,
+  abrirTarea = null,
 }: {
   obraId: string;
   datos: LookaheadDatos;
   /// Fecha ISO del corte que se abriria si no hay ninguna semana abierta.
   fechaProximoCorte: string;
+  /// Restriccion cuya evidencia se abre al entrar (viene del codigo QR).
+  abrirEvidencia?: string | null;
+  /// Tarea a la que se llega desde el codigo QR: se resalta y se despliega.
+  abrirTarea?: number | null;
 }) {
   const [pendiente, iniciar] = useTransition();
   const [elegidas, setElegidas] = useState<Set<number>>(new Set());
@@ -68,7 +74,9 @@ export function MatrizLookahead({
   // Que celda tiene la evidencia abierta. Se guarda el ID de la restriccion y
   // no la celda entera: asi, cuando la accion de subir repinta la pantalla, el
   // panel se vuelve a leer de los datos NUEVOS y ensena la foto recien subida.
-  const [evidenciaEn, setEvidenciaEn] = useState<string | null>(null);
+  //
+  // Arranca con lo que diga el codigo QR, si se llego por uno.
+  const [evidenciaEn, setEvidenciaEn] = useState<string | null>(abrirEvidencia);
   const router = useRouter();
   const ruta = usePathname();
   const {
@@ -140,6 +148,33 @@ export function MatrizLookahead({
     return null;
   })();
 
+  // Se llego por un codigo QR pero eso no esta en la ventana que se muestra
+  // (la tarea ya paso, o la ventana es mas corta que cuando se imprimio la
+  // hoja). Hay que DECIRLO: quien escaneo con el telefono en la mano vería la
+  // pantalla de siempre y pensaria que el codigo esta roto.
+  const qrPerdido =
+    (abrirEvidencia !== null &&
+      evidenciaEn === abrirEvidencia &&
+      evidencia === null) ||
+    (abrirTarea !== null && !filas.some((f) => f.uid === abrirTarea));
+
+  // Al llegar por un QR, la tarea se busca sola: en una ventana de treinta
+  // filas, dejar a alguien buscandola a mano en el movil es no haber resuelto
+  // nada. Se elige la copia VISIBLE (escritorio o movil), que es la que tiene
+  // caja de layout.
+  useEffect(() => {
+    if (abrirTarea === null) return;
+    const candidatos = document.querySelectorAll<HTMLElement>(
+      `[data-tarea="${abrirTarea}"]`,
+    );
+    for (const el of candidatos) {
+      if (el.offsetParent !== null) {
+        el.scrollIntoView({ block: "center" });
+        return;
+      }
+    }
+  }, [abrirTarea]);
+
   // Se calcula UNA vez y se pinta donde toque: bajo la tabla en escritorio,
   // dentro de la tarjeta en movil. Solo una de las dos esta visible.
   const panelEvidencia = evidencia ? (
@@ -202,6 +237,18 @@ export function MatrizLookahead({
 
   return (
     <div className="space-y-4">
+      {qrPerdido && (
+        <p
+          className="rounded-lg border px-3 py-2 text-sm"
+          style={{ borderColor: "var(--color-alerta)" }}
+        >
+          El código que escaneaste apunta a una tarea que <strong>no está en
+          esta ventana</strong> de {semanas} semanas. Amplíala arriba para
+          encontrarla: puede que ese trabajo ya haya pasado o que aún quede
+          lejos.
+        </p>
+      )}
+
       {/* Resumen de confiabilidad + sincronizar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -327,8 +374,17 @@ export function MatrizLookahead({
             {filas.map((fila) => (
               <tr
                 key={fila.uid}
+                data-tarea={fila.uid}
                 className="border-t"
-                style={{ borderColor: "var(--borde)" }}
+                style={{
+                  borderColor: "var(--borde)",
+                  // La tarea a la que apuntaba el QR, senalada: quien llega
+                  // del codigo tiene que ver DONDE cayo.
+                  backgroundColor:
+                    fila.uid === abrirTarea
+                      ? "color-mix(in oklab, var(--color-marca-500) 12%, transparent)"
+                      : undefined,
+                }}
               >
                 <td
                   className="sticky left-0 z-10 px-3 py-2"
@@ -434,6 +490,7 @@ export function MatrizLookahead({
             evidenciaEn={evidenciaEn}
             onEvidencia={(id) => setEvidenciaEn((p) => (p === id ? null : id))}
             panelEvidencia={panelEvidencia}
+            resaltada={fila.uid === abrirTarea}
           />
         ))}
       </ul>
@@ -469,6 +526,7 @@ function TarjetaTarea({
   evidenciaEn,
   onEvidencia,
   panelEvidencia,
+  resaltada,
 }: {
   fila: LookaheadDatos["filas"][number];
   elegida: boolean;
@@ -484,16 +542,23 @@ function TarjetaTarea({
   /// bajo la restriccion que le corresponde, para no perderlo de vista en una
   /// lista larga.
   panelEvidencia: React.ReactNode;
+  /// Es la tarea del codigo QR que se acaba de escanear.
+  resaltada: boolean;
 }) {
-  const [abierta, setAbierta] = useState(false);
+  // Si se llego por un QR, la tarjeta ya viene desplegada: el que escaneo
+  // quiere adjuntar una foto, no dar otro toque para abrir la lista.
+  const [abierta, setAbierta] = useState(resaltada);
   const resueltas = fila.restricciones.filter((r) => r.resuelta).length;
   const total = fila.restricciones.length;
   const Icono = ICONO_ESTADO[fila.estado];
 
   return (
     <li
+      data-tarea={fila.uid}
       className="rounded-lg border"
-      style={{ borderColor: "var(--borde)" }}
+      style={{
+        borderColor: resaltada ? "var(--color-marca-600)" : "var(--borde)",
+      }}
     >
       <div className="flex items-start gap-2 p-3">
         {puedeElegir && (

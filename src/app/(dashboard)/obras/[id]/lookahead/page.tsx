@@ -7,6 +7,8 @@ import { puede } from "@/lib/rbac";
 import { fechaCorta, hoy } from "@/utils/fechas";
 import { proximoCorte } from "@/lib/plan-semanal";
 import { MatrizLookahead } from "@/components/lookahead/MatrizLookahead";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
+import { QrCode } from "lucide-react";
 
 export const metadata: Metadata = { title: "Lookahead" };
 
@@ -24,13 +26,21 @@ export default async function LookaheadPage({
   params: Promise<{ id: string }>;
   /// La ventana vive en la URL: se comparte por enlace y se cambia al vuelo,
   /// sin necesidad de guardarla ni de migrar la base.
-  searchParams: Promise<{ semanas?: string }>;
+  ///
+  /// `tarea` y `evidencia` son la otra punta de los codigos QR pegados en
+  /// obra: quien escanea cae aqui con el frente ya senalado, o directamente
+  /// con el panel de esa restriccion abierto.
+  searchParams: Promise<{
+    semanas?: string;
+    tarea?: string;
+    evidencia?: string;
+  }>;
 }) {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
   const { id } = await params;
-  const { semanas } = await searchParams;
+  const { semanas, tarea, evidencia } = await searchParams;
   const obra = await obtenerObra(sesion, id);
   if (!obra) redirect("/panel");
   if (!puede(sesion, "lookahead:leer")) redirect(`/obras/${id}`);
@@ -55,6 +65,17 @@ export default async function LookaheadPage({
         </p>
       </div>
 
+      {datos && datos.puedeGestionar && datos.filas.length > 0 && (
+        <EnlaceBoton
+          href={`/obras/${id}/lookahead/codigos?semanas=${datos.semanas}`}
+          icono={QrCode}
+          posicionIcono="izquierda"
+          tamano="sm"
+        >
+          Códigos QR para pegar en obra
+        </EnlaceBoton>
+      )}
+
       {datos && (
         <MatrizLookahead
           obraId={id}
@@ -62,6 +83,8 @@ export default async function LookaheadPage({
           fechaProximoCorte={proximoCorte(obra.diaCorteSemanal, hoy())
             .toISOString()
             .slice(0, 10)}
+          abrirEvidencia={evidencia ?? null}
+          abrirTarea={tarea ? Number(tarea) : null}
         />
       )}
     </div>

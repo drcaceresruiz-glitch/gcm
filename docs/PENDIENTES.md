@@ -180,12 +180,32 @@ primero ortografia tanda 2 y plantilla Excel, luego esto.
     anadir una segunda variable con otro nombre de carpeta**: duplicar la
     clave deja en el aire cual gana. La carpeta no se crea a mano; el
     servicio la crea con `mkdir` recursivo en la primera subida.
-  - **AL RETOMAR**: (1) la prueba de punta a punta en prod —subir una foto
-    desde el clip del Lookahead y desde el cierre del PTS, y ver que la
-    miniatura aparece sola—, que es lo unico que no se pudo verificar por
-    falta de sesion; (2) commit 3: la hoja de codigos QR (necesita
-    `npm install qrcode`) con enlace profundo por restriccion, siempre con
-    sesion.
+  - *Commit 3 (10 de agosto, noche)*: **visor emergente y codigos QR.**
+    - La foto ya no abre una pestana aparte, que sacaba a la gente de la
+      obra: se superpone un visor (`GaleriaEvidencia`) con Escape, toque
+      fuera, flechas entre fotos y el pie —quien y cuando— SIEMPRE a la
+      vista, que antes estaba escondido en un `title`.
+    - **Un solo codigo QR por obra**, decidido con el usuario al ver la
+      cuenta: 20 tareas x 7 flujos son 140 stickers que nadie pega ni
+      mantiene. El codigo se pega en la caseta y lleva a
+      `/obras/[id]/evidencia`, un MENU pensado para el telefono a pie de
+      obra (buscador, objetivos de 56 px, tarea -> restriccion -> subir).
+      Ese menu NO es la matriz con otra ropa: siete columnas no se tocan
+      con el dedo.
+    - La hoja (`/obras/[id]/lookahead/codigos`) mantiene los otros dos
+      granos —por tarea y por restriccion— para casos puntuales, y dice
+      CUANTOS codigos va a imprimir antes de gastar papel, con aviso a
+      partir de 30. `src/lib/evidencia-qr.ts` tiene la aritmetica probada
+      (14 pruebas), incluida la que fija que el enlace va a la app normal y
+      nunca a `/api/evidencia`: un QR pegado en una columna no puede ser una
+      puerta trasera a las fotos.
+    - Los QR se dibujan como SVG EN EL SERVIDOR: en papel un PNG escalado se
+      emborrona y el telefono deja de leerlo.
+    - Dependencia nueva: `qrcode` (+ `@types/qrcode`).
+    - Verificado: `tsc`, `eslint`, `vitest` (509) y `next build`, limpios.
+  - **AL RETOMAR**: probar en obra el ciclo del QR —imprimir el codigo de la
+    obra, escanearlo con el telefono y subir una foto desde el menu—. Es lo
+    unico que no se puede verificar desde aqui.
 - **Fase B**: pestana Evidencia de la obra: vista agregada con filtros.
 - **Fase C**: estandares visuales (quality gates), dentro de Fase 2 documental.
 - **Fase D**: rol cliente solo lectura + reconocimiento de cuadrillas.
