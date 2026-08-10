@@ -6,6 +6,7 @@ import {
   paletaValida,
   temaValido,
 } from "@/lib/tema";
+import { RescateRevelado } from "@/components/ui/RescateRevelado";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -60,7 +61,14 @@ export default async function RootLayout({
 
   return (
     <html lang="es-PE" data-tema={tema} data-paleta={paleta}>
-      <body className="min-h-dvh antialiased">{children}</body>
+      <body className="min-h-dvh antialiased">
+        {/* Vigia del revelado de React. No pinta nada; existe para que una
+            pestana en segundo plano no se quede con el esqueleto de carga
+            puesto para siempre. Va aqui, fuera de todo limite de suspension,
+            porque tiene que hidratar aunque la pagina siga suspendida. */}
+        <RescateRevelado />
+        {children}
+      </body>
     </html>
   );
 }
