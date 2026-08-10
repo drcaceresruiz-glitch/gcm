@@ -13,18 +13,17 @@ Ultima revision: 10 de agosto de 2026.
 
 ## 1. Deuda del incidente del 10 de agosto
 
-### Devolver los esqueletos de carga
+### ~~Devolver los esqueletos de carga~~ HECHO
 
-Los dos `loading.tsx` estan apagados, movidos a
-`src/app/(dashboard)/_esqueletos/`. Sin ellos la pagina llega entera y se
-pinta aunque falle la hidratacion.
+Volvieron el 10 de agosto de 2026 con `RescateRevelado` en el layout raiz, que
+drena la cola `$RB` con `setInterval` y `visibilitychange` cuando
+`requestAnimationFrame` no puede. Verificado en produccion con la pestana en
+SEGUNDO PLANO —la condicion exacta que lo rompia—: cola de revelado presente y
+cero esqueletos visibles.
 
-Para devolverlos hace falta una **red de seguridad** que drene la cola `$RB`
-si `$RV` no llego a ejecutarse. En React 19.2 el revelado del contenido se
-programa con `requestAnimationFrame`, que **no corre en pestanas en segundo
-plano**: sin esa red, quien abra GCM en una pestana de fondo se encuentra el
-esqueleto congelado. El diagnostico completo esta en
-`_esqueletos/LEEME.md`.
+El mecanismo y sus cuatro reglas estan en `REVELADO-REACT.md`. **Leelo antes
+de anadir otro `loading.tsx` o `<Suspense>`**, y sobre todo si algun dia se
+actualiza React: `$RB` y `$RV` son internos, no API publica.
 
 ### El despliegue no borra nada
 
