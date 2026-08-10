@@ -12,6 +12,7 @@ import {
   type EnlaceEmpresa,
 } from "@/components/navegacion/Navegacion";
 import { RelojPeru } from "@/components/ui/RelojPeru";
+import { FraseRotativa } from "@/components/portada/FraseRotativa";
 import { CierrePorInactividad } from "@/components/navegacion/CierrePorInactividad";
 import { PieDePagina } from "@/components/navegacion/PieDePagina";
 
@@ -119,8 +120,13 @@ export default async function DashboardLayout({
           {/* En el medio de la cabecera y no en un rincon: es la unica
               pantalla que se ve SIEMPRE, en cualquier pagina del sistema, y
               una obra se rige por fechas de calendario -saber que dia y hora
-              es en Peru tiene que estar a la vista, no a un clic. */}
-          <RelojPeru />
+              es en Peru tiene que estar a la vista, no a un clic.
+              Debajo, la frase de la casa rotando; solo en pantalla ancha,
+              porque en un movil ese espacio no existe. */}
+          <div className="flex min-w-0 flex-col items-center gap-0.5">
+            <RelojPeru />
+            <FraseRotativa className="hidden lg:block" />
+          </div>
 
           <Navegacion
             empresa={enlaces}
