@@ -74,6 +74,13 @@ export default async function DashboardLayout({
       clave: "solicitudes",
       badge: pendientes,
     },
+    // Quien opera GCM. No va por `puede()` porque no es un permiso DENTRO de
+    // la empresa: esta por encima de ella y se concede en el servidor.
+    sesion.esOperador && {
+      href: "/operador",
+      etiqueta: "Constructoras",
+      clave: "constructoras",
+    },
   ].filter(Boolean) as EnlaceEmpresa[];
 
   return (

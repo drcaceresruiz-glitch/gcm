@@ -4,6 +4,8 @@ import { hashPassword, verifyPassword } from "@/lib/password";
 import { validarClaveNueva } from "@/lib/claves";
 import { crearSesion, cerrarTodasLasSesiones } from "@/services/sesion.service";
 import { crearDesafio } from "@/services/dosFactores.service";
+import { env } from "@/lib/env";
+import { parsearOperadores, esCorreoOperador } from "@/lib/operador";
 import type { AuditAction } from "@/generated/prisma/enums";
 
 /**
@@ -36,6 +38,8 @@ async function auditar(datos: {
   entidad: string;
   entidadId: string;
   meta?: MetadatosPeticion;
+  /// Para distinguir un fallo de otro (clave mala vs empresa suspendida).
+  despues?: Record<string, string>;
 }): Promise<void> {
   await prisma.auditLog
     .create({
@@ -45,6 +49,7 @@ async function auditar(datos: {
         entidad: datos.entidad,
         entidadId: datos.entidadId,
         accion: datos.accion,
+        despues: datos.despues ?? undefined,
         ip: datos.meta?.ip?.slice(0, 45) ?? null,
         userAgent: datos.meta?.userAgent?.slice(0, 255) ?? null,
       },
@@ -73,6 +78,7 @@ export async function iniciarSesion(
       dosFactoresActivo: true,
       nombres: true,
       email: true,
+      company: { select: { activa: true } },
     },
   });
 
@@ -128,6 +134,36 @@ export async function iniciarSesion(
     where: { id: usuario.id },
     data: { failedLoginCount: 0, lockedUntil: null },
   });
+
+  // Empresa suspendida: no entra nadie suyo.
+  //
+  // Va DESPUES de comprobar la clave a proposito. Si fuera antes, el formulario
+  // de acceso se convertiria en un detector de que constructoras estan
+  // suspendidas para cualquiera que supiera un correo.
+  //
+  // El operador se salta el bloqueo: si no, suspender su empresa por error lo
+  // dejaria fuera y no habria quien lo devolviera.
+  const esOperador = esCorreoOperador(
+    usuario.email,
+    parsearOperadores(env.GCM_OPERADORES),
+  );
+  if (!usuario.company.activa && !esOperador) {
+    await auditar({
+      companyId: usuario.companyId,
+      userId: usuario.id,
+      accion: "LOGIN_FAILED",
+      entidad: "User",
+      entidadId: usuario.id,
+      meta,
+      despues: { motivo: "empresa_suspendida" },
+    });
+
+    return {
+      ok: false,
+      error:
+        "El acceso de tu empresa esta suspendido. Contacta con el administrador de GCM.",
+    };
+  }
 
   // Con dos pasos activos la clave sola no abre nada: se manda el codigo y
   // aqui se acaba. No hay sesion todavia, y por eso `lastLoginAt` y el

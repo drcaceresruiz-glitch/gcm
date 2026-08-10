@@ -58,6 +58,19 @@ const envSchema = z.object({
   MPXJ_JAVA: z.string().optional(),
   MPXJ_HOME: z.string().optional(),
 
+  /**
+   * Correos de quienes operan GCM: los unicos que pueden dar de alta
+   * constructoras clientes y suspenderlas. Lista separada por comas.
+   *
+   * Vive aqui y no en la base a proposito: asi el privilegio mas alto del
+   * producto NO se puede conceder desde la aplicacion, solo con acceso al
+   * servidor. Ver `src/lib/operador.ts`.
+   *
+   * OPCIONAL, como el SMTP: sin ella no hay area de operador y todo lo demas
+   * funciona igual. Ausente = NADIE es operador, que es el fallo seguro.
+   */
+  GCM_OPERADORES: z.string().optional(),
+
   // --- Correo saliente (alta de usuarios y recuperacion de clave) ---
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),

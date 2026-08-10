@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Building2,
   ClipboardCheck,
+  Landmark,
   KeyRound,
   LogOut,
   Menu,
@@ -41,6 +42,7 @@ const ICONOS = {
   empresa: Building2,
   usuarios: UsersRound,
   permisos: ShieldCheck,
+  constructoras: Landmark,
   solicitudes: ClipboardCheck,
 } as const;
 

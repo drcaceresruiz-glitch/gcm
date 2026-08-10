@@ -3,8 +3,9 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { generateToken, hashToken } from "@/lib/tokens";
-import { isProduction } from "@/lib/env";
+import { env, isProduction } from "@/lib/env";
 import { resolverPermisos, type Permiso } from "@/lib/rbac";
+import { parsearOperadores, esCorreoOperador } from "@/lib/operador";
 import type { Role } from "@/generated/prisma/enums";
 
 /**
@@ -53,6 +54,16 @@ export interface SesionActiva {
   apellidos: string;
   email: string;
   mustChangePassword: boolean;
+  /**
+   * Opera GCM: puede dar de alta constructoras clientes y suspenderlas.
+   *
+   * DERIVADO de una variable de entorno, no guardado: no hay columna ni rol
+   * que conceda esto, solo la lista del servidor. Ver `@/lib/operador`.
+   *
+   * No concede NI UN permiso del dominio: dentro de su empresa el operador es
+   * un usuario corriente y `puede()` sigue mandando.
+   */
+  esOperador: boolean;
 }
 
 export async function crearSesion(
@@ -125,6 +136,9 @@ export const obtenerSesion = cache(async function obtenerSesion(): Promise<Sesio
           // una segunda consulta porque el rol vive en la fila de al lado.
           company: {
             select: {
+              // Si la empresa esta suspendida, sus usuarios no entran. Va en
+              // esta consulta, que ya se hace, para no pagar otra.
+              activa: true,
               permisos: {
                 select: { role: true, permiso: true, concedido: true },
               },
@@ -139,7 +153,24 @@ export const obtenerSesion = cache(async function obtenerSesion(): Promise<Sesio
 
   const ahora = Date.now();
 
-  if (sesion.expiresAt.getTime() < ahora || sesion.user.estado !== "ACTIVO") {
+  const esOperador = esCorreoOperador(
+    sesion.user.email,
+    parsearOperadores(env.GCM_OPERADORES),
+  );
+
+  // Suspender una empresa tiene que echar tambien a quien YA estaba dentro:
+  // comprobarlo solo al entrar dejaria viva su sesion hasta que caducara. Al
+  // vivir aqui, corta paginas, acciones de servidor y API a la vez.
+  //
+  // El operador se salta el bloqueo: si no, suspender su empresa por error lo
+  // dejaria fuera sin nadie que pudiera devolverlo.
+  const empresaSuspendida = !sesion.user.company.activa && !esOperador;
+
+  if (
+    sesion.expiresAt.getTime() < ahora ||
+    sesion.user.estado !== "ACTIVO" ||
+    empresaSuspendida
+  ) {
     await prisma.session.delete({ where: { id: sesion.id } }).catch(() => {});
     return null;
   }
@@ -172,6 +203,7 @@ export const obtenerSesion = cache(async function obtenerSesion(): Promise<Sesio
     apellidos: sesion.user.apellidos,
     email: sesion.user.email,
     mustChangePassword: sesion.user.mustChangePassword,
+    esOperador,
   };
 });
 
