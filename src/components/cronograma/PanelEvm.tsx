@@ -177,24 +177,20 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         ) : null}
       </dl>
 
-      {/* La curva de las tres lineas. */}
-      <div>
-        <CurvaEvm
-          planPv={datos.planPv}
-          cortesEv={datos.cortesEv}
-          costoAc={datos.costoAc}
-          bac={Number(m.bac) || 0}
-          inicio={datos.inicio}
-          fin={datos.fin}
-          fechaCorte={datos.fechaCorte}
-          verCosto={verCosto}
-        />
-        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
-          <Leyenda color="var(--color-marca-600)">Ganado (EV)</Leyenda>
-          <Leyenda color="var(--texto)" punteada>Planeado (PV)</Leyenda>
-          {verCosto && <Leyenda color="var(--color-peligro)">Costo (AC)</Leyenda>}
-        </div>
-      </div>
+      {/* La curva de las tres lineas. La leyenda vive en la franja del
+          cursor, dentro de la propia curva: alli cada serie sale con su color
+          Y su cifra en la fecha elegida, asi que repetirla aqui seria tener
+          los mismos rotulos dos veces. */}
+      <CurvaEvm
+        planPv={datos.planPv}
+        cortesEv={datos.cortesEv}
+        costoAc={datos.costoAc}
+        bac={Number(m.bac) || 0}
+        inicio={datos.inicio}
+        fin={datos.fin}
+        fechaCorte={datos.fechaCorte}
+        verCosto={verCosto}
+      />
 
       {/* Los avisos: lo que hay que saber para no leer mal las cifras. */}
       {verCosto && (
@@ -216,8 +212,8 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
             <strong>Sin proyeccion de resultado (EAC, VAC, CPI).</strong>{" "}
-            {textoSinCosto(m.motivoSinCosto)} La mitad de plazo —SPI, SV y la
-            curva— no depende del costo y es valida hoy.
+            {textoSinCosto(m.motivoSinCosto)} Las cifras de plazo —SPI, SV y la
+            curva— no dependen del costo y si son validas hoy.
           </span>
         </p>
       )}
@@ -284,30 +280,3 @@ function Dato({
   );
 }
 
-function Leyenda({
-  color,
-  punteada,
-  children,
-}: {
-  color: string;
-  punteada?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span
-        className="inline-block w-7 shrink-0 rounded-full"
-        style={{
-          height: 4,
-          ...(punteada
-            ? {
-                backgroundImage: `repeating-linear-gradient(to right, ${color} 0 7px, transparent 7px 12px)`,
-              }
-            : { backgroundColor: color }),
-        }}
-        aria-hidden="true"
-      />
-      <span className="opacity-70">{children}</span>
-    </span>
-  );
-}
