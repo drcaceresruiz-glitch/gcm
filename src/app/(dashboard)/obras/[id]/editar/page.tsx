@@ -67,7 +67,7 @@ export default async function EditarObraPage({
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
           Corrige los datos de la obra. El estado se cambia con sus botones
-          (iniciar, paralizar, cerrar), no aqui.
+          (iniciar, paralizar, cerrar), no aquí.
         </p>
       </div>
 
@@ -89,17 +89,17 @@ export default async function EditarObraPage({
               {
                 titulo: "El plazo mueve el calendario",
                 texto:
-                  "Las fechas de inicio y fin dan los dias restantes y el avance de calendario del panel. Si la fecha fin difiere del cronograma, el panel lo avisa.",
+                  "Las fechas de inicio y fin dan los días restantes y el avance de calendario del panel. Si la fecha fin difiere del cronograma, el panel lo avisa.",
               },
               {
-                titulo: "El codigo no se repite",
+                titulo: "El código no se repite",
                 texto:
                   "Puedes cambiarlo, pero no puede coincidir con el de otra obra de la empresa. El correlativo (OB-000001) no cambia.",
               },
               {
                 titulo: "El estado va por sus botones",
                 texto:
-                  "Iniciar, paralizar o cerrar la obra se hace desde la obra, para respetar el orden de estados. Por eso no esta en este formulario.",
+                  "Iniciar, paralizar o cerrar la obra se hace desde la obra, para respetar el orden de estados. Por eso no está en este formulario.",
               },
             ]}
           />
@@ -110,11 +110,11 @@ export default async function EditarObraPage({
         className="rounded-xl border p-4"
         style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
       >
-        <h2 className="text-base font-semibold">Regimen laboral</h2>
+        <h2 className="text-base font-semibold">Régimen laboral</h2>
         <p className="mt-0.5 mb-3 max-w-2xl text-sm opacity-70">
-          Que dias se trabaja en esta obra y cuantas horas. De aqui salen los
-          dias laborables que quedan de plazo. Una edificacion urbana suele ir
-          de lunes a sabado; una obra vial de turno corrido, los siete dias.
+          Qué días se trabaja en esta obra y cuántas horas. De aquí salen los
+          días laborables que quedan de plazo. Una edificación urbana suele ir
+          de lunes a sábado; una obra vial de turno corrido, los siete días.
         </p>
         <CalendarioLaboral obraId={id} inicial={calendario} />
       </section>

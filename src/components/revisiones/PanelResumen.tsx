@@ -49,12 +49,12 @@ export function PanelResumen({ resumen, obraId, puedeAprobar }: PanelProps) {
       >
         <FileText className="mx-auto size-8 opacity-40" aria-hidden="true" />
         <p className="mt-3 text-sm opacity-70">
-          Todavia no hay ninguna revision del presupuesto.
+          Todavía no hay ninguna revisión del presupuesto.
         </p>
         <p className="mx-auto mt-1 max-w-md text-sm text-pretty opacity-60">
-          Una revision congela el costo directo de hoy con sus porcentajes y
-          su tipo de cambio, y es contra ella contra la que se miden despues
-          el avance y la desviacion.
+          Una revisión congela el costo directo de hoy con sus porcentajes y
+          su tipo de cambio, y es contra ella contra la que se miden después
+          el avance y la desviación.
         </p>
       </div>
     );
@@ -72,7 +72,7 @@ export function PanelResumen({ resumen, obraId, puedeAprobar }: PanelProps) {
         >
           <div>
             <h2 className="text-sm font-semibold">
-              Revision v{vigente.version}
+              Revisión v{vigente.version}
             </h2>
             <p className="mt-0.5 text-xs opacity-60">
               {fechaCorta(vigente.fechaRevision)}
@@ -166,7 +166,7 @@ function Comparacion({
         className="border-b px-4 py-3 text-sm font-semibold"
         style={{ borderColor: "var(--borde)" }}
       >
-        Diferencia con la revision anterior
+        Diferencia con la revisión anterior
       </h2>
 
       <dl className="space-y-2 p-4 text-sm">
@@ -209,7 +209,7 @@ function Comparacion({
 
       {!actual.tipoCambio && (
         <p className="px-4 pb-3 text-xs opacity-60">
-          Sin tipo de cambio en la revision v{actual.version}, la diferencia
+          Sin tipo de cambio en la revisión v{actual.version}, la diferencia
           solo se puede expresar en soles.
         </p>
       )}
@@ -234,7 +234,7 @@ function Clausulas({ texto }: { texto: string }) {
         className="border-b px-4 py-3 text-sm font-semibold"
         style={{ borderColor: "var(--borde)" }}
       >
-        Clausulas de ejecucion
+        Cláusulas de ejecución
       </h2>
       <p className="px-4 py-3 text-sm whitespace-pre-line">{texto}</p>
     </section>
@@ -252,7 +252,7 @@ function Historial({ revisiones }: { revisiones: RevisionResumen[] }) {
       >
         <table className="w-full min-w-[38rem] text-sm">
           <caption className="sr-only">
-            Todas las revisiones del presupuesto, de la mas reciente a la mas
+            Todas las revisiones del presupuesto, de la más reciente a la más
             antigua
           </caption>
           <thead>
@@ -262,7 +262,7 @@ function Historial({ revisiones }: { revisiones: RevisionResumen[] }) {
                 backgroundColor: "color-mix(in oklab, var(--borde) 40%, transparent)",
               }}
             >
-              <th scope="col" className="px-3 py-2 font-medium">Version</th>
+              <th scope="col" className="px-3 py-2 font-medium">Versión</th>
               <th scope="col" className="px-3 py-2 font-medium">Fecha</th>
               <th scope="col" className="px-3 py-2 font-medium">Estado</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">

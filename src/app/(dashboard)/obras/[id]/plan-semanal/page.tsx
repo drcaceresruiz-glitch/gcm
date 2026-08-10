@@ -48,7 +48,7 @@ export default async function PlanSemanalPage({
 
       {datos.semanas.length === 0 ? (
         <p className="text-sm opacity-60">
-          Aun no hay semanas.{" "}
+          Aún no hay semanas.{" "}
           {puedeGestionar ? "Crea la primera con «Nueva semana»." : ""}
         </p>
       ) : (

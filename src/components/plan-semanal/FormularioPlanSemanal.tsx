@@ -207,7 +207,7 @@ export function FormularioPlanSemanal({
                     </optgroup>
                   )}
                   {restringidas.length > 0 && (
-                    <optgroup label="Con restriccion (predecesora pendiente)">
+                    <optgroup label="Con restricción (predecesora pendiente)">
                       {restringidas.map((t) => (
                         <option key={t.uid} value={t.uid}>
                           {etiqueta(t)} — ⚠ {t.restriccion}
@@ -227,7 +227,7 @@ export function FormularioPlanSemanal({
           style={{ borderColor: "var(--borde)" }}
         >
           <Plus className="size-3.5" aria-hidden="true" />
-          Anadir tarea
+          Añadir tarea
         </button>
 
         <label className="min-w-48 flex-1 text-xs">
@@ -247,13 +247,13 @@ export function FormularioPlanSemanal({
           style={{ borderColor: "var(--borde)" }}
         >
           <Plus className="size-3.5" aria-hidden="true" />
-          Anadir libre
+          Añadir libre
         </button>
       </div>
 
       {items.length === 0 ? (
         <p className="text-sm opacity-60">
-          Aun no hay compromisos. Anade tareas o lineas libres para esta semana.
+          Aún no hay compromisos. Añade tareas o líneas libres para esta semana.
         </p>
       ) : (
         <ul className="space-y-1.5">

@@ -32,7 +32,7 @@ export function FormularioPerfil({ perfil }: { perfil: Perfil }) {
       <Tarjeta>
         <SeccionTarjeta
           titulo="Foto"
-          nota="Opcional. Es lo unico, junto al telefono, que se guarda al instante."
+          nota="Opcional. Es lo único, junto al teléfono, que se guarda al instante."
           primera
         >
           <FotoPerfil
@@ -67,8 +67,8 @@ function BloqueTelefono({ celular }: { celular: string | null }) {
     <form action={accion}>
       <Tarjeta>
         <SeccionTarjeta
-          titulo="Telefono"
-          nota="Es el unico dato que se guarda al instante, sin aprobacion."
+          titulo="Teléfono"
+          nota="Es el único dato que se guarda al instante, sin aprobación."
           primera
         >
           <CampoTexto
@@ -84,7 +84,7 @@ function BloqueTelefono({ celular }: { celular: string | null }) {
         <Avisos estado={estado} />
 
         <div className="mt-6 border-t pt-5" style={{ borderColor: "var(--borde)" }}>
-          <Boton>Guardar telefono</Boton>
+          <Boton>Guardar teléfono</Boton>
         </div>
       </Tarjeta>
     </form>
@@ -104,7 +104,7 @@ function BloqueIdentidad({ perfil }: { perfil: Perfil }) {
       <Tarjeta>
         <SeccionTarjeta
           titulo="Datos de identidad"
-          nota="Cambiarlos requiere que un administrador lo apruebe: son los que quedan escritos en las ordenes y movimientos que ya firmaste."
+          nota="Cambiarlos requiere que un administrador lo apruebe: son los que quedan escritos en las órdenes y movimientos que ya firmaste."
           primera
         >
           <div className="grid gap-4 sm:grid-cols-2">
@@ -128,7 +128,7 @@ function BloqueIdentidad({ perfil }: { perfil: Perfil }) {
             id="cargo"
             name="cargo"
             etiqueta="Cargo"
-            ayuda="Puede quedar vacio."
+            ayuda="Puede quedar vacío."
             defaultValue={perfil.cargo ?? ""}
             maxLength={100}
           />
@@ -161,7 +161,7 @@ function BloqueIdentidad({ perfil }: { perfil: Perfil }) {
             <CampoTexto
               id="numDoc"
               name="numDoc"
-              etiqueta="Numero de documento"
+              etiqueta="Número de documento"
               defaultValue={perfil.numDoc}
               maxLength={20}
             />
@@ -175,7 +175,7 @@ function BloqueIdentidad({ perfil }: { perfil: Perfil }) {
               id="motivo"
               name="motivo"
               rows={3}
-              placeholder="Por que pides el cambio. Ayuda a quien lo aprueba."
+              placeholder="Por qué pides el cambio. Ayuda a quien lo aprueba."
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
               style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
             />
@@ -207,9 +207,9 @@ function SolicitudPendiente({ perfil }: { perfil: Perfil }) {
   const propuestos: { etiqueta: string; valor: string }[] = [];
   if (p.nombres !== null) propuestos.push({ etiqueta: "Nombres", valor: p.nombres });
   if (p.apellidos !== null) propuestos.push({ etiqueta: "Apellidos", valor: p.apellidos });
-  if (p.cargo !== null) propuestos.push({ etiqueta: "Cargo", valor: p.cargo === "" ? "(vacio)" : p.cargo });
+  if (p.cargo !== null) propuestos.push({ etiqueta: "Cargo", valor: p.cargo === "" ? "(vacío)" : p.cargo });
   if (p.tipoDoc !== null) propuestos.push({ etiqueta: "Tipo de documento", valor: p.tipoDoc });
-  if (p.numDoc !== null) propuestos.push({ etiqueta: "Numero de documento", valor: p.numDoc });
+  if (p.numDoc !== null) propuestos.push({ etiqueta: "Número de documento", valor: p.numDoc });
 
   return (
     <Tarjeta>
@@ -222,7 +222,7 @@ function SolicitudPendiente({ perfil }: { perfil: Perfil }) {
         >
           <Clock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <div>
-            <p className="font-medium">Tienes una solicitud pendiente de aprobacion.</p>
+            <p className="font-medium">Tienes una solicitud pendiente de aprobación.</p>
             <p className="mt-0.5 opacity-70">
               Tus datos siguen mostrando los valores actuales hasta que un
               administrador la apruebe.
@@ -266,7 +266,7 @@ function BloqueSoloLectura({ perfil }: { perfil: Perfil }) {
   return (
     <Tarjeta>
       <SeccionTarjeta
-        titulo="Datos que no se editan aqui"
+        titulo="Datos que no se editan aquí"
         nota="El correo es tu identificador de acceso; el rol y la empresa los gestiona un administrador."
         primera
       >

@@ -17,7 +17,7 @@ import { BotonEliminarBorrador } from "@/components/movimientos/BotonEliminarBor
  */
 
 const ETIQUETA: Record<TipoMovimiento, string> = {
-  RECONVERSION: "Reconversion",
+  RECONVERSION: "Reconversión",
   ADICIONAL: "Adicional",
   DEDUCTIVO: "Deductivo",
 };
@@ -55,12 +55,12 @@ export function HistorialMovimientos({
         >
           <FileText className="mx-auto size-8 opacity-40" aria-hidden="true" />
           <p className="mt-3 text-sm opacity-70">
-            Esta obra no tiene ningun movimiento presupuestal.
+            Esta obra no tiene ningún movimiento presupuestal.
           </p>
           <p className="mx-auto mt-1 max-w-lg text-sm text-pretty opacity-60">
-            Una reconversion mueve dinero entre partidas y suma cero; un
+            Una reconversión mueve dinero entre partidas y suma cero; un
             adicional aumenta el presupuesto aprobado y un deductivo lo
-            reduce. Los tres van encima de la linea base, que no se toca.
+            reduce. Los tres van encima de la línea base, que no se toca.
           </p>
         </div>
       ) : (

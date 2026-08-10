@@ -83,8 +83,8 @@ export function ChecklistRequisitos({
 
       <p className="mt-3 border-t pt-2 text-xs opacity-60" style={{ borderColor: "var(--borde)" }}>
         {completo
-          ? "Listo para crear. El resto de datos se puede completar despues."
-          : "Completa lo que falta para habilitar el boton de crear."}
+          ? "Listo para crear. El resto de datos se puede completar después."
+          : "Completa lo que falta para habilitar el botón de crear."}
       </p>
     </div>
   );

@@ -101,13 +101,13 @@ export default async function DetallePlanSemanalPage({
           <h3 className="mb-1 text-base font-semibold">Compromisos de la semana</h3>
           {autocargado ? (
             <p className="mb-3 text-sm opacity-70">
-              Se cargaron automaticamente las <strong>{plan.sugeridas.length}</strong>{" "}
+              Se cargaron automáticamente las <strong>{plan.sugeridas.length}</strong>{" "}
               tarea(s) programadas para esta semana. Quita las que no correspondan,
-              ajusta metas o anade lineas libres, y guarda.
+              ajusta metas o añade líneas libres, y guarda.
             </p>
           ) : (
             <p className="mb-3 text-sm opacity-70">
-              Elige tareas del cronograma o anade lineas libres para esta semana.
+              Elige tareas del cronograma o añade líneas libres para esta semana.
             </p>
           )}
           <FormularioPlanSemanal
@@ -123,7 +123,7 @@ export default async function DetallePlanSemanalPage({
         <Seccion>
           <h3 className="mb-1 text-base font-semibold">Cerrar la semana</h3>
           <p className="mb-3 text-sm opacity-70">
-            Marca cada compromiso y, si no se cumplio, su causa. De aqui sale el PPC.
+            Marca cada compromiso y, si no se cumplió, su causa. De aquí sale el PPC.
           </p>
           <CierrePlanSemanal
             obraId={id}
@@ -189,7 +189,7 @@ export default async function DetallePlanSemanalPage({
                       <span
                         className="ml-2 text-xs"
                         style={{ color: "var(--color-alerta)" }}
-                        title="Se comprometio sin liberar sus restricciones en el Lookahead"
+                        title="Se comprometió sin liberar sus restricciones en el Lookahead"
                       >
                         sin liberar
                       </span>

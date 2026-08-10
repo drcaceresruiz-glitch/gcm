@@ -4,7 +4,7 @@ import { hayDesafioAbierto } from "@/services/dosFactores.service";
 import { VIGENCIA_CODIGO_MINUTOS } from "@/lib/dosFactores";
 import { FormularioCodigo } from "@/components/auth/FormularioCodigo";
 
-export const metadata: Metadata = { title: "Verificacion" };
+export const metadata: Metadata = { title: "Verificación" };
 
 /**
  * Segundo paso del acceso. Ruta publica en el proxy porque quien llega aqui

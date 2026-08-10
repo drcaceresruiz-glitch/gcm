@@ -28,8 +28,8 @@ import {
  */
 
 const ESTADOS = [
-  { valor: "PLANIFICACION", etiqueta: "Planificacion" },
-  { valor: "EN_EJECUCION", etiqueta: "En ejecucion" },
+  { valor: "PLANIFICACION", etiqueta: "Planificación" },
+  { valor: "EN_EJECUCION", etiqueta: "En ejecución" },
   { valor: "PARALIZADA", etiqueta: "Paralizada" },
   { valor: "CERRADA", etiqueta: "Cerrada" },
 ] as const;
@@ -74,8 +74,8 @@ export function FormularioObra({
   const fFin = fechaDeObra(fin);
   const requisitos: Requisito[] = [
     { etiqueta: "Nombre de la obra", cumplido: nombre.trim().length > 0 },
-    { etiqueta: "Fecha de inicio valida", cumplido: fInicio !== null },
-    { etiqueta: "Fecha de fin valida", cumplido: fFin !== null },
+    { etiqueta: "Fecha de inicio válida", cumplido: fInicio !== null },
+    { etiqueta: "Fecha de fin válida", cumplido: fFin !== null },
     {
       etiqueta: "El fin no es anterior al inicio",
       cumplido: fInicio !== null && fFin !== null && fFin >= fInicio,
@@ -87,7 +87,7 @@ export function FormularioObra({
     <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
       <form action={accionForm}>
         <Tarjeta>
-          <SeccionTarjeta titulo="Identificacion" primera>
+          <SeccionTarjeta titulo="Identificación" primera>
             <CampoTexto
               id="nombreObra"
               name="nombreObra"
@@ -101,10 +101,10 @@ export function FormularioObra({
             <CampoTexto
               id="codigoObra"
               name="codigoObra"
-              etiqueta="Codigo"
+              etiqueta="Código"
               maxLength={40}
               defaultValue={valores?.codigoObra ?? ""}
-              ayuda="Opcional, pero no se puede repetir dentro de la empresa. El sistema le asigna ademas un correlativo propio (OB-000001)."
+              ayuda="Opcional, pero no se puede repetir dentro de la empresa. El sistema le asigna además un correlativo propio (OB-000001)."
             />
             <CampoTexto
               id="cliente"
@@ -116,7 +116,7 @@ export function FormularioObra({
             <CampoTexto
               id="ubicacion"
               name="ubicacion"
-              etiqueta="Ubicacion"
+              etiqueta="Ubicación"
               maxLength={255}
               defaultValue={valores?.ubicacion ?? ""}
             />
@@ -124,7 +124,7 @@ export function FormularioObra({
 
           <SeccionTarjeta
             titulo="Plazo"
-            nota="De aqui salen los dias restantes y el avance de calendario del panel."
+            nota="De aquí salen los días restantes y el avance de calendario del panel."
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <CampoTexto
@@ -170,7 +170,7 @@ export function FormularioObra({
                   ))}
                 </select>
                 <p className="text-xs opacity-60">
-                  Lo normal es abrirla en planificacion y pasarla a ejecucion
+                  Lo normal es abrirla en planificación y pasarla a ejecución
                   cuando arranque.
                 </p>
               </div>
@@ -245,7 +245,7 @@ function BotonGuardar({
           ? "Completa los requisitos de la derecha para habilitar el guardado."
           : editar
             ? "Los cambios se aplican al panel y a la obra al guardar."
-            : "Al crearla se abre vacia: el paso siguiente es cargarle el presupuesto."}
+            : "Al crearla se abre vacía: el paso siguiente es cargarle el presupuesto."}
       </p>
     </div>
   );

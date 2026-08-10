@@ -101,7 +101,7 @@ export default async function NuevaOrdenPage({
   return (
     <div className="space-y-8">
       <div>
-        <Volver href={`/obras/${id}/ordenes`}>Volver a las ordenes</Volver>
+        <Volver href={`/obras/${id}/ordenes`}>Volver a las órdenes</Volver>
 
         <h2 className="mt-3 text-xl font-semibold tracking-tight">
           Nueva orden

@@ -44,8 +44,8 @@ export const metadata: Metadata = { title: "Cronograma" };
 
 /// Nombre del dia de corte por indice ISO (1=lunes … 7=domingo).
 const DIAS_SEMANA: Record<number, string> = {
-  1: "lunes", 2: "martes", 3: "miercoles", 4: "jueves",
-  5: "viernes", 6: "sabado", 7: "domingo",
+  1: "lunes", 2: "martes", 3: "miércoles", 4: "jueves",
+  5: "viernes", 6: "sábado", 7: "domingo",
 };
 
 export default async function CronogramaPage({
@@ -148,14 +148,14 @@ export default async function CronogramaPage({
 
       {cargado && (
         <Mensaje tono="exito" icono={<CheckCircle2 className="size-4 shrink-0" />}>
-          Cronograma cargado como version {cargado}.
+          Cronograma cargado como versión {cargado}.
         </Mensaje>
       )}
 
       {repetido && (
         <Mensaje tono="alerta" icono={<Info className="size-4 shrink-0" />}>
-          Ese corte ya estaba cargado (version {repetido}), asi que no se ha
-          creado ninguna version nueva. Para registrar un corte nuevo, fija otra
+          Ese corte ya estaba cargado (versión {repetido}), así que no se ha
+          creado ninguna versión nueva. Para registrar un corte nuevo, fija otra
           fecha de estado en MS Project y vuelve a exportar.
         </Mensaje>
       )}
@@ -169,10 +169,10 @@ export default async function CronogramaPage({
             <Mascota pose="trabajando" alto={170} flotar />
           </div>
           <p className="mt-3 text-sm opacity-70">
-            Esta obra aun no tiene cronograma.
+            Esta obra aún no tiene cronograma.
           </p>
           <p className="mx-auto mt-1 max-w-md text-sm opacity-60">
-            Al cargarlo se veran las tareas con sus fechas, la ruta critica y
+            Al cargarlo se verán las tareas con sus fechas, la ruta crítica y
             el avance planeado que trae el propio archivo.
           </p>
           {puedeImportar && (
@@ -194,10 +194,10 @@ export default async function CronogramaPage({
             />
             <Dato etiqueta="Tareas" valor={String(cronograma.tareas.length)} />
             <Dato
-              etiqueta="Ruta critica"
+              etiqueta="Ruta crítica"
               valor={`${cronograma.tareas.filter((t) => t.esCritico).length} tareas`}
             />
-            <Dato etiqueta="Version" valor={`v${cronograma.version}`} />
+            <Dato etiqueta="Versión" valor={`v${cronograma.version}`} />
           </dl>
 
           <p className="text-xs opacity-60">
@@ -218,8 +218,8 @@ export default async function CronogramaPage({
             <Mensaje tono="alerta" icono={<AlertTriangle className="size-4 shrink-0" />}>
               <span>
                 Hay {cronograma.huerfanos.length} reporte(s) de avance de tareas
-                que ya no estan en el cronograma. No se han borrado: si la tarea
-                vuelve a aparecer en Project, su avance sigue ahi.
+                que ya no están en el cronograma. No se han borrado: si la tarea
+                vuelve a aparecer en Project, su avance sigue ahí.
                 <span className="mt-1 block font-mono text-xs opacity-70">
                   {cronograma.huerfanos
                     .map((h) => `UID ${h.uid} · ${decimal(h.porcentaje, "")}% · ${fechaCorta(h.fecha)}`)
@@ -232,9 +232,9 @@ export default async function CronogramaPage({
           <Tarjeta>
             <h3 className="text-base font-semibold">Curva de avance</h3>
             <p className="mt-0.5 mb-4 text-sm opacity-70">
-              La linea de puntos es el plan repartido dia a dia; la continua, lo
-              medido en cada corte. Cada tarea pesa segun su duracion, no todas
-              por igual: terminar una partida de un dia no es lo mismo que
+              La línea de puntos es el plan repartido día a día; la continua, lo
+              medido en cada corte. Cada tarea pesa según su duración, no todas
+              por igual: terminar una partida de un día no es lo mismo que
               terminar una de veinte.
             </p>
 
@@ -253,7 +253,7 @@ export default async function CronogramaPage({
                     </span>
                   ) : (
                     <span style={{ color: "var(--color-exito)" }}>
-                      {" "}Al dia (ultimo corte{" "}
+                      {" "}Al día (último corte{" "}
                       {fechaCorta(curva.cadencia.ultimoCorteEsperado)}).
                     </span>
                   ))}
@@ -273,13 +273,13 @@ export default async function CronogramaPage({
 
             {curva.cortes.length === 1 && (
               <p className="mt-3 text-xs opacity-60">
-                Con un solo corte la linea real es todavia un punto. Carga los
-                cortes siguientes y se ira dibujando sola.
+                Con un solo corte la línea real es todavía un punto. Carga los
+                cortes siguientes y se irá dibujando sola.
               </p>
             )}
 
             <p className="mt-3 text-xs opacity-60">
-              La ponderacion es por duracion porque es el unico peso que trae el
+              La ponderación es por duración porque es el único peso que trae el
               archivo —no lleva costes ni horas de trabajo—.{" "}
               <Link
                 href={`/obras/${id}/cronograma/mapeo`}
@@ -287,7 +287,7 @@ export default async function CronogramaPage({
               >
                 Enlaza las tareas con las partidas del presupuesto
               </Link>{" "}
-              y pasara a ponderarse por dinero, que es lo que hace comparable el
+              y pasará a ponderarse por dinero, que es lo que hace comparable el
               avance con lo comprometido.
             </p>
           </Tarjeta>
@@ -297,7 +297,7 @@ export default async function CronogramaPage({
               <h3 className="text-base font-semibold">Valor ganado (EVM)</h3>
               <p className="mt-0.5 mb-4 text-sm opacity-70">
                 El avance y el gasto en la misma escala de dinero: el control
-                integrado de plazo y costo. El SPI dice como se va de plazo; el
+                integrado de plazo y costo. El SPI dice cómo se va de plazo; el
                 CPI, de costo.
               </p>
 
@@ -310,18 +310,18 @@ export default async function CronogramaPage({
             <p className="mt-0.5 mb-4 text-sm opacity-70">
               Las fechas clave del cronograma.{" "}
               {baseCron
-                ? "El desvio se mide contra la linea base."
-                : "Fija una linea base para medir su desvio."}
+                ? "El desvío se mide contra la línea base."
+                : "Fija una línea base para medir su desvío."}
             </p>
 
             <Hitos filas={filasDeHitos} hayBase={baseCron !== null} />
           </Tarjeta>
 
           <Tarjeta>
-            <h3 className="text-base font-semibold">Que esta frenando la obra</h3>
+            <h3 className="text-base font-semibold">Qué está frenando la obra</h3>
             <p className="mt-0.5 mb-4 text-sm opacity-70">
-              Solo partidas de trabajo. Un capitulo atrasado no se lista aparte:
-              lo esta porque lo estan sus partidas.
+              Solo partidas de trabajo. Un capítulo atrasado no se lista aparte:
+              lo está porque lo están sus partidas.
             </p>
 
             <AlertasAtraso
@@ -330,11 +330,11 @@ export default async function CronogramaPage({
           </Tarjeta>
 
           <Tarjeta>
-            <h3 className="text-base font-semibold">Ruta critica</h3>
+            <h3 className="text-base font-semibold">Ruta crítica</h3>
             <p className="mt-0.5 mb-4 text-sm opacity-70">
               La cadena de tareas cuyo atraso corre la fecha de entrega de toda
-              la obra. No aparecen ni los capitulos ni los hitos que Project
-              tambien marca como criticos: no son trabajo sobre el que se pueda
+              la obra. No aparecen ni los capítulos ni los hitos que Project
+              también marca como críticos: no son trabajo sobre el que se pueda
               actuar.
             </p>
 
@@ -344,7 +344,7 @@ export default async function CronogramaPage({
           </Tarjeta>
 
           <Tarjeta>
-            <h3 className="text-base font-semibold">Avance por capitulo</h3>
+            <h3 className="text-base font-semibold">Avance por capítulo</h3>
             <p className="mt-0.5 mb-4 text-sm opacity-70">
               La lectura que falta entre la curva —una cifra para toda la obra— y
               la tabla de {cronograma.tareas.length} filas.
@@ -363,12 +363,12 @@ export default async function CronogramaPage({
           <p className="text-xs opacity-60">
             La marca vertical de cada barra es el % planeado que trae el
             archivo. El porcentaje en gris es el que dice MS Project, porque
-            todavia nadie lo ha reportado desde obra.
+            todavía nadie lo ha reportado desde obra.
           </p>
 
           {historial.length >= 1 && (
             <section>
-              <h3 className="mb-2 text-sm font-semibold">Cortes y linea base</h3>
+              <h3 className="mb-2 text-sm font-semibold">Cortes y línea base</h3>
               <ul className="space-y-2 text-sm">
                 {historial.map((c) => (
                   <li key={c.id} className="flex flex-wrap items-center gap-2">
@@ -480,7 +480,7 @@ function DesajusteDePlazo({
         El cronograma va de {fechaCronograma(inicioPlan)} a{" "}
         {fechaCronograma(finPlan)}, y la ficha de la obra registra{" "}
         {fechaCronograma(inicioObra)} a {fechaCronograma(finObra)}. Si la
-        reprogramacion es firme, conviene actualizar la ficha.
+        reprogramación es firme, conviene actualizar la ficha.
       </span>
     </p>
   );

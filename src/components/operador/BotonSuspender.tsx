@@ -57,7 +57,7 @@ export function BotonSuspender({
       ) : confirmando ? (
         <>
           <span className="text-xs opacity-70">
-            Dejara fuera a todo {razonSocial}.
+            Dejará fuera a todo {razonSocial}.
           </span>
           <button
             type="button"

@@ -60,8 +60,8 @@ export function BotonEliminarPlan({
       <h4 className="text-sm font-semibold">Eliminar la semana {numero}</h4>
       <p className="mt-1 text-sm text-pretty opacity-80">
         {cerrada
-          ? "Esta semana ya esta cerrada y cuenta en el PPC historico y el Pareto: al eliminarla, esos graficos dejaran de incluirla. Se borran sus compromisos. Solo queda en la auditoria."
-          : "Se borran la semana y todos sus compromisos. Podras crearla de nuevo. Solo queda en la auditoria."}
+          ? "Esta semana ya está cerrada y cuenta en el PPC histórico y el Pareto: al eliminarla, esos gráficos dejarán de incluirla. Se borran sus compromisos. Solo queda en la auditoría."
+          : "Se borran la semana y todos sus compromisos. Podrás crearla de nuevo. Solo queda en la auditoría."}
       </p>
 
       {error && (
@@ -88,7 +88,7 @@ export function BotonEliminarPlan({
           ) : (
             <Trash2 className="size-4" aria-hidden="true" />
           )}
-          {pendiente ? "Eliminando..." : "Si, eliminar"}
+          {pendiente ? "Eliminando..." : "Sí, eliminar"}
         </button>
         <button
           type="button"

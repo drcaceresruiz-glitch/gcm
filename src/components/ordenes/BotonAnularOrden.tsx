@@ -75,7 +75,7 @@ export function BotonAnularOrden({
       <p className="mt-1 text-sm text-pretty opacity-80">
         {aprobada
           ? `Deja de contar en el comprometido y libera ${neto} de presupuesto. La orden se conserva con este motivo.`
-          : "La orden se conserva con este motivo, pero ya no se podra aprobar."}
+          : "La orden se conserva con este motivo, pero ya no se podrá aprobar."}
       </p>
 
       <div className="mt-3 space-y-1.5">
@@ -90,8 +90,8 @@ export function BotonAnularOrden({
           style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
         />
         <p className="text-xs opacity-60">
-          Obligatorio. Quien lea esto dentro de seis meses no estara en esta
-          conversacion.
+          Obligatorio. Quien lea esto dentro de seis meses no estará en esta
+          conversación.
         </p>
       </div>
 
@@ -131,7 +131,7 @@ function BotonConfirmar() {
       ) : (
         <Ban className="size-4" aria-hidden="true" />
       )}
-      {pending ? "Anulando..." : "Si, anular"}
+      {pending ? "Anulando..." : "Sí, anular"}
     </button>
   );
 }

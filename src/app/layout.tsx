@@ -11,11 +11,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "GCM - Gestor de Construccion y Mantenimiento",
+    default: "GCM - Gestor de Construcción y Mantenimiento",
     template: "%s | GCM",
   },
   description:
-    "Control de obra multiproyecto: presupuesto, avance fisico y resultado economico.",
+    "Control de obra multiproyecto: presupuesto, avance físico y resultado económico.",
   robots: { index: false, follow: false },
   /**
    * Instalable en el movil.

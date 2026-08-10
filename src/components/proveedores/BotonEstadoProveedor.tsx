@@ -57,8 +57,8 @@ export function BotonEstadoProveedor({
 
           <span className="text-sm">
             {razonSocial} tiene{" "}
-            {totalOrdenes === 1 ? "1 orden" : `${totalOrdenes} ordenes`}. Se
-            conservan; solo deja de aparecer al crear ordenes nuevas.
+            {totalOrdenes === 1 ? "1 orden" : `${totalOrdenes} órdenes`}. Se
+            conservan; solo deja de aparecer al crear órdenes nuevas.
           </span>
 
           <BotonConfirmar activo={false} />
@@ -124,8 +124,8 @@ function BotonConfirmar({
       ? "Activar"
       : "Desactivar"
     : activo
-      ? "Si, activar"
-      : "Si, desactivar";
+      ? "Sí, activar"
+      : "Sí, desactivar";
 
   return (
     <button

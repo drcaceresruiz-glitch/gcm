@@ -55,13 +55,13 @@ export default async function ImportarPage({
           <div>
             <h2 className="text-sm font-semibold">Presupuesto congelado</h2>
             <p className="mt-1 text-sm">
-              Esta obra tiene la linea base v{obra.lineaBaseVersion} aprobada.
+              Esta obra tiene la línea base v{obra.lineaBaseVersion} aprobada.
               El presupuesto contractual ya no se puede reemplazar, porque los
-              indicadores de avance y costo se calculan contra el.
+              indicadores de avance y costo se calculan contra él.
             </p>
             <p className="mt-2 text-sm">
               Los cambios posteriores se registran como adicionales o
-              deductivos, que suman sobre la linea base sin alterarla.
+              deductivos, que suman sobre la línea base sin alterarla.
             </p>
           </div>
         </div>

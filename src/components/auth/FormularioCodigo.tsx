@@ -43,7 +43,7 @@ export function FormularioCodigo({ minutos }: { minutos: number }) {
           aria-hidden="true"
         />
         <p className="mt-2 text-sm">
-          Te enviamos un codigo de {LONGITUD_CODIGO} cifras a tu correo.
+          Te enviamos un código de {LONGITUD_CODIGO} cifras a tu correo.
         </p>
         <p className="mt-1 text-xs opacity-60">
           Caduca en {minutos} minutos.
@@ -67,7 +67,7 @@ export function FormularioCodigo({ minutos }: { minutos: number }) {
 
         <div className="space-y-1.5">
           <label htmlFor="codigo" className="block text-sm font-medium">
-            Codigo
+            Código
           </label>
           {/* `inputMode` numerico saca el teclado de cifras en el movil, que
               es donde se teclea esto casi siempre. `one-time-code` deja que

@@ -122,9 +122,9 @@ export function FormularioRevision({
           id="fechaRevision"
           name="fechaRevision"
           type="date"
-          etiqueta="Fecha de la revision"
+          etiqueta="Fecha de la revisión"
           defaultValue={fechaHoy}
-          ayuda="La del documento, no la de hoy si se carga despues."
+          ayuda="La del documento, no la de hoy si se carga después."
           required
         />
 
@@ -168,16 +168,16 @@ export function FormularioRevision({
           inputMode="decimal"
           etiqueta="Tipo de cambio"
           defaultValue={iniciales.tipoCambio}
-          ayuda="Opcional. Sin el, la diferencia entre revisiones solo sale en soles."
+          ayuda="Opcional. Sin él, la diferencia entre revisiones solo sale en soles."
         />
 
         <CampoArea
           id="clausulas"
           name="clausulas"
-          etiqueta="Clausulas de ejecucion"
+          etiqueta="Cláusulas de ejecución"
           defaultValue={iniciales.clausulas}
           rows={5}
-          ayuda="Alcance, forma de pago, garantia y vigencia pactados en esta revision."
+          ayuda="Alcance, forma de pago, garantía y vigencia pactados en esta revisión."
         />
 
         <CampoArea
@@ -185,14 +185,14 @@ export function FormularioRevision({
           name="notas"
           etiqueta="Notas internas"
           rows={2}
-          ayuda="Opcional. Por que se emite esta revision."
+          ayuda="Opcional. Por qué se emite esta revisión."
         />
       </div>
 
       <div className="space-y-3">
         <div>
           <h2 className="text-sm font-semibold">
-            Asi quedara la revision v{(ultimaVersion ?? 0) + 1}
+            Así quedará la revisión v{(ultimaVersion ?? 0) + 1}
           </h2>
           <p className="mt-1 text-sm opacity-70">
             Sobre el costo directo de las {totalPartidas} partidas que tiene
@@ -213,8 +213,8 @@ export function FormularioRevision({
         <BotonCrear />
 
         <p className="text-xs opacity-60">
-          Se guarda una copia de las {totalPartidas} partidas tal como estan
-          ahora. Esa copia no cambia aunque despues se edite el presupuesto.
+          Se guarda una copia de las {totalPartidas} partidas tal como están
+          ahora. Esa copia no cambia aunque después se edite el presupuesto.
         </p>
       </div>
     </form>
@@ -234,7 +234,7 @@ function BotonCrear() {
       {pending && (
         <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
       )}
-      {pending ? "Creando revision..." : "Crear revision"}
+      {pending ? "Creando revisión..." : "Crear revisión"}
     </button>
   );
 }

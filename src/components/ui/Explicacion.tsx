@@ -69,7 +69,7 @@ export function Explicacion({ texto }: { texto: TextoExplicacion }) {
       >
         <p className="text-pretty">{texto.queEs}</p>
 
-        <Bloque titulo="Para que sirve">
+        <Bloque titulo="Para qué sirve">
           <p className="text-pretty opacity-80">{texto.paraQue}</p>
         </Bloque>
 
@@ -80,7 +80,7 @@ export function Explicacion({ texto }: { texto: TextoExplicacion }) {
         )}
 
         {texto.consecuencias && texto.consecuencias.length > 0 && (
-          <Bloque titulo="Que pasa despues">
+          <Bloque titulo="Qué pasa después">
             <Lista puntos={texto.consecuencias} />
           </Bloque>
         )}

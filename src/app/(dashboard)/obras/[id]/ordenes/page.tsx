@@ -21,7 +21,7 @@ import { PanelComprometido } from "@/components/ordenes/PanelComprometido";
 import { FiltrosOrdenes } from "@/components/ordenes/FiltrosOrdenes";
 import { HistorialOrdenes } from "@/components/ordenes/HistorialOrdenes";
 
-export const metadata: Metadata = { title: "Ordenes de compra" };
+export const metadata: Metadata = { title: "Órdenes de compra" };
 
 /**
  * Las ordenes de la obra y lo que llevan comprometido.
@@ -106,17 +106,17 @@ export default async function OrdenesPage({
   }
 
   const avisos = [
-    creada && `Orden ${creada} guardada como borrador. Todavia no cuenta en el comprometido: hay que aprobarla.`,
+    creada && `Orden ${creada} guardada como borrador. Todavía no cuenta en el comprometido: hay que aprobarla.`,
     aprobada && `Orden ${aprobada} aprobada. Ya cuenta en el comprometido.`,
     anulada && `Orden ${anulada} anulada. Deja de contar en el comprometido y se conserva con su motivo.`,
-    eliminada && `Orden ${eliminada} eliminada. No contaba en el comprometido, asi que ninguna cifra cambia.`,
+    eliminada && `Orden ${eliminada} eliminada. No contaba en el comprometido, así que ninguna cifra cambia.`,
   ].filter(Boolean) as string[];
 
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <h2 className="text-xl font-semibold tracking-tight">
-          Ordenes de compra
+          Órdenes de compra
         </h2>
 
         {puede(sesion, "orden:crear") && (
@@ -156,7 +156,7 @@ export default async function OrdenesPage({
       />
 
       <section className="space-y-4">
-        <h3 className="text-lg font-semibold">Ordenes</h3>
+        <h3 className="text-lg font-semibold">Órdenes</h3>
 
         <FiltrosOrdenes proveedores={proveedores} />
 
@@ -178,7 +178,7 @@ export default async function OrdenesPage({
           totalPaginas={ordenes.totalPaginas}
           total={ordenes.total}
           porPagina={5}
-          etiqueta="ordenes"
+          etiqueta="órdenes"
           // Los filtros SI viajan —perderlos al pasar de pagina reiniciaria
           // la busqueda—, los avisos de un solo uso no.
           params={filtros}

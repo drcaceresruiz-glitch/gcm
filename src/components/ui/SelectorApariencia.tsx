@@ -76,7 +76,7 @@ export function SelectorApariencia() {
               type="button"
               onClick={() => aplicarTema(t)}
               aria-pressed={activo}
-              title={t === "auto" ? "Segun el sistema" : t}
+              title={t === "auto" ? "Según el sistema" : t}
               className="flex flex-1 items-center justify-center rounded-lg border py-1.5"
               style={{
                 borderColor: activo ? "var(--color-marca-600)" : "var(--borde)",

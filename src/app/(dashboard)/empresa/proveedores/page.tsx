@@ -52,7 +52,7 @@ export default async function ProveedoresPage({
           Proveedores
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-pretty opacity-70">
-          El catalogo es de la empresa, no de cada obra: el mismo proveedor
+          El catálogo es de la empresa, no de cada obra: el mismo proveedor
           trabaja en varias. El RUC lo identifica y no puede repetirse, entre
           por donde entre.
         </p>

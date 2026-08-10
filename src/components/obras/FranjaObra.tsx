@@ -74,7 +74,7 @@ export function FranjaObra({
         {avanceFisico ? (
           <div className="min-w-0 flex-1">
             <Barra
-              etiqueta="Avance fisico"
+              etiqueta="Avance físico"
               valor={avanceFisico.real}
               detalle={`${avanceFisico.real.toFixed(1)}% de ${avanceFisico.planeado.toFixed(1)}%`}
               // Verde solo si llega a lo previsto. Es la misma lectura que en
@@ -132,7 +132,7 @@ export function FranjaObra({
           }}
         >
           <div className="flex items-start justify-between gap-2">
-            <h4 className="text-sm font-semibold">Requiere atencion</h4>
+            <h4 className="text-sm font-semibold">Requiere atención</h4>
             <button
               type="button"
               onClick={(e) => {
@@ -173,8 +173,8 @@ export function FranjaObra({
             <Info className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
             <span>
               {avanceFisico
-                ? `Avance fisico del corte del ${avanceFisico.corte}, ponderado por la duracion de cada tarea.`
-                : "Sin datos aun de avance fisico: llegan al cargar el cronograma de la obra."}
+                ? `Avance físico del corte del ${avanceFisico.corte}, ponderado por la duración de cada tarea.`
+                : "Sin datos aún de avance físico: llegan al cargar el cronograma de la obra."}
             </span>
           </p>
         </div>
@@ -242,7 +242,7 @@ function BarraPendiente() {
   return (
     <div className="min-w-0 flex-1">
       <div className="flex items-center justify-between text-xs opacity-45">
-        <span>Avance fisico</span>
+        <span>Avance físico</span>
         <span>pendiente</span>
       </div>
       <div

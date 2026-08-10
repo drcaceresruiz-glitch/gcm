@@ -44,7 +44,7 @@ export default async function ProveedoresPage({
         <div>
           <h2 className="text-lg font-semibold">Proveedores por frente</h2>
           <p className="mt-0.5 text-sm opacity-70">
-            Reparte la obra en encargos: quien hace que, por cuanto y como va.
+            Reparte la obra en encargos: quién hace qué, por cuánto y cómo va.
           </p>
         </div>
         {puedeGestionar && (
@@ -96,8 +96,8 @@ export default async function ProveedoresPage({
           )}
           {cobertura.porcentaje > 100 && (
             <p className="mt-1.5 text-xs" style={{ color: "var(--color-peligro)" }}>
-              Se ha asignado mas del 100 %: revisa las fracciones, alguna
-              partida esta contada de mas.
+              Se ha asignado más del 100 %: revisa las fracciones, alguna
+              partida está contada de más.
             </p>
           )}
         </div>
@@ -112,7 +112,7 @@ export default async function ProveedoresPage({
             <Mascota pose="trabajando" alto={150} />
           </div>
           <p className="mt-3 text-sm opacity-70">
-            Aun no hay proveedores asignados a frentes de esta obra.
+            Aún no hay proveedores asignados a frentes de esta obra.
           </p>
           {puedeGestionar ? (
             <Link

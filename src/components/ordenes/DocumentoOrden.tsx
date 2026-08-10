@@ -30,7 +30,7 @@ const CUENTA: Record<string, string> = {
   CORRIENTE: "Corriente",
 };
 
-const MONEDA: Record<string, string> = { PEN: "Soles", USD: "Dolares" };
+const MONEDA: Record<string, string> = { PEN: "Soles", USD: "Dólares" };
 
 export function DocumentoOrden({ orden }: Props) {
   const { emisor, proveedor } = orden;
@@ -78,7 +78,7 @@ export function DocumentoOrden({ orden }: Props) {
           )}
         </Dato>
         {orden.referencia && (
-          <Dato etiqueta="EN ATENCION A">{orden.referencia}</Dato>
+          <Dato etiqueta="EN ATENCIÓN A">{orden.referencia}</Dato>
         )}
       </section>
 
@@ -86,7 +86,7 @@ export function DocumentoOrden({ orden }: Props) {
         <TablaLineas lineas={orden.lineas} />
       ) : (
         <p className="mt-5 border border-black px-2 py-3 text-center">
-          Orden registrada solo por cabecera: el detalle esta en el documento
+          Orden registrada solo por cabecera: el detalle está en el documento
           original del proveedor.
         </p>
       )}
@@ -143,7 +143,7 @@ function Sello({ estado }: { estado: string }) {
   const texto =
     estado === "BORRADOR"
       ? "BORRADOR — no compromete presupuesto hasta que se apruebe"
-      : "ANULADA — este pedido quedo sin efecto";
+      : "ANULADA — este pedido quedó sin efecto";
 
   return (
     <p className="mb-4 border-2 border-black px-3 py-2 text-center text-xs font-bold tracking-wide uppercase">
@@ -217,7 +217,7 @@ function TablaLineas({ lineas }: { lineas: OrdenImpresa["lineas"] }) {
         <tr className="bg-neutral-100 text-left">
           <Th className="w-16 text-right">CANT.</Th>
           <Th className="w-14">UND.</Th>
-          <Th>DESCRIPCION</Th>
+          <Th>DESCRIPCIÓN</Th>
           <Th className="w-24 text-right">P. UNIT.</Th>
           <Th className="w-28 text-right">IMPORTE</Th>
         </tr>

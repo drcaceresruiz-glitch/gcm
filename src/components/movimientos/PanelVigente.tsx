@@ -53,13 +53,13 @@ export function PanelVigente({ presupuesto, obraId, mostrarTodas }: Props) {
       )}
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <Cuadro titulo={`Linea base v${version}`} nota="El presupuesto contratado, congelado.">
+        <Cuadro titulo={`Línea base v${version}`} nota="El presupuesto contratado, congelado.">
           <CuadroCascada cascada={cascadaBase} />
         </Cuadro>
 
         <Cuadro
           titulo="Presupuesto vigente"
-          nota="La base mas los movimientos aprobados."
+          nota="La base más los movimientos aprobados."
           destacado
         >
           <CuadroCascada cascada={cascadaVigente} />
@@ -109,8 +109,8 @@ export function PanelVigente({ presupuesto, obraId, mostrarTodas }: Props) {
             className="rounded-xl border border-dashed p-8 text-center text-sm opacity-70"
             style={{ borderColor: "var(--borde)" }}
           >
-            Ningun movimiento aprobado ha tocado todavia una partida. El
-            vigente es identico a la linea base.
+            Ningún movimiento aprobado ha tocado todavía una partida. El
+            vigente es idéntico a la línea base.
           </p>
         ) : (
           <TablaVigente partidas={visibles} />
@@ -140,12 +140,12 @@ function AvisoDescuadre({ importe }: { importe: string }) {
       <AlertTriangle className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
       <div>
         <h2 className="text-sm font-semibold">
-          La linea base no cuadra consigo misma
+          La línea base no cuadra consigo misma
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-pretty">
           El desglose de partidas congelado difiere en {soles(importe)} del
-          costo directo y los descuentos que guarda la propia linea base. No
-          te fies de ninguna cifra de esta pantalla hasta revisarlo: todo el
+          costo directo y los descuentos que guarda la propia línea base. No
+          te fíes de ninguna cifra de esta pantalla hasta revisarlo: todo el
           vigente se apoya en esa base.
         </p>
       </div>
@@ -174,12 +174,12 @@ function AvisoSinPartida({ codigos }: { codigos: string[] }) {
       <div>
         <h2 className="text-sm font-semibold">
           {codigos.length === 1
-            ? "Una partida de la linea base ya no existe"
-            : `${codigos.length} partidas de la linea base ya no existen`}
+            ? "Una partida de la línea base ya no existe"
+            : `${codigos.length} partidas de la línea base ya no existen`}
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-pretty">
           Su importe sigue contando en la base, pero no se les puede aplicar
-          ningun movimiento porque no hay partida a la que apuntar:{" "}
+          ningún movimiento porque no hay partida a la que apuntar:{" "}
           <span className="font-medium">{codigos.join(", ")}</span>.
         </p>
       </div>
@@ -266,7 +266,7 @@ function TablaVigente({ partidas }: { partidas: PresupuestoVigente["partidas"] }
     >
       <table className="w-full min-w-[44rem] text-sm">
         <caption className="sr-only">
-          Presupuesto por partida: importe de la linea base, ajustes de los
+          Presupuesto por partida: importe de la línea base, ajustes de los
           movimientos aprobados e importe vigente
         </caption>
         <thead>
@@ -277,8 +277,8 @@ function TablaVigente({ partidas }: { partidas: PresupuestoVigente["partidas"] }
                 "color-mix(in oklab, var(--borde) 40%, transparent)",
             }}
           >
-            <th scope="col" className="px-3 py-2 font-medium">Codigo</th>
-            <th scope="col" className="px-3 py-2 font-medium">Descripcion</th>
+            <th scope="col" className="px-3 py-2 font-medium">Código</th>
+            <th scope="col" className="px-3 py-2 font-medium">Descripción</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Base</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Ajustes</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Vigente</th>

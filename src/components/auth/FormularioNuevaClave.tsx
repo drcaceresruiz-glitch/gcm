@@ -41,7 +41,7 @@ export function FormularioNuevaClave({ token }: { token: string }) {
       <input type="hidden" name="token" value={token} />
 
       <p className="text-sm opacity-70">
-        Elige tu clave nueva. Al guardarla se cerraran todas las sesiones
+        Elige tu clave nueva. Al guardarla se cerrarán todas las sesiones
         abiertas.
       </p>
 

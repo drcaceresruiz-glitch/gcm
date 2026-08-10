@@ -82,8 +82,8 @@ export function PanelComprometido({
             {soles(total)}
           </p>
           <p className="mt-0.5 text-xs opacity-60">
-            Sin IGV. Solo ordenes aprobadas: un borrador todavia no compromete
-            a nadie, y una anulada dejo de hacerlo.
+            Sin IGV. Solo órdenes aprobadas: un borrador todavía no compromete
+            a nadie, y una anulada dejó de hacerlo.
           </p>
         </div>
       </div>
@@ -101,12 +101,12 @@ export function PanelComprometido({
           <div>
             <h2 className="text-sm font-semibold">
               {excedidas.length === 1
-                ? "Una partida ya esta comprometida por encima de su presupuesto"
-                : `${excedidas.length} partidas estan comprometidas por encima de su presupuesto`}
+                ? "Una partida ya está comprometida por encima de su presupuesto"
+                : `${excedidas.length} partidas están comprometidas por encima de su presupuesto`}
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-pretty">
-              No es un error del sistema: se pidio mas de lo presupuestado. Se
-              corrige con una reconversion que traiga presupuesto de otra
+              No es un error del sistema: se pidió más de lo presupuestado. Se
+              corrige con una reconversión que traiga presupuesto de otra
               partida, o con un adicional si no hay de donde sacarlo.
             </p>
           </div>
@@ -118,8 +118,8 @@ export function PanelComprometido({
           className="rounded-xl border border-dashed p-6 text-center text-sm text-pretty opacity-70"
           style={{ borderColor: "var(--borde)" }}
         >
-          Sin linea base aprobada no hay presupuesto vigente contra el que
-          comparar, asi que solo se puede ensenar el total. Las ordenes se
+          Sin línea base aprobada no hay presupuesto vigente contra el que
+          comparar, así que solo se puede enseñar el total. Las órdenes se
           registran igual: pedir a un proveedor no exige tener el presupuesto
           congelado.
         </p>
@@ -134,7 +134,7 @@ export function PanelComprometido({
               }}
             >
               Hay {soles(huerfano)} comprometidos contra partidas que ya no
-              estan en el presupuesto vigente. Cuentan en el total pero no
+              están en el presupuesto vigente. Cuentan en el total pero no
               aparecen en la tabla.
             </p>
           )}
@@ -172,7 +172,7 @@ function TablaComprometido({ filas }: { filas: Fila[] }) {
         className="rounded-xl border border-dashed p-6 text-center text-sm opacity-70"
         style={{ borderColor: "var(--borde)" }}
       >
-        Ninguna orden aprobada ha tocado todavia una partida del presupuesto.
+        Ninguna orden aprobada ha tocado todavía una partida del presupuesto.
       </p>
     );
   }
@@ -185,7 +185,7 @@ function TablaComprometido({ filas }: { filas: Fila[] }) {
       <table className="w-full min-w-[44rem] text-sm">
         <caption className="sr-only">
           Presupuesto vigente, importe comprometido con proveedores y saldo
-          disponible de cada partida con ordenes
+          disponible de cada partida con órdenes
         </caption>
 
         <thead>
@@ -196,8 +196,8 @@ function TablaComprometido({ filas }: { filas: Fila[] }) {
                 "color-mix(in oklab, var(--borde) 40%, transparent)",
             }}
           >
-            <th scope="col" className="px-3 py-2 font-medium">Codigo</th>
-            <th scope="col" className="px-3 py-2 font-medium">Descripcion</th>
+            <th scope="col" className="px-3 py-2 font-medium">Código</th>
+            <th scope="col" className="px-3 py-2 font-medium">Descripción</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Vigente</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Comprometido</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Saldo</th>

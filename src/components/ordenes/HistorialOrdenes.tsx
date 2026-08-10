@@ -47,7 +47,7 @@ export function HistorialOrdenes({
       >
         <FileText className="mx-auto size-8 opacity-40" aria-hidden="true" />
         <p className="mt-3 text-sm opacity-70">
-          Esta obra no tiene ordenes registradas.
+          Esta obra no tiene órdenes registradas.
         </p>
         <p className="mx-auto mt-1 max-w-lg text-sm text-pretty opacity-60">
           Una orden reparte su importe entre las partidas a las que carga, y

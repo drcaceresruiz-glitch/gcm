@@ -86,7 +86,7 @@ function BotonConfirmar() {
       ) : (
         <Trash2 className="size-4" aria-hidden="true" />
       )}
-      {pending ? "Eliminando..." : "Si, eliminar"}
+      {pending ? "Eliminando..." : "Sí, eliminar"}
     </button>
   );
 }

@@ -109,7 +109,7 @@ export function BotonAprobarMovimiento({
         </li>
         <li>
           Si trae partidas nuevas, <strong>se crean ahora</strong> en el
-          arbol del presupuesto.
+          árbol del presupuesto.
         </li>
       </ul>
 
@@ -149,7 +149,7 @@ function BotonConfirmar({ numero }: { numero: number }) {
       ) : (
         <Lock className="size-4" aria-hidden="true" />
       )}
-      {pending ? "Aprobando..." : `Si, aprobar el ${numero}`}
+      {pending ? "Aprobando..." : `Sí, aprobar el ${numero}`}
     </button>
   );
 }

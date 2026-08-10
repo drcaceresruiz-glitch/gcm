@@ -73,7 +73,7 @@ export function FiltrosOrdenes({ proveedores }: Props) {
               id="filtro-q"
               type="text"
               defaultValue={valor("q")}
-              placeholder="Numero, descripcion o referencia"
+              placeholder="Número, descripción o referencia"
               // Al soltar Enter o salir del campo, no en cada tecla: cada
               // cambio es una navegacion y una consulta al servidor.
               onKeyDown={(e) => {

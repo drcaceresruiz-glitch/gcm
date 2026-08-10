@@ -84,13 +84,13 @@ export function BotonAprobarOrden({
           <dd className="font-semibold tabular-nums">{neto}</dd>
         </div>
         <div className="flex justify-between gap-4">
-          <dt className="opacity-70">Se le pagara al proveedor</dt>
+          <dt className="opacity-70">Se le pagará al proveedor</dt>
           <dd className="tabular-nums opacity-70">{total}</dd>
         </div>
       </dl>
 
       <p className="mt-2 text-xs opacity-70">
-        La diferencia es el IGV, que es credito fiscal y se recupera: por eso
+        La diferencia es el IGV, que es crédito fiscal y se recupera: por eso
         no consume presupuesto de obra.
       </p>
 
@@ -130,7 +130,7 @@ function BotonConfirmar({ numero }: { numero: string }) {
       ) : (
         <Lock className="size-4" aria-hidden="true" />
       )}
-      {pending ? "Aprobando..." : `Si, aprobar la ${numero}`}
+      {pending ? "Aprobando..." : `Sí, aprobar la ${numero}`}
     </button>
   );
 }

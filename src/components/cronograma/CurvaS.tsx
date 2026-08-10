@@ -473,13 +473,13 @@ export function CurvaS({
               punteada
               grosor={5}
             >
-              Proyeccion{" "}
+              Proyección{" "}
               <strong className="tabular-nums">{lectura.proyeccion.toFixed(1)}%</strong>
             </Leyenda>
           )}
 
           <span className="ml-auto text-xs opacity-60">
-            Arrastra sobre el grafico para leer cualquier fecha
+            Arrastra sobre el gráfico para leer cualquier fecha
           </span>
         </div>
 
@@ -495,7 +495,7 @@ export function CurvaS({
           <strong>{textoRitmo(datos.factor)}%</strong> de lo previsto.{" "}
           {datos.terminoProyectado ? (
             <>
-              A este paso la obra terminaria el{" "}
+              A este paso la obra terminaría el{" "}
               <strong>{fechaCronograma(datos.terminoProyectado)}</strong>, frente al{" "}
               {fechaCronograma(datos.fin)} programado.
             </>
@@ -517,7 +517,7 @@ export function CurvaS({
           />
           <Dato etiqueta="Ritmo" valor={`${textoRitmo(datos.factor)}%`} />
           <Dato
-            etiqueta="Termino proyectado"
+            etiqueta="Término proyectado"
             valor={
               datos.terminoProyectado
                 ? fechaCorta(datos.terminoProyectado)
@@ -534,14 +534,14 @@ export function CurvaS({
             valor={`${fechaCorta(datos.inicio)} a ${fechaCorta(datos.fin)}`}
           />
           <Dato etiqueta="Tareas" valor={String(totalTareas)} />
-          <Dato etiqueta="Ruta critica" valor={`${totalCriticas} tareas`} />
+          <Dato etiqueta="Ruta crítica" valor={`${totalCriticas} tareas`} />
           <Dato etiqueta="Cortes cargados" valor={String(datos.cortes.length)} />
         </dl>
 
         <p className="text-xs opacity-60">
-          Los circulos huecos son el «% Planeado» que trae el archivo en cada
-          corte. La linea de puntos es ese mismo plan reconstruido dia a dia
-          para poder dibujarlo entero, asi que pueden no coincidir del todo: son
+          Los círculos huecos son el «% Planeado» que trae el archivo en cada
+          corte. La línea de puntos es ese mismo plan reconstruido día a día
+          para poder dibujarlo entero, así que pueden no coincidir del todo: son
           dos formas de repartir el mismo trabajo en el tiempo.
         </p>
 

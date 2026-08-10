@@ -373,7 +373,7 @@ function MiniCurva({ curva }: { curva: DatosCronogramaTablero["curva"] }) {
       preserveAspectRatio="none"
       className="mt-2 h-20 w-full"
       role="img"
-      aria-label="Curva de avance: plan, real y proyeccion, de inicio a fin de obra"
+      aria-label="Curva de avance: plan, real y proyección, de inicio a fin de obra"
     >
       {/* Rejilla ligera al 25/50/75% para dar referencia de altura. */}
       {[0.25, 0.5, 0.75].map((f) => (

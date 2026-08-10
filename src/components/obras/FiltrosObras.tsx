@@ -53,7 +53,7 @@ export function FiltrosObras() {
             id="obras-q"
             type="text"
             defaultValue={valor("q")}
-            placeholder="Nombre o codigo de la obra"
+            placeholder="Nombre o código de la obra"
             // Al pulsar Enter o al salir del campo, no en cada tecla: cada
             // cambio es una navegacion y una consulta al servidor.
             onKeyDown={(e) => {

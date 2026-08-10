@@ -153,7 +153,7 @@ export function MatrizLookahead({
       <div className="space-y-3">
         {selectorSemanas}
         <p className="text-sm opacity-60">
-          No hay tareas del cronograma en las proximas {semanas} semanas. Amplia
+          No hay tareas del cronograma en las próximas {semanas} semanas. Amplía
           la ventana o espera a que el cronograma programe trabajo en ese rango.
         </p>
       </div>
@@ -224,7 +224,7 @@ export function MatrizLookahead({
                 onClick={() => setElegidas(new Set())}
                 className="text-sm opacity-70 underline"
               >
-                Quitar seleccion
+                Quitar selección
               </button>
             </>
           ) : (
@@ -377,8 +377,8 @@ export function MatrizLookahead({
       </ul>
 
       <p className="text-xs opacity-60">
-        Marca cada restriccion cuando quede resuelta. Cuando las 7 estan
-        resueltas, la tarea pasa a <strong>Lista</strong> y podra comprometerse
+        Marca cada restricción cuando quede resuelta. Cuando las 7 están
+        resueltas, la tarea pasa a <strong>Lista</strong> y podrá comprometerse
         en el Plan Semanal.
       </p>
     </div>

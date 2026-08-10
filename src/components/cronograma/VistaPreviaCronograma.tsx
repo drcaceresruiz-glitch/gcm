@@ -31,7 +31,7 @@ export function VistaPreviaCronograma({
         <Resumen etiqueta="Tareas" valor={String(analisis.totalTareas)} destacado />
         <Resumen etiqueta="Hitos" valor={String(analisis.totalHitos)} />
         <Resumen
-          etiqueta="Ruta critica"
+          etiqueta="Ruta crítica"
           valor={`${analisis.totalCriticas} tareas`}
         />
         <Resumen
@@ -56,21 +56,21 @@ export function VistaPreviaCronograma({
           }
         />
         <Resumen
-          etiqueta="Duracion"
-          valor={analisis.duracionDias ? `${decimal(analisis.duracionDias)} dias` : "—"}
+          etiqueta="Duración"
+          valor={analisis.duracionDias ? `${decimal(analisis.duracionDias)} días` : "—"}
         />
       </dl>
 
       {!analisis.fechaCorte && (
         <Aviso peligro titulo="El archivo no trae fecha de estado">
           <p className="mt-1 text-sm">
-            El <code>StatusDate</code> es la fecha a la que estan referidos los
-            avances, y es lo que identifica cada corte. Sin el no se puede
-            importar: ponerle la fecha de hoy seria inventar el dato que
-            despues situa cada punto de la curva de avance.
+            El <code>StatusDate</code> es la fecha a la que están referidos los
+            avances, y es lo que identifica cada corte. Sin él no se puede
+            importar: ponerle la fecha de hoy sería inventar el dato que
+            después sitúa cada punto de la curva de avance.
           </p>
           <p className="mt-2 text-sm">
-            En MS Project se fija en <strong>Proyecto &gt; Informacion del
+            En MS Project se fija en <strong>Proyecto &gt; Información del
             proyecto &gt; Fecha de estado</strong>, y luego vuelve a exportar.
           </p>
         </Aviso>
@@ -79,11 +79,11 @@ export function VistaPreviaCronograma({
       {analisis.errores.length > 0 && (
         <Aviso
           peligro
-          titulo={`${analisis.errores.length} tarea(s) no se importaran`}
+          titulo={`${analisis.errores.length} tarea(s) no se importarán`}
           icono={<XCircle className="size-4" aria-hidden="true" />}
         >
           <p className="mt-1 text-xs opacity-70">
-            El resto si se importara.
+            El resto sí se importará.
           </p>
           <ul className="mt-3 max-h-52 space-y-1.5 overflow-y-auto text-sm">
             {analisis.errores.map((e, i) => (
@@ -101,7 +101,7 @@ export function VistaPreviaCronograma({
       {conAviso.length > 0 && (
         <Aviso titulo={`${conAviso.length} aviso(s)`}>
           <p className="mt-1 text-xs opacity-70">
-            Estas tareas si se importan, pero conviene revisarlas.
+            Estas tareas sí se importan, pero conviene revisarlas.
           </p>
           <ul className="mt-3 max-h-40 space-y-1.5 overflow-y-auto text-sm">
             {conAviso.slice(0, 30).map((t) => (
@@ -122,7 +122,7 @@ export function VistaPreviaCronograma({
         {analisis.holgurasInferidas > 0 &&
           ` En ${analisis.holgurasInferidas} tareas el archivo no informa la holgura y se anota como cero.`}
         {analisis.dependenciasDescartadas > 0 &&
-          ` Se descartan ${analisis.dependenciasDescartadas} enlace(s) que apuntan a una tarea que no esta en el archivo.`}
+          ` Se descartan ${analisis.dependenciasDescartadas} enlace(s) que apuntan a una tarea que no está en el archivo.`}
       </p>
 
       <TablaPrevia tareas={visibles} ocultas={ocultas} />
@@ -206,18 +206,18 @@ function TablaPrevia({
       >
         <table className="w-full min-w-[52rem] text-sm">
           <caption className="sr-only">
-            Vista previa de las tareas que se importaran
+            Vista previa de las tareas que se importarán
           </caption>
           <thead>
             <tr
               className="text-left text-xs uppercase"
               style={{ backgroundColor: "color-mix(in oklab, var(--borde) 40%, transparent)" }}
             >
-              <th scope="col" className="px-3 py-2 font-medium">Codigo</th>
+              <th scope="col" className="px-3 py-2 font-medium">Código</th>
               <th scope="col" className="px-3 py-2 font-medium">Tarea</th>
               <th scope="col" className="px-3 py-2 font-medium">Comienzo</th>
               <th scope="col" className="px-3 py-2 font-medium">Fin</th>
-              <th scope="col" className="px-3 py-2 text-right font-medium">Dias</th>
+              <th scope="col" className="px-3 py-2 text-right font-medium">Días</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">Planeado</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">Real</th>
             </tr>
@@ -270,7 +270,7 @@ function TablaPrevia({
       {ocultas > 0 && (
         <p className="mt-2 text-xs opacity-60">
           Se muestran las primeras {MAXIMO_VISIBLE} filas. Las {ocultas}{" "}
-          restantes tambien se importaran.
+          restantes también se importarán.
         </p>
       )}
     </div>

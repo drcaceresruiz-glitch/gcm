@@ -151,7 +151,7 @@ export function TarjetaEncargo({
           </div>
           {encargo.ultimaValorizacion && (
             <p className="mt-1 text-xs opacity-60">
-              Ultima valorizacion: {fechaCorta(encargo.ultimaValorizacion)}
+              Última valorización: {fechaCorta(encargo.ultimaValorizacion)}
             </p>
           )}
         </div>
@@ -360,7 +360,7 @@ function FormularioValorizar({
             type="text"
             value={nota}
             onChange={(e) => setNota(e.target.value)}
-            placeholder="Que se valorizo en este corte"
+            placeholder="Qué se valorizó en este corte"
             className="w-full rounded-lg border px-2 py-1.5 text-sm"
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
           />
@@ -382,7 +382,7 @@ function FormularioValorizar({
           style={{ backgroundColor: "var(--color-marca-600)" }}
         >
           <Plus className="size-3.5" aria-hidden="true" />
-          {pendiente ? "Guardando..." : "Guardar valorizacion"}
+          {pendiente ? "Guardando..." : "Guardar valorización"}
         </button>
         <button
           type="button"

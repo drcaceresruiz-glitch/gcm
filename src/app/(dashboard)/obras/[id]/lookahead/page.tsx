@@ -42,10 +42,10 @@ export default async function LookaheadPage({
       <div>
         <h2 className="text-xl font-semibold">Lookahead</h2>
         <p className="mt-0.5 max-w-2xl text-sm opacity-70">
-          La ventana de mediano plazo: lo que el cronograma trae en las proximas
-          semanas y su analisis de restricciones. Una tarea esta{" "}
-          <strong>lista</strong> cuando sus 7 flujos estan resueltos; solo lo
-          listo deberia comprometerse en el Plan Semanal.
+          La ventana de mediano plazo: lo que el cronograma trae en las próximas
+          semanas y su análisis de restricciones. Una tarea está{" "}
+          <strong>lista</strong> cuando sus 7 flujos están resueltos; solo lo
+          listo debería comprometerse en el Plan Semanal.
           {datos && (
             <>
               {" "}

@@ -19,7 +19,7 @@ function BotonEnviar() {
       {pending && (
         <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
       )}
-      {pending ? "Guardando..." : "Cambiar contrasena"}
+      {pending ? "Guardando..." : "Cambiar contraseña"}
     </button>
   );
 }
@@ -43,7 +43,7 @@ export function FormularioCambioClave({ obligatorio }: { obligatorio: boolean })
         >
           <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            Es tu primer ingreso. Define una contrasena propia para continuar.
+            Es tu primer ingreso. Define una contraseña propia para continuar.
           </span>
         </div>
       )}
@@ -66,7 +66,7 @@ export function FormularioCambioClave({ obligatorio }: { obligatorio: boolean })
         id="claveActual"
         name="claveActual"
         type="password"
-        etiqueta="Contrasena actual"
+        etiqueta="Contraseña actual"
         autoComplete="current-password"
         required
         autoFocus
@@ -76,9 +76,9 @@ export function FormularioCambioClave({ obligatorio }: { obligatorio: boolean })
         id="claveNueva"
         name="claveNueva"
         type="password"
-        etiqueta="Nueva contrasena"
+        etiqueta="Nueva contraseña"
         autoComplete="new-password"
-        ayuda="Minimo 10 caracteres."
+        ayuda="Mínimo 10 caracteres."
         required
         minLength={10}
       />
@@ -87,7 +87,7 @@ export function FormularioCambioClave({ obligatorio }: { obligatorio: boolean })
         id="confirmacion"
         name="confirmacion"
         type="password"
-        etiqueta="Repite la nueva contrasena"
+        etiqueta="Repite la nueva contraseña"
         autoComplete="new-password"
         required
       />
@@ -95,7 +95,7 @@ export function FormularioCambioClave({ obligatorio }: { obligatorio: boolean })
       <BotonEnviar />
 
       <p className="text-xs opacity-60">
-        Al cambiarla se cerraran todas tus sesiones abiertas y deberas ingresar
+        Al cambiarla se cerrarán todas tus sesiones abiertas y deberás ingresar
         de nuevo.
       </p>
     </form>

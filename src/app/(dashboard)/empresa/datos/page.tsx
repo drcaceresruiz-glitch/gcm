@@ -41,7 +41,7 @@ export default async function DatosEmpresaPage({
           Datos de la empresa
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
-          Lo que sale impreso en las ordenes que reciben los proveedores.
+          Lo que sale impreso en las órdenes que reciben los proveedores.
         </p>
       </div>
 
@@ -55,7 +55,7 @@ export default async function DatosEmpresaPage({
           }}
         >
           <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>Datos guardados. Las ordenes ya salen con ellos.</span>
+          <span>Datos guardados. Las órdenes ya salen con ellos.</span>
         </p>
       )}
 
@@ -71,22 +71,22 @@ export default async function DatosEmpresaPage({
             {
               titulo: "Esto sale impreso a terceros",
               texto:
-                "La razon social, el contacto y el representante encabezan y firman cada orden que recibe un proveedor. No es una ficha interna.",
+                "La razón social, el contacto y el representante encabezan y firman cada orden que recibe un proveedor. No es una ficha interna.",
             },
             {
               titulo: "Sin representante, la orden va sin firmante",
               texto:
-                "Si no se rellena, el documento sale encabezado con la razon social en lugar del nombre de quien firma.",
+                "Si no se rellena, el documento sale encabezado con la razón social en lugar del nombre de quien firma.",
             },
             {
-              titulo: "El RUC no se edita aqui",
+              titulo: "El RUC no se edita aquí",
               texto:
-                "Identifica a la empresa y ya figura impreso en las ordenes emitidas. Cambiarlo desde una pantalla de ajustes reescribiria documentos ya enviados.",
+                "Identifica a la empresa y ya figura impreso en las órdenes emitidas. Cambiarlo desde una pantalla de ajustes reescribiría documentos ya enviados.",
             },
             {
               titulo: "Cada entorno tiene los suyos",
               texto:
-                "Rellenarlos aqui no los pone en produccion: la base de cada entorno se completa por separado.",
+                "Rellenarlos aquí no los pone en producción: la base de cada entorno se completa por separado.",
             },
           ]}
         />

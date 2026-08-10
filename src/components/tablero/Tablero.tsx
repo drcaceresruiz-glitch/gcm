@@ -149,7 +149,7 @@ export function Tablero({
             />
           </span>
           <div>
-            <h2 className="text-sm font-semibold">Tablero de supervision</h2>
+            <h2 className="text-sm font-semibold">Tablero de supervisión</h2>
             <p className="text-xs opacity-60">
               Los indicadores de la obra que elijas, de un vistazo.
             </p>
@@ -194,7 +194,7 @@ export function Tablero({
             type="button"
             onClick={() => setConfigurando((p) => !p)}
             aria-expanded={configurando}
-            aria-label="Configurar modulos del tablero"
+            aria-label="Configurar módulos del tablero"
             className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
             style={{
               borderColor: configurando
@@ -236,8 +236,8 @@ export function Tablero({
               className="mt-4 rounded-xl border border-dashed p-6 text-center text-sm opacity-60"
               style={{ borderColor: "var(--borde)" }}
             >
-              No hay ningun modulo encendido. Pulsa «Configurar» para elegir
-              cuales ver.
+              No hay ningún módulo encendido. Pulsa «Configurar» para elegir
+              cuáles ver.
             </p>
           ) : (
             <div
@@ -256,7 +256,7 @@ export function Tablero({
           className="mt-4 rounded-xl border border-dashed p-6 text-center text-sm opacity-60"
           style={{ borderColor: "var(--borde)" }}
         >
-          Crea una obra para empezar a supervisarla desde aqui.
+          Crea una obra para empezar a supervisarla desde aquí.
         </p>
       )}
     </section>

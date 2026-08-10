@@ -323,8 +323,8 @@ export function Gantt({
       </div>
 
       <p className="mt-2 text-xs opacity-60">
-        La linea roja marca el corte ({fechaCorta(fechaCorte)}). El relleno de
-        cada barra es su avance real; el numero al final, el porcentaje.
+        La línea roja marca el corte ({fechaCorta(fechaCorte)}). El relleno de
+        cada barra es su avance real; el número al final, el porcentaje.
       </p>
     </div>
   );
@@ -365,7 +365,7 @@ function Fila({
       ? "var(--superficie)"
       : "color-mix(in oklab, var(--texto) 3%, var(--superficie))";
 
-  const tooltip = `${tarea.codigo ? tarea.codigo + " " : ""}${tarea.nombre}\n${fechaCorta(tarea.inicio)} – ${fechaCorta(tarea.fin)}\nReal ${real.toFixed(0)}% · Plan ${plan.toFixed(0)}%${tarea.esCritico ? "\nRuta critica" : ""}`;
+  const tooltip = `${tarea.codigo ? tarea.codigo + " " : ""}${tarea.nombre}\n${fechaCorta(tarea.inicio)} – ${fechaCorta(tarea.fin)}\nReal ${real.toFixed(0)}% · Plan ${plan.toFixed(0)}%${tarea.esCritico ? "\nRuta crítica" : ""}`;
 
   return (
     <div className="relative z-10 flex" style={{ height: ALTO_FILA }}>
@@ -535,7 +535,7 @@ function Leyenda() {
   return (
     <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs opacity-70">
       <Muestra color="var(--color-marca-500)" etiqueta="Tarea" />
-      <Muestra color="var(--color-peligro)" etiqueta="Ruta critica" />
+      <Muestra color="var(--color-peligro)" etiqueta="Ruta crítica" />
       <span className="inline-flex items-center gap-1.5">
         <Diamond
           className="size-3"
@@ -550,7 +550,7 @@ function Leyenda() {
           style={{ backgroundColor: "var(--texto)", opacity: 0.6 }}
           aria-hidden="true"
         />
-        Capitulo
+        Capítulo
       </span>
     </div>
   );

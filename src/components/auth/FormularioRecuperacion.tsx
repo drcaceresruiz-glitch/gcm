@@ -50,7 +50,7 @@ export function FormularioRecuperacion() {
           para elegir clave nueva.
         </p>
         <p className="text-xs opacity-60">
-          Caduca en una hora y sirve una sola vez. Revisa tambien la carpeta de
+          Caduca en una hora y sirve una sola vez. Revisa también la carpeta de
           correo no deseado.
         </p>
         <Link
@@ -87,7 +87,7 @@ export function FormularioRecuperacion() {
         id="email"
         name="email"
         type="email"
-        etiqueta="Correo electronico"
+        etiqueta="Correo electrónico"
         autoComplete="username"
         required
         autoFocus

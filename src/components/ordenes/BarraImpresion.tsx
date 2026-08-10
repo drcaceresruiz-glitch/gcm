@@ -19,7 +19,7 @@ export function BarraImpresion({ obraId }: { obraId: string }) {
         className="inline-flex items-center gap-1.5 text-sm opacity-70 hover:opacity-100"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
-        Volver a las ordenes
+        Volver a las órdenes
       </Link>
 
       <button

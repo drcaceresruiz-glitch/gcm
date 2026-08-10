@@ -31,10 +31,10 @@ const ETIQUETA_DOMINIO: Record<string, string> = {
   usuario: "Usuarios",
   obra: "Obras",
   partida: "Partidas",
-  linea_base: "Linea base",
+  linea_base: "Línea base",
   movimiento: "Movimientos presupuestales",
   permiso: "Permisos",
-  auditoria: "Auditoria",
+  auditoria: "Auditoría",
 };
 
 /** Clave de una casilla. El rol y el permiso, que es lo que la identifica. */
@@ -231,7 +231,7 @@ function Casilla({
   onChange,
 }: CasillaProps) {
   const estado = [
-    desviado ? "fuera de la plantilla" : "segun la plantilla",
+    desviado ? "fuera de la plantilla" : "según la plantilla",
     pendiente ? "sin guardar" : null,
   ]
     .filter(Boolean)
@@ -323,12 +323,12 @@ function BarraCambios({
               </li>
             ))}
             {cambios.length > 6 && (
-              <li className="opacity-70">y {cambios.length - 6} mas</li>
+              <li className="opacity-70">y {cambios.length - 6} más</li>
             )}
           </ul>
         ) : (
           <p className="mt-1 text-sm opacity-70">
-            Marca o desmarca casillas y aqui aparecera lo que va a cambiar.
+            Marca o desmarca casillas y aquí aparecerá lo que va a cambiar.
           </p>
         )}
       </div>

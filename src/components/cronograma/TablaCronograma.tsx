@@ -73,11 +73,11 @@ export function TablaCronograma({
             className="text-left text-xs uppercase"
             style={{ backgroundColor: "color-mix(in oklab, var(--borde) 40%, transparent)" }}
           >
-            <th scope="col" className="px-3 py-2 font-medium">Codigo</th>
+            <th scope="col" className="px-3 py-2 font-medium">Código</th>
             <th scope="col" className="px-3 py-2 font-medium">Tarea</th>
             <th scope="col" className="px-3 py-2 font-medium">Comienzo</th>
             <th scope="col" className="px-3 py-2 font-medium">Fin</th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">Dias</th>
+            <th scope="col" className="px-3 py-2 text-right font-medium">Días</th>
             <th scope="col" className="px-3 py-2 font-medium">Avance</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Desfase</th>
             {puedeRegistrar && <th scope="col" className="px-3 py-2 font-medium sr-only">Reportar</th>}
@@ -164,7 +164,7 @@ function FilaTarea({
               <Flag
                 className="size-3 shrink-0"
                 style={{ color: "var(--color-peligro)" }}
-                aria-label="En la ruta critica"
+                aria-label="En la ruta crítica"
               />
             )}
             <span>{t.nombre}</span>
@@ -268,7 +268,7 @@ function FormularioAvance({
       <p className="text-xs opacity-70">
         Reportar avance de <strong>{t.codigo ? `${t.codigo} ` : ""}{t.nombre}</strong>.
         {t.avance
-          ? ` Ultimo reporte: ${decimal(t.avance.porcentaje, "")}% el ${fechaCorta(t.avance.fecha)}, por ${t.avance.reportadoPor}.`
+          ? ` Último reporte: ${decimal(t.avance.porcentaje, "")}% el ${fechaCorta(t.avance.fecha)}, por ${t.avance.reportadoPor}.`
           : ` MS Project dice ${decimal(t.porcentajeArchivo, "")}%.`}
       </p>
 
@@ -307,7 +307,7 @@ function FormularioAvance({
             name="nota"
             type="text"
             maxLength={500}
-            placeholder="Que se ejecuto, quien, incidencias..."
+            placeholder="Qué se ejecutó, quién, incidencias..."
             className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm"
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
           />
@@ -360,7 +360,7 @@ function BarraAvance({ tarea }: { tarea: Fila }) {
   const titulo = tarea.avance
     ? `Reportado por ${tarea.avance.reportadoPor} el ${fechaCorta(tarea.avance.fecha)}` +
       (tarea.discrepa ? `. MS Project dice ${decimal(tarea.porcentajeArchivo, "")}%.` : "")
-    : "Segun MS Project. Todavia nadie lo ha reportado desde obra.";
+    : "Según MS Project. Todavía nadie lo ha reportado desde obra.";
 
   return (
     <span className="flex items-center gap-2" title={titulo}>

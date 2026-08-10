@@ -54,7 +54,7 @@ export function ControlesPartidas({
           type="text"
           value={consulta}
           onChange={(e) => onConsulta(e.target.value)}
-          placeholder="Buscar por codigo o descripcion"
+          placeholder="Buscar por código o descripción"
           aria-label="Buscar en el presupuesto"
           className="w-full rounded-lg border py-1.5 pr-8 pl-8 text-sm"
           style={{
@@ -66,7 +66,7 @@ export function ControlesPartidas({
           <button
             type="button"
             onClick={() => onConsulta("")}
-            aria-label="Limpiar la busqueda"
+            aria-label="Limpiar la búsqueda"
             className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 opacity-60 hover:opacity-100"
           >
             <X className="size-3.5" aria-hidden="true" />
@@ -99,7 +99,7 @@ export function ControlesPartidas({
         icono={<SlidersHorizontal className="size-4" aria-hidden="true" />}
       >
         <p className="px-3 py-2 text-xs opacity-60">
-          Codigo, descripcion e importe no se ocultan.
+          Código, descripción e importe no se ocultan.
         </p>
         {opcionales.map((c) => (
           <label

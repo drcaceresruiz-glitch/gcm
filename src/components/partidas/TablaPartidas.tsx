@@ -163,7 +163,7 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
   }
 
   function eliminar(f: PartidaFila) {
-    if (!confirm(`Eliminar "${f.codigoPartida} ${f.descripcion.slice(0, 60)}"?`)) {
+    if (!confirm(`¿Eliminar "${f.codigoPartida} ${f.descripcion.slice(0, 60)}"?`)) {
       return;
     }
     setError(null);
@@ -247,7 +247,7 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
         >
           <table className={`w-full text-sm ${hayOpcionales ? "min-w-[56rem]" : ""}`}>
             <caption className="sr-only">
-              Presupuesto por partidas, agrupado en capitulos
+              Presupuesto por partidas, agrupado en capítulos
             </caption>
             <thead>
               {/* Cabecera con contraste de verdad, como en las tablas de las
@@ -329,7 +329,7 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
                       style={{ paddingLeft: `${0.75 + f.nivel * 0.9}rem` }}
                     >
                       <CeldaEditable
-                        etiqueta={`descripcion de ${f.codigoPartida}`}
+                        etiqueta={`descripción de ${f.codigoPartida}`}
                         valor={f.descripcion}
                         mostrar={f.descripcion}
                         editable={editable}

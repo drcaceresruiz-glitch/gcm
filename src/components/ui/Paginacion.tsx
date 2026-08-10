@@ -51,7 +51,7 @@ export function Paginacion({
 
   return (
     <nav
-      aria-label={`Paginacion de ${etiqueta}`}
+      aria-label={`Paginación de ${etiqueta}`}
       className="flex flex-wrap items-center justify-between gap-3 print:hidden"
     >
       <p className="text-sm opacity-70 tabular-nums">
@@ -62,7 +62,7 @@ export function Paginacion({
         <Salto
           href={href(pagina - 1)}
           activo={pagina > 1}
-          etiqueta="Pagina anterior"
+          etiqueta="Página anterior"
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
           <span className="hidden sm:inline">Anterior</span>
@@ -75,7 +75,7 @@ export function Paginacion({
         <Salto
           href={href(pagina + 1)}
           activo={pagina < totalPaginas}
-          etiqueta="Pagina siguiente"
+          etiqueta="Página siguiente"
         >
           <span className="hidden sm:inline">Siguiente</span>
           <ChevronRight className="size-4" aria-hidden="true" />

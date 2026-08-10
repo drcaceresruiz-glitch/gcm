@@ -49,7 +49,7 @@ export function AlertasEmpresa({ alertas }: { alertas: AlertaEmpresa[] }) {
           }}
         >
           <div className="flex items-start justify-between gap-2">
-            <h4 className="text-sm font-semibold">Requiere atencion</h4>
+            <h4 className="text-sm font-semibold">Requiere atención</h4>
             <button
               type="button"
               onClick={() => setAbierto(false)}

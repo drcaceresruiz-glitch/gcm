@@ -197,7 +197,7 @@ export function FormularioOrden({
   const requisitos: Requisito[] = [
     { etiqueta: "Proveedor elegido", cumplido: proveedorId !== "" },
     { etiqueta: "Concepto", cumplido: descripcion.trim().length > 0 },
-    { etiqueta: "Numero de la orden", cumplido: numero.trim().length > 0 },
+    { etiqueta: "Número de la orden", cumplido: numero.trim().length > 0 },
     { etiqueta: "Importe mayor que cero", cumplido: esPositivo(imputable) },
     {
       etiqueta: "El reparto cuadra con el importe",
@@ -340,7 +340,7 @@ export function FormularioOrden({
             onChange={(e) => elegirProveedor(e.target.value)}
             ayuda={
               (habituales[proveedorId]?.length ?? 0) > 0
-                ? "Sus partidas habituales se han cargado abajo. Se pueden quitar o anadir otras."
+                ? "Sus partidas habituales se han cargado abajo. Se pueden quitar o añadir otras."
                 : undefined
             }
           >
@@ -369,7 +369,7 @@ export function FormularioOrden({
             id="numero"
             name="numero"
             type="text"
-            etiqueta="Numero"
+            etiqueta="Número"
             ayuda="Como en el papel: 2026-07-00113."
             value={numero}
             onChange={(e) => setNumero(e.target.value)}
@@ -395,7 +395,7 @@ export function FormularioOrden({
           name="descripcion"
           type="text"
           etiqueta="Concepto"
-          ayuda="Lo que el papel llama «Partida»: «CRIOCORD ESTRUCTURAS METALICAS»."
+          ayuda="Lo que el papel llama «Partida»: «CRIOCORD ESTRUCTURAS METÁLICAS»."
           value={descripcion}
           onChange={(e) => setDescripcion(e.target.value)}
         />
@@ -411,7 +411,7 @@ export function FormularioOrden({
                   const elegida = formasPago.find((f) => f.id === e.target.value);
                   if (elegida) setFormaPago(elegida.texto);
                 }}
-                ayuda="Copia una guardada. Despues se puede ajustar."
+                ayuda="Copia una guardada. Después se puede ajustar."
               >
                 <option value="">Elegir una guardada...</option>
                 {formasPago.map((f) => (
@@ -429,7 +429,7 @@ export function FormularioOrden({
               rows={3}
               value={formaPago}
               onChange={(e) => setFormaPago(e.target.value)}
-              ayuda="Tal cual viene: «50% adelanto, 40% contra instalacion, 10% contra dossier»."
+              ayuda="Tal cual viene: «50% adelanto, 40% contra instalación, 10% contra dossier»."
             />
           </div>
           <CampoArea
@@ -449,7 +449,7 @@ export function FormularioOrden({
             className="inline-flex overflow-hidden rounded-lg border text-sm"
             style={{ borderColor: "var(--borde)" }}
             role="group"
-            aria-label="Como se indica el importe"
+            aria-label="Cómo se indica el importe"
           >
             <BotonModo activo={!conDetalle} onClick={() => setConDetalle(false)}>
               <Receipt className="size-4" aria-hidden="true" />
@@ -464,8 +464,8 @@ export function FormularioOrden({
 
         <p className="text-sm text-pretty opacity-70">
           {conDetalle
-            ? "El subtotal sale de las lineas. Marca como agrupadora la linea que solo repite el total de su bloque: si no, ese dinero se cuenta dos veces."
-            : "Para las ordenes antiguas basta con el subtotal del papel. El detalle de lineas es opcional."}
+            ? "El subtotal sale de las líneas. Marca como agrupadora la línea que solo repite el total de su bloque: si no, ese dinero se cuenta dos veces."
+            : "Para las órdenes antiguas basta con el subtotal del papel. El detalle de líneas es opcional."}
         </p>
 
         {conDetalle ? (
@@ -501,7 +501,7 @@ export function FormularioOrden({
           backgroundColor: "var(--superficie)",
         }}
       >
-        <h2 className="text-sm font-semibold">Asi queda la orden</h2>
+        <h2 className="text-sm font-semibold">Así queda la orden</h2>
 
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <CampoTexto
@@ -518,11 +518,11 @@ export function FormularioOrden({
             etiqueta="Impuesto"
             value={tipoImpuesto}
             onChange={(e) => setTipoImpuesto(e.target.value as TipoImpuesto)}
-            ayuda="Viene del proveedor. Solo se cambia por excepcion."
+            ayuda="Viene del proveedor. Solo se cambia por excepción."
           >
             <option value="IGV">IGV — el proveedor factura</option>
             <option value="RENTA">
-              Retencion de renta — recibo por honorarios
+              Retención de renta — recibo por honorarios
             </option>
             <option value="NINGUNO">Sin impuesto</option>
           </CampoSelect>
@@ -532,7 +532,7 @@ export function FormularioOrden({
               id="igv"
               type="text"
               inputMode="decimal"
-              etiqueta={tipoImpuesto === "IGV" ? "IGV %" : "Retencion %"}
+              etiqueta={tipoImpuesto === "IGV" ? "IGV %" : "Retención %"}
               value={igv}
               onChange={(e) => setIgv(e.target.value)}
             />
@@ -557,10 +557,10 @@ export function FormularioOrden({
           />
           {tipoImpuesto !== "NINGUNO" && (
             <Linea
-              etiqueta={tipoImpuesto === "IGV" ? "IGV" : "Retencion de renta"}
+              etiqueta={tipoImpuesto === "IGV" ? "IGV" : "Retención de renta"}
               sufijo={
                 tipoImpuesto === "IGV"
-                  ? "credito fiscal, se recupera"
+                  ? "crédito fiscal, se recupera"
                   : "se paga a SUNAT y NO se recupera"
               }
               valor={soles(cascada.impuesto)}
@@ -581,14 +581,14 @@ export function FormularioOrden({
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-lg font-semibold">Contra que partidas carga</h2>
+          <h2 className="text-lg font-semibold">Contra qué partidas carga</h2>
           <BotonSecundario
             onClick={() =>
               setImputaciones((p) => [...p, imputacionVacia(clave.current++)])
             }
           >
             <Plus className="size-4" aria-hidden="true" />
-            Anadir partida
+            Añadir partida
           </BotonSecundario>
         </div>
 
@@ -601,7 +601,7 @@ export function FormularioOrden({
           ) : (
             <>
               El reparto tiene que sumar el <strong>total</strong>, no el neto:
-              la retencion se paga a SUNAT y no vuelve, asi que si consume
+              la retención se paga a SUNAT y no vuelve, así que sí consume
               presupuesto.
             </>
           )}{" "}
@@ -649,7 +649,7 @@ export function FormularioOrden({
               </strong>{" "}
               en esta obra
               <span className="block text-xs opacity-70">
-                La proxima orden suya las traera cargadas. Se anaden a las que
+                La próxima orden suya las traerá cargadas. Se añaden a las que
                 ya tenga; no sustituyen su lista.
               </span>
             </span>
@@ -673,7 +673,7 @@ export function FormularioOrden({
 
         <BotonCrear bloqueado={!listo} />
         <p className="text-xs text-pretty opacity-60">
-          Se guarda como borrador: todavia no compromete presupuesto. Alguien
+          Se guarda como borrador: todavía no compromete presupuesto. Alguien
           con permiso para aprobar tiene que hacerlo, y entonces empieza a
           contar.
         </p>
@@ -734,7 +734,7 @@ function Reparto({
             <span>
               {sobra ? "Se reparten" : "Faltan por repartir"}{" "}
               <strong>{soles(magnitud)}</strong>
-              {sobra ? " de mas" : ""}.
+              {sobra ? " de más" : ""}.
             </span>
           </>
         )}
@@ -835,7 +835,7 @@ function FilaImputacion({
         ) && (
         <p className="mt-2 text-sm opacity-80">
           Esta partida tiene {soles(elegida.referencia)} de presupuesto:
-          imputarle mas la dejara por encima.
+          imputarle más la dejará por encima.
         </p>
       )}
     </div>
@@ -878,7 +878,7 @@ function Lineas({
 
       <BotonSecundario onClick={onAnadir}>
         <Plus className="size-4" aria-hidden="true" />
-        Anadir linea
+        Añadir línea
       </BotonSecundario>
     </div>
   );
@@ -940,7 +940,7 @@ function FilaLinea({
         <CampoTexto
           id={`${id}-descripcion`}
           type="text"
-          etiqueta="Descripcion"
+          etiqueta="Descripción"
           value={linea.descripcion}
           onChange={(e) => onCambio({ descripcion: e.target.value })}
         />

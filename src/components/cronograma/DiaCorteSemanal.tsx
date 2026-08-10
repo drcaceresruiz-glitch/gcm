@@ -16,10 +16,10 @@ import {
 const DIAS: { valor: number; etiqueta: string }[] = [
   { valor: 1, etiqueta: "Lunes" },
   { valor: 2, etiqueta: "Martes" },
-  { valor: 3, etiqueta: "Miercoles" },
+  { valor: 3, etiqueta: "Miércoles" },
   { valor: 4, etiqueta: "Jueves" },
   { valor: 5, etiqueta: "Viernes" },
-  { valor: 6, etiqueta: "Sabado" },
+  { valor: 6, etiqueta: "Sábado" },
   { valor: 7, etiqueta: "Domingo" },
 ];
 
@@ -38,7 +38,7 @@ export function DiaCorteSemanal({
   return (
     <form action={accion} className="flex flex-wrap items-center gap-2 text-xs">
       <input type="hidden" name="obraId" value={obraId} />
-      <label className="opacity-70">Dia de corte</label>
+      <label className="opacity-70">Día de corte</label>
       {/* `key` fuerza remontar el select cuando cambia el dia guardado, para que
           tras guardar refleje el valor nuevo (un select no controlado no se
           reajusta solo al revalidar). */}

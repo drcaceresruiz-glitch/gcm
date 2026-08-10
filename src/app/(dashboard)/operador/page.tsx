@@ -33,8 +33,8 @@ export default async function OperadorPage() {
         <div>
           <h2 className="text-xl font-semibold">Constructoras</h2>
           <p className="mt-0.5 max-w-2xl text-sm opacity-70">
-            Las empresas que usan GCM. Aqui se dan de alta y se suspenden; sus
-            obras y presupuestos son suyos y no se ven desde aqui.
+            Las empresas que usan GCM. Aquí se dan de alta y se suspenden; sus
+            obras y presupuestos son suyos y no se ven desde aquí.
           </p>
         </div>
         <Link
@@ -51,7 +51,7 @@ export default async function OperadorPage() {
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <Mascota pose="saludando" alto={170} flotar />
           <p className="text-sm opacity-70">
-            Aun no has dado de alta ninguna constructora.
+            Aún no has dado de alta ninguna constructora.
           </p>
         </div>
       ) : (

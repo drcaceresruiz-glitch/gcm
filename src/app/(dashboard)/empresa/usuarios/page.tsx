@@ -32,7 +32,7 @@ export default async function UsuariosPage() {
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">Usuarios</h1>
         <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
           Las personas de tu empresa. Cada una nace con un rol, que trae sus
-          permisos ya configurados, y una clave temporal que cambiara al entrar.
+          permisos ya configurados, y una clave temporal que cambiará al entrar.
         </p>
       </div>
 

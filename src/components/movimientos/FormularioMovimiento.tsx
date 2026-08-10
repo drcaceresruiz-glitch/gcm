@@ -97,7 +97,7 @@ type CambiosLinea = Partial<
 const TIPOS = [
   {
     valor: "RECONVERSION",
-    titulo: "Reconversion",
+    titulo: "Reconversión",
     icono: ArrowLeftRight,
     ayuda: "Saca de unas partidas y mete en otras. La suma tiene que dar cero.",
   },
@@ -236,7 +236,7 @@ export function FormularioMovimiento({
         style={{ borderColor: "var(--borde)" }}
       >
         Esta obra no tiene ninguna partida que se pueda ajustar. Las partidas
-        de modalidad ALCANCE no llevan importe propio: el dinero esta en su
+        de modalidad ALCANCE no llevan importe propio: el dinero está en su
         partida padre.
       </p>
     );
@@ -264,8 +264,8 @@ export function FormularioMovimiento({
       <fieldset>
         <legend className="text-lg font-semibold">Tipo de movimiento</legend>
         <p className="mt-1 mb-3 text-sm opacity-70">
-          Decide que puede llevar el movimiento, y el sistema no deja
-          mezclarlo despues.
+          Decide qué puede llevar el movimiento, y el sistema no deja
+          mezclarlo después.
         </p>
 
         <div className="grid gap-3 sm:grid-cols-3">
@@ -316,7 +316,7 @@ export function FormularioMovimiento({
             type="date"
             etiqueta="Fecha"
             defaultValue={fechaHoy}
-            ayuda="La del acta o el documento, no la de hoy si se registra despues."
+            ayuda="La del acta o el documento, no la de hoy si se registra después."
             required
           />
           <CampoTexto
@@ -324,7 +324,7 @@ export function FormularioMovimiento({
             name="referencia"
             type="text"
             etiqueta="Referencia"
-            ayuda="Opcional. Numero de acta, carta o correo con el que se acordo."
+            ayuda="Opcional. Número de acta, carta o correo con el que se acordó."
           />
         </div>
 
@@ -333,7 +333,7 @@ export function FormularioMovimiento({
           name="concepto"
           type="text"
           etiqueta="Concepto"
-          ayuda="Una linea para citarlo despues: «Refuerzo de losa en zona de tanques»."
+          ayuda="Una línea para citarlo después: «Refuerzo de losa en zona de tanques»."
           required
         />
 
@@ -342,7 +342,7 @@ export function FormularioMovimiento({
           name="motivo"
           etiqueta="Motivo"
           rows={3}
-          ayuda="Por que procede. La clausula 1 del contrato admite un adicional por vicios ocultos o cambios de diseno."
+          ayuda="Por qué procede. La cláusula 1 del contrato admite un adicional por vicios ocultos o cambios de diseño."
           required
         />
       </section>
@@ -350,7 +350,7 @@ export function FormularioMovimiento({
       <section className="space-y-3">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="text-lg font-semibold">
-            Lineas
+            Líneas
             <span className="ml-2 text-sm font-normal opacity-60">
               {lineas.length === 1 ? "1 partida" : `${lineas.length} partidas`}
             </span>
@@ -361,7 +361,7 @@ export function FormularioMovimiento({
               onClick={() => setLineas([...lineas, nuevaExistente(fija ?? "entra")])}
             >
               <Plus className="size-4" aria-hidden="true" />
-              Anadir linea
+              Añadir línea
             </BotonSecundario>
 
             {/* Solo un adicional puede dar de alta partidas: en los demas
@@ -389,7 +389,7 @@ export function FormularioMovimiento({
                 }
               >
                 <Plus className="size-4" aria-hidden="true" />
-                Anadir partida nueva
+                Añadir partida nueva
               </BotonSecundario>
             )}
           </div>
@@ -424,7 +424,7 @@ export function FormularioMovimiento({
           backgroundColor: "var(--superficie)",
         }}
       >
-        <h2 className="text-sm font-semibold">Asi queda el movimiento</h2>
+        <h2 className="text-sm font-semibold">Así queda el movimiento</h2>
 
         <dl className="mt-3 grid gap-3 sm:grid-cols-3">
           <Total etiqueta="Entra" valor={soles(entradas)} />
@@ -439,7 +439,7 @@ export function FormularioMovimiento({
         </div>
 
         <p className="mt-3 text-xs text-pretty opacity-60">
-          Se guarda como borrador: todavia no ajusta el presupuesto. Un
+          Se guarda como borrador: todavía no ajusta el presupuesto. Un
           administrador tiene que aprobarlo, y entonces ya no se puede
           deshacer.
         </p>
@@ -460,7 +460,7 @@ function avisoDeLinea(linea: Linea, partida?: OpcionPartida): string | null {
   // El precio de una partida a suma alzada esta cerrado por contrato:
   // sacarle dinero daria un vigente que no se puede facturar.
   if (partida.modalidad === "SUMA_ALZADA") {
-    return "Esta partida esta contratada a suma alzada: su precio esta cerrado y no se le puede quitar dinero. Acuerdalo con el cliente como deductivo.";
+    return "Esta partida está contratada a suma alzada: su precio está cerrado y no se le puede quitar dinero. Acuérdalo con el cliente como deductivo.";
   }
 
   // `conSigno("entra", ...)` devuelve la cantidad sin signo: sirve para
@@ -469,7 +469,7 @@ function avisoDeLinea(linea: Linea, partida?: OpcionPartida): string | null {
 
   const resto = sumar([partida.vigente, conSigno("sale", linea.importe)]);
   if (esNegativo(resto)) {
-    return `Esta partida tiene ${soles(partida.vigente)} disponibles. No se puede sacar mas de lo que tiene.`;
+    return `Esta partida tiene ${soles(partida.vigente)} disponibles. No se puede sacar más de lo que tiene.`;
   }
 
   return null;
@@ -537,7 +537,7 @@ function FilaLinea({
             className="inline-flex overflow-hidden rounded-lg border text-sm"
             style={{ borderColor: "var(--borde)" }}
             role="group"
-            aria-label="Direccion del dinero"
+            aria-label="Dirección del dinero"
           >
             <BotonDireccion
               activo={linea.direccion === "sale"}
@@ -597,7 +597,7 @@ function FilaLinea({
               ayuda={
                 partida && linea.direccion === "sale"
                   ? `Disponible: ${soles(partida.vigente)}`
-                  : "Siempre en positivo: la direccion la marca el boton."
+                  : "Siempre en positivo: la dirección la marca el botón."
               }
             />
 
@@ -615,10 +615,10 @@ function FilaLinea({
           <CampoTexto
             id={`${id}-justificacion`}
             type="text"
-            etiqueta="Justificacion de la linea"
+            etiqueta="Justificación de la línea"
             value={linea.justificacion}
             onChange={(e) => onCambio({ justificacion: e.target.value })}
-            ayuda="Opcional. Por que esta partida en concreto."
+            ayuda="Opcional. Por qué esta partida en concreto."
           />
         </div>
 
@@ -729,12 +729,12 @@ function CamposPartidaNueva({
     <div className="space-y-3">
       <CampoSelect
         id={`${id}-capitulo`}
-        etiqueta="Capitulo donde cuelga"
+        etiqueta="Capítulo donde cuelga"
         value={linea.parentId}
         onChange={(e) => onCambio({ parentId: e.target.value })}
-        ayuda="Solo capitulos: colgarla de una partida con importe borraria el importe de esa partida."
+        ayuda="Solo capítulos: colgarla de una partida con importe borraría el importe de esa partida."
       >
-        <option value="">Elige un capitulo</option>
+        <option value="">Elige un capítulo</option>
 
         {/* La sangria de los subcapitulos son espacios DUROS. El navegador
             colapsa los normales dentro de una opcion y la jerarquia se
@@ -751,16 +751,16 @@ function CamposPartidaNueva({
         <CampoTexto
           id={`${id}-codigo`}
           type="text"
-          etiqueta="Codigo"
+          etiqueta="Código"
           value={linea.codigoPartida}
           onChange={(e) => onCambio({ codigoPartida: e.target.value })}
-          ayuda="Con la numeracion del presupuesto: 7.02.04."
+          ayuda="Con la numeración del presupuesto: 7.02.04."
         />
         <div className="sm:col-span-2">
           <CampoTexto
             id={`${id}-descripcion`}
             type="text"
-            etiqueta="Descripcion"
+            etiqueta="Descripción"
             value={linea.descripcion}
             onChange={(e) => onCambio({ descripcion: e.target.value })}
           />
@@ -853,7 +853,7 @@ function Cuadre({ cuadra, neto }: { cuadra: boolean; neto: string }) {
         }}
       >
         <Check className="size-4 shrink-0" aria-hidden="true" />
-        La reconversion cuadra: sale tanto como entra.
+        La reconversión cuadra: sale tanto como entra.
       </p>
     );
   }
@@ -871,10 +871,10 @@ function Cuadre({ cuadra, neto }: { cuadra: boolean; neto: string }) {
     >
       <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
       <span>
-        Una reconversion tiene que sumar cero, y{" "}
+        Una reconversión tiene que sumar cero, y{" "}
         {sobra
-          ? `entra ${soles(magnitud)} mas de lo que sale`
-          : `sale ${soles(magnitud)} mas de lo que entra`}
+          ? `entra ${soles(magnitud)} más de lo que sale`
+          : `sale ${soles(magnitud)} más de lo que entra`}
         . Ajusta los importes antes de guardar.
       </span>
     </p>

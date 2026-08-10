@@ -124,7 +124,7 @@ export default async function PanelPage({
           <h1 className="text-2xl font-semibold tracking-tight">Obras</h1>
           <p className="mt-1 text-sm opacity-70">
             {vacioDeVerdad
-              ? "Aun no hay obras registradas."
+              ? "Aún no hay obras registradas."
               : `${obras.total} obra(s)${hayFiltro ? " coinciden" : " en tu empresa"}.`}
           </p>
         </AcentoTitulo>
@@ -195,7 +195,7 @@ export default async function PanelPage({
             <Mascota pose="pensando" alto={150} />
           </div>
           <p className="mt-3 text-sm opacity-70">
-            Ninguna obra coincide con la busqueda.
+            Ninguna obra coincide con la búsqueda.
           </p>
         </div>
       ) : (
@@ -239,7 +239,7 @@ export default async function PanelPage({
               if (desfase <= -5) {
                 alertas.push({
                   clave: "avance",
-                  texto: `La obra va ${Math.abs(desfase).toFixed(1)} puntos por detras del plan`,
+                  texto: `La obra va ${Math.abs(desfase).toFixed(1)} puntos por detrás del plan`,
                   detalle: `Avance real ${Number(fisico.real).toFixed(1)}% frente al ${Number(fisico.planeado).toFixed(1)}% previsto en el corte del ${fechaCorta(fisico.fechaCorte)}.`,
                 });
               }
@@ -261,8 +261,8 @@ export default async function PanelPage({
                   clave: "plazo-cronograma",
                   texto:
                     desvio < 0
-                      ? `El cronograma termina ${Math.abs(desvio)} dia(s) antes que la ficha`
-                      : `El cronograma termina ${desvio} dia(s) despues que la ficha`,
+                      ? `El cronograma termina ${Math.abs(desvio)} día(s) antes que la ficha`
+                      : `El cronograma termina ${desvio} día(s) después que la ficha`,
                   detalle: `Cronograma: ${fechaCorta(fisico.finPlan)}. Ficha de la obra: ${fechaCorta(obra.fechaFinProgramada)}. De la ficha salen la barra de calendario y el aviso de plazo vencido.`,
                 });
               }
@@ -276,7 +276,7 @@ export default async function PanelPage({
                     ? "1 partida comprometida por encima de su presupuesto"
                     : `${obra.partidasSobregiradas} partidas comprometidas por encima de su presupuesto`,
                 detalle:
-                  "Se corrige con una reconversion que traiga presupuesto de otra partida, o con un adicional.",
+                  "Se corrige con una reconversión que traiga presupuesto de otra partida, o con un adicional.",
               });
             }
 
@@ -285,9 +285,9 @@ export default async function PanelPage({
             if (diasDeRetraso > 0 && obra.estado === "EN_EJECUCION") {
               alertas.push({
                 clave: "plazo",
-                texto: `El plazo vencio hace ${diasDeRetraso} dia(s)`,
+                texto: `El plazo venció hace ${diasDeRetraso} día(s)`,
                 detalle:
-                  "La obra sigue en ejecucion despues de la fecha de fin programada.",
+                  "La obra sigue en ejecución después de la fecha de fin programada.",
               });
             }
 

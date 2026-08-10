@@ -320,13 +320,13 @@ export function CurvaEvm({
           <Cifra color="var(--color-peligro)">
             Costo{" "}
             <strong className="tabular-nums">
-              {lectura.ac === null ? "sin ordenes" : soles(lectura.ac.toFixed(2))}
+              {lectura.ac === null ? "sin órdenes" : soles(lectura.ac.toFixed(2))}
             </strong>
           </Cifra>
         )}
 
         <span className="ml-auto text-xs opacity-60">
-          Arrastra sobre el grafico para leer cualquier fecha
+          Arrastra sobre el gráfico para leer cualquier fecha
         </span>
       </div>
     </div>

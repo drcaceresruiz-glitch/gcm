@@ -94,8 +94,8 @@ export function ImportadorPresupuesto({
       >
         <h2 className="text-sm font-semibold">1. Elige el archivo</h2>
         <p className="mt-1 text-sm opacity-70">
-          Un Excel (.xlsx) con las columnas de codigo, descripcion, unidad,
-          metrado y precio unitario. Los titulos pueden variar: se reconocen
+          Un Excel (.xlsx) con las columnas de código, descripción, unidad,
+          metrado y precio unitario. Los títulos pueden variar: se reconocen
           las variantes habituales.
         </p>
 
@@ -162,7 +162,7 @@ export function ImportadorPresupuesto({
         >
           <h2 className="text-sm font-semibold">2. Revisa antes de cargar</h2>
           <p className="mt-1 text-sm opacity-70">
-            Nada se ha guardado todavia. Comprueba que las cifras cuadran con
+            Nada se ha guardado todavía. Comprueba que las cifras cuadran con
             tu presupuesto.
           </p>
 
@@ -195,7 +195,7 @@ export function ImportadorPresupuesto({
                 />
                 <span>
                   <strong>{nombreObra}</strong> ya tiene {partidasExistentes}{" "}
-                  partidas. Entiendo que se <strong>borraran y seran
+                  partidas. Entiendo que se <strong>borrarán y serán
                   sustituidas</strong> por las {analisis?.filas.length} de este
                   archivo.
                 </span>
@@ -222,8 +222,8 @@ export function ImportadorPresupuesto({
 
           {analisis && analisis.errores.length > 0 && (
             <p className="mt-2 text-xs opacity-70">
-              Las {analisis.errores.length} filas con incidencias quedaran
-              fuera. Puedes importar ahora y corregirlas despues, o arreglar el
+              Las {analisis.errores.length} filas con incidencias quedarán
+              fuera. Puedes importar ahora y corregirlas después, o arreglar el
               Excel y volver a subirlo.
             </p>
           )}
@@ -266,18 +266,18 @@ function TrabajoQueSePierde({
     >
       <p className="flex items-start gap-2 text-sm font-semibold">
         <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        <span>Esto no viene en ningun archivo</span>
+        <span>Esto no viene en ningún archivo</span>
       </p>
 
       <div className="mt-2 space-y-2 text-sm">
         <Grupo
           titulo="Creadas a mano"
-          explicacion="No estan en el Excel. Al reemplazar desapareceran."
+          explicacion="No están en el Excel. Al reemplazar desaparecerán."
           partidas={creadasAMano}
         />
         <Grupo
           titulo="Corregidas a mano"
-          explicacion="El archivo las trae, pero con los valores de antes de la correccion."
+          explicacion="El archivo las trae, pero con los valores de antes de la corrección."
           partidas={corregidasAMano}
         />
       </div>
@@ -314,7 +314,7 @@ function Grupo({
         ))}
         {partidas.length > visibles.length && (
           <li className="opacity-70">
-            y {partidas.length - visibles.length} mas
+            y {partidas.length - visibles.length} más
           </li>
         )}
       </ul>

@@ -24,13 +24,13 @@ export function ControlCapitulos({ capitulos }: { capitulos: Capitulo[] }) {
       style={{ borderColor: "var(--borde)" }}
     >
       <table className="w-full min-w-[44rem] text-sm">
-        <caption className="sr-only">Avance por capitulo</caption>
+        <caption className="sr-only">Avance por capítulo</caption>
         <thead>
           <tr
             className="text-left text-xs uppercase"
             style={{ backgroundColor: "color-mix(in oklab, var(--borde) 40%, transparent)" }}
           >
-            <th scope="col" className="px-3 py-2 font-medium">Capitulo</th>
+            <th scope="col" className="px-3 py-2 font-medium">Capítulo</th>
             <th scope="col" className="px-3 py-2 font-medium">Avance</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Real</th>
             <th scope="col" className="px-3 py-2 text-right font-medium">Plan</th>

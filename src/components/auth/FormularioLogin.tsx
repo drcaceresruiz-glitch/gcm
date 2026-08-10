@@ -52,7 +52,7 @@ export function FormularioLogin({
               "color-mix(in oklab, var(--color-alerta) 15%, transparent)",
           }}
         >
-          El codigo caduco o se agotaron los intentos. Ingresa otra vez para
+          El código caducó o se agotaron los intentos. Ingresa otra vez para
           pedir uno nuevo.
         </p>
       )}
@@ -76,7 +76,7 @@ export function FormularioLogin({
           className="rounded-lg px-3 py-2 text-sm"
           style={{ backgroundColor: "color-mix(in oklab, var(--color-exito) 15%, transparent)" }}
         >
-          Contrasena actualizada. Ingresa con la nueva.
+          Contraseña actualizada. Ingresa con la nueva.
         </p>
       )}
 
@@ -96,7 +96,7 @@ export function FormularioLogin({
         id="email"
         name="email"
         type="email"
-        etiqueta="Correo electronico"
+        etiqueta="Correo electrónico"
         autoComplete="username"
         required
         autoFocus
@@ -107,7 +107,7 @@ export function FormularioLogin({
         id="clave"
         name="clave"
         type="password"
-        etiqueta="Contrasena"
+        etiqueta="Contraseña"
         autoComplete="current-password"
         required
       />
@@ -119,7 +119,7 @@ export function FormularioLogin({
           href="/recuperar-clave"
           className="text-sm underline opacity-70"
         >
-          Olvide mi contrasena
+          Olvidé mi contraseña
         </Link>
       </p>
     </form>

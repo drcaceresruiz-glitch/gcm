@@ -43,7 +43,7 @@ export function GraficosPpc({
 
 function Tendencia({ puntos }: { puntos: PuntoPpc[] }) {
   if (puntos.length === 0) {
-    return <p className="text-sm opacity-60">Aun no hay semanas cerradas.</p>;
+    return <p className="text-sm opacity-60">Aún no hay semanas cerradas.</p>;
   }
 
   const anchoUtil = ANCHO - M.izquierda - M.derecha;
@@ -121,7 +121,7 @@ function Tendencia({ puntos }: { puntos: PuntoPpc[] }) {
 
 function Pareto({ filas }: { filas: FilaPareto[] }) {
   if (filas.length === 0) {
-    return <p className="text-sm opacity-60">Sin causas registradas todavia.</p>;
+    return <p className="text-sm opacity-60">Sin causas registradas todavía.</p>;
   }
 
   const max = Math.max(...filas.map((f) => f.conteo));

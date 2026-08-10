@@ -67,7 +67,7 @@ export default async function NuevoMovimientoPage({
           Nuevo movimiento presupuestal
         </h2>
         <p className="mt-1 text-sm text-pretty opacity-70">
-          Sobre la linea base v{presupuesto.version}
+          Sobre la línea base v{presupuesto.version}
         </p>
       </div>
 

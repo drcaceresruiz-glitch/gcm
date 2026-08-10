@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { FormularioCambioClave } from "@/components/auth/FormularioCambioClave";
 
-export const metadata: Metadata = { title: "Cambiar contrasena" };
+export const metadata: Metadata = { title: "Cambiar contraseña" };
 
 export default async function CambiarClavePage() {
   const sesion = await obtenerSesion();

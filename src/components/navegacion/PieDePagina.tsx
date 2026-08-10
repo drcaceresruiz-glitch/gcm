@@ -40,10 +40,10 @@ export function PieDePagina() {
         {/* Creditos y version, centrados y en negrita, envolviendo en pantallas
             estrechas. */}
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
-          <span>Dr. Caceres Ruiz</span>
+          <span>Dr. Cáceres Ruiz</span>
           <span className="flex items-center gap-1.5">
             <Ruler className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
-            Arq. Eduardo Antonio Perez Moreno
+            Arq. Eduardo Antonio Pérez Moreno
           </span>
           <span
             className="flex items-center gap-1.5 tracking-wider opacity-70"

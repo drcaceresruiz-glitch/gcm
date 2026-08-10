@@ -150,7 +150,7 @@ export function FormularioEncargo({
     setError(null);
 
     if (!proveedorId) return setError("Elige un proveedor.");
-    if (!descripcion.trim()) return setError("Escribe una descripcion del frente.");
+    if (!descripcion.trim()) return setError("Escribe una descripción del frente.");
     if (!monto) return setError("Falta el monto contratado.");
     if (seleccion.size === 0) return setError("Marca al menos una partida.");
 
@@ -222,7 +222,7 @@ export function FormularioEncargo({
           <label htmlFor="enc-cap" className="mb-1 block text-sm font-medium">
             <span className="inline-flex items-center gap-1.5">
               <Layers className="size-4" aria-hidden="true" />
-              Traer un capitulo como frente (opcional)
+              Traer un capítulo como frente (opcional)
             </span>
           </label>
           <select
@@ -235,7 +235,7 @@ export function FormularioEncargo({
             className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
           >
-            <option value="">— Elige un capitulo para marcarlo entero —</option>
+            <option value="">— Elige un capítulo para marcarlo entero —</option>
             {capitulos.map((c) => (
               <option key={c.id} value={c.id}>
                 {" ".repeat(Math.max(0, (c.nivel - 1) * 2))}
@@ -245,7 +245,7 @@ export function FormularioEncargo({
           </select>
           <p className="mt-1 text-xs opacity-60">
             Marca todas sus partidas de una vez. Luego puedes quitar, fraccionar
-            o sumar otro capitulo.
+            o sumar otro capítulo.
           </p>
         </div>
       )}
@@ -253,14 +253,14 @@ export function FormularioEncargo({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <label htmlFor="enc-desc" className="mb-1 block text-sm font-medium">
-            Descripcion del frente
+            Descripción del frente
           </label>
           <input
             id="enc-desc"
             type="text"
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Estructura metalica ZONA 1, instalaciones sanitarias..."
+            placeholder="Estructura metálica ZONA 1, instalaciones sanitarias..."
             className="w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
           />
@@ -338,7 +338,7 @@ export function FormularioEncargo({
             type="text"
             value={filtro}
             onChange={(e) => setFiltro(e.target.value)}
-            placeholder="Buscar partida por codigo o descripcion"
+            placeholder="Buscar partida por código o descripción"
             className="w-full rounded-lg border py-2 pr-3 pl-8 text-sm"
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
           />
@@ -350,7 +350,7 @@ export function FormularioEncargo({
         >
           {filtradas.length === 0 ? (
             <p className="p-4 text-center text-sm opacity-60">
-              Ninguna partida coincide con la busqueda.
+              Ninguna partida coincide con la búsqueda.
             </p>
           ) : (
             <ul>
@@ -406,7 +406,7 @@ export function FormularioEncargo({
                                 : "var(--borde)",
                             backgroundColor: "var(--superficie)",
                           }}
-                          aria-label={`Fraccion de ${p.codigoPartida}`}
+                          aria-label={`Fracción de ${p.codigoPartida}`}
                         />
                         <span className="opacity-60">%</span>
                       </label>
@@ -418,7 +418,7 @@ export function FormularioEncargo({
           )}
         </div>
         <p className="mt-1 text-xs opacity-60">
-          Lo normal es 100 % (la partida entera). Baja la fraccion cuando el
+          Lo normal es 100 % (la partida entera). Baja la fracción cuando el
           frente se reparte con otro proveedor.
         </p>
       </div>

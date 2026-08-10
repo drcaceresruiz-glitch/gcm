@@ -41,13 +41,13 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         <GaugeIndice
           indice={m.spi}
           etiqueta="SPI"
-          descripcion="Indice de plazo (EV/PV). Sobre 1, adelantado."
+          descripcion="Índice de plazo (EV/PV). Sobre 1, adelantado."
         />
         {verCosto && m.cpi !== null ? (
           <GaugeIndice
             indice={m.cpi}
             etiqueta="CPI"
-            descripcion="Indice de costo (EV/AC). Sobre 1, por debajo de lo previsto."
+            descripcion="Índice de costo (EV/AC). Sobre 1, por debajo de lo previsto."
           />
         ) : verCosto && m.motivoSinCosto !== null ? (
           <div
@@ -56,7 +56,7 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
           >
             <TriangleAlert className="size-6 opacity-40" aria-hidden="true" />
             <p className="mt-2 text-xs font-medium opacity-80">
-              CPI todavia no disponible
+              CPI todavía no disponible
             </p>
             <p className="mt-1 text-xs opacity-60">
               {textoSinCosto(m.motivoSinCosto)}
@@ -69,7 +69,7 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
           >
             <Lock className="size-6 opacity-40" aria-hidden="true" />
             <p className="mt-2 text-xs opacity-60">
-              El indice de costo (CPI) necesita permiso para ver ordenes de
+              El índice de costo (CPI) necesita permiso para ver órdenes de
               compra.
             </p>
           </div>
@@ -80,7 +80,7 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
       {datos.lineaBase ? (
         <p className="text-xs opacity-70">
           PV y SPI medidos contra la{" "}
-          <strong>linea base v{datos.lineaBase.version}</strong>
+          <strong>línea base v{datos.lineaBase.version}</strong>
           {datos.lineaBase.fijadaEn
             ? ` (fijada el ${fechaLarga(datos.lineaBase.fijadaEn)})`
             : ""}
@@ -88,8 +88,8 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         </p>
       ) : (
         <p className="text-xs opacity-60">
-          Sin linea base fijada: el PV sale del corte vigente. Fija una en
-          «Cortes y linea base» para congelar la referencia.
+          Sin línea base fijada: el PV sale del corte vigente. Fija una en
+          «Cortes y línea base» para congelar la referencia.
         </p>
       )}
 
@@ -99,7 +99,7 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         <strong>{soles(m.ev)}</strong> de un plan de <strong>{soles(m.pv)}</strong>{" "}
         —{" "}
         {m.spi === null || plazo === null ? (
-          <>aun no toca nada del plan</>
+          <>aún no toca nada del plan</>
         ) : plazo === 0 ? (
           <span>justo en el plan (SPI {m.spi.toFixed(2)})</span>
         ) : plazo > 0 ? (
@@ -125,7 +125,7 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
                   </span>
                 ) : (
                   <span style={{ color: "var(--color-peligro)" }}>
-                    mas de lo ganado (CPI {m.cpi.toFixed(2)})
+                    más de lo ganado (CPI {m.cpi.toFixed(2)})
                   </span>
                 )}
               </>
@@ -135,7 +135,7 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         .{" "}
         {m.eac !== null && (
           <>
-            A este ritmo la obra terminaria costando{" "}
+            A este ritmo la obra terminaría costando{" "}
             <strong>{soles(m.eac)}</strong> sobre un presupuesto de{" "}
             <strong>{soles(m.bac)}</strong>.
           </>
@@ -150,7 +150,7 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         <Dato etiqueta="% ganado del presupuesto" valor={`${m.avance.toFixed(1)}%`} />
 
         <Dato
-          etiqueta="Variacion de plazo (SV)"
+          etiqueta="Variación de plazo (SV)"
           valor={conSigno(m.sv)}
           color={colorImporte(m.sv)}
         />
@@ -158,7 +158,7 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
           <>
             <Dato etiqueta="Costo real (AC)" valor={soles(m.ac)} />
             <Dato
-              etiqueta="Variacion de costo (CV)"
+              etiqueta="Variación de costo (CV)"
               valor={conSigno(m.cv)}
               color={colorImporte(m.cv)}
             />
@@ -167,7 +167,7 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
               <>
                 <Dato etiqueta="Costo estimado al final (EAC)" valor={soles(m.eac)} />
                 <Dato
-                  etiqueta="Variacion al final (VAC)"
+                  etiqueta="Variación al final (VAC)"
                   valor={conSigno(m.vac)}
                   color={colorImporte(m.vac)}
                 />
@@ -197,11 +197,11 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         <p className="flex items-start gap-2 text-xs opacity-70">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            El costo real es el <strong>comprometido en ordenes aprobadas</strong>,
+            El costo real es el <strong>comprometido en órdenes aprobadas</strong>,
             no lo devengado. Al principio de la obra suele ir{" "}
-            <strong>por detras</strong> de lo ejecutado —se trabaja y la orden se
-            aprueba despues—, y dividir por el daria un CPI y un ahorro
-            enganosamente buenos; por eso esas cifras no aparecen hasta que el
+            <strong>por detrás</strong> de lo ejecutado —se trabaja y la orden se
+            aprueba después—, y dividir por él daría un CPI y un ahorro
+            engañosamente buenos; por eso esas cifras no aparecen hasta que el
             costo registrado respalde lo ganado.
           </span>
         </p>
@@ -211,9 +211,9 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         <p className="flex items-start gap-2 text-xs opacity-70">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            <strong>Sin proyeccion de resultado (EAC, VAC, CPI).</strong>{" "}
+            <strong>Sin proyección de resultado (EAC, VAC, CPI).</strong>{" "}
             {textoSinCosto(m.motivoSinCosto)} Las cifras de plazo —SPI, SV y la
-            curva— no dependen del costo y si son validas hoy.
+            curva— no dependen del costo y sí son válidas hoy.
           </span>
         </p>
       )}
@@ -222,11 +222,11 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         <p className="flex items-start gap-2 text-xs opacity-70">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            El avance se pondera por <strong>duracion</strong>, que es lo unico
+            El avance se pondera por <strong>duración</strong>, que es lo único
             que trae el archivo. El mapeo tarea-partida cubre el{" "}
             {datos.coberturaMapeo.toFixed(0)}% del presupuesto; al pasar del 60%
-            se podra ponderar por <strong>dinero</strong> y estas cifras
-            afinaran.
+            se podrá ponderar por <strong>dinero</strong> y estas cifras
+            afinarán.
           </span>
         </p>
       )}

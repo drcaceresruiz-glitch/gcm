@@ -61,8 +61,8 @@ export function FormularioConstructora() {
       } else {
         setAvisoRuc(
           r.motivo === "sin_token"
-            ? "La consulta a SUNAT no esta configurada. Escribe la razon social a mano."
-            : "No se encontro ese RUC. Escribe la razon social a mano.",
+            ? "La consulta a SUNAT no está configurada. Escribe la razón social a mano."
+            : "No se encontró ese RUC. Escribe la razón social a mano.",
         );
       }
     });
@@ -112,7 +112,7 @@ export function FormularioConstructora() {
         style={{ borderColor: "var(--color-exito)" }}
       >
         <h3 className="text-base font-semibold">
-          {hecho.razonSocial} ya esta dada de alta
+          {hecho.razonSocial} ya está dada de alta
         </h3>
 
         <div
@@ -124,14 +124,14 @@ export function FormularioConstructora() {
             {hecho.claveTemporal}
           </p>
           <p className="mt-2 text-xs opacity-70">
-            Se ensena una sola vez. Al entrar, la aplicacion le obligara a
+            Se enseña una sola vez. Al entrar, la aplicación le obligará a
             cambiarla.
           </p>
         </div>
 
         {hecho.correoEnviado ? (
           <p className="text-sm" style={{ color: "var(--color-exito)" }}>
-            Se le envio por correo.
+            Se le envió por correo.
           </p>
         ) : (
           <p
@@ -139,7 +139,7 @@ export function FormularioConstructora() {
             style={{ color: "var(--color-alerta)" }}
           >
             <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            No se pudo enviar el correo. Copia la clave y hazsela llegar tu.
+            No se pudo enviar el correo. Copia la clave y házsela llegar tú.
           </p>
         )}
 
@@ -209,7 +209,7 @@ export function FormularioConstructora() {
         )}
 
         <label className="block text-xs">
-          <span className="opacity-70">Razon social</span>
+          <span className="opacity-70">Razón social</span>
           <input
             value={f.razonSocial}
             onChange={(e) => set("razonSocial", e.target.value)}
@@ -221,7 +221,7 @@ export function FormularioConstructora() {
 
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="text-xs">
-            <span className="opacity-70">Direccion</span>
+            <span className="opacity-70">Dirección</span>
             <input
               value={f.direccion}
               onChange={(e) => set("direccion", e.target.value)}
@@ -231,7 +231,7 @@ export function FormularioConstructora() {
             />
           </label>
           <label className="text-xs">
-            <span className="opacity-70">Telefono</span>
+            <span className="opacity-70">Teléfono</span>
             <input
               value={f.telefono}
               onChange={(e) => set("telefono", e.target.value)}
@@ -256,8 +256,8 @@ export function FormularioConstructora() {
       <section className="space-y-3">
         <h3 className="text-base font-semibold">Su primer administrador</h3>
         <p className="text-sm opacity-70">
-          Sera ADMIN de su constructora y podra dar de alta al resto de su
-          equipo. Recibira una clave temporal que tendra que cambiar al entrar.
+          Será ADMIN de su constructora y podrá dar de alta al resto de su
+          equipo. Recibirá una clave temporal que tendrá que cambiar al entrar.
         </p>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -314,7 +314,7 @@ export function FormularioConstructora() {
             </select>
           </label>
           <label className="text-xs">
-            <span className="opacity-70">Numero</span>
+            <span className="opacity-70">Número</span>
             <input
               value={f.numDoc}
               onChange={(e) => set("numDoc", e.target.value)}

@@ -66,7 +66,7 @@ export function ExportarCurva({
   ): Promise<T | null> {
     const svg = grafico.current;
     if (!svg) {
-      setError("El grafico aun no esta listo.");
+      setError("El gráfico aún no está listo.");
       return null;
     }
 
@@ -77,7 +77,7 @@ export function ExportarCurva({
     try {
       return await trabajo(svg);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo preparar el grafico.");
+      setError(e instanceof Error ? e.message : "No se pudo preparar el gráfico.");
       return null;
     } finally {
       setOcupado(null);
@@ -100,7 +100,7 @@ export function ExportarCurva({
         // tiene la imagen y sabe que le toca adjuntarla a mano.
         descargar(blob, `${nombreBase}.png`);
         setAviso(
-          "Este equipo no puede compartir archivos directamente. La imagen se ha descargado: adjuntala tu en WhatsApp o donde la necesites.",
+          "Este equipo no puede compartir archivos directamente. La imagen se ha descargado: adjúntala tú en WhatsApp o donde la necesites.",
         );
         return;
       }
@@ -133,7 +133,7 @@ export function ExportarCurva({
 
       if (!ventana) {
         setError(
-          "El navegador bloqueo la ventana de impresion. Permite las ventanas emergentes de este sitio y vuelve a intentarlo.",
+          "El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes de este sitio y vuelve a intentarlo.",
         );
         return;
       }
@@ -163,9 +163,9 @@ export function ExportarCurva({
     ${dato("Avance planeado", `${escapar(resumen.planeado)}%`)}
     ${dato("Desfase", `${escapar(resumen.desfase)}%`)}
     ${dato("Ritmo actual", `${escapar(resumen.ritmo)} de lo previsto`)}
-    ${dato("Termino proyectado", escapar(resumen.termino))}
+    ${dato("Término proyectado", escapar(resumen.termino))}
   </table>
-  <footer>GCM - Gestion en Construccion Moderna</footer>
+  <footer>GCM - Gestión en Construcción Moderna</footer>
 </body></html>`);
 
       ventana.document.close();
@@ -185,7 +185,7 @@ export function ExportarCurva({
       try {
         datos.set("imagen", await aBase64(await svgAPng(svg)));
       } catch {
-        setEnvio({ ok: false, error: "No se pudo preparar el grafico." });
+        setEnvio({ ok: false, error: "No se pudo preparar el gráfico." });
         return;
       }
 
@@ -273,9 +273,9 @@ export function ExportarCurva({
           </div>
 
           <p className="text-xs opacity-60">
-            El grafico va adjunto como imagen, y las cifras tambien en el cuerpo
+            El gráfico va adjunto como imagen, y las cifras también en el cuerpo
             del correo. Cada destinatario lo recibe por separado: nadie ve la
-            lista de los demas.
+            lista de los demás.
           </p>
         </form>
       )}

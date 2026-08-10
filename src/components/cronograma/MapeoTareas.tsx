@@ -68,7 +68,7 @@ export function MapeoTareas({
             type="search"
             value={filtro}
             onChange={(e) => setFiltro(e.target.value)}
-            placeholder="Buscar tarea por codigo o nombre"
+            placeholder="Buscar tarea por código o nombre"
             className="w-full rounded-lg border py-2 pr-3 pl-9 text-sm"
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
           />
@@ -90,7 +90,7 @@ export function MapeoTareas({
           style={{ borderColor: "var(--borde)" }}>
           {sinEnlazar === 0
             ? "Todas las tareas tienen partida asignada."
-            : "Ninguna tarea coincide con la busqueda."}
+            : "Ninguna tarea coincide con la búsqueda."}
         </p>
       ) : (
         <ul className="space-y-3">
@@ -176,9 +176,9 @@ export function MapeoTareas({
                           <span
                             className="text-xs whitespace-nowrap"
                             style={{ color: "var(--color-alerta)" }}
-                            title="El codigo coincide, pero en los archivos reales dos de cada tres coincidencias de codigo apuntaban a otra partida"
+                            title="El código coincide, pero en los archivos reales dos de cada tres coincidencias de código apuntaban a otra partida"
                           >
-                            mismo codigo (poco fiable)
+                            mismo código (poco fiable)
                           </span>
                         )}
 
@@ -278,7 +278,7 @@ function BuscadorManual({
   return (
     <div className="mt-2">
       <p className="mb-1 text-xs opacity-60">
-        Sin propuestas. Busca la partida a mano si sabes cual es.
+        Sin propuestas. Busca la partida a mano si sabes cuál es.
       </p>
       <input
         type="search"

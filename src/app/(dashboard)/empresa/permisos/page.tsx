@@ -39,7 +39,7 @@ export default async function PermisosPage({
           Permisos por perfil
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-pretty opacity-70">
-          Cada rol trae unos permisos de serie. Aqui se conceden o se quitan
+          Cada rol trae unos permisos de serie. Aquí se conceden o se quitan
           los que hagan falta, solo para esta empresa. Lo que se guarda son
           las diferencias: una casilla devuelta a su valor por defecto deja de
           ocupar sitio.
@@ -59,7 +59,7 @@ export default async function PermisosPage({
           {guardados === "1"
             ? "1 permiso actualizado."
             : `${guardados} permisos actualizados.`}{" "}
-          Surte efecto en la siguiente peticion de cada usuario, sin cerrar
+          Surte efecto en la siguiente petición de cada usuario, sin cerrar
           sesiones.
         </p>
       )}
@@ -72,9 +72,9 @@ export default async function PermisosPage({
         <div>
           <h2 className="text-sm font-semibold">Cuatro permisos no se tocan</h2>
           <p className="mt-1 max-w-3xl text-sm text-pretty opacity-70">
-            Aprobar una linea base y aprobar un movimiento son actos
+            Aprobar una línea base y aprobar un movimiento son actos
             contractuales irreversibles: mueven la cifra contra la que se mide
-            la obra. Y quien reparte permisos podria repartirselos a si mismo.
+            la obra. Y quien reparte permisos podría repartírselos a sí mismo.
             Los cuatro quedan reservados al administrador y salen bloqueados
             en la rejilla.
           </p>

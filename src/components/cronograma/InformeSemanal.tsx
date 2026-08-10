@@ -112,7 +112,7 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
                 {desviacion.toFixed(1)}%
               </dd>
               <dt className="text-xs tracking-wider uppercase opacity-60">
-                Desviacion
+                Desviación
               </dt>
             </div>
           </dl>
@@ -123,7 +123,7 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
           {datos.planeadoProject !== null && (
             <p className="mt-3 text-center text-xs opacity-60">
               MS Project totaliza {decimal(datos.planeadoProject, "")}% planeado y{" "}
-              {decimal(datos.realProject ?? "0", "")}% real con su propio metodo.
+              {decimal(datos.realProject ?? "0", "")}% real con su propio método.
             </p>
           )}
         </section>
@@ -137,7 +137,7 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
           <Titulo>Alertas de atraso</Titulo>
           {datos.alertas.length === 0 ? (
             <p className="mt-3 text-xs opacity-70">
-              Ninguna partida va por detras del plan.
+              Ninguna partida va por detrás del plan.
             </p>
           ) : (
             <ul className="mt-3 space-y-2">
@@ -174,11 +174,11 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
                       {a.severidad === "alta"
                         ? "Urgente"
                         : a.severidad === "media"
-                          ? "Atencion"
+                          ? "Atención"
                           : "Leve"}
                     </span>
                     <span className="font-semibold tabular-nums">
-                      &minus;{a.diasAtraso} dias
+                      &minus;{a.diasAtraso} días
                     </span>
                   </p>
                 </li>
@@ -190,7 +190,7 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)]">
         <section>
-          <Titulo>Control de capitulos</Titulo>
+          <Titulo>Control de capítulos</Titulo>
           <ul className="mt-3 space-y-2.5">
             {capitulos.map((c) => (
               <li key={c.uid}>
@@ -225,7 +225,7 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
             <thead>
               <tr className="border-b" style={{ borderColor: "var(--borde)" }}>
                 <th scope="col" className="pb-1 text-left font-normal opacity-60">Id</th>
-                <th scope="col" className="pb-1 text-left font-normal opacity-60">Descripcion de tarea</th>
+                <th scope="col" className="pb-1 text-left font-normal opacity-60">Descripción de tarea</th>
                 <th scope="col" className="pb-1 text-left font-normal opacity-60">Fechas</th>
                 <th scope="col" className="pb-1 text-right font-normal opacity-60">% Plan</th>
                 <th scope="col" className="pb-1 text-right font-normal opacity-60">% Real</th>
@@ -274,7 +274,7 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
         style={{ borderColor: "var(--borde)" }}
       >
         Informe generado el {fechaLarga(new Date())} por {datos.generadoPor} &middot;{" "}
-        GCM &mdash; Gestion en Construccion Moderna
+        GCM &mdash; Gestión en Construcción Moderna
       </footer>
     </article>
   );
@@ -341,7 +341,7 @@ function Rosco({ real }: { real: number }) {
 /** La misma curva de la pantalla, sin controles y con el eje del plazo entero. */
 function CurvaEstatica({ curva }: { curva: DatosCurva }) {
   if (curva.plan.length === 0 || !curva.inicio || !curva.fin) {
-    return <p className="mt-3 text-xs opacity-70">Sin curva todavia.</p>;
+    return <p className="mt-3 text-xs opacity-70">Sin curva todavía.</p>;
   }
 
   const ANCHO = 560;
@@ -413,7 +413,7 @@ function CurvaEstatica({ curva }: { curva: DatosCurva }) {
       <p className="mt-1 flex flex-wrap justify-center gap-4 text-xs opacity-70">
         <span>- - - Avance planeado</span>
         <span style={{ color: "var(--color-marca-600)" }}>&mdash; Avance real</span>
-        <span style={{ color: "var(--color-exito)" }}>&middot;&middot;&middot; Proyeccion</span>
+        <span style={{ color: "var(--color-exito)" }}>&middot;&middot;&middot; Proyección</span>
       </p>
     </>
   );

@@ -120,7 +120,7 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
             consultarSiProcede(e.target.value);
           }}
           onBlur={(e) => consultarSiProcede(e.target.value)}
-          ayuda="11 digitos. Al completarlo se busca la razon social en SUNAT."
+          ayuda="11 dígitos. Al completarlo se busca la razón social en SUNAT."
         />
 
         <div className="sm:col-span-2">
@@ -128,7 +128,7 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
             id="razonSocial"
             name="razonSocial"
             type="text"
-            etiqueta="Razon social o nombre"
+            etiqueta="Razón social o nombre"
             value={razonSocial}
             onChange={(e) => setRazonSocial(e.target.value)}
             ayuda="Tal como debe salir en la orden. Se puede corregir."
@@ -165,7 +165,7 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
           name="contactoTelefono"
           type="text"
           inputMode="tel"
-          etiqueta="Telefono"
+          etiqueta="Teléfono"
           defaultValue={proveedor?.contactoTelefono ?? ""}
         />
         <CampoTexto
@@ -183,13 +183,13 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
         <CampoSelect
           id="tipoImpuesto"
           name="tipoImpuesto"
-          etiqueta="Que emite este proveedor"
+          etiqueta="Qué emite este proveedor"
           defaultValue={proveedor?.tipoImpuesto ?? "IGV"}
-          ayuda="Decide como cuenta su gasto en el presupuesto. El IGV se recupera y no cuesta; la retencion de renta se paga a SUNAT y no vuelve, asi que si cuesta."
+          ayuda="Decide cómo cuenta su gasto en el presupuesto. El IGV se recupera y no cuesta; la retención de renta se paga a SUNAT y no vuelve, así que sí cuesta."
         >
           <option value="IGV">Factura con IGV 18%</option>
           <option value="RENTA">
-            Recibo por honorarios — retencion de renta 8%
+            Recibo por honorarios — retención de renta 8%
           </option>
           <option value="NINGUNO">Sin impuesto</option>
         </CampoSelect>
@@ -222,7 +222,7 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
         >
           <option value="">Sin indicar</option>
           <option value="PEN">Soles</option>
-          <option value="USD">Dolares</option>
+          <option value="USD">Dólares</option>
         </CampoSelect>
       </div>
 
@@ -231,9 +231,9 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
           id="cuentaBancaria"
           name="cuentaBancaria"
           type="text"
-          etiqueta="Numero de cuenta"
+          etiqueta="Número de cuenta"
           defaultValue={proveedor?.cuentaBancaria ?? ""}
-          ayuda="La de depositos. Es donde se le paga."
+          ayuda="La de depósitos. Es donde se le paga."
         />
         <CampoTexto
           id="cci"

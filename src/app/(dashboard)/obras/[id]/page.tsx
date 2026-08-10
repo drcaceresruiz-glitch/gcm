@@ -74,7 +74,7 @@ export default async function ObraPage({
         <Tarjeta etiqueta="Subtotal de partidas" valor={soles(montoTotal)} destacado />
         <Tarjeta etiqueta="Partidas" valor={String(totalPartidas)} />
         <Tarjeta
-          etiqueta="Linea base"
+          etiqueta="Línea base"
           valor={
             obra.lineaBaseVersion !== null
               ? `v${obra.lineaBaseVersion} congelada`
@@ -86,7 +86,7 @@ export default async function ObraPage({
       {obra.lineaBaseVersion !== null && (
         <p className="flex items-center gap-2 text-sm opacity-70">
           <Lock className="size-4 shrink-0" aria-hidden="true" />
-          El presupuesto contractual esta congelado. Los cambios se registran
+          El presupuesto contractual está congelado. Los cambios se registran
           como adicionales.
         </p>
       )}
@@ -108,7 +108,7 @@ export default async function ObraPage({
               <Mascota pose="trabajando" alto={170} flotar />
             </div>
             <p className="mt-3 text-sm opacity-70">
-              Esta obra aun no tiene partidas.
+              Esta obra aún no tiene partidas.
             </p>
             {puedeImportar && (
               <Link

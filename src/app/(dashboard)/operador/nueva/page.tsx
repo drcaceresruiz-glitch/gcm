@@ -18,7 +18,7 @@ export default async function NuevaConstructoraPage() {
         <h2 className="mt-3 text-xl font-semibold">Nueva constructora</h2>
         <p className="mt-0.5 max-w-2xl text-sm opacity-70">
           Se crea la empresa y su primer administrador a la vez. Al terminar
-          veras su clave temporal una sola vez.
+          verás su clave temporal una sola vez.
         </p>
       </div>
 

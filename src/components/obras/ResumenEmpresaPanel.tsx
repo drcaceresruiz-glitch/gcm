@@ -42,8 +42,8 @@ export function ResumenEmpresaPanel({
         acento="var(--color-marca-500)"
         detalle={
           resumen.obrasEnEjecucion === 1
-            ? "1 en ejecucion"
-            : `${resumen.obrasEnEjecucion} en ejecucion`
+            ? "1 en ejecución"
+            : `${resumen.obrasEnEjecucion} en ejecución`
         }
       />
 
@@ -64,7 +64,7 @@ export function ResumenEmpresaPanel({
         numero={Number(resumen.comprometido)}
         moneda
         acento="var(--color-alerta)"
-        detalle="Solo ordenes aprobadas"
+        detalle="Solo órdenes aprobadas"
       />
 
       <Cifra

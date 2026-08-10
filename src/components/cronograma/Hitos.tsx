@@ -29,7 +29,7 @@ export function Hitos({ filas, hayBase }: { filas: FilaHito[]; hayBase: boolean 
             <th className="py-2 pr-3 font-medium opacity-70">Hito</th>
             <th className="py-2 px-3 font-medium opacity-70">Fecha</th>
             {hayBase && <th className="py-2 px-3 font-medium opacity-70">Base</th>}
-            {hayBase && <th className="py-2 px-3 font-medium opacity-70">Desvio</th>}
+            {hayBase && <th className="py-2 px-3 font-medium opacity-70">Desvío</th>}
             <th className="py-2 pl-3 font-medium opacity-70">Estado</th>
           </tr>
         </thead>

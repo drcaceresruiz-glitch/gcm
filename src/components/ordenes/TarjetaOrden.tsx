@@ -161,7 +161,7 @@ export function TarjetaOrden({
               />
               {o.tipoImpuesto !== "NINGUNO" && (
                 <Dato
-                  etiqueta={o.tipoImpuesto === "IGV" ? "IGV" : "Retencion"}
+                  etiqueta={o.tipoImpuesto === "IGV" ? "IGV" : "Retención"}
                   valor={soles(o.impuesto)}
                 />
               )}
@@ -174,9 +174,9 @@ export function TarjetaOrden({
 
             <p className="mt-1 text-xs opacity-60">
               {o.tipoImpuesto === "IGV"
-                ? `Compromete el neto: ${soles(o.neto)}. El IGV es credito fiscal, no costo de obra.`
-                : `Compromete el total: ${soles(o.total)}. La retencion no se recupera, asi que si es costo de obra.`}
-              {o.totalLineas > 0 && ` · ${o.totalLineas} lineas de detalle`}
+                ? `Compromete el neto: ${soles(o.neto)}. El IGV es crédito fiscal, no costo de obra.`
+                : `Compromete el total: ${soles(o.total)}. La retención no se recupera, así que sí es costo de obra.`}
+              {o.totalLineas > 0 && ` · ${o.totalLineas} líneas de detalle`}
               {o.origen === "IMPORTADO" && " · cargada desde archivo"}
             </p>
 

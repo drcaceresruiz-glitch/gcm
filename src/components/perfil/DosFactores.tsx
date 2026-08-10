@@ -57,8 +57,8 @@ export function DosFactores({
     <Tarjeta>
       <SeccionTarjeta
         primera
-        titulo="Verificacion en dos pasos"
-        nota={`Al entrar te pediremos, ademas de la clave, un codigo de seis cifras que enviamos a ${email}. Asi, quien averigue tu clave tampoco entra sin tu correo.`}
+        titulo="Verificación en dos pasos"
+        nota={`Al entrar te pediremos, además de la clave, un código de seis cifras que enviamos a ${email}. Así, quien averigüe tu clave tampoco entra sin tu correo.`}
       >
         <p
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
@@ -105,9 +105,9 @@ export function DosFactores({
 
         {!activo && (
           <p className="text-xs opacity-60">
-            Antes de activarla, comprueba que recibes correo en esa direccion.
-            Si te quedas sin acceso al buzon, un administrador tendra que
-            apagartela.
+            Antes de activarla, comprueba que recibes correo en esa dirección.
+            Si te quedas sin acceso al buzón, un administrador tendrá que
+            apagártela.
           </p>
         )}
       </SeccionTarjeta>

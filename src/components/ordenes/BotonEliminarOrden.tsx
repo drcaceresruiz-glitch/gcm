@@ -73,8 +73,8 @@ export function BotonEliminarOrden({
 
       <p className="mt-1 text-sm text-pretty opacity-80">
         {anulada
-          ? "Ya no contaba en el comprometido, asi que no se revierte ninguna cifra. Pero la orden desaparece de la lista: solo quedara en la auditoria."
-          : "Un borrador no compromete presupuesto, asi que no hay nada que revertir."}
+          ? "Ya no contaba en el comprometido, así que no se revierte ninguna cifra. Pero la orden desaparece de la lista: solo quedará en la auditoría."
+          : "Un borrador no compromete presupuesto, así que no hay nada que revertir."}
       </p>
 
       {estado.error && (
@@ -113,7 +113,7 @@ function BotonConfirmar({ anulada }: { anulada?: boolean }) {
       ) : (
         <Trash2 className="size-4" aria-hidden="true" />
       )}
-      {pending ? "Eliminando..." : anulada ? "Si, eliminar" : "Si, descartar"}
+      {pending ? "Eliminando..." : anulada ? "Sí, eliminar" : "Sí, descartar"}
     </button>
   );
 }

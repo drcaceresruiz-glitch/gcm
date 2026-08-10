@@ -114,7 +114,7 @@ export function ActividadReciente({ entradas }: { entradas: Entrada[] }) {
             className="flex shrink-0 items-center gap-1.5 text-xs font-medium opacity-70 hover:opacity-100"
           >
             <CheckCheck className="size-3.5 shrink-0" aria-hidden="true" />
-            Marcar como leido
+            Marcar como leído
           </button>
         )}
       </div>
@@ -180,7 +180,7 @@ export function ActividadReciente({ entradas }: { entradas: Entrada[] }) {
       {colapsada && (
         <p className="mt-1.5 flex items-center gap-1.5 text-xs opacity-60">
           <Info className="size-3 shrink-0" aria-hidden="true" />
-          Contraida. Pulsa el titulo para volver a verla.
+          Contraída. Pulsa el título para volver a verla.
         </p>
       )}
     </section>

@@ -186,7 +186,7 @@ export function Navegacion({ empresa, operador, usuario }: Props) {
         onClick={() => setCajonAbierto((previo) => !previo)}
         aria-expanded={cajonAbierto}
         aria-controls="cajon-navegacion"
-        aria-label={cajonAbierto ? "Cerrar el menu" : "Abrir el menu"}
+        aria-label={cajonAbierto ? "Cerrar el menú" : "Abrir el menú"}
         className="rounded-lg border p-2 sm:hidden"
         style={{ borderColor: "var(--borde)" }}
       >

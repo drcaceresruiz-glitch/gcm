@@ -124,7 +124,26 @@ Restricciones tecnicas que NO se pueden olvidar:
 3. Respaldo: las fotos no estan en repo ni tar; sumarlas a las copias del
    servidor junto al volcado de la base.
 
-## 5. Importacion de presupuesto (Excel)
+## 5. Notas y Recordatorios (propuesta aceptada a falta de "adelante")
+
+Bitacora libre de obra con recordatorios. Adaptaciones a GCM ya decididas:
+permisos en la matriz (nota:leer/crear/gestionar), NO tabla de auditoria
+propia (se usa auditLog), estado "vencido" DERIVADO (pendiente + fecha
+pasada), categorias fijas al inicio (financiero/logistica/operativo/legal).
+Una nota que describe una restriccion de tarea debe marcarse en el Lookahead
+—la UI lo dira—. Adjuntos sobre la MISMA infraestructura de archivos de la
+evidencia (seccion 4), con hash SHA-256 al subir y purga que borra el archivo
+pero deja el registro inmutable (nombre, hash, quien, cuando, tamano).
+Compresion en el NAVEGADOR, nunca en el backend (LiteSpeed mata procesos
+lentos). Limite 5 MB. Notificaciones: campana in-app por sondeo ligero (sin
+websockets en este hosting) + resumen diario por correo via cron (el SMTP de
+recuperar clave ya existe) + preferencias por usuario en Perfil.
+
+Orden de entregas acordado: plantilla Excel → infraestructura de archivos
+(hash+purga) + Evidencia Fase A con QR → Notas E1 (CRUD + pestana + widget
+de proximos recordatorios) → Notas con adjuntos → Notificaciones.
+
+## 6. Importacion de presupuesto (Excel)
 
 - Verificar de punta a punta que importa TODO correctamente.
 - Plantilla ideal descargable para llenar e importar al crear la obra.
@@ -133,7 +152,7 @@ Restricciones tecnicas que NO se pueden olvidar:
 
 ---
 
-## 6. Defectos conocidos, sin arreglar
+## 7. Defectos conocidos, sin arreglar
 
 - **Ortografía: el sitio entero se escribió sin tildes** (convención heredada
   por miedo a la codificación, que ya no aplica: UTF-8 de punta a punta y
@@ -170,7 +189,7 @@ Restricciones tecnicas que NO se pueden olvidar:
 
 ---
 
-## 7. Documentacion
+## 8. Documentacion
 
 - **`MANUAL.md` quedo atras el 10 de agosto.** Describe el panel como si
   cargara los once modulos siempre, y no menciona las pestanas en dos niveles
@@ -180,7 +199,7 @@ Restricciones tecnicas que NO se pueden olvidar:
 
 ---
 
-## 8. Seguridad
+## 9. Seguridad
 
 Anotado antes del 10 de agosto, sin tocar:
 
@@ -195,7 +214,7 @@ Anotado antes del 10 de agosto, sin tocar:
 
 ---
 
-## 9. Funcionalidad pendiente
+## 10. Funcionalidad pendiente
 
 | | Que es | Migracion |
 |---|---|---|
@@ -209,7 +228,7 @@ Anotado antes del 10 de agosto, sin tocar:
 
 ---
 
-## 10. Limitaciones del asistente
+## 11. Limitaciones del asistente
 
 Para que ninguna sesion futura pierda tiempo redescubriendolas:
 

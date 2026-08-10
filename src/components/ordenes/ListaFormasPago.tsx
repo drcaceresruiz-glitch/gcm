@@ -47,7 +47,7 @@ export function ListaFormasPago({ formas, verTodas, puedeEditar }: Props) {
             href={verTodas ? "/empresa/formas-pago" : "/empresa/formas-pago?todas=1"}
             className="text-sm font-medium underline opacity-70 hover:opacity-100"
           >
-            {verTodas ? "Ver solo las activas" : "Ver tambien las desactivadas"}
+            {verTodas ? "Ver solo las activas" : "Ver también las desactivadas"}
           </Link>
 
           {puedeEditar && abierto !== "nueva" && (
@@ -75,11 +75,11 @@ export function ListaFormasPago({ formas, verTodas, puedeEditar }: Props) {
         >
           <Receipt className="mx-auto size-8 opacity-40" aria-hidden="true" />
           <p className="mt-3 text-sm opacity-70">
-            Todavia no hay formas de pago guardadas.
+            Todavía no hay formas de pago guardadas.
           </p>
           <p className="mx-auto mt-1 max-w-lg text-sm text-pretty opacity-60">
-            Las de las ordenes reales se repiten con pocas variantes: «50 %
-            adelanto, 40 % contra instalacion, 10 % contra dossier». Guardarlas
+            Las de las órdenes reales se repiten con pocas variantes: «50 %
+            adelanto, 40 % contra instalación, 10 % contra dossier». Guardarlas
             evita que cada orden acabe diciendo algo distinto de lo pactado.
           </p>
         </div>
@@ -209,7 +209,7 @@ function Formulario({
           style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
         />
         <p className="text-xs opacity-60">
-          Tal como debe salir en la orden. Se copia y alli se puede ajustar.
+          Tal como debe salir en la orden. Se copia y allí se puede ajustar.
         </p>
       </div>
 

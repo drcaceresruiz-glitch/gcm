@@ -29,8 +29,8 @@ export default async function PerfilPage() {
 
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">Mi perfil</h1>
         <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
-          Tus datos. El telefono se guarda al instante; cambiar tu identidad
-          requiere aprobacion de un administrador.
+          Tus datos. El teléfono se guarda al instante; cambiar tu identidad
+          requiere aprobación de un administrador.
         </p>
       </div>
 

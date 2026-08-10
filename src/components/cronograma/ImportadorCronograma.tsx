@@ -87,7 +87,7 @@ export function ImportadorCronograma({
           {admiteMpp ? (
             <>
               El <strong>.mpp</strong> de MS Project directamente, o su
-              exportacion a <strong>.xml</strong>. El .mpp lo convierte el
+              exportación a <strong>.xml</strong>. El .mpp lo convierte el
               servidor: el de esta obra tarda unos cinco segundos.
             </>
           ) : (
@@ -96,7 +96,7 @@ export function ImportadorCronograma({
               XML). Este servidor no puede convertir archivos .mpp.
             </>
           )}{" "}
-          Se lee el plan tal como esta en el archivo: tareas, fechas,
+          Se lee el plan tal como está en el archivo: tareas, fechas,
           duraciones, predecesoras y el <strong>% Planeado</strong>, que no se
           calcula sino que se toma del campo personalizado, para que las cifras
           coincidan con tu informe.
@@ -165,7 +165,7 @@ export function ImportadorCronograma({
       {analisis && (
         <Seccion titulo="2. Revisa antes de cargar">
           <p className="mt-1 text-sm opacity-70">
-            Nada se ha guardado todavia. Comprueba que el plazo y los
+            Nada se ha guardado todavía. Comprueba que el plazo y los
             porcentajes cuadran con tu informe.
           </p>
 
@@ -178,7 +178,7 @@ export function ImportadorCronograma({
       {hayTareas && (
         <Seccion titulo="3. Confirma">
           <p className="mt-1 text-sm opacity-70">
-            Cada corte se guarda como una version nueva: no se pisa nada, y el
+            Cada corte se guarda como una versión nueva: no se pisa nada, y el
             avance que ya hayas reportado en GCM se mantiene.
           </p>
 
@@ -193,7 +193,7 @@ export function ImportadorCronograma({
               <span>
                 El corte del{" "}
                 <strong>{fechaLarga(new Date(`${analisis.fechaCorte}T00:00:00Z`))}</strong>{" "}
-                ya esta cargado. Para registrar uno nuevo, fija otra fecha de
+                ya está cargado. Para registrar uno nuevo, fija otra fecha de
                 estado en MS Project y vuelve a exportar.
               </span>
             </div>
@@ -216,8 +216,8 @@ export function ImportadorCronograma({
 
           {analisis && analisis.errores.length > 0 && (
             <p className="mt-2 text-xs opacity-70">
-              Las {analisis.errores.length} tareas con incidencias quedaran
-              fuera. Puedes cargar ahora y corregirlas despues, o arreglar el
+              Las {analisis.errores.length} tareas con incidencias quedarán
+              fuera. Puedes cargar ahora y corregirlas después, o arreglar el
               cronograma en Project y volver a exportarlo.
             </p>
           )}

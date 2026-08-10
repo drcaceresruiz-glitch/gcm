@@ -86,7 +86,7 @@ export default async function RevisionesPage({
           }}
         >
           <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
-          Revision v{creada} creada.
+          Revisión v{creada} creada.
         </p>
       )}
 
@@ -100,7 +100,7 @@ export default async function RevisionesPage({
           }}
         >
           <Lock className="size-4 shrink-0" aria-hidden="true" />
-          Revision v{aprobada} aprobada. El presupuesto queda congelado y la
+          Revisión v{aprobada} aprobada. El presupuesto queda congelado y la
           obra ya no permite editar partidas.
         </p>
       )}
@@ -116,12 +116,12 @@ export default async function RevisionesPage({
           className="border-t pt-8"
           style={{ borderColor: "var(--borde)" }}
         >
-          <h2 className="text-lg font-semibold">Nueva revision</h2>
+          <h2 className="text-lg font-semibold">Nueva revisión</h2>
           <p className="mt-1 mb-5 max-w-2xl text-sm text-pretty opacity-70">
             Congela el presupuesto de hoy con sus porcentajes y su tipo de
-            cambio. Los porcentajes se guardan en la revision, no en la obra:
-            por eso una revision antigua sigue dando la misma cifra aunque
-            despues cambien.
+            cambio. Los porcentajes se guardan en la revisión, no en la obra:
+            por eso una revisión antigua sigue dando la misma cifra aunque
+            después cambien.
           </p>
 
           <FormularioRevision
@@ -146,10 +146,10 @@ export default async function RevisionesPage({
           <Lock className="mt-0.5 size-5 shrink-0 opacity-70" aria-hidden="true" />
           <div>
             <h2 className="text-sm font-semibold">
-              El presupuesto esta congelado
+              El presupuesto está congelado
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
-              La linea base v{obra.lineaBaseVersion} esta aprobada, asi que ya
+              La línea base v{obra.lineaBaseVersion} está aprobada, así que ya
               no se crean revisiones nuevas. Los cambios posteriores se
               registran como adicionales o reconversiones sobre ella, en{" "}
               <Link

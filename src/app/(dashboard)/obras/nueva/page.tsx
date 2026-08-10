@@ -33,7 +33,7 @@ export default async function NuevaObraPage() {
           Nueva obra
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
-          Se crea vacia. Despues se le carga el presupuesto, desde un Excel o
+          Se crea vacía. Después se le carga el presupuesto, desde un Excel o
           partida a partida.
         </p>
       </div>
@@ -50,19 +50,19 @@ export default async function NuevaObraPage() {
             ilustracion={<IlustracionPlano />}
             puntos={[
               {
-                titulo: "La obra nace vacia",
+                titulo: "La obra nace vacía",
                 texto:
                   "Al crearla no tiene partidas. El paso siguiente es cargarle el presupuesto, desde un Excel o partida a partida.",
               },
               {
-                titulo: "El codigo es opcional, pero no se repite",
+                titulo: "El código es opcional, pero no se repite",
                 texto:
-                  "Sirve para nombrar la obra en corto. Ademas, el sistema le pone un correlativo propio (OB-000001).",
+                  "Sirve para nombrar la obra en corto. Además, el sistema le pone un correlativo propio (OB-000001).",
               },
               {
-                titulo: "Empieza en planificacion",
+                titulo: "Empieza en planificación",
                 texto:
-                  "Es lo normal: se pasa a ejecucion cuando la obra arranca de verdad. El estado ordena el panel y deja filtrar.",
+                  "Es lo normal: se pasa a ejecución cuando la obra arranca de verdad. El estado ordena el panel y deja filtrar.",
               },
               {
                 titulo: "Las fechas dan el avance de calendario",

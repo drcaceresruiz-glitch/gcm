@@ -71,12 +71,12 @@ export function BotonAprobar({
       <input type="hidden" name="revisionId" value={revisionId} />
 
       <h3 className="text-sm font-semibold">
-        Vas a congelar la revision v{version}
+        Vas a congelar la revisión v{version}
       </h3>
 
       <dl className="mt-3 space-y-1 text-sm">
         <div className="flex justify-between gap-4">
-          <dt className="opacity-70">Fecha de la revision</dt>
+          <dt className="opacity-70">Fecha de la revisión</dt>
           <dd className="tabular-nums">{fecha}</dd>
         </div>
         <div className="flex justify-between gap-4">
@@ -88,11 +88,11 @@ export function BotonAprobar({
       <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
         <li>
           <strong>No se puede deshacer.</strong> Los indicadores de avance y
-          costo se miden contra esta cifra; poder cambiarla despues los
-          invalidaria hacia atras.
+          costo se miden contra esta cifra; poder cambiarla después los
+          invalidaría hacia atrás.
         </li>
         <li>
-          La obra dejara de permitir <strong>editar partidas</strong> y de
+          La obra dejará de permitir <strong>editar partidas</strong> y de
           ofrecer el <strong>importador de Excel</strong>.
         </li>
         <li>
@@ -138,7 +138,7 @@ function BotonConfirmar({ version }: { version: number }) {
       ) : (
         <Lock className="size-4" aria-hidden="true" />
       )}
-      {pending ? "Congelando..." : `Si, congelar la v${version}`}
+      {pending ? "Congelando..." : `Sí, congelar la v${version}`}
     </button>
   );
 }

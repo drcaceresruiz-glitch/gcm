@@ -30,7 +30,7 @@ export default async function NuevaClavePage({
           aria-hidden="true"
         />
         <p className="text-sm">
-          Este enlace ya no sirve: caduco o ya se uso.
+          Este enlace ya no sirve: caducó o ya se usó.
         </p>
         <p className="text-xs opacity-60">
           Los enlaces duran una hora y valen una sola vez. Pide uno nuevo.

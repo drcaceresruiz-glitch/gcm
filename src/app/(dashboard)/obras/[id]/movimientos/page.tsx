@@ -95,7 +95,7 @@ export default async function MovimientosPage({
 
       {creado && (
         <Aviso icono={CheckCircle2} tono="exito">
-          Movimiento {creado} guardado como borrador. Todavia no ajusta el
+          Movimiento {creado} guardado como borrador. Todavía no ajusta el
           presupuesto: hay que aprobarlo.
         </Aviso>
       )}
@@ -188,11 +188,11 @@ function SinLineaBase({
     >
       <Lock className="mx-auto size-8 opacity-40" aria-hidden="true" />
       <p className="mt-3 text-sm opacity-70">
-        Esta obra todavia no tiene una linea base aprobada.
+        Esta obra todavía no tiene una línea base aprobada.
       </p>
       <p className="mx-auto mt-1 max-w-lg text-sm text-pretty opacity-60">
-        Los movimientos van ENCIMA de la linea base y se miden contra ella,
-        asi que primero hay que congelar el presupuesto contractual. Mientras
+        Los movimientos van ENCIMA de la línea base y se miden contra ella,
+        así que primero hay que congelar el presupuesto contractual. Mientras
         no exista, el presupuesto se corrige editando las partidas.
       </p>
 

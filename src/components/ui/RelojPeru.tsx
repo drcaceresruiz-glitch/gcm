@@ -62,7 +62,7 @@ export function RelojPeru() {
     <p
       className="elevacion-1 flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold tabular-nums"
       style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
-      title="Hora de Peru (UTC-5)"
+      title="Hora de Perú (UTC-5)"
     >
       <Clock
         className="size-3.5 shrink-0"

@@ -35,11 +35,11 @@ export default async function MapeoPage({
         <Volver href={`/obras/${id}/cronograma`}>Volver al cronograma</Volver>
 
         <h2 className="mt-3 text-xl font-semibold tracking-tight">
-          Que partidas cubre cada tarea
+          Qué partidas cubre cada tarea
         </h2>
         <p className="mt-1 max-w-3xl text-sm opacity-70">
-          Hoy el avance de la obra se pondera por la duracion de cada tarea,
-          que es el unico peso que trae el archivo de MS Project. Al enlazar
+          Hoy el avance de la obra se pondera por la duración de cada tarea,
+          que es el único peso que trae el archivo de MS Project. Al enlazar
           tareas con partidas, el avance pasa a pesarse por{" "}
           <strong>dinero</strong>: terminar una partida de S/ 500 deja de valer
           lo mismo que terminar una de S/ 200.000.
@@ -85,14 +85,14 @@ export default async function MapeoPage({
         <p className="mt-3 text-sm opacity-70">
           {suficiente
             ? "Con esta cobertura, el avance ya se puede pesar por dinero de forma representativa."
-            : "Mientras la cobertura sea baja, el avance se sigue pesando por duracion. Pesar por dinero un mapeo que cubre una parte pequena del presupuesto seria peor: la cifra parece mas seria y describe solo ese trozo."}
+            : "Mientras la cobertura sea baja, el avance se sigue pesando por duración. Pesar por dinero un mapeo que cubre una parte pequeña del presupuesto sería peor: la cifra parece más seria y describe solo ese trozo."}
         </p>
 
         {/* Por que este total no es el mismo que el del presupuesto. */}
         <p className="mt-2 text-xs opacity-60">
           El total de referencia solo cuenta partidas con importe positivo. Los
           descuentos comerciales quedan fuera porque no son trabajo que nadie
-          ejecute, y un peso negativo en una media ponderada restaria avance en
+          ejecute, y un peso negativo en una media ponderada restaría avance en
           vez de sumarlo. Por eso esta cifra puede no coincidir con el subtotal
           de partidas de la obra.
         </p>
@@ -101,9 +101,9 @@ export default async function MapeoPage({
       <Tarjeta>
         <h3 className="text-base font-semibold">Tareas del cronograma</h3>
         <p className="mt-0.5 mb-4 text-sm opacity-70">
-          GCM propone por parecido de la descripcion; tu decides. No aparecen
+          GCM propone por parecido de la descripción; tú decides. No aparecen
           ni las tareas resumen —su dinero es el de sus partidas hijas, y
-          enlazarlas contaria el mismo importe dos veces— ni los hitos, que
+          enlazarlas contaría el mismo importe dos veces— ni los hitos, que
           marcan un acontecimiento y no trabajo que ejecutar.
         </p>
 

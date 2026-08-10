@@ -57,7 +57,7 @@ export function EstadoObra({
       {estado === "CERRADA" && (
         <span className="inline-flex items-center gap-1 text-xs opacity-60">
           <Lock className="size-3.5" aria-hidden="true" />
-          Cerrada: no admite mas cambios.
+          Cerrada: no admite más cambios.
         </span>
       )}
 
@@ -88,7 +88,7 @@ function BotonTransicion({ desde, hacia }: { desde: Estado; hacia: Estado }) {
       disabled={pending}
       onClick={(e) => {
         // Cerrar es terminal: se confirma para que no se dispare por inercia.
-        if (cerrar && !window.confirm("Cerrar la obra? Una vez cerrada no se puede reabrir.")) {
+        if (cerrar && !window.confirm("¿Cerrar la obra? Una vez cerrada no se puede reabrir.")) {
           e.preventDefault();
         }
       }}

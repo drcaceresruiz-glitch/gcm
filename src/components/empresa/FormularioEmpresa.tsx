@@ -35,11 +35,11 @@ export function FormularioEmpresa({ empresa, soloLectura }: Props) {
   return (
     <form action={accion} className="max-w-2xl">
       <Tarjeta>
-      <Bloque titulo="Identificacion" primera>
+      <Bloque titulo="Identificación" primera>
         <CampoTexto
           id="razonSocial"
           name="razonSocial"
-          etiqueta="Razon social"
+          etiqueta="Razón social"
           defaultValue={empresa.razonSocial}
           disabled={soloLectura}
           required
@@ -53,8 +53,8 @@ export function FormularioEmpresa({ empresa, soloLectura }: Props) {
             {empresa.ruc}
           </p>
           <p className="text-xs opacity-60">
-            No se edita desde aqui: identifica a la empresa y ya figura
-            impreso en las ordenes emitidas.
+            No se edita desde aquí: identifica a la empresa y ya figura
+            impreso en las órdenes emitidas.
           </p>
         </div>
       </Bloque>
@@ -66,7 +66,7 @@ export function FormularioEmpresa({ empresa, soloLectura }: Props) {
         <CampoTexto
           id="direccion"
           name="direccion"
-          etiqueta="Direccion"
+          etiqueta="Dirección"
           defaultValue={empresa.direccion ?? ""}
           disabled={soloLectura}
           maxLength={255}
@@ -74,7 +74,7 @@ export function FormularioEmpresa({ empresa, soloLectura }: Props) {
         <CampoTexto
           id="telefono"
           name="telefono"
-          etiqueta="Telefono"
+          etiqueta="Teléfono"
           defaultValue={empresa.telefono ?? ""}
           disabled={soloLectura}
           maxLength={30}
@@ -91,8 +91,8 @@ export function FormularioEmpresa({ empresa, soloLectura }: Props) {
       </Bloque>
 
       <Bloque
-        titulo="Firma de las ordenes"
-        nota="Va sobre la linea de firma del documento que recibe el proveedor."
+        titulo="Firma de las órdenes"
+        nota="Va sobre la línea de firma del documento que recibe el proveedor."
       >
         <CampoTexto
           id="representanteLegal"
@@ -116,7 +116,7 @@ export function FormularioEmpresa({ empresa, soloLectura }: Props) {
 
       <Bloque
         titulo="Condiciones al pie"
-        nota="Texto fijo que se repite al final de TODAS las ordenes."
+        nota="Texto fijo que se repite al final de TODAS las órdenes."
       >
         <div className="space-y-1.5">
           <label htmlFor="observacionesOrden" className="block text-sm font-medium">
@@ -136,8 +136,8 @@ export function FormularioEmpresa({ empresa, soloLectura }: Props) {
           />
           <p className="text-xs opacity-60">
             Son las condiciones que la empresa impone en todos sus pedidos —de
-            quien es el riesgo del traslado, por ejemplo—. Cada orden puede
-            anadir las suyas encima sin tocar estas.
+            quién es el riesgo del traslado, por ejemplo—. Cada orden puede
+            añadir las suyas encima sin tocar estas.
           </p>
         </div>
       </Bloque>

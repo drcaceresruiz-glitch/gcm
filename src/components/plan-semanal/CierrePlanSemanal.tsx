@@ -101,7 +101,7 @@ export function CierrePlanSemanal({
   }
 
   if (compromisos.length === 0) {
-    return <p className="text-sm opacity-60">Anade compromisos antes de cerrar la semana.</p>;
+    return <p className="text-sm opacity-60">Añade compromisos antes de cerrar la semana.</p>;
   }
 
   return (

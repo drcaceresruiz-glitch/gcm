@@ -60,7 +60,7 @@ export function ListaProveedores({
             }
             className="text-sm font-medium underline opacity-70 hover:opacity-100"
           >
-            {verTodos ? "Ver solo los activos" : "Ver tambien los desactivados"}
+            {verTodos ? "Ver solo los activos" : "Ver también los desactivados"}
           </Link>
 
           {puedeCrear && abierto !== "nuevo" && (
@@ -91,7 +91,7 @@ export function ListaProveedores({
         >
           <Users className="mx-auto size-8 opacity-40" aria-hidden="true" />
           <p className="mt-3 text-sm opacity-70">
-            Todavia no hay proveedores.
+            Todavía no hay proveedores.
           </p>
           <p className="mx-auto mt-1 max-w-md text-sm text-pretty opacity-60">
             Se dan de alta una vez y sirven para todas las obras. Cada orden de
@@ -172,7 +172,7 @@ function Fila({
                   ? "corriente"
                   : null,
               p.monedaCuenta === "USD"
-                ? "dolares"
+                ? "dólares"
                 : p.monedaCuenta === "PEN"
                   ? "soles"
                   : null,
@@ -186,10 +186,10 @@ function Fila({
 
         <p className="mt-1 text-xs opacity-70">
           {p.totalOrdenes === 0
-            ? "Sin ordenes todavia"
+            ? "Sin órdenes todavía"
             : p.totalOrdenes === 1
               ? "1 orden"
-              : `${p.totalOrdenes} ordenes`}
+              : `${p.totalOrdenes} órdenes`}
         </p>
       </div>
 

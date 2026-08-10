@@ -107,9 +107,9 @@ function PanelAlta({ alCerrar }: { alCerrar: () => void }) {
   const requisitos: Requisito[] = [
     { etiqueta: "Nombres", cumplido: vals.nombres.trim().length > 0 },
     { etiqueta: "Apellidos", cumplido: vals.apellidos.trim().length > 0 },
-    { etiqueta: "Correo valido", cumplido: correoValido(vals.email) },
+    { etiqueta: "Correo válido", cumplido: correoValido(vals.email) },
     {
-      etiqueta: "Documento valido para su tipo",
+      etiqueta: "Documento válido para su tipo",
       cumplido: validarDocumento(vals.tipoDoc, vals.numDoc).ok,
     },
   ];
@@ -143,7 +143,7 @@ function PanelAlta({ alCerrar }: { alCerrar: () => void }) {
         <Tarjeta>
           <SeccionTarjeta
             titulo="Nuevo usuario"
-            nota="Nace con una clave temporal que debera cambiar en su primer acceso. El rol trae sus permisos ya configurados."
+            nota="Nace con una clave temporal que deberá cambiar en su primer acceso. El rol trae sus permisos ya configurados."
             primera
           >
             <div className="grid gap-4 sm:grid-cols-2">
@@ -156,14 +156,14 @@ function PanelAlta({ alCerrar }: { alCerrar: () => void }) {
               name="email"
               type="email"
               etiqueta="Correo"
-              ayuda="Sera su usuario de acceso. No se puede cambiar despues."
+              ayuda="Será su usuario de acceso. No se puede cambiar después."
               required
               maxLength={150}
             />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <SelectorTipoDoc actual="DNI" />
-              <CampoTexto id="numDoc" name="numDoc" etiqueta="Numero de documento" required maxLength={20} />
+              <CampoTexto id="numDoc" name="numDoc" etiqueta="Número de documento" required maxLength={20} />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -219,7 +219,7 @@ function FilaUsuario({ usuario }: { usuario: UsuarioLista }) {
                   {ETIQUETA_ROL[usuario.role as Role] ?? usuario.role}
                 </Chip>
                 {inactivo && <Chip tono="peligro">Inactivo</Chip>}
-                {usuario.esYo && <Chip tono="neutro">Tu</Chip>}
+                {usuario.esYo && <Chip tono="neutro">Tú</Chip>}
               </div>
               <p className="mt-1 text-xs opacity-70">{usuario.email}</p>
               <p className="mt-0.5 text-xs opacity-60">
@@ -289,7 +289,7 @@ function FormEdicion({
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <SelectorTipoDoc actual={usuario.tipoDoc} id={`td-${usuario.id}`} />
-        <CampoTexto id={`nd-${usuario.id}`} name="numDoc" etiqueta="Numero de documento" defaultValue={usuario.numDoc} required maxLength={20} />
+        <CampoTexto id={`nd-${usuario.id}`} name="numDoc" etiqueta="Número de documento" defaultValue={usuario.numDoc} required maxLength={20} />
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -306,7 +306,7 @@ function FormEdicion({
         />
         {usuario.esYo && (
           <p className="mt-1 text-xs opacity-60">
-            No puedes cambiar tu propio rol. Pideselo a otro administrador.
+            No puedes cambiar tu propio rol. Pídeselo a otro administrador.
           </p>
         )}
       </div>
@@ -347,7 +347,7 @@ function FormReset({ usuario }: { usuario: UsuarioLista }) {
     <form action={accion}>
       <input type="hidden" name="id" value={usuario.id} />
       <input type="hidden" name="email" value={usuario.email} />
-      <BotonMini icono={<KeyRound className="size-3.5" />} confirmar="Resetear la clave de este usuario? Se cerraran sus sesiones.">
+      <BotonMini icono={<KeyRound className="size-3.5" />} confirmar="¿Resetear la clave de este usuario? Se cerrarán sus sesiones.">
         Resetear clave
       </BotonMini>
     </form>
@@ -378,7 +378,7 @@ function FormDosFactores({ usuario }: { usuario: UsuarioLista }) {
       <input type="hidden" name="id" value={usuario.id} />
       <BotonMini
         icono={<ShieldOff className="size-3.5" />}
-        confirmar={`Apagar la verificacion en dos pasos de ${usuario.nombres} ${usuario.apellidos}? Hazlo solo si perdio el acceso a su correo: volvera a entrar con la clave sola.`}
+        confirmar={`¿Apagar la verificación en dos pasos de ${usuario.nombres} ${usuario.apellidos}? Hazlo solo si perdió el acceso a su correo: volverá a entrar con la clave sola.`}
       >
         Apagar 2FA
       </BotonMini>
@@ -407,7 +407,7 @@ function FormEliminar({ usuario }: { usuario: UsuarioLista }) {
       <BotonMini
         icono={<Trash2 className="size-3.5" />}
         peligro
-        confirmar={`Eliminar a ${usuario.nombres} ${usuario.apellidos} de forma definitiva? Esta accion no se puede deshacer. Lo que haya firmado se conserva.`}
+        confirmar={`¿Eliminar a ${usuario.nombres} ${usuario.apellidos} de forma definitiva? Esta acción no se puede deshacer. Lo que haya firmado se conserva.`}
       >
         Eliminar
       </BotonMini>
@@ -435,7 +435,7 @@ function FormEstado({ usuario, inactivo }: { usuario: UsuarioLista; inactivo: bo
           confirmar={
             inactivo
               ? undefined
-              : "Desactivar este usuario? No podra iniciar sesion y se cerraran las suyas."
+              : "¿Desactivar este usuario? No podrá iniciar sesión y se cerrarán las suyas."
           }
         >
           {inactivo ? "Activar" : "Desactivar"}
@@ -527,9 +527,9 @@ function BannerClave({ estado }: { estado: EstadoUsuarios }) {
       <p className="text-sm font-medium">{estado.ok}</p>
       <p className="mt-1 text-xs opacity-70">
         {estado.correoEnviado
-          ? `Se envio por correo a ${estado.usuarioClave}. Si quieres, tambien puedes comunicarsela: no volvera a mostrarse.`
-          : `Anota o copia esta clave temporal y comunicala a ${estado.usuarioClave} (el correo no esta configurado). No volvera a mostrarse.`}
-        {" "}La debera cambiar en su primer acceso.
+          ? `Se envió por correo a ${estado.usuarioClave}. Si quieres, también puedes comunicársela: no volverá a mostrarse.`
+          : `Anota o copia esta clave temporal y comunícala a ${estado.usuarioClave} (el correo no está configurado). No volverá a mostrarse.`}
+        {" "}La deberá cambiar en su primer acceso.
       </p>
       <div className="mt-3 flex items-center gap-2">
         <code

@@ -61,7 +61,7 @@ function Boton({ nombre }: { nombre: string }) {
       onClick={(e) => {
         if (
           !window.confirm(
-            `Eliminar la obra "${nombre}"? Se borra junto con sus partidas. Esta accion no se puede deshacer.`,
+            `¿Eliminar la obra "${nombre}"? Se borra junto con sus partidas. Esta acción no se puede deshacer.`,
           )
         ) {
           e.preventDefault();

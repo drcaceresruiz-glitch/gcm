@@ -43,7 +43,7 @@ const TONO: Record<Severidad, "peligro" | "alerta" | "neutro"> = {
  */
 const ETIQUETA: Record<Severidad, string> = {
   alta: "Urgente",
-  media: "Atencion",
+  media: "Atención",
   baja: "Leve",
 };
 
@@ -56,7 +56,7 @@ export function AlertasAtraso({ alertas }: { alertas: AlertaAtraso[] }) {
           style={{ color: "var(--color-exito)" }}
           aria-hidden="true"
         />
-        Ninguna partida va por detras del plan.
+        Ninguna partida va por detrás del plan.
       </p>
     );
   }
@@ -67,7 +67,7 @@ export function AlertasAtraso({ alertas }: { alertas: AlertaAtraso[] }) {
   return (
     <div className="space-y-3">
       <p className="text-sm">
-        <strong>{alertas.length}</strong> partida(s) por detras del plan
+        <strong>{alertas.length}</strong> partida(s) por detrás del plan
         {altas > 0 && (
           <>
             ,{" "}
@@ -76,7 +76,7 @@ export function AlertasAtraso({ alertas }: { alertas: AlertaAtraso[] }) {
             </strong>
           </>
         )}
-        . Cada una dice por que.
+        . Cada una dice por qué.
       </p>
 
       <ul className="space-y-2">
@@ -110,7 +110,7 @@ export function AlertasAtraso({ alertas }: { alertas: AlertaAtraso[] }) {
                 style={{ color: "var(--color-peligro)" }}
               >
                 <Flag className="size-3.5" aria-hidden="true" />
-                Ruta critica
+                Ruta crítica
               </span>
             )}
 
@@ -133,7 +133,7 @@ export function AlertasAtraso({ alertas }: { alertas: AlertaAtraso[] }) {
             <span
               className="font-semibold tabular-nums whitespace-nowrap"
               style={{ color: "var(--color-peligro)" }}
-              title="Trabajo pendiente para ponerse al dia, en dias de esta partida"
+              title="Trabajo pendiente para ponerse al día, en días de esta partida"
             >
               {a.diasAtraso} d
             </span>
@@ -147,15 +147,15 @@ export function AlertasAtraso({ alertas }: { alertas: AlertaAtraso[] }) {
 
       {alertas.length > visibles.length && (
         <p className="text-xs opacity-60">
-          Y {alertas.length - visibles.length} mas, con menos peso. Estan todas
+          Y {alertas.length - visibles.length} más, con menos peso. Están todas
           en la tabla de tareas, con su desfase.
         </p>
       )}
 
       <p className="text-xs opacity-60">
-        Los dias son lo que falta por ejecutar de cada partida traducido a su
-        propia duracion: asi un 10% de una partida de veinte dias pesa mas que
-        un 40% de una de dos, que es como se decide a que atender primero.
+        Los días son lo que falta por ejecutar de cada partida traducido a su
+        propia duración: así un 10% de una partida de veinte días pesa más que
+        un 40% de una de dos, que es como se decide a qué atender primero.
       </p>
     </div>
   );

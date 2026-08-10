@@ -100,7 +100,7 @@ export function FotoPerfil({
           </div>
 
           <p className="text-xs opacity-60">
-            Opcional. Se recorta a un circulo. Formatos JPG, PNG o WebP.
+            Opcional. Se recorta a un círculo. Formatos JPG, PNG o WebP.
           </p>
 
           <GuardarFoto />

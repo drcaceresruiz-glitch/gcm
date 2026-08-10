@@ -13,7 +13,7 @@ export function VistaPrevia({ analisis }: { analisis: ResultadoAnalisis }) {
   return (
     <div className="space-y-5">
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Resumen etiqueta="Capitulos" valor={String(analisis.totalCapitulos)} />
+        <Resumen etiqueta="Capítulos" valor={String(analisis.totalCapitulos)} />
         <Resumen etiqueta="Partidas" valor={String(analisis.totalPartidas)} />
         <Resumen etiqueta="Presupuesto" valor={soles(analisis.montoTotal)} destacado />
         <Resumen
@@ -40,7 +40,7 @@ export function VistaPrevia({ analisis }: { analisis: ResultadoAnalisis }) {
           <p className="mt-2 text-sm">
             Varias partidas seguidas muestran exactamente el mismo importe y el
             mismo precio unitario. Suele ocurrir cuando en Excel se arrastra la
-            formula del subtotal sin ajustar la fila a la que apunta: todas
+            fórmula del subtotal sin ajustar la fila a la que apunta: todas
             acaban mostrando el importe de la primera.
           </p>
 
@@ -69,9 +69,9 @@ export function VistaPrevia({ analisis }: { analisis: ResultadoAnalisis }) {
 
           <p className="mt-3 text-sm">
             <strong>Compara ambas cifras con el total de tu Excel</strong> para
-            saber cual corresponde. Se importaran los importes tal como estan en
+            saber cuál corresponde. Se importarán los importes tal como están en
             el archivo; las filas afectadas quedan marcadas para que puedas
-            revisarlas y corregirlas despues.
+            revisarlas y corregirlas después.
           </p>
 
           <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto text-sm">
@@ -91,8 +91,8 @@ export function VistaPrevia({ analisis }: { analisis: ResultadoAnalisis }) {
 
       {analisis.filasTextoOmitidas > 0 && (
         <p className="text-xs opacity-60">
-          Se omitieron {analisis.filasTextoOmitidas} fila(s) de texto sin codigo
-          (notas, subtitulos o clausulas del contrato).
+          Se omitieron {analisis.filasTextoOmitidas} fila(s) de texto sin código
+          (notas, subtítulos o cláusulas del contrato).
         </p>
       )}
 
@@ -106,11 +106,11 @@ export function VistaPrevia({ analisis }: { analisis: ResultadoAnalisis }) {
         >
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <XCircle className="size-4" aria-hidden="true" />
-            {analisis.errores.length} fila(s) no se importaran
+            {analisis.errores.length} fila(s) no se importarán
           </h3>
           <p className="mt-1 text-xs opacity-70">
-            Corrige estas filas en tu Excel y vuelve a subirlo. El resto si se
-            importara.
+            Corrige estas filas en tu Excel y vuelve a subirlo. El resto sí se
+            importará.
           </p>
           <ul className="mt-3 max-h-52 space-y-1.5 overflow-y-auto text-sm">
             {analisis.errores.map((e, i) => (
@@ -138,7 +138,7 @@ export function VistaPrevia({ analisis }: { analisis: ResultadoAnalisis }) {
             {conAviso.length} aviso(s)
           </h3>
           <p className="mt-1 text-xs opacity-70">
-            Estas filas si se importan, pero conviene revisarlas.
+            Estas filas sí se importan, pero conviene revisarlas.
           </p>
           <ul className="mt-3 max-h-40 space-y-1.5 overflow-y-auto text-sm">
             {conAviso.slice(0, 30).map((f) => (
@@ -204,15 +204,15 @@ function TablaPrevia({
       >
         <table className="w-full min-w-[46rem] text-sm">
           <caption className="sr-only">
-            Vista previa de las partidas que se importaran
+            Vista previa de las partidas que se importarán
           </caption>
           <thead>
             <tr
               className="text-left text-xs uppercase"
               style={{ backgroundColor: "color-mix(in oklab, var(--borde) 40%, transparent)" }}
             >
-              <th scope="col" className="px-3 py-2 font-medium">Codigo</th>
-              <th scope="col" className="px-3 py-2 font-medium">Descripcion</th>
+              <th scope="col" className="px-3 py-2 font-medium">Código</th>
+              <th scope="col" className="px-3 py-2 font-medium">Descripción</th>
               <th scope="col" className="px-3 py-2 font-medium">Und.</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">Metrado</th>
               <th scope="col" className="px-3 py-2 text-right font-medium">P. Unitario</th>
@@ -264,7 +264,7 @@ function TablaPrevia({
       {ocultas > 0 && (
         <p className="mt-2 text-xs opacity-60">
           Se muestran las primeras {MAXIMO_VISIBLE} filas. Las {ocultas}{" "}
-          restantes tambien se importaran.
+          restantes también se importarán.
         </p>
       )}
     </div>

@@ -53,7 +53,7 @@ export function BotonLineaBase({
         }}
       >
         <Flag className="size-3" aria-hidden="true" />
-        Linea base
+        Línea base
       </span>
     );
   }
@@ -70,7 +70,7 @@ export function BotonLineaBase({
           style={{ borderColor: "var(--borde)" }}
         >
           <Flag className="size-3.5" aria-hidden="true" />
-          Fijar como linea base
+          Fijar como línea base
         </button>
         {estado.error && <Aviso mensaje={estado.error} />}
       </span>
@@ -90,9 +90,9 @@ export function BotonLineaBase({
       <input type="hidden" name="cronogramaId" value={cronogramaId} />
 
       <p className="text-sm">
-        Fijar la <strong>v{version}</strong> ({fecha}) como linea base. El{" "}
-        <strong>PV y el SPI</strong> del valor ganado pasaran a medirse contra
-        esta version. Si ya habia otra base, deja de serlo.
+        Fijar la <strong>v{version}</strong> ({fecha}) como línea base. El{" "}
+        <strong>PV y el SPI</strong> del valor ganado pasarán a medirse contra
+        esta versión. Si ya había otra base, deja de serlo.
       </p>
 
       {/* La explicacion completa, plegada. Quien ya sabe lo que hace no la

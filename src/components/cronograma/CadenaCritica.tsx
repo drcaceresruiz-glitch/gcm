@@ -16,8 +16,8 @@ export function CadenaCritica({ cadena }: { cadena: Cadena }) {
   if (cadena.eslabones.length === 0) {
     return (
       <p className="text-sm opacity-70">
-        El archivo no marca ninguna tarea de trabajo como critica. Puede que el
-        cronograma no tenga aun la red de predecesoras completa.
+        El archivo no marca ninguna tarea de trabajo como crítica. Puede que el
+        cronograma no tenga aún la red de predecesoras completa.
       </p>
     );
   }
@@ -31,16 +31,16 @@ export function CadenaCritica({ cadena }: { cadena: Cadena }) {
           <strong>{cadena.eslabones.length}</strong> tareas de trabajo
         </span>
         <span className="opacity-70">
-          {decimal(cadena.duracionTotal)} dias de cadena
+          {decimal(cadena.duracionTotal)} días de cadena
         </span>
         {cadena.atrasados > 0 ? (
           <span style={{ color: "var(--color-peligro)" }}>
-            <strong>{cadena.atrasados}</strong> por detras del plan, costando ya{" "}
-            <strong>{cadena.atrasoAcumulado} dia(s)</strong> de la fecha de entrega
+            <strong>{cadena.atrasados}</strong> por detrás del plan, costando ya{" "}
+            <strong>{cadena.atrasoAcumulado} día(s)</strong> de la fecha de entrega
           </span>
         ) : (
           <span style={{ color: "var(--color-exito)" }}>
-            Ninguna va por detras del plan
+            Ninguna va por detrás del plan
           </span>
         )}
       </div>
@@ -54,7 +54,7 @@ export function CadenaCritica({ cadena }: { cadena: Cadena }) {
               <strong>{c.capitulo}</strong> ({c.tareas})
             </span>
           ))}
-          . Ahi es donde un dia perdido es un dia de obra perdido.
+          . Ahí es donde un día perdido es un día de obra perdido.
         </p>
       )}
 
@@ -121,14 +121,14 @@ export function CadenaCritica({ cadena }: { cadena: Cadena }) {
                 <span
                   className="font-semibold tabular-nums whitespace-nowrap"
                   style={{ color: "var(--color-peligro)" }}
-                  title="Dias de la fecha de entrega que esta costando este eslabon"
+                  title="Días de la fecha de entrega que está costando este eslabón"
                 >
                   &minus;{e.diasAtraso} d
                 </span>
               )}
 
               <span className="w-20 shrink-0 text-right text-xs tabular-nums opacity-50">
-                dia {decimal(e.acumuladoDias, "")}
+                día {decimal(e.acumuladoDias, "")}
               </span>
             </li>
           );
@@ -137,10 +137,10 @@ export function CadenaCritica({ cadena }: { cadena: Cadena }) {
 
       {atrasoTotal > 0 && (
         <p className="text-xs opacity-60">
-          Los {cadena.atrasoAcumulado} dias son la suma de todos los eslabones
+          Los {cadena.atrasoAcumulado} días son la suma de todos los eslabones
           atrasados, y por tanto el TECHO del retraso: los que van en ramas
-          paralelas no se suman entre si, solo cuenta la peor. La cifra sirve
-          para saber cuanto hay en juego, no para fijar una fecha nueva.
+          paralelas no se suman entre sí, solo cuenta la peor. La cifra sirve
+          para saber cuánto hay en juego, no para fijar una fecha nueva.
         </p>
       )}
     </div>

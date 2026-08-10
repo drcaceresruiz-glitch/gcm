@@ -24,8 +24,8 @@ export interface Columna {
  * tipo distinto y `c.fija` deja de existir en la mitad de ellas.
  */
 export const COLUMNAS = [
-  { clave: "codigo", etiqueta: "Codigo", fija: true, alineadaDerecha: false },
-  { clave: "descripcion", etiqueta: "Descripcion", fija: true, alineadaDerecha: false },
+  { clave: "codigo", etiqueta: "Código", fija: true, alineadaDerecha: false },
+  { clave: "descripcion", etiqueta: "Descripción", fija: true, alineadaDerecha: false },
   { clave: "modalidad", etiqueta: "Modalidad", fija: false, alineadaDerecha: false },
   { clave: "unidad", etiqueta: "Und.", fija: false, alineadaDerecha: false },
   { clave: "metrado", etiqueta: "Metrado", fija: false, alineadaDerecha: true },

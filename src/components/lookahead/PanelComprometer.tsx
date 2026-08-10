@@ -214,7 +214,7 @@ export function PanelComprometer({
 
       {!avisos && sinLiberar > 0 && (
         <p className="text-sm" style={{ color: "var(--color-alerta)" }}>
-          {sinLiberar} de las elegidas aun no estan listas: se pedira confirmar.
+          {sinLiberar} de las elegidas aún no están listas: se pedirá confirmar.
         </p>
       )}
 
