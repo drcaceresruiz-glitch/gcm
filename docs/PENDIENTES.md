@@ -25,7 +25,14 @@ El mecanismo y sus cuatro reglas estan en `REVELADO-REACT.md`. **Leelo antes
 de anadir otro `loading.tsx` o `<Suspense>`**, y sobre todo si algun dia se
 actualiza React: `$RB` y `$RV` son internos, no API publica.
 
-### El despliegue no borra nada
+### ~~El despliegue no borra nada~~ SCRIPT LISTO, FALTA CABLEARLO
+
+`scripts/desplegar.sh` (10 de agosto) descomprime a un directorio de
+preparacion y hace un intercambio atomico con `mv`, con lo que los restos de
+compilaciones viejas desaparecen. **Aun no esta cableado**: ni el workflow lo
+sube ni el cron lo invoca. Hasta entonces sigue vigente lo de abajo.
+
+### El despliegue no borra nada (mientras el script no este cableado)
 
 `tar -xzf` descomprime ENCIMA del arbol anterior. Los ficheros de
 compilaciones viejas se quedan para siempre. Comprobado en produccion: en
@@ -52,7 +59,52 @@ proceso mucho antes; por eso ningun despliegue del dia llego a aplicarse.
 
 ---
 
-## 2. Defectos conocidos, sin arreglar
+## 2. Cierre y arranque de obra (empezado el 10 de agosto)
+
+Lo hecho: una obra `CERRADA` ya no admite NINGUNA escritura. El guard
+compartido es `motivoSiObraCerrada` (`src/services/obra-abierta.ts`) —devuelve
+el texto del motivo, no un booleano, para que todos los servicios den el mismo
+mensaje—. Cubre mapeo, revisiones, movimientos, importacion, ordenes,
+plan semanal, encargos, calendario, lookahead y cronograma; partidas, obras y
+la importacion del cronograma usan `obraAdmiteCambios` directo porque ya
+cargaban el estado. Ademas `requisitosParaEjecutar` bloquea pasar a
+EN_EJECUCION sin presupuesto (cronograma y linea base solo avisan).
+
+Lo que falta:
+
+- **Requisitos de cierre**: no permitir cerrar con valorizaciones, pagos o
+  tareas pendientes; listar lo que falta igual que al arrancar.
+- **Acta de cierre** con lecciones aprendidas (auditoria y aprendizaje).
+- **Repositorio de obras cerradas**: listar, buscar y revisar en solo
+  lectura, con estadisticas comparadas.
+- **¿Reabrir?** Hoy una obra cerrada por error no tiene salida. Propuesta:
+  permitirlo con permiso propio y quedando en la auditoria. Sin decidir.
+- **Eliminar obra**: el usuario borro su obra de prueba por SQL; en la app no
+  debe existir el borrado cuando este en produccion real.
+
+## 3. Cronograma: opcion B (decidida el 10 de agosto)
+
+Project **solo siembra** el plan una vez; despues se edita y se corta siempre
+desde la app. Para que eso sea posible GCM tiene que calcular por si mismo lo
+que hoy lee del archivo:
+
+- `porcentajePlaneado` por tarea a una fecha dada.
+- Camino critico (`esCritico`) y holgura.
+- Motor de fechas que respete el calendario laboral de la obra
+  (`calendario.service` ya guarda los dias laborables).
+- Editor manual con dependencias y recalculo automatico (ya decidido:
+  arrastrar y soltar llega despues, el motor es lo primero).
+
+## 4. Importacion de presupuesto (Excel)
+
+- Verificar de punta a punta que importa TODO correctamente.
+- Plantilla ideal descargable para llenar e importar al crear la obra.
+- Permitir corregir, editar, eliminar y crear partidas tras importar (la
+  edicion existe; falta revisarla contra la importacion).
+
+---
+
+## 5. Defectos conocidos, sin arreglar
 
 - **`moduloConDatos` duplica las guardas de `ModuloContenido`**
   (`components/tablero/modulos.tsx`). Estan pegadas y comentadas a proposito,
@@ -77,7 +129,7 @@ proceso mucho antes; por eso ningun despliegue del dia llego a aplicarse.
 
 ---
 
-## 3. Documentacion
+## 6. Documentacion
 
 - **`MANUAL.md` quedo atras el 10 de agosto.** Describe el panel como si
   cargara los once modulos siempre, y no menciona las pestanas en dos niveles
@@ -87,7 +139,7 @@ proceso mucho antes; por eso ningun despliegue del dia llego a aplicarse.
 
 ---
 
-## 4. Seguridad
+## 7. Seguridad
 
 Anotado antes del 10 de agosto, sin tocar:
 
@@ -102,7 +154,7 @@ Anotado antes del 10 de agosto, sin tocar:
 
 ---
 
-## 5. Funcionalidad pendiente
+## 8. Funcionalidad pendiente
 
 | | Que es | Migracion |
 |---|---|---|
@@ -116,7 +168,7 @@ Anotado antes del 10 de agosto, sin tocar:
 
 ---
 
-## 6. Limitaciones del asistente
+## 9. Limitaciones del asistente
 
 Para que ninguna sesion futura pierda tiempo redescubriendolas:
 
