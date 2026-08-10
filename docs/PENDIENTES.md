@@ -156,15 +156,14 @@ de proximos recordatorios) → Notas con adjuntos → Notificaciones.
 
 - **Ortografía: el sitio entero se escribió sin tildes** (convención heredada
   por miedo a la codificación, que ya no aplica: UTF-8 de punta a punta y
-  prod lo sirve bien). El usuario lo señaló el 10 de agosto. Tanda 1 hecha:
-  portada, lema del login, tablero completo (etiquetas, notas y tarjetas),
-  riel de la obra y pestañas. Faltan: **tanda 2** formularios y páginas de
-  obra (presupuesto, cronograma, órdenes, plan semanal, lookahead,
-  proveedores, movimientos, revisiones, empresa, perfil); **tanda 3**
-  mensajes de error de los servicios —OJO: los textos de `src/lib` están
-  fijados por tests; cambiarlos exige actualizar los tests en el MISMO
-  commit—; **tanda 4** MANUAL.md y docs. Regla: solo texto visible —no tocar
-  claves internas, rutas, enums de Prisma ni nombres de cookies—.
+  prod lo sirve bien). El usuario lo señaló el 10 de agosto. **Tandas 1 y 2
+  hechas y verificadas en prod** (portada, login, tablero, riel, pestañas, y
+  las 109 páginas/componentes: ~440 cadenas). Faltan: **tanda 3** mensajes de
+  los servicios y textos de `src/lib` —OJO: están fijados por tests;
+  cambiarlos exige actualizar los tests en el MISMO commit; incluye el "Sin
+  capitulo" que se dejó a propósito en dos páginas para no divergir de
+  `control-avance.ts:361`—; **tanda 4** MANUAL.md y docs. Regla: solo texto
+  visible —no tocar claves internas, rutas, enums de Prisma ni cookies—.
 
 - **`moduloConDatos` duplica las guardas de `ModuloContenido`**
   (`components/tablero/modulos.tsx`). Estan pegadas y comentadas a proposito,
