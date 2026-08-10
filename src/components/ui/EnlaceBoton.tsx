@@ -22,13 +22,18 @@ export function EnlaceBoton({
   href,
   children,
   icono: Icono,
+  posicionIcono = "derecha",
   tamano = "md",
   className = "",
 }: {
   href: string;
   children: React.ReactNode;
-  /// Icono lucide opcional, a la derecha del texto.
+  /// Icono lucide opcional.
   icono?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  /// A la DERECHA cuando el icono dice "vas a otro sitio" (un chevron); a la
+  /// IZQUIERDA cuando nombra la accion misma (un lapiz, una impresora). Puesto
+  /// del lado que no le toca, el icono se lee como parte de la palabra.
+  posicionIcono?: "izquierda" | "derecha";
   tamano?: "sm" | "md";
   className?: string;
 }) {
@@ -52,8 +57,13 @@ export function EnlaceBoton({
         outlineColor: "var(--color-marca-600)",
       }}
     >
+      {Icono && posicionIcono === "izquierda" && (
+        <Icono className="size-3.5 shrink-0" aria-hidden={true} />
+      )}
       {children}
-      {Icono && <Icono className="size-3.5 shrink-0" aria-hidden={true} />}
+      {Icono && posicionIcono === "derecha" && (
+        <Icono className="size-3.5 shrink-0" aria-hidden={true} />
+      )}
     </Link>
   );
 }

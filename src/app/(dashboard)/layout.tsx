@@ -47,39 +47,38 @@ export default async function DashboardLayout({
       href: "/empresa/proveedores",
       etiqueta: "Proveedores",
       clave: "proveedores",
+      grupo: "compras",
     },
     puede(sesion, "orden:leer") && {
       href: "/empresa/formas-pago",
       etiqueta: "Formas de pago",
       clave: "formasPago",
-    },
-    puede(sesion, "empresa:editar") && {
-      href: "/empresa/datos",
-      etiqueta: "Datos de la empresa",
-      clave: "empresa",
+      grupo: "compras",
     },
     puede(sesion, "usuario:leer") && {
       href: "/empresa/usuarios",
       etiqueta: "Usuarios",
       clave: "usuarios",
+      grupo: "personas",
     },
     puede(sesion, "permiso:leer") && {
       href: "/empresa/permisos",
       etiqueta: "Permisos",
       clave: "permisos",
+      grupo: "personas",
     },
     puede(sesion, "usuario:editar") && {
       href: "/empresa/solicitudes",
       etiqueta: "Solicitudes de perfil",
       clave: "solicitudes",
+      grupo: "personas",
       badge: pendientes,
     },
-    // Quien opera GCM. No va por `puede()` porque no es un permiso DENTRO de
-    // la empresa: esta por encima de ella y se concede en el servidor.
-    sesion.esOperador && {
-      href: "/operador",
-      etiqueta: "Constructoras",
-      clave: "constructoras",
+    puede(sesion, "empresa:editar") && {
+      href: "/empresa/datos",
+      etiqueta: "Datos de la empresa",
+      clave: "empresa",
+      grupo: "empresa",
     },
   ].filter(Boolean) as EnlaceEmpresa[];
 
@@ -125,6 +124,14 @@ export default async function DashboardLayout({
 
           <Navegacion
             empresa={enlaces}
+            // Quien opera GCM. No va por `puede()` porque no es un permiso
+            // DENTRO de la empresa: esta por encima de ella y se concede en el
+            // servidor. Por lo mismo tampoco va en el menu de la empresa.
+            operador={
+              sesion.esOperador
+                ? { href: "/operador", etiqueta: "Constructoras" }
+                : null
+            }
             usuario={{
               nombre: `${sesion.nombres} ${sesion.apellidos}`,
               rol: sesion.role,

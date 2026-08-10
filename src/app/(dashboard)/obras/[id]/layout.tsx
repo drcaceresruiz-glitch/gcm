@@ -1,11 +1,11 @@
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
 import { CalendarDays, MapPin, Pencil } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
 import { fechaCorta } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 import {
   PestanasObra,
   type Pestana,
@@ -141,14 +141,16 @@ export default async function ObraLayout({
           {/* Editar los datos de la obra (nombre, plazo, codigo...). Nace para
               poder corregir la fecha fin, que gobierna el plazo del panel. */}
           {puede(sesion, "obra:editar") && (
-            <Link
-              href={`/obras/${obra.id}/editar`}
-              className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium"
-              style={{ color: "var(--color-marca-600)" }}
-            >
-              <Pencil className="size-3.5" aria-hidden="true" />
-              Editar datos de la obra
-            </Link>
+            <div className="mt-3">
+              <EnlaceBoton
+                href={`/obras/${obra.id}/editar`}
+                icono={Pencil}
+                posicionIcono="izquierda"
+                tamano="sm"
+              >
+                Editar datos de la obra
+              </EnlaceBoton>
+            </div>
           )}
 
           {/* Eliminar la obra solo tiene sentido en planificacion: aun no ha

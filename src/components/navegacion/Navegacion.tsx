@@ -30,6 +30,16 @@ import { accionCerrarSesion } from "@/app/(auth)/acciones";
  * y por debajo de `sm` ambos se sustituyen por un cajon donde las etiquetas
  * SI se leen.
  *
+ * El desplegable de empresa llego a tener SIETE entradas seguidas, sin
+ * relacion entre si: proveedores, formas de pago, datos, usuarios, permisos,
+ * solicitudes y constructoras. Una lista plana de siete hay que leerla entera
+ * cada vez, porque nada dice donde mirar. Ahora van en grupos con su
+ * titulillo y el ojo salta al grupo.
+ *
+ * Y «Constructoras» sale del menu de empresa: da de alta OTRAS empresas, esta
+ * por encima de esta y no dentro. Estaba ahi por ser el ultimo en llegar, que
+ * es como se forman los cajones de sastre.
+ *
  * Que enlaces llegan aqui lo decide el layout con `puede()`: este componente
  * no conoce los permisos, solo pinta lo que le dan.
  */
@@ -42,14 +52,28 @@ const ICONOS = {
   empresa: Building2,
   usuarios: UsersRound,
   permisos: ShieldCheck,
-  constructoras: Landmark,
   solicitudes: ClipboardCheck,
 } as const;
+
+/**
+ * Los grupos del menu de empresa, en el orden en que se pintan.
+ *
+ * De lo que se usa a diario a lo que se toca una vez al ano: primero la
+ * compra, luego las personas, y al final los datos de la empresa.
+ */
+export const GRUPOS_EMPRESA = [
+  { clave: "compras", titulo: "Compras" },
+  { clave: "personas", titulo: "Personas" },
+  { clave: "empresa", titulo: "Empresa" },
+] as const;
+
+export type GrupoEmpresa = (typeof GRUPOS_EMPRESA)[number]["clave"];
 
 export interface EnlaceEmpresa {
   href: string;
   etiqueta: string;
   clave: keyof typeof ICONOS;
+  grupo: GrupoEmpresa;
   /// Numerito a la derecha del enlace, para pendientes que reclaman atencion.
   /// Se omite cuando es cero: un badge en cero solo distrae.
   badge?: number;
@@ -57,23 +81,78 @@ export interface EnlaceEmpresa {
 
 interface Props {
   empresa: EnlaceEmpresa[];
+  /// Alta de constructoras. Null salvo para quien opera GCM.
+  operador: { href: string; etiqueta: string } | null;
   usuario: { nombre: string; rol: string; foto: string | null };
 }
 
-export function Navegacion({ empresa, usuario }: Props) {
+/**
+ * Las opciones agrupadas, saltando los grupos que se quedaron sin ninguna.
+ *
+ * Un titulillo sobre una seccion vacia es peor que no agrupar: promete algo
+ * que no esta. Y con un solo grupo no se pinta cabecera ninguna, porque
+ * separar de nada no separa.
+ */
+function OpcionesAgrupadas({ empresa }: { empresa: EnlaceEmpresa[] }) {
+  const conContenido = GRUPOS_EMPRESA.map((g) => ({
+    ...g,
+    enlaces: empresa.filter((e) => e.grupo === g.clave),
+  })).filter((g) => g.enlaces.length > 0);
+
+  const agrupar = conContenido.length > 1;
+
+  return (
+    <>
+      {conContenido.map((g, i) => (
+        <div key={g.clave}>
+          {agrupar && (
+            <>
+              {i > 0 && (
+                <div
+                  className="my-1 border-t"
+                  style={{ borderColor: "var(--borde)" }}
+                />
+              )}
+              <p className="px-3 pt-1.5 pb-1 text-xs font-medium tracking-wide uppercase opacity-50">
+                {g.titulo}
+              </p>
+            </>
+          )}
+          {g.enlaces.map((e) => (
+            <Opcion key={e.href} enlace={e} />
+          ))}
+        </div>
+      ))}
+    </>
+  );
+}
+
+export function Navegacion({ empresa, operador, usuario }: Props) {
   const [cajonAbierto, setCajonAbierto] = useState(false);
 
   return (
     <>
       <div className="hidden items-center gap-3 sm:flex">
+        {/* Fuera del menu de empresa y a su izquierda: se opera GCM o se
+            trabaja en una obra, y quien hace lo primero no deberia tener que
+            entrar en «Empresa» —la suya— para dar de alta otra distinta. */}
+        {operador && (
+          <Link
+            href={operador.href}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <Landmark className="size-4 opacity-70" aria-hidden="true" />
+            {operador.etiqueta}
+          </Link>
+        )}
+
         {empresa.length > 0 && (
           <MenuDesplegable
             etiqueta="Empresa"
             icono={<Building2 className="size-4" aria-hidden="true" />}
           >
-            {empresa.map((e) => (
-              <Opcion key={e.href} enlace={e} />
-            ))}
+            <OpcionesAgrupadas empresa={empresa} />
           </MenuDesplegable>
         )}
 
@@ -150,9 +229,19 @@ export function Navegacion({ empresa, usuario }: Props) {
 
             <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
 
-            {empresa.map((e) => (
-              <Opcion key={e.href} enlace={e} />
-            ))}
+            {operador && (
+              <>
+                <EnlaceMenu href={operador.href} icono={Landmark}>
+                  {operador.etiqueta}
+                </EnlaceMenu>
+                <div
+                  className="my-1 border-t"
+                  style={{ borderColor: "var(--borde)" }}
+                />
+              </>
+            )}
+
+            <OpcionesAgrupadas empresa={empresa} />
 
             <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
             <SelectorApariencia />
