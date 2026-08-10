@@ -95,7 +95,36 @@ que hoy lee del archivo:
 - Editor manual con dependencias y recalculo automatico (ya decidido:
   arrastrar y soltar llega despues, el motor es lo primero).
 
-## 4. Importacion de presupuesto (Excel)
+## 4. Evidencia fotografica con QR (plan aprobado el 10 de agosto)
+
+Decision de enfoque: NO una galeria suelta —la foto se ADOSA al dato donde se
+decide (la restriccion que se libera, la causa de no cumplimiento)— y la
+galeria es una VISTA sobre esa evidencia. Orden acordado con el usuario:
+primero ortografia tanda 2 y plantilla Excel, luego esto.
+
+- **Fase A (nucleo)**: modelo FotoEvidencia (obra, empresa, restriccionId |
+  compromisoId, ruta, miniatura, nota, quien, cuando). Subida desde el
+  telefono con compresion EN EL NAVEGADOR (~1600 px, JPEG 80 → 150-400 KB).
+  Permisos: lookahead:gestionar / plan_semanal:gestionar; candado CERRADA;
+  auditoria. UI: clip en la celda de restriccion y en el cierre de semana.
+  **QR por tarea**: boton "Imprimir codigos" en PTS/Lookahead → hoja
+  imprimible con QR por fila que abre el enlace profundo de subida de ESA
+  restriccion (la sesion sigue mandando: sin login no se ve nada; sin enlaces
+  magicos). QR generado en servidor, sin CDN.
+- **Fase B**: pestana Evidencia de la obra: vista agregada con filtros.
+- **Fase C**: estandares visuales (quality gates), dentro de Fase 2 documental.
+- **Fase D**: rol cliente solo lectura + reconocimiento de cuadrillas.
+
+Restricciones tecnicas que NO se pueden olvidar:
+1. Las fotos viven FUERA del arbol de la app (/home/drcacere/gcm-archivos):
+   el deploy extrae un tar encima y el futuro desplegar.sh hace swap atomico
+   que BORRA el arbol. Servidas por route handler que valida sesion, permiso
+   y EMPRESA —nunca publicas por URL adivinable—.
+2. Cuota de disco cPanel: limite por archivo y contador por obra visible.
+3. Respaldo: las fotos no estan en repo ni tar; sumarlas a las copias del
+   servidor junto al volcado de la base.
+
+## 5. Importacion de presupuesto (Excel)
 
 - Verificar de punta a punta que importa TODO correctamente.
 - Plantilla ideal descargable para llenar e importar al crear la obra.
@@ -104,7 +133,7 @@ que hoy lee del archivo:
 
 ---
 
-## 5. Defectos conocidos, sin arreglar
+## 6. Defectos conocidos, sin arreglar
 
 - **Ortografía: el sitio entero se escribió sin tildes** (convención heredada
   por miedo a la codificación, que ya no aplica: UTF-8 de punta a punta y
@@ -141,7 +170,7 @@ que hoy lee del archivo:
 
 ---
 
-## 6. Documentacion
+## 7. Documentacion
 
 - **`MANUAL.md` quedo atras el 10 de agosto.** Describe el panel como si
   cargara los once modulos siempre, y no menciona las pestanas en dos niveles
@@ -151,7 +180,7 @@ que hoy lee del archivo:
 
 ---
 
-## 7. Seguridad
+## 8. Seguridad
 
 Anotado antes del 10 de agosto, sin tocar:
 
@@ -166,7 +195,7 @@ Anotado antes del 10 de agosto, sin tocar:
 
 ---
 
-## 8. Funcionalidad pendiente
+## 9. Funcionalidad pendiente
 
 | | Que es | Migracion |
 |---|---|---|
@@ -180,7 +209,7 @@ Anotado antes del 10 de agosto, sin tocar:
 
 ---
 
-## 9. Limitaciones del asistente
+## 10. Limitaciones del asistente
 
 Para que ninguna sesion futura pierda tiempo redescubriendolas:
 
