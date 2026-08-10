@@ -37,15 +37,15 @@ export function PanelComprometer({
   semanasAbiertas,
   fechaProximoCorte,
   onCerrar,
-  onHecho,
 }: {
   obraId: string;
   seleccionadas: TareaSeleccionada[];
   semanasAbiertas: SemanaAbierta[];
   /// Fecha (ISO corta) de la semana que se abriria si no hay ninguna.
   fechaProximoCorte: string;
+  /// Cierra el panel Y limpia la seleccion (por eso no se limpia al terminar:
+  /// el aviso de exito tiene que poder leerse).
   onCerrar: () => void;
-  onHecho: () => void;
 }) {
   const [planId, setPlanId] = useState<string>(semanasAbiertas[0]?.id ?? "");
   const [avisos, setAvisos] = useState<{
@@ -81,7 +81,6 @@ export function PanelComprometer({
           omitidos: r.omitidos,
         });
         setAvisos(null);
-        onHecho();
         return;
       }
       if (r.requiereConfirmacion) {

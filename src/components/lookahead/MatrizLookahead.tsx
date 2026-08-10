@@ -201,8 +201,13 @@ export function MatrizLookahead({
           seleccionadas={seleccionadas}
           semanasAbiertas={semanasAbiertas}
           fechaProximoCorte={fechaProximoCorte}
-          onCerrar={() => setAbrirPanel(false)}
-          onHecho={() => setElegidas(new Set())}
+          // La seleccion se limpia al CERRAR, no al comprometer: si se limpiara
+          // antes, el panel se quedaria sin tareas y se desmontaria llevandose
+          // el aviso de "listo, N comprometidas" sin que diera tiempo a leerlo.
+          onCerrar={() => {
+            setAbrirPanel(false);
+            setElegidas(new Set());
+          }}
         />
       )}
 
