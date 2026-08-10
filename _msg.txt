@@ -1,0 +1,15 @@
+Propagacion PTS a avance real, indicadores EVM desde GCM y adelantar tareas
+
+- Al cerrar el Plan Semanal se registra el % alcanzado real por tarea (campo en
+  el cierre, pre-llenado con la meta, editable; se guarda aunque no se cumpla).
+  Los avances quedan enlazados al plan (AvanceTarea.planSemanalId, migracion
+  avance_desde_plan_semanal) para reemplazarlos al reabrir/re-cerrar sin duplicar
+  y no tocar los avances manuales.
+- La curva S, el EVM (SPI/CPI, valor ganado) y el "avance al corte" del panel
+  avanzan desde el ULTIMO avance semanal de GCM, ya no dependen de reimportar
+  Project: datosCurvaS expone puntoActual; datosEvm lo usa para EV/PV y arma la
+  serie EV desde el real semanal; avanceFisicoPorObra mide a hoy.
+- Adelantar tareas: el desplegable del plan agrupa "De esta semana",
+  "Se pueden adelantar" (sin restriccion) y "Con restriccion" (predecesora
+  pendiente, con aviso). Logica pura restriccionDeTarea (FC/CC gobiernan el
+  inicio; FF/CF no) con tests.
