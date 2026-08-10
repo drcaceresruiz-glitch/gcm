@@ -1,7 +1,10 @@
 # Estado del proyecto GCM
 
-Documento de traspaso. Léelo antes de tocar nada: recoge lo construido, por
-qué está construido así, y qué falta.
+Documento de traspaso. Léelo antes de tocar nada: recoge lo construido y por
+qué está construido así.
+
+**Lo que FALTA vive en [`PENDIENTES.md`](PENDIENTES.md)**, aparte, para poder
+tacharlo sin reescribir esto.
 
 Última actualización: 10 de agosto de 2026.
 
@@ -121,14 +124,22 @@ constructoras están suspendidas para cualquiera que supiera un correo.
 - **Cierre por cantidad**: la semana pregunta cuánto se EJECUTÓ, y la semana
   cerrada muestra «90 / 120 m2».
 
-### El tablero ya habla de Last Planner (APAGADO, ver incidente)
+### El tablero ya habla de Last Planner
 
-> **Los tres modulos estan apagados** con `CARGAR_LAST_PLANNER = false` en
-> `tablero.service.ts`, como precaucion durante el incidente del 10 de agosto.
-> Al final no eran la causa, pero antes de reencenderlos hay que hacer las dos
-> cosas que faltaban: cargar solo los modulos ENCENDIDOS (el servidor ya lee la
-> cookie) y compartir la lectura del cronograma en vez de que
-> `obtenerLookahead` la repita.
+> Se apagaron durante el incidente del 10 de agosto y se reencendieron el
+> mismo dia, con las dos condiciones cumplidas:
+>
+> 1. **`datosTablero` recibe los modulos encendidos** y carga solo lo suyo. El
+>    diseno anterior traia los datos de los once siempre, para que encender
+>    uno no costara una vuelta al servidor. Ahora la paga quien enciende —una
+>    recarga, una vez— en vez de cobrarsela a todos en cada carga.
+> 2. **La confiabilidad ya no relee el cronograma.**
+>    `confiabilidadDeVentana` recibe las tareas que el tablero acaba de leer y
+>    hace UNA consulta, frente a las cuatro de `obtenerLookahead` —la primera
+>    de las cuales era el cronograma entero—.
+>
+> El numero sigue siendo el mismo que el de la pantalla del Lookahead: ambos
+> derivan el estado con `estadoDeTarea` y agregan con `confiabilidad`.
 
 
 Enseñaba avance, plazo y dinero —las tres cifras del control clasico— y ni una
