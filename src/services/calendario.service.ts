@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { validarCalendario, type DiaLaboral } from "@/lib/calendario";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -56,6 +57,9 @@ export async function guardarCalendario(
   if (!puede(sesion, "obra:editar")) {
     return { ok: false, error: "No tienes permiso para editar la obra." };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },

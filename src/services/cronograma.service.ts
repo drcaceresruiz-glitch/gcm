@@ -8,6 +8,7 @@ import {
   type Medida,
 } from "@/lib/cronograma";
 import { normalizarDecimal, restar } from "@/lib/decimal";
+import { obraAdmiteCambios, OBRA_CERRADA } from "@/lib/obras";
 import { hoy as hoyCalendario } from "@/utils/fechas";
 import {
   curvaPlaneada,
@@ -21,6 +22,7 @@ import {
   type PuntoDiario,
 } from "@/lib/curva-s";
 import type { ResultadoAnalisisCronograma } from "@/lib/msproject-xml";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -91,10 +93,14 @@ export async function importarCronograma(
   // cronograma en la obra de otro cliente manipulando el identificador.
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
-    select: { id: true },
+    select: { id: true, estado: true },
   });
 
   if (!obra) return { ok: false, error: "Obra no encontrada." };
+
+  if (!obraAdmiteCambios(obra.estado)) {
+    return { ok: false, error: OBRA_CERRADA };
+  }
 
   const fechaCorte = fechaDeObra(analisis.fechaCorte);
 
@@ -408,6 +414,9 @@ export async function marcarLineaBase(
     return { ok: false, error: "No tienes permiso para fijar la linea base." };
   }
 
+  const cerradaBase = await motivoSiObraCerrada(sesion, obraId);
+  if (cerradaBase) return { ok: false, error: cerradaBase };
+
   // El corte tiene que ser de esta obra y de esta empresa: sin esta
   // comprobacion, con el identificador de un corte ajeno se marcaria base en
   // la obra de otro.
@@ -537,6 +546,9 @@ export async function configurarDiaCorte(
     return { ok: false, error: "El dia de corte debe estar entre 1 (lunes) y 7 (domingo)." };
   }
 
+  const cerradaDia = await motivoSiObraCerrada(sesion, obraId);
+  if (cerradaDia) return { ok: false, error: cerradaDia };
+
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
     select: { id: true, diaCorteSemanal: true },
@@ -585,6 +597,9 @@ export async function registrarAvance(
   if (!puede(sesion, "avance:registrar")) {
     return { ok: false, error: "No tienes permiso para reportar avance." };
   }
+
+  const cerradaAvance = await motivoSiObraCerrada(sesion, obraId);
+  if (cerradaAvance) return { ok: false, error: cerradaAvance };
 
   const porcentaje = normalizarDecimal(datos.porcentaje, 2);
   if (porcentaje === null) {

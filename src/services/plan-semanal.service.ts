@@ -27,6 +27,7 @@ import type {
   CausaNoCumplimiento,
   EstadoLookahead,
 } from "@/generated/prisma/enums";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -420,6 +421,9 @@ export async function crearPlanSemanal(
     return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
   }
 
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   if (!/^\d{4}-\d{2}-\d{2}$/.test(datos.fechaCorte)) {
     return { ok: false, error: "Falta la fecha de la semana." };
   }
@@ -507,6 +511,9 @@ export async function guardarCompromisos(
   if (!puede(sesion, "plan_semanal:gestionar")) {
     return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   const plan = await prisma.planSemanal.findFirst({
     where: { id: planId, projectId: obraId, project: { companyId: sesion.companyId } },
@@ -659,6 +666,9 @@ export async function cerrarPlanSemanal(
     return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
   }
 
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   const plan = await prisma.planSemanal.findFirst({
     where: { id: planId, projectId: obraId, project: { companyId: sesion.companyId } },
     select: {
@@ -794,6 +804,9 @@ export async function reabrirPlanSemanal(
     return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
   }
 
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   const { count } = await prisma.planSemanal.updateMany({
     where: { id: planId, projectId: obraId, project: { companyId: sesion.companyId } },
     data: { estado: "ABIERTO", cerradoPor: null, cerradoAt: null },
@@ -829,6 +842,9 @@ export async function eliminarPlanSemanal(
   if (!puede(sesion, "plan_semanal:gestionar")) {
     return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   const plan = await prisma.planSemanal.findFirst({
     where: { id: planId, projectId: obraId, project: { companyId: sesion.companyId } },
@@ -988,6 +1004,9 @@ export async function comprometerAlPts(
   if (!puede(sesion, "plan_semanal:gestionar")) {
     return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   const uids = [...new Set(datos.uids.filter((u) => Number.isSafeInteger(u)))];
   if (uids.length === 0) return { ok: false, error: "No elegiste ninguna tarea." };

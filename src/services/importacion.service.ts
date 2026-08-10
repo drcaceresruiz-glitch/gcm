@@ -6,6 +6,7 @@ import {
   sumarHojas,
   calcularProfundidades,
 } from "@/lib/jerarquia-partidas";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { FilaImportada } from "@/lib/excel-presupuesto";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -104,6 +105,9 @@ export async function aplicarImportacion(
   });
 
   if (!obra) return { ok: false, error: "Obra no encontrada." };
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   // Un presupuesto congelado no se toca. Cambiarlo invalidaria todos los
   // indicadores calculados contra el.

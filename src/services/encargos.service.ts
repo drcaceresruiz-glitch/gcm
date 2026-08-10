@@ -11,6 +11,7 @@ import {
   type ResumenEncargo,
   type Cobertura,
 } from "@/lib/encargos";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { EstadoEncargo, TipoImpuesto } from "@/generated/prisma/enums";
 
@@ -551,6 +552,9 @@ export async function crearEncargo(
     return { ok: false, error: "No tienes permiso para gestionar encargos." };
   }
 
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   const problema = validar(datos);
   if (problema) return { ok: false, error: problema };
 
@@ -653,6 +657,9 @@ export async function editarEncargo(
     return { ok: false, error: "No tienes permiso para gestionar encargos." };
   }
 
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   const problema = validar(datos);
   if (problema) return { ok: false, error: problema };
 
@@ -738,6 +745,9 @@ export async function cambiarEstadoEncargo(
     return { ok: false, error: "No tienes permiso para gestionar encargos." };
   }
 
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   const { count } = await prisma.encargoProveedor.updateMany({
     where: {
       id: encargoId,
@@ -783,6 +793,9 @@ export async function valorizarEncargo(
   if (!puede(sesion, "encargo:valorizar")) {
     return { ok: false, error: "No tienes permiso para valorizar encargos." };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   const pct = Number(datos.porcentaje);
   if (!Number.isFinite(pct) || pct < 0 || pct > 100) {

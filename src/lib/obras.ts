@@ -76,6 +76,113 @@ export function puedeTransicionarObra(desde: string, hacia: string): boolean {
 }
 
 /**
+ * Que le falta a una obra para poder ponerse en marcha.
+ *
+ * Hasta el 10 de agosto de 2026 no se comprobaba NADA: bastaba con que la
+ * transicion fuera legal. Una obra recien creada, con cero partidas y sin
+ * cronograma, podia pasar a "En ejecucion" y quedarse ahi produciendo
+ * indicadores vacios que en el panel no se distinguen de una obra que va mal:
+ * 0% de avance y S/ 0.00 de presupuesto se leen igual esten vacios o sean
+ * reales.
+ *
+ * EL PRESUPUESTO ES OBLIGATORIO y lo demas no, y la diferencia no es de
+ * grado. Sin partidas no hay contra que imputar una orden de compra ni contra
+ * que medir nada: el BAC es cero y todo el control economico se cae. El
+ * cronograma y la linea base, en cambio, pueden llegar despues sin romper
+ * nada; la obra real a veces arranca mientras se termina de montar el plan, y
+ * una puerta demasiado rigida solo consigue que alguien cargue datos de
+ * relleno para pasarla, que es peor que no tener puerta.
+ */
+export interface RequisitoObra {
+  clave: "presupuesto" | "cronograma" | "linea_base";
+  /// Que falta, en una linea.
+  falta: string;
+  /// Que NO va a funcionar si se arranca sin esto.
+  consecuencia: string;
+  /// Si impide arrancar o solo se avisa.
+  bloqueante: boolean;
+}
+
+export interface EstadoObraParaArrancar {
+  partidas: number;
+  tieneCronograma: boolean;
+  tieneLineaBase: boolean;
+}
+
+export function requisitosParaEjecutar(
+  estado: EstadoObraParaArrancar,
+): RequisitoObra[] {
+  const faltan: RequisitoObra[] = [];
+
+  if (estado.partidas === 0) {
+    faltan.push({
+      clave: "presupuesto",
+      falta: "El presupuesto no tiene ninguna partida.",
+      consecuencia:
+        "Sin partidas no hay contra que imputar las ordenes de compra ni con " +
+        "que calcular el valor ganado: el presupuesto de control seria cero.",
+      bloqueante: true,
+    });
+  }
+
+  if (!estado.tieneCronograma) {
+    faltan.push({
+      clave: "cronograma",
+      falta: "No hay cronograma cargado.",
+      consecuencia:
+        "No habra curva de avance, ni SPI, ni Lookahead, ni Plan Semanal: " +
+        "todo el Last Planner se apoya en las tareas del cronograma.",
+      bloqueante: false,
+    });
+  } else if (!estado.tieneLineaBase) {
+    // Solo se menciona si HAY cronograma: decirle a alguien que no ha cargado
+    // el plan que ademas no lo ha congelado es ruido.
+    faltan.push({
+      clave: "linea_base",
+      falta: "El cronograma no tiene linea base fijada.",
+      consecuencia:
+        "El plazo se medira contra el ultimo corte cargado, es decir, contra " +
+        "si mismo: siempre parecera que la obra va al dia.",
+      bloqueante: false,
+    });
+  }
+
+  return faltan;
+}
+
+/** Si algo impide arrancar. Lo demas son avisos que se pueden aceptar. */
+export function puedeArrancar(faltan: readonly RequisitoObra[]): boolean {
+  return !faltan.some((r) => r.bloqueante);
+}
+
+/**
+ * Si una obra admite cambios.
+ *
+ * Hasta el 10 de agosto de 2026 la pantalla decia "Cerrada: no admite mas
+ * cambios" y era MENTIRA: `CERRADA` solo impedia cambiar de estado. En una
+ * obra cerrada se podia seguir importando presupuesto, editando partidas,
+ * creando ordenes de compra y registrando avance. Un cartel que no se cumple
+ * es peor que no ponerlo: ensena a no creerse los carteles.
+ *
+ * Se declara aqui, en logica pura, para que el mismo criterio valga en la
+ * pantalla y en el servidor. La comprobacion que MANDA es la del servidor: la
+ * de la pantalla solo evita ofrecer un boton que va a fallar.
+ */
+export function obraAdmiteCambios(estado: string): boolean {
+  return estado !== "CERRADA";
+}
+
+/**
+ * El motivo, para no repetirlo distinto en cada servicio.
+ *
+ * Nombra la salida: sin ella, quien se topa con esto no sabe si ha hecho algo
+ * mal o si el sistema esta roto.
+ */
+export const OBRA_CERRADA =
+  "La obra esta cerrada y no admite cambios. El resultado de una obra " +
+  "cerrada es historia: modificarlo falsearia lo que de verdad paso.";
+
+/**
  * El verbo del boton que hace la transicion, no el nombre del estado destino.
  *
  * "Iniciar ejecucion" y "Reanudar" llevan al MISMO estado (EN_EJECUCION) pero

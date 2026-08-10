@@ -7,6 +7,8 @@ import {
   accionMarcarLineaBase,
   type EstadoLineaBase,
 } from "@/app/(dashboard)/obras/[id]/cronograma/acciones";
+import { Explicacion } from "@/components/ui/Explicacion";
+import { CONGELAR_CRONOGRAMA } from "@/lib/explicaciones";
 
 /**
  * Fijar (o re-fijar) una version del cronograma como linea base.
@@ -92,6 +94,12 @@ export function BotonLineaBase({
         <strong>PV y el SPI</strong> del valor ganado pasaran a medirse contra
         esta version. Si ya habia otra base, deja de serlo.
       </p>
+
+      {/* La explicacion completa, plegada. Quien ya sabe lo que hace no la
+          abre; quien no, no tiene que ir a buscarla a otra pantalla. */}
+      <div className="mt-3">
+        <Explicacion texto={CONGELAR_CRONOGRAMA} />
+      </div>
 
       {estado.error && (
         <div className="mt-2">

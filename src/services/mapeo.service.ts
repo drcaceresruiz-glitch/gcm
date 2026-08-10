@@ -10,6 +10,7 @@ import {
   type PartidaMapeable,
   type Propuesta,
 } from "@/lib/mapeo-partidas";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -173,6 +174,9 @@ export async function confirmarEnlace(
     return { ok: false, error: "No tienes permiso para editar el mapeo." };
   }
 
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
     select: { id: true },
@@ -247,6 +251,9 @@ export async function quitarEnlace(
   if (!puede(sesion, "cronograma:importar")) {
     return { ok: false, error: "No tienes permiso para editar el mapeo." };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   // El filtro por empresa va en el borrado mismo: sin el, bastaria con
   // cambiar el identificador de obra para deshacer el mapeo de otro cliente.

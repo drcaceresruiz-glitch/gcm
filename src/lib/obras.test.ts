@@ -7,7 +7,97 @@ import {
   puedeTransicionarObra,
   transicionesDeObra,
   etiquetaTransicionObra,
+  requisitosParaEjecutar,
+  puedeArrancar,
+  obraAdmiteCambios,
 } from "@/lib/obras";
+
+describe("una obra cerrada no admite cambios", () => {
+  it("solo CERRADA cierra la puerta", () => {
+    expect(obraAdmiteCambios("PLANIFICACION")).toBe(true);
+    expect(obraAdmiteCambios("EN_EJECUCION")).toBe(true);
+    expect(obraAdmiteCambios("PARALIZADA")).toBe(true);
+    expect(obraAdmiteCambios("CERRADA")).toBe(false);
+  });
+
+  it("paralizada SI admite cambios: esta parada, no terminada", () => {
+    // Una obra parada sigue teniendo papeleo pendiente que cerrar.
+    expect(obraAdmiteCambios("PARALIZADA")).toBe(true);
+  });
+
+  it("y de cerrada no se vuelve: no hay reabrir", () => {
+    // Si algun dia se anade, hay que decidirlo a proposito. Esta prueba esta
+    // aqui para que ese cambio no pase inadvertido.
+    expect(transicionesDeObra("CERRADA")).toEqual([]);
+  });
+});
+
+describe("requisitos para poner una obra en marcha", () => {
+  const completa = { partidas: 313, tieneCronograma: true, tieneLineaBase: true };
+
+  it("una obra completa no tiene nada pendiente", () => {
+    const faltan = requisitosParaEjecutar(completa);
+    expect(faltan).toEqual([]);
+    expect(puedeArrancar(faltan)).toBe(true);
+  });
+
+  it("sin partidas NO se puede arrancar", () => {
+    // El caso real: una obra recien creada que podia pasar a ejecucion con el
+    // presupuesto vacio y quedarse ahi con el BAC en cero.
+    const faltan = requisitosParaEjecutar({ ...completa, partidas: 0 });
+    expect(puedeArrancar(faltan)).toBe(false);
+    expect(faltan[0]?.clave).toBe("presupuesto");
+    expect(faltan[0]?.bloqueante).toBe(true);
+  });
+
+  it("sin cronograma se avisa, pero se deja arrancar", () => {
+    const faltan = requisitosParaEjecutar({
+      ...completa,
+      tieneCronograma: false,
+      tieneLineaBase: false,
+    });
+    expect(puedeArrancar(faltan)).toBe(true);
+    expect(faltan.map((r) => r.clave)).toEqual(["cronograma"]);
+  });
+
+  it("sin cronograma NO se menciona la linea base", () => {
+    // Decirle a alguien que no ha cargado el plan que ademas no lo ha
+    // congelado es ruido: son la misma tarea pendiente.
+    const faltan = requisitosParaEjecutar({
+      ...completa,
+      tieneCronograma: false,
+      tieneLineaBase: false,
+    });
+    expect(faltan.some((r) => r.clave === "linea_base")).toBe(false);
+  });
+
+  it("con cronograma pero sin congelar, se avisa de la linea base", () => {
+    const faltan = requisitosParaEjecutar({ ...completa, tieneLineaBase: false });
+    expect(puedeArrancar(faltan)).toBe(true);
+    expect(faltan.map((r) => r.clave)).toEqual(["linea_base"]);
+  });
+
+  it("acumula lo bloqueante y lo que solo avisa", () => {
+    const faltan = requisitosParaEjecutar({
+      partidas: 0,
+      tieneCronograma: false,
+      tieneLineaBase: false,
+    });
+    expect(faltan.map((r) => r.clave)).toEqual(["presupuesto", "cronograma"]);
+    expect(puedeArrancar(faltan)).toBe(false);
+  });
+
+  it("cada requisito dice que se rompe, no solo que falta", () => {
+    // Un aviso que solo nombra lo que falta no ayuda a decidir.
+    for (const r of requisitosParaEjecutar({
+      partidas: 0,
+      tieneCronograma: false,
+      tieneLineaBase: false,
+    })) {
+      expect(r.consecuencia.length).toBeGreaterThan(30);
+    }
+  });
+});
 
 describe("transiciones de estado de obra", () => {
   it("una obra avanza, no salta ni retrocede", () => {

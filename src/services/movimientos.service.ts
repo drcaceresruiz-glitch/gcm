@@ -18,6 +18,7 @@ import {
   POR_PAGINA,
   type Pagina,
 } from "@/lib/paginacion";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { ModalidadPartida, TipoMovimiento } from "@/generated/prisma/enums";
 
@@ -408,6 +409,9 @@ export async function crearMovimiento(
     return { ok: false, error: "No tienes permiso para crear movimientos." };
   }
 
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   const errorEntrada = validarEntrada(datos);
   if (errorEntrada) return { ok: false, error: errorEntrada };
 
@@ -654,6 +658,9 @@ export async function aprobarMovimiento(
       if (mov.estado === "APROBADO") {
         throw new FalloAprobacion(`El movimiento ${mov.numero} ya estaba aprobado.`);
       }
+
+      const cerrada = await motivoSiObraCerrada(sesion, mov.projectId);
+      if (cerrada) throw new FalloAprobacion(cerrada);
 
       /**
        * Se serializa por obra bloqueando la fila de la linea base.
@@ -966,6 +973,9 @@ export async function eliminarBorrador(
       error: `El movimiento ${mov.numero} esta aprobado y no se puede eliminar. Registra otro de signo contrario para corregirlo.`,
     };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, mov.projectId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   await prisma.$transaction(async (tx) => {
     await tx.movimientoPresupuestal.delete({ where: { id: mov.id } });

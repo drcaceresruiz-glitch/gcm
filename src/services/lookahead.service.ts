@@ -13,6 +13,7 @@ import {
   type Confiabilidad,
 } from "@/lib/lookahead";
 import { planesAbiertos, type SemanaAbierta } from "@/services/plan-semanal.service";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { EstadoLookahead, TipoRestriccion } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -325,6 +326,9 @@ export async function sincronizarLookahead(
     return { ok: false, error: "No tienes permiso para gestionar el Lookahead." };
   }
 
+  const cerradaSync = await motivoSiObraCerrada(sesion, obraId);
+  if (cerradaSync) return { ok: false, error: cerradaSync };
+
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
     select: { id: true },
@@ -387,6 +391,9 @@ export async function alternarRestriccion(
   if (!puede(sesion, "lookahead:gestionar")) {
     return { ok: false, error: "No tienes permiso para gestionar el Lookahead." };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   const restr = await prisma.restriccion.findFirst({
     where: {

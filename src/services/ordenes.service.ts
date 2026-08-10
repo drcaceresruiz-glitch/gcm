@@ -18,6 +18,7 @@ import {
   POR_PAGINA,
   type Pagina,
 } from "@/lib/paginacion";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 import type {
   EstadoOrden,
@@ -136,6 +137,9 @@ export async function crearOrden(
   if (!puede(sesion, "orden:crear")) {
     return { ok: false, error: "No tienes permiso para registrar ordenes." };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   const errorEntrada = validarEntrada(datos);
   if (errorEntrada) return { ok: false, error: errorEntrada };
@@ -439,6 +443,9 @@ export async function aprobarOrden(
     return { ok: false, error: "No tienes permiso para aprobar ordenes." };
   }
 
+  const cerrada = await siObraDeLaOrdenEstaCerrada(sesion, ordenId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   const aprobadaPor = `${sesion.nombres} ${sesion.apellidos} (${sesion.email})`
     .trim()
     .slice(0, 150);
@@ -574,11 +581,39 @@ export async function aprobarOrden(
  * El permiso depende del estado: descartar un borrador es parte de
  * redactarlo (`orden:crear`), pero purgar una anulada es un acto destructivo
  * sobre el ciclo de vida de la orden (`orden:anular`).
+ *
+ * (La guarda de obra cerrada esta en `siObraDeLaOrdenEstaCerrada`, justo
+ * debajo.)
  */
+
+/**
+ * La obra de una orden, para la guarda de obra cerrada.
+ *
+ * Estas tres operaciones reciben el id de la ORDEN, no el de la obra, asi que
+ * hay que remontar. Se hace en una consulta aparte y no anadiendo el estado a
+ * cada `select`: son tres sitios distintos, y repartir la misma comprobacion
+ * por tres formas distintas es como acaban divergiendo.
+ */
+async function siObraDeLaOrdenEstaCerrada(
+  sesion: SesionActiva,
+  ordenId: string,
+): Promise<string | null> {
+  const orden = await prisma.ordenCompra.findFirst({
+    where: { id: ordenId, companyId: sesion.companyId },
+    select: { projectId: true },
+  });
+  // Si no existe, que lo diga la operacion con su propio mensaje.
+  if (!orden) return null;
+  return motivoSiObraCerrada(sesion, orden.projectId);
+}
+
 export async function eliminarOrden(
   sesion: SesionActiva,
   ordenId: string,
 ): Promise<{ ok: true; numero: string } | { ok: false; error: string }> {
+  const cerrada = await siObraDeLaOrdenEstaCerrada(sesion, ordenId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   const orden = await prisma.ordenCompra.findFirst({
     where: { id: ordenId, companyId: sesion.companyId },
     select: {
@@ -669,6 +704,9 @@ export async function anularOrden(
   if (!puede(sesion, "orden:anular")) {
     return { ok: false, error: "No tienes permiso para anular ordenes." };
   }
+
+  const cerrada = await siObraDeLaOrdenEstaCerrada(sesion, ordenId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   if (!motivo.trim()) {
     return { ok: false, error: "Explica por que se anula la orden." };

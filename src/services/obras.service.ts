@@ -10,6 +10,10 @@ import {
   ESTADOS_OBRA,
   formatearCorrelativoObra,
   puedeTransicionarObra,
+  requisitosParaEjecutar,
+  puedeArrancar,
+  obraAdmiteCambios,
+  OBRA_CERRADA,
   ETIQUETA_ESTADO_OBRA,
   type EstadoObra,
 } from "@/lib/obras";
@@ -687,9 +691,14 @@ export async function actualizarObra(
       cliente: true,
       fechaInicio: true,
       fechaFinProgramada: true,
+      estado: true,
     },
   });
   if (!obra) return { ok: false, error: "No se encontro la obra." };
+
+  if (!obraAdmiteCambios(obra.estado)) {
+    return { ok: false, error: OBRA_CERRADA };
+  }
 
   const validacion = validarObra(datos);
   if (!validacion.ok) return { ok: false, error: validacion.error };
@@ -884,6 +893,34 @@ export async function cambiarEstadoObra(
       ok: false,
       error: `No se puede pasar de ${ETIQUETA_ESTADO_OBRA[obra.estado as EstadoObra]} a ${ETIQUETA_ESTADO_OBRA[nuevoEstado as EstadoObra]}.`,
     };
+  }
+
+  // Arrancar POR PRIMERA VEZ exige presupuesto. Reanudar una obra paralizada
+  // no: esa ya paso por aqui, y volver a exigirselo bloquearia una obra en
+  // marcha por un requisito que cumplio hace meses.
+  if (nuevoEstado === "EN_EJECUCION" && obra.estado === "PLANIFICACION") {
+    const partidas = await prisma.wbsItem.count({
+      where: { projectId: obraId, tipo: "PARTIDA" },
+    });
+
+    // Se comprueba en el servidor y no solo en la pantalla: la accion se puede
+    // invocar directamente, y una obra en ejecucion sin presupuesto deja el
+    // control economico entero sin suelo.
+    const faltan = requisitosParaEjecutar({
+      partidas,
+      // Cronograma y linea base no bloquean, asi que no hace falta
+      // consultarlos aqui: la pantalla ya los avisa antes de llegar.
+      tieneCronograma: true,
+      tieneLineaBase: true,
+    });
+
+    if (!puedeArrancar(faltan)) {
+      const bloqueante = faltan.find((r) => r.bloqueante);
+      return {
+        ok: false,
+        error: `${bloqueante?.falta ?? "Faltan requisitos."} ${bloqueante?.consecuencia ?? ""}`.trim(),
+      };
+    }
   }
 
   await prisma.$transaction(async (tx) => {

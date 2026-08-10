@@ -6,6 +6,8 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, listarPartidas } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
 import { soles } from "@/utils/formato";
+import { Explicacion } from "@/components/ui/Explicacion";
+import { CONGELAR_PRESUPUESTO } from "@/lib/explicaciones";
 import { TablaPartidas } from "@/components/partidas/TablaPartidas";
 import { Mascota } from "@/components/ui/Mascota";
 
@@ -88,6 +90,11 @@ export default async function ObraPage({
           como adicionales.
         </p>
       )}
+
+      {/* La tarjeta de arriba dice "Sin congelar" sin explicar que es congelar
+          ni por que importa. La explicacion va aqui, donde se lee esa palabra,
+          y no en otra pantalla. */}
+      <Explicacion texto={CONGELAR_PRESUPUESTO} />
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Presupuesto por partidas</h2>

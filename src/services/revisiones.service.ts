@@ -4,6 +4,7 @@ import { puede } from "@/lib/rbac";
 import { esNegativo, normalizarDecimal } from "@/lib/decimal";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
 import { calcularCascada, compararRevisiones, type Cascada } from "@/lib/presupuesto";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -141,6 +142,9 @@ export async function crearRevision(
   if (!puede(sesion, "linea_base:crear")) {
     return { ok: false, error: "No tienes permiso para crear revisiones." };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
@@ -398,6 +402,9 @@ export async function aprobarRevision(
       error: `La revision v${revision.version} ya estaba aprobada.`,
     };
   }
+
+  const cerrada = await motivoSiObraCerrada(sesion, revision.projectId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   // Solo la ultima. Aprobar una revision antigua teniendo un borrador mas
   // nuevo dejaria como linea base un contrato ya superado, y `obtenerObra`
