@@ -9,6 +9,9 @@ import {
   solicitarCambio,
   cancelarSolicitud,
   cambiarDosFactores,
+  cambiarCanal2FA,
+  verificarCelularPedirCodigo,
+  verificarCelularConfirmar,
 } from "@/services/perfil.service";
 import { CAMPOS_CONTROLADOS } from "@/lib/perfil";
 
@@ -29,7 +32,65 @@ export async function accionGuardarCelular(
   if (!resultado.ok) return { error: resultado.error };
 
   revalidatePath("/perfil");
-  return { ok: "Telefono guardado." };
+  return { ok: "Teléfono guardado." };
+}
+
+/**
+ * Pide el codigo que comprueba que el celular guardado es suyo.
+ *
+ * Sin parametros: el numero sale de la sesion, no del formulario, y el estado
+ * previo no hace falta. `useActionState` la llama igual con dos argumentos y
+ * JavaScript los descarta.
+ */
+export async function accionVerificarCelularPedir(): Promise<EstadoPerfil> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const resultado = await verificarCelularPedirCodigo(sesion);
+  if (!resultado.ok) return { error: resultado.error };
+
+  revalidatePath("/perfil");
+  return { ok: "Te mandamos un código por SMS. Escríbelo aquí abajo." };
+}
+
+/** Comprueba el codigo y da el celular por verificado. */
+export async function accionVerificarCelularConfirmar(
+  _previo: EstadoPerfil,
+  datos: FormData,
+): Promise<EstadoPerfil> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const resultado = await verificarCelularConfirmar(
+    sesion,
+    String(datos.get("codigo") ?? ""),
+  );
+  if (!resultado.ok) return { error: resultado.error };
+
+  revalidatePath("/perfil");
+  return { ok: "Celular verificado. Ya puedes recibir los códigos por SMS." };
+}
+
+/** Elige por donde llega el codigo de acceso: correo o SMS. */
+export async function accionCambiarCanal2FA(
+  _previo: EstadoPerfil,
+  datos: FormData,
+): Promise<EstadoPerfil> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const canal = datos.get("canal") === "SMS" ? "SMS" : "CORREO";
+
+  const resultado = await cambiarCanal2FA(sesion, canal);
+  if (!resultado.ok) return { error: resultado.error };
+
+  revalidatePath("/perfil");
+  return {
+    ok:
+      canal === "SMS"
+        ? "Desde ahora tu código llegará por SMS."
+        : "Desde ahora tu código llegará por correo.",
+  };
 }
 
 /** Guarda o quita la foto de perfil. Libre, sin aprobacion. */

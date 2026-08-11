@@ -8,7 +8,7 @@ import {
   accionCancelarCodigo,
   type EstadoFormulario,
 } from "@/app/(auth)/acciones";
-import { LONGITUD_CODIGO } from "@/lib/dosFactores";
+import { LONGITUD_CODIGO, type Canal2FA } from "@/lib/dosFactores";
 
 function BotonEnviar() {
   const { pending } = useFormStatus();
@@ -28,7 +28,16 @@ function BotonEnviar() {
   );
 }
 
-export function FormularioCodigo({ minutos }: { minutos: number }) {
+export function FormularioCodigo({
+  minutos,
+  canal,
+  destino,
+}: {
+  minutos: number;
+  canal: Canal2FA;
+  /// Ya enmascarado por el servidor. Aqui no llega el dato entero.
+  destino: string;
+}) {
   const [estado, accion] = useActionState<EstadoFormulario, FormData>(
     accionVerificarCodigo,
     {},
@@ -42,8 +51,13 @@ export function FormularioCodigo({ minutos }: { minutos: number }) {
           style={{ color: "var(--color-marca-500)" }}
           aria-hidden="true"
         />
+        {/* Se dice el destino, tapado. Quien cambio de canal hace un mes no
+            tiene por que acordarse, y sin esto se queda mirando el buzon
+            equivocado hasta que el codigo caduca. */}
         <p className="mt-2 text-sm">
-          Te enviamos un código de {LONGITUD_CODIGO} cifras a tu correo.
+          Te enviamos un código de {LONGITUD_CODIGO} cifras a{" "}
+          {canal === "SMS" ? "tu celular" : "tu correo"}{" "}
+          <span className="font-medium">{destino}</span>.
         </p>
         <p className="mt-1 text-xs opacity-60">
           Caduca en {minutos} minutos.
@@ -71,7 +85,9 @@ export function FormularioCodigo({ minutos }: { minutos: number }) {
           </label>
           {/* `inputMode` numerico saca el teclado de cifras en el movil, que
               es donde se teclea esto casi siempre. `one-time-code` deja que
-              el sistema lo ofrezca desde la notificacion del correo. */}
+              el sistema lo ofrezca solo: con el SMS lo hace de verdad —iOS y
+              Android leen el codigo de la notificacion—, con el correo
+              depende del cliente. */}
           <input
             id="codigo"
             name="codigo"

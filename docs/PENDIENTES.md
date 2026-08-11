@@ -19,18 +19,21 @@ abajo.
 
 **LO SIGUIENTE, ACORDADO EL 11 DE AGOSTO, EN ESTE ORDEN:**
 
-1. **Segundo factor y recuperacion de clave por SMS.** Hoy los dos van solo
-   por correo (`dosFactores.service`, `recuperacion.service`) y en obra nadie
-   mira el correo, pero el telefono lo tienen en la mano. Los flujos ya
-   existen y `enviarSms` se reutiliza tal cual: es el cambio mas pequeno con
-   mas efecto. **Es por donde se empieza.**
-2. **Cablear `scripts/desplegar.sh`** (seccion 1). Sigue sin hacerse y sigue
+1. ~~**Segundo factor por SMS.**~~ **HECHO el 12 de agosto**, ver 6f. La
+   **recuperacion de clave se dejo fuera a proposito**: por SMS no puede ser
+   el enlace de ahora —una URL larga, y las operadoras marcan como spam los
+   SMS con enlaces—, asi que hay que rehacerla con codigo y pantalla nueva.
+   Es otro trabajo, no un cambio de canal.
+2. **Tablero de configuracion de la empresa** (pedido el 12 de agosto). Ver
+   6g: no es un lujo para el futuro, es lo que le falta a la cola de SMS para
+   poder venderse a una segunda constructora.
+3. **Cablear `scripts/desplegar.sh`** (seccion 1). Sigue sin hacerse y sigue
    siendo la raiz de casi todo. **No es solo codigo**: hay que decidir quien
    manda al descomprimir —hoy `app.js` lo hace por su cuenta, y anadir el
    script deja DOS candados con caducidades distintas (3 min y 10 min) sobre
    el mismo directorio— y crear el cron en cPanel, que solo se puede hacer
    desde el panel.
-3. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
+4. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
    worktree. Investigacion hecha el 11 de agosto, plan sin escribir.
 
 Y sigue sin existir el **parte diario**, que es el Bloque 1 entero de la
@@ -847,6 +850,83 @@ Por orden de lo que aporta:
 diario por numero. Si el primer mes la gente recibe seis SMS al dia, silencia
 el numero y ya no lee un aviso nunca mas —el mismo motivo por el que en el
 tablero se decidio que nada parpadee—.
+
+## 6f. Segundo factor por SMS — HECHO (12 de agosto)
+
+El codigo de acceso ya puede llegar por SMS. **Lo elige cada persona en su
+perfil, y es UNO de los dos, no los dos a la vez**: eso lo distingue del pase
+de obra, que manda por correo y SMS a la vez a proposito porque alli lo que
+importa es que el codigo llegue como sea.
+
+Piezas:
+
+- Migracion `20260811160014_segundo_factor_por_sms`: `User.canal2FA`,
+  `User.celularVerificadoAt`, y en `CodigoAcceso` los campos `proposito` y
+  `destino` (con `tokenHash` ya nulable).
+- `lib/contacto.ts` **nuevo**: `normalizarCelular` y compania se mudaron ahi
+  desde `lib/pase.ts`, que las reexporta. Autenticacion no puede importar del
+  pase de obra: son dominios distintos y el que manda no es el pase.
+- `lib/dosFactores.ts`: `canalEfectivo` y `enmascararDestino`, con pruebas.
+
+**Cuatro decisiones que no se deben deshacer sin pensarlo:**
+
+1. **El celular hay que VERIFICARLO** antes de poder elegirlo. Se guardaba
+   texto libre —«+51 987 654 321»— que nadie leia y que `enviarSms` no sabe
+   marcar; ahora se normaliza a nueve cifras y se comprueba con un codigo. Sin
+   esto, un digito mal tecleado deja a esa persona fuera de su cuenta **sin un
+   solo aviso**, porque el envio de SMS se traga los errores a proposito.
+2. **Cambiar el numero borra la verificacion y baja el canal a correo.** Ese
+   campo se edita sin aprobacion y sin pedir la clave, asi que sin esto, quien
+   pillara una sesion abierta pondria su numero y se auto-enviaria los codigos
+   de acceso de esa cuenta.
+3. **Si el SMS falla, el codigo sale por correo.** No es mandarlo por los dos:
+   es que un SMS fallido no puede dejar a nadie fuera de su propia cuenta.
+4. **El limite de reenvios NO deja a nadie sin codigo**, a diferencia del
+   pase: baja al correo, que es gratis. Aqui quien pide ya acerto su clave, no
+   es un desconocido bombardeando; lo que se protege es el gasto de la linea.
+
+> **EL RIESGO, dicho en voz alta:** por la cola de SMS los codigos viajan EN
+> CLARO, y desde hoy por ahi pasan tambien los del segundo factor. Eso sube el
+> valor de `SMS_COLA_TOKEN` de «puede subir fotos a una obra» a «puede leer el
+> codigo de acceso de cualquiera que haya elegido SMS». Se acepto a sabiendas.
+> La alternativa era mandar el 2FA solo por json.pe, que devuelve la
+> dependencia de un tercero —justo lo que se quiso quitar—.
+
+**ANTES DE USARLO EN PROD**: aplicar la migracion, que es paso MANUAL, y
+contar despues las carpetas de `prisma/migrations` (el deploy pierde archivos;
+ver el aviso de la seccion 6e). Sin ella la aplicacion **no arranca**: el
+codigo consulta columnas que no existirian.
+
+**FALTA probarlo de punta a punta en produccion**: verificar el celular,
+cambiar el canal, salir y volver a entrar. Desde aqui no se puede, que no hay
+sesion en local.
+
+## 6g. Tablero de configuracion de la empresa (pedido el 12 de agosto)
+
+El usuario quiere que el administrador de la empresa tenga un panel modular de
+configuracion, ampliable, y que una de las opciones sea **elegir el telefono
+que manda los SMS de la plataforma**.
+
+**El matiz tecnico que hay que fijar antes de construir nada**: GCM hoy NO
+sabe que telefono manda. El emisor se configura en el propio telefono
+(direccion + token) y el tira de la cola; no existe ningun numero que cambiar.
+Asi que «cambiar el emisor» solo puede ser una de dos cosas:
+
+- **Dejarlo anotado**, para saber cual es el telefono de guardia. Cosmetico.
+- **Registrar VARIOS emisores**, cada uno con su token, y elegir cual sirve la
+  cola. Eso si es real: da telefono de respaldo y saca el secreto del entorno
+  a la base.
+
+**Y lo que de verdad lo hace urgente**: `SMS_COLA_TOKEN` es UNA variable de
+entorno para toda la plataforma. Mientras GCM sea de una sola constructora da
+igual, pero con la segunda **todas compartirian el mismo telefono emisor, y
+los codigos de acceso de una empresa saldrian por el movil de otra**. La
+configuracion por empresa no es un adorno: es lo que le falta a la cola de SMS
+para poder venderse. Ver [vender GCM a otras constructoras].
+
+Condicion de diseno acordada: que no sea un saco de ajustes sueltos. Que cada
+opcion diga **a que afecta y que se rompe si se apaga**, como hace el panel
+«Que falta».
 
 ## 6d. Panel «Que falta» (10 de agosto)
 

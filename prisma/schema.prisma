@@ -198,11 +198,29 @@ model User {
   failedLoginCount   Int       @default(0)
   lockedUntil        DateTime?
 
-  /// Verificacion en dos pasos por codigo al correo. La activa cada persona
-  /// desde su perfil; por defecto esta apagada para no dejar fuera a nadie al
-  /// desplegar. Un ADMIN puede apagarla si alguien pierde el acceso al buzon,
-  /// que si no seria un callejon sin salida.
+  /// Verificacion en dos pasos por codigo. La activa cada persona desde su
+  /// perfil; por defecto esta apagada para no dejar fuera a nadie al
+  /// desplegar. Un ADMIN puede apagarla si alguien pierde el acceso a su
+  /// buzon o a su telefono, que si no seria un callejon sin salida.
   dosFactoresActivo Boolean @default(false)
+
+  /// Por donde quiere recibir el codigo. UNO de los dos, no los dos a la vez:
+  /// recibirlo por duplicado en cada entrada molesta y, con SMS, cuesta.
+  ///
+  /// Es una preferencia, no una garantia: quien manda es `canalEfectivo` en
+  /// `@/lib/dosFactores`, que cae al correo si el celular falta o dejo de
+  /// estar verificado. El fallo seguro es "te llega por correo", nunca "no te
+  /// llega".
+  canal2FA Canal2FA @default(CORREO)
+
+  /// Cuando se comprobo que ese celular es de verdad suyo, tecleando un
+  /// codigo enviado a el. Null = sin verificar, y entonces el SMS no se puede
+  /// elegir como canal.
+  ///
+  /// Se pone a null en cuanto el numero cambia. Sin eso, cambiar el celular
+  /// —que se hace sin aprobacion de nadie— seria una forma de desviarse los
+  /// codigos de acceso ajenos desde una sesion secuestrada.
+  celularVerificadoAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -300,6 +318,28 @@ model PasswordResetToken {
   @@map("password_reset_tokens")
 }
 
+/// Por donde sale el codigo de acceso.
+///
+/// Correo y SMS, uno u otro. No hay "los dos": recibir el mismo codigo por
+/// duplicado en cada entrada molesta, y por SMS ademas cuesta dinero de la
+/// linea de la empresa.
+enum Canal2FA {
+  CORREO
+  SMS
+}
+
+/// Para que se pidio un codigo.
+///
+/// `ACCESO` es el segundo paso del ingreso; `VERIFICAR_CELULAR` comprueba que
+/// un numero es de quien dice antes de dejarle elegirlo como canal. Van en la
+/// misma tabla porque son el mismo mecanismo —seis cifras, caducidad, tope de
+/// intentos—, pero NO se pueden mezclar: cada ciclo borra y gasta solo los
+/// suyos.
+enum PropositoCodigo {
+  ACCESO
+  VERIFICAR_CELULAR
+}
+
 /// Codigo de un solo uso para la verificacion en dos pasos.
 ///
 /// Existe entre que alguien acierta su clave y termina de entrar. Guarda DOS
@@ -307,9 +347,11 @@ model PasswordResetToken {
 ///
 /// - `tokenHash` identifica el desafio. Su token viaja en una cookie, de modo
 ///   que el navegador no puede decir "soy el usuario X": solo presenta un
-///   vale opaco que el servidor resuelve.
-/// - `codigoHash` es el codigo de seis cifras que llega al correo, que es lo
-///   unico que demuestra el acceso al buzon.
+///   vale opaco que el servidor resuelve. Es NULO cuando el proposito es
+///   `VERIFICAR_CELULAR`: ahi la persona ya tiene sesion, asi que el desafio
+///   se ata a su `userId` y no hace falta cookie ni vale opaco.
+/// - `codigoHash` es el codigo de seis cifras que llega al correo o al SMS,
+///   que es lo unico que demuestra el acceso a ese buzon o a ese telefono.
 ///
 /// Sin el token, el usuario tendria que reenviar su correo junto al codigo y
 /// bastaria con adivinar seis cifras de CUALQUIER cuenta; con el, un intento
@@ -318,8 +360,20 @@ model CodigoAcceso {
   id     String @id @default(cuid())
   userId String
 
-  tokenHash  String @unique @db.Char(64)
-  codigoHash String @db.Char(64)
+  /// Para que se pidio: entrar, o comprobar que un celular es de quien dice.
+  /// Separa los dos ciclos, que conviven: se puede estar verificando el
+  /// telefono en el perfil y a la vez tener un desafio de acceso abierto en
+  /// otra pestana, y uno no puede gastar ni borrar el del otro.
+  proposito PropositoCodigo @default(ACCESO)
+
+  /// A donde se mando, ya normalizado. Sirve para dos cosas: ensenarlo tapado
+  /// en la pantalla ("te lo mandamos al 999321") aunque se recargue, y que un
+  /// codigo pedido para un numero no sirva para verificar otro si la persona
+  /// lo cambia entre medias.
+  destino String? @db.VarChar(150)
+
+  tokenHash  String? @unique @db.Char(64)
+  codigoHash String  @db.Char(64)
 
   /// Intentos gastados. Al llegar al tope el desafio se borra y toca volver a
   /// empezar por la clave: sin esto, seis cifras se agotan a fuerza bruta.

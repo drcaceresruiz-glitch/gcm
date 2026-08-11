@@ -39,6 +39,10 @@ export default async function PerfilPage() {
       <DosFactores
         activo={perfil.dosFactoresActivo}
         email={perfil.email}
+        canal={perfil.canal2FA}
+        celular={perfil.celular}
+        celularVerificado={perfil.celularVerificado}
+        smsDisponible={perfil.smsDisponible}
       />
     </div>
   );

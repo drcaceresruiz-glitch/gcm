@@ -167,3 +167,18 @@ async function enviarPorPasarela(
 export function textoCodigoPase(codigo: string, minutos: number): string {
   return `GCM: tu codigo para cargar evidencia es ${codigo}. Vence en ${minutos} minutos. No lo compartas.`;
 }
+
+/**
+ * El codigo para ENTRAR en GCM, en un SMS.
+ *
+ * Va aparte de `textoCodigoPase` porque no es lo mismo y la diferencia
+ * importa: aquel abre una obra para subir fotos, este abre una cuenta entera.
+ * Quien lo reciba sin haberlo pedido tiene que entender que alguien conoce su
+ * clave, y por eso el aviso final —el mismo que ya lleva el correo—.
+ *
+ * Las mismas reglas de siempre: menos de 160 caracteres para que no se parta
+ * en dos, y sin enlaces, que las operadoras marcan como spam.
+ */
+export function textoCodigoAcceso(codigo: string, minutos: number): string {
+  return `GCM: tu codigo para entrar es ${codigo}. Vence en ${minutos} minutos. Si no estabas entrando, cambia tu clave.`;
+}

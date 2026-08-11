@@ -76,6 +76,9 @@ export async function iniciarSesion(
       failedLoginCount: true,
       lockedUntil: true,
       dosFactoresActivo: true,
+      canal2FA: true,
+      celular: true,
+      celularVerificadoAt: true,
       nombres: true,
       email: true,
       company: { select: { activa: true } },
@@ -170,10 +173,16 @@ export async function iniciarSesion(
   // registro de LOGIN se dejan para cuando el codigo acierte: si no,
   // constaria como entrada alguien que quiza nunca llego a entrar.
   if (usuario.dosFactoresActivo) {
+    // Por donde sale el codigo lo decide `crearDesafio` a partir de lo que la
+    // persona eligio en su perfil. Aqui no se mira: el login no tiene por que
+    // saber si hay SMS configurado.
     await crearDesafio({
       id: usuario.id,
       nombres: usuario.nombres,
       email: usuario.email,
+      celular: usuario.celular,
+      canal2FA: usuario.canal2FA,
+      celularVerificadoAt: usuario.celularVerificadoAt,
     });
     return { ok: true, requiere2FA: true };
   }

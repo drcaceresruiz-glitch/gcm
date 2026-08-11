@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { hayDesafioAbierto } from "@/services/dosFactores.service";
+import { desafioAbierto } from "@/services/dosFactores.service";
 import { VIGENCIA_CODIGO_MINUTOS } from "@/lib/dosFactores";
 import { FormularioCodigo } from "@/components/auth/FormularioCodigo";
 
@@ -15,7 +15,14 @@ export const metadata: Metadata = { title: "Verificación" };
  * abierta hasta que el codigo caduca.
  */
 export default async function VerificarCodigoPage() {
-  if (!(await hayDesafioAbierto())) redirect("/login");
+  const desafio = await desafioAbierto();
+  if (!desafio) redirect("/login");
 
-  return <FormularioCodigo minutos={VIGENCIA_CODIGO_MINUTOS} />;
+  return (
+    <FormularioCodigo
+      minutos={VIGENCIA_CODIGO_MINUTOS}
+      canal={desafio.canal}
+      destino={desafio.destinoTapado}
+    />
+  );
 }

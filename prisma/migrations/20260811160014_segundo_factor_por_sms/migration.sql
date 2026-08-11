@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE `codigos_acceso` ADD COLUMN `destino` VARCHAR(150) NULL,
+    ADD COLUMN `proposito` ENUM('ACCESO', 'VERIFICAR_CELULAR') NOT NULL DEFAULT 'ACCESO',
+    MODIFY `tokenHash` CHAR(64) NULL;
+
+-- AlterTable
+ALTER TABLE `users` ADD COLUMN `canal2FA` ENUM('CORREO', 'SMS') NOT NULL DEFAULT 'CORREO',
+    ADD COLUMN `celularVerificadoAt` DATETIME(3) NULL;

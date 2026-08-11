@@ -3,18 +3,37 @@
  *
  * El pase es el personal de campo que documenta sin ser usuario de GCM: se
  * identifica con su celular o su correo y recibe un codigo de un solo uso.
- * De eso, aqui vive lo unico que se puede probar sin navegador ni base:
- * reconocer que escribio y dejarlo en forma canonica.
- *
- * Por que importa la forma canonica: el mismo celular se escribe de cinco
- * maneras (+51 987 654 321, 987-654-321, 51987654321...). Si no se guardara
- * siempre igual, la persona teclearia su numero de otra forma un martes y el
- * sistema le diria que no esta registrada.
+ * De eso, aqui vive lo unico que se puede probar sin navegador ni base: las
+ * reglas del alta.
  */
 
-/// Cuanto vive el codigo. Se reusan las constantes del segundo factor
-/// (`@/lib/dosFactores`): es el mismo problema y ya estan probadas.
-export { LONGITUD_CODIGO, VIGENCIA_CODIGO_MINUTOS, MAX_INTENTOS_CODIGO, normalizarCodigo, codigoBienFormado } from "@/lib/dosFactores";
+/// Cuanto vive el codigo y cuantos se pueden pedir. Se reusan las constantes
+/// del segundo factor (`@/lib/dosFactores`): es el mismo problema y ya estan
+/// probadas.
+export {
+  LONGITUD_CODIGO,
+  VIGENCIA_CODIGO_MINUTOS,
+  MAX_INTENTOS_CODIGO,
+  MAX_CODIGOS_POR_VENTANA,
+  VENTANA_CODIGOS_MINUTOS,
+  normalizarCodigo,
+  codigoBienFormado,
+} from "@/lib/dosFactores";
+
+/// Reconocer y normalizar un contacto vive en `@/lib/contacto` desde que el
+/// segundo factor de los usuarios tambien lo necesita. Se reexporta para no
+/// tocar a quien ya lo importaba de aqui.
+///
+/// El `import` de debajo NO sobra: `export ... from` reexporta pero no deja
+/// el nombre en el ambito de este archivo, y `validarAltaPase` los usa.
+export {
+  normalizarCelular,
+  normalizarEmail,
+  reconocerContacto,
+  type Contacto,
+} from "@/lib/contacto";
+
+import { normalizarCelular, normalizarEmail } from "@/lib/contacto";
 
 /**
  * Cuanto dura el telefono reconocido. Un ano es un TECHO, no el control:
@@ -22,70 +41,6 @@ export { LONGITUD_CODIGO, VIGENCIA_CODIGO_MINUTOS, MAX_INTENTOS_CODIGO, normaliz
  * cada peticion. Esto solo evita que una cookie olvidada viva para siempre.
  */
 export const VIGENCIA_PASE_DIAS = 365;
-
-/// Cuantos codigos puede pedir una misma persona seguidos, y en cuanto rato.
-/// Sin esto, un correo se puede usar para bombardear un buzon —y el dia que
-/// haya SMS, para gastar dinero ajeno—.
-export const MAX_CODIGOS_POR_VENTANA = 3;
-export const VENTANA_CODIGOS_MINUTOS = 15;
-
-export type Contacto =
-  | { tipo: "email"; valor: string }
-  | { tipo: "celular"; valor: string };
-
-/**
- * Deja un celular peruano en nueve cifras.
- *
- * Acepta como lo escribe la gente: con +51, con 51 delante, con espacios,
- * guiones o parentesis. Devuelve null si lo que queda no es un movil peruano
- * (nueve cifras empezando por 9).
- *
- * Se guarda sin prefijo de pais a proposito: es lo que la persona teclea
- * cuando se lo piden, y anadirlo obligaria a adivinar si el 51 del principio
- * es el pais o parte del numero.
- */
-export function normalizarCelular(entrada: string): string | null {
-  const cifras = entrada.replace(/\D/g, "");
-
-  // 51 delante: puede ser el prefijo de pais, pero solo se quita si lo que
-  // queda es un movil valido. Un numero que ya empieza por 9 no se toca.
-  const sinPrefijo =
-    cifras.length === 11 && cifras.startsWith("51") ? cifras.slice(2) : cifras;
-
-  return /^9\d{8}$/.test(sinPrefijo) ? sinPrefijo : null;
-}
-
-/**
- * Correo en minusculas y sin espacios.
- *
- * La comprobacion es deliberadamente laxa, la misma que el alta de usuarios
- * (`@/lib/usuarios`): validar correos con una expresion estricta rechaza
- * direcciones legitimas, y quien se equivoque simplemente no recibira el
- * codigo.
- */
-export function normalizarEmail(entrada: string): string | null {
-  const limpio = entrada.trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(limpio) ? limpio : null;
-}
-
-/**
- * Que escribio quien quiere entrar: un correo o un celular.
- *
- * Se decide por la arroba y no preguntandole a la persona: en obra, un campo
- * menos es un error menos.
- */
-export function reconocerContacto(entrada: string): Contacto | null {
-  const bruto = entrada.trim();
-  if (!bruto) return null;
-
-  if (bruto.includes("@")) {
-    const valor = normalizarEmail(bruto);
-    return valor ? { tipo: "email", valor } : null;
-  }
-
-  const valor = normalizarCelular(bruto);
-  return valor ? { tipo: "celular", valor } : null;
-}
 
 export interface DatosAltaPase {
   nombres: string;

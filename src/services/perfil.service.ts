@@ -8,6 +8,13 @@ import {
   type PerfilActual,
   type PropuestaPerfil,
 } from "@/lib/perfil";
+import { normalizarCelular } from "@/lib/contacto";
+import type { Canal2FA } from "@/lib/dosFactores";
+import {
+  pedirCodigoCelular,
+  comprobarCodigoCelular,
+} from "@/services/dosFactores.service";
+import { hayCanalSms } from "@/services/sms.service";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -57,6 +64,14 @@ export interface Perfil {
   role: string;
   /// Verificacion en dos pasos. Libre, la enciende y apaga cada persona.
   dosFactoresActivo: boolean;
+  /// Por donde quiere recibir el codigo.
+  canal2FA: Canal2FA;
+  /// Si el celular guardado esta comprobado. Sin esto, no se puede elegir SMS.
+  celularVerificado: boolean;
+  /// Si esta instalacion tiene por donde mandar SMS. Cuando no, la opcion se
+  /// ensena apagada y explicada, en vez de desaparecer: si desapareciera,
+  /// nadie sabria que existe ni por que no esta.
+  smsDisponible: boolean;
   /// De la empresa, solo lectura.
   razonSocial: string;
   ruc: string;
@@ -95,10 +110,12 @@ export async function obtenerPerfil(sesion: SesionActiva): Promise<Perfil | null
       tipoDoc: true,
       numDoc: true,
       celular: true,
+      celularVerificadoAt: true,
       fotoPerfil: true,
       email: true,
       role: true,
       dosFactoresActivo: true,
+      canal2FA: true,
       company: { select: { razonSocial: true, ruc: true } },
     },
   });
@@ -132,6 +149,9 @@ export async function obtenerPerfil(sesion: SesionActiva): Promise<Perfil | null
     email: usuario.email,
     role: usuario.role,
     dosFactoresActivo: usuario.dosFactoresActivo,
+    canal2FA: usuario.canal2FA,
+    celularVerificado: usuario.celularVerificadoAt !== null,
+    smsDisponible: hayCanalSms(),
     razonSocial: usuario.company.razonSocial,
     ruc: usuario.company.ruc,
     pendiente,
@@ -142,24 +162,131 @@ export async function obtenerPerfil(sesion: SesionActiva): Promise<Perfil | null
  * El unico campo libre. Se guarda directo, sin aprobacion.
  *
  * Vacio y ausente son lo mismo: el celular no es obligatorio.
+ *
+ * **Se guarda NORMALIZADO**, en nueve cifras. Antes se guardaba tal cual se
+ * tecleaba —«+51 987 654 321»— y daba igual, porque nadie lo leia; desde que
+ * es el canal del segundo factor, `enviarSms` espera nueve cifras y lo demas
+ * se manda a ninguna parte, en silencio.
+ *
+ * **Cambiar el numero borra la verificacion y baja el canal a correo.** Es el
+ * cierre del hueco: este campo se edita sin aprobacion y sin pedir la clave,
+ * asi que sin esto, quien pillara una sesion abierta pondria su propio numero
+ * y se auto-enviaria los codigos de acceso de esa cuenta.
  */
 export async function guardarCelular(
   sesion: SesionActiva,
   celular: string,
 ): Promise<Resultado> {
-  const limpio = celular.trim().slice(0, 30);
-  const valor = limpio === "" ? null : limpio;
+  const bruto = celular.trim();
+  let valor: string | null = null;
+
+  if (bruto !== "") {
+    valor = normalizarCelular(bruto);
+    if (!valor) {
+      return {
+        ok: false,
+        error: "El celular debe tener nueve cifras y empezar por 9.",
+      };
+    }
+  }
 
   const antes = await prisma.user.findFirst({
     where: { id: sesion.userId, companyId: sesion.companyId },
-    select: { celular: true },
+    select: { celular: true, celularVerificadoAt: true, canal2FA: true },
   });
   if (!antes) return { ok: false, error: "No se encontro el usuario." };
+
+  if (antes.celular === valor) return { ok: true };
+
+  const bajaElCanal = antes.canal2FA === "SMS";
 
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: sesion.userId },
-      data: { celular: valor },
+      data: {
+        celular: valor,
+        celularVerificadoAt: null,
+        canal2FA: bajaElCanal ? "CORREO" : antes.canal2FA,
+      },
+    });
+
+    // Los codigos pendientes de verificar el numero VIEJO no pueden servir
+    // para el nuevo.
+    await tx.codigoAcceso.deleteMany({
+      where: { userId: sesion.userId, proposito: "VERIFICAR_CELULAR" },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        entidad: "User",
+        entidadId: sesion.userId,
+        accion: "UPDATE",
+        antes: { celular: antes.celular, canal2FA: antes.canal2FA },
+        despues: {
+          celular: valor,
+          perdioLaVerificacion: antes.celularVerificadoAt !== null,
+          canal2FA: bajaElCanal ? "CORREO" : antes.canal2FA,
+        },
+      },
+    });
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Manda un codigo al celular guardado para comprobar que es suyo.
+ *
+ * Al numero GUARDADO y no a uno que venga en la peticion: si se aceptara un
+ * numero suelto, se podria verificar un telefono sin haberlo puesto nunca en
+ * el perfil.
+ */
+export async function verificarCelularPedirCodigo(
+  sesion: SesionActiva,
+): Promise<Resultado> {
+  const usuario = await prisma.user.findFirst({
+    where: { id: sesion.userId, companyId: sesion.companyId },
+    select: { celular: true, celularVerificadoAt: true },
+  });
+  if (!usuario) return { ok: false, error: "No se encontro el usuario." };
+
+  if (!usuario.celular) {
+    return { ok: false, error: "Primero guarda tu celular." };
+  }
+  if (usuario.celularVerificadoAt) return { ok: true };
+
+  if (!hayCanalSms()) {
+    return {
+      ok: false,
+      error: "Ahora mismo no hay por dónde enviar SMS. Avisa al administrador.",
+    };
+  }
+
+  return pedirCodigoCelular(sesion.userId, usuario.celular);
+}
+
+/** Comprueba el codigo y da el celular por verificado. */
+export async function verificarCelularConfirmar(
+  sesion: SesionActiva,
+  codigo: string,
+): Promise<Resultado> {
+  const usuario = await prisma.user.findFirst({
+    where: { id: sesion.userId, companyId: sesion.companyId },
+    select: { celular: true },
+  });
+  if (!usuario?.celular) {
+    return { ok: false, error: "Primero guarda tu celular." };
+  }
+
+  const r = await comprobarCodigoCelular(sesion.userId, usuario.celular, codigo);
+  if (!r.ok) return r;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: sesion.userId },
+      data: { celularVerificadoAt: new Date() },
     });
     await tx.auditLog.create({
       data: {
@@ -168,8 +295,53 @@ export async function guardarCelular(
         entidad: "User",
         entidadId: sesion.userId,
         accion: "UPDATE",
-        antes: { celular: antes.celular },
-        despues: { celular: valor },
+        despues: { evento: "celular_verificado", celular: usuario.celular },
+      },
+    });
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Elige por donde llega el codigo de acceso.
+ *
+ * El SMS exige celular verificado. Se comprueba AQUI y no solo en la
+ * pantalla: un boton deshabilitado no es una regla, es una sugerencia.
+ */
+export async function cambiarCanal2FA(
+  sesion: SesionActiva,
+  canal: Canal2FA,
+): Promise<Resultado> {
+  const usuario = await prisma.user.findFirst({
+    where: { id: sesion.userId, companyId: sesion.companyId },
+    select: { canal2FA: true, celularVerificadoAt: true },
+  });
+  if (!usuario) return { ok: false, error: "No se encontro el usuario." };
+
+  if (canal === "SMS" && !usuario.celularVerificadoAt) {
+    return {
+      ok: false,
+      error: "Verifica tu celular antes de recibir los códigos por SMS.",
+    };
+  }
+
+  if (usuario.canal2FA === canal) return { ok: true };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: sesion.userId },
+      data: { canal2FA: canal },
+    });
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        entidad: "User",
+        entidadId: sesion.userId,
+        accion: "UPDATE",
+        antes: { canal2FA: usuario.canal2FA },
+        despues: { canal2FA: canal },
       },
     });
   });
