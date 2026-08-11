@@ -2,8 +2,16 @@
 #
 # Aplica en el servidor el paquete que sube el despliegue.
 #
-# Lo llama un CRON cada minuto:
-#   cd /home/drcacere/gcm && bash desplegar.sh
+# Lo llama un CRON cada minuto, desde cPanel -> Trabajos cron:
+#   cd ~/RUTA_DE_LA_APP && bash desplegar.sh >/dev/null 2>&1
+#
+# La ruta real no se escribe aqui: este repositorio es publico y el nombre de
+# la cuenta se deduce de ella. Vive en el secreto `FTP_SERVER_DIR` y en el
+# propio cron, como manda `docs/infraestructura.md`.
+#
+# El script lo sube el workflow por FTP, junto a `app.js` y fuera del
+# comprimido: si viajara dentro, el intercambio de mas abajo lo moveria
+# mientras se esta ejecutando.
 #
 # POR QUE NO LO HACE EL ARRANQUE DE LA APLICACION
 #

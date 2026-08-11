@@ -27,12 +27,10 @@ abajo.
 2. ~~**Tablero de configuracion de la empresa.**~~ **HECHO el 12 de agosto**,
    ver 6g. Con la cola de SMS ya separada por empresa, que era el bloqueo real
    para vender a una segunda constructora.
-3. **Cablear `scripts/desplegar.sh`** (seccion 1). Sigue sin hacerse y sigue
-   siendo la raiz de casi todo. **No es solo codigo**: hay que decidir quien
-   manda al descomprimir —hoy `app.js` lo hace por su cuenta, y anadir el
-   script deja DOS candados con caducidades distintas (3 min y 10 min) sobre
-   el mismo directorio— y crear el cron en cPanel, que solo se puede hacer
-   desde el panel.
+3. ~~**Cablear `scripts/desplegar.sh`.**~~ **HECHO el 12 de agosto**, ver la
+   seccion 1. `app.js` ya no descomprime: lo hace el cron con el script, que
+   es quien sabe hacerlo sin cronometro. Lo que hay que vigilar ahora es que
+   el cron exista, y eso se ve con un `curl` a `/api/health`.
 4. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
    worktree. Investigacion hecha el 11 de agosto, plan sin escribir.
 
@@ -193,7 +191,34 @@ y probar en prod el ciclo de la plantilla (descargar - llenar - importar).
 
 ---
 
-## 0. LO PRIMERO DE MANANA: el candado de despliegue no caduca
+## 0. El candado de despliegue — RESUELTO el 12 de agosto
+
+> **Ya no hay candado en el arranque, porque el arranque ya no descomprime.**
+> `app.js` se quedo solo con arrancar el servidor; el paquete lo aplica
+> `scripts/desplegar.sh` desde un cron cada minuto. Un cron no tiene
+> cronometro, que era el problema de fondo: descomprimir son 16 segundos y
+> LiteSpeed corta el arranque mucho antes.
+>
+> Con eso desaparecen de golpe los tres sintomas de estos dias: despliegues en
+> verde que no se aplicaban, el arbol mezclando dos compilaciones, y el
+> candado abandonado que bloqueaba los siguientes.
+>
+> **Lo que hay que vigilar ahora es otra cosa: que el cron exista.** Si no
+> corre, no se aplica nada. Se ve desde fuera, sin entrar al servidor:
+> `curl -s https://gcm.drcaceresruiz.com/api/health` responde
+> `"despliegue":"pendiente"` cuando hay un paquete sin aplicar, y trae ademas
+> el SHA de la compilacion viva.
+>
+> Dos cosas del cambio que no son evidentes y conviene no deshacer: el paquete
+> se sube como `gcm.tar.gz.subiendo` y se renombra al final —durante la subida
+> de 20 MB el archivo existe y esta a medias, y el cron lo cogeria roto—, y el
+> workflow ya NO sube `tmp/restart.txt`, porque el reinicio tiene que pedirse
+> DESPUES del intercambio y lo hace el script.
+
+<!-- Lo de abajo es el diagnostico original del 10 de agosto. Se conserva
+     porque explica por que el arreglo es el que es. -->
+
+### Como era antes: el candado que no caducaba
 
 La noche del 10 de agosto, **seis despliegues seguidos salieron VERDES en
 GitHub Actions y ninguno se aplico**. La causa: `tmp/candado-despliegue`

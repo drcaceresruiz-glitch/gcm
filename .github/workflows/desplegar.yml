@@ -153,116 +153,47 @@ jobs:
           tar -czf envio/gcm.tar.gz -C deploy .
           ls -lh envio/gcm.tar.gz
 
-      # Este archivo es el punto de entrada que ejecuta Passenger. Descomprime
-      # el paquete si hay uno pendiente y despues arranca el servidor. Va
-      # aparte del .tar.gz a proposito: no puede sobrescribirse a si mismo
-      # mientras se esta ejecutando.
+      # El punto de entrada que ejecuta Passenger. Va aparte del .tar.gz a
+      # proposito: no puede sobrescribirse a si mismo mientras se ejecuta.
       - name: Escribir el arranque
         run: |
           cat > envio/app.js <<'FIN'
           // Punto de entrada en cPanel/LiteSpeed.
           //
-          // El despliegue sube un unico gcm.tar.gz y toca tmp/restart.txt. El
-          // servidor reinicia, y este archivo descomprime el paquete antes de
-          // ceder el control al servidor de Next.
+          // NO DESCOMPRIME NADA, Y ESO ES EL ARREGLO. Hasta el 12 de agosto
+          // de 2026 este archivo extraia aqui el gcm.tar.gz, y son 16
+          // segundos medidos: LiteSpeed mata el arranque mucho antes. De ahi
+          // salieron las dos caidas de produccion —el 10, con todos los
+          // despliegues del dia sin aplicar y el arbol mezclando dos
+          // compilaciones; y el 11, con el login devolviendo 404 porque el
+          // manifiesto de acciones era de una version y el JavaScript de
+          // otra—. La regla, que ya estaba escrita y se incumplia aqui
+          // mismo: **nada lento en el arranque, este hosting lo corta.**
           //
-          // Se descomprime aqui y no por FTP porque subir los 1452 archivos
-          // sueltos dejaba la instalacion a medias en cuanto se cortaba una
-          // conexion, y los archivos truncados pasaban desapercibidos.
+          // Ahora aplica el paquete `desplegar.sh`, que lanza un cron cada
+          // minuto. Un cron no tiene cronometro: descomprime aparte,
+          // comprueba que el paquete trae `server.js` y `.next`, y solo
+          // entonces intercambia con renombrados, que son instantaneos.
           //
-          // CANDADO (10 de agosto de 2026, tras una caida de produccion).
-          // LiteSpeed levanta VARIAS instancias de la aplicacion. Sin candado,
-          // una descomprimia sobre el mismo arbol que otra estaba leyendo, y
-          // Node se encontraba los archivos cambiando bajo los pies. Sintomas
-          // observados: "Failed to load external module ...wasm-base64.mjs:
-          // SyntaxError: Invalid or unexpected token" (un archivo leido a
-          // medio escribir), "Failed to find Server Action ... from an older
-          // or newer deployment" (mitad de una version y mitad de otra) y
-          // "The destination stream closed early". Ahora solo UNA instancia
-          // descomprime y las demas esperan a que termine.
+          // Con el cron mandando, el candado que habia aqui sobra y ademas
+          // estorbaba: los dos usaban el MISMO directorio de candado con
+          // caducidades distintas —tres minutos este, diez el script—, asi
+          // que este podia quitarle el candado al otro a mitad de un
+          // intercambio.
           const fs = require("fs");
-          const { execFileSync } = require("child_process");
           const { join } = require("path");
 
-          const raiz = __dirname;
-          const paquete = join(raiz, "gcm.tar.gz");
-          const enCurso = join(raiz, "gcm.tar.gz.desplegando");
-          const candado = join(raiz, "tmp", "candado-despliegue");
-
-          // Un candado abandonado no puede bloquear la aplicacion para
-          // siempre: si la instancia que lo cogio murio, a los tres minutos
-          // cualquiera puede quitarlo.
-          const CADUCA_MS = 3 * 60 * 1000;
-          const ESPERA_MAX_MS = 2 * 60 * 1000;
-
-          function dormir(ms) {
-            // Sincrono a proposito: esto ocurre ANTES de servir nada, y no
-            // puede continuarse de forma asincrona sin arrancar el servidor.
-            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-          }
-
-          function cogerCandado() {
-            try {
-              fs.mkdirSync(candado); // atomico: solo uno gana
-              return true;
-            } catch (e) {
-              if (e.code !== "EEXIST") throw e;
-            }
-            try {
-              const edad = Date.now() - fs.statSync(candado).mtimeMs;
-              if (edad > CADUCA_MS) {
-                console.error("[gcm] Candado caducado (" + Math.round(edad / 1000) + "s). Se retoma.");
-                fs.rmSync(candado, { recursive: true, force: true });
-                fs.mkdirSync(candado);
-                return true;
-              }
-            } catch (e) {
-              // Otra instancia lo solto justo ahora: se reintenta en el bucle.
-            }
-            return false;
-          }
-
-          function descomprimir() {
-            // Se renombra antes de tocarlo: si el proceso muere a mitad, el
-            // siguiente arranque no reintenta sobre un archivo incompleto y
-            // el fallo queda visible en el log en vez de repetirse en bucle.
-            fs.renameSync(paquete, enCurso);
-            execFileSync("tar", ["-xzf", enCurso], { cwd: raiz });
-            fs.unlinkSync(enCurso);
-            console.log("[gcm] Paquete desplegado.");
-          }
-
-          if (fs.existsSync(paquete)) {
-            fs.mkdirSync(join(raiz, "tmp"), { recursive: true });
-            const hasta = Date.now() + ESPERA_MAX_MS;
-            let hecho = false;
-
-            while (!hecho && Date.now() < hasta) {
-              if (cogerCandado()) {
-                try {
-                  // Puede haberlo descomprimido otra instancia mientras se
-                  // esperaba: si ya no esta el paquete, no hay nada que hacer.
-                  if (fs.existsSync(paquete)) descomprimir();
-                  hecho = true;
-                } catch (e) {
-                  console.error("[gcm] No se pudo descomprimir:", e.message);
-                  throw e;
-                } finally {
-                  fs.rmSync(candado, { recursive: true, force: true });
-                }
-              } else if (!fs.existsSync(paquete)) {
-                console.log("[gcm] Otra instancia ya desplego el paquete.");
-                hecho = true;
-              } else {
-                dormir(250);
-              }
-            }
-
-            if (!hecho) {
-              // Arrancar con el arbol a medias es peor que no arrancar: se
-              // veria media version y media otra, que es justo lo que se
-              // quiere evitar.
-              throw new Error("[gcm] Se agoto la espera del candado de despliegue.");
+          // Si hay un paquete esperando, es que el cron no esta haciendo su
+          // trabajo: o no se creo, o esta fallando. Se grita en el log en vez
+          // de descomprimirlo por nuestra cuenta, que es justo lo que
+          // tumbaba el arranque. `/api/health` lo dice tambien, para poder
+          // verlo sin entrar al servidor.
+          for (const pendiente of ["gcm.tar.gz", "gcm.tar.gz.desplegando"]) {
+            if (fs.existsSync(join(__dirname, pendiente))) {
+              console.error(
+                "[gcm] Hay un " + pendiente + " sin aplicar. Revisa el cron de " +
+                  "desplegar.sh y tmp/despliegue.log: esta version NO es la ultima.",
+              );
             }
           }
 
@@ -290,9 +221,21 @@ jobs:
             exit 1
           fi
 
-      # Tres archivos en total. El orden importa: primero el paquete, y el
-      # restart.txt AL FINAL, porque es lo que dispara el reinicio y no debe
-      # llegar antes de que el paquete este completo.
+      # Tres archivos, y el ORDEN es parte del diseno.
+      #
+      # Quien aplica el paquete es `desplegar.sh`, que un cron del servidor
+      # lanza cada minuto y que actua en cuanto ve un `gcm.tar.gz`. De ahi las
+      # dos reglas:
+      #
+      # 1. **El paquete se sube con otro nombre y se renombra al final.**
+      #    Durante la subida de 20 MB el archivo YA EXISTE y esta a medias; si
+      #    se subiera directamente como `gcm.tar.gz`, el cron lo cogeria a
+      #    mitad y fallaria al descomprimir. El renombrado es instantaneo: el
+      #    paquete aparece entero o no aparece.
+      # 2. **Ya no se sube `tmp/restart.txt`.** Antes era lo que disparaba el
+      #    reinicio para que `app.js` descomprimiera. Ahora el reinicio se
+      #    pide DESPUES del intercambio, y lo hace el propio script: subirlo
+      #    aqui reiniciaria antes de haber aplicado nada.
       #
       # ftp:ssl-force        -> control CIFRADO: la contrasena no viaja en claro.
       # ftp:ssl-protect-data -> datos SIN cifrar: este ProFTPD resetea la
@@ -307,8 +250,6 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq lftp
-
-          date -u +"%Y-%m-%dT%H:%M:%SZ" > envio/restart.txt
 
           # Credenciales por ~/.netrc: no aparecen en la lista de procesos.
           umask 077
@@ -326,12 +267,14 @@ jobs:
             set net:timeout 30;
             open '$FTP_SERVER';
             cd '$FTP_SERVER_DIR';
-            put envio/gcm.tar.gz -o gcm.tar.gz;
-            put envio/app.js -o app.js;
             mkdir -f tmp;
-            put envio/restart.txt -o tmp/restart.txt;
+            put scripts/desplegar.sh -o desplegar.sh;
+            put envio/app.js -o app.js;
+            put envio/gcm.tar.gz -o gcm.tar.gz.subiendo;
+            rm -f gcm.tar.gz;
+            mv gcm.tar.gz.subiendo gcm.tar.gz;
             bye
           "
 
           rm -f ~/.netrc
-          echo "Subido. La aplicacion descomprime el paquete al reiniciar."
+          echo "Subido. El cron del servidor aplicara el paquete en menos de un minuto."

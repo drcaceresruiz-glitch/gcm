@@ -125,15 +125,42 @@ standalone).
 
 El archivo de inicio en cPanel debe ser **`app.js`**, no `server.js`. `app.js` es
 un arranque propio que se sube aparte del comprimido —no puede sobrescribirse a
-sí mismo mientras se ejecuta— y hace dos cosas: descomprime `gcm.tar.gz` si hay
-uno pendiente, y después cede el control a `server.js`.
+sí mismo mientras se ejecuta— y desde el 12/08/2026 **no hace nada pesado**:
+solo avisa si hay un paquete sin aplicar y cede el control a `server.js`.
 
-Descomprimir en el arranque, y no por FTP, es lo que permite que el despliegue
-sea automático sin entrar a cPanel.
+### Quién aplica el paquete: el cron, no el arranque
 
-Passenger reinicia al detectar que cambió `tmp/restart.txt`. El workflow lo sube
-**el último**, para que el reinicio nunca se dispare antes de que el paquete esté
-completo.
+> **Esto cambió el 12/08/2026 y es el arreglo de las dos caídas.** Hasta
+> entonces `app.js` descomprimía el `gcm.tar.gz` al arrancar, y son **16
+> segundos medidos**: LiteSpeed mata el arranque mucho antes. De ahí que el 10
+> de agosto ningún despliegue del día se aplicara, y que el 11 el árbol
+> quedara mezclando dos compilaciones con el login devolviendo 404.
+
+Ahora lo aplica **`scripts/desplegar.sh`**, que un cron lanza cada minuto. Un
+cron no tiene cronómetro. El script descomprime en un directorio aparte,
+comprueba que el paquete trae `server.js` y `.next`, y solo entonces
+intercambia con renombrados, que son instantáneos. Si algo falla antes del
+cambio no toca nada y la versión que servía sigue en pie —media versión
+desplegada es peor que una versión vieja—. Como el intercambio sustituye el
+árbol entero, también se lleva el sedimento de compilaciones anteriores.
+
+**El cron hay que crearlo a mano** en cPanel → *Trabajos cron*, cada minuto:
+
+```bash
+cd ~/RUTA_DE_LA_APP && bash desplegar.sh >/dev/null 2>&1
+```
+
+Sin ese cron **ningún despliegue se aplica**. Se nota sin entrar al servidor:
+`/api/health` responde `"despliegue":"pendiente"`, y `app.js` lo grita en el
+log al arrancar. El porqué de cada intento está en `tmp/despliegue.log`.
+
+Passenger reinicia al detectar que cambió `tmp/restart.txt`. **Lo escribe el
+script al terminar el intercambio, y ya no el workflow**: subirlo antes
+reiniciaba la aplicación sin haber aplicado nada.
+
+Y el paquete se sube como `gcm.tar.gz.subiendo` y se renombra al final. Durante
+la subida de 20 MB el archivo ya existe y está a medias; sin ese rodeo, el cron
+lo cogría a mitad y fallaría al descomprimir.
 
 > ⚠️ **Una instancia vieja puede sobrevivir días, y `restart.txt` no siempre se
 > la lleva.** El 11/08/2026 había **dos** `next-server` a la vez: uno recién
@@ -246,15 +273,19 @@ abre el sitio (o `curl` a `/api/health`) y repítelo. La alternativa manual es
 copiarla de cPanel → *Setup Node.js App* → *Environment variables* y pegarla
 entre **comillas simples**, que la contraseña suele traer `$` o `!`.
 
-> **El despliegue no se aplica hasta la primera petición.** El workflow sube
-> `gcm.tar.gz` y toca `tmp/restart.txt`, pero quien descomprime el paquete es
-> `app.js` al arrancar, y Passenger no arranca hasta que alguien pide una
-> página. Con el workflow en verde y sin haber abierto el sitio, el servidor
-> **sigue ejecutando el código anterior**: `prisma/migrations/` no tiene la
-> migración nueva y `migrate resolve` responde `P3017`.
+> **Espera a que el cron aplique el paquete antes de migrar.** El workflow
+> sube el `gcm.tar.gz` y ahí se acaba su trabajo; quien lo aplica es el cron,
+> que corre cada minuto. Hasta entonces el servidor **sigue ejecutando el
+> código anterior**, `prisma/migrations/` no tiene la migración nueva y
+> `migrate resolve` responde `P3017`.
 >
-> Antes de tocar el Terminal, **abre `gcm.drcaceresruiz.com`**. Para
-> comprobar en qué estado está:
+> *(Hasta el 12/08/2026 esto dependía de que alguien abriera el sitio, porque
+> descomprimía `app.js` al arrancar y Passenger no arranca hasta la primera
+> petición. Ya no: el cron lo hace solo, lo pida alguien o no.)*
+>
+> Para comprobar en qué estado está, lo más rápido es desde fuera:
+> `curl -s https://gcm.drcaceresruiz.com/api/health` dice `"despliegue"` y el
+> SHA de la compilación viva. Y en el servidor:
 >
 > ```bash
 > ls ~/gcm/gcm.tar.gz ~/gcm/gcm.tar.gz.desplegando 2>&1

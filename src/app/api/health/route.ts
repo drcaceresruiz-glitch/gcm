@@ -25,6 +25,10 @@ export async function GET() {
       baseDatos: "conectada",
       latenciaMs: salud.latenciaMs,
       version: process.env["BUILD_SHA"] ?? "dev",
+      // "pendiente" = hay un paquete subido que nadie aplico, o sea que esta
+      // NO es la ultima version. Se dice aqui para poder saberlo con un curl,
+      // sin entrar al servidor a mirar fechas de archivos.
+      despliegue: salud.desplieguePendiente ? "pendiente" : "al dia",
     },
     { headers: { "Cache-Control": "no-store" } },
   );
