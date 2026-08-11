@@ -1,7 +1,6 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { env } from "@/lib/env";
 import { obraAdmiteCambios } from "@/lib/obras";
 import {
   diaDeClave,
@@ -16,9 +15,13 @@ import {
   type EstadoReloj,
   type MotivoAviso,
 } from "@/lib/avisos";
-import { FLUJOS_RESTRICCION } from "@/lib/lookahead";
-import { enviarCorreo, correoRestricciones } from "@/services/mailer.service";
-import { despacharPorCanal, suscripcionesResueltas } from "@/services/avisos-envio";
+import {
+  despacharLotes,
+  entregarCorreo,
+  entregarSms,
+  repartoDeAviso,
+  suscripcionesResueltas,
+} from "@/services/avisos-envio";
 import type { EventoAviso } from "@/generated/prisma/enums";
 
 /**
@@ -60,14 +63,12 @@ const PRESUPUESTO_MS = 20_000;
 /// para siempre —el mismo fallo que el candado de `desplegar.sh` ya tuvo—.
 const PASADA_MUERTA_MS = PRESUPUESTO_MS * 3;
 
-/// Cuantas filas de tarea caben en un correo antes de resumir ("y otras 30").
-const MAX_LINEAS_CORREO = 25;
-
 export interface ResumenPasada {
   ok: boolean;
   obras: number;
   avisosApp: number;
   correos: number;
+  sms: number;
   siguiente: string | null;
   cortadaPorTiempo: boolean;
   /// Otra pasada estaba corriendo: esta se declina sin hacer nada.
@@ -112,6 +113,7 @@ export async function pasadaDelReloj(): Promise<ResumenPasada> {
       obras: 0,
       avisosApp: 0,
       correos: 0,
+      sms: 0,
       siguiente: previa.cursor,
       cortadaPorTiempo: false,
       solapada: true,
@@ -127,6 +129,7 @@ export async function pasadaDelReloj(): Promise<ResumenPasada> {
   let obrasVistas = 0;
   let avisosApp = 0;
   let correos = 0;
+  let sms = 0;
   let cortadaPorTiempo = false;
   let cursor = previa?.cursor ?? null;
   let error: string | null = null;
@@ -157,6 +160,7 @@ export async function pasadaDelReloj(): Promise<ResumenPasada> {
       obrasVistas += 1;
       avisosApp += r.avisosApp;
       correos += r.correos;
+      sms += r.sms;
       // El cursor avanza obra a obra: si la siguiente revienta, lo ya hecho
       // no se repite.
       cursor = obra.id;
@@ -174,7 +178,7 @@ export async function pasadaDelReloj(): Promise<ResumenPasada> {
       terminadaAt: new Date(),
       cursor,
       obrasVistas,
-      avisosCreados: avisosApp + correos,
+      avisosCreados: avisosApp + correos + sms,
       error: error?.slice(0, 300) ?? null,
     },
   });
@@ -184,6 +188,7 @@ export async function pasadaDelReloj(): Promise<ResumenPasada> {
     obras: obrasVistas,
     avisosApp,
     correos,
+    sms,
     siguiente: cursor,
     cortadaPorTiempo,
     ...(error ? { error } : {}),
@@ -202,28 +207,34 @@ async function pasadaDeObra(
   obra: ObraDelReloj,
   ahora: Date,
   correosDisponibles: number,
-): Promise<{ avisosApp: number; correos: number }> {
+): Promise<{ avisosApp: number; correos: number; sms: number }> {
+  const nada = { avisosApp: 0, correos: 0, sms: 0 };
+
   const ajustes = await prisma.ajustesAvisosObra.findUnique({
     where: { projectId: obra.id },
-    select: { activo: true, diasRecordatorio: true, horaResumen: true, createdAt: true },
+    select: {
+      activo: true,
+      diasRecordatorio: true,
+      horaResumen: true,
+      maxSmsDia: true,
+      createdAt: true,
+    },
   });
 
   // Sin fila, la obra nunca configuro nada. El recordatorio y el resumen NO se
   // dan por defecto: son los dos que insisten, y empezar a insistirle a quien
   // no lo pidio es la forma mas rapida de que apague los avisos enteros.
-  if (!ajustes || !ajustes.activo) return { avisosApp: 0, correos: 0 };
+  if (!ajustes || !ajustes.activo) return nada;
 
   const umbral = ajustes.diasRecordatorio;
 
   // La primera pasada sobre una obra con cuarenta restricciones viejas
   // mandaria cuarenta recordatorios de golpe, y quien acaba de configurar los
   // avisos concluiria —con razon— que esto es spam.
-  if (esEstreno(ajustes.createdAt, ahora, umbral)) {
-    return { avisosApp: 0, correos: 0 };
-  }
+  if (esEstreno(ajustes.createdAt, ahora, umbral)) return nada;
 
   const resueltas = await suscripcionesResueltas(obra.id);
-  if (resueltas.length === 0) return { avisosApp: 0, correos: 0 };
+  if (resueltas.length === 0) return nada;
 
   const abiertas = await prisma.restriccion.findMany({
     where: { resuelta: false, tarea: { projectId: obra.id } },
@@ -233,7 +244,7 @@ async function pasadaDeObra(
       tarea: { select: { uid: true } },
     },
   });
-  if (abiertas.length === 0) return { avisosApp: 0, correos: 0 };
+  if (abiertas.length === 0) return nada;
 
   const nombres = await nombresDeTareas(
     obra.id,
@@ -249,92 +260,115 @@ async function pasadaDeObra(
 
   let avisosApp = 0;
   let correos = 0;
+  let sms = 0;
 
   // Recordatorio: solo lo que hoy toca. Cada N dias, no todos los dias.
   const paraRecordar = todos.filter((m) => tocaRecordar(m.diasAbierta, umbral));
   if (paraRecordar.length > 0) {
     const r = await despachar(obra, "RECORDAR", paraRecordar, resueltas, {
+      maxSmsDia: ajustes.maxSmsDia,
       correosDisponibles: correosDisponibles - correos,
     });
     avisosApp += r.avisosApp;
     correos += r.correos;
+    sms += r.sms;
   }
 
   // Resumen: una vez al dia, a partir de la hora que diga la obra.
   if (ahora.getHours() >= ajustes.horaResumen) {
     const r = await despachar(obra, "RESUMEN", todos, resueltas, {
+      maxSmsDia: ajustes.maxSmsDia,
       correosDisponibles: correosDisponibles - correos,
     });
     avisosApp += r.avisosApp;
     correos += r.correos;
+    sms += r.sms;
   }
 
-  return { avisosApp, correos };
+  return { avisosApp, correos, sms };
 }
 
+/**
+ * Un evento por los tres canales.
+ *
+ * El reparto se calcula UNA vez y se reparte entre canales, en vez de uno por
+ * canal: el tope de SMS degrada a correo lo que no cabe, y para saber si ese
+ * correo ya iba a salir hay que tener delante el reparto entero.
+ */
 async function despachar(
   obra: ObraDelReloj,
   evento: EventoAviso,
   motivos: readonly MotivoAviso[],
   resueltas: Awaited<ReturnType<typeof suscripcionesResueltas>>,
-  limites: { correosDisponibles: number },
-): Promise<{ avisosApp: number; correos: number }> {
+  limites: { maxSmsDia: number; correosDisponibles: number },
+): Promise<{ avisosApp: number; correos: number; sms: number }> {
   const dia = diaDeClave(new Date());
+  const contexto = { companyId: obra.companyId, projectId: obra.id };
 
-  const app = await despacharPorCanal({
-    contexto: { companyId: obra.companyId, projectId: obra.id },
+  const todos = await repartoDeAviso({
+    projectId: obra.id,
     evento,
     motivos,
     resueltas,
-    canal: "APP",
+    maxSmsDia: limites.maxSmsDia,
     dia,
-    entregar: async () => true,
+  });
+  if (todos.length === 0) return { avisosApp: 0, correos: 0, sms: 0 };
+
+  const comun = { contexto, evento, todos, dia };
+
+  const avisosApp = await despacharLotes({
+    ...comun,
+    canal: "APP",
+    entregar: (persona, suyos) => avisoEnBandeja(contexto, evento, persona, suyos),
   });
 
-  let correos = 0;
-  if (limites.correosDisponibles > 0) {
-    const r = await despacharPorCanal({
-      contexto: { companyId: obra.companyId, projectId: obra.id },
-      evento,
-      motivos,
-      resueltas,
-      canal: "CORREO",
-      dia,
-      tope: limites.correosDisponibles,
-      entregar: async (persona, suyos) => {
-        if (!persona.email) return false;
+  const sms = await despacharLotes({
+    ...comun,
+    canal: "SMS",
+    entregar: (persona, suyos) =>
+      entregarSms(contexto, obra.nombreObra, persona, suyos),
+  });
 
-        const texto = textoAviso(evento, suyos);
-        const enlace = `${env.APP_URL.replace(/\/$/, "")}/obras/${obra.id}/lookahead`;
+  // El correo va el ULTIMO y con el presupuesto que quede de la pasada: es el
+  // unico canal lento —una conversacion SMTP por persona— y si algo se queda
+  // fuera por tiempo, mejor que sea este y no la campanita ni el SMS.
+  const correos =
+    limites.correosDisponibles > 0
+      ? await despacharLotes({
+          ...comun,
+          canal: "CORREO",
+          tope: limites.correosDisponibles,
+          entregar: (persona, suyos) =>
+            entregarCorreo(contexto, obra.nombreObra, evento, persona, suyos),
+        })
+      : 0;
 
-        const { enviado } = await enviarCorreo({
-          para: persona.email,
-          ...correoRestricciones({
-            nombre: persona.nombre,
-            obra: obra.nombreObra,
-            titulo: texto.titulo,
-            cuerpo: texto.cuerpo,
-            lineas: suyos.slice(0, MAX_LINEAS_CORREO).map((m) => ({
-              tarea: m.tarea,
-              flujo: etiqueta(m.tipo),
-              dias: m.diasAbierta,
-            })),
-            masCuantas: Math.max(0, suyos.length - MAX_LINEAS_CORREO),
-            enlace,
-          }),
-        });
-        return enviado;
-      },
-    });
-    correos = r;
-  }
-
-  return { avisosApp: app, correos };
+  return { avisosApp, correos, sms };
 }
 
-const ETIQUETAS = new Map(FLUJOS_RESTRICCION.map((f) => [f.tipo, f.etiqueta]));
-function etiqueta(tipo: MotivoAviso["tipo"]): string {
-  return ETIQUETAS.get(tipo) ?? tipo;
+/// La campanita. Solo la tienen los usuarios de GCM; alguien de fuera no.
+async function avisoEnBandeja(
+  contexto: { companyId: string; projectId: string },
+  evento: EventoAviso,
+  persona: { clave: string },
+  motivos: MotivoAviso[],
+): Promise<boolean> {
+  if (!persona.clave.startsWith("u:")) return false;
+
+  const texto = textoAviso(evento, motivos);
+  await prisma.aviso.create({
+    data: {
+      companyId: contexto.companyId,
+      projectId: contexto.projectId,
+      userId: persona.clave.slice(2),
+      evento,
+      titulo: texto.titulo.slice(0, 200),
+      cuerpo: texto.cuerpo.slice(0, 400),
+      camino: "/lookahead",
+    },
+  });
+  return true;
 }
 
 /// Los nombres viven en el cronograma vigente: el Lookahead se ancla por uid.

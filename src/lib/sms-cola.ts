@@ -47,6 +47,26 @@ export const MAXIMO_POR_ENTREGA = 5;
 export const MAXIMO_ENTREGAS = 5;
 
 /**
+ * Que sale antes cuando hay cola. Mas alto, antes.
+ *
+ * Un codigo de acceso CADUCA a los diez minutos; un aviso de restriccion no
+ * caduca nunca. Sin este orden, diez avisos encolados por delante pueden dejar
+ * a alguien sin poder entrar en su cuenta por culpa de un aviso de materiales
+ * —el codigo sale el undecimo, cuando ya no vale—.
+ *
+ * La solucion NO era subir `MAXIMO_POR_ENTREGA`: ese tope es lo que protege la
+ * SIM del corte por antispam. Lo que hay que ordenar es la cola, no ensancharla.
+ *
+ * OJO: la columna tiene `@default(0)` y aqui el valor por defecto del codigo es
+ * el URGENTE. No es un descuido: quien olvide pasar la prioridad al encolar
+ * algo nuevo se lleva el trato preferente, que es el fallo inofensivo. Al reves
+ * —olvidarlo y que el codigo de acceso quede detras— es el que deja a alguien
+ * fuera de su cuenta.
+ */
+export const PRIORIDAD_CODIGO = 10;
+export const PRIORIDAD_AVISO = 0;
+
+/**
  * La credencial que viene en `Authorization: Bearer <token>`.
  *
  * Devuelve null si falta o no tiene esa forma. No se acepta el token por

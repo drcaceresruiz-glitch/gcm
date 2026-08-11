@@ -1,15 +1,26 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
+import { FLUJOS_RESTRICCION } from "@/lib/lookahead";
 import {
+  acotarPorTope,
   claveDeAviso,
   diaDeClave,
   repartirAvisos,
   textoAviso,
+  textoAvisoSms,
+  MAX_SMS_POR_PASADA,
+  MAX_SMS_POR_PERSONA_DIA,
+  type Gastado,
+  type Lote,
   type MotivoAviso,
   type Persona,
   type SuscripcionResuelta,
 } from "@/lib/avisos";
+import { PRIORIDAD_AVISO } from "@/lib/sms-cola";
+import { enviarSms } from "@/services/sms.service";
+import { enviarCorreo, correoRestricciones } from "@/services/mailer.service";
 import type {
   CanalAviso,
   EventoAviso,
@@ -37,7 +48,53 @@ export interface ContextoAviso {
 const MAX_POR_TANDA = 200;
 
 /**
- * Reparte un evento por UN canal y entrega lo que toque.
+ * El reparto de un evento, ya con los topes de SMS aplicados.
+ *
+ * Se calcula UNA vez para los tres canales y no uno por canal, porque el tope
+ * de SMS no se puede decidir mirando solo los SMS: lo que no cabe se convierte
+ * en correo, y para saber si ese correo ya iba a salir hay que tener delante
+ * el reparto entero.
+ */
+export async function repartoDeAviso(args: {
+  projectId: string;
+  evento: EventoAviso;
+  motivos: readonly MotivoAviso[];
+  resueltas: readonly SuscripcionResuelta[];
+  /// Tope diario de SMS de esta obra. Lo dice `AjustesAvisosObra.maxSmsDia`.
+  maxSmsDia: number;
+  dia: string;
+}): Promise<Lote[]> {
+  const crudo = repartirAvisos(args.resueltas, args.motivos, args.evento);
+  if (crudo.length === 0) return [];
+
+  const gastado = await gastoDeSmsHoy(args.projectId, args.dia);
+
+  const { lotes, degradados, descartados } = acotarPorTope(crudo, gastado, {
+    porPersonaDia: MAX_SMS_POR_PERSONA_DIA,
+    porObraDia: args.maxSmsDia,
+    porPasada: MAX_SMS_POR_PASADA,
+  });
+
+  // Se dice, no se calla. Un aviso que se degrado a correo llego igual; uno
+  // que se descarto NO llego a nadie, y esa persona figura en la pantalla como
+  // si cubriera un flujo.
+  if (descartados.length > 0) {
+    console.warn(
+      `[avisos] ${descartados.length} destinatario(s) sin ningun canal en ${args.projectId}: ` +
+        descartados.map((d) => `${d.clave}(${d.motivo})`).join(", "),
+    );
+  }
+  if (degradados.length > 0) {
+    console.info(
+      `[avisos] ${degradados.length} SMS pasaron a correo por tope en ${args.projectId}`,
+    );
+  }
+
+  return lotes;
+}
+
+/**
+ * Entrega los lotes de UN canal, con la reserva que impide repetir.
  *
  * El orden es lo unico que importa aqui, y es este:
  *
@@ -51,11 +108,10 @@ const MAX_POR_TANDA = 200;
  * antes con un `findFirst` no valdria: entre la lectura y la escritura cabe
  * la otra pasada.
  */
-export async function despacharPorCanal(args: {
+export async function despacharLotes(args: {
   contexto: ContextoAviso;
   evento: EventoAviso;
-  motivos: readonly MotivoAviso[];
-  resueltas: readonly SuscripcionResuelta[];
+  todos: readonly Lote[];
   canal: CanalAviso;
   /// El dia, para las claves de lo que se repite (recordatorio, resumen).
   dia: string;
@@ -64,10 +120,9 @@ export async function despacharPorCanal(args: {
   /// Que hacer con cada destinatario. Devuelve si de verdad salio.
   entregar: (persona: Persona, motivos: MotivoAviso[]) => Promise<boolean>;
 }): Promise<number> {
-  const { contexto, evento, motivos, resueltas, canal, dia, entregar } = args;
-  if (motivos.length === 0) return 0;
+  const { contexto, evento, canal, dia, entregar } = args;
 
-  const lotes = repartirAvisos(resueltas, motivos, evento)
+  const lotes = args.todos
     .filter((l) => l.canal === canal)
     .slice(0, Math.min(args.tope ?? MAX_POR_TANDA, MAX_POR_TANDA));
 
@@ -127,39 +182,74 @@ export async function despacharPorCanal(args: {
 }
 
 /**
- * Escribe los avisos in-app de unos hechos. **NUNCA lanza.**
+ * Cuantos correos se permiten DENTRO de una accion de servidor.
+ *
+ * Seis. `enviarCorreo` es sincrono y sin cola: cada uno es una conversacion
+ * SMTP entera, y LiteSpeed corta lo lento. Los suscriptores tipicos de una
+ * obra son dos o tres, asi que este techo casi nunca se toca; cuando se toca,
+ * lo que sobra no se pierde —el resumen del dia lo recoge, y el aviso in-app
+ * ya salio—.
+ *
+ * El reloj no usa este tope: alli manda `MAX_CORREOS_POR_PASADA`, que es mucho
+ * mayor porque nadie esta esperando delante de una pantalla.
+ */
+const MAX_CORREOS_EN_ACCION = 6;
+
+/**
+ * Avisa de unos hechos por los tres canales. **NUNCA lanza.**
  *
  * Se llama FUERA de la transaccion de la operacion que lo origino y con su
  * propio try/catch, por la misma razon por la que `enviarCorreo` se traga sus
  * fallos: un aviso perdido es un incordio, pero una restriccion que no se
  * guardo por culpa de un aviso es un dato falso.
+ *
+ * El SMS sale por la cola —que es un INSERT, no una llamada— asi que aqui es
+ * barato. El correo no, y por eso lleva su propio techo.
  */
-export async function avisarEnApp(
+export async function avisarDeHechos(
   contexto: ContextoAviso,
   evento: EventoAviso,
   motivos: readonly MotivoAviso[],
-): Promise<{ creados: number }> {
-  if (motivos.length === 0) return { creados: 0 };
+): Promise<{ app: number; correos: number; sms: number }> {
+  const nada = { app: 0, correos: 0, sms: 0 };
+  if (motivos.length === 0) return nada;
 
   try {
-    const ajustes = await prisma.ajustesAvisosObra.findUnique({
-      where: { projectId: contexto.projectId },
-      select: { activo: true },
-    });
+    const [ajustes, obra] = await Promise.all([
+      prisma.ajustesAvisosObra.findUnique({
+        where: { projectId: contexto.projectId },
+        select: { activo: true, maxSmsDia: true },
+      }),
+      prisma.project.findUnique({
+        where: { id: contexto.projectId },
+        select: { nombreObra: true },
+      }),
+    ]);
+
     // Sin fila, la obra nunca lo configuro: se avisa igual, con los valores
     // por defecto. Lo que apaga es haberlo apagado a mano.
-    if (ajustes && !ajustes.activo) return { creados: 0 };
+    if (ajustes && !ajustes.activo) return nada;
+    if (!obra) return nada;
 
     const resueltas = await suscripcionesResueltas(contexto.projectId);
-    if (resueltas.length === 0) return { creados: 0 };
+    if (resueltas.length === 0) return nada;
 
-    const creados = await despacharPorCanal({
-      contexto,
+    const dia = diaDeClave(new Date());
+    const todos = await repartoDeAviso({
+      projectId: contexto.projectId,
       evento,
       motivos,
       resueltas,
+      maxSmsDia: ajustes?.maxSmsDia ?? 20,
+      dia,
+    });
+    if (todos.length === 0) return nada;
+
+    const comun = { contexto, evento, todos, dia };
+
+    const app = await despacharLotes({
+      ...comun,
       canal: "APP",
-      dia: diaDeClave(new Date()),
       entregar: async (persona, suyos) => {
         const userId = idDeUsuario(persona);
         // Solo los usuarios de GCM tienen bandeja. `canalesEfectivos` ya lo
@@ -182,11 +272,123 @@ export async function avisarEnApp(
       },
     });
 
-    return { creados };
+    const sms = await despacharLotes({
+      ...comun,
+      canal: "SMS",
+      entregar: (persona, suyos) =>
+        entregarSms(contexto, obra.nombreObra, persona, suyos),
+    });
+
+    const correos = await despacharLotes({
+      ...comun,
+      canal: "CORREO",
+      tope: MAX_CORREOS_EN_ACCION,
+      entregar: (persona, suyos) =>
+        entregarCorreo(contexto, obra.nombreObra, evento, persona, suyos),
+    });
+
+    return { app, correos, sms };
   } catch (e) {
     console.error("[avisos] No se pudo avisar:", e);
-    return { creados: 0 };
+    return nada;
   }
+}
+
+/**
+ * El SMS de un aviso.
+ *
+ * Va con `PRIORIDAD_AVISO`, la mas baja: un codigo de acceso caduca a los diez
+ * minutos y este no caduca nunca, asi que si coinciden en la cola el codigo
+ * pasa primero. Y con `projectId`, sin el cual el tope diario por obra no se
+ * podria contar.
+ */
+export async function entregarSms(
+  contexto: ContextoAviso,
+  nombreObra: string,
+  persona: Persona,
+  motivos: MotivoAviso[],
+): Promise<boolean> {
+  if (!persona.celular) return false;
+
+  const { enviado } = await enviarSms(
+    contexto.companyId,
+    persona.celular,
+    textoAvisoSms(nombreObra, motivos),
+    { projectId: contexto.projectId, prioridad: PRIORIDAD_AVISO },
+  );
+  return enviado;
+}
+
+/// Cuantas filas de tarea caben en un correo antes de resumir ("y otras 30").
+const MAX_LINEAS_CORREO = 25;
+
+/** El correo de un aviso. Este SI lleva enlace, al contrario que el SMS. */
+export async function entregarCorreo(
+  contexto: ContextoAviso,
+  nombreObra: string,
+  evento: EventoAviso,
+  persona: Persona,
+  motivos: MotivoAviso[],
+): Promise<boolean> {
+  if (!persona.email) return false;
+
+  const texto = textoAviso(evento, motivos);
+  const enlace = `${env.APP_URL.replace(/\/$/, "")}/obras/${contexto.projectId}/lookahead`;
+
+  const { enviado } = await enviarCorreo({
+    para: persona.email,
+    ...correoRestricciones({
+      nombre: persona.nombre,
+      obra: nombreObra,
+      titulo: texto.titulo,
+      cuerpo: texto.cuerpo,
+      lineas: motivos.slice(0, MAX_LINEAS_CORREO).map((m) => ({
+        tarea: m.tarea,
+        flujo: etiquetaDeFlujo(m.tipo),
+        dias: m.diasAbierta,
+      })),
+      masCuantas: Math.max(0, motivos.length - MAX_LINEAS_CORREO),
+      enlace,
+    }),
+  });
+  return enviado;
+}
+
+const ETIQUETAS = new Map(FLUJOS_RESTRICCION.map((f) => [f.tipo, f.etiqueta]));
+
+/** El nombre del flujo tal como se ve en la matriz, no el del enum. */
+export function etiquetaDeFlujo(tipo: TipoRestriccion): string {
+  return ETIQUETAS.get(tipo) ?? tipo;
+}
+
+/**
+ * Cuantos SMS de aviso lleva hoy esta obra, y cuantos cada persona.
+ *
+ * Se cuenta sobre `EnvioAviso` y no sobre `MensajeSms` a proposito: alli esta
+ * la clave de la PERSONA, y el tope por persona es el que de verdad importa
+ * —el cuarto SMS del dia ya no informa, entrena a ignorarlos—. `MensajeSms`
+ * solo tiene el numero, y un numero no dice a quien pertenece.
+ */
+async function gastoDeSmsHoy(projectId: string, dia: string): Promise<Gastado> {
+  const desde = new Date(`${dia}T00:00:00`);
+
+  const enviados = await prisma.envioAviso.findMany({
+    where: { projectId, canal: "SMS", enviado: true, createdAt: { gte: desde } },
+    select: { userId: true, contactoId: true },
+  });
+
+  const porPersona = new Map<string, number>();
+  for (const e of enviados) {
+    const clave = e.userId
+      ? `u:${e.userId}`
+      : e.contactoId
+        ? `c:${e.contactoId}`
+        : null;
+    if (!clave) continue;
+    porPersona.set(clave, (porPersona.get(clave) ?? 0) + 1);
+  }
+
+  return { porPersona, porObra: enviados.length };
 }
 
 // ---------------------------------------------------------------------------

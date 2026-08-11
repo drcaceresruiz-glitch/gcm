@@ -72,7 +72,7 @@ CUERPO="$(echo "$RESPUESTA" | sed '$d')"
 # hace falta.
 case "$CODIGO" in
   200)
-    if echo "$CUERPO" | grep -q '"avisosApp":0,"correos":0'; then
+    if echo "$CUERPO" | grep -q '"avisosApp":0,"correos":0,"sms":0'; then
       exit 0
     fi
     anotar "$CUERPO"

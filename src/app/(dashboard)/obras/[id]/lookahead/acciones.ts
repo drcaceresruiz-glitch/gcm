@@ -11,7 +11,7 @@ import {
   levantarTodasDeTareas,
   type ResultadoAnalisis,
 } from "@/services/lookahead.service";
-import { avisarEnApp, motivosDeHechos } from "@/services/avisos-envio";
+import { avisarDeHechos, motivosDeHechos } from "@/services/avisos-envio";
 import type { ModoFlujos } from "@/lib/lookahead";
 import type { TipoRestriccion } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
@@ -73,9 +73,11 @@ function revalidar(obraId: string): void {
  * aviso perdido es un incordio, pero un analisis que no se guardo porque el
  * aviso reviento es un dato falso en la pantalla del residente.
  *
- * Solo escribe la campanita. El correo y el SMS no salen de aqui: son
- * sincronos y treinta de ellos dejarian esta accion colgada hasta que
- * LiteSpeed la corte. Eso lo hara el reloj, por lotes.
+ * Salen los tres canales, pero no cuestan lo mismo. El SMS va por la cola, que
+ * es un INSERT: el telefono de la empresa lo recoge despues. El correo si es
+ * sincrono —una conversacion SMTP por persona— y por eso lleva un techo bajo
+ * dentro de la accion; lo que no quepa lo recoge el resumen del dia, y la
+ * campanita ya salio.
  */
 async function avisar(
   sesion: SesionActiva,
@@ -88,10 +90,11 @@ async function avisar(
     const contexto = { companyId: sesion.companyId, projectId: obraId };
     const motivos = await motivosDeHechos(obraId, hechos.abiertas, hechos.listas);
 
-    await Promise.all([
-      avisarEnApp(contexto, "ABRIR", motivos.abiertas),
-      avisarEnApp(contexto, "LISTA", motivos.listas),
-    ]);
+    // En serie y no con `Promise.all`: los dos comparten el presupuesto de
+    // correo y el tope de SMS, y en paralelo cada uno creeria que lo tiene
+    // entero para si.
+    await avisarDeHechos(contexto, "ABRIR", motivos.abiertas);
+    await avisarDeHechos(contexto, "LISTA", motivos.listas);
   } catch (e) {
     console.error("[avisos] No se pudo avisar del Lookahead:", e);
   }

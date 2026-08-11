@@ -7,6 +7,7 @@ import {
   GRACIA_PRESTAMO_SEGUNDOS,
   MAXIMO_ENTREGAS,
   MAXIMO_POR_ENTREGA,
+  PRIORIDAD_CODIGO,
   caducidadDeMensaje,
   tokenValido,
 } from "@/lib/sms-cola";
@@ -98,11 +99,22 @@ export async function hayColaSms(companyId: string): Promise<boolean> {
   return Boolean(global && global.length >= 32);
 }
 
-/** Deja un SMS en la cola de su empresa. Nunca lanza. */
+/**
+ * Deja un SMS en la cola de su empresa. Nunca lanza.
+ *
+ * `prioridad` por defecto es la del CODIGO, no la del aviso: quien encole algo
+ * nuevo y se olvide de decirlo se lleva el trato preferente, que es el fallo
+ * inofensivo. Ver `PRIORIDAD_CODIGO` en @/lib/sms-cola.
+ *
+ * `projectId` es opcional porque no todo SMS sale de una obra —un codigo de
+ * acceso a GCM no—, pero cuando sale de una hay que decirlo: el tope diario de
+ * SMS por obra no se puede calcular sin eso.
+ */
 export async function encolarSms(
   companyId: string,
   numero: string,
   texto: string,
+  opciones?: { projectId?: string | null; prioridad?: number },
 ): Promise<boolean> {
   try {
     const ahora = new Date();
@@ -112,6 +124,8 @@ export async function encolarSms(
         numero: numero.slice(0, 20),
         texto: texto.slice(0, 320),
         expiraAt: caducidadDeMensaje(ahora),
+        projectId: opciones?.projectId ?? null,
+        prioridad: opciones?.prioridad ?? PRIORIDAD_CODIGO,
       },
     });
     return true;
@@ -157,7 +171,10 @@ export async function recogerPendientes(
       entregas: { lt: MAXIMO_ENTREGAS },
       OR: [{ tomadoAt: null }, { tomadoAt: { lte: limitePrestamo } }],
     },
-    orderBy: { createdAt: "asc" },
+    // Primero lo urgente, y dentro de cada nivel lo mas antiguo. Un codigo de
+    // acceso caduca a los diez minutos; un aviso de restriccion no caduca, asi
+    // que puede esperar el siguiente sorbo de la cola.
+    orderBy: [{ prioridad: "desc" }, { createdAt: "asc" }],
     take: MAXIMO_POR_ENTREGA,
     select: { id: true, numero: true, texto: true },
   });

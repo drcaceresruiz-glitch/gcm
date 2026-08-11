@@ -73,11 +73,17 @@ export async function hayCanalSms(companyId: string): Promise<boolean> {
  * @param companyId De quien es el mensaje. La cola es por empresa: sin esto
  *   el telefono de una constructora recogeria los codigos de otra.
  * @param numero Celular en el formato que guarda GCM (nueve cifras).
+ * @param opciones De que obra sale y con que urgencia. Solo llegan a la cola
+ *   propia: la pasarela de json.pe manda al momento y no tiene nada que
+ *   ordenar. Sin `projectId` no se puede contar cuantos SMS gasta una obra, y
+ *   sin `prioridad` un aviso puede adelantar a un codigo de acceso que caduca
+ *   en diez minutos.
  */
 export async function enviarSms(
   companyId: string,
   numero: string,
   mensaje: string,
+  opciones?: { projectId?: string | null; prioridad?: number },
 ): Promise<ResultadoSms> {
   const canales = canalesAProbar({
     cola: await hayColaSms(companyId),
@@ -101,7 +107,7 @@ export async function enviarSms(
   for (const canal of canales) {
     const r =
       canal === "cola"
-        ? await porLaCola(companyId, numero, mensaje)
+        ? await porLaCola(companyId, numero, mensaje, opciones)
         : await enviarPorPasarela(numero, mensaje);
 
     if (r.enviado) return r;
@@ -122,8 +128,9 @@ async function porLaCola(
   companyId: string,
   numero: string,
   mensaje: string,
+  opciones?: { projectId?: string | null; prioridad?: number },
 ): Promise<ResultadoSms> {
-  const encolado = await encolarSms(companyId, numero, mensaje);
+  const encolado = await encolarSms(companyId, numero, mensaje, opciones);
 
   return encolado
     ? { enviado: true, encolado: true }
