@@ -126,8 +126,55 @@ model Company {
   ordenes     OrdenCompra[]
   formasPago  FormaPagoPlantilla[]
   solicitudesPerfil SolicitudCambioPerfil[]
+  emisoresSms       EmisorSms[]
+  mensajesSms       MensajeSms[]
 
   @@map("companies")
+}
+
+/// El telefono que manda los SMS de UNA empresa.
+///
+/// Existe porque hasta el 12 de agosto de 2026 habia un unico
+/// SMS_COLA_TOKEN para toda la plataforma. Con una sola constructora daba
+/// igual; con dos, los codigos de acceso de una saldrian por el movil de la
+/// otra. Cada empresa tiene ahora los suyos.
+///
+/// Se guarda el HASH del token, nunca el token: igual que las sesiones y los
+/// codigos del pase. Al vincular se ensena una vez en pantalla y no se puede
+/// volver a ver; si se pierde, se revoca y se crea otro.
+///
+/// Puede haber VARIOS por empresa a proposito: un telefono de respaldo evita
+/// que la obra se quede sin SMS porque uno se quedo sin bateria.
+model EmisorSms {
+  id        String @id @default(cuid())
+  companyId String
+
+  /// Como lo llama la gente: "el de la caseta", "telefono de Juan". Sirve
+  /// para saber cual revocar cuando haya dos.
+  etiqueta String @db.VarChar(80)
+
+  /// El numero de la SIM, si se sabe. Solo informativo: GCM no lo usa, porque
+  /// no es el quien manda sino el telefono. Sirve para que el administrador
+  /// sepa que aparato es sin ir a buscarlo.
+  numero String? @db.VarChar(20)
+
+  tokenHash String @unique @db.Char(64)
+
+  /// Revocar no borra: la fila queda para saber que existio y quien lo puso.
+  activo Boolean @default(true)
+
+  /// Ultima vez que este telefono pregunto por la cola. Es el unico modo de
+  /// saber desde la aplicacion si sigue vivo: si esta fecha se queda parada,
+  /// el telefono esta dormido o apagado y los SMS no salen.
+  ultimaConsultaAt DateTime?
+
+  vinculadoPor String   @db.VarChar(150)
+  createdAt    DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, activo])
+  @@map("emisores_sms")
 }
 
 /// Excepcion al permiso que un rol trae por defecto, para UNA empresa.
@@ -1954,6 +2001,11 @@ model SesionPase {
 model MensajeSms {
   id String @id @default(cuid())
 
+  /// De quien es este mensaje. Sin esto la cola era UNA para toda la
+  /// plataforma, y el telefono de una constructora recogia y mandaba los
+  /// codigos de otra.
+  companyId String
+
   /// Celular como lo guarda GCM (nueve cifras). Si algun dia hace falta el
   /// prefijo de pais, se anade al ENTREGARLO, no aqui.
   numero String @db.VarChar(20)
@@ -1979,7 +2031,10 @@ model MensajeSms {
   expiraAt  DateTime
   createdAt DateTime @default(now())
 
-  /// El indice de la consulta que corre cada pocos segundos.
-  @@index([enviadoAt, expiraAt])
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  /// El indice de la consulta que corre cada pocos segundos. Empieza por la
+  /// empresa porque ahora cada emisor solo ve la suya.
+  @@index([companyId, enviadoAt, expiraAt])
   @@map("mensajes_sms")
 }

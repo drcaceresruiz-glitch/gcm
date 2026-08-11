@@ -151,7 +151,7 @@ export async function obtenerPerfil(sesion: SesionActiva): Promise<Perfil | null
     dosFactoresActivo: usuario.dosFactoresActivo,
     canal2FA: usuario.canal2FA,
     celularVerificado: usuario.celularVerificadoAt !== null,
-    smsDisponible: hayCanalSms(),
+    smsDisponible: await hayCanalSms(sesion.companyId),
     razonSocial: usuario.company.razonSocial,
     ruc: usuario.company.ruc,
     pendiente,
@@ -257,14 +257,15 @@ export async function verificarCelularPedirCodigo(
   }
   if (usuario.celularVerificadoAt) return { ok: true };
 
-  if (!hayCanalSms()) {
+  if (!(await hayCanalSms(sesion.companyId))) {
     return {
       ok: false,
-      error: "Ahora mismo no hay por dónde enviar SMS. Avisa al administrador.",
+      error:
+        "Tu empresa no tiene todavía un teléfono que envíe SMS. Un administrador puede vincularlo en Configuración.",
     };
   }
 
-  return pedirCodigoCelular(sesion.userId, usuario.celular);
+  return pedirCodigoCelular(sesion.userId, sesion.companyId, usuario.celular);
 }
 
 /** Comprueba el codigo y da el celular por verificado. */

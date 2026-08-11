@@ -1,41 +1,47 @@
 import { tokenDeCabecera } from "@/lib/sms-cola";
 import {
-  emisorAutorizado,
-  hayColaSms,
+  resolverAlcance,
   recogerPendientes,
   confirmarEnviados,
 } from "@/services/sms-cola.service";
+import type { AlcanceCola } from "@/lib/emisor-sms";
 
 /**
  * La cola de SMS, vista desde el telefono emisor.
  *
  * Es la unica ruta de GCM pensada para una maquina y no para una persona: la
- * consulta MacroDroid o Tasker en el movil de la empresa, cada ~20 segundos.
+ * consulta la app de `movil/emisor-sms` en el movil de la empresa, cada ~20
+ * segundos.
  *
  * - `GET`  devuelve lo que haya que mandar y lo marca como prestado.
  * - `POST` confirma que salio, con `{"enviados": ["id", ...]}`.
  *
- * Se identifica con `Authorization: Bearer <SMS_COLA_TOKEN>`, nunca por
- * parametro en la URL: los servidores escriben las URL en su log de accesos,
- * y ahi el secreto quedaria en claro para siempre.
+ * Se identifica con `Authorization: Bearer <token>`, nunca por parametro en
+ * la URL: los servidores escriben las URL en su log de accesos, y ahi el
+ * secreto quedaria en claro para siempre.
  *
- * Cuando no hay cola configurada responde 404 y no 401: sin token en el
- * servidor no hay nada que autorizar, y un 401 invitaria a seguir probando
- * credenciales contra algo que no existe.
+ * **El token decide DE QUE EMPRESA son los mensajes.** No hay ningun
+ * parametro que lo diga, y no puede haberlo: si la empresa viajara en la
+ * peticion, cualquier emisor podria pedir la cola de otra constructora.
+ *
+ * Responde 401 a todo lo que no case, sin distinguir entre «no hay token»,
+ * «el token no existe» y «ese emisor esta revocado». Antes habia un 404 para
+ * el caso de no tener cola configurada; ya no aplica, porque la ruta existe
+ * siempre y quien decide es la credencial.
  */
 
 /// Nunca cacheada: dos peticiones seguidas tienen que dar cosas distintas.
 export const dynamic = "force-dynamic";
 
-function autorizado(peticion: Request): boolean {
-  return emisorAutorizado(tokenDeCabecera(peticion.headers.get("authorization")));
+async function alcanceDe(peticion: Request): Promise<AlcanceCola | null> {
+  return resolverAlcance(tokenDeCabecera(peticion.headers.get("authorization")));
 }
 
 export async function GET(peticion: Request) {
-  if (!hayColaSms()) return new Response("No disponible", { status: 404 });
-  if (!autorizado(peticion)) return new Response("No autorizado", { status: 401 });
+  const alcance = await alcanceDe(peticion);
+  if (!alcance) return new Response("No autorizado", { status: 401 });
 
-  const mensajes = await recogerPendientes();
+  const mensajes = await recogerPendientes(alcance);
 
   return Response.json(
     { mensajes },
@@ -49,8 +55,8 @@ export async function GET(peticion: Request) {
 }
 
 export async function POST(peticion: Request) {
-  if (!hayColaSms()) return new Response("No disponible", { status: 404 });
-  if (!autorizado(peticion)) return new Response("No autorizado", { status: 401 });
+  const alcance = await alcanceDe(peticion);
+  if (!alcance) return new Response("No autorizado", { status: 401 });
 
   let cuerpo: unknown;
   try {
@@ -66,7 +72,10 @@ export async function POST(peticion: Request) {
     });
   }
 
-  const confirmados = await confirmarEnviados(enviados as string[]);
+  // El MISMO alcance con el que se recogieron: confirmar tiene que estar tan
+  // acotado como pedir, o un emisor podria hacer desaparecer de la cola los
+  // mensajes de otra empresa sin haberlos mandado.
+  const confirmados = await confirmarEnviados(alcance, enviados as string[]);
 
   return Response.json(
     { confirmados },

@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
+import { hashToken } from "@/lib/tokens";
 import {
   GRACIA_PRESTAMO_SEGUNDOS,
   MAXIMO_ENTREGAS,
@@ -9,25 +10,28 @@ import {
   caducidadDeMensaje,
   tokenValido,
 } from "@/lib/sms-cola";
+import type { AlcanceCola } from "@/lib/emisor-sms";
 
 /**
  * La cola de SMS: GCM deja los mensajes y el telefono emisor los recoge.
  *
  * Por que al reves de lo obvio: json.pe tampoco enviaba desde la nube —salia
  * del movil Android de la empresa con su app instalada—, y el usuario quiere
- * usar su propia linea sin depender de un tercero. Construir esa app es otro
- * producto: Android restringe el permiso de enviar SMS, y lo dificil no es
- * mandar el mensaje sino mantener la app viva contra el gestor de bateria de
- * cada fabricante. Invirtiendo el sentido, el lado del telefono es
- * configuracion de MacroDroid o Tasker —que ya existen y ya resolvieron eso—
- * y aqui no hay una linea de codigo movil que mantener.
+ * usar su propia linea sin depender de un tercero. Invirtiendo el sentido, el
+ * lado del telefono es una app que pregunta cada veinte segundos, y aqui no
+ * hay que mantener nada movil.
  *
- * LO QUE HAY QUE SABER ANTES DE ACTIVARLO, sin adornos: por esta cola viajan
- * los codigos del pase EN CLARO, porque hay que poder mandarlos. Quien
- * obtenga `SMS_COLA_TOKEN` lee los codigos del personal antes que ellos. Lo
- * unico que lo acota es que el texto se borra en cuanto sale, que caduca a
- * los diez minutos y que el codigo en si dura eso y admite tres intentos.
- * Es el punto debil del diseno y no conviene olvidarlo.
+ * **LA COLA ES POR EMPRESA.** Hasta el 12 de agosto de 2026 era una sola para
+ * toda la plataforma, con un unico token de entorno. Con una constructora daba
+ * igual; con dos, el telefono de una habria recogido y mandado los codigos de
+ * la otra. Cada empresa tiene ahora sus emisores y solo ve sus mensajes.
+ *
+ * LO QUE HAY QUE SABER, sin adornos: por esta cola viajan los codigos EN
+ * CLARO, porque hay que poder mandarlos, y desde que existe el segundo factor
+ * por SMS eso incluye los codigos de acceso. Quien obtenga el token de un
+ * emisor lee los codigos de esa empresa antes que sus duenos. Lo unico que lo
+ * acota es que el texto se borra en cuanto sale y que caduca a los diez
+ * minutos. Es el punto debil del diseno y no conviene olvidarlo.
  */
 
 export interface MensajePendiente {
@@ -37,43 +41,66 @@ export interface MensajePendiente {
 }
 
 /**
- * Cuanto tiene que medir el secreto para que la cola se encienda.
+ * A quien sirve el token que acaba de presentarse, o null si no sirve a nadie.
  *
- * La comprobacion vive AQUI y no en `env.ts` a proposito: alli tumbaria el
- * arranque de toda la aplicacion por una funcion opcional. Aqui, un token
- * corto deja la cola apagada —la ruta responde 404, los codigos siguen
- * saliendo por correo y por pantalla— y avisa en el log. Lo que NO puede
- * pasar es que un secreto debil quede protegiendo una cola con codigos en
- * claro sin que nadie se entere.
+ * Busca por HASH sobre un indice unico, igual que las sesiones. Aqui no hace
+ * falta comparar en tiempo constante como en `tokenValido`: el hash de 32
+ * bytes no filtra el secreto por lo que tarde la consulta.
+ *
+ * El respaldo del token de entorno se comprueba DESPUES, y solo si ningun
+ * emisor casa: mientras una empresa no tenga el suyo, su cola la sigue
+ * sirviendo el telefono de siempre. Ver `AlcanceCola`.
  */
-const LARGO_MINIMO_TOKEN = 32;
+export async function resolverAlcance(
+  token: string | null,
+): Promise<AlcanceCola | null> {
+  if (!token) return null;
 
-export function hayColaSms(): boolean {
-  const token = env.SMS_COLA_TOKEN;
-  if (!token) return false;
+  const emisor = await prisma.emisorSms.findFirst({
+    where: { tokenHash: hashToken(token), activo: true, company: { activa: true } },
+    select: { id: true, companyId: true },
+  });
 
-  if (token.length < LARGO_MINIMO_TOKEN) {
-    console.error(
-      `[sms-cola] SMS_COLA_TOKEN mide ${token.length} caracteres y hacen falta ` +
-        `${LARGO_MINIMO_TOKEN}. La cola queda APAGADA: los codigos saldran por ` +
-        `correo o los dictara el residente.`,
-    );
-    return false;
+  if (emisor) {
+    return { tipo: "empresa", companyId: emisor.companyId, emisorId: emisor.id };
   }
 
-  return true;
+  const global = env.SMS_COLA_TOKEN;
+  if (global && global.length >= 32 && tokenValido(token, global)) {
+    return { tipo: "respaldo" };
+  }
+
+  return null;
 }
 
-/** Comprueba la credencial del emisor. */
-export function emisorAutorizado(token: string | null): boolean {
-  // `hayColaSms` primero: con un token demasiado corto no se autoriza a
-  // nadie, ni siquiera a quien lo acierte.
-  if (!token || !hayColaSms() || !env.SMS_COLA_TOKEN) return false;
-  return tokenValido(token, env.SMS_COLA_TOKEN);
+/**
+ * Que mensajes alcanza este emisor.
+ *
+ * El respaldo alcanza a las empresas que **todavia no tienen emisor propio**.
+ * Es lo que hace que encender esto no deje a nadie sin SMS ni un minuto: el
+ * telefono de siempre sigue sirviendo hasta que cada empresa registra el suyo,
+ * y en ese momento deja de alcanzarla.
+ */
+function filtroDelAlcance(alcance: AlcanceCola) {
+  return alcance.tipo === "empresa"
+    ? { companyId: alcance.companyId }
+    : { company: { emisoresSms: { none: { activo: true } } } };
 }
 
-/** Deja un SMS en la cola. Nunca lanza. */
+/** Si esta empresa tiene por donde sacar un SMS. */
+export async function hayColaSms(companyId: string): Promise<boolean> {
+  const propio = await prisma.emisorSms.count({
+    where: { companyId, activo: true },
+  });
+  if (propio > 0) return true;
+
+  const global = env.SMS_COLA_TOKEN;
+  return Boolean(global && global.length >= 32);
+}
+
+/** Deja un SMS en la cola de su empresa. Nunca lanza. */
 export async function encolarSms(
+  companyId: string,
   numero: string,
   texto: string,
 ): Promise<boolean> {
@@ -81,6 +108,7 @@ export async function encolarSms(
     const ahora = new Date();
     await prisma.mensajeSms.create({
       data: {
+        companyId,
         numero: numero.slice(0, 20),
         texto: texto.slice(0, 320),
         expiraAt: caducidadDeMensaje(ahora),
@@ -106,19 +134,24 @@ export async function encolarSms(
  * de la aplicacion, la limpieza tiene que colgar de algo que corra solo, y
  * esto corre cada pocos segundos.
  */
-export async function recogerPendientes(): Promise<MensajePendiente[]> {
+export async function recogerPendientes(
+  alcance: AlcanceCola,
+): Promise<MensajePendiente[]> {
   const ahora = new Date();
 
   await purgar(ahora);
+  await anotarLatido(alcance, ahora);
 
   const limitePrestamo = new Date(
     ahora.getTime() - GRACIA_PRESTAMO_SEGUNDOS * 1000,
   );
 
-  // Las mismas condiciones que `sePuedeOfrecer`, dichas en SQL. La version
-  // pura existe para poder probarlas; esta, para no traerse la cola entera.
+  // Las mismas condiciones que `sePuedeOfrecer`, dichas en SQL, y ademas el
+  // filtro de empresa. La version pura existe para poder probarlas; esta,
+  // para no traerse la cola entera.
   const pendientes = await prisma.mensajeSms.findMany({
     where: {
+      ...filtroDelAlcance(alcance),
       enviadoAt: null,
       expiraAt: { gt: ahora },
       entregas: { lt: MAXIMO_ENTREGAS },
@@ -140,20 +173,50 @@ export async function recogerPendientes(): Promise<MensajePendiente[]> {
 }
 
 /**
+ * Deja constancia de que este telefono sigue preguntando.
+ *
+ * Es el unico modo de saber desde la aplicacion si el emisor esta vivo.
+ * Android duerme la app cuando se apaga la pantalla si no se le quito el
+ * ahorro de bateria, y entonces los codigos dejan de salir sin que nada
+ * avise; con esto, la pantalla del administrador lo dice.
+ */
+async function anotarLatido(alcance: AlcanceCola, ahora: Date): Promise<void> {
+  if (alcance.tipo !== "empresa") return;
+
+  await prisma.emisorSms
+    .update({
+      where: { id: alcance.emisorId },
+      data: { ultimaConsultaAt: ahora },
+    })
+    .catch(() => {
+      // Que no se pueda anotar la hora no puede impedir que salgan los SMS.
+    });
+}
+
+/**
  * El emisor confirma que los SMS salieron de la SIM.
  *
- * Se vacia el texto en el acto: a partir de aqui la fila sirve para saber que
- * salio, no para saber que decia. Es lo que reduce la ventana en la que un
- * codigo esta legible en la base a los segundos que tarda el telefono.
+ * **El filtro de empresa NO es decorativo.** Sin el, el telefono de una
+ * constructora podria marcar como enviados los mensajes de otra con solo
+ * acertar sus identificadores, y esos codigos desaparecerian de la cola sin
+ * haberse mandado: una denegacion de servicio silenciosa entre clientes. Tiene
+ * que ser el MISMO alcance con el que se recogieron.
  *
- * Devuelve cuantos se marcaron, que puede ser menos de los pedidos si alguno
- * ya habia caducado.
+ * Se vacia el texto en el acto: a partir de aqui la fila sirve para saber que
+ * salio, no que decia.
  */
-export async function confirmarEnviados(ids: string[]): Promise<number> {
+export async function confirmarEnviados(
+  alcance: AlcanceCola,
+  ids: string[],
+): Promise<number> {
   if (ids.length === 0) return 0;
 
   const { count } = await prisma.mensajeSms.updateMany({
-    where: { id: { in: ids.slice(0, 50) }, enviadoAt: null },
+    where: {
+      ...filtroDelAlcance(alcance),
+      id: { in: ids.slice(0, 50) },
+      enviadoAt: null,
+    },
     data: { enviadoAt: new Date(), texto: "" },
   });
 
@@ -163,10 +226,15 @@ export async function confirmarEnviados(ids: string[]): Promise<number> {
 /**
  * Borra lo que ya no sirve.
  *
- * Los caducados se van enteros: llevan un codigo en claro que ya no vale
- * para nada, asi que conservarlos es todo riesgo y ningun dato. Los enviados
- * se conservan un dia sin texto, que es lo que permite responder a «¿salio
- * el SMS de fulano?» sin guardar lo que decia.
+ * **A proposito NO se filtra por empresa.** Cuelga del latido de cualquier
+ * emisor porque este hosting no tiene cron para la logica de la aplicacion.
+ * Si se filtrara, la basura de una empresa cuyo telefono esta apagado no se
+ * limpiaria nunca, que es justo cuando mas se acumula.
+ *
+ * Los caducados se van enteros: llevan un codigo en claro que ya no vale para
+ * nada, asi que conservarlos es todo riesgo y ningun dato. Los enviados se
+ * conservan un dia sin texto, que es lo que permite responder a «¿salio el
+ * SMS de fulano?» sin guardar lo que decia.
  */
 async function purgar(ahora: Date): Promise<void> {
   const ayer = new Date(ahora.getTime() - 24 * 60 * 60_000);

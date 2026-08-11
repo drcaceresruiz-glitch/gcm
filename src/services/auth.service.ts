@@ -178,6 +178,7 @@ export async function iniciarSesion(
     // saber si hay SMS configurado.
     await crearDesafio({
       id: usuario.id,
+      companyId: usuario.companyId,
       nombres: usuario.nombres,
       email: usuario.email,
       celular: usuario.celular,

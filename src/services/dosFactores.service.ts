@@ -40,6 +40,9 @@ const COOKIE_DESAFIO = "gcm_2fa";
 /** Lo que hay que saber del usuario para mandarle su codigo. */
 export interface DestinatarioCodigo {
   id: string;
+  /// De que empresa es. La cola de SMS es por empresa: sin esto el codigo
+  /// saldria por el telefono de otra constructora.
+  companyId: string;
   nombres: string;
   email: string;
   celular: string | null;
@@ -148,6 +151,7 @@ async function repartirCodigo(
 ): Promise<{ canal: Canal2FA; destino: string }> {
   if (canal === "SMS") {
     const sms = await enviarSms(
+      usuario.companyId,
       destino,
       textoCodigoAcceso(codigo, VIGENCIA_CODIGO_MINUTOS),
     );
@@ -335,6 +339,7 @@ export type ResultadoVerificacion =
  */
 export async function pedirCodigoCelular(
   userId: string,
+  companyId: string,
   celular: string,
 ): Promise<ResultadoVerificacion> {
   const ahora = new Date();
@@ -381,6 +386,7 @@ export async function pedirCodigoCelular(
   });
 
   const sms = await enviarSms(
+    companyId,
     celular,
     textoCodigoAcceso(codigo, VIGENCIA_CODIGO_MINUTOS),
   );

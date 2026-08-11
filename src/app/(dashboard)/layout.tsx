@@ -81,6 +81,15 @@ export default async function DashboardLayout({
       clave: "empresa",
       grupo: "empresa",
     },
+    // UNA entrada, no una por ajuste: el desplegable de empresa ya llego a
+    // tener siete seguidas y hubo que agruparlo. Lo que crezca, que crezca
+    // dentro de la pagina.
+    puede(sesion, "configuracion:editar") && {
+      href: "/empresa/configuracion",
+      etiqueta: "Configuración",
+      clave: "configuracion",
+      grupo: "empresa",
+    },
   ].filter(Boolean) as EnlaceEmpresa[];
 
   return (

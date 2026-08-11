@@ -57,21 +57,30 @@ export interface ResultadoSms {
   motivo?: string;
 }
 
-export function hayCanalSms(): boolean {
-  return hayColaSms() || Boolean(env.SMS_TOKEN);
+/**
+ * Si esta empresa tiene por donde sacar un SMS.
+ *
+ * Asincrona desde que la cola es por empresa: hay que mirar si tiene emisor
+ * propio, y eso es una consulta.
+ */
+export async function hayCanalSms(companyId: string): Promise<boolean> {
+  return (await hayColaSms(companyId)) || Boolean(env.SMS_TOKEN);
 }
 
 /**
  * Manda un SMS por el canal que haya. Nunca lanza.
  *
+ * @param companyId De quien es el mensaje. La cola es por empresa: sin esto
+ *   el telefono de una constructora recogeria los codigos de otra.
  * @param numero Celular en el formato que guarda GCM (nueve cifras).
  */
 export async function enviarSms(
+  companyId: string,
   numero: string,
   mensaje: string,
 ): Promise<ResultadoSms> {
   const canales = canalesAProbar({
-    cola: hayColaSms(),
+    cola: await hayColaSms(companyId),
     pasarela: Boolean(env.SMS_TOKEN),
   });
 
@@ -92,7 +101,7 @@ export async function enviarSms(
   for (const canal of canales) {
     const r =
       canal === "cola"
-        ? await porLaCola(numero, mensaje)
+        ? await porLaCola(companyId, numero, mensaje)
         : await enviarPorPasarela(numero, mensaje);
 
     if (r.enviado) return r;
@@ -110,10 +119,11 @@ export async function enviarSms(
  * quien lo lea sepa que promete menos.
  */
 async function porLaCola(
+  companyId: string,
   numero: string,
   mensaje: string,
 ): Promise<ResultadoSms> {
-  const encolado = await encolarSms(numero, mensaje);
+  const encolado = await encolarSms(companyId, numero, mensaje);
 
   return encolado
     ? { enviado: true, encolado: true }

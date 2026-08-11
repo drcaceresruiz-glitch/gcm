@@ -24,9 +24,9 @@ abajo.
    el enlace de ahora —una URL larga, y las operadoras marcan como spam los
    SMS con enlaces—, asi que hay que rehacerla con codigo y pantalla nueva.
    Es otro trabajo, no un cambio de canal.
-2. **Tablero de configuracion de la empresa** (pedido el 12 de agosto). Ver
-   6g: no es un lujo para el futuro, es lo que le falta a la cola de SMS para
-   poder venderse a una segunda constructora.
+2. ~~**Tablero de configuracion de la empresa.**~~ **HECHO el 12 de agosto**,
+   ver 6g. Con la cola de SMS ya separada por empresa, que era el bloqueo real
+   para vender a una segunda constructora.
 3. **Cablear `scripts/desplegar.sh`** (seccion 1). Sigue sin hacerse y sigue
    siendo la raiz de casi todo. **No es solo codigo**: hay que decidir quien
    manda al descomprimir —hoy `app.js` lo hace por su cuenta, y anadir el
@@ -989,6 +989,43 @@ intentos—.
 constructora necesita **su propio telefono con su propia SIM**, encendido y
 con el ahorro de bateria quitado. Eso es un coste operativo suyo, no un boton.
 Para quien no lo quiera, la salida honesta es correo solamente.
+
+### Lo construido el 12 de agosto
+
+Migracion `20260811173658_emisor_sms_por_empresa`: modelo **`EmisorSms`** (con
+`tokenHash`, nunca el token) y **`MensajeSms.companyId`**. Pantalla en
+`/empresa/configuracion`, UNA sola entrada de menu con secciones dentro -el
+desplegable de empresa ya llego a tener siete entradas planas y hubo que
+agruparlo-.
+
+**Cinco cosas que no se deben deshacer sin pensarlo:**
+
+1. **`confirmarEnviados` filtra por el MISMO alcance que `recogerPendientes`.**
+   Sin eso, el telefono de una constructora podria marcar como enviados los
+   mensajes de otra con solo acertar sus identificadores, y esos codigos
+   desapareceran de la cola sin haberse mandado: una denegacion de servicio
+   silenciosa entre clientes. Era el fallo mas facil de dejar pasar.
+2. **`purgar` NO filtra por empresa**, y lleva comentario. Cuelga del latido
+   de cualquier emisor porque este hosting no tiene cron para la logica de la
+   aplicacion; si filtrara, la basura de una empresa con el telefono apagado
+   no se limpiaria nunca, que es cuando mas se acumula.
+3. **En el pase publico el `companyId` sale de la OBRA, jamas de la peticion.**
+   Alli no hay sesion y el `obraId` viene de un QR pegado en una caseta.
+4. **`configuracion:editar` es INNEGOCIABLE.** No por ser "ajustes": quien
+   vincula un emisor puede leer los codigos de acceso de toda su empresa. Es
+   de la misma familia que `permiso:editar`.
+5. **`SMS_COLA_TOKEN` sigue sirviendo, pero SOLO a las empresas sin emisor
+   propio.** Es la transicion, para que nadie se quedara sin SMS el dia del
+   cambio, y **esta pensada para borrarse**: mientras exista, un solo secreto
+   alcanza la cola de cualquier empresa que se quede sin emisor.
+
+**La ruta `/api/sms/cola` ya no responde 404** cuando no hay cola configurada:
+ahora existe siempre y quien decide es la credencial, asi que todo lo que no
+case es un 401.
+
+**FALTA**: vincular el telefono real desde la pantalla y comprobar que los SMS
+siguen saliendo con el token nuevo. Y queda pendiente el **emparejamiento por
+codigo**, que evitaria copiar el token a mano pero obliga a tocar el APK.
 
 ## 6d. Panel «Que falta» (10 de agosto)
 

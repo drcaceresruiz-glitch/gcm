@@ -78,6 +78,8 @@ export const PERMISOS = [
   "permiso:leer",
   "permiso:editar",
 
+  "configuracion:editar",
+
   "auditoria:leer",
 ] as const;
 
@@ -95,12 +97,19 @@ export type Permiso = (typeof PERMISOS)[number];
  * ADMIN podria darselos a un CONSULTOR y ese repartirse a si mismo el resto:
  * seria una escalada de privilegios con dos clics. Repartir permisos es un
  * acto de administracion, no una tarea delegable.
+ *
+ * `configuracion:editar` esta aqui por la misma familia de razones, y no por
+ * ser "ajustes": lo que gobierna es el TELEFONO por el que salen los SMS de
+ * la empresa, y por esa cola viajan los codigos de acceso en claro. Quien
+ * pueda vincular un emisor puede leer el segundo factor de cualquiera de sus
+ * companeros. Es escalada de privilegios con otro nombre.
  */
 export const INNEGOCIABLES: readonly Permiso[] = [
   "linea_base:aprobar",
   "movimiento:aprobar",
   "permiso:leer",
   "permiso:editar",
+  "configuracion:editar",
 ];
 
 /** Los que si admiten excepcion por empresa. Es lo que dibuja la pantalla. */

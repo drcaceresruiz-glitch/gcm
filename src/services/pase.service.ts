@@ -429,6 +429,10 @@ async function buscarPaseParaEntrar(obraId: string, entrada: string) {
     },
     select: {
       id: true, nombres: true, apellidos: true, email: true, celular: true,
+      // La empresa sale de la OBRA, nunca de la peticion: aqui no hay sesion
+      // que consultar y el `obraId` viene de un codigo QR pegado en una
+      // caseta. Es lo que decide por que telefono sale el SMS.
+      project: { select: { companyId: true } },
     },
   });
 }
@@ -454,7 +458,7 @@ export async function solicitarCodigo(
   if (limite) return { ok: true };
 
   const codigo = await sembrarCodigo(pase.id);
-  await repartirCodigo(pase, codigo);
+  await repartirCodigo({ ...pase, companyId: pase.project.companyId }, codigo);
 
   return { ok: true };
 }
@@ -471,12 +475,21 @@ export async function solicitarCodigo(
  * residente lo genere en su pantalla y lo dicte.
  */
 async function repartirCodigo(
-  pase: { nombres: string; email: string | null; celular: string | null },
+  pase: {
+    nombres: string;
+    email: string | null;
+    celular: string | null;
+    companyId: string;
+  },
   codigo: string,
 ): Promise<{ porSms: boolean; porCorreo: boolean }> {
   const [sms, correo] = await Promise.all([
     pase.celular
-      ? enviarSms(pase.celular, textoCodigoPase(codigo, VIGENCIA_CODIGO_MINUTOS))
+      ? enviarSms(
+          pase.companyId,
+          pase.celular,
+          textoCodigoPase(codigo, VIGENCIA_CODIGO_MINUTOS),
+        )
       : Promise.resolve({ enviado: false }),
     pase.email
       ? enviarCorreo({
@@ -523,7 +536,10 @@ export async function generarCodigoParaEntregar(
 
   // Ademas de devolverlo para dictarlo, se intenta mandar por sus canales:
   // puede llegar antes de que el residente termine de escribir el WhatsApp.
-  const repartido = await repartirCodigo(pase, codigo);
+  const repartido = await repartirCodigo(
+    { ...pase, companyId: sesion.companyId },
+    codigo,
+  );
   const enviadoA = repartido.porSms
     ? (pase.celular ?? undefined)
     : repartido.porCorreo

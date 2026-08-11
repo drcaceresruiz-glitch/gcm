@@ -1,0 +1,77 @@
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { obtenerSesion } from "@/services/sesion.service";
+import { listarEmisores } from "@/services/emisor-sms.service";
+import { puede } from "@/lib/rbac";
+import { Volver } from "@/components/ui/Volver";
+import { PanelAyuda } from "@/components/ui/PanelAyuda";
+import { IlustracionDocumento } from "@/components/ui/IlustracionDocumento";
+import { EmisoresSms } from "@/components/empresa/EmisoresSms";
+
+export const metadata: Metadata = { title: "Configuración" };
+
+/**
+ * El tablero de configuracion de la empresa.
+ *
+ * Una sola entrada en el menu, con secciones dentro. El desplegable de
+ * empresa ya llego a tener siete entradas planas y hubo que agruparlo: lo que
+ * se configure de aqui en adelante crece DENTRO de esta pagina, no al lado.
+ *
+ * Regla para lo que se anada: cada opcion tiene que decir a que afecta y que
+ * se rompe si se apaga. Un panel de ajustes que solo enumera interruptores
+ * obliga a probar para entender.
+ */
+export default async function ConfiguracionPage() {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  if (!puede(sesion, "configuracion:editar")) redirect("/panel");
+
+  const emisores = await listarEmisores(sesion);
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <Volver href="/panel">Volver al panel</Volver>
+
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight">
+          Configuración
+        </h1>
+        <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
+          Lo que decide cómo funciona GCM para tu empresa. Solo lo ve quien
+          administra.
+        </p>
+      </div>
+
+      <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
+        <EmisoresSms emisores={emisores} />
+
+        <PanelAyuda
+          ilustracion={<IlustracionDocumento />}
+          puntos={[
+            {
+              titulo: "Sin teléfono vinculado no salen SMS",
+              texto:
+                "Los códigos de acceso y los del pase de obra llegarán solo por correo. Nadie se queda fuera, pero en obra el correo no se mira.",
+            },
+            {
+              titulo: "El teléfono tiene que estar despierto",
+              texto:
+                "Android duerme la aplicación al apagar la pantalla si no se le quita el ahorro de batería. Si un teléfono aparece como dormido, es eso casi siempre.",
+            },
+            {
+              titulo: "El token se ve una sola vez",
+              texto:
+                "Se guarda cifrado y no se puede volver a mirar. Si se pierde, se revoca ese teléfono y se vincula otro. Es incómodo a propósito.",
+            },
+            {
+              titulo: "Quien tenga ese teléfono ve los códigos",
+              texto:
+                "Por la cola viajan en claro los códigos de acceso de tu gente, durante los segundos que tardan en salir. Guárdalo como las llaves de la obra.",
+            },
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
