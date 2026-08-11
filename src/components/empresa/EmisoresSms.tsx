@@ -2,11 +2,13 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   CheckCircle2,
   LoaderCircle,
   MessageSquare,
+  RefreshCw,
   Smartphone,
   RotateCcw,
   Ban,
@@ -98,7 +100,14 @@ function BotonEnviar({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function EmisoresSms({ emisores }: { emisores: EmisorLista[] }) {
+export function EmisoresSms({
+  emisores,
+  direccionCola,
+}: {
+  emisores: EmisorLista[];
+  direccionCola: string;
+}) {
+  const router = useRouter();
   const [vinculo, vincular] = useActionState<EstadoConfiguracion, FormData>(
     accionVincularEmisor,
     {},
@@ -109,6 +118,12 @@ export function EmisoresSms({ emisores }: { emisores: EmisorLista[] }) {
   );
 
   const activos = emisores.filter((e) => e.activo).length;
+
+  // El estado se calcula al pintar la pagina, asi que no cambia solo. Quien
+  // acaba de configurar el telefono se quedaba mirando «Sin estrenar» sin
+  // saber si habia funcionado, y no tiene por que adivinar que hay que
+  // recargar.
+  const sinEstrenar = emisores.some((e) => e.activo && e.estado === "nunca");
 
   return (
     <Tarjeta>
@@ -141,13 +156,39 @@ export function EmisoresSms({ emisores }: { emisores: EmisorLista[] }) {
           </ul>
         )}
 
+        {sinEstrenar && (
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <RefreshCw className="size-3.5" aria-hidden="true" />
+            Comprobar de nuevo
+          </button>
+        )}
+
         <Avisos estado={cambio} />
       </SeccionTarjeta>
 
       <SeccionTarjeta
         titulo="Vincular un teléfono"
-        nota="Te daremos un token. Se pega UNA vez en la aplicación del móvil, junto con la dirección de GCM."
+        nota="Te daremos un token. Se pega UNA vez en la aplicación del móvil, junto con la dirección de aquí abajo."
       >
+        <div className="space-y-1">
+          <p className="text-xs font-medium">Dirección para la aplicación</p>
+          <code
+            className="block rounded-lg p-2 text-xs break-all"
+            style={{ backgroundColor: "var(--fondo)" }}
+          >
+            {direccionCola}
+          </code>
+          <p className="text-xs opacity-60">
+            Es la misma para todos los teléfonos. Lo que distingue a tu empresa
+            es el token, no la dirección.
+          </p>
+        </div>
+
         <form action={vincular} className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <Campo
@@ -172,6 +213,13 @@ export function EmisoresSms({ emisores }: { emisores: EmisorLista[] }) {
         <Avisos estado={vinculo} />
 
         {vinculo.token && <TokenNuevo token={vinculo.token} />}
+
+        <p className="text-xs opacity-60">
+          ¿No tienes la aplicación en ese teléfono? Pídesela a quien administra
+          GCM: es un instalador de Android que se pone a mano, no está en la
+          tienda —Google reserva el permiso de enviar SMS para la aplicación de
+          mensajes del teléfono—.
+        </p>
       </SeccionTarjeta>
     </Tarjeta>
   );

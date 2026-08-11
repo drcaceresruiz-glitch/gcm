@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { listarEmisores } from "@/services/emisor-sms.service";
 import { puede } from "@/lib/rbac";
+import { env } from "@/lib/env";
 import { Volver } from "@/components/ui/Volver";
 import { PanelAyuda } from "@/components/ui/PanelAyuda";
 import { IlustracionDocumento } from "@/components/ui/IlustracionDocumento";
@@ -44,7 +45,13 @@ export default async function ConfiguracionPage() {
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
-        <EmisoresSms emisores={emisores} />
+        {/* La direccion se calcula, no se escribe: si algun dia GCM vive en
+            otro dominio, la pantalla seguiria dictando el viejo y nadie
+            entenderia por que el telefono no pregunta. */}
+        <EmisoresSms
+          emisores={emisores}
+          direccionCola={`${env.APP_URL.replace(/\/$/, "")}/api/sms/cola`}
+        />
 
         <PanelAyuda
           ilustracion={<IlustracionDocumento />}
