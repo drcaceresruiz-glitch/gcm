@@ -16,11 +16,47 @@ Queda, en este orden: **la cola de SMS con la linea propia** y despues el
 **parte diario**, que no existe y es el Bloque 1 entero de la matriz de
 control.
 
-> **El candado de despliegue (seccion 0) lo dio por arreglado el usuario el 11
-> de agosto.** No se toco desde aqui. Lo que si quedo comprobado, y conviene
-> no perder: el workflow reescribe `app.js` en CADA despliegue, asi que
-> cualquier arreglo hecho a mano en el servidor sobre ese archivo dura hasta
-> el siguiente push.
+> **DESPLEGAR CON LA APP ABIERTA ROMPE LA PESTANA** (visto el 11 de agosto).
+> Sintoma: «This page couldn't load» al pulsar cualquier boton —le paso al
+> usuario con «Salir» en `/panel`—. Causa: el navegador ejecuta una server
+> action con el JavaScript de la compilacion vieja contra un servidor que ya
+> tiene otra, y ese identificador ya no existe. NO es que produccion este
+> caida: desde fuera responde 200 a todo. **Arreglo: `Ctrl+Shift+R`.**
+> Conviene mirarlo ANTES de suponer que el render pesado corto el stream, que
+> da el mismo texto en pantalla y se diagnostica muy distinto. Y no desplegar
+> mientras alguien esta usando la aplicacion si se puede evitar.
+
+> **EL CANDADO NO ESTA ARREGLADO. Se dio por arreglado y volvio a pasar la
+> noche del 11 de agosto, con produccion caida.** Prueba, sacada del propio
+> servidor: `tmp/candado-despliegue` y `gcm.tar.gz.desplegando` (22 MB) con la
+> MISMA marca de tiempo, las 20:33. O sea el ciclo exacto de siempre: un
+> arranque cogio el candado, empezo a descomprimir, LiteSpeed lo mato a los
+> pocos segundos y quedaron el candado abandonado y el paquete a medias.
+>
+> **Consecuencia nueva y peor de lo que se creia**: el arbol `.next` quedo
+> MEZCLANDO dos compilaciones, y eso rompio el LOGIN de toda la aplicacion —
+> `POST /login` devolvia **404** porque el manifiesto de acciones era de una
+> compilacion y el JavaScript de otra—. Desde fuera todo parecia sano: `GET
+> /login` 200, `/api/health` 200 y los chunks en 200. Solo se ve enviando el
+> formulario.
+>
+> **Recuperacion que funciono** (descomprimir a mano, que es lo unico sin
+> cronometro):
+> ```
+> cd ~/gcm && tar -tzf gcm.tar.gz.desplegando > /dev/null && echo INTEGRO
+> cd ~/gcm && rm -rf tmp/candado-despliegue .next \
+>   && tar -xzf gcm.tar.gz.desplegando && rm -f gcm.tar.gz.desplegando \
+>   && touch tmp/restart.txt
+> ```
+>
+> **Lo primero que hay que hacer, ya sin discusion, es cablear
+> `scripts/desplegar.sh`**: descomprime aparte, comprueba que el paquete trae
+> `server.js` y `.next`, y solo entonces intercambia. Mientras no este, esto
+> se repite en cualquier despliegue.
+>
+> Y el otro dato comprobado: el workflow reescribe `app.js` en CADA
+> despliegue, asi que cualquier arreglo hecho a mano en el servidor sobre ese
+> archivo dura hasta el siguiente push.
 
 ## Lo que dejo la sesion de la noche del 10 de agosto
 
