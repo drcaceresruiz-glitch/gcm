@@ -1,0 +1,2085 @@
+================================================================================
+
+                    G C M  -  D I A G N O S T I C O   L E A N
+
+           Fundamento, bases, diagnostico MMM y plan correctivo
+                    Gestor de Construccion y Mantenimiento
+
+================================================================================
+
+  Documento          Diagnostico tecnico
+  Version            1.0
+  Fecha              11 de agosto de 2026
+  Alcance            La aplicacion GCM, no la obra que gestiona
+  Marco              Lean Construction - las tres M (Mura, Muri, Muda)
+                     desagregadas en seis enfoques
+  Metodo             Lectura y verificacion directa del codigo fuente
+  Repositorio        C:\Projects\PROYECTO_CONSTRUCCION  (rama main)
+  Produccion         https://gcm.drcaceresruiz.com
+
+--------------------------------------------------------------------------------
+
+  AVISO SOBRE LA NATURALEZA DE ESTE DOCUMENTO
+
+  Todo lo que aqui se afirma sobre el comportamiento de GCM se comprobo
+  leyendo el codigo, no la documentacion ni el recuerdo. Cuando una
+  afirmacion procede de una inferencia sobre el proceso de obra y no del
+  codigo, se marca de forma explicita con [INFERENCIA].
+
+  Las referencias van en formato archivo:linea para que se puedan abrir y
+  contrastar. El anexo A recoge las comprobaciones que sostienen los
+  hallazgos.
+
+================================================================================
+INDICE
+================================================================================
+
+  PARTE I - FUNDAMENTO
+
+    1.  Por que un marco Lean para una aplicacion de gestion de obra
+    2.  Las tres M
+    3.  Los seis enfoques
+    4.  Last Planner System y su relacion con las tres M
+    5.  Metodo del diagnostico
+
+  PARTE II - BASES
+
+    6.  Que es GCM y que problema resuelve
+    7.  Arquitectura y reglas duras
+    8.  Modelo de datos relevante para el diagnostico
+    9.  Roles y permisos
+    10. Los cuatro flujos operativos
+    11. Los trece modulos del panel
+
+  PARTE III - DIAGNOSTICO
+
+    12. Cuadro de mando
+    13. Enfoque 1 - Estructura y estandares
+    14. Enfoque 2 - Informacion y sincronizacion
+    15. Enfoque 3 - Fatiga humana y perfiles
+    16. Enfoque 4 - Capacidad tecnologica e infraestructura
+    17. Enfoque 5 - Tiempos muertos y esperas
+    18. Enfoque 6 - Reprocesos y calidad administrativa
+    19. Tabla consolidada de hallazgos
+
+  PARTE IV - PROPUESTAS
+
+    20. Criterios de diseno de las propuestas
+    21. P-1  Carga contra capacidad semanal
+    22. P-2  Deteccion de sobrecarga: PPC bajo con confiabilidad alta
+    23. P-3  Antiguedad de restricciones por flujo
+    24. P-4  Aviso de cronograma desactualizado
+    25. P-5  Salud de infraestructura en el panel de obra
+    26. P-6  Empuje del mapeo al aprobar un adicional
+    27. P-7  Pruebas de la capa de servicios
+    28. P-8  La modalidad de contratacion gobierna el calculo
+
+  PARTE V - PLAN CORRECTIVO
+
+    29. Secuencia y fases
+    30. Criterios de aceptacion globales
+    31. Riesgos y mitigaciones
+    32. Lo que NO se propone, y por que
+
+  ANEXOS
+
+    A.  Evidencia verificada
+    B.  Glosario
+    C.  Correcciones pendientes en el manual del residente
+
+
+================================================================================
+                            P A R T E   I
+                           F U N D A M E N T O
+================================================================================
+
+
+1. POR QUE UN MARCO LEAN PARA UNA APLICACION DE GESTION DE OBRA
+--------------------------------------------------------------------------------
+
+GCM no es una aplicacion de proposito general a la que se le aplica un marco
+prestado. Es una herramienta que implementa Last Planner System, que es a su
+vez la aplicacion de Lean a la produccion en construccion. El marco no se
+importa: ya estaba dentro.
+
+Eso permite hacer una pregunta mas exigente que la habitual. La pregunta no
+es "que tan buena es esta aplicacion", sino:
+
+    Una herramienta que existe para combatir el desperdicio en obra,
+    .como de completa es respecto del marco que dice implementar?
+
+Un sistema puede estar bien construido, ser rapido, estar bien probado, y aun
+asi implementar solo un tercio del metodo. Eso es exactamente lo que este
+diagnostico encuentra, y es un tipo de hueco que ninguna revision de codigo
+convencional detecta: no hay errores donde falta una funcionalidad entera.
+
+El diagnostico se hace sobre LA APLICACION. Es decir, se pregunta que puede
+VER y que puede DECIR GCM, no como de bien va la obra que gestiona. Si GCM no
+puede ver una forma de desperdicio, esa forma de desperdicio es invisible
+para todos sus usuarios, y ese es el defecto que interesa.
+
+
+2. LAS TRES M
+--------------------------------------------------------------------------------
+
+Las tres M son las tres familias de perdida del pensamiento Lean. Se abordan
+en un orden que no es arbitrario:
+
+    MURA   Irregularidad, variabilidad, falta de nivelacion.
+           El proceso no es predecible. A veces va a un ritmo, a veces a
+           otro; a veces la informacion llega, a veces no.
+
+    MURI   Sobrecarga. Se exige a personas, equipos o sistemas mas de lo que
+           pueden dar de forma sostenible.
+
+    MUDA   Desperdicio propiamente dicho. Actividad que consume recursos sin
+           anadir valor: esperas, reprocesos, transportes, inventario.
+
+
+  EL ORDEN IMPORTA, Y ES LA CLAVE DE ESTE DIAGNOSTICO
+  ..............................................................................
+
+  MUDA es lo visible. Es lo que se ve en obra: la cuadrilla parada, el
+  material que no llego, el plano que se rehizo. Por eso es lo primero que
+  toda herramienta mide, y es lo que GCM mide muy bien.
+
+  Pero MUDA es en gran medida CONSECUENCIA de MURA y MURI:
+
+      Un proceso irregular (MURA) obliga a dimensionar para el pico, lo que
+      genera sobrecarga en el pico (MURI), y la sobrecarga produce esperas,
+      errores y reprocesos (MUDA).
+
+  Una herramienta que solo mide MUDA describe sintomas con precision y no
+  llega nunca a la causa. El diagnostico de la parte III muestra que GCM esta
+  hoy en ese punto respecto de MURI.
+
+
+3. LOS SEIS ENFOQUES
+--------------------------------------------------------------------------------
+
+Cada M se desagrega en dos enfoques operativos, que son las preguntas que se
+le hacen al sistema:
+
+        .-- Enfoque 1: Estructura y estandares
+        |   .El proceso es predecible?
+    MURA
+        '-- Enfoque 2: Informacion y sincronizacion
+            .Hay sorpresas o asimetria de informacion?
+
+        .-- Enfoque 3: Fatiga humana y perfiles
+        |   .El personal esta desbordado?
+    MURI
+        '-- Enfoque 4: Capacidad tecnologica e infraestructura
+            .El sistema colapsa?
+
+        .-- Enfoque 5: Tiempos muertos y esperas
+        |   .El flujo esta detenido?
+    MUDA
+        '-- Enfoque 6: Reprocesos y calidad administrativa
+            .Hay burocracia o errores?
+
+La utilidad de desagregar en seis es que separa lo humano de lo tecnico
+dentro de cada M. Sin esa separacion, MURI se lee siempre como "el servidor
+va lento" y nunca como "la cuadrilla no da abasto", que es la mitad que de
+verdad decide una obra.
+
+
+4. LAST PLANNER SYSTEM Y SU RELACION CON LAS TRES M
+--------------------------------------------------------------------------------
+
+Last Planner (LPS) tiene cuatro niveles de planificacion encadenados. Cada
+uno ataca una M distinta, y esto es lo que permite auditar una herramienta que
+dice implementarlo:
+
+  NIVEL                QUE HACE                              M QUE ATACA
+  -------------------  ------------------------------------  --------------
+  Plan maestro         Fija hitos y secuencia general         MURA
+  (cronograma)         Estandariza el "que" y el "cuando"
+
+  Lookahead            Analisis de restricciones: convierte   MUDA
+  (3-6 semanas)        "lo que TOCA hacer" en "lo que SE      (esperas)
+                       PUEDE hacer"
+
+  Plan semanal (PTS)   Compromiso de quien ejecuta.           MURI
+                       Se compromete lo que CABE, no lo       (sobrecarga)
+                       que toca
+
+  PPC y causas         Aprendizaje: por que fallo lo          MUDA + MURA
+                       prometido                              (reproceso y
+                                                              variabilidad)
+
+  LA OBSERVACION CENTRAL DE ESTE DOCUMENTO
+  ..............................................................................
+
+  El nivel del PTS tiene DOS condiciones en el metodo original, no una:
+
+      (a) Solo se compromete trabajo LIBERADO   -> filtro de calidad
+      (b) Solo se compromete trabajo que CABE   -> filtro de capacidad
+
+  GCM implementa (a) con un rigor notable: el Lookahead, los siete flujos de
+  restriccion, el semaforo LISTO/PENDIENTE/BLOQUEADO y el aviso al
+  comprometer sin liberar.
+
+  GCM NO implementa (b). No existe en el sistema ninguna nocion de cuanto
+  cabe en una semana. Este documento sostiene que ese es el hueco principal
+  de la aplicacion, y la parte IV propone como cerrarlo con datos que ya
+  estan guardados.
+
+
+5. METODO DEL DIAGNOSTICO
+--------------------------------------------------------------------------------
+
+El diagnostico se construyo en cuatro pasos:
+
+  PASO 1 - Inventario del sistema
+     Lectura de prisma/schema.prisma (52 modelos y enumeraciones), de la
+     matriz de permisos en src/lib/rbac.ts, del catalogo de indicadores en
+     src/lib/tablero.ts, de los 38 servicios de src/services/ y de las 44
+     rutas de src/app/.
+
+  PASO 2 - Mapeo de cada capacidad al enfoque que sirve
+     Para cada indicador, regla o validacion del sistema se determino a que
+     enfoque responde. Lo que no respondia a ninguno se descarto del
+     diagnostico; lo que respondia se anoto como evidencia a favor.
+
+  PASO 3 - Busqueda del silencio
+     Para cada enfoque se busco lo contrario: datos que el sistema GUARDA y
+     no usa. Es donde aparecen los hallazgos de mayor rendimiento, porque no
+     requieren cambiar el modelo de datos.
+
+  PASO 4 - Verificacion
+     Toda afirmacion sobre ausencia se comprobo por busqueda exhaustiva en
+     src/, no por memoria. El anexo A recoge esas comprobaciones. Una
+     afirmacion del tipo "nadie usa X" solo aparece en este documento si se
+     enumeraron todos los consumidores de X.
+
+  LIMITACIONES CONOCIDAS
+
+  - No se ejecuto la aplicacion ni se midio rendimiento real. El enfoque 4
+    se diagnostica por diseno y por los mecanismos de deteccion presentes,
+    no por telemetria.
+  - No se entrevisto a usuarios. Lo que se afirma sobre la carga de trabajo
+    del residente sale de la matriz de permisos, no de observacion de campo,
+    y va marcado como [INFERENCIA] donde corresponde.
+  - El diagnostico incluye trabajo sin commitear (la migracion
+    lookahead_analisis y el componente PanelAnalizar). Se senala de forma
+    explicita donde influye.
+
+
+================================================================================
+                            P A R T E   I I
+                              B A S E S
+================================================================================
+
+
+6. QUE ES GCM Y QUE PROBLEMA RESUELVE
+--------------------------------------------------------------------------------
+
+GCM es un sistema multiproyecto y multiempresa de control de obra. Une tres
+cosas que en la practica habitual viven separadas y no se hablan:
+
+    MS PROJECT          dice CUANDO         (fechas, secuencia, ruta critica)
+    EL PRESUPUESTO      dice CUANTO         (partidas, metrados, precios)
+    GCM                 dice QUE SE PUEDE   (restricciones, compromisos,
+                        HACER DE VERDAD      cumplimiento)
+
+El reparto de autoridad esta decidido y es coherente en todo el sistema:
+
+  - Project MANDA sobre el plan. GCM no recalcula la ruta critica: la lee del
+    archivo (campo <Critical>) y la muestra. No la deduce de la holgura,
+    porque en los archivos reales hay 18 tareas con holgura cero que NO son
+    criticas.
+  - GCM MANDA sobre el avance real: cuanto se hizo, quien lo reporto y
+    cuando.
+
+El ancla entre versiones del cronograma es el <UID> de Project. Se eligio
+tras comprobar sobre dos cortes reales que los <GUID> se regeneran enteros,
+el <ID> se corre al insertar o borrar filas, el <WBS> se recalcula con la
+posicion y el nombre se edita. Todos fallan en silencio; el UID no.
+
+
+7. ARQUITECTURA Y REGLAS DURAS
+--------------------------------------------------------------------------------
+
+  CAPA                TECNOLOGIA
+  ------------------  ----------------------------------------------------
+  Interfaz            Next.js 16 (App Router), React 19, Tailwind 4
+  Datos               Prisma 7 con adaptador MariaDB (sin motor nativo)
+  Base de datos       MariaDB / MySQL
+  Lenguaje            TypeScript en modo estricto
+
+  ESTRUCTURA
+
+    src/app/          Rutas y paginas (44 paginas)
+    src/components/   Componentes de interfaz
+    src/services/     Logica de negocio. UNICO punto que accede a Prisma (38)
+    src/lib/          Nucleo puro: entorno, sesion, permisos, criptografia,
+                      y toda la logica sin base de datos (es lo que se prueba)
+    prisma/           Esquema y migraciones
+    infra/            Arranque y despliegue del servidor de produccion
+    docs/             Documentacion
+
+  LAS CUATRO REGLAS DEL PROYECTO
+
+    1. Todo importe es Decimal, jamas Float. Un centimo perdido por redondeo
+       en un presupuesto de obra es un error contable.
+    2. Los componentes no importan Prisma. Todo acceso a datos pasa por
+       src/services/, que es donde se verifican permisos y se filtra por
+       empresa. La regla la impone ESLint, no la convencion.
+    3. Denegacion por defecto. Un permiso que no figura explicitamente en
+       src/lib/rbac.ts no se concede.
+    4. El filtro por empresa sale SIEMPRE de la sesion, jamas de un parametro
+       de la peticion. Es lo que impide que un cliente vea obras de otro.
+
+  DOS DECISIONES CONDICIONADAS POR EL HOSTING
+
+  Ambas tienen la misma causa: en el servidor de produccion no ejecutan
+  binarios compilados.
+
+    - src/lib/password.ts usa scrypt (incluido en Node) en vez de argon2 o
+      bcrypt.
+    - src/lib/prisma.ts usa el adaptador MariaDB en vez del motor en Rust,
+      con lo que el cliente queda en JavaScript puro.
+
+  Son relevantes para el enfoque 4: no son descuidos, son restricciones de
+  infraestructura asumidas conscientemente y documentadas junto a la linea
+  que explican.
+
+
+8. MODELO DE DATOS RELEVANTE PARA EL DIAGNOSTICO
+--------------------------------------------------------------------------------
+
+Del esquema completo (52 modelos y enumeraciones) interesan aqui los que
+sostienen o deberian sostener alguno de los seis enfoques.
+
+  DOS ARBOLES QUE SE CRUZAN
+
+    WbsItem            El arbol del presupuesto (EDT). CAPITULO agrupa,
+                       PARTIDA lleva unidad, metrado, precioUnitario y
+                       parcial. Es la unidad de DINERO.
+
+    TareaCronograma    La fila del cronograma. Lleva uid, fechas, duracion,
+                       nivel, esHito, esResumen, esCritico. Es la unidad de
+                       TIEMPO.
+
+    MapeoTareaPartida  El cruce. De UNA tarea a VARIAS partidas y viceversa.
+                       Se confirma A MANO siempre, y la fila guarda quien lo
+                       confirmo y cuando.
+
+  Por que el mapeo se confirma a mano: se midio sobre los archivos reales de
+  CRIOCORD y enlazar por codigo automaticamente resulto peor que no enlazar.
+  De 56 coincidencias de codigo, 36 apuntaban a otra cosa: el capitulo 5 del
+  cronograma va desplazado una posicion respecto del presupuesto, y el "5.5"
+  habria caido sobre un descuento comercial. Un mapeo equivocado NO da
+  sintoma: la curva sale bonita y miente.
+
+  LINEA BASE Y PRESUPUESTO VIGENTE
+
+    Baseline           Foto congelada del presupuesto, con su cascada propia
+                       (costoDirecto, descuentos, % gastos generales, %
+                       utilidad, % IGV, montoTotal, clausulas). Con
+                       aprobadaAt puesta es INMUTABLE.
+
+    MovimientoPresupuestal
+                       La unica forma de mover un presupuesto aprobado:
+                       RECONVERSION (suma cero), ADICIONAL (solo entradas),
+                       DEDUCTIVO (solo salidas). Aprobar es irreversible; se
+                       corrige con otro de signo contrario.
+
+    PRESUPUESTO VIGENTE = revision aprobada + movimientos aprobados
+
+  Por que los porcentajes viven en la revision y no en la obra: cambian entre
+  revisiones, y cada revision debe conservar los suyos. Si vivieran en la
+  obra, recalcular una revision antigua daria otro numero y la comparacion
+  entre revisiones dejaria de tener sentido.
+
+  LAST PLANNER
+
+    WorkCalendar       Calendario laboral POR OBRA. diaSemana (ISO 1..7),
+                       laborable, horas Decimal(4,2), turno.
+                       *** Este modelo es el que sostiene el hallazgo H-3 ***
+
+    LookaheadTask      Tarea en la ventana de mediano plazo. Anclada por
+                       (projectId, uid). Anade faseBloque, zona, proveedorId
+                       y estado (PENDIENTE / LISTO / BLOQUEADO).
+                       Con la WIP: analizadaAt, analizadaPor.
+
+    Restriccion        Un flujo sobre una tarea del Lookahead. tipo, detalle,
+                       requiereDoc, documentoId, resuelta, resueltaAt,
+                       resueltaPor, createdAt.
+                       *** createdAt + resueltaAt sostienen el hallazgo H-6 ***
+
+    PlanSemanal        Un plan por semana, anclado a fechaCorte. ABIERTO o
+                       CERRADO. Unicidad por (projectId, fechaCorte).
+
+    CompromisoSemanal  Un compromiso. uid o linea libre, descripcion,
+                       metaPorcentaje, cumplido, causa, zona, color,
+                       proveedorId, cantidadPlan, cantidadEjec, unidad.
+                       *** cantidadPlan sostiene el hallazgo H-3 ***
+
+  LOS CATALOGOS CERRADOS
+
+    TipoRestriccion (7)     SEGURIDAD, INFORMACION, ESPACIO, MATERIALES,
+                            MANO_OBRA, REQUISITOS, EQUIPOS
+
+    CausaNoCumplimiento (9) PRERREQUISITO, MATERIALES, MANO_OBRA, EQUIPOS,
+                            INFORMACION, CLIENTE_TERCEROS, CLIMA,
+                            REPROGRAMACION, OTRA
+
+  Son fijos a proposito: sin catalogo cerrado no hay Pareto comparable entre
+  semanas ni entre obras. Es una decision de nivelacion (MURA) tomada en el
+  esquema.
+
+  NOTA SOBRE EL ORDEN DE LOS SIETE FLUJOS
+
+  El codigo los ordena en FLUJOS_RESTRICCION (src/lib/lookahead.ts) asi:
+  INFORMACION, MATERIALES, MANO_OBRA, EQUIPOS, ESPACIO, REQUISITOS,
+  SEGURIDAD. Es el orden de la matriz en pantalla.
+
+  El manual del residente los presenta en el orden nemotecnico SIEMPRE
+  (Seguridad, Informacion, Espacio, Materiales, Personas, Requisitos,
+  Equipos). Los dos ordenes son correctos y describen el mismo catalogo: uno
+  es de pantalla y el otro de memoria. Conviene no confundirlos al programar.
+
+
+9. ROLES Y PERMISOS
+--------------------------------------------------------------------------------
+
+Cinco roles. El rol es POR OBRA (ProjectMembership), no global: la misma
+persona puede ser RESIDENTE en una obra y CONSULTOR en otra.
+
+  ROL             PERFIL
+  --------------  ------------------------------------------------------------
+  ADMIN           Control total sobre su empresa. Unico que aprueba la linea
+                  base: congelar el presupuesto es un acto contractual.
+  RESIDENTE       Responsable tecnico. Construye y mantiene el presupuesto y
+                  el cronograma, lleva el Lookahead y el PTS, reporta avance
+                  y valoriza encargos. No aprueba ni administra usuarios.
+  ADMIN_OBRA      Perfil economico-administrativo. Proveedores, encargos y
+                  ordenes. Redacta movimientos. TAMBIEN puede gestionar
+                  Lookahead y plan semanal.
+  ALMACENERO      Solo obra:leer y partida:leer.
+  CONSULTOR       Consulta externa (cliente, supervision). Estrictamente
+                  lectura.
+
+  LOS CINCO PERMISOS INNEGOCIABLES
+
+  No se pueden reconfigurar por empresa, ni siquiera por su propio ADMIN:
+
+    linea_base:aprobar     Acto contractual irreversible que mueve la cifra
+    movimiento:aprobar     contra la que se mide la obra.
+
+    permiso:leer           Reparten todos los demas. Si se pudieran conceder,
+    permiso:editar         un ADMIN podria darselos a un CONSULTOR y ese
+                           repartirse el resto: escalada de privilegios con
+                           dos clics.
+
+    configuracion:editar   Gobierna el TELEFONO por el que salen los SMS de
+                           la empresa, y por esa cola viajan los codigos de
+                           acceso en claro. Quien vincule un emisor puede
+                           leer el segundo factor de sus companeros.
+
+  Sobre el resto de permisos, cada empresa puede conceder o revocar
+  excepciones sobre la plantilla del rol (company_permissions). Quien decide
+  es resolverPermisos(), que se ejecuta una vez por peticion.
+
+  EL PASE DE OBRA NO ES UN USUARIO
+
+  Quien documenta en campo sin cuenta de GCM entra con un pase. Es
+  deliberadamente incompatible con una sesion: el tipo PaseActivo no tiene
+  permisos, ni role, ni userId, precisamente para que no encaje por estructura
+  en puede() ni en ningun servicio que espere una sesion. Un pase alcanza UNA
+  obra y lo unico que se le concede es adjuntar fotos.
+
+
+10. LOS CUATRO FLUJOS OPERATIVOS
+--------------------------------------------------------------------------------
+
+  FLUJO A - PRESUPUESTO
+
+    Excel  -->  Analisis  -->  Vista previa  -->  Arbol EDT  -->  Revision
+                                                                     |
+                                       Movimientos  <-----------  aprobada
+                                       (reconversion / adicional / deductivo)
+                                                    |
+                                                    v
+                                          PRESUPUESTO VIGENTE
+
+    El importador nunca escribe por si mismo: analiza, valida y devuelve una
+    vista previa. La escritura es un segundo paso, ya con el usuario habiendo
+    visto lo que se va a cargar.
+
+    Detecta cabeceras por sinonimos (item/codigo/nro, descripcion/partida/
+    detalle, und/unidad/um, metrado/cantidad, precio unitario/p.u.,
+    parcial/subtotal/importe). Detecta celdas combinadas verticalmente, que
+    son la senal autoritativa de una partida a suma alzada cuyo alcance se
+    detalla en varias lineas.
+
+  FLUJO B - CRONOGRAMA
+
+    .mpp/.xml --> Version --> Linea base --> Mapeo --> Avance --> Curva S
+                                              ^                      |
+                                              |                      v
+                                    (uid estable)             SPI / SV / CV
+
+  FLUJO C - LAST PLANNER  (el ciclo que se repite cada semana)
+
+    Cronograma --> Lookahead --> 7 restricciones --> LISTO --> PTS --> Cierre
+        ^                                                                |
+        |                                                                v
+        '------------------ lo aprendido afina la proxima ------- PPC + causas
+
+  FLUJO D - COMPRAS
+
+    Proveedor --> Encargo (frente + monto) --> Orden --> Aprobada
+                        |                                    |
+                        v                                    v
+                  Valorizacion                        COMPROMETIDO
+                                                (base del saldo y del CPI)
+
+
+11. LOS TRECE MODULOS DEL PANEL
+--------------------------------------------------------------------------------
+
+Catalogo en src/lib/tablero.ts. El orden de la lista MANDA el orden de la
+rejilla: configurar decide QUE se ve, no DONDE se coloca.
+
+   #  CLAVE           ETIQUETA               CONTESTA A                 CRON
+  --  --------------  ---------------------  -------------------------  ----
+   1  pendientes      Que falta              Lo que hay que completar    no
+   2  avance          Avance fisico          .Voy por delante o detras?  si
+   3  curva           Curva de avance        .Como llegue y donde acabo? si
+   4  plazo           Plazo                  .Cuantos dias quedan?       no
+   5  presupuesto     Presupuesto            .Cuanto queda por gastar?   no
+   6  valorGanado     Valor ganado (EVM)     SPI y CPI contra el plan    si
+   7  ppc             PPC (Last Planner)     .Se cumple lo prometido?    no
+   8  confiabilidad   Lookahead              .Cuanto esta liberado?      si
+   9  causas          Causa que mas frena    .Cual es el cuello?         no
+  10  atrasos         Partidas atrasadas     .Cual urge?                 si
+  11  criticas        Cadena critica         .Que mueve la fecha de fin? si
+  12  capitulos       Capitulos              .Cuales se desvian mas?     no
+  13  ordenes         Ordenes de compra      .Cuantas y en que estado?   no
+
+  CRON = requiere cronograma cargado para tener algo que ensenar.
+
+  Los tres de Last Planner (7, 8, 9) son los que avisan ANTES. Los demas
+  cuentan lo que ya paso.
+
+  TRES DECISIONES DE DISENO RELEVANTES PARA EL DIAGNOSTICO
+
+  - Los AVISOS de la parte superior no se filtran por la obra elegida: son de
+    toda la empresa. Un tablero que solo ensena problemas de la obra que
+    estas mirando te deja ciego ante la que no estas mirando, que es justo
+    donde se escapan. (Enfoque 2, a favor.)
+
+  - El panel carga UNICAMENTE los datos de los modulos encendidos. Apagar los
+    que no se miran hace que cargue mas rapido. La carga la gradua el
+    usuario. (Enfoque 4, a favor.)
+
+  - La preferencia guarda los modulos APAGADOS, no los encendidos. Es una
+    correccion deliberada: cuando guardaba los encendidos, todo modulo nuevo
+    nacia apagado para los usuarios existentes, y los tres de Last Planner
+    -justo los mas importantes- no habrian aparecido nunca sin ir a
+    buscarlos. (Enfoque 2, a favor.)
+
+
+================================================================================
+                           P A R T E   I I I
+                        D I A G N O S T I C O
+================================================================================
+
+
+12. CUADRO DE MANDO
+--------------------------------------------------------------------------------
+
+  M     ENF  ENFOQUE                        NOTA   SEVERIDAD DEL HUECO
+  ----  ---  -----------------------------  -----  ---------------------
+  MURA   1   Estructura y estandares        4,0/5  Media
+  MURA   2   Informacion y sincronizacion   4,5/5  Baja
+  MURI   3   Fatiga humana y perfiles       0,0/5  ***  CRITICA  ***
+  MURI   4   Capacidad tecnologica          2,5/5  Media
+  MUDA   5   Tiempos muertos y esperas      4,5/5  Baja
+  MUDA   6   Reprocesos y calidad admin.    3,5/5  Media
+
+  MEDIA GLOBAL                              3,2/5
+
+  ESCALA
+    5  El sistema mide el enfoque y actua sobre el
+    4  Lo mide bien; queda algun dato sin explotar
+    3  Lo mide parcialmente o el dato no llega a quien lo sufre
+    2  Existe deteccion pero no llega a ninguna pantalla de usuario
+    1  Solo hay datos crudos, sin ninguna lectura
+    0  El sistema no puede ver este tipo de perdida
+
+  LECTURA DEL CUADRO
+
+  La media de 3,2 es enganosa y no debe citarse sola. El perfil real es:
+  cinco enfoques entre notable y sobresaliente, y uno en cero absoluto.
+
+  Un sistema con seis enfoques a 3,2 de media uniforme seria un sistema
+  mediocre y mejorable en todas partes. GCM es lo contrario: es un sistema
+  muy bueno con un agujero de forma definida. Eso es una noticia buena,
+  porque un agujero definido se tapa; una mediocridad uniforme, no.
+
+
+                     PERFIL VISUAL DEL DIAGNOSTICO
+
+    5 |                                        ####        ####
+      |         ####        ####               ####        ####
+    4 |         ####        ####               ####        ####
+      |         ####        ####               ####        ####
+    3 |         ####        ####               ####        ####
+      |         ####        ####    ####       ####        ####
+    2 |         ####        ####    ####       ####        ####
+      |         ####        ####    ####       ####        ####
+    1 |         ####        ####    ####       ####        ####
+      |         ####        ####    ####       ####        ####
+    0 +---------####--------####----____-------####--------####------
+              ENF 1       ENF 2   ENF 3 ENF 4  ENF 5      ENF 6
+                                    ^
+                                    |
+                          aqui no hay barra:
+                          el sistema no puede
+                          ver esta perdida
+
+
+13. ENFOQUE 1 - ESTRUCTURA Y ESTANDARES                              4,0 / 5
+--------------------------------------------------------------------------------
+  MURA  ...El proceso es predecible?
+
+  EVIDENCIA A FAVOR
+
+  E1.1  Catalogos cerrados. TipoRestriccion (7) y CausaNoCumplimiento (9) son
+        enumeraciones del esquema, no texto libre. El comentario del codigo
+        lo justifica: "catalogo FIJO para poder comparar y hacer Pareto".
+        Sin esto, la agregacion entre semanas y entre obras seria imposible.
+
+  E1.2  Cadencia anclada. Project.diaCorteSemanal fija el dia de corte por
+        obra, y PlanSemanal lleva @@unique([projectId, fechaCorte]): la base
+        impide dos planes para la misma semana. La nivelacion temporal esta
+        garantizada por el motor, no por la disciplina del usuario.
+
+  E1.3  Correlativos que no se reciclan. Company.siguienteCorrelativoObra
+        solo sube. Borrar una obra NO recicla su numero, porque un
+        correlativo de auditoria no se repite.
+
+  E1.4  Denegacion por defecto y permisos innegociables (seccion 9). La
+        estructura de autoridad es explicita y no puede degradarse por
+        configuracion.
+
+  E1.5  Separacion tipada de conceptos. WbsType separa lo que agrupa
+        (CAPITULO) de lo que lleva dinero (PARTIDA). Impide por construccion
+        el error clasico de imputar costo a un capitulo.
+
+  HALLAZGO H-1  [SEVERIDAD MEDIA]
+  ..............................................................................
+  LA MODALIDAD DE CONTRATACION ESTA REGISTRADA PERO NO GOBIERNA NINGUN CALCULO
+
+  El enum ModalidadPartida distingue tres casos con consecuencias economicas
+  opuestas, y el propio esquema lo documenta:
+
+     PRECIOS_UNITARIOS  importe = metrado x precio unitario. Si el metrado
+                        real difiere del previsto, el COSTO CAMBIA.
+     SUMA_ALZADA        precio cerrado por el alcance completo. El metrado es
+                        referencial: aunque se ejecute mas o menos, el
+                        importe NO cambia y el riesgo lo asume el
+                        contratista.
+     ALCANCE            detalle dentro de una suma alzada. Sin importe
+                        propio: el dinero esta en la partida padre.
+
+  VERIFICACION: "modalidad" aparece 76 veces en 16 archivos de src/. Los 16
+  pertenecen a la captura y presentacion del dato -importador de Excel, CRUD
+  de partidas, movimientos, ordenes, columnas de tabla-.
+
+  NINGUNO de esos 16 archivos es evm.service.ts, cronograma.service.ts,
+  presupuesto-obra.ts ni curva-s.ts.
+
+  Es decir: la modalidad se captura, se guarda, se muestra y se filtra, y
+  DESAPARECE en el momento del calculo. El avance, la curva S y el valor
+  ganado tratan una suma alzada exactamente igual que unos precios
+  unitarios.
+
+  CONSECUENCIA: la misma cifra de "avance" significa cosas distintas segun la
+  partida, y nada lo advierte. Es MURA en la unidad de medida, que es el peor
+  sitio donde tenerlo, porque contamina todo lo que se calcula por encima.
+
+  POR QUE NO ES URGENTE PESE A SER DE FONDO: mientras el grueso del
+  presupuesto sea de precios unitarios, el sesgo es acotado. Se convierte en
+  grave en obras con mucha suma alzada. Requiere diseno, no parche: ver P-8.
+
+
+14. ENFOQUE 2 - INFORMACION Y SINCRONIZACION                         4,5 / 5
+--------------------------------------------------------------------------------
+  MURA  ...Hay sorpresas o asimetria de informacion?
+
+  Es el enfoque mejor resuelto en terminos de intencion de diseno. El sistema
+  tiene un modulo dedicado exclusivamente a combatir la asimetria.
+
+  EVIDENCIA A FAVOR
+
+  E2.1  src/lib/pendientes.ts. Su comentario de cabecera enuncia el problema
+        con precision:
+
+           "GCM sabe muchas cosas que no dice. Sabe que doce tareas de la
+            ventana no se han analizado -y que por eso el porcentaje de
+            confiabilidad esta mintiendo-, sabe que una tarea empezo hace
+            cinco dias y nadie ha reportado avance, y sabe que una partida
+            que arranca en dos semanas no tiene a nadie contratado. Todo eso
+            estaba en la base y en ninguna pantalla."
+
+        Nueve reglas, cada una con su CONSECUENCIA explicita, ordenadas en
+        tres bloques que son un modelo de flujo:
+
+           entradas  ->  procesos  ->  salidas
+
+        Un hueco en las entradas invalida todo lo que viene detras, por eso
+        se leen en ese orden.
+
+  E2.2  Tres reglas de forma que son Lean puro, citadas del propio codigo:
+
+           "Cada pendiente dice la CONSECUENCIA, no solo el hecho. '12 tareas
+            sin analizar' no mueve a nadie; 'tu confiabilidad dice 40% y no
+            es cierto' si."
+
+           "La urgencia se transmite con el ORDEN y con el numero, nunca con
+            parpadeos: lo que parpadea se ignora a los tres dias y molesta
+            desde el primero."
+
+           "Informa, no bloquea. Quien esta en obra sabe cosas que el sistema
+            no."
+
+  E2.3  Las nueve reglas y sus umbrales:
+
+        BLOQUE     REGLA                          GRAVEDAD  UMBRAL
+        ---------  -----------------------------  --------  --------------
+        entradas   avance-sin-reportar            critica   >0 tareas
+        entradas   cierre-sin-porcentaje          critica   >0 semanas
+        procesos   sin-cobertura                  -         >0 tareas
+        procesos   restricciones-sin-liberar      -         >0 tareas
+        procesos   proximas-sin-analizar          -         >0 tareas
+        procesos   lookahead-sin-analizar         -         >0 tareas
+        salidas    sobregiro                      -         >0 partidas
+        salidas    ppc-bajo                       -         PPC < 70
+        salidas    mapeo-incompleto               -         cobertura < 60
+
+        Constantes: PPC_PREOCUPANTE = 70, COBERTURA_MINIMA_MAPEO = 60.
+
+  E2.4  Los avisos de empresa no se filtran por obra (seccion 11).
+
+  E2.5  La preferencia del panel guarda los modulos APAGADOS (seccion 11):
+        lo nuevo entra encendido solo.
+
+  E2.6  [WIP, sin commitear] La migracion lookahead_analisis cierra la
+        asimetria mas grave que quedaba. Hasta ahora "sincronizar ventana"
+        sembraba las 7 restricciones a TODA tarea, incluidos los hitos de
+        duracion cero. El efecto, en palabras de la propia migracion:
+
+           "'cero restricciones' y 'nadie la ha mirado' eran la misma fila, y
+            de esa confusion venia que el porcentaje de confiabilidad midiera
+            la falta de analisis en vez de la obra."
+
+        Con analizadaAt / analizadaPor las dos situaciones se separan, y las
+        restricciones se ELIGEN en vez de sembrarse. Es una correccion de
+        primer orden: hasta ahora el indicador de confiabilidad -uno de los
+        tres de Last Planner- no medía lo que decia medir.
+
+  HALLAZGO H-2  [SEVERIDAD BAJA]
+  ..............................................................................
+  NO HAY SENAL DE CRONOGRAMA DESACTUALIZADO
+
+  Cronograma.fechaCorte guarda el <StatusDate> del archivo: la fecha a la que
+  estan referidos los avances que trae. Es un dato presente y fiable.
+
+  Nada en el sistema compara esa fecha contra hoy.
+
+  CONSECUENCIA: si el plan cambio en Project y nadie subio la version nueva,
+  el Lookahead sincroniza su ventana contra un plan muerto, la ruta critica
+  que se muestra es la de hace un mes y los pendientes de "tareas que
+  arrancan pronto" se calculan sobre fechas que ya no son. Todo ello en
+  silencio: ninguna pantalla lo advierte.
+
+  Es una sorpresa diferida, que es la peor clase: se descubre cuando alguien
+  compara con Project, y para entonces se han tomado decisiones sobre el plan
+  viejo.
+
+
+15. ENFOQUE 3 - FATIGA HUMANA Y PERFILES                             0,0 / 5
+--------------------------------------------------------------------------------
+  MURI  ...El personal esta desbordado?
+                                                            *** CRITICO ***
+
+  EVIDENCIA A FAVOR
+
+  Ninguna. No existe en GCM ningun indicador, aviso, validacion ni pantalla
+  que responda a esta pregunta.
+
+  Esta es la unica seccion del diagnostico sin evidencia a favor.
+
+  HALLAZGO H-3  [SEVERIDAD CRITICA]
+  ..............................................................................
+  LA CAPACIDAD ESTA A MEDIO CALCULAR. LA CARGA NO SE AGREGA.
+  NADIE LAS COMPARA.
+
+  Es el hallazgo central de este diagnostico, y lo notable no es que falte,
+  sino LO CERCA QUE ESTA DE EXISTIR.
+
+  LADO 1 - LA JORNADA, que es la mitad calendario de la capacidad:
+           ya calculada, y probada
+
+     (La capacidad en horas-hombre necesita ademas la dotacion, que GCM no
+     guarda. La precision completa esta en P-1, seccion 21.)
+
+     src/lib/calendario.ts:76
+
+        export function horasPorSemana(calendario: readonly DiaLaboral[])
+                                                                    : number
+        {
+          return calendario
+            .filter((d) => d.laborable)
+            .reduce((total, d) => total + (Number(d.horas) || 0), 0);
+        }
+
+     Tiene prueba propia en src/lib/calendario.test.ts:73-76, que comprueba
+     45 h para el calendario tipo CRIOCORD y 70 h para uno corrido.
+
+     VERIFICACION DE CONSUMIDORES: la busqueda de "horasPorSemana" en todo
+     src/ devuelve exactamente cinco apariciones:
+
+        calendario.ts:76               la definicion
+        calendario.test.ts:6,73,75,76  las pruebas
+        CalendarioLaboral.tsx:5,44     el UNICO consumidor real
+
+     Y en CalendarioLaboral.tsx:44 su resultado se asigna a una variable
+     llamada "total" que se pinta como rotulo en la pantalla de
+     configuracion del calendario.
+
+     Resumen: la funcion que calcula la jornada semanal de la obra existe,
+     esta probada, y se usa para escribir un numero en una pantalla de
+     ajustes.
+
+  LADO 2 - LA CARGA:  guardada, nunca agregada
+
+     CompromisoSemanal.cantidadPlan  Decimal(14,4), con su unidad
+     CompromisoSemanal.cantidadEjec  Decimal(14,4)
+
+     VERIFICACION DE CONSUMIDORES: la busqueda de "cantidadPlan|
+     cantidadEjecutada" en src/ devuelve 30 apariciones en 8 archivos. Se
+     clasifican asi:
+
+        plan-semanal.service.ts   se lee, se valida, se escribe, se propone
+        FormularioPlanSemanal.tsx se edita
+        CierrePlanSemanal.tsx     se muestra como "X / Y unidad"
+        [planId]/page.tsx         se muestra
+        plan-semanal.ts           se arrastra entre estados del formulario
+        plan-semanal-cierre.test.ts  fixtures a null
+
+     En NINGUNA aparicion se suma, se agrega ni se compara contra nada.
+
+  LA OPERACION QUE FALTA
+
+     Los dos lados de la ecuacion estan en la base. Falta la division:
+
+         carga comprometida de la semana
+        ---------------------------------  =  indice de ocupacion
+         capacidad de la semana
+
+     Ver P-1 (seccion 21) para las dos vias: una que funciona con lo que hay
+     hoy, y otra que necesita captura nueva.
+
+  POR QUE ESTO ES CRITICO Y NO UNA MEJORA
+
+  Last Planner exige DOS condiciones para comprometer (seccion 4):
+
+     (a) que el trabajo este LIBERADO   -> GCM lo implementa con rigor
+     (b) que el trabajo QUEPA           -> GCM no lo implementa en absoluto
+
+  Falta la mitad del filtro del PTS. Y no es la mitad decorativa: la
+  sobrecarga es la causa de incumplimiento que NO se corrige liberando
+  restricciones, porque el trabajo ya estaba liberado.
+
+  EL SINTOMA YA SE ESTA PRODUCIENDO, DISFRAZADO
+
+  Considerese esta combinacion, que GCM puede mostrar hoy en el mismo panel:
+
+        Confiabilidad del Lookahead ...... 92 %   (casi todo liberado)
+        PPC de la semana ................. 55 %   (casi la mitad fallo)
+
+  La lectura correcta es: se prometio mas de lo que cabe. No es un problema
+  de liberacion -estaba liberado- ni de analisis -estaba analizado-.
+
+  GCM muestra las dos cifras juntas y NO nombra esa combinacion. El residente
+  que la ve concluye lo unico que el sistema le sugiere: "planificamos mal",
+  y la accion correctora que deduce -analizar mejor, liberar antes- no toca
+  la causa.
+
+  Peor: la accion correcta ante sobrecarga es COMPROMETER MENOS, que es
+  contraintuitiva y que nadie toma sin un dato que la respalde.
+
+  HALLAZGO H-4  [SEVERIDAD MEDIA]  [INFERENCIA parcial]
+  ..............................................................................
+  SOBRECARGA DEL PROPIO RESIDENTE, CON LA VALVULA YA ABIERTA Y SIN USAR
+
+  Verificado en src/lib/rbac.ts: el rol RESIDENTE acumula, ademas de la base
+  de solo lectura, estos permisos de escritura:
+
+     obra:editar
+     partida:crear / editar / eliminar / importar
+     cronograma:importar
+     avance:registrar
+     cronograma:linea_base
+     linea_base:crear
+     plan_semanal:gestionar
+     lookahead:gestionar
+     movimiento:crear
+     encargo:valorizar
+
+  Es decir: importar el presupuesto, importar el cronograma, mapear, fijar la
+  linea base, configurar el calendario, analizar restricciones, armar el PTS,
+  cerrar la semana, reportar avance y valorizar encargos. Todo la misma
+  persona, que ademas esta en obra.
+
+  [INFERENCIA] Que esto constituya sobrecarga real depende del tamano de la
+  obra y del equipo, y no se ha observado en campo. Lo que si es un hecho del
+  codigo es que el sistema concentra la ruta critica operativa en un solo
+  rol.
+
+  LO RELEVANTE: la valvula ya existe y no requiere desarrollo. El rol
+  ADMIN_OBRA tiene concedidos, hoy mismo:
+
+     lookahead:gestionar
+     plan_semanal:gestionar
+
+  El analisis de restricciones puede repartirse entre residente y
+  administrador de obra sin tocar una linea de codigo. Es una decision
+  organizativa que el sistema ya soporta y que nadie ha tomado.
+
+
+16. ENFOQUE 4 - CAPACIDAD TECNOLOGICA E INFRAESTRUCTURA              2,5 / 5
+--------------------------------------------------------------------------------
+  MURI  ...El sistema colapsa?
+
+  EVIDENCIA A FAVOR
+
+  E4.1  Carga graduable por el usuario. El panel consulta UNICAMENTE los
+        datos de los modulos encendidos. Apagar los que no se miran reduce el
+        trabajo del servidor. Es nivelacion de carga puesta en manos de quien
+        la provoca.
+
+  E4.2  Restricciones de hosting asumidas y documentadas (seccion 7): scrypt
+        en vez de argon2, adaptador MariaDB en vez del motor en Rust. Las dos
+        con su razon escrita junto a la linea que explican.
+
+  E4.3  Almacenamiento acotado sin perder trazabilidad. FotoEvidencia guarda
+        hash SHA-256 y purgadaAt. El archivo fisico puede borrarse por
+        espacio y el registro sigue diciendo que se subio, quien y cuando.
+        "La huella que sobrevive a la purga."
+
+  E4.4  Redundancia deliberada en el canal SMS. Puede haber VARIOS EmisorSms
+        por empresa a proposito: "un telefono de respaldo evita que la obra
+        se quede sin SMS porque uno se quedo sin bateria."
+
+  E4.5  Chequeo de vida real. salud.service.ts ejecuta una consulta contra la
+        base ("SELECT 1") en vez de responder "ok" sin consultar nada: "un
+        chequeo que solo responde ok sin consultar nada da luz verde aunque
+        la conexion este rota, que es justamente el fallo que interesa
+        detectar tras un despliegue."
+
+  HALLAZGO H-5  [SEVERIDAD MEDIA]
+  ..............................................................................
+  EL SISTEMA DETECTA SU FALLO MAS CARO Y NO SE LO CUENTA A NADIE
+
+  salud.service.ts devuelve tres cosas:
+
+     baseDatosConectada   boolean
+     latenciaMs           number
+     desplieguePendiente  boolean
+
+  El tercero merece atencion. Su comentario documenta un incidente real:
+
+     "Quiere decir que esta version NO es la ultima: el despliegue llego al
+      servidor y sigue ahi esperando. Se mira porque es exactamente el fallo
+      que mas tiempo ha costado: la Action en verde, la web respondiendo 200
+      y codigo viejo corriendo, sin nada que lo delatara. El 12 de agosto se
+      perdio una hora deduciendolo de fechas de archivos."
+
+  El sistema aprendio del incidente y construyo el detector. Pero el detector
+  vive en un endpoint tecnico, no en ninguna pantalla de usuario. Quien
+  sufre el fallo -el residente que no ve su cambio, o que ve datos de una
+  version vieja- no tiene forma de saberlo desde la aplicacion.
+
+  El mismo patron se repite con EmisorSms.ultimaConsultaAt:
+
+     "Ultima vez que este telefono pregunto por la cola. Es el unico modo de
+      saber desde la aplicacion si sigue vivo: si esta fecha se queda parada,
+      el telefono esta dormido o apagado y los SMS no salen."
+
+  El campo existe justamente para eso. Ninguna pantalla lo vigila. El
+  resultado practico: la obra se entera de que el emisor esta dormido cuando
+  a alguien no le llega un codigo de acceso y no puede entrar.
+
+  PATRON COMUN DE H-2, H-5 Y H-6
+
+  Los tres hallazgos son la misma forma de defecto:
+
+        el dato existe  +  el dato es fiable  +  nadie lo lee
+
+  Es el defecto mas barato de corregir que existe, porque no requiere ni
+  migracion ni captura nueva. Y es el que mas facilmente se acumula, porque
+  no produce ningun error: produce silencio.
+
+  NOTA SOBRE EL DESPLIEGUE  [FUERA DEL ALCANCE DE LA APLICACION]
+
+  El despliegue por FTP tiene un modo de fallo conocido: puede dejar caer
+  archivos aunque la Action termine en verde. La mitigacion actual es
+  re-desplegar y verificar que los assets responden 200. Es infraestructura,
+  no aplicacion, y por eso no genera hallazgo propio; pero es la razon por la
+  que desplieguePendiente merece estar en pantalla y no solo en un endpoint.
+
+
+17. ENFOQUE 5 - TIEMPOS MUERTOS Y ESPERAS                            4,5 / 5
+--------------------------------------------------------------------------------
+  MUDA  ...El flujo esta detenido?
+
+  Es el enfoque mejor cubierto del sistema, y por un margen amplio. Es
+  tambien la razon de ser de GCM.
+
+  EVIDENCIA A FAVOR
+
+  E5.1  Los siete flujos SON las siete fuentes canonicas de espera. No es una
+        lista de comprobacion generica: cada tipo de restriccion nombra una
+        forma concreta de trabajo detenido.
+
+           SEGURIDAD    espera por permiso, PETAR o ATS
+           INFORMACION  espera por plano o RFI
+           ESPACIO      espera por frente ocupado
+           MATERIALES   espera por suministro
+           MANO_OBRA    espera por cuadrilla
+           REQUISITOS   espera por tarea previa
+           EQUIPOS      espera por maquinaria
+
+  E5.2  La confiabilidad de la ventana es, literalmente, el porcentaje de
+        trabajo proximo SIN espera pendiente. Es un indicador anticipado, no
+        una foto del pasado.
+
+  E5.3  El PPC mide cumplimiento de promesa, no avance. El comentario del
+        sistema es explicito: una tarea a medias cuenta como no cumplida, y
+        esa dureza es intencional.
+
+  E5.4  El Pareto de CausaNoCumplimiento ordena las causas de mayor a menor.
+        Con catalogo cerrado, es comparable entre semanas y entre obras.
+
+  E5.5  pendientes.ts distingue dos situaciones que se parecen y se arreglan
+        de forma distinta:
+
+           tareasProximasBloqueadas    analizadas, con restricciones sin
+                                       liberar  -> hay que liberar
+           tareasProximasSinAnalizar   nadie las ha mirado
+                                       -> hay que analizar
+
+        Su comentario lo dice: "son dos problemas distintos y se arreglan de
+        forma distinta". Confundirlos habria hecho el indicador inutil.
+
+  E5.6  Ventana configurable por obra: de 1 a 12 semanas, con sugeridas
+        3, 4, 6, 8 y 12 y valor por defecto 3. La razon esta escrita:
+
+           "El Last Planner no fija un numero: tres semanas es el minimo util
+            y lo habitual son cuatro a seis. Depende de los plazos de entrega
+            de la obra -una con acero importado necesita mirar mas lejos que
+            una de acabados-, asi que se elige por obra en vez de imponerlo."
+
+        El maximo tambien tiene razon: "Mas alla de esto el cronograma deja de
+        ser fiable y el analisis es humo."
+
+  HALLAZGO H-6  [SEVERIDAD BAJA, RENDIMIENTO ALTO]
+  ..............................................................................
+  LA DURACION DE LAS ESPERAS ESTA GUARDADA Y NO SE LEE
+
+  El modelo Restriccion guarda:
+
+     createdAt   DateTime  cuando aparecio la restriccion
+     resueltaAt  DateTime? cuando se levanto
+     tipo        TipoRestriccion
+
+  La diferencia entre ambas fechas, agrupada por tipo, es la MEDICION DIRECTA
+  del tiempo que cada flujo tuvo el trabajo detenido. Es el indicador de MUDA
+  mas puro que puede tener una obra.
+
+  No se muestra en ninguna pantalla.
+
+  QUE CAMBIARIA
+
+     HOY        "Materiales es mi causa de incumplimiento mas frecuente."
+                -> diagnostico postumo. Llega despues del fallo.
+
+     CON H-6    "Materiales tarda 9 dias de media en liberarse. Mi ventana
+                 de 3 semanas deja 12 dias de margen: voy justo."
+                -> llega ANTES del fallo, y ademas dimensiona la ventana
+                   con un dato en lugar de con una costumbre.
+
+  El segundo efecto es el mas valioso y el menos obvio: el numero de semanas
+  del Lookahead se elige hoy por criterio -"lo habitual son cuatro a seis"-.
+  Con la antiguedad media por flujo, se elige por evidencia: la ventana debe
+  cubrir el flujo mas lento de esa obra.
+
+
+18. ENFOQUE 6 - REPROCESOS Y CALIDAD ADMINISTRATIVA                  3,5 / 5
+--------------------------------------------------------------------------------
+  MUDA  ...Hay burocracia o errores?
+
+  EVIDENCIA A FAVOR
+
+  E6.1  La doble captura se cierra EN LA BASE, no en la interfaz.
+        OrdenCompra lleva @@unique([companyId, numero]) y el comentario lo
+        explica:
+
+           "Que las dos vias no se pisen NO se confia a la interfaz, se
+            cierra en la base. Da igual por donde entre: el numero de orden
+            identifica el documento y no puede repetirse. El importador topa
+            con la misma restriccion que el formulario, y por eso tiene que
+            ENSENAR lo que ya existe en vez de insertarlo otra vez."
+
+  E6.2  Trazabilidad del origen. OrigenRegistro (MANUAL / IMPORTADO) existe
+        para poder responder "esta cifra la tecleo alguien o la leyo un
+        importador", que es la primera pregunta cuando un total no cuadra.
+
+  E6.3  Correccion sin destruccion. Un movimiento aprobado no se borra: se
+        corrige con otro de signo contrario. Una orden anulada deja de contar
+        en el comprometido pero se conserva con su motivo.
+
+  E6.4  Proteccion del trabajo manual en la reimportacion. WbsItem lleva
+        origen y editadaAMano para responder a UNA pregunta concreta: "de lo
+        que voy a borrar, .que NO esta en ningun archivo?". Sin esos dos
+        campos el aviso solo podria decir "se borraran 360 partidas", que se
+        lee como rutina.
+
+  E6.5  Negativa a mostrar cifras insostenibles. CPI, EAC y VAC se ocultan
+        hasta que haya al menos 15 % de obra ejecutada Y el costo registrado
+        cubra la mitad de lo ganado. El origen es un incidente real: la
+        pantalla llego a anunciar en verde un ahorro de S/ 633.873 que era
+        falso, porque el gasto son ordenes aprobadas y las ordenes se
+        aprueban DESPUES del trabajo. Ademas, cuando falta, la pantalla dice
+        POR QUE falta en vez de dejar un guion.
+
+  E6.6  Honestidad en el redondeo de la curva S. Un ritmo de 99,6 % se
+        muestra como 99,6 % y no como 100 %: "decirle 'vas al dia' a quien no
+        va es la peor ayuda posible." Y "no se llega" solo se dice cuando el
+        ritmo es cero, que es el unico caso en que es literal.
+
+  HALLAZGO H-7  [SEVERIDAD BAJA]
+  ..............................................................................
+  DOBLE CAPTURA DEL MISMO HECHO EN EL CIERRE SEMANAL
+
+  En CierrePlanSemanal.tsx el usuario introduce, en la misma fila:
+
+     - la cantidad ejecutada  (cantidadEjec), con su tooltip
+       "Cantidad ejecutada de {cantidadPlan} {unidad} comprometidos"
+     - y por separado, si el compromiso se cumplio o no  (cumplido)
+
+  El segundo dato es en gran medida deducible del primero. Registrar los dos
+  a mano es trabajo administrativo redundante y, peor, permite que se
+  contradigan: 30 de 120 m2 marcados como "cumplido".
+
+  Esta previsto en Fase 4 del propio proyecto ("que 'cumplio' se calcule
+  desde la cantidad ejecutada"), asi que el hallazgo confirma la prioridad ya
+  identificada, no la descubre.
+
+  HALLAZGO H-8  [SEVERIDAD MEDIA]
+  ..............................................................................
+  EL MAPEO SE DEGRADA SOLO Y NADIE LO RECLAMA DONDE NACE EL PROBLEMA
+
+  Un ADICIONAL aprobado da de alta partidas nuevas (WbsItem.origenMovimientoId
+  apunta al movimiento que las creo). Esas partidas nacen SIN mapeo a ninguna
+  tarea del cronograma.
+
+  El sistema detecta la consecuencia a posteriori: el pendiente
+  "mapeo-incompleto" avisa cuando la cobertura cae por debajo del 60 %.
+
+  Pero nada lo reclama en el momento en que se aprueba el movimiento, que es
+  cuando la persona tiene el contexto fresco y sabe a que tarea corresponde
+  cada partida nueva. Semanas despues, reconstruirlo cuesta mucho mas.
+
+  Es reproceso puro: el mismo trabajo, hecho mas tarde y peor informado.
+
+  HALLAZGO H-9  [SEVERIDAD MEDIA]
+  ..............................................................................
+  COBERTURA DE PRUEBAS ASIMETRICA: LA FRONTERA DE SEGURIDAD NO ESTA PROBADA
+
+  VERIFICACION: existen 40 archivos de prueba en el proyecto. Los 40 estan en
+  src/lib/. En src/services/ no hay ninguno.
+
+     src/lib/       40 archivos .test.ts   (actividad, calendario, claves,
+                    control-avance, cronograma, curva-s, decimal, dosFactores,
+                    emisor-sms, empresas, encargos, evidencia-qr, evm,
+                    excel-presupuesto, gantt, hitos, jerarquia-partidas,
+                    lookahead, mapeo-partidas, msproject-xml, obras, operador,
+                    ordenes, paginacion, partidas-filtro, pase, pendientes,
+                    perfil, plan-semanal-cierre, plan-semanal,
+                    plantilla-presupuesto, presupuesto, rbac, redondeo,
+                    result, sms-cola, sms, tablero, tema, usuarios)
+
+     src/services/  0 archivos de prueba   (38 servicios)
+
+  MATIZ IMPORTANTE, Y ES A FAVOR DEL DISENO: la asimetria es en gran parte
+  consecuencia deliberada de la arquitectura. src/lib/ es logica pura sin
+  base de datos, precisamente para poder probarla entera; el propio
+  pendientes.ts lo dice: "este modulo no toca la base ni sabe de Prisma, para
+  poder probarlo entero". Que la logica de negocio este probada al 100 % es
+  un merito, no un accidente.
+
+  PERO: el README declara que src/services/ es "donde se verifican permisos y
+  se filtra por empresa", y la regla 4 del proyecto dice que el filtro por
+  empresa "es lo que impide que un cliente vea obras de otro".
+
+  Es decir: la frontera de aislamiento entre empresas -el requisito de
+  seguridad mas importante del sistema, y el que bloquea el objetivo de
+  vender GCM a varias constructoras- no tiene ninguna prueba automatica que
+  impida una regresion.
+
+  No es un defecto de correctitud: no hay evidencia de que el filtrado falle.
+  Es un defecto de RED DE SEGURIDAD: nada avisaria si algun dia falla.
+
+
+19. TABLA CONSOLIDADA DE HALLAZGOS
+--------------------------------------------------------------------------------
+
+  ID   ENF  TITULO                                    SEVER.   TIPO
+  ---  ---  ----------------------------------------  -------  ---------------
+  H-1   1   La modalidad no gobierna el calculo       Media    Correctitud
+  H-2   2   Sin senal de cronograma desactualizado    Baja     Dato sin leer
+  H-3   3   Capacidad a medias, carga sin agregar     CRITICA  Funcion ausente
+  H-4   3   Concentracion de carga en el residente    Media    Organizativo
+  H-5   4   Salud detectada y no comunicada           Media    Dato sin leer
+  H-6   5   Duracion de esperas guardada y no leida   Baja     Dato sin leer
+  H-7   6   Doble captura en el cierre semanal        Baja     Reproceso
+  H-8   6   El mapeo se degrada sin reclamo           Media    Reproceso
+  H-9   6   Frontera de seguridad sin pruebas         Media    Red de segur.
+
+  DISTRIBUCION POR TIPO
+
+     Dato sin leer      3 hallazgos  (H-2, H-5, H-6)
+        El dato existe, es fiable, nadie lo consulta. Coste bajo, sin
+        migracion. Es el grupo de mayor rendimiento del diagnostico.
+
+     Reproceso          2 hallazgos  (H-7, H-8)
+        Trabajo administrativo repetido o hecho a destiempo.
+
+     Funcion ausente    1 hallazgo   (H-3)
+        Falta una capacidad entera del metodo. Es el unico de severidad
+        critica.
+
+     Correctitud        1 hallazgo   (H-1)
+        Un calculo trata igual dos casos que el negocio distingue.
+
+     Red de seguridad   1 hallazgo   (H-9)
+        No hay error hoy; no habria aviso si lo hubiera manana.
+
+     Organizativo       1 hallazgo   (H-4)
+        No requiere desarrollo. Requiere decision.
+
+
+================================================================================
+                           P A R T E   I V
+                         P R O P U E S T A S
+================================================================================
+
+
+20. CRITERIOS DE DISENO DE LAS PROPUESTAS
+--------------------------------------------------------------------------------
+
+Las ocho propuestas se disenaron bajo cinco criterios, en este orden de
+prioridad:
+
+  C1  COHERENCIA CON LO YA DECIDIDO
+      GCM tiene una linea de diseno explicita y consistente: informar en vez
+      de bloquear, decir la consecuencia y no solo el hecho, callar una cifra
+      antes que mostrarla falsa, transmitir urgencia con el orden y no con
+      parpadeos. Ninguna propuesta la contradice.
+
+  C2  EXPLOTAR ANTES QUE CAPTURAR
+      Se prefiere leer un dato ya guardado a pedir uno nuevo. Tres de los
+      nueve hallazgos son datos sin leer, y sus propuestas no tocan el modelo
+      de datos ni anaden trabajo al usuario.
+
+  C3  NADA QUE MIENTA
+      Si una propuesta necesita un dato que la obra todavia no tiene, se
+      propone en fases: primero la version que funciona con lo que hay,
+      despues la que necesita captura nueva. Nunca una estimacion presentada
+      como medicion. Es la misma regla que ya rige el EAC.
+
+  C4  UN PENDIENTE ANTES QUE UNA PANTALLA
+      Cuando un hallazgo se puede resolver anadiendo una regla a
+      pendientes.ts, se prefiere eso a construir una pantalla nueva. El
+      residente ya mira esa lista; anadir una linea cuesta poco y se lee
+      seguro. Una pantalla mas hay que aprender a visitarla.
+
+  C5  REVERSIBILIDAD
+      Ninguna propuesta destruye datos ni exige migraciones irreversibles.
+      Las dos que anaden columnas (P-1 fase B, P-8) las anaden opcionales.
+
+
+21. P-1  CARGA CONTRA CAPACIDAD SEMANAL                       [H-3]  CRITICA
+--------------------------------------------------------------------------------
+
+  PROBLEMA
+    GCM no puede decir si lo que se compromete cabe en la semana. Falta la
+    mitad del filtro del PTS (seccion 4).
+
+  PRECISION NECESARIA SOBRE H-3
+
+    Antes de proponer conviene ser exacto sobre lo que hay, porque de ello
+    depende que la propuesta sea honesta:
+
+      - horasPorSemana() calcula la JORNADA semanal del calendario de la obra
+        (45 h en el caso CRIOCORD: 8 h de lunes a viernes mas 5 h el sabado).
+        Eso NO es capacidad en horas-hombre: para eso hace falta saber
+        cuantas personas trabajan.
+      - GCM no guarda hoy la dotacion de ninguna cuadrilla, ni el rendimiento
+        (horas por unidad) de ninguna partida.
+
+    Por tanto, la afirmacion exacta del hallazgo H-3 es: existe la mitad
+    calendario de la capacidad, existe la carga en cantidad fisica, y no
+    existe ni la dotacion ni el rendimiento que permitirian convertir una en
+    otra.
+
+    Esto NO debilita el hallazgo: sigue siendo cierto que el sistema no puede
+    responder la pregunta. Pero obliga a proponer en dos fases, porque una
+    propuesta que exigiera rendimientos desde el primer dia no se aplicaria
+    nunca.
+
+  FASE A - CAPACIDAD EMPIRICA  (sin ningun dato nuevo)
+
+    IDEA: no hace falta saber cuantas horas cabe una semana si se sabe
+    cuantos compromisos cumple esta obra de forma sostenida. La capacidad se
+    OBSERVA en vez de calcularse.
+
+    DATOS QUE USA (todos ya guardados)
+      PlanSemanal          los planes CERRADOS de la obra
+      CompromisoSemanal    cumplido = true / false por plan
+
+    CALCULO
+      rendimiento historico = media de compromisos CUMPLIDOS por semana
+                              en las ultimas N semanas cerradas (N = 6)
+
+      indice de ambicion    = compromisos del plan ABIERTO
+                              -------------------------------
+                              rendimiento historico
+
+    LECTURA
+      indice <= 1,0   lo prometido cabe segun tu propio historial
+      1,0 < i <= 1,3  ambicioso
+      indice > 1,3    sobrecarga probable
+
+    DONDE TOCA
+      src/lib/plan-semanal.ts     funcion pura nueva + su prueba
+      plan-semanal.service.ts     el conteo
+      FormularioPlanSemanal.tsx   el aviso al armar el PTS
+      src/lib/pendientes.ts       regla nueva (ver P-2)
+
+    LIMITE HONESTO: las primeras 6 semanas de una obra no hay historial. En
+    ese caso el indicador NO se muestra y se dice por que, igual que hace hoy
+    el EAC. Nunca un numero inventado.
+
+  FASE B - CAPACIDAD EN HORAS-HOMBRE  (requiere captura nueva)
+
+    DATOS NUEVOS, los dos opcionales
+      WbsItem.rendimiento    Decimal(10,4)  horas-hombre por unidad
+      Recurso / dotacion     personas asignadas por cuadrilla o proveedor
+
+    CALCULO
+      carga (h-h)      = SUMA( cantidadPlan x rendimiento de su partida )
+      capacidad (h-h)  = horasPorSemana(calendario) x dotacion
+
+      ocupacion        = carga / capacidad
+
+    CONDICION DE ACTIVACION, en la linea del EAC: la ocupacion solo se
+    muestra si al menos el 70 % de los compromisos de la semana tienen
+    rendimiento conocido. Por debajo de eso la cifra seria una extrapolacion
+    presentada como medida.
+
+  CRITERIO DE ACEPTACION
+    - Con 6 semanas cerradas, el PTS avisa al superar 1,3 de indice.
+    - Con menos de 6, no se muestra nada y se explica el motivo.
+    - La funcion de calculo esta en src/lib/ y tiene prueba propia.
+
+  RIESGO
+    Que el rendimiento historico se lea como objetivo y la obra deje de
+    intentar mejorar. MITIGACION: el texto debe decir "tu media", no "tu
+    maximo", y acompanarse del PPC para que se lea como par.
+
+
+22. P-2  DETECCION DE SOBRECARGA EN EL PANEL                   [H-3]  ALTA
+--------------------------------------------------------------------------------
+
+  PROBLEMA
+    La combinacion "confiabilidad alta + PPC bajo" significa sobrecarga, y es
+    la unica lectura que el sistema no ofrece. Hoy el residente la interpreta
+    como mala planificacion y aplica la correccion equivocada.
+
+  PROPUESTA
+    Una regla nueva en src/lib/pendientes.ts, bloque "salidas".
+
+    CONDICION
+      confiabilidad >= 80     y     ppcUltimo < PPC_PREOCUPANTE (70)
+
+    TITULO
+      "Liberas bien (92 %) pero cumples poco (55 %)"
+
+    CONSECUENCIA
+      "El trabajo estaba liberado y aun asi no se cumplio: no es un problema
+       de analisis, es que se compromete mas de lo que cabe. Prueba a
+       comprometer menos la semana que viene y compara el PPC."
+
+    CAMINO
+      /plan-semanal
+
+  POR QUE ESTA SEPARADA DE P-1 Y VA ANTES
+    P-1 fase A requiere historial y una funcion nueva. P-2 se calcula con dos
+    numeros que el panel YA carga -confiabilidad y PPC-, no anade ninguna
+    consulta y cabe en una regla de veinte lineas con su prueba.
+
+    Es la intervencion de mayor relacion valor/coste de todo el diagnostico:
+    convierte un enfoque en cero absoluto en un enfoque con al menos una
+    senal, en media jornada.
+
+  DONDE TOCA
+    src/lib/pendientes.ts        la regla
+    src/lib/pendientes.test.ts   sus casos
+    tablero.service.ts           pasar confiabilidad al conteo
+
+  CRITERIO DE ACEPTACION
+    - Con confiabilidad 92 y PPC 55, el pendiente aparece.
+    - Con confiabilidad 40 y PPC 55, NO aparece (ese es el otro problema, y
+      ya lo cubre "lookahead-sin-analizar").
+    - Sin PPC o sin confiabilidad, no aparece.
+
+  RIESGO
+    Falso positivo en obras con muy pocos compromisos, donde un PPC del 50 %
+    puede ser una tarea de dos. MITIGACION: exigir un minimo de compromisos
+    en la semana evaluada (propuesta: 5).
+
+
+23. P-3  ANTIGUEDAD DE RESTRICCIONES POR FLUJO                 [H-6]  ALTA
+--------------------------------------------------------------------------------
+
+  PROBLEMA
+    El tiempo que cada flujo tiene el trabajo detenido esta guardado y no se
+    lee. El sistema solo sabe decir que causa falla mas, no cual tarda mas.
+
+  PROPUESTA
+    Dos lecturas del mismo dato:
+
+    (a) EN EL LOOKAHEAD - antiguedad de lo que sigue abierto
+        Por cada restriccion no resuelta, dias desde createdAt.
+        Ordenar la matriz por antiguedad descendente pone arriba lo que lleva
+        mas tiempo frenando.
+
+    (b) EN EL PANEL - tiempo medio de liberacion por flujo
+        Sobre las restricciones RESUELTAS de la obra:
+
+           dias medios(tipo) = media( resueltaAt - createdAt )
+                               agrupado por tipo
+
+        Presentacion: una lista de 7 lineas, ordenada de mayor a menor.
+
+           Materiales .......... 9,4 dias   (23 liberadas)
+           Informacion ......... 6,1 dias   (18 liberadas)
+           Espacio ............. 2,0 dias   (31 liberadas)
+           ...
+
+  EL SEGUNDO EFECTO, QUE ES EL MAS VALIOSO
+    Permite dimensionar la ventana del Lookahead con evidencia. Hoy el numero
+    de semanas se elige por criterio general. Con este dato:
+
+       ventana minima recomendada = flujo mas lento de ESTA obra + margen
+
+    Una obra cuyo flujo mas lento sea Materiales con 9,4 dias necesita al
+    menos 2 semanas de ventana solo para ese flujo; si ademas Informacion
+    tarda 6, encadenadas dan 3 semanas justas. El selector puede sugerirlo.
+
+  DATOS QUE USA
+    Restriccion.createdAt, .resueltaAt, .tipo   Todos ya existentes.
+    NINGUNA columna nueva. NINGUNA migracion.
+
+  DONDE TOCA
+    src/lib/lookahead.ts        funciones puras de agregacion + pruebas
+    lookahead.service.ts        la consulta agrupada
+    tablero.service.ts          el modulo del panel
+    src/lib/tablero.ts          entrada nueva en MODULOS
+
+  CRITERIO DE ACEPTACION
+    - Un flujo sin restricciones resueltas no muestra media (no muestra cero).
+    - La media se calcula en dias de calendario, y se dice que lo son.
+    - La matriz del Lookahead puede ordenarse por antiguedad.
+
+  RIESGO
+    Restricciones creadas y resueltas el mismo dia por puro tramite
+    administrativo hundirian la media. MITIGACION: mostrar tambien la mediana,
+    o el numero de casos junto a la media para que se pueda juzgar.
+
+
+24. P-4  AVISO DE CRONOGRAMA DESACTUALIZADO                    [H-2]  MEDIA
+--------------------------------------------------------------------------------
+
+  PROBLEMA
+    Si el plan cambio en Project y nadie subio la version, todo el analisis
+    corre sobre un plan muerto y nada lo advierte.
+
+  PROPUESTA
+    Regla nueva en pendientes.ts, bloque "entradas" -es una entrada que
+    falta, y por eso invalida lo que viene detras-.
+
+    CONDICION
+      dias desde Cronograma.fechaCorte del vigente > UMBRAL
+
+    UMBRAL PROPUESTO
+      21 dias. Justificacion: la ventana por defecto del Lookahead es de 3
+      semanas, asi que a partir de ahi el analisis empieza a apoyarse en
+      fechas que el archivo ya no respalda.
+
+    TITULO
+      "El cronograma tiene 34 dias"
+
+    CONSECUENCIA
+      "La ventana del Lookahead, la ruta critica y las tareas que arrancan
+       pronto se calculan sobre este archivo. Si el plan cambio en Project y
+       no se subio, todo eso esta mirando un plan que ya no existe."
+
+    CAMINO
+      /cronograma
+
+  MATIZ NECESARIO
+    Un cronograma antiguo NO es necesariamente un error: una obra estable
+    puede pasar semanas sin cambiar el plan, y el propio manual recomienda no
+    crear versiones si el plan no cambio. Por eso esto es AVISO y no CRITICA,
+    y el texto pregunta en vez de afirmar.
+
+  DONDE TOCA
+    src/lib/pendientes.ts + su prueba
+    tablero.service.ts (aportar la fecha del cronograma vigente)
+
+  CRITERIO DE ACEPTACION
+    - Sin cronograma cargado, no aparece (ya hay otros avisos para eso).
+    - A los 21 dias aparece como aviso, nunca como critica.
+
+  RIESGO
+    Fatiga de aviso en obras de ritmo lento. MITIGACION: umbral configurable
+    por obra en una fase posterior si se observa.
+
+
+25. P-5  SALUD DE INFRAESTRUCTURA EN EL PANEL                  [H-5]  MEDIA
+--------------------------------------------------------------------------------
+
+  PROBLEMA
+    El sistema detecta desplieguePendiente y emisor SMS dormido, y no se lo
+    dice a quien sufre las consecuencias.
+
+  PROPUESTA
+    Dos avisos, en la franja de avisos de empresa -que ya existe y ya es
+    transversal a las obras (seccion 11)-.
+
+    AVISO 1 - DESPLIEGUE SIN APLICAR
+      CONDICION    salud.desplieguePendiente == true
+      TEXTO        "Hay una version subida sin aplicar. Lo que estas viendo
+                    no es la ultima."
+      VISIBLE PARA ADMIN. No tiene sentido inquietar al residente con algo
+                    sobre lo que no puede actuar.
+
+    AVISO 2 - EMISOR SMS DORMIDO
+      CONDICION    ningun EmisorSms activo de la empresa con
+                   ultimaConsultaAt en las ultimas 2 horas
+      TEXTO        "El telefono que manda los SMS lleva N horas sin
+                    conectarse. Los codigos de acceso no estan saliendo."
+      VISIBLE PARA ADMIN, que es quien puede activar el de respaldo.
+
+  POR QUE 2 HORAS
+    Es un compromiso entre detectar el telefono apagado y no avisar por un
+    tunel o una siesta del movil. Debe quedar como constante nombrada, no
+    como numero suelto.
+
+  DONDE TOCA
+    salud.service.ts        ya devuelve lo necesario
+    emisor-sms.service.ts   consulta de ultima actividad
+    obras.service.ts        listarAlertasEmpresa
+
+  CRITERIO DE ACEPTACION
+    - En desarrollo, desplieguePendiente es siempre false y el aviso no sale.
+    - Una empresa sin ningun emisor vinculado no genera aviso 2 (no usa SMS).
+
+  RIESGO
+    Bajo. Son dos avisos de solo lectura sobre datos que ya se calculan.
+
+
+26. P-6  EMPUJE DEL MAPEO AL APROBAR UN ADICIONAL              [H-8]  MEDIA
+--------------------------------------------------------------------------------
+
+  PROBLEMA
+    Las partidas nacidas de un adicional entran sin mapeo. El sistema lo
+    detecta semanas despues, por degradacion de la cobertura, cuando
+    reconstruirlo cuesta mas.
+
+  PROPUESTA
+    Al aprobar un movimiento que da de alta partidas, ofrecer el mapeo
+    inmediatamente: pantalla de mapeo prefiltrada por las partidas recien
+    creadas -que son identificables por origenMovimientoId-.
+
+    No bloquear la aprobacion. Coherente con C1: informar, no impedir.
+
+    Y una regla adicional en pendientes.ts, mas precisa que la de cobertura
+    global:
+
+      TITULO       "3 partidas de adicionales aprobados sin enlazar"
+      CONSECUENCIA "Su importe cuenta en el presupuesto vigente pero no en el
+                    avance: la obra parece mas atrasada de lo que esta."
+      CAMINO       /cronograma/mapeo
+
+  POR QUE ESTA REGLA ADEMAS DE "mapeo-incompleto"
+    La existente mira la cobertura global (< 60 %). Una obra bien mapeada al
+    85 % con tres partidas nuevas sin enlazar no dispara nada, y sin embargo
+    esas tres son exactamente las que hay que mapear y las unicas
+    identificables sin revisar el arbol entero.
+
+  DONDE TOCA
+    movimientos.service.ts    devolver las partidas creadas al aprobar
+    mapeo (pantalla)          aceptar prefiltro
+    src/lib/pendientes.ts     regla nueva + prueba
+
+  CRITERIO DE ACEPTACION
+    - Aprobar un adicional con partidas nuevas ofrece el mapeo.
+    - Rechazar la oferta no bloquea nada, y deja el pendiente.
+
+  RIESGO
+    Que el prefiltro oculte partidas antiguas que tambien convendria mapear.
+    MITIGACION: el filtro debe ser quitable de un clic.
+
+
+27. P-7  PRUEBAS DE LA CAPA DE SERVICIOS                       [H-9]  MEDIA
+--------------------------------------------------------------------------------
+
+  PROBLEMA
+    El aislamiento entre empresas -la frontera de seguridad declarada- no
+    tiene ninguna prueba automatica. No hay evidencia de fallo; no habria
+    aviso si lo hubiera.
+
+  PROPUESTA
+    No perseguir cobertura general de los 38 servicios, que seria un proyecto
+    en si mismo y de rendimiento decreciente. Probar UNA propiedad, la que
+    sostiene el modelo de negocio multiempresa:
+
+       Ninguna funcion de servicio devuelve ni modifica datos de una empresa
+       distinta de la de la sesion, sea cual sea el identificador que reciba
+       en los parametros.
+
+    FORMA
+      Un fichero de pruebas por familia (obras, partidas, cronograma,
+      ordenes, lookahead, plan semanal), cada uno con el mismo patron:
+      crear dos empresas con datos, pedir con la sesion de A un
+      identificador de B, y exigir que el resultado sea vacio o error, nunca
+      el dato.
+
+    Y una segunda propiedad, mas barata y tambien critica:
+
+       Toda funcion que escribe exige su permiso, y lo exige contra los
+       permisos resueltos de la sesion, no contra el rol.
+
+  PRIORIDAD DENTRO DE LA PROPUESTA
+    Primero obras, partidas y ordenes: son las que exponen dinero. Despues
+    las de Last Planner.
+
+  DONDE TOCA
+    src/services/*.test.ts  (nuevos)
+    Requiere decidir la estrategia de base de datos de prueba, que hoy no
+    existe: es el unico coste real de esta propuesta.
+
+  CRITERIO DE ACEPTACION
+    - Un intento de acceso cruzado entre empresas falla la prueba si algun
+      dia deja de estar filtrado.
+    - Las pruebas corren con "npm test" sin configuracion manual.
+
+  RIESGO
+    Que montar la base de prueba consuma mas de lo previsto. MITIGACION:
+    empezar por una sola familia (obras) y decidir con ese coste medido.
+
+
+28. P-8  LA MODALIDAD GOBIERNA EL CALCULO                      [H-1]  BAJA*
+--------------------------------------------------------------------------------
+                                              * baja urgencia, alta profundidad
+
+  PROBLEMA
+    ModalidadPartida distingue tres casos con consecuencias economicas
+    opuestas y no interviene en ningun calculo.
+
+  PROPUESTA
+    Es la unica propuesta que NO debe implementarse directamente: debe
+    disenarse primero, porque toca la definicion de avance y de valor ganado,
+    que es el nucleo del sistema.
+
+    PREGUNTAS QUE EL DISENO DEBE RESPONDER ANTES DE ESCRIBIR CODIGO
+
+      1. En SUMA_ALZADA, .que significa "60 % ejecutado"? .Porcentaje del
+         alcance pactado, o proporcion del metrado referencial? Son cosas
+         distintas y dan curvas distintas.
+
+      2. Las filas ALCANCE no tienen importe propio. .Como se reparte el
+         avance del padre entre sus alcances, si es que se reparte?
+
+      3. Si el metrado real supera al previsto en SUMA_ALZADA, el importe no
+         cambia. .Debe el avance poder pasar del 100 %? .Debe avisarse como
+         desviacion de alcance?
+
+      4. .Que hace el EVM con una suma alzada? El valor ganado de una partida
+         a precio cerrado es el porcentaje de alcance por el precio pactado,
+         no metrado por unitario.
+
+    ENTREGABLE DE LA FASE DE DISENO
+      Un documento corto -dos paginas- con las cuatro respuestas y sus
+      ejemplos numericos, revisado por quien conoce los contratos. Recien
+      entonces, implementacion.
+
+  POR QUE NO ES URGENTE
+    Mientras el grueso del presupuesto sea de precios unitarios, el sesgo es
+    acotado. Se vuelve grave en obras con mucha suma alzada, y el caso
+    CRIOCORD ya tiene un paquete de drywall de nueve filas compartiendo un
+    solo precio de 79.727,33: la situacion ya existe, solo que todavia
+    pequena.
+
+  RIESGO DE NO HACERLO
+    Silencioso y acumulativo. Como el mapeo equivocado: la curva sale bonita
+    y miente.
+
+================================================================================
+                            P A R T E   V
+                    P L A N   C O R R E C T I V O
+================================================================================
+
+
+29. SECUENCIA Y FASES
+--------------------------------------------------------------------------------
+
+  FASE 1 - EXPLOTAR LO QUE YA ESTA GUARDADO
+  ..............................................................................
+  Objetivo: subir tres enfoques sin tocar el modelo de datos.
+
+    ORD  PROP  ACCION                             ENF  ESFUERZO  MIGRACION
+    ---  ----  ---------------------------------  ---  --------  ---------
+     1   P-2   Sobrecarga: PPC bajo + conf. alta    3    ~0,5 d      no
+     2   P-4   Aviso de cronograma desactualizado   2    ~0,5 d      no
+     3   P-5   Salud de infra en avisos de empresa  4    ~1,0 d      no
+     4   P-3   Antiguedad de restricciones          5    ~2,0 d      no
+
+    TOTAL FASE 1:  aproximadamente 4 dias de trabajo, cero migraciones.
+
+    EFECTO ESPERADO SOBRE EL CUADRO DE MANDO
+
+       ENFOQUE                      ANTES   DESPUES
+       ---------------------------  -----   -------
+       1  Estructura y estandares    4,0      4,0
+       2  Informacion y sincroniz.   4,5      5,0     (+0,5)
+       3  Fatiga humana              0,0      2,0     (+2,0)
+       4  Capacidad tecnologica      2,5      4,0     (+1,5)
+       5  Tiempos muertos            4,5      5,0     (+0,5)
+       6  Reprocesos y calidad       3,5      3,5
+       ---------------------------  -----   -------
+       MEDIA                         3,2      3,9
+
+    Y lo mas importante, que la media no refleja: DESAPARECE EL CERO. Tras la
+    fase 1 no queda ningun tipo de perdida que el sistema sea incapaz de ver.
+
+  FASE 2 - CERRAR EL HUECO DE CAPACIDAD
+  ..............................................................................
+  Objetivo: implementar la mitad ausente del filtro del PTS.
+
+    ORD  PROP    ACCION                           ENF  ESFUERZO  MIGRACION
+    ---  ------  -------------------------------  ---  --------  ---------
+     5   P-1 A   Capacidad empirica por historial  3    ~3,0 d      no
+
+    Se hace DESPUES de P-2 y no antes, deliberadamente: P-2 pone el sintoma
+    en pantalla, y unas semanas de convivir con ese aviso dicen si el
+    problema es real en estas obras y con que frecuencia. Construir P-1 sin
+    ese dato seria disenar a ciegas la funcionalidad mas cara de la lista.
+
+    CRITERIO DE ENTRADA A LA FASE 2
+      Que el pendiente de P-2 haya aparecido al menos tres veces en obras
+      distintas, o una vez de forma sostenida durante tres semanas. Si no
+      aparece nunca, P-1 fase A baja de prioridad y P-1 fase B se descarta.
+
+  FASE 3 - REPROCESOS
+  ..............................................................................
+
+    ORD  PROP  ACCION                             ENF  ESFUERZO  MIGRACION
+    ---  ----  ---------------------------------  ---  --------  ---------
+     6   P-6   Empuje del mapeo tras adicional      6    ~2,0 d      no
+     7   P-7   Pruebas de aislamiento (obras)       6    ~3,0 d      no*
+
+    * P-7 no migra datos, pero exige montar base de datos de prueba, que hoy
+      no existe. Ese es su coste real y conviene medirlo con una sola familia
+      antes de comprometerse con las seis.
+
+  FASE 4 - PROFUNDIDAD
+  ..............................................................................
+
+    ORD  PROP    ACCION                           ENF  ESFUERZO  MIGRACION
+    ---  ------  -------------------------------  ---  --------  ---------
+     8   P-8     Diseno: modalidad en el calculo   1    ~2,0 d      no
+     9   P-8     Implementacion                    1     por        si
+                                                        determinar
+    10   P-1 B   Capacidad en horas-hombre         3     por        si
+                                                        determinar
+
+    Las dos ultimas quedan sin estimar a proposito: dependen de decisiones
+    que todavia no se han tomado. Estimarlas ahora seria inventar.
+
+  FUERA DE FASES - DECISION ORGANIZATIVA
+  ..............................................................................
+
+    H-4 no requiere desarrollo. Repartir lookahead:gestionar y
+    plan_semanal:gestionar entre residente y administrador de obra es una
+    decision que el sistema ya soporta hoy. Se puede tomar esta semana y su
+    efecto se mide con el PPC y la confiabilidad de las siguientes.
+
+
+30. CRITERIOS DE ACEPTACION GLOBALES
+--------------------------------------------------------------------------------
+
+  Aplicables a toda propuesta antes de darla por terminada:
+
+  G1  La logica de decision vive en src/lib/ y tiene prueba propia. Los
+      servicios cuentan filas; no deciden. Es la arquitectura que el proyecto
+      ya tiene y la razon de que src/lib/ este cubierto al 100 %.
+
+  G2  Ningun indicador nuevo muestra un numero cuando no tiene con que
+      sostenerlo. Si falta el dato, se dice que falta y por que, como ya hace
+      el EAC. Es la regla C3 y es innegociable.
+
+  G3  Ningun aviso nuevo bloquea una accion. GCM informa; quien esta en obra
+      sabe cosas que el sistema no.
+
+  G4  Todo pendiente nuevo dice la CONSECUENCIA, no solo el hecho, y apunta
+      con "camino" al sitio donde se arregla.
+
+  G5  El orden de MODULOS en src/lib/tablero.ts solo se amplia por el final o
+      en posicion pensada; nunca se reordena. Que cada indicador este siempre
+      en el mismo sitio es la mitad de lo que hace util un tablero.
+
+  G6  npm run typecheck y npm test pasan. El PDF y la documentacion del
+      residente se actualizan en el mismo commit que cambia el
+      comportamiento, no despues.
+
+
+31. RIESGOS Y MITIGACIONES
+--------------------------------------------------------------------------------
+
+  R1  FATIGA DE AVISOS
+      La fase 1 anade cuatro senales nuevas a un panel que ya tiene nueve
+      pendientes. Un panel que nunca esta en verde ensena a ignorarlo -y el
+      propio codigo ya advierte de ello-.
+      MITIGACION: respetar el bloque y la gravedad. De las cuatro nuevas,
+      ninguna es "critica": P-2 y P-4 son avisos, y P-5 va a la franja de
+      empresa, que es otra zona de la pantalla. Revisar a las cuatro semanas
+      cuantos pendientes tiene de media una obra sana; si son mas de cinco,
+      subir umbrales antes de anadir mas.
+
+  R2  MEDIR LO FACIL EN VEZ DE LO IMPORTANTE
+      P-2 es barata y P-1 es cara. El riesgo es quedarse en P-2 y dar el
+      enfoque 3 por resuelto con una sola senal binaria.
+      MITIGACION: el criterio de entrada a la fase 2 esta escrito
+      explicitamente en la seccion 29. La decision debe tomarse mirando ese
+      criterio, no la comodidad.
+
+  R3  EL HISTORIAL COMO TECHO
+      P-1 fase A deriva la capacidad del rendimiento pasado. Si se lee como
+      objetivo, cristaliza el rendimiento actual.
+      MITIGACION: lenguaje ("tu media", nunca "tu maximo") y presentacion
+      siempre junto al PPC.
+
+  R4  DESPLIEGUE
+      Cada entrega a main desencadena despliegue automatico, y el despliegue
+      por FTP puede dejar caer archivos aunque la Action salga verde.
+      MITIGACION: tras cada entrega, comprobar que produccion responde 200 y
+      que los assets cargan. P-5 mejora precisamente la deteccion de este
+      problema, asi que conviene entregarla pronto.
+
+  R5  DOCUMENTACION QUE SE QUEDA ATRAS
+      El manual del residente ya tiene tres desviaciones respecto del codigo
+      (anexo C). Cada propuesta de este plan cambia lo que el residente ve.
+      MITIGACION: G6. La documentacion se actualiza en el mismo commit.
+
+
+32. LO QUE NO SE PROPONE, Y POR QUE
+--------------------------------------------------------------------------------
+
+  Un diagnostico util tambien dice donde NO hay que gastar.
+
+  NO se propone reordenar el panel ni redisenar la navegacion.
+     Las decisiones actuales tienen justificacion escrita y sobreviven al
+     examen: orden fijo de modulos, avisos transversales a las obras,
+     preferencia que guarda lo apagado. No hay hallazgo que las cuestione.
+
+  NO se propone sustituir scrypt ni el adaptador MariaDB.
+     No son deuda tecnica: son restricciones del hosting asumidas y
+     documentadas. Cambiarlas exigiria cambiar de hosting, que es una
+     decision de otra naturaleza y otro presupuesto.
+
+  NO se propone cobertura general de pruebas en servicios.
+     P-7 persigue UNA propiedad -el aislamiento entre empresas- y no un
+     porcentaje. Perseguir cobertura por cobertura en una capa que habla con
+     la base es de rendimiento decreciente rapido.
+
+  NO se propone automatizar el mapeo tarea-partida.
+     Ya se midio sobre archivos reales: de 56 coincidencias de codigo, 36
+     apuntaban a otra cosa. La decision de que lo confirme una persona es
+     correcta y esta respaldada por datos. P-6 mejora CUANDO se pide, no
+     quien decide.
+
+  NO se propone mostrar EAC y VAC antes de sus condiciones.
+     La restriccion actual nacio de un error real de S/ 633.873 y es
+     exactamente el criterio C3. Ampliarla seria retroceder.
+
+  NO se propone bloquear el compromiso de tareas no liberadas.
+     El sistema avisa y deja constancia, y esa eleccion es correcta: "la obra
+     a veces arranca igual", y quien esta en obra sabe cosas que el sistema
+     no. Convertir el aviso en prohibicion produciria rodeos fuera del
+     sistema, que es peor que el problema.
+
+
+================================================================================
+                              A N E X O S
+================================================================================
+
+
+ANEXO A - EVIDENCIA VERIFICADA
+--------------------------------------------------------------------------------
+
+  Las afirmaciones de ausencia de este documento se sostienen en busquedas
+  exhaustivas sobre src/. Se recogen aqui para que se puedan repetir.
+
+  A.1  CONSUMIDORES DE horasPorSemana   -> sostiene H-3
+       Resultado: 5 apariciones.
+         src/lib/calendario.ts:76                       definicion
+         src/lib/calendario.test.ts:6,73,75,76          pruebas
+         src/components/obras/CalendarioLaboral.tsx:5,44  unico consumidor
+       Conclusion: la jornada semanal se calcula y solo se usa para pintar un
+       rotulo en la pantalla de configuracion del calendario.
+
+  A.2  CONSUMIDORES DE cantidadPlan / cantidadEjecutada   -> sostiene H-3
+       Resultado: 30 apariciones en 8 archivos, todas de lectura, escritura,
+       validacion o presentacion. Ninguna suma, agregacion ni comparacion.
+
+  A.3  ALCANCE DE modalidad   -> sostiene H-1
+       Resultado: 76 apariciones en 16 archivos.
+       Ninguno de los 16 es evm.service.ts, cronograma.service.ts,
+       presupuesto-obra.ts ni curva-s.ts.
+       Conclusion: la modalidad no interviene en avance, curva ni EVM.
+
+  A.4  DISTRIBUCION DE PRUEBAS   -> sostiene H-9
+       Resultado: 40 archivos *.test.ts, los 40 bajo src/lib/.
+       src/services/ (38 servicios): 0 archivos de prueba.
+
+  A.5  CONTENIDO DE salud.service   -> sostiene H-5
+       EstadoSalud = { baseDatosConectada, latenciaMs, desplieguePendiente }.
+       desplieguePendiente detecta el fallo documentado del 12 de agosto.
+       No consta consumidor en ninguna pantalla del panel.
+
+  A.6  CATALOGO DE MODULOS DEL PANEL   -> sostiene seccion 11
+       src/lib/tablero.ts define 13 entradas en MODULOS:
+       pendientes, avance, curva, plazo, presupuesto, valorGanado, ppc,
+       confiabilidad, causas, atrasos, criticas, capitulos, ordenes.
+
+  A.7  REGLAS DE pendientes.ts   -> sostiene E2.3
+       9 claves: avance-sin-reportar, cierre-sin-porcentaje, sin-cobertura,
+       restricciones-sin-liberar, proximas-sin-analizar,
+       lookahead-sin-analizar, sobregiro, ppc-bajo, mapeo-incompleto.
+       Constantes: PPC_PREOCUPANTE = 70, COBERTURA_MINIMA_MAPEO = 60.
+
+  A.8  PARAMETROS DE LA VENTANA DEL LOOKAHEAD   -> sostiene E5.6
+       src/lib/lookahead.ts:
+         SEMANAS_POR_DEFECTO = 3
+         SEMANAS_MINIMO      = 1
+         SEMANAS_MAXIMO      = 12
+         SEMANAS_SUGERIDAS   = [3, 4, 6, 8, 12]
+       El selector ofrece las sugeridas; por URL se admite cualquier entero,
+       que se recorta al rango en vez de fallar.
+
+
+ANEXO B - GLOSARIO
+--------------------------------------------------------------------------------
+
+  TERMINOS LEAN
+
+    Mura            Irregularidad, variabilidad, falta de nivelacion
+    Muri            Sobrecarga de personas, equipos o sistemas
+    Muda            Desperdicio: actividad que consume sin anadir valor
+    Last Planner    Metodo donde quien ejecuta es quien compromete
+    Lookahead       Ventana de mediano plazo donde se liberan restricciones
+    PTS             Plan de Trabajo Semanal
+    PPC             Porcentaje de Plan Cumplido: cumplidas / prometidas x 100
+    CNC             Causa de No Cumplimiento
+    Pareto          Grafico que ordena las causas de mayor a menor
+    Confiabilidad   Porcentaje de tareas de la ventana en estado LISTO
+    Restriccion     Cada uno de los 7 flujos a liberar antes de comprometer
+
+  TERMINOS DEL SISTEMA
+
+    EDT             Arbol del presupuesto: capitulos y partidas
+    Capitulo        Nivel que solo agrupa. Sin metrado ni costo propio
+    Partida         Hoja del presupuesto: unidad, metrado, precio
+    Tarea           Fila del cronograma: fechas y duracion
+    UID             Identificador de tarea estable entre versiones
+    Revision        Foto congelada del presupuesto (Baseline)
+    Linea base      Version congelada contra la que se mide
+    Presup. vigente Revision aprobada + movimientos aprobados
+    Movimiento      Reconversion, adicional o deductivo
+    Comprometido    Suma de las ordenes de compra aprobadas
+    Encargo         Frente de un proveedor, con alcance y monto
+    Pase de obra    Acceso limitado a una obra, solo para subir fotos
+
+  TERMINOS DE VALOR GANADO
+
+    EVM             Compara lo planificado, lo ejecutado y lo gastado
+    SPI / CPI       Indices de rendimiento de plazo y de costo
+    SV / CV         Desviaciones de plazo y de costo, en soles
+    EAC             Costo estimado al terminar
+    VAC             Diferencia entre presupuesto y EAC
+    Ritmo           Porcentaje del avance previsto que se lleva realmente
+
+
+ANEXO C - CORRECCIONES PENDIENTES EN EL MANUAL DEL RESIDENTE
+--------------------------------------------------------------------------------
+
+  El proceso de verificacion de este diagnostico detecto tres desviaciones
+  entre docs/Manual-Residente-GCM.pdf (v1.0, 11 de agosto de 2026) y el
+  codigo. Se recogen aqui para corregirlas en la proxima revision.
+
+  C.1  NUMERO DE MODULOS DEL PANEL                        [ERROR DEL MANUAL]
+       El manual dice "12 indicadores" en el capitulo 5 y en la tabla de
+       salidas del capitulo 13.
+       El catalogo real tiene TRECE entradas (anexo A.6). Falta contar
+       "valorGanado", que en el manual se describe en el capitulo 12 pero no
+       se cuenta como modulo del panel.
+       CORRECCION: 12 -> 13, en los dos sitios.
+
+  C.2  COMPORTAMIENTO DE "SINCRONIZAR VENTANA"      [PENDIENTE DE LA WIP]
+       El manual dice, en el capitulo 9.2, que sincronizar "trae las tareas
+       del cronograma vigente y les crea sus siete restricciones en blanco",
+       y en el capitulo 15 que si una tarea dice "Sin analizar" hay que
+       pulsar sincronizar.
+       Con la migracion lookahead_analisis aplicada, las restricciones se
+       ELIGEN y ya no se siembran, y "Sin analizar" significa que nadie ha
+       decidido que flujos aplican: sincronizar no lo arregla.
+       CORRECCION: reescribir 9.2 y la entrada correspondiente del 15,
+       CUANDO esa WIP se integre. Antes no: el manual describiria un
+       comportamiento que produccion todavia no tiene.
+
+  C.3  VENTANA MINIMA DEL LOOKAHEAD                      [IMPRECISION MENOR]
+       El manual dice que "el selector admite de 3 a 12 semanas".
+       El selector ofrece 3, 4, 6, 8 y 12; el rango aceptado va de 1 a 12
+       (anexo A.8). Tres es el minimo UTIL, no el minimo admitido.
+       CORRECCION: precisar "las opciones son 3, 4, 6, 8 y 12 semanas; tres
+       es el minimo util".
+
+
+================================================================================
+                              FIN DEL DOCUMENTO
+
+   GCM - Diagnostico Lean (MMM)  ...  version 1.0  ...  11 de agosto de 2026
+   Fuente: C:\Projects\PROYECTO_CONSTRUCCION  ...  gcm.drcaceresruiz.com
+================================================================================
