@@ -83,6 +83,23 @@ const envSchema = z.object({
    */
   SMS_TOKEN: z.string().optional(),
 
+  /**
+   * Secreto de la COLA de SMS: la linea propia, sin intermediarios.
+   *
+   * Con ella, GCM deja los mensajes en una cola y el telefono de la empresa
+   * los recoge (MacroDroid o Tasker) y los manda con su SIM. Tiene
+   * preferencia sobre `SMS_TOKEN`.
+   *
+   * OPCIONAL, como el SMTP: sin ella la ruta de la cola responde 404 y el
+   * codigo del pase sale por correo o lo dicta el residente.
+   *
+   * MINIMO 32 CARACTERES, y que sea aleatorio. Es la unica credencial que
+   * protege la cola, y por esa cola viajan los codigos del pase EN CLARO
+   * hasta que salen. Generarlo con `openssl rand -base64 48` o equivalente,
+   * y no reutilizar ningun otro secreto.
+   */
+  SMS_COLA_TOKEN: z.string().min(32).optional(),
+
   // --- Correo saliente (alta de usuarios y recuperacion de clave) ---
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),

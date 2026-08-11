@@ -40,6 +40,10 @@ const RUTAS_PUBLICAS = [
   // seguridad (ver la cabecera): quitar una ruta de aqui no protege nada, y
   // ponerla no desprotege nada.
   "/api/evidencia",
+  // La cola de SMS: la consulta un telefono con MacroDroid o Tasker, que
+  // jamas va a tener cookie de sesion. Se identifica con su propio token en
+  // la cabecera `Authorization`, que comprueba el route handler.
+  "/api/sms",
 ];
 
 export default function proxy(peticion: NextRequest) {

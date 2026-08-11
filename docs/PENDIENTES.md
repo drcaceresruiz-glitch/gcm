@@ -612,6 +612,55 @@ sentido. En vez de que GCM llame al telefono, el telefono pregunta a GCM.
 **Orden acordado**: primero las pantallas con correo + codigo en pantalla
 —que no cuestan nada y dejan el pase usable—, y la cola de SMS despues.
 
+### La cola: CONSTRUIDA el 11 de agosto, DORMIDA hasta que se configure
+
+Esta todo escrito y probado, y **no hace nada hasta que exista
+`SMS_COLA_TOKEN`**. Sin esa variable la ruta responde 404, `enviarSms` cae al
+canal de antes y nadie consulta la tabla nueva.
+
+Piezas:
+
+- `MensajeSms` (migracion `20260811010133_cola_de_sms`).
+- `lib/sms-cola.ts` (13 pruebas): leer la credencial de la cabecera,
+  compararla en tiempo constante y decidir si un prestamo caduco.
+- `sms-cola.service.ts`: encolar, entregar con prestamo, confirmar y purgar.
+- `GET`/`POST` en `/api/sms/cola`, con `Authorization: Bearer`.
+- `sms.service.ts` elige canal: la cola manda sobre json.pe.
+
+**Como se activa** (lo hace el usuario, no se puede desde aqui):
+
+1. Generar un secreto largo (`openssl rand -base64 48`) y ponerlo como
+   `SMS_COLA_TOKEN` en Setup Node.js App de cPanel. Minimo 32 caracteres: lo
+   valida `env.ts` y sin eso la aplicacion no arranca.
+2. En el telefono emisor, MacroDroid o Tasker con dos pasos que se repitan
+   cada ~20 s:
+   - `GET https://gcm.drcaceresruiz.com/api/sms/cola` con la cabecera
+     `Authorization: Bearer <token>`. Devuelve `{"mensajes":[{id,numero,texto}]}`.
+   - por cada uno, enviar el SMS con la SIM y despues
+     `POST` al mismo sitio con `{"enviados":["<id>"]}`.
+
+**Decisiones que no son evidentes:**
+
+- **Es un PRESTAMO, no una entrega.** Si el telefono recoge y no confirma en
+  90 segundos, el mensaje se vuelve a ofrecer. Mandar dos veces el mismo
+  codigo es inofensivo —es el mismo—; no mandarlo, no. Con un tope de 5
+  entregas para no reintentar en bucle contra un telefono sin saldo.
+- **El texto se borra al confirmar.** La fila queda para saber que salio, no
+  que decia.
+- **La credencial va en la cabecera, nunca en la URL**: los servidores
+  escriben las URL en su log de accesos y ahi el secreto quedaria en claro.
+- **Sin cola configurada responde 404 y no 401**: un 401 invitaria a seguir
+  probando credenciales contra algo que no existe.
+
+**EL RIESGO, dicho otra vez**: por esa cola viajan los codigos del pase EN
+CLARO, porque hay que poder mandarlos. Quien obtenga el token los lee antes
+que su destinatario. Lo acotan el borrado al enviar, la caducidad de diez
+minutos y que el codigo en si dura eso y admite tres intentos. Es el punto
+debil del diseno y se acepto a sabiendas.
+
+**FALTA**: probarla con un telefono de verdad. Desde aqui solo se puede
+verificar que la ruta responde 404 sin token y 401 con uno equivocado.
+
 ## 6d. Panel «Que falta» (10 de agosto)
 
 La ayuda visual permanente que pidio el usuario: un modulo del tablero que

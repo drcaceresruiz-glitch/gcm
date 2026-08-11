@@ -1877,3 +1877,55 @@ model SesionPase {
   @@index([expiresAt])
   @@map("sesiones_pase")
 }
+
+/// Un SMS esperando a que el telefono emisor lo recoja.
+///
+/// GCM no manda SMS: los DEJA AQUI, y un telefono con la SIM de la empresa
+/// pregunta cada pocos segundos si hay algo que mandar. Se invirtio el
+/// sentido a proposito. La alternativa —que GCM llamara al telefono— exige
+/// una aplicacion Android propia, y mantener viva una app contra el gestor
+/// de bateria de cada fabricante es otro producto, no una funcion de esta.
+/// Asi el lado del telefono es configuracion (MacroDroid o Tasker, que ya
+/// existen) y no hay una linea de codigo movil que mantener.
+///
+/// EL PUNTO DEBIL, dicho en voz alta: aqui el codigo del pase esta EN CLARO,
+/// porque hay que poder mandarlo. Quien obtenga el token de la cola lee los
+/// codigos del personal antes que ellos. Lo que lo acota:
+///
+/// - el texto se borra en cuanto el emisor confirma que salio (`enviadoAt`),
+///   asi que la ventana es de segundos, no de dias;
+/// - `expiraAt` corta los que ya no sirven aunque nadie los recoja;
+/// - el codigo del pase caduca solo a los diez minutos y admite tres
+///   intentos, que es la red que habia debajo de todo esto.
+model MensajeSms {
+  id String @id @default(cuid())
+
+  /// Celular como lo guarda GCM (nueve cifras). Si algun dia hace falta el
+  /// prefijo de pais, se anade al ENTREGARLO, no aqui.
+  numero String @db.VarChar(20)
+
+  /// El texto del SMS. Se vacia al confirmar el envio: a partir de ese
+  /// momento la fila sirve para saber que salio, no para saber que decia.
+  texto String @db.VarChar(320)
+
+  /// Cuando un emisor se lo llevo. Es un prestamo, no una entrega: si no
+  /// confirma dentro de la gracia, el mensaje vuelve a ofrecerse. Mandar dos
+  /// veces el mismo codigo es inofensivo; no mandarlo, no.
+  tomadoAt DateTime?
+
+  /// Cuando el emisor confirmo que el SMS salio de la SIM.
+  enviadoAt DateTime?
+
+  /// Cuantas veces se ha ofrecido. Un numero alto delata un emisor que
+  /// recoge y nunca confirma —telefono sin saldo, permiso de SMS revocado—.
+  entregas Int @default(0)
+
+  /// A partir de aqui ya no vale la pena mandarlo: el codigo que lleva
+  /// dentro habra caducado igualmente.
+  expiraAt  DateTime
+  createdAt DateTime @default(now())
+
+  /// El indice de la consulta que corre cada pocos segundos.
+  @@index([enviadoAt, expiraAt])
+  @@map("mensajes_sms")
+}

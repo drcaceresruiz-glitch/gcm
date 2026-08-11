@@ -1,25 +1,31 @@
 import "server-only";
 
 import { env } from "@/lib/env";
+import { encolarSms, hayColaSms } from "@/services/sms-cola.service";
 
 /**
- * Envio de SMS por json.pe.
+ * Envio de SMS. UN solo sitio, con dos canales detras.
  *
- * OJO A COMO FUNCIONA, porque no es un proveedor en la nube: el SMS **sale
- * del telefono Android del cliente**. Hay que instalar su app en un movil,
- * vincularlo, y ese aparato es el que manda el mensaje por su propia SIM.
+ * Este archivo existe para que el resto del sistema no sepa por donde sale un
+ * SMS: `pase.service` llama a `enviarSms` y se acabo. Los canales, en orden
+ * de preferencia:
  *
- * De ahi las tres consecuencias que hay que tener presentes:
+ * 1. **La cola propia** (`SMS_COLA_TOKEN`). GCM deja el mensaje en una cola y
+ *    el telefono de la empresa lo recoge con MacroDroid o Tasker y lo manda
+ *    con su SIM. Es lo que pidio el usuario para no depender de nadie. Ver
+ *    `sms-cola.service` para el reparto y para el riesgo que trae.
+ * 2. **json.pe** (`SMS_TOKEN`). La pasarela de antes, que TAMPOCO enviaba
+ *    desde la nube: salia del movil Android del cliente con su app instalada.
+ *    Se conserva como respaldo.
  *
- * 1. **Ese telefono es un punto unico de fallo.** Sin bateria, sin saldo o
- *    sin cobertura, no sale ningun codigo y nadie puede entrar a documentar.
- *    Por eso el correo sigue siendo el respaldo y por eso el residente puede
- *    generar el codigo en pantalla y dictarlo.
- * 2. **Es opcional, como el SMTP.** Sin token, esto devuelve
- *    `{ enviado: false }` y no lanza: un fallo de envio no puede tumbar la
- *    operacion que lo pidio.
- * 3. El numero va como lo guarda GCM (nueve cifras). Si algun dia la pasarela
- *    exige prefijo de pais, se anade AQUI y en ningun otro sitio.
+ * Sin ninguno de los dos no pasa nada grave: el codigo del pase sale por
+ * correo, o lo genera el residente en su pantalla y lo dicta. Por eso los dos
+ * son OPCIONALES, como el SMTP, y por eso nada de aqui lanza nunca: un fallo
+ * de envio no puede tumbar la operacion que lo pidio.
+ *
+ * En los dos casos el telefono emisor es un punto unico de fallo: sin
+ * bateria, sin saldo o sin cobertura no sale ningun codigo. Eso no lo arregla
+ * ningun software, y es la razon de que el correo y el dictado sigan ahi.
  */
 
 const URL_ENVIO = "https://api.sms.json.pe/send";
@@ -29,18 +35,27 @@ const URL_ENVIO = "https://api.sms.json.pe/send";
 const TIEMPO_MAXIMO_MS = 10_000;
 
 export interface ResultadoSms {
+  /**
+   * Se acepto el envio por algun canal.
+   *
+   * OJO: con la cola significa **encolado**, no recibido. Nadie puede
+   * garantizar lo segundo —el SMS sale de un telefono ajeno— y prometerlo
+   * seria mentir en la pantalla del residente.
+   */
   enviado: boolean;
+  /// Salio por la cola propia y no por la pasarela.
+  encolado?: boolean;
   /// Por que no se envio, para el log. Nunca se ensena al usuario: delataria
   /// si un contacto existe.
   motivo?: string;
 }
 
 export function hayCanalSms(): boolean {
-  return Boolean(env.SMS_TOKEN);
+  return hayColaSms() || Boolean(env.SMS_TOKEN);
 }
 
 /**
- * Manda un SMS. Nunca lanza.
+ * Manda un SMS por el canal que haya. Nunca lanza.
  *
  * @param numero Celular en el formato que guarda GCM (nueve cifras).
  */
@@ -48,15 +63,32 @@ export async function enviarSms(
   numero: string,
   mensaje: string,
 ): Promise<ResultadoSms> {
+  // La cola manda cuando esta configurada: es la linea de la empresa, no la
+  // de un tercero.
+  if (hayColaSms()) {
+    const encolado = await encolarSms(numero, mensaje);
+    return encolado
+      ? { enviado: true, encolado: true }
+      : { enviado: false, motivo: "cola" };
+  }
+
   if (!env.SMS_TOKEN) {
     if (env.NODE_ENV !== "production") {
       // En desarrollo se imprime, como hace el correo: asi se puede probar el
       // ciclo entero del pase sin contratar nada.
-      console.info(`[sms NO enviado — sin token] Para: ${numero} | ${mensaje}`);
+      console.info(`[sms NO enviado — sin canal] Para: ${numero} | ${mensaje}`);
     }
-    return { enviado: false, motivo: "sin-token" };
+    return { enviado: false, motivo: "sin-canal" };
   }
 
+  return enviarPorPasarela(numero, mensaje);
+}
+
+/** El canal viejo: json.pe. */
+async function enviarPorPasarela(
+  numero: string,
+  mensaje: string,
+): Promise<ResultadoSms> {
   const corte = AbortSignal.timeout(TIEMPO_MAXIMO_MS);
 
   try {
