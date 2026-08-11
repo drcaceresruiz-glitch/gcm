@@ -205,6 +205,19 @@ function ElegirCanal({
             accion={accion}
             valor="SMS"
             bloqueado={!puedeSms}
+            // El motivo va EN la tarjeta, no solo en el recuadro de abajo.
+            // Un control apagado y mudo se lee como «esto no funciona», no
+            // como «me falta un paso»: paso de verdad la primera vez que se
+            // uso esta pantalla.
+            motivo={
+              !smsDisponible
+                ? "No disponible ahora"
+                : !celular
+                  ? "Guarda tu celular"
+                  : !celularVerificado
+                    ? "Falta verificarlo — aquí abajo"
+                    : undefined
+            }
           />
         </div>
 
@@ -243,6 +256,7 @@ function OpcionCanal({
   valor,
   accion,
   bloqueado = false,
+  motivo,
 }: {
   icono: React.ReactNode;
   titulo: string;
@@ -251,6 +265,8 @@ function OpcionCanal({
   valor: Canal2FA;
   accion: (datos: FormData) => void;
   bloqueado?: boolean;
+  /// Por que esta apagada, si lo esta.
+  motivo?: string;
 }) {
   return (
     <form action={accion}>
@@ -263,7 +279,9 @@ function OpcionCanal({
         style={{
           borderColor: elegido ? "var(--color-marca-600)" : "var(--borde)",
           borderWidth: elegido ? 2 : 1,
-          opacity: bloqueado ? 0.5 : 1,
+          // Apagada pero LEGIBLE: al 0.5 el motivo no se lee, y un aviso que
+          // no se lee no es un aviso.
+          opacity: bloqueado ? 0.75 : 1,
           backgroundColor: elegido
             ? "color-mix(in oklab, var(--color-marca-500) 8%, transparent)"
             : "transparent",
@@ -283,6 +301,15 @@ function OpcionCanal({
         <span className="mt-0.5 block truncate text-xs opacity-70">
           {detalle}
         </span>
+
+        {motivo && (
+          <span
+            className="mt-1 block text-xs font-medium"
+            style={{ color: "var(--color-alerta)" }}
+          >
+            {motivo}
+          </span>
+        )}
       </button>
     </form>
   );
