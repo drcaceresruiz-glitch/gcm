@@ -58,6 +58,31 @@ control.
 > despliegue, asi que cualquier arreglo hecho a mano en el servidor sobre ese
 > archivo dura hasta el siguiente push.
 
+> **UNA INSTANCIA VIEJA PUEDE SOBREVIVIR DIAS SIRVIENDO CODIGO DE OTRA
+> COMPILACION** (encontrado el 11 de agosto persiguiendo un SMS que no
+> llegaba). Habia DOS `next-server` a la vez: uno de 4 minutos y otro de
+> **26 horas**, los dos con `cwd` en `/home/drcacere/gcm`. Cada peticion caia
+> en uno o en otro segun la suerte.
+>
+> **Es un problema DISTINTO del candado, y no estaba visto.** El candado
+> impide que dos instancias descompriman a la vez; no impide que una
+> instancia arrancada ayer siga viva con el arbol de ayer en memoria. Explica
+> el 404 del login de anoche mejor que ninguna otra cosa, y explica que un
+> SMS saliera unas veces si y otras no.
+>
+> **`touch tmp/restart.txt` NO se la llevo**: Passenger no la estaba
+> gestionando. Hubo que `kill <pid>` a secas (sin `-9`); Passenger levanta
+> una nueva con la siguiente peticion y el corte son un par de segundos.
+>
+> Como mirarlo, y conviene hacerlo despues de cada despliegue:
+> ```
+> ps -u "$USER" -o pid,etime,cmd | grep next-server | grep -v grep
+> ls -l /proc/<pid>/cwd     # confirmar que es GCM y no la otra app
+> ```
+> Mas de un proceso, o uno con horas encima justo despues de desplegar, es el
+> sintoma. **Ojo**: la cuenta tiene otra aplicacion (`preanestesia_venv`,
+> Python), asi que no todo proceso ajeno es de GCM —por eso el `cwd`—.
+
 ## Lo que dejo la sesion de la noche del 10 de agosto
 
 Empezo por la evidencia fotografica y acabo siendo, sobre todo, una
@@ -723,6 +748,39 @@ bien y que GCM no tiene nada que darle; la hora parada significa que Android
 la durmio (falta quitar el ahorro de bateria, y en Xiaomi/Huawei/Oppo/Samsung
 ademas la lista del fabricante); un 401 ahi significa que el token del
 telefono no coincide con el de cPanel.
+
+**COMO ACABO el caso del 11 de agosto, que es lo que hay que leer**: no era
+la tabla. Era **una instancia vieja de 26 horas** (ver el aviso del principio)
+que servia parte de las peticiones con codigo anterior a la cola: alli
+`enviarSms` solo conocia json.pe, y sin `SMS_TOKEN` no mandaba nada y se
+callaba. Matando ese proceso, el SMS llego. Camino recorrido, por si vuelve:
+404/401 en la ruta -> migraciones -> tabla -> **procesos vivos** -> telefono.
+**Empezar por los procesos la proxima vez**, que cuesta un `ps`.
+
+Dos cosas mas que salieron por el camino y hay que corregir en
+`infraestructura.md`, porque su procedimiento de migraciones las da por
+supuestas:
+
+1. **`source ...activate` ya NO deja `DATABASE_URL` en el shell.** Se
+   comprobo el 11 de agosto: con el entorno activo, `$DATABASE_URL` viene
+   vacia y `prisma` no arranca. La receta escrita da por hecho lo contrario.
+   Lo que si funciona es tomarsela prestada al proceso vivo:
+   ```
+   PID=$(ps -u "$USER" -o pid,cmd | grep next-server | grep -v grep | awk '{print $1}' | head -1)
+   export DATABASE_URL="$(tr '\0' '\n' < /proc/$PID/environ | sed -n 's/^DATABASE_URL=//p')"
+   ```
+   O copiarla de cPanel -> Setup Node.js App -> Environment variables.
+2. **No hay `.env` en `~/gcm`, y es a proposito**: el workflow lo borra del
+   paquete (`rm -f deploy/.env`) para no pisar la configuracion del servidor
+   con la de desarrollo. Que nadie lo busque ahi.
+
+**Y un aviso sobre `migrate status`**: dijo «Database schema is up to date!»
+teniendo **28** migraciones cuando el repositorio tiene **29**. No miente
+—esta al dia con las que ve— pero **no detecta un archivo de migracion que el
+deploy dejo caer**. Para eso hay que contar carpetas:
+`ls ~/gcm/prisma/migrations | wc -l` contra las del repositorio. En este caso
+faltaba `20260811010133_cola_de_sms` aunque la tabla SI existia: se aplico
+cuando el archivo estaba y un despliegue posterior lo tiro.
 
 **Lo que ese caso destapo, y ya esta arreglado**: la cola encendida ANULABA el
 respaldo de json.pe —`enviarSms` no lo probaba ni cuando el encolado
