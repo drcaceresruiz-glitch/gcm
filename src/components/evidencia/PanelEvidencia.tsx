@@ -3,8 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { Camera, LoaderCircle, Paperclip, X } from "lucide-react";
 import { GaleriaEvidencia } from "@/components/evidencia/GaleriaEvidencia";
-import { accionSubirEvidencia } from "@/app/(dashboard)/obras/[id]/evidencia/acciones";
-import type { FotoResumen } from "@/services/evidencia.service";
+import type { FotoResumen, ResultadoSubida } from "@/services/evidencia.service";
 
 /**
  * Evidencia fotografica adosada al dato donde se decide.
@@ -19,11 +18,18 @@ import type { FotoResumen } from "@/services/evidencia.service";
  * 1. **La compresion es del NAVEGADOR.** Se reduce con un canvas antes de
  *    enviar. En el servidor no se puede: LiteSpeed mata los procesos lentos
  *    —es la misma razon por la que el despliegue tuvo que salir del arranque—.
- * 2. **La foto se sirve por `/api/evidencia/<id>`,** que valida sesion,
- *    permiso y empresa. Nunca hay una URL publica adivinable.
+ * 2. **La foto se sirve por `/api/evidencia/<id>`,** que valida quien pide
+ *    —sesion o pase— y la empresa. Nunca hay una URL publica adivinable.
  * 3. **No hay boton de borrar.** El registro es evidencia de auditoria; la
  *    purga futura quitara el archivo del disco y dejara el rastro (nombre,
  *    hash, quien y cuando). Una foto purgada se muestra como tal.
+ * 4. **La accion de subida llega por PROPIEDAD, no por import.** Hay dos
+ *    puertas —la sesion de un usuario y el pase de obra— con modelos de
+ *    autorizacion distintos, y este panel sirve a las dos. Si importara una
+ *    de ellas, la pantalla del pase acabaria llamando a la puerta de sesion
+ *    y fallando en silencio con una redireccion al login; peor aun, un
+ *    descuido futuro podria hacer que llamara a la que NO comprueba lo que
+ *    toca. Quien monta el panel dice explicitamente por donde entra.
  *
  * Se despliega en linea, sin dialogo modal, por lo mismo que `PanelComprometer`:
  * en un movil en obra un panel que empuja la pagina se maneja mejor que una
@@ -38,6 +44,19 @@ const CALIDAD = 0.8;
 export type DestinoPanel =
   | { restriccionId: string }
   | { compromisoId: string };
+
+/**
+ * La puerta por la que sube la foto.
+ *
+ * La firma es la misma para la sesion y para el pase a proposito: el panel no
+ * tiene por que saber cual le toco. Quien la implementa comprueba lo suyo
+ * —permisos en un caso, obra del pase en el otro— y devuelve el mismo
+ * resultado.
+ */
+export type AccionSubirEvidencia = (
+  obraId: string,
+  datos: FormData,
+) => Promise<ResultadoSubida>;
 
 /**
  * El clip que abre el panel, con el numero de fotos.
@@ -87,6 +106,7 @@ export function PanelEvidencia({
   titulo,
   fotos,
   puedeSubir,
+  accion,
   onCerrar,
 }: {
   obraId: string;
@@ -96,6 +116,8 @@ export function PanelEvidencia({
   fotos: FotoResumen[];
   /// Ver la evidencia y anadirla son cosas distintas: un consultor mira.
   puedeSubir: boolean;
+  /// Por donde sube la foto. Sin valor por defecto: ver la nota 4 de arriba.
+  accion: AccionSubirEvidencia;
   onCerrar: () => void;
 }) {
   const [nota, setNota] = useState("");
@@ -123,7 +145,7 @@ export function PanelEvidencia({
       }
 
       iniciar(async () => {
-        const r = await accionSubirEvidencia(obraId, datos);
+        const r = await accion(obraId, datos);
         if (r.ok) setNota("");
         else setError(r.error);
       });

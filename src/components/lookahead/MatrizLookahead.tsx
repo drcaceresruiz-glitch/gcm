@@ -21,6 +21,7 @@ import {
   accionSincronizar,
   accionAlternarRestriccion,
 } from "@/app/(dashboard)/obras/[id]/lookahead/acciones";
+import { accionSubirEvidencia } from "@/app/(dashboard)/obras/[id]/evidencia/acciones";
 import type { EstadoLookahead } from "@/generated/prisma/enums";
 import type { LookaheadDatos } from "@/services/lookahead.service";
 
@@ -186,6 +187,7 @@ export function MatrizLookahead({
       }${evidencia.fila.nombre}`}
       fotos={evidencia.celda.fotos}
       puedeSubir={puedeGestionar}
+      accion={accionSubirEvidencia}
       onCerrar={() => setEvidenciaEn(null)}
     />
   ) : null;

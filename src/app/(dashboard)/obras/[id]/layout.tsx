@@ -118,6 +118,16 @@ export default async function ObraLayout({
       clave: "planSemanal",
       grupo: "ejecucion",
     },
+    // El personal con pase va en EJECUCION, junto al Lookahead: son las
+    // personas que documentan lo que ese Lookahead pide liberar. Manda el
+    // mismo permiso que gestionar el Lookahead, que es el que el servicio de
+    // pases exige.
+    puede(sesion, "lookahead:gestionar") && {
+      href: `${raiz}/personal`,
+      etiqueta: "Personal",
+      clave: "personal",
+      grupo: "ejecucion",
+    },
     puede(sesion, "linea_base:leer") && {
       href: `${raiz}/revisiones`,
       etiqueta: "Revisiones",

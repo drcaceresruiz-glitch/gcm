@@ -10,6 +10,7 @@ import {
   ClipboardList,
   FileClock,
   Handshake,
+  HardHat,
   Table2,
   Truck,
 } from "lucide-react";
@@ -39,6 +40,7 @@ const ICONOS = {
   cronograma: CalendarClock,
   lookahead: CalendarRange,
   planSemanal: ClipboardList,
+  personal: HardHat,
   revisiones: FileClock,
   movimientos: ArrowLeftRight,
   proveedores: Handshake,

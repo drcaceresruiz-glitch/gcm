@@ -8,6 +8,7 @@ import {
   BotonEvidencia,
   PanelEvidencia,
 } from "@/components/evidencia/PanelEvidencia";
+import { accionSubirEvidencia } from "@/app/(dashboard)/obras/[id]/evidencia/acciones";
 import type { FotoResumen } from "@/services/evidencia.service";
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 
@@ -232,6 +233,7 @@ export function CierrePlanSemanal({
                 // Quien puede cerrar la semana puede documentarla: esta
                 // pantalla solo se pinta con `plan_semanal:gestionar`.
                 puedeSubir
+                accion={accionSubirEvidencia}
                 onCerrar={() => setEvidenciaEn(null)}
               />
             )}

@@ -129,7 +129,7 @@ export function validarAltaPase(d: DatosAltaPase): ValidacionPase {
   if (!celularBruto && !emailBruto) {
     return {
       ok: false,
-      error: "Escribe al menos un celular o un correo: es por donde recibira su codigo.",
+      error: "Escribe al menos un celular o un correo: es por donde recibirá su código.",
     };
   }
 
@@ -147,7 +147,7 @@ export function validarAltaPase(d: DatosAltaPase): ValidacionPase {
   let email: string | null = null;
   if (emailBruto) {
     email = normalizarEmail(emailBruto);
-    if (!email) return { ok: false, error: "El correo no parece valido." };
+    if (!email) return { ok: false, error: "El correo no parece válido." };
   }
 
   return {

@@ -13,10 +13,15 @@ import {
   type Confiabilidad,
 } from "@/lib/lookahead";
 import { planesAbiertos, type SemanaAbierta } from "@/services/plan-semanal.service";
-import { fotosPorDestino, type FotoResumen } from "@/services/evidencia.service";
+import {
+  fotosPorDestino,
+  fotosPorDestinoDePase,
+  type FotoResumen,
+} from "@/services/evidencia.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { EstadoLookahead, TipoRestriccion } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
+import type { PaseActivo } from "@/services/pase.service";
 
 /**
  * Lookahead (Last Planner): la ventana de mediano plazo y el analisis de las 7
@@ -260,6 +265,126 @@ export async function obtenerLookahead(
     semanasAbiertas: puedeComprometer ? await planesAbiertos(sesion, obraId) : [],
     puedeComprometer,
   };
+}
+
+/**
+ * Lo que el menu de evidencia necesita, y NADA mas.
+ *
+ * Estructuralmente compatible con `DatosMenuEvidencia` del componente, que es
+ * quien fija el contrato. Deliberadamente no incluye confiabilidad, semanas
+ * del PTS ni permisos: un pase no los tiene.
+ */
+export interface MenuPaseDatos {
+  filas: {
+    uid: number;
+    codigo: string | null;
+    nombre: string;
+    sincronizada: boolean;
+    restricciones: CeldaRestriccion[];
+  }[];
+  semanas: number;
+  puedeSubir: boolean;
+}
+
+/**
+ * El menu de evidencia para un PASE DE OBRA.
+ *
+ * Puerta APARTE de `obtenerLookahead`, por lo mismo que en `evidencia.service`:
+ * el pase no tiene rol ni permisos que consultar, tiene UNA obra. Mezclar los
+ * dos modelos de autorizacion en la misma funcion —un `if` que acepte sesion o
+ * pase— es como se cuelan los agujeros; el precio es esta duplicacion, que es
+ * barata y esta a la vista.
+ *
+ * El `obraId` sale SIEMPRE de la fila del pase, nunca de la peticion: por eso
+ * recibe el `PaseActivo` entero y no un id suelto.
+ *
+ * Solo devuelve tareas SINCRONIZADAS. Una tarea sin analizar no tiene
+ * restricciones a las que colgar la foto, y ofrecerla en el telefono seria un
+ * callejon sin salida; ademas sincronizar es cosa de quien gestiona el
+ * Lookahead, no del personal de campo.
+ */
+export async function menuDePase(
+  pase: PaseActivo,
+  semanasPedidas?: string | number,
+): Promise<MenuPaseDatos> {
+  const semanas = normalizarSemanas(semanasPedidas);
+  const { desde, hasta } = ventanaLookahead(hoy(), semanas);
+
+  // El cronograma vigente de SU obra. No se reusa `cronogramaVigente`, que
+  // filtra por la empresa de una sesion que aqui no existe.
+  const cronograma = await prisma.cronograma.findFirst({
+    where: { projectId: pase.obraId },
+    orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
+    select: {
+      tareas: {
+        select: {
+          uid: true, codigo: true, nombre: true,
+          inicio: true, fin: true, esResumen: true,
+        },
+      },
+    },
+  });
+
+  const tareas = tareasDeLaSemana(
+    (cronograma?.tareas ?? []).map((t) => ({
+      uid: t.uid,
+      codigo: t.codigo,
+      nombre: t.nombre,
+      inicio: t.inicio,
+      fin: t.fin,
+      esResumen: t.esResumen,
+    })),
+    desde,
+    hasta,
+  );
+
+  const uids = tareas.map((t) => t.uid);
+  const analizadas = uids.length
+    ? await prisma.lookaheadTask.findMany({
+        where: { projectId: pase.obraId, uid: { in: uids } },
+        select: {
+          uid: true,
+          restricciones: { select: { id: true, tipo: true, resuelta: true } },
+        },
+      })
+    : [];
+  const porUid = new Map(analizadas.map((l) => [l.uid, l]));
+
+  // Toda la evidencia de la ventana en UNA consulta: son 7 restricciones por
+  // tarea y una consulta por celda mataria la pagina (ya paso en produccion).
+  const idsRestriccion = analizadas.flatMap((l) =>
+    l.restricciones.map((r) => r.id),
+  );
+  const fotosPorRestriccion = idsRestriccion.length
+    ? await fotosPorDestinoDePase(pase.obraId, { restricciones: idsRestriccion })
+    : new Map<string, FotoResumen[]>();
+
+  const filas = tareas
+    .filter((t) => porUid.has(t.uid))
+    .map((t) => {
+      const lk = porUid.get(t.uid)!;
+      const porTipo = new Map(lk.restricciones.map((r) => [r.tipo, r]));
+      return {
+        uid: t.uid,
+        codigo: t.codigo,
+        nombre: t.nombre,
+        sincronizada: true,
+        restricciones: TIPOS_RESTRICCION.map((tipo) => {
+          const r = porTipo.get(tipo);
+          return {
+            id: r?.id ?? null,
+            tipo,
+            resuelta: r?.resuelta ?? false,
+            fotos: r ? (fotosPorRestriccion.get(r.id) ?? []) : [],
+          };
+        }),
+      };
+    });
+
+  // El derecho del pase ES adjuntar: no hay permiso que mirar. Que la obra
+  // este cerrada lo corta antes `obtenerPaseVigente`, y la subida lo vuelve a
+  // comprobar en el servicio.
+  return { filas, semanas, puedeSubir: true };
 }
 
 export interface ConfiabilidadVentana extends Confiabilidad {

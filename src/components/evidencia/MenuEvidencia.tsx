@@ -2,8 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { Camera, ChevronDown, ChevronRight, Search } from "lucide-react";
-import { PanelEvidencia } from "@/components/evidencia/PanelEvidencia";
-import type { LookaheadDatos } from "@/services/lookahead.service";
+import {
+  PanelEvidencia,
+  type AccionSubirEvidencia,
+} from "@/components/evidencia/PanelEvidencia";
+import type { FotoResumen } from "@/services/evidencia.service";
 
 /**
  * El menu al que lleva el codigo QR de la obra: "donde cargo la foto".
@@ -17,17 +20,53 @@ import type { LookaheadDatos } from "@/services/lookahead.service";
  * foto— y todo lo demas estorba: se entra buscando, los objetivos son grandes
  * para un dedo con guante, y cada restriccion dice si ya esta resuelta y
  * cuantas fotos tiene.
+ *
+ * Lo usan DOS pantallas con puertas distintas: la de la obra (usuario con
+ * sesion) y la del pase (personal de campo que no es usuario de GCM). Por eso
+ * no recibe `LookaheadDatos` —que arrastra permisos, semanas del PTS y
+ * confiabilidad, cosas que un pase ni tiene ni debe ver— sino lo minimo que
+ * necesita para pintar. Ensanchar esta interfaz para "aprovechar" un dato que
+ * ya venia es como se le acaban colando al pase cosas de usuario.
  */
+
+/// Una restriccion, tal como la ve este menu.
+export interface CeldaMenu {
+  /// null si la tarea no se sincronizo: no hay a que colgar la foto.
+  id: string | null;
+  tipo: string;
+  resuelta: boolean;
+  fotos: FotoResumen[];
+}
+
+export interface FilaMenu {
+  uid: number;
+  codigo: string | null;
+  nombre: string;
+  sincronizada: boolean;
+  restricciones: CeldaMenu[];
+}
+
+export interface DatosMenuEvidencia {
+  filas: FilaMenu[];
+  /// Cuantas semanas mira la ventana, para poder decirlo cuando esta vacia.
+  semanas: number;
+  /// Ver y adjuntar son cosas distintas: un consultor mira.
+  puedeSubir: boolean;
+}
+
 export function MenuEvidencia({
   obraId,
   datos,
   etiquetaFlujo,
+  accion,
 }: {
   obraId: string;
-  datos: LookaheadDatos;
+  datos: DatosMenuEvidencia;
   /// Nombre legible de cada flujo, resuelto por quien llama para no volver a
   /// importar la tabla de flujos aqui.
   etiquetaFlujo: Record<string, string>;
+  /// Por donde sube la foto: la puerta de sesion o la del pase.
+  accion: AccionSubirEvidencia;
 }) {
   const [busqueda, setBusqueda] = useState("");
   const [tareaAbierta, setTareaAbierta] = useState<number | null>(null);
@@ -173,7 +212,8 @@ export function MenuEvidencia({
                                 destino={{ restriccionId: c.id }}
                                 titulo={`${nombre} · ${fila.codigo ? `${fila.codigo} ` : ""}${fila.nombre}`}
                                 fotos={c.fotos}
-                                puedeSubir={datos.puedeGestionar}
+                                puedeSubir={datos.puedeSubir}
+                                accion={accion}
                                 onCerrar={() => setEvidenciaEn(null)}
                               />
                             </div>

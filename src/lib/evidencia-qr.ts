@@ -6,9 +6,11 @@
  * y cae directo en el sitio donde se adjunta la foto, sin navegar por menus
  * con las manos sucias.
  *
- * El enlace apunta a la aplicacion NORMAL, no a una ruta publica: al abrirlo
- * sin sesion, el sistema de siempre lleva al login y vuelve. Un QR pegado en
- * una columna no puede ser una puerta trasera a las fotos de la obra.
+ * Ningun enlace apunta a `/api/evidencia`: escanear no ensena una sola foto.
+ * Los de grano fino (tarea y restriccion) llevan a la aplicacion normal, que
+ * sin sesion pasa por el login. El de la OBRA lleva a la puerta del pase,
+ * donde quien no es usuario de GCM se identifica con su celular o su correo y
+ * un codigo de un solo uso.
  *
  * Aqui solo vive la aritmetica de los enlaces y del troquelado de la hoja, que
  * es lo que se puede probar sin navegador ni base de datos.
@@ -51,10 +53,16 @@ export function enlaceEvidencia(
 ): string {
   const raiz = base.replace(/\/+$/, "");
 
-  // El codigo de la obra NO lleva al Lookahead: lleva al menu de evidencia,
-  // que es una pantalla pensada para un telefono a pie de obra. La matriz de 7
-  // columnas ahi no se puede usar.
-  if ("obra" in destino) return `${raiz}/obras/${obraId}/evidencia`;
+  // El codigo de la obra lleva a la puerta del PASE, y no a la pantalla de
+  // dentro. Es el que se pega en la caseta, o sea el que escanea el personal
+  // de campo, que NO es usuario de GCM: mandarlo a `/obras/...` lo dejaba en
+  // el login, delante de una clave que nadie le ha dado. Quien SI tiene
+  // sesion no lo nota: `/pase/[obraId]` lo reenvia a la pantalla de siempre.
+  //
+  // Detras, la pantalla que se pinta es un MENU pensado para un telefono a pie
+  // de obra, no la matriz del Lookahead: siete columnas no se tocan con el
+  // dedo.
+  if ("obra" in destino) return `${raiz}/pase/${obraId}`;
 
   const lookahead = `${raiz}/obras/${obraId}/lookahead`;
   return "uid" in destino

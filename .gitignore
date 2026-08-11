@@ -86,11 +86,15 @@ next-env.d.ts
 # Cliente Prisma generado (se regenera con `prisma generate`)
 /src/generated/
 
-# Volcados de base de datos: NUNCA versionar (datos sensibles)
-/storage/*.sql
-
-# Evidencia fotografica subida en desarrollo (en prod vive fuera del arbol)
-/storage/evidencia/
+# `storage/` es el cajon de lo que NO se versiona: volcados de la base (datos
+# sensibles), la evidencia subida en desarrollo (en prod vive fuera del arbol)
+# y los scripts sueltos de verificacion.
+#
+# Se ignora la CARPETA ENTERA, no solo `*.sql`. Antes solo estaban excluidos
+# los volcados, asi que cualquier script de apoyo que se dejara ahi aparecia
+# como archivo nuevo y podia colarse en un commit —y este repositorio es
+# PUBLICO—. Nada de lo que vive en `storage/` tiene que viajar.
+/storage/
 
 # Documentos de referencia (binarios pesados; se guardan en local)
 /docs/referencias/

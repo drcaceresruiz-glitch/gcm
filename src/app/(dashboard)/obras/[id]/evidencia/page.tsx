@@ -6,6 +6,7 @@ import { obtenerLookahead } from "@/services/lookahead.service";
 import { puede } from "@/lib/rbac";
 import { FLUJOS_RESTRICCION } from "@/lib/lookahead";
 import { MenuEvidencia } from "@/components/evidencia/MenuEvidencia";
+import { accionSubirEvidencia } from "./acciones";
 
 export const metadata: Metadata = { title: "Cargar evidencia" };
 
@@ -59,8 +60,15 @@ export default async function EvidenciaObraPage({
       {datos ? (
         <MenuEvidencia
           obraId={id}
-          datos={datos}
+          // Se le da lo minimo, no el objeto entero: el menu es el mismo que
+          // usa el pase de obra, y su interfaz esta acotada a proposito.
+          datos={{
+            filas: datos.filas,
+            semanas: datos.semanas,
+            puedeSubir: datos.puedeGestionar,
+          }}
           etiquetaFlujo={etiquetaFlujo}
+          accion={accionSubirEvidencia}
         />
       ) : (
         <p className="text-sm opacity-70">

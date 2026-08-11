@@ -30,11 +30,12 @@ describe("normalizarModo", () => {
 describe("enlaceEvidencia", () => {
   const base = "https://gcm.drcaceresruiz.com";
 
-  it("el de la obra lleva al menu de evidencia, no a la matriz", () => {
-    // La matriz son 7 columnas: en el telefono de quien esta en obra no se
-    // puede tocar. El codigo de la caseta tiene que caer en el menu.
+  it("el de la obra lleva a la puerta del pase, no a una pantalla de dentro", () => {
+    // Lo escanea el personal de campo, que NO es usuario de GCM: si apuntara
+    // a `/obras/...` acabaria en el login, delante de una clave que nadie le
+    // ha dado.
     expect(enlaceEvidencia(base, "obra1", { obra: true })).toBe(
-      "https://gcm.drcaceresruiz.com/obras/obra1/evidencia",
+      "https://gcm.drcaceresruiz.com/pase/obra1",
     );
   });
 

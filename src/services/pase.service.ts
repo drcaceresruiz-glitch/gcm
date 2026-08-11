@@ -247,6 +247,29 @@ export async function cambiarEstadoPase(
 // ---------------------------------------------------------------------------
 
 /**
+ * Lo minimo de la obra para pintar la pantalla de acceso: su nombre.
+ *
+ * Se sirve SIN sesion, asi que va justo lo que ya esta impreso en el codigo QR
+ * que cuelga en la caseta: el nombre de la obra. Nada de presupuesto, avance
+ * ni empresa. Si la obra no admite entrar —cerrada o empresa suspendida—
+ * devuelve null y la pantalla lo dice sin entrar en detalles.
+ */
+export async function obraParaPase(
+  obraId: string,
+): Promise<{ nombre: string } | null> {
+  const obra = await prisma.project.findFirst({
+    where: {
+      id: obraId,
+      estado: { not: "CERRADA" },
+      company: { activa: true },
+    },
+    select: { nombreObra: true },
+  });
+
+  return obra ? { nombre: obra.nombreObra } : null;
+}
+
+/**
  * El pase vigente de una obra, buscado por lo que la persona tecleo.
  *
  * Devuelve null tambien cuando existe pero esta revocado, o cuando la obra o
@@ -343,7 +366,7 @@ export async function generarCodigoParaEntregar(
   paseId: string,
 ): Promise<ResultadoCodigo> {
   if (!puede(sesion, "lookahead:gestionar")) {
-    return { ok: false, error: "No tienes permiso para generar codigos." };
+    return { ok: false, error: "No tienes permiso para generar códigos." };
   }
 
   const pase = await prisma.paseObra.findFirst({
@@ -437,7 +460,7 @@ export async function verificarCodigoPase(
   const almacen = await cookies();
   const token = almacen.get(COOKIE_DESAFIO_PASE)?.value;
 
-  const CADUCADO = "El codigo caduco o ya no vale. Pide otro.";
+  const CADUCADO = "El código caducó o ya no vale. Pide otro.";
   if (!token) return { ok: false, error: CADUCADO };
 
   const desafio = await prisma.codigoPase.findUnique({
@@ -490,7 +513,7 @@ export async function verificarCodigoPase(
       await olvidarDesafioPase();
       return {
         ok: false,
-        error: "Demasiados intentos. Pide un codigo nuevo.",
+        error: "Demasiados intentos. Pide un código nuevo.",
       };
     }
 
@@ -502,7 +525,7 @@ export async function verificarCodigoPase(
     const quedan = MAX_INTENTOS_CODIGO - intentos;
     return {
       ok: false,
-      error: `Codigo incorrecto. Te quedan ${quedan} intento(s).`,
+      error: `Código incorrecto. Te quedan ${quedan} intento(s).`,
     };
   }
 
@@ -578,14 +601,20 @@ export async function hayCodigoPendiente(): Promise<boolean> {
 }
 
 /**
- * El pase de quien esta usando el telefono, o null.
+ * El pase de quien esta usando el telefono, SIN exigir una obra concreta.
+ *
+ * Existe para quien no sabe todavia de que obra habla: `/api/evidencia/<id>`
+ * recibe el id de una foto y nada mas, asi que primero averigua de quien es
+ * el telefono y despues comprueba que la foto sea de SU obra. Devolver aqui
+ * la obra del pase —y no aceptarla como parametro— es lo que impide que ese
+ * id venga de la peticion.
  *
  * Se comprueba TODO en cada peticion —que el pase siga activo, que la obra
  * no este cerrada y que la empresa no este suspendida— porque la cookie dura
  * un ano: revocar a alguien tiene que echarlo al instante, no dentro de once
  * meses.
  */
-export async function obtenerPase(obraId: string): Promise<PaseActivo | null> {
+export async function obtenerPaseVigente(): Promise<PaseActivo | null> {
   const almacen = await cookies();
   const token = almacen.get(COOKIE_PASE)?.value;
   if (!token) return null;
@@ -607,21 +636,18 @@ export async function obtenerPase(obraId: string): Promise<PaseActivo | null> {
 
   if (!sesion) return null;
 
-  const vale =
-    sesion.expiresAt > new Date() &&
-    sesion.pase.activo &&
-    sesion.pase.projectId === obraId &&
-    sesion.pase.project.estado !== "CERRADA" &&
-    sesion.pase.project.company.activa;
-
-  if (!vale) {
-    // Solo se borra la fila si de verdad murio. Si lo que falla es que el
-    // pase es de OTRA obra, la sesion sigue siendo buena para la suya.
-    if (sesion.expiresAt <= new Date() || !sesion.pase.activo) {
-      await prisma.sesionPase.delete({ where: { id: sesion.id } }).catch(() => {});
-    }
+  const muerta = sesion.expiresAt <= new Date() || !sesion.pase.activo;
+  if (muerta) {
+    // Solo se borra la fila si de verdad murio. Que la obra este cerrada o la
+    // empresa suspendida son estados REVERSIBLES: tirar la sesion por eso
+    // obligaria a pedir codigo otra vez el dia que la obra se reabra.
+    await prisma.sesionPase.delete({ where: { id: sesion.id } }).catch(() => {});
     return null;
   }
+
+  const vale =
+    sesion.pase.project.estado !== "CERRADA" && sesion.pase.project.company.activa;
+  if (!vale) return null;
 
   return {
     paseId: sesion.pase.id,
@@ -629,6 +655,18 @@ export async function obtenerPase(obraId: string): Promise<PaseActivo | null> {
     companyId: sesion.pase.project.companyId,
     nombre: nombreDePase(sesion.pase),
   };
+}
+
+/**
+ * El pase de quien usa el telefono, exigiendo que sea de ESTA obra.
+ *
+ * Es la puerta normal: toda pantalla del pase sabe en que obra esta, y
+ * comparar aqui evita que una cookie legitima de la obra A sirva para mirar
+ * la obra B con solo cambiar el id de la URL.
+ */
+export async function obtenerPase(obraId: string): Promise<PaseActivo | null> {
+  const pase = await obtenerPaseVigente();
+  return pase && pase.obraId === obraId ? pase : null;
 }
 
 export async function cerrarPase(): Promise<void> {

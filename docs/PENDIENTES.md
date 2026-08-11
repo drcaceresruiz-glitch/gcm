@@ -3,7 +3,24 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 10 de agosto de 2026 (cierre de la sesion de la NOCHE).
+Ultima revision: 11 de agosto de 2026.
+
+## Lo ultimo: el pase de obra ya se puede usar (11 de agosto)
+
+Se cerraron **las pantallas del pase** (seccion 6e), que era lo siguiente en
+el orden acordado. El recorrido entero esta verificado en el navegador contra
+CRIOCORD; lo unico que no se pudo probar desde aqui es adjuntar un archivo de
+verdad, que hay que hacer a mano desde un telefono.
+
+Queda, en este orden: **la cola de SMS con la linea propia** y despues el
+**parte diario**, que no existe y es el Bloque 1 entero de la matriz de
+control.
+
+> **El candado de despliegue (seccion 0) lo dio por arreglado el usuario el 11
+> de agosto.** No se toco desde aqui. Lo que si quedo comprobado, y conviene
+> no perder: el workflow reescribe `app.js` en CADA despliegue, asi que
+> cualquier arreglo hecho a mano en el servidor sobre ese archivo dura hasta
+> el siguiente push.
 
 ## Lo que dejo la sesion de la noche del 10 de agosto
 
@@ -448,7 +465,70 @@ contable—. Recordar el aviso ya escrito: **lo pagado lleva IGV y el resto no**
 asi que esas columnas no son homogeneas y hay que normalizar ANTES de
 construir los pagos, no despues.
 
-## 6e. Pase de obra con OTP (10 de agosto) — BACKEND HECHO, FALTAN PANTALLAS
+## 6e. Pase de obra con OTP — COMPLETO Y VERIFICADO (11 de agosto)
+
+**Las pantallas ya estan y el recorrido entero funciona.** Verificado en el
+navegador contra CRIOCORD, de punta a punta: identificarse con el celular
+escrito CON ESPACIOS (`987 654 321`), recibir el codigo, teclear uno
+equivocado —sale «Te quedan 4 intento(s)»—, teclear el bueno y aterrizar en
+el menu con las 30 tareas sincronizadas y el panel de subida abierto.
+
+Lo que se construyo, mas alla de los seis puntos que estaban apuntados:
+
+- Grupo `(pase)` con layout propio, deliberadamente pobre (sin cabecera, riel
+  ni pestanas: estorban en un movil a pie de obra).
+- `/pase/[obraId]` con sus tres caminos: con sesion de GCM redirige a la
+  pantalla de siempre; con el telefono ya reconocido, directo a cargar; el
+  resto se identifica.
+- `/pase/[obraId]/cargar` reusando `MenuEvidencia`, y `menuDePase` en
+  `lookahead.service` —que HABIA QUE ESCRIBIR: `obtenerLookahead` exige
+  `SesionActiva` de punta a punta, cosa que el plan anterior no habia visto—.
+- Pantalla **Personal** en la obra (pestana en EJECUCION, permiso
+  `lookahead:gestionar`): alta, revocar, reactivar y «generar codigo» para
+  dictarlo, con el contador de fotos aportadas por persona.
+- `/api/evidencia/[id]` acepta ya las DOS puertas, sesion y pase.
+- `enlaceEvidencia({obra:true})` apunta a `/pase/[obraId]`.
+
+**Tres decisiones que no se deben deshacer sin pensarlo:**
+
+1. **`PanelEvidencia` recibe la accion de subida por PROPIEDAD, no por
+   import.** Hay dos puertas con modelos de autorizacion distintos y el panel
+   sirve a las dos; un valor por defecto haria que la pantalla del pase
+   llamara a la de sesion, y un descuido futuro que llamara a la que NO
+   comprueba lo que toca.
+2. **`MenuEvidencia` ya no recibe `LookaheadDatos`** sino una interfaz
+   acotada. Ensancharla para «aprovechar» un dato que ya venia es como se le
+   acaban colando al pase cosas de usuario.
+3. **El paso al segundo formulario lo decide el CLIENTE, no el servidor.** Se
+   avanza siempre que la peticion salga bien, exista el contacto o no. Si
+   avanzara solo con contacto real, avanzar o no seria la respuesta que el
+   servicio se cuida de no dar, y cualquiera con el QR de la caseta podria
+   averiguar quien trabaja en la obra probando numeros. Por lo mismo NO se
+   resuelve redirigiendo para que mande `hayCodigoPendiente`: eso delata.
+
+**Trampa que costo encontrarla**: `/api/evidencia/<id>` no lleva punto, asi
+que el proxy lo intercepta; sin anadirlo a `RUTAS_PUBLICAS` un telefono con
+pase habria recibido una redireccion al login por cada miniatura y la
+pantalla habria salido con todos los huecos en blanco. Comprobado: ahora
+responde **401**, no una redireccion.
+
+Comprobado tambien el aislamiento: una cookie de pase valida de CRIOCORD **no**
+abre la obra PRUEBA (cerrada), que responde «Este codigo ya no sirve» —el
+mismo texto para obra inexistente, cerrada o empresa suspendida—.
+
+**LO UNICO QUE FALTA**: subir una foto de verdad con un pase. El navegador
+automatizado no puede adjuntar archivos, asi que hay que hacerlo a mano desde
+un telefono. El camino de guardado es el MISMO `guardarFoto` que ya esta en
+produccion.
+
+**Y ANTES DE USARLO EN PROD**: aplicar la migracion `20260810214500_pase_de_obra`
+(`migrate deploy`). Sin ella, la pestana Personal y `/pase/...` dan error; el
+resto de la app aguanta, porque nada mas consulta esas tablas.
+
+<!-- Lo de abajo es el estado ANTERIOR, se conserva por el porque de cada
+     decision del backend. -->
+
+## 6e-bis. Pase de obra con OTP (10 de agosto) — el backend, y por que asi
 
 El personal de campo documenta SIN ser usuario de GCM: se identifica con su
 celular o correo, recibe un codigo de un solo uso y entra. Decidido con el
@@ -479,18 +559,21 @@ LOCAL):
   `archivoEvidenciaDePase`, puertas APARTE de las de sesion —mezclar dos
   modelos de autorizacion en el mismo `if` es como se cuelan los agujeros—.
 
-**FALTA, y sin esto no se puede usar**:
+~~**FALTA, y sin esto no se puede usar**~~ **LOS SEIS, HECHOS el 11 de
+agosto.** Se conservan por lo que cada uno explica:
 
-1. Grupo de rutas `(pase)` con layout minimo (el de `(dashboard)` arrastra
+1. ~~Grupo de rutas `(pase)` con layout minimo~~ (el de `(dashboard)` arrastra
    cabecera, riel y pestanas, que en un movil en obra sobran).
-2. `/pase/[obraId]`: identificarse + codigo. **Anadir `/pase` a
+2. ~~`/pase/[obraId]`: identificarse + codigo.~~ **Anadir `/pase` a
    `RUTAS_PUBLICAS` en `proxy.ts`**, y que si trae `gcm_sesion` redirija a
-   `/obras/[id]/evidencia`.
-3. `/pase/[obraId]/cargar`: el menu (reutilizar `MenuEvidencia` con una
-   interfaz mas estrecha que `LookaheadDatos`).
-4. `/api/evidencia/[id]` que acepte pase.
-5. Pantalla **Personal** de la obra: alta, lista, revocar y «generar codigo».
-6. `enlaceEvidencia({obra:true})` debe apuntar a `/pase/[obraId]`, no a
+   `/obras/[id]/evidencia`. *Hubo que anadir tambien `/api/evidencia`, que no
+   estaba previsto: ver la trampa arriba.*
+3. ~~`/pase/[obraId]/cargar`: el menu~~ (reutilizar `MenuEvidencia` con una
+   interfaz mas estrecha que `LookaheadDatos`). *Ademas hizo falta `menuDePase`
+   en el servicio: el lector que habia exige sesion.*
+4. ~~`/api/evidencia/[id]` que acepte pase.~~
+5. ~~Pantalla **Personal** de la obra: alta, lista, revocar y «generar codigo».~~
+6. ~~`enlaceEvidencia({obra:true})` debe apuntar a `/pase/[obraId]`~~, no a
    `/obras/[id]/evidencia`.
 
 **Del usuario**: decidir QUE telefono hace de emisor si se activa el SMS.

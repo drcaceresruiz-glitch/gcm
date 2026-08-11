@@ -105,7 +105,7 @@ export async function subirEvidencia(
 ): Promise<ResultadoSubida> {
   const objetivo = await resolverDestino(sesion, destino);
   if (!objetivo) {
-    return { ok: false, error: "No tienes permiso para subir evidencia aqui." };
+    return { ok: false, error: "No tienes permiso para subir evidencia aquí." };
   }
 
   const cerrada = await motivoSiObraCerrada(sesion, objetivo.obraId);
@@ -170,7 +170,7 @@ export async function subirEvidenciaConPase(
     select: { estado: true },
   });
   if (obra?.estado === "CERRADA") {
-    return { ok: false, error: "La obra esta cerrada: ya no admite cambios." };
+    return { ok: false, error: "La obra está cerrada: ya no admite cambios." };
   }
 
   return guardarFoto(

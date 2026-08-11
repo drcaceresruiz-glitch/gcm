@@ -27,6 +27,19 @@ const RUTAS_PUBLICAS = [
   // tiene sesion, asi que la cookie de sesion todavia no existe.
   "/verificar-codigo",
   "/api/health",
+  // PASE DE OBRA: el personal de campo documenta sin ser usuario de GCM, asi
+  // que jamas tendra `gcm_sesion`. Su identidad viaja en `gcm_pase` y la
+  // comprueba `obtenerPase()` en cada pantalla, contra la base y en cada
+  // peticion.
+  "/pase",
+  // Y por la misma razon la ruta que SIRVE las fotos: sin esto, un telefono
+  // con pase pedira cada miniatura, se le respondera con una redireccion al
+  // login y la pantalla saldra con todos los huecos en blanco. No abre nada:
+  // el route handler exige sesion o pase antes de leer un solo byte, y filtra
+  // por empresa o por obra. Recuerdese que este archivo NO es la frontera de
+  // seguridad (ver la cabecera): quitar una ruta de aqui no protege nada, y
+  // ponerla no desprotege nada.
+  "/api/evidencia",
 ];
 
 export default function proxy(peticion: NextRequest) {
