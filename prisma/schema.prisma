@@ -278,6 +278,8 @@ model User {
   resetTokens PasswordResetToken[]
   solicitudesPerfil SolicitudCambioPerfil[]
   codigosAcceso CodigoAcceso[]
+  suscripcionesAviso SuscripcionAviso[]
+  avisos             Aviso[]
 
   @@unique([companyId, numDoc])
   @@index([companyId, estado])
@@ -485,6 +487,10 @@ model Project {
   lookaheadTareas      LookaheadTask[]
   fotosEvidencia       FotoEvidencia[]
   pasesObra            PaseObra[]
+  contactosAviso       ContactoAviso[]
+  suscripcionesAviso   SuscripcionAviso[]
+  avisos               Aviso[]
+  ajustesAvisos        AjustesAvisosObra?
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -1777,6 +1783,14 @@ model LookaheadTask {
   /// y `restricciones` (ver `estadoDeTarea` en @/lib/lookahead).
   estado EstadoLookahead @default(PENDIENTE)
 
+  /// Cuando paso a LISTO. Null mientras no lo este.
+  ///
+  /// Es la fecha de la TRANSICION, no del estado, y por eso solo se sella la
+  /// primera vez (`listaAt: null` en el where de `recalcularEstados`). Sin esa
+  /// guarda, cada recalculo la refrescaria y el aviso de "ya esta lista"
+  /// saldria otra vez cada vez que alguien toca la matriz.
+  listaAt DateTime?
+
   /// Cuando alguien reviso QUE flujos le aplican, y quien. Null = nadie la ha
   /// mirado, que NO es lo mismo que "revisada y no le aplica ninguna": las dos
   /// tienen cero restricciones, y sin esta fecha son la misma fila. De esa
@@ -2039,6 +2053,17 @@ model MensajeSms {
   /// recoge y nunca confirma —telefono sin saldo, permiso de SMS revocado—.
   entregas Int @default(0)
 
+  /// Que sale antes cuando hay cola.
+  ///
+  /// Los codigos de acceso y de pase CADUCAN a los diez minutos; un aviso de
+  /// restriccion no caduca. Sin esto, diez avisos encolados por delante pueden
+  /// dejar a alguien sin poder entrar en su cuenta por culpa de un aviso de
+  /// materiales. Los codigos encolan con 10, los avisos con 0.
+  ///
+  /// La solucion NO es subir `MAXIMO_POR_ENTREGA`: ese tope protege la SIM del
+  /// corte por antispam. Lo que hay que ordenar es la cola, no ensancharla.
+  prioridad Int @default(0)
+
   /// A partir de aqui ya no vale la pena mandarlo: el codigo que lleva
   /// dentro habra caducado igualmente.
   expiraAt  DateTime
@@ -2046,8 +2071,291 @@ model MensajeSms {
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  /// De que obra salio, cuando sale de una. Null en lo que no es de obra —un
+  /// codigo de acceso a GCM—. Se anadio con los avisos: sin esto no habia
+  /// forma de contar cuantos SMS gasta una obra, y el tope diario necesita
+  /// saberlo.
+  projectId String?
+
   /// El indice de la consulta que corre cada pocos segundos. Empieza por la
   /// empresa porque ahora cada emisor solo ve la suya.
+  ///
+  /// `prioridad` NO va aqui a proposito: anadirla obliga a MySQL a soltar y
+  /// rehacer la clave ajena que se apoya en este indice, y eso es un riesgo
+  /// real —perder la integridad referencial de la cola— a cambio de ahorrar
+  /// una ordenacion sobre las pocas filas que devuelve la consulta.
   @@index([companyId, enviadoAt, expiraAt])
+  /// Para el tope diario de SMS de aviso por obra.
+  @@index([projectId, createdAt])
   @@map("mensajes_sms")
+}
+
+
+// ---------------------------------------------------------------------------
+// Avisos: que lo que GCM ya sabe llegue a quien puede resolverlo
+// ---------------------------------------------------------------------------
+//
+// El Lookahead sabe que a una tarea le falta el plano, y lo sabe con dias de
+// antelacion. Hasta ahora habia que entrar a mirarlo. El Pareto de la primera
+// obra real lo dijo sin ambiguedad: 5 de 5 incumplimientos por "prerrequisito
+// o tarea previa", ni una sola barra mas. No faltaba material ni cuadrilla;
+// faltaba que alguien se enterara a tiempo.
+//
+// Tres piezas: a QUIEN se avisa (`SuscripcionAviso`), gente de fuera a la que
+// tambien hay que escribir (`ContactoAviso`), y el aviso que se queda dentro
+// de GCM (`Aviso`). El reloj que dispara lo periodico vive en `RelojTarea`.
+
+/// Alguien de FUERA de GCM a quien hay que avisar: el proveedor que trae el
+/// fierro, el proyectista que responde la RFI.
+///
+/// NO es un `PaseObra`, y la diferencia importa: aquel es una CREDENCIAL —da
+/// entrada a una obra y arrastra codigo y sesion— y esto es una libreta de
+/// direcciones. Reutilizarlo obligaria a dar de alta gente EN la obra solo
+/// para poder escribirle, que es conceder de mas por comodidad.
+model ContactoAviso {
+  id        String @id @default(cuid())
+  projectId String
+
+  nombre  String  @db.VarChar(150)
+  empresa String? @db.VarChar(150)
+  cargo   String? @db.VarChar(100)
+
+  /// Hace falta AL MENOS uno de los dos o la fila es una fila muerta: no
+  /// habria por donde avisarle. Misma regla que `validarAltaPase`. El celular
+  /// se guarda normalizado (nueve cifras) porque `enviarSms` no acepta otra
+  /// cosa.
+  celular String? @db.VarChar(20)
+  email   String? @db.VarChar(150)
+
+  /// Dar de baja NO borra: los avisos que ya se le mandaron siguen teniendo a
+  /// quien senalar.
+  activo    Boolean   @default(true)
+  bajaAt    DateTime?
+  creadoPor String    @db.VarChar(150)
+  createdAt DateTime  @default(now())
+
+  project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suscripciones SuscripcionAviso[]
+
+  /// MySQL admite varios NULL en un indice unico, asi que esto no estorba a
+  /// quien solo tiene correo o solo celular.
+  @@unique([projectId, email])
+  @@unique([projectId, celular])
+  @@index([projectId, activo])
+  @@map("contactos_aviso")
+}
+
+/// Una regla de aviso: A QUIEN, DE QUE y POR DONDE.
+///
+/// Las tres formas de decir "a quien" —una persona, un rol, alguien de
+/// fuera— viven en la MISMA tabla porque son la misma pregunta con distinto
+/// sujeto. Partirlas en tres obligaria a tres consultas, tres pantallas y
+/// tres formas de duplicar al mismo destinatario sin darse cuenta.
+model SuscripcionAviso {
+  id        String @id @default(cuid())
+  projectId String
+
+  /// EXACTAMENTE UNO de los tres. La base no puede exigirlo; lo valida
+  /// `validarSuscripcion` en @/lib/avisos, que esta probado.
+  userId     String?
+  /// Quien tenga ese rol EN ESTA OBRA (`ProjectMembership`), no en la
+  /// empresa: un residente puede llevar una obra y solo mirar otra.
+  rol        Role?
+  contactoId String?
+
+  /// Null = todos los flujos. Con valor = solo ese. Es lo unico que separa al
+  /// responsable de MATERIALES del de INFORMACION, que era el encargo.
+  tipo TipoRestriccion?
+
+  /// Por donde. Booleanos y no un array de texto: se filtran en SQL y se leen
+  /// sin descifrar nada.
+  porApp    Boolean @default(true)
+  porCorreo Boolean @default(true)
+  /// Apagado por defecto A PROPOSITO: el SMS sale de una SIM real de la
+  /// empresa y se paga. Encenderlo es una decision, no un descuido.
+  porSms    Boolean @default(false)
+
+  /// Cuando. Los cuatro momentos, cada uno por separado.
+  alAbrir       Boolean @default(true)
+  alRecordar    Boolean @default(true)
+  /// Apagado por defecto: "ya puedes comprometerla" es una buena noticia, y
+  /// las buenas noticias son las primeras que se aprenden a ignorar.
+  alQuedarLista Boolean @default(false)
+  enResumen     Boolean @default(true)
+
+  creadoPor String   @db.VarChar(150)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contacto ContactoAviso? @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, tipo])
+  @@map("suscripciones_aviso")
+}
+
+/// Por donde sale un aviso. APP es la campanita; los otros dos cuestan buzon
+/// ajeno o dinero de la linea.
+enum CanalAviso {
+  APP
+  CORREO
+  SMS
+}
+
+/// Que momento genero el aviso.
+enum EventoAviso {
+  /// Se acaba de decidir que a una tarea le falta este flujo.
+  ABRIR
+  /// Lleva demasiados dias sin levantarse y la tarea se acerca.
+  RECORDAR
+  /// La tarea quedo LISTA: ya se puede comprometer en el PTS.
+  LISTA
+  /// El repaso del dia, agrupado.
+  RESUMEN
+}
+
+/// El aviso dentro de GCM.
+///
+/// Persistido y con "leido" POR USUARIO. El "no leido" de `ActividadReciente`
+/// vive en `localStorage`, o sea por NAVEGADOR: sirve para una lista que se
+/// mira, no para saber si a alguien le llego algo.
+model Aviso {
+  id        String @id @default(cuid())
+  companyId String
+  projectId String
+
+  /// Null cuando el destinatario es de fuera de GCM: no tiene bandeja donde
+  /// ensenarselo, pero el aviso se registra igual para poder decir a quien se
+  /// escribio y cuando.
+  userId String?
+
+  evento EventoAviso
+  titulo String      @db.VarChar(200)
+
+  /// Que se rompe si no se atiende, no solo el hecho. Es la misma linea del
+  /// panel «Que falta»: "3 restricciones abiertas" no mueve a nadie.
+  cuerpo String @db.VarChar(400)
+  /// Donde se arregla. Ruta relativa a la obra, como en `Pendiente.camino`.
+  camino String @db.VarChar(200)
+
+  leidoAt   DateTime?
+  createdAt DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// El indice de la campanita: lo no leido de una persona, lo mas nuevo
+  /// primero.
+  @@index([userId, leidoAt, createdAt])
+  @@index([projectId, createdAt])
+  @@map("avisos")
+}
+
+/// Que se mando, a quien y por donde. Es lo que impide que el reloj repita.
+///
+/// NO va en `AuditLog`, y no por comodidad: esta tabla no es un registro para
+/// leer, es una CLAVE UNICA que se reserva ANTES de enviar. Esa es la unica
+/// forma de que dos pasadas solapadas del cron no manden el mismo correo dos
+/// veces —y de que, si el cron estuvo caido tres horas, lo de esas tres horas
+/// salga una sola vez cuando vuelva—.
+///
+/// Es ademas el contador de los topes: cuantos SMS lleva hoy esta empresa.
+model EnvioAviso {
+  id        String @id @default(cuid())
+  companyId String
+  projectId String
+
+  evento EventoAviso
+  canal  CanalAviso
+
+  userId     String?
+  contactoId String?
+
+  /// La compone `claveDeAviso` en @/lib/avisos. Lleva el dia dentro cuando el
+  /// aviso se repite (recordatorio, resumen) y no lo lleva cuando es de una
+  /// sola vez (se abrio, quedo lista).
+  clave String @db.VarChar(120)
+
+  /// Correo o celular al que fue, para poder responder "¿le llego?" sin
+  /// reconstruirlo. Nunca se ensena fuera de la pantalla de configuracion.
+  destino String @db.VarChar(150)
+
+  enviado Boolean
+  /// "sin-canal", "tope-persona", "tope-empresa", "smtp"... Para la pantalla
+  /// del que configura, no para el destinatario.
+  motivo String? @db.VarChar(60)
+
+  createdAt DateTime @default(now())
+
+  /// El que hace idempotente al reloj. Se reserva antes de enviar.
+  @@unique([projectId, canal, clave])
+  /// El indice de los topes: cuantos SMS lleva hoy esta empresa.
+  @@index([companyId, canal, createdAt])
+  @@map("envios_aviso")
+}
+
+/// Lo que se ajusta de los avisos EN UNA OBRA.
+///
+/// Por obra y no por empresa, con el mismo argumento que `WorkCalendar`: el
+/// proyectista de una obra no es el de la siguiente, y la cadencia con que
+/// conviene insistir depende de como va cada una.
+model AjustesAvisosObra {
+  projectId String @id
+
+  /// Apagarlo todo de golpe, sin desmontar la configuracion.
+  activo Boolean @default(true)
+
+  /// Cada cuantos dias insiste el recordatorio. Cada N dias y no todos los
+  /// dias a partir del N: un recordatorio diario se ignora a la semana y
+  /// molesta desde el segundo.
+  diasRecordatorio Int @default(3)
+
+  /// Hora local (Peru) a la que sale el resumen. 0..23.
+  horaResumen Int @default(7)
+
+  /// Tope de SMS al dia PARA ESTA OBRA.
+  maxSmsDia Int @default(20)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@map("ajustes_avisos_obra")
+}
+
+/// Cuando corrio por ultima vez cada tarea programada.
+///
+/// GCM no tenia NADA que corriera solo: la purga de la cola de SMS cuelga del
+/// latido del telefono emisor por eso mismo. Los recordatorios y el resumen
+/// diario no pueden depender de que un movil este encendido, asi que los
+/// dispara un cron del servidor contra `/api/reloj`.
+///
+/// Esta tabla existe por dos razones, y la segunda es la importante: para no
+/// repetir el resumen del dia, y para poder DECIR que el cron lleva horas sin
+/// correr. Un aviso que falla en silencio es peor que no tenerlo, porque
+/// nadie lo echa de menos hasta que ya paso lo que iba a avisar.
+model RelojTarea {
+  /// "avisos". Corta y estable: se escribe en el codigo.
+  clave String @id @db.VarChar(40)
+
+  /// Cuando arranco la pasada en curso. Con `terminadaAt` null y esto
+  /// reciente, hay una corriendo y la siguiente se declina: solaparse no
+  /// romperia nada —lo impide el unico de `EnvioAviso`— pero gasta el doble
+  /// de conexiones al SMTP para nada.
+  iniciadaAt  DateTime
+  /// Se escribe TAMBIEN cuando la pasada falla. Una que revienta y deja esto
+  /// en null bloquearia el reloj para siempre.
+  terminadaAt DateTime?
+
+  /// Por donde iba: la ultima obra mirada. Null = empezar por el principio.
+  /// El recorrido es circular, y las obras se miran de pocas en pocas porque
+  /// recorrerlas todas en una peticion es lo que LiteSpeed corta.
+  cursor String? @db.VarChar(60)
+
+  obrasVistas   Int     @default(0)
+  avisosCreados Int     @default(0)
+  error         String? @db.VarChar(300)
+
+  @@map("reloj_tareas")
 }
