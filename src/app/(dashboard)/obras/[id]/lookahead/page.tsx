@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Lookahead" };
 /**
  * Lookahead (Last Planner): la ventana de mediano plazo (3 semanas por
  * defecto, configurable de 1 a 12) con el
- * analisis de las 7 restricciones por tarea y el semaforo de confiabilidad. Es
+ * analisis de restricciones por tarea y el semaforo de confiabilidad. Es
  * el paso entre el cronograma (largo plazo) y el Plan Semanal (corto plazo): de
  * aqui saldran las tareas LISTAS que se pueden comprometer.
  */
@@ -53,9 +53,11 @@ export default async function LookaheadPage({
         <h2 className="text-xl font-semibold">Lookahead</h2>
         <p className="mt-0.5 max-w-2xl text-sm opacity-70">
           La ventana de mediano plazo: lo que el cronograma trae en las próximas
-          semanas y su análisis de restricciones. Una tarea está{" "}
-          <strong>lista</strong> cuando sus 7 flujos están resueltos; solo lo
-          listo debería comprometerse en el Plan Semanal.
+          semanas y su análisis de restricciones. Elige qué flujos frenan cada
+          tarea —las siete preguntas se hacen siempre, las siete restricciones
+          no aplican siempre—. Una tarea está <strong>lista</strong> cuando está
+          analizada y no le queda ninguna sin levantar, aunque no le aplique
+          ninguna; solo lo listo debería comprometerse en el Plan Semanal.
           {datos && (
             <>
               {" "}

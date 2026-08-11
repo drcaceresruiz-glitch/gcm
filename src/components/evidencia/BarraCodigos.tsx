@@ -26,9 +26,9 @@ const AYUDA_MODO: Record<ModoCodigo, string> = {
   obra:
     "Un solo código, para pegar en la caseta. Al escanearlo se abre un menú donde se elige el frente y la restricción desde el propio teléfono. Es el que conviene casi siempre.",
   tarea:
-    "Un código por frente de trabajo, para pegarlo donde se trabaja. Al escanearlo se abre esa tarea con sus 7 restricciones.",
+    "Un código por frente de trabajo, para pegarlo donde se trabaja. Al escanearlo se abre esa tarea con las restricciones que le apliquen.",
   restriccion:
-    "Un código por cada restricción: cae directo en su panel. Son 7 por tarea, así que solo tiene sentido para un frente concreto y por poco tiempo.",
+    "Un código por cada restricción: cae directo en su panel. Solo se imprimen las que de verdad aplican, así que tiene sentido para un frente concreto y por poco tiempo.",
 };
 
 export function BarraCodigos({
