@@ -66,34 +66,58 @@ type Tx = Prisma.TransactionClient;
  * justo el patron que tumbo produccion el 10 de agosto.
  *
  * BLOQUEADO se respeta: es una marca manual, no se deduce de nada.
+ *
+ * Devuelve los uid que ACABAN de pasar a LISTO —no los que ya lo estaban—,
+ * que es lo unico que se puede avisar: "ya esta lista" solo tiene sentido la
+ * primera vez.
  */
-async function recalcularEstados(tx: Tx, ids: readonly string[]): Promise<void> {
-  if (ids.length === 0) return;
+async function recalcularEstados(
+  tx: Tx,
+  ids: readonly string[],
+): Promise<number[]> {
+  if (ids.length === 0) return [];
 
   const tareas = await tx.lookaheadTask.findMany({
     where: { id: { in: [...ids] }, estado: { not: "BLOQUEADO" } },
     select: {
       id: true,
+      uid: true,
+      listaAt: true,
       analizadaAt: true,
       restricciones: { select: { resuelta: true } },
     },
   });
 
-  const listas = tareas.filter((t) => estadoDeTarea(t) === "LISTO").map((t) => t.id);
-  const resto = tareas.filter((t) => estadoDeTarea(t) !== "LISTO").map((t) => t.id);
+  const listas = tareas.filter((t) => estadoDeTarea(t) === "LISTO");
+  const resto = tareas.filter((t) => estadoDeTarea(t) !== "LISTO");
+
+  // Las que TRANSITAN: estaban sin sellar y ahora estan listas. Se calcula
+  // antes de escribir, que es cuando todavia se puede distinguir.
+  const nuevas = listas.filter((t) => t.listaAt === null).map((t) => t.uid);
 
   if (listas.length > 0) {
     await tx.lookaheadTask.updateMany({
-      where: { id: { in: listas } },
+      where: { id: { in: listas.map((t) => t.id) } },
       data: { estado: "LISTO" },
+    });
+    // `listaAt: null` en el where: la fecha es de la TRANSICION, no del
+    // estado. Sin esa guarda, cada recalculo la refrescaria y el aviso de "ya
+    // esta lista" saldria otra vez cada vez que alguien toca la matriz.
+    await tx.lookaheadTask.updateMany({
+      where: { id: { in: listas.map((t) => t.id) }, listaAt: null },
+      data: { listaAt: new Date() },
     });
   }
   if (resto.length > 0) {
+    // Al dejar de estar lista se borra el sello: si vuelve a estarlo, es una
+    // transicion nueva y merece un aviso nuevo.
     await tx.lookaheadTask.updateMany({
-      where: { id: { in: resto } },
-      data: { estado: "PENDIENTE" },
+      where: { id: { in: resto.map((t) => t.id) } },
+      data: { estado: "PENDIENTE", listaAt: null },
     });
   }
+
+  return nuevas;
 }
 
 export interface CeldaRestriccion {
@@ -666,6 +690,23 @@ export interface Conservada {
   motivo: MotivoConservada;
 }
 
+/**
+ * Lo que ACABA de pasar, para que quien llame pueda avisar.
+ *
+ * Va aparte del resultado numerico y en crudo —uid y tipo, sin nombres—
+ * porque avisar NO es trabajo de este servicio: aqui solo se dice que ocurrio.
+ * Quien compone el aviso resuelve los nombres, que es donde hacen falta.
+ */
+export interface HechosLookahead {
+  /// Flujos que se acaban de abrir.
+  abiertas: { uid: number; tipo: TipoRestriccion }[];
+  /// Tareas que acaban de pasar a LISTA (solo la transicion, no las que ya lo
+  /// estaban).
+  listas: number[];
+}
+
+const SIN_HECHOS: HechosLookahead = { abiertas: [], listas: [] };
+
 export type ResultadoAnalisis =
   | {
       ok: true;
@@ -677,6 +718,7 @@ export type ResultadoAnalisis =
       /// Flujos que se pidio quitar y se quedaron porque tenian algo dentro.
       /// La pantalla lo dice: no se pierde nada en silencio.
       conservadas: Conservada[];
+      hechos: HechosLookahead;
     }
   | { ok: false; error: string };
 
@@ -687,6 +729,7 @@ const NADA: ResultadoAnalisis = {
   borradas: 0,
   levantadas: 0,
   conservadas: [],
+  hechos: SIN_HECHOS,
 };
 
 /**
@@ -842,7 +885,15 @@ async function analizar(
       where: { id: { in: ids } },
       data: { analizadaAt: ahora, analizadaPor: autor },
     });
-    await recalcularEstados(tx, ids);
+    const listas = await recalcularEstados(tx, ids);
+
+    // Los flujos recien abiertos, con su uid: es lo que se avisa. Se traduce
+    // de id de tarea a uid aqui, que es donde se tiene el mapa.
+    const uidPorId = new Map(tareas.map((t) => [t.id, t.uid]));
+    const abiertas = crear.flatMap((c) => {
+      const uid = uidPorId.get(c.lookaheadTaskId);
+      return uid === undefined ? [] : [{ uid, tipo: c.tipo }];
+    });
 
     // Queda registrado QUIEN descarto que flujo. La doctrina del Last Planner
     // es que las siete preguntas se hacen siempre; poder responder "a esta no
@@ -874,6 +925,7 @@ async function analizar(
       borradas: borrar.length,
       levantadas: 0,
       conservadas,
+      hechos: { abiertas, listas },
     };
   });
 }
@@ -921,7 +973,7 @@ export async function levantarRestricciones(
       },
     });
 
-    await recalcularEstados(tx, tareas);
+    const listas = await recalcularEstados(tx, tareas);
 
     await tx.auditLog.create({
       data: {
@@ -946,6 +998,8 @@ export async function levantarRestricciones(
       borradas: 0,
       levantadas: suyas.length,
       conservadas: [],
+      // Levantar no abre nada; lo que puede pasar es que alguna quede lista.
+      hechos: { abiertas: [], listas },
     };
   });
 }

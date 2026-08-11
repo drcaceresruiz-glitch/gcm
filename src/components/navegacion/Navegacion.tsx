@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
+  Bell,
   Building2,
   ClipboardCheck,
   Landmark,
@@ -85,6 +86,9 @@ interface Props {
   empresa: EnlaceEmpresa[];
   /// Alta de constructoras. Null salvo para quien opera GCM.
   operador: { href: string; etiqueta: string } | null;
+  /// La campanita. Con `sinLeer` en cero no se pinta numerito, por lo mismo
+  /// que en `EnlaceMenu`: un badge en cero solo distrae.
+  avisos: { href: string; sinLeer: number };
   usuario: { nombre: string; rol: string; foto: string | null };
 }
 
@@ -129,12 +133,13 @@ function OpcionesAgrupadas({ empresa }: { empresa: EnlaceEmpresa[] }) {
   );
 }
 
-export function Navegacion({ empresa, operador, usuario }: Props) {
+export function Navegacion({ empresa, operador, avisos, usuario }: Props) {
   const [cajonAbierto, setCajonAbierto] = useState(false);
 
   return (
     <>
       <div className="hidden items-center gap-3 sm:flex">
+        <Campana href={avisos.href} sinLeer={avisos.sinLeer} />
         {/* Fuera del menu de empresa y a su izquierda: se opera GCM o se
             trabaja en una obra, y quien hace lo primero no deberia tener que
             entrar en «Empresa» —la suya— para dar de alta otra distinta. */}
@@ -231,6 +236,14 @@ export function Navegacion({ empresa, operador, usuario }: Props) {
 
             <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
 
+            {/* Arriba del todo: en el movil es donde se mira primero, y es lo
+                unico de este menu que puede haber cambiado desde ayer. */}
+            <EnlaceMenu href={avisos.href} icono={Bell} badge={avisos.sinLeer}>
+              Avisos
+            </EnlaceMenu>
+
+            <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
+
             {operador && (
               <>
                 <EnlaceMenu href={operador.href} icono={Landmark}>
@@ -260,6 +273,39 @@ export function Navegacion({ empresa, operador, usuario }: Props) {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * La campanita, a la izquierda de todo.
+ *
+ * Con cero sin leer sigue estando: no parpadea ni se esconde. Un icono que
+ * aparece y desaparece obliga a buscarlo, y GCM ya decidio que la urgencia se
+ * transmite con el numero y con el orden, nunca con movimiento.
+ */
+function Campana({ href, sinLeer }: { href: string; sinLeer: number }) {
+  return (
+    <Link
+      href={href}
+      aria-label={
+        sinLeer === 0
+          ? "Avisos"
+          : `Avisos: ${sinLeer} sin leer`
+      }
+      className="relative rounded-lg border p-2"
+      style={{ borderColor: "var(--borde)" }}
+    >
+      <Bell className="size-4 opacity-70" aria-hidden="true" />
+      {sinLeer > 0 && (
+        <span
+          aria-hidden="true"
+          className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full px-1 text-center text-xs font-semibold text-white tabular-nums"
+          style={{ backgroundColor: "var(--color-peligro)" }}
+        >
+          {sinLeer > 99 ? "99+" : sinLeer}
+        </span>
+      )}
+    </Link>
   );
 }
 

@@ -11,8 +11,10 @@ import {
   levantarTodasDeTareas,
   type ResultadoAnalisis,
 } from "@/services/lookahead.service";
+import { avisarEnApp, motivosDeHechos } from "@/services/avisos-envio";
 import type { ModoFlujos } from "@/lib/lookahead";
 import type { TipoRestriccion } from "@/generated/prisma/enums";
+import type { SesionActiva } from "@/services/sesion.service";
 import {
   comprometerAlPts,
   type DatosComprometer,
@@ -50,6 +52,7 @@ export async function accionAlternarRestriccion(
   if (r.ok) revalidar(obraId);
 }
 
+
 /**
  * Las pantallas que hay que refrescar tras tocar el analisis.
  *
@@ -60,6 +63,38 @@ export async function accionAlternarRestriccion(
 function revalidar(obraId: string): void {
   revalidatePath(`/obras/${obraId}/lookahead`);
   revalidatePath(`/obras/${obraId}/plan-semanal`);
+}
+
+/**
+ * Avisa de lo que acaba de pasar, sin poder romper lo que acaba de pasar.
+ *
+ * Va FUERA de la transaccion que guardo el analisis y con su propio manejo de
+ * fallos, por la misma razon por la que `enviarCorreo` se traga los suyos: un
+ * aviso perdido es un incordio, pero un analisis que no se guardo porque el
+ * aviso reviento es un dato falso en la pantalla del residente.
+ *
+ * Solo escribe la campanita. El correo y el SMS no salen de aqui: son
+ * sincronos y treinta de ellos dejarian esta accion colgada hasta que
+ * LiteSpeed la corte. Eso lo hara el reloj, por lotes.
+ */
+async function avisar(
+  sesion: SesionActiva,
+  obraId: string,
+  hechos: { abiertas: { uid: number; tipo: TipoRestriccion }[]; listas: number[] },
+): Promise<void> {
+  if (hechos.abiertas.length === 0 && hechos.listas.length === 0) return;
+
+  try {
+    const contexto = { companyId: sesion.companyId, projectId: obraId };
+    const motivos = await motivosDeHechos(obraId, hechos.abiertas, hechos.listas);
+
+    await Promise.all([
+      avisarEnApp(contexto, "ABRIR", motivos.abiertas),
+      avisarEnApp(contexto, "LISTA", motivos.listas),
+    ]);
+  } catch (e) {
+    console.error("[avisos] No se pudo avisar del Lookahead:", e);
+  }
 }
 
 /**
@@ -80,7 +115,10 @@ export async function accionFijarFlujos(
   if (!sesion) redirect("/login");
 
   const r = await fijarFlujos(sesion, obraId, { uids, tipos, modo });
-  if (r.ok) revalidar(obraId);
+  if (r.ok) {
+    await avisar(sesion, obraId, r.hechos);
+    revalidar(obraId);
+  }
   return r;
 }
 
@@ -93,7 +131,10 @@ export async function accionSinRestricciones(
   if (!sesion) redirect("/login");
 
   const r = await marcarSinRestricciones(sesion, obraId, uids);
-  if (r.ok) revalidar(obraId);
+  if (r.ok) {
+    await avisar(sesion, obraId, r.hechos);
+    revalidar(obraId);
+  }
   return r;
 }
 
@@ -106,7 +147,10 @@ export async function accionLevantarTodas(
   if (!sesion) redirect("/login");
 
   const r = await levantarTodasDeTareas(sesion, obraId, uids);
-  if (r.ok) revalidar(obraId);
+  if (r.ok) {
+    await avisar(sesion, obraId, r.hechos);
+    revalidar(obraId);
+  }
   return r;
 }
 

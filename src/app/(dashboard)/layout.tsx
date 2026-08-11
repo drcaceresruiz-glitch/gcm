@@ -6,6 +6,7 @@ import {
   contarSolicitudesPendientes,
   obtenerFotoPerfil,
 } from "@/services/perfil.service";
+import { contarAvisosSinLeer } from "@/services/avisos-bandeja";
 import { puede } from "@/lib/rbac";
 import {
   Navegacion,
@@ -32,12 +33,16 @@ export default async function DashboardLayout({
   // Nadie navega por el sistema con una clave temporal sin estrenar.
   if (sesion.mustChangePassword) redirect("/cambiar-clave");
 
-  // En paralelo: son dos consultas independientes y encadenarlas solo suma
-  // sus latencias. El numerito de solicitudes solo se pide si el rol las puede
+  // En paralelo: son consultas independientes y encadenarlas solo suma sus
+  // latencias. El numerito de solicitudes solo se pide si el rol las puede
   // resolver; para el resto la funcion devuelve cero sin tocar la base.
-  const [pendientes, foto] = await Promise.all([
+  //
+  // El de avisos corre en CADA carga del area privada, asi que es un `count`
+  // con su indice hecho a medida (`userId, leidoAt, createdAt`) y nada mas.
+  const [pendientes, foto, avisosSinLeer] = await Promise.all([
     contarSolicitudesPendientes(sesion),
     obtenerFotoPerfil(sesion),
+    contarAvisosSinLeer(sesion),
   ]);
 
   // Los permisos se resuelven aqui y no en el componente de navegacion: la
@@ -147,6 +152,7 @@ export default async function DashboardLayout({
                 ? { href: "/operador", etiqueta: "Constructoras" }
                 : null
             }
+            avisos={{ href: "/avisos", sinLeer: avisosSinLeer }}
             usuario={{
               nombre: `${sesion.nombres} ${sesion.apellidos}`,
               rol: sesion.role,

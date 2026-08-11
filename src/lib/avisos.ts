@@ -127,6 +127,18 @@ export function cubreFlujo(s: SuscripcionAviso, tipo: TipoRestriccion): boolean 
 }
 
 /**
+ * Si este momento se filtra por flujo.
+ *
+ * "Quedo lista" NO se filtra: es de la TAREA, no de un flujo. Quien estaba
+ * esperando el fierro tambien quiere saber que ya se puede empezar, y
+ * filtrarlo significaria que solo se entera quien responde del ultimo flujo
+ * que se levanto —que es justo el que ya lo sabia—.
+ */
+export function seFiltraPorFlujo(evento: EventoAviso): boolean {
+  return evento !== "LISTA";
+}
+
+/**
  * Por donde le llega DE VERDAD a esta persona.
  *
  * Misma doctrina que `canalEfectivo` del segundo factor, y por la misma razon:
@@ -188,7 +200,9 @@ export function repartirAvisos(
   for (const { suscripcion, personas } of resueltas) {
     if (!quiereEvento(suscripcion, evento)) continue;
 
-    const suyos = motivos.filter((m) => cubreFlujo(suscripcion, m.tipo));
+    const suyos = seFiltraPorFlujo(evento)
+      ? motivos.filter((m) => cubreFlujo(suscripcion, m.tipo))
+      : [...motivos];
     if (suyos.length === 0) continue;
 
     for (const persona of personas) {

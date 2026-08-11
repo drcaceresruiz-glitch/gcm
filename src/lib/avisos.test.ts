@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   quiereEvento,
   cubreFlujo,
+  seFiltraPorFlujo,
   canalesEfectivos,
   repartirAvisos,
   diasEntre,
@@ -108,6 +109,18 @@ describe("cubreFlujo", () => {
   });
 });
 
+describe("seFiltraPorFlujo", () => {
+  it("'quedo lista' NO se filtra por flujo: es de la tarea", () => {
+    expect(seFiltraPorFlujo("LISTA")).toBe(false);
+  });
+
+  it("los demas si", () => {
+    expect(seFiltraPorFlujo("ABRIR")).toBe(true);
+    expect(seFiltraPorFlujo("RECORDAR")).toBe(true);
+    expect(seFiltraPorFlujo("RESUMEN")).toBe(true);
+  });
+});
+
 describe("canalesEfectivos", () => {
   it("un usuario completo recibe por los tres", () => {
     const r = canalesEfectivos(usuario("u1"), TODOS_CANALES);
@@ -201,6 +214,27 @@ describe("repartirAvisos", () => {
     const inf = lotes.find((l) => l.persona.clave === "u:inf");
     expect(mat?.motivos.map((m) => m.uid)).toEqual([1, 2]);
     expect(inf?.motivos.map((m) => m.uid)).toEqual([3]);
+  });
+
+  it("quien esperaba MATERIALES tambien se entera de que la tarea quedo lista", () => {
+    // Filtrarlo por flujo significaria que solo se entera quien responde del
+    // ultimo flujo levantado, que es justo el que ya lo sabia.
+    const lotes = repartirAvisos(
+      [
+        {
+          suscripcion: suscripcion({
+            tipo: "MATERIALES",
+            canales: SOLO_APP,
+            momentos: { ...TODOS_MOMENTOS, alQuedarLista: true },
+          }),
+          personas: [usuario("u1")],
+        },
+      ],
+      [motivo(7, "INFORMACION")],
+      "LISTA",
+    );
+    expect(lotes).toHaveLength(1);
+    expect(lotes[0]?.motivos.map((m) => m.uid)).toEqual([7]);
   });
 
   it("una suscripcion que no pidio ese momento no reparte nada", () => {

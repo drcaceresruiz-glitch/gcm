@@ -14,8 +14,11 @@ import {
   type Persona,
 } from "@/lib/avisos";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
-import type { Role, TipoRestriccion } from "@/generated/prisma/enums";
-import type { CanalAviso } from "@/generated/prisma/enums";
+import type {
+  CanalAviso,
+  Role,
+  TipoRestriccion,
+} from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
