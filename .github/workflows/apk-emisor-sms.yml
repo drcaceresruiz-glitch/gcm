@@ -1,0 +1,57 @@
+# Compila el APK del emisor de SMS y lo deja descargable.
+#
+# Existe para que nadie tenga que instalar el SDK de Android: se lanza a mano
+# desde la pestana Actions, tarda unos minutos y deja el APK como artefacto
+# del propio run. Se descarga, se pasa al telefono y se instala.
+#
+# NO se dispara en cada push a proposito. La aplicacion movil cambia una vez
+# al ano y compilarla en cada commit seria gastar minutos de Actions para
+# nada; ademas, el despliegue de GCM ya usa esa cola y no conviene competir.
+name: APK del emisor de SMS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "movil/emisor-sms/**"
+      - ".github/workflows/apk-emisor-sms.yml"
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # El SDK de Android ya viene en el runner de GitHub; solo hay que
+      # apuntarle un JDK, que el plugin de Android exige que sea el 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # El proyecto no lleva el wrapper de Gradle (son binarios y este
+      # repositorio es publico): se genera aqui con la version que toca.
+      - name: Preparar Gradle
+        working-directory: movil/emisor-sms
+        run: gradle wrapper --gradle-version 8.11.1
+
+      - name: Compilar
+        working-directory: movil/emisor-sms
+        run: ./gradlew assembleDebug --no-daemon
+
+      # Firmado de depuracion: el APK se instala de lado en UN telefono
+      # conocido. Android avisara de que viene de un origen desconocido, que
+      # es correcto y hay que aceptar una vez.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emisor-sms-apk
+          path: movil/emisor-sms/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 90
