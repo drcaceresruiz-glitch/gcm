@@ -47,10 +47,14 @@ abajo.
      antiguedad. Un aviso por cada casilla marcada seria ruido en tres dias.
    - **Con que se manda**: la cola de SMS por empresa ya existe (6g) y el
      correo tambien. La pieza que falta es a QUIEN.
-6. **El arrastre de lo incumplido** (acordado el 11 de agosto: se construye
-   DESPUES de los avisos). Un compromiso que se incumple no va a ninguna parte:
-   se queda dentro de su semana cerrada y nadie vuelve a abrirla. Detalle y
-   razonamiento en la seccion 6i.
+6. **Los tres de la seccion 6i**, en este orden y TODOS despues de los avisos
+   (acordado con el usuario el 11 de agosto):
+   - **Aviso de numeracion de semanas**: crear una semana con fecha anterior a
+     otra existente deja el correlativo a contramano.
+   - **El arrastre de lo incumplido**: un compromiso que falla no va a ninguna
+     parte; se queda en su semana cerrada y, si su fecha ya paso, desaparece
+     tambien del Lookahead.
+   - **El texto del PPC bajo**, que miente entre 50% y 70%.
 7. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
    worktree. Investigacion hecha el 11 de agosto, plan sin escribir.
 
@@ -1155,7 +1159,9 @@ anotado por si el uso lo pide.
 ## 6i. Lo incumplido no se arrastra a ninguna parte (visto el 11 de agosto)
 
 Encontrado mirando CRIOCORD con el usuario, despues del rework del Lookahead.
-**Se construye DESPUES de los avisos a los implicados** (decision suya).
+**Los tres de esta seccion se construyen DESPUES de los avisos a los
+implicados**, en el orden de la lista del principio: primero el aviso de
+numeracion, luego el arrastre, luego el texto del PPC (decision suya).
 
 ### Lo que hace hoy
 
