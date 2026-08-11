@@ -10,6 +10,25 @@ import java.net.URL
 data class MensajePendiente(val id: String, val numero: String, val texto: String)
 
 /**
+ * Lo que devuelve la consulta a la cola.
+ *
+ * Distinguir «no hay nada» de «fallo» NO es un lujo: son los dos estados que
+ * mas se parecen desde fuera y los que hay que separar para poder diagnosticar
+ * algo. Sin esto, un token mal pegado, una tabla que no existe o un telefono
+ * sin cobertura se veian los tres igual que una cola vacia, y la unica pista
+ * era que los SMS no llegaban.
+ */
+sealed class Respuesta {
+    data class Mensajes(val lista: List<MensajePendiente>) : Respuesta()
+
+    /** El servidor contesto, pero con un codigo que no es 2xx. */
+    data class Rechazo(val codigo: Int) : Respuesta()
+
+    /** No se pudo ni preguntar: sin datos, sin cobertura, direccion mala. */
+    data class SinRed(val detalle: String) : Respuesta()
+}
+
+/**
  * Habla con la cola de GCM. Dos llamadas y nada mas.
  *
  * Con `HttpURLConnection` y `org.json`, que vienen dentro de Android: una
@@ -21,24 +40,32 @@ data class MensajePendiente(val id: String, val numero: String, val texto: Strin
  */
 class ClienteCola(private val url: String, private val token: String) {
 
-    /** Lo que haya que mandar. Lista vacia si no hay nada o si fallo. */
-    fun pendientes(): List<MensajePendiente> {
-        val cuerpo = pedir("GET", null) ?: return emptyList()
+    /** Lo que haya que mandar, o por que no se pudo saber. */
+    fun pendientes(): Respuesta {
+        val r = pedir("GET", null)
+
+        val cuerpo = when (r) {
+            is Cruda.Ok -> r.cuerpo
+            is Cruda.Codigo -> return Respuesta.Rechazo(r.codigo)
+            is Cruda.Error -> return Respuesta.SinRed(r.detalle)
+        }
 
         return try {
             val mensajes = JSONObject(cuerpo).optJSONArray("mensajes")
-                ?: return emptyList()
+                ?: return Respuesta.Mensajes(emptyList())
 
-            (0 until mensajes.length()).mapNotNull { i ->
-                val m = mensajes.optJSONObject(i) ?: return@mapNotNull null
-                val id = m.optString("id")
-                val numero = m.optString("numero")
-                val texto = m.optString("texto")
-                if (id.isBlank() || numero.isBlank() || texto.isBlank()) null
-                else MensajePendiente(id, numero, texto)
-            }
+            Respuesta.Mensajes(
+                (0 until mensajes.length()).mapNotNull { i ->
+                    val m = mensajes.optJSONObject(i) ?: return@mapNotNull null
+                    val id = m.optString("id")
+                    val numero = m.optString("numero")
+                    val texto = m.optString("texto")
+                    if (id.isBlank() || numero.isBlank() || texto.isBlank()) null
+                    else MensajePendiente(id, numero, texto)
+                },
+            )
         } catch (e: Exception) {
-            emptyList()
+            Respuesta.SinRed("respuesta ilegible")
         }
     }
 
@@ -53,10 +80,17 @@ class ClienteCola(private val url: String, private val token: String) {
         if (ids.isEmpty()) return true
 
         val cuerpo = JSONObject().put("enviados", JSONArray(ids)).toString()
-        return pedir("POST", cuerpo) != null
+        return pedir("POST", cuerpo) is Cruda.Ok
     }
 
-    private fun pedir(metodo: String, cuerpo: String?): String? {
+    /// El resultado de una llamada, antes de interpretarla.
+    private sealed class Cruda {
+        data class Ok(val cuerpo: String) : Cruda()
+        data class Codigo(val codigo: Int) : Cruda()
+        data class Error(val detalle: String) : Cruda()
+    }
+
+    private fun pedir(metodo: String, cuerpo: String?): Cruda {
         var conexion: HttpURLConnection? = null
         return try {
             conexion = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -77,11 +111,12 @@ class ClienteCola(private val url: String, private val token: String) {
                 conexion.outputStream.use { it.write(cuerpo.toByteArray()) }
             }
 
-            if (conexion.responseCode !in 200..299) return null
+            val codigo = conexion.responseCode
+            if (codigo !in 200..299) return Cruda.Codigo(codigo)
 
-            conexion.inputStream.bufferedReader().use(BufferedReader::readText)
+            Cruda.Ok(conexion.inputStream.bufferedReader().use(BufferedReader::readText))
         } catch (e: Exception) {
-            null
+            Cruda.Error(e.javaClass.simpleName)
         } finally {
             conexion?.disconnect()
         }

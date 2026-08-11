@@ -87,7 +87,21 @@ class ServicioEmisor : Service() {
 
     private fun unaVuelta(ajustes: Ajustes) {
         val cliente = ClienteCola(ajustes.url, ajustes.token)
-        val pendientes = cliente.pendientes()
+
+        // Cada fallo dice EXACTAMENTE cual es. Antes los tres se veian como
+        // «Sin mensajes», y no habia forma de saber si la cola estaba vacia o
+        // si llevaba dos dias rechazando el token.
+        val pendientes = when (val r = cliente.pendientes()) {
+            is Respuesta.Mensajes -> r.lista
+            is Respuesta.SinRed -> {
+                anotar(ajustes, "Sin conexión (${r.detalle}) · ${horaActual()}")
+                return
+            }
+            is Respuesta.Rechazo -> {
+                anotar(ajustes, "${explicar(r.codigo)} · ${horaActual()}")
+                return
+            }
+        }
 
         if (pendientes.isEmpty()) {
             anotar(ajustes, "Sin mensajes · ${horaActual()}")
@@ -133,6 +147,20 @@ class ServicioEmisor : Service() {
             Log.e(TAG, "No se pudo enviar a ${m.numero}", e)
             false
         }
+    }
+
+    /**
+     * Que significa cada codigo, en la lengua de quien mira el telefono.
+     *
+     * Son los tres que de verdad pasan al montar esto, y cada uno tiene una
+     * accion distinta: revisar la direccion, revisar el token o avisar a quien
+     * lleva el servidor.
+     */
+    private fun explicar(codigo: Int): String = when (codigo) {
+        401 -> "Token rechazado (401)"
+        404 -> "La cola no está activa en el servidor (404)"
+        500 -> "Error del servidor (500)"
+        else -> "El servidor respondió $codigo"
     }
 
     private fun anotar(ajustes: Ajustes, texto: String) {
