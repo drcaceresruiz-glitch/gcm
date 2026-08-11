@@ -266,10 +266,21 @@ jobs:
             }
           }
 
+          // Que compilacion es esta, para que `/api/health` pueda decirlo.
+          //
+          // Se pone AQUI y no en el entorno de cPanel porque el que despliega
+          // es el workflow, no el panel. El 12 de agosto se perdio media hora
+          // deduciendo que version estaba viva a partir de la fecha de
+          // `server.js`, que es adivinar: con esto se pregunta y se responde.
+          process.env.BUILD_SHA = "__BUILD_SHA__";
+
           require("./server.js");
           FIN
+          # El heredoc va entrecomillado para que nada de dentro se expanda,
+          # asi que el SHA se sustituye despues.
+          sed -i "s/__BUILD_SHA__/${GITHUB_SHA}/" envio/app.js
           node --check envio/app.js
-          echo "OK: app.js es JavaScript valido"
+          echo "OK: app.js es JavaScript valido (build ${GITHUB_SHA})"
 
       - name: Comprobar que hay destino
         run: |

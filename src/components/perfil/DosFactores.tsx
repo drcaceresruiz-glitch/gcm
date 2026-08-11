@@ -141,6 +141,7 @@ export function DosFactores({
       </Tarjeta>
 
       <ElegirCanal
+        activo={activo}
         canal={canal}
         email={email}
         celular={celular}
@@ -159,12 +160,14 @@ export function DosFactores({
  * motivo se lee como que la aplicación está rota.
  */
 function ElegirCanal({
+  activo,
   canal,
   email,
   celular,
   celularVerificado,
   smsDisponible,
 }: {
+  activo: boolean;
   canal: Canal2FA;
   email: string;
   celular: string | null;
@@ -185,6 +188,27 @@ function ElegirCanal({
         titulo="Por dónde te llega el código"
         nota="Uno de los dos, no los dos a la vez."
       >
+        {/* Con la verificacion apagada esto no manda nada, y callarselo hace
+            que la pantalla aparente funcionar: se elige canal con detalle, se
+            verifica un celular, y al entrar no llega ningun codigo porque no
+            se pide ninguno. Paso la primera vez que se uso. */}
+        {!activo && (
+          <p
+            className="flex items-start gap-2 rounded-lg px-3 py-2 text-sm"
+            style={{
+              backgroundColor:
+                "color-mix(in oklab, var(--color-alerta) 15%, transparent)",
+            }}
+          >
+            <ShieldOff className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>
+              Esto todavía no hace nada: la verificación en dos pasos está
+              desactivada. Actívala arriba y entonces el código te llegará por
+              donde elijas aquí.
+            </span>
+          </p>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2">
           <OpcionCanal
             icono={<Mail className="size-4 shrink-0" aria-hidden="true" />}

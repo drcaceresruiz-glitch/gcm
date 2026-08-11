@@ -912,9 +912,24 @@ contar despues las carpetas de `prisma/migrations` (el deploy pierde archivos;
 ver el aviso de la seccion 6e). Sin ella la aplicacion **no arranca**: el
 codigo consulta columnas que no existirian.
 
-**FALTA probarlo de punta a punta en produccion**: verificar el celular,
-cambiar el canal, salir y volver a entrar. Desde aqui no se puede, que no hay
-sesion en local.
+**PROBADO DE PUNTA A PUNTA EN PRODUCCION** el 12 de agosto: guardar el
+celular, pedir el codigo, verificarlo, elegir SMS, salir, entrar, recibir el
+codigo por SMS y pasar. Funciona.
+
+> **Las dos cosas que fallaron eran de pantalla, no de logica, y las dos son
+> el mismo error mio**: dejar un control apagado sin decir por que.
+>
+> 1. La tarjeta de SMS salia en gris y se leyo como «no me deja elegir SMS» en
+>    vez de «me falta verificar el celular». El motivo estaba escrito, pero en
+>    otra caja mas abajo, y nadie relaciona las dos.
+> 2. Peor: se puede elegir canal y verificar un telefono **con la verificacion
+>    en dos pasos apagada**, y entonces no llega ningun codigo porque no se
+>    pide ninguno. La pantalla aparentaba funcionar entera.
+>
+> Las dos arregladas: el motivo va ahora EN la tarjeta, y la seccion del canal
+> avisa en cabecera cuando el segundo factor esta desactivado. **La regla, que
+> ya estaba escrita para el panel «Que falta» y aqui se olvido: un control
+> apagado y mudo se lee como una aplicacion rota.**
 
 ## 6g. Tablero de configuracion de la empresa (pedido el 12 de agosto)
 
@@ -942,6 +957,38 @@ para poder venderse. Ver [vender GCM a otras constructoras].
 Condicion de diseno acordada: que no sea un saco de ajustes sueltos. Que cada
 opcion diga **a que afecta y que se rompe si se apaga**, como hace el panel
 «Que falta».
+
+### Como reparte el APK una constructora que no es la nuestra
+
+Pregunta del usuario, y es la parte que hoy NO existe. El APK sale de
+**Actions -> artefacto**, que caduca a los 90 dias y exige cuenta de GitHub:
+ningun administrador ajeno puede llegar ahi. Tres cosas a resolver, y la
+obvia es la menos importante:
+
+1. **Donde vive el APK.** GitHub **Releases** en vez de artefactos: enlace
+   publico, permanente y sin login. O servirlo desde el propio GCM.
+2. **La firma.** Hoy se compila en modo debug y la clave se regenera en cada
+   ejecucion, asi que **cada version tiene firma distinta y Android no deja
+   actualizar encima**: habria que desinstalar y reinstalar, perdiendo la
+   configuracion. Hace falta una clave de firma estable como secreto del
+   repositorio. Es lo que romperia una actualizacion dentro de seis meses sin
+   que nadie entienda por que.
+3. **Como se configura sin pegar un secreto.** Pedirle a alguien que copie un
+   token de 48 caracteres en un movil es garantia de error, y obliga a mandar
+   el secreto por correo o WhatsApp.
+
+**La propuesta para el punto 3, que es la que cambia el diseno**: un **codigo
+de emparejamiento**. El administrador pulsa «Vincular telefono», GCM ensena
+seis cifras, el APK las pide UNA vez y a cambio recibe el token de verdad y lo
+guarda. El secreto no pasa nunca por manos humanas ni por un chat, y el
+emparejamiento caduca en minutos. Es el mismo mecanismo del pase de obra, que
+ya esta construido y probado —`CodigoPase`, `timingSafeEqual`, tope de
+intentos—.
+
+**Y lo que hay que decirle al cliente ANTES de vender, no despues**: cada
+constructora necesita **su propio telefono con su propia SIM**, encendido y
+con el ahorro de bateria quitado. Eso es un coste operativo suyo, no un boton.
+Para quien no lo quiera, la salida honesta es correo solamente.
 
 ## 6d. Panel «Que falta» (10 de agosto)
 
