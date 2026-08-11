@@ -525,7 +525,9 @@ export interface HitosObra {
   cronograma: boolean;
   /// Linea base del PRESUPUESTO aprobada (la referencia congelada).
   lineaBase: boolean;
-  /// Hay tareas sincronizadas en el Lookahead (se hizo analisis de restricciones).
+  /// Hay al menos una tarea ANALIZADA en el Lookahead. No basta con que la
+  /// tarea este en la matriz: desde que las restricciones se eligen, traerla
+  /// no analiza nada y el hito se encenderia sin que nadie hubiera mirado.
   lookahead: boolean;
   /// Existe al menos una semana del PTS.
   planSemanal: boolean;
@@ -550,7 +552,10 @@ export const hitosDeObra = cache(async function hitosDeObra(
       where: { ...deLaObra, aprobadaAt: { not: null } },
       select: { id: true },
     }),
-    prisma.lookaheadTask.findFirst({ where: deLaObra, select: { id: true } }),
+    prisma.lookaheadTask.findFirst({
+      where: { ...deLaObra, analizadaAt: { not: null } },
+      select: { id: true },
+    }),
     prisma.planSemanal.findFirst({ where: deLaObra, select: { id: true } }),
   ]);
 

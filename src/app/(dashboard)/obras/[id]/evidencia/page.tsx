@@ -63,7 +63,16 @@ export default async function EvidenciaObraPage({
           // Se le da lo minimo, no el objeto entero: el menu es el mismo que
           // usa el pase de obra, y su interfaz esta acotada a proposito.
           datos={{
-            filas: datos.filas,
+            // Solo los flujos que APLICAN: la matriz rellena hasta siete
+            // celdas con `id: null` porque necesita siete columnas, y aqui
+            // eso serian filas muertas que no hacen nada al tocarlas.
+            filas: datos.filas.map((f) => ({
+              uid: f.uid,
+              codigo: f.codigo,
+              nombre: f.nombre,
+              analizada: f.fase !== "SIN_ANALIZAR",
+              restricciones: f.restricciones.filter((c) => c.id !== null),
+            })),
             semanas: datos.semanas,
             puedeSubir: datos.puedeGestionar,
           }}

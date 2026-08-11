@@ -173,11 +173,13 @@ export interface DatosLookaheadTablero {
   total: number;
   porcentaje: number;
   semanas: number;
-  /// Restricciones resueltas en toda la ventana. Cero = nadie ha usado la
-  /// matriz: la tarjeta lo dice en neutro en vez de gritar 0% en rojo.
+  /// Restricciones resueltas en toda la ventana.
   restriccionesResueltas: number;
-  /// Tareas de la ventana que aun no se han traido: sin ellas el % engaña.
-  sinSincronizar: number;
+  /// Tareas de la ventana que nadie ha analizado. Cuentan como no listas, asi
+  /// que sin decirlo el porcentaje engaña: parece mala ejecucion cuando es
+  /// falta de analisis. Si son TODAS, la tarjeta lo dice en neutro en vez de
+  /// gritar un 0% en rojo que solo mide la adopcion.
+  sinAnalizar: number;
 }
 
 export interface DatosCronogramaTablero {
@@ -743,7 +745,7 @@ async function pendientesDeLaObra(
     uidsProximos.length > 0
       ? prisma.lookaheadTask.findMany({
           where: { projectId: obraId, uid: { in: uidsProximos } },
-          select: { uid: true, estado: true },
+          select: { uid: true, estado: true, analizadaAt: true },
         })
       : Promise.resolve([]),
 
@@ -778,9 +780,23 @@ async function pendientesDeLaObra(
     }),
   ]);
 
-  const estadoLk = new Map(lkProximas.map((l) => [l.uid, l.estado]));
-  const tareasProximasBloqueadas = proximas.filter(
-    (t) => (estadoLk.get(t.uid) ?? "PENDIENTE") !== "LISTO",
+  const lkPorUid = new Map(lkProximas.map((l) => [l.uid, l]));
+
+  // Solo las ANALIZADAS que siguen con algo sin liberar. Una tarea que nadie
+  // ha mirado no "arranca con restricciones sin liberar": no tiene ninguna, y
+  // pedirle al residente que libere restricciones que nadie eligio no
+  // significa nada. De ese hueco avisa la regla de al lado, y contarla en las
+  // dos seria acusar dos veces del mismo problema.
+  const tareasProximasBloqueadas = proximas.filter((t) => {
+    const lk = lkPorUid.get(t.uid);
+    return lk != null && lk.analizadaAt !== null && lk.estado !== "LISTO";
+  }).length;
+
+  // Arrancan en dos semanas y nadie ha mirado si les falta plano, material o
+  // frente. Es mas grave que el aviso general de la ventana: aqui ya no queda
+  // margen para reaccionar.
+  const tareasProximasSinAnalizar = proximas.filter(
+    (t) => (lkPorUid.get(t.uid)?.analizadaAt ?? null) === null,
   ).length;
 
   // Cobertura: que partidas tienen ya a alguien contratado.
@@ -821,9 +837,10 @@ async function pendientesDeLaObra(
   return pendientesDeObra({
     tareasEmpezadasSinAvance,
     semanasSinPorcentaje,
-    lookaheadSinAnalizar: lookahead?.sinSincronizar ?? 0,
+    lookaheadSinAnalizar: lookahead?.sinAnalizar ?? 0,
     confiabilidadMostrada: lookahead?.porcentaje ?? null,
     tareasProximasBloqueadas,
+    tareasProximasSinAnalizar,
     diasVentana: DIAS_PROXIMAS,
     tareasProximasSinCobertura,
     partidasSobregiradas: sobregiradas,

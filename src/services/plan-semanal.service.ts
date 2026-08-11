@@ -162,9 +162,12 @@ export interface TareaOpcionPlan {
   conRestriccion: boolean;
   /// Texto de la restriccion, si la hay.
   restriccion: string | null;
-  /// Estado en el Lookahead: LISTO = sus 7 flujos estan resueltos. null = la
-  /// tarea aun no se analizo (no esta en la ventana o no se sincronizo).
+  /// Estado en el Lookahead: LISTO = analizada y sin restricciones pendientes
+  /// (puede que no tenga ninguna). null = la tarea no esta en la matriz.
   estadoLookahead: EstadoLookahead | null;
+  /// Alguien decidio que flujos le aplican. Sin esto, PENDIENTE no distingue
+  /// "le falta el fierro" de "nadie la ha mirado".
+  analizadaLookahead: boolean;
   /// Cantidad y unidad que propone la partida mapeada, si se puede.
   cantidadSugerida: string | null;
   unidadSugerida: string | null;
@@ -307,8 +310,9 @@ export async function obtenerPlanSemanal(
   // restricciones se liberan luego, el aviso desaparece solo.
   const deLookahead = await prisma.lookaheadTask.findMany({
     where: { projectId: obraId },
-    select: { uid: true, estado: true },
+    select: { uid: true, estado: true, analizadaAt: true },
   });
+  const lkPorUidPlan = new Map(deLookahead.map((l) => [l.uid, l]));
   const estadoLkPorUid = new Map(deLookahead.map((l) => [l.uid, l.estado]));
 
   // Cantidad y unidad que propone la partida mapeada de cada tarea.
@@ -332,6 +336,8 @@ export async function obtenerPlanSemanal(
         conRestriccion: !r.libre,
         restriccion: r.motivo,
         estadoLookahead: estadoLkPorUid.get(t.uid) ?? null,
+        analizadaLookahead:
+          (lkPorUidPlan.get(t.uid)?.analizadaAt ?? null) !== null,
         cantidadSugerida: s?.cantidad ?? null,
         unidadSugerida: s?.unidad ?? null,
       };
@@ -1001,7 +1007,13 @@ export type ResultadoComprometer =
       error?: string;
       /// El servidor exige una vuelta mas: hay que confirmar estos avisos.
       requiereConfirmacion?: {
+        /// Analizadas, pero con alguna restriccion sin levantar.
         noListas: AvisoComprometer[];
+        /// Nadie ha dicho todavia que restricciones les aplican. Van aparte de
+        /// `noListas` porque no es el mismo problema: acusar de "sin liberar" a
+        /// una tarea que no tiene ninguna restriccion es un aviso falso, y un
+        /// aviso falso ensena a saltarse el dialogo entero.
+        sinAnalizar: AvisoComprometer[];
         enOtraSemana: AvisoComprometer[];
       };
     };
@@ -1070,7 +1082,7 @@ export async function comprometerAlPts(
   // Avisos: lo que no esta LISTO y lo que ya vive en otra semana.
   const lookahead = await prisma.lookaheadTask.findMany({
     where: { projectId: obraId, uid: { in: uids } },
-    select: { uid: true, id: true, estado: true },
+    select: { uid: true, id: true, estado: true, analizadaAt: true },
   });
   const lkPorUid = new Map(lookahead.map((l) => [l.uid, l]));
 
@@ -1080,9 +1092,16 @@ export async function comprometerAlPts(
   });
 
   const noListas: AvisoComprometer[] = [];
+  const sinAnalizar: AvisoComprometer[] = [];
   const enOtraSemana: AvisoComprometer[] = [];
   for (const t of tareas) {
-    if (lkPorUid.get(t.uid)?.estado !== "LISTO") {
+    const lk = lkPorUid.get(t.uid);
+    // Los dos siguen exigiendo confirmacion —comprometer lo que nadie ha
+    // revisado es exactamente el fallo que el Last Planner quiere hacer
+    // visible— pero el dialogo tiene que decir cual de los dos es.
+    if (lk == null || lk.analizadaAt === null) {
+      sinAnalizar.push({ uid: t.uid, nombre: nombreDe(t) });
+    } else if (lk.estado !== "LISTO") {
       noListas.push({ uid: t.uid, nombre: nombreDe(t) });
     }
     const otra = yaEnAlguna.find((c) => c.uid === t.uid && c.plan.id !== planId);
@@ -1091,8 +1110,14 @@ export async function comprometerAlPts(
     }
   }
 
-  if (!datos.confirmado && (noListas.length > 0 || enOtraSemana.length > 0)) {
-    return { ok: false, requiereConfirmacion: { noListas, enOtraSemana } };
+  if (
+    !datos.confirmado &&
+    (noListas.length > 0 || sinAnalizar.length > 0 || enOtraSemana.length > 0)
+  ) {
+    return {
+      ok: false,
+      requiereConfirmacion: { noListas, sinAnalizar, enOtraSemana },
+    };
   }
 
   const sugerencias = await sugerenciasPorTarea(obraId, uids);
@@ -1173,6 +1198,7 @@ export async function comprometerAlPts(
             evento: "comprometer",
             uids: nuevas.map((t) => t.uid),
             noListas: noListas.map((a) => a.uid),
+            sinAnalizar: sinAnalizar.map((a) => a.uid),
           },
         },
       });

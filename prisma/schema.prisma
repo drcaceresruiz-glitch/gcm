@@ -1773,8 +1773,17 @@ model LookaheadTask {
   /// GUID del elemento BIM, para el futuro enlace 4D. Sin uso todavia.
   bimGuid String? @db.VarChar(255)
 
-  /// Estado de confiabilidad; LISTO lo calcula el backend desde `restricciones`.
+  /// Estado de confiabilidad; LISTO lo calcula el backend desde `analizadaAt`
+  /// y `restricciones` (ver `estadoDeTarea` en @/lib/lookahead).
   estado EstadoLookahead @default(PENDIENTE)
+
+  /// Cuando alguien reviso QUE flujos le aplican, y quien. Null = nadie la ha
+  /// mirado, que NO es lo mismo que "revisada y no le aplica ninguna": las dos
+  /// tienen cero restricciones, y sin esta fecha son la misma fila. De esa
+  /// confusion venia que la confiabilidad midiera la falta de analisis en vez
+  /// de la obra.
+  analizadaAt  DateTime?
+  analizadaPor String?   @db.VarChar(150)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1815,7 +1824,11 @@ model Restriccion {
   tarea LookaheadTask @relation(fields: [lookaheadTaskId], references: [id], onDelete: Cascade)
   fotos FotoEvidencia[]
 
-  @@index([lookaheadTaskId])
+  /// Un flujo no puede estar dos veces en la misma tarea. Cuando se sembraban
+  /// las 7 de golpe no hacia falta; ahora se anaden y se quitan de una en una,
+  /// y un duplicado seria invisible: la matriz indexa por tipo y ensenaria uno
+  /// mientras el otro cuenta para el estado. Cubre tambien el indice de la FK.
+  @@unique([lookaheadTaskId, tipo])
   @@map("restricciones_tarea")
 }
 

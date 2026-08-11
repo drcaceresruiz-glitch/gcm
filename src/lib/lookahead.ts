@@ -85,20 +85,55 @@ export const FLUJOS_RESTRICCION: ReadonlyArray<{
   { tipo: "SEGURIDAD", etiqueta: "Seguridad", descripcion: "Permisos, PETAR, ATS" },
 ];
 
-/** Los 7 tipos en el orden de la matriz. Base para sembrar restricciones. */
+/**
+ * Los 7 tipos en el orden de la matriz. Es el CHECKLIST de preguntas que hay
+ * que hacerse sobre cada tarea, no la lista de restricciones que se le crean:
+ * cuales aplican de verdad lo decide quien la analiza.
+ */
 export const TIPOS_RESTRICCION: readonly TipoRestriccion[] =
   FLUJOS_RESTRICCION.map((f) => f.tipo);
 
 /**
- * Estado de confiabilidad de una tarea segun sus restricciones: LISTO si TODAS
- * estan resueltas (y hay al menos una); si no, PENDIENTE. El estado BLOQUEADO
- * es una marca manual y no se deduce aqui.
+ * En que punto del analisis esta una tarea.
+ *
+ * Distingue lo que `EstadoLookahead` no puede: "nadie la ha mirado" de
+ * "revisada y no le aplica ninguna restriccion". Las dos tienen cero
+ * restricciones, y confundirlas es lo que hacia que el porcentaje de
+ * confiabilidad midiera la falta de analisis y no la obra.
  */
-export function estadoDeTarea(
-  restricciones: ReadonlyArray<{ resuelta: boolean }>,
-): EstadoLookahead {
-  if (restricciones.length === 0) return "PENDIENTE";
-  return restricciones.every((r) => r.resuelta) ? "LISTO" : "PENDIENTE";
+export type FaseAnalisis = "SIN_ANALIZAR" | "CON_PENDIENTES" | "LISTA";
+
+export interface TareaAnalizable {
+  /// Cuando alguien decidio que flujos aplican. Null = nadie la ha mirado.
+  analizadaAt: Date | null;
+  restricciones: ReadonlyArray<{ resuelta: boolean }>;
+}
+
+/**
+ * La fase de analisis de una tarea.
+ *
+ * Sin fecha de analisis es SIN_ANALIZAR aunque tenga restricciones: la fecha
+ * manda sobre las filas, porque hay tareas viejas con las 7 sembradas que
+ * nadie llego a mirar.
+ *
+ * Analizada y sin ninguna restriccion sale LISTA, y eso NO es un descuido:
+ * `[].every()` es true, y ese caso —"la revise y no le aplica nada"— es justo
+ * el que antes no se podia expresar.
+ */
+export function faseDeTarea(tarea: TareaAnalizable): FaseAnalisis {
+  if (tarea.analizadaAt === null) return "SIN_ANALIZAR";
+  return tarea.restricciones.every((r) => r.resuelta)
+    ? "LISTA"
+    : "CON_PENDIENTES";
+}
+
+/**
+ * El semaforo que se guarda en `LookaheadTask.estado`: responde a "se puede
+ * comprometer?". Se deriva de `faseDeTarea` a proposito, para que los dos no
+ * puedan divergir. BLOQUEADO es una marca manual y no se deduce aqui.
+ */
+export function estadoDeTarea(tarea: TareaAnalizable): EstadoLookahead {
+  return faseDeTarea(tarea) === "LISTA" ? "LISTO" : "PENDIENTE";
 }
 
 export interface Confiabilidad {
@@ -106,14 +141,100 @@ export interface Confiabilidad {
   total: number;
   /// 0..100, entero: cuantas tareas de la ventana estan LISTAS.
   porcentaje: number;
+  /// Cuantas de `total` no las ha mirado nadie. Sin este numero, un 0% no
+  /// distingue "la obra va mal" de "no se ha usado la matriz".
+  sinAnalizar: number;
 }
 
 /** Resumen de confiabilidad de la ventana: cuantas tareas estan LISTAS. */
 export function confiabilidad(
-  filas: ReadonlyArray<{ estado: EstadoLookahead }>,
+  filas: ReadonlyArray<{ fase: FaseAnalisis }>,
 ): Confiabilidad {
   const total = filas.length;
-  const listas = filas.filter((f) => f.estado === "LISTO").length;
+  const listas = filas.filter((f) => f.fase === "LISTA").length;
+  const sinAnalizar = filas.filter((f) => f.fase === "SIN_ANALIZAR").length;
   const porcentaje = total === 0 ? 0 : Math.round((listas / total) * 100);
-  return { listas, total, porcentaje };
+  return { listas, total, porcentaje, sinAnalizar };
+}
+
+// --- Elegir que flujos aplican ---------------------------------------------
+
+/// Una restriccion tal como esta hoy en la base, con lo que hace falta para
+/// decidir si se puede retirar sin tirar trabajo de nadie.
+export interface RestriccionActual {
+  id: string;
+  tipo: TipoRestriccion;
+  resuelta: boolean;
+  detalle: string | null;
+  requiereDoc: boolean;
+  documentoId: string | null;
+  /// Cuantas fotos de evidencia cuelgan de ella.
+  fotos: number;
+}
+
+/// Por que se conservo una restriccion que sobraba. Se le dice al usuario.
+export type MotivoConservada = "resuelta" | "con-fotos" | "con-datos";
+
+/// `reemplazar`: la tarea queda EXACTAMENTE con los flujos pedidos.
+/// `agregar`: se anaden a los que ya tenga, sin quitar ninguno.
+export type ModoFlujos = "reemplazar" | "agregar";
+
+export interface PlanDeFlujos {
+  /// Tipos a crear, en el orden de la matriz.
+  crear: TipoRestriccion[];
+  /// Ids a borrar: sobraban Y estaban en blanco.
+  borrar: string[];
+  /// Sobraban pero se quedan porque tienen algo dentro.
+  conservadas: { id: string; tipo: TipoRestriccion; motivo: MotivoConservada }[];
+}
+
+/**
+ * Que hay que crear y que se puede borrar para dejar una tarea con los flujos
+ * pedidos.
+ *
+ * Vive aqui y no en el servicio porque es la regla que PROTEGE LA EVIDENCIA.
+ * `FotoEvidencia.restriccionId` es `ON DELETE SET NULL`: borrar una
+ * restriccion con fotos no borra las fotos, las deja con los dos anclajes en
+ * null —invisibles para siempre en toda pantalla, ocupando disco—. Por eso
+ * una restriccion con fotos NUNCA entra en `borrar`, y por eso esto tiene
+ * tests.
+ *
+ * Lo mismo con las resueltas (alguien hizo el trabajo de levantarlas) y con
+ * las que llevan detalle o documento (alguien escribio algo). Se conservan y
+ * se informa; no se pide confirmacion, porque no se pierde nada que confirmar.
+ */
+export function planificarFlujos(
+  actuales: readonly RestriccionActual[],
+  pedidos: readonly TipoRestriccion[],
+  modo: ModoFlujos = "reemplazar",
+): PlanDeFlujos {
+  const quiere = new Set(pedidos);
+  const hay = new Set(actuales.map((r) => r.tipo));
+
+  // En el orden de la matriz y no en el que llegaron: la lista de creadas se
+  // ensena al usuario, y el orden de la pantalla es el que reconoce.
+  const crear = TIPOS_RESTRICCION.filter((t) => quiere.has(t) && !hay.has(t));
+
+  if (modo === "agregar") return { crear, borrar: [], conservadas: [] };
+
+  const borrar: string[] = [];
+  const conservadas: PlanDeFlujos["conservadas"] = [];
+
+  for (const r of actuales) {
+    if (quiere.has(r.tipo)) continue;
+    const motivo = motivoParaConservar(r);
+    if (motivo === null) borrar.push(r.id);
+    else conservadas.push({ id: r.id, tipo: r.tipo, motivo });
+  }
+
+  return { crear, borrar, conservadas };
+}
+
+/// Null si la restriccion esta en blanco y se puede retirar sin perder nada.
+function motivoParaConservar(r: RestriccionActual): MotivoConservada | null {
+  if (r.resuelta) return "resuelta";
+  if (r.fotos > 0) return "con-fotos";
+  if (r.detalle !== null && r.detalle.trim() !== "") return "con-datos";
+  if (r.requiereDoc || r.documentoId !== null) return "con-datos";
+  return null;
 }

@@ -31,7 +31,7 @@ import type { FotoResumen } from "@/services/evidencia.service";
 
 /// Una restriccion, tal como la ve este menu.
 export interface CeldaMenu {
-  /// null si la tarea no se sincronizo: no hay a que colgar la foto.
+  /// null = ese flujo no aplica a la tarea: no hay a que colgar la foto.
   id: string | null;
   tipo: string;
   resuelta: boolean;
@@ -42,7 +42,10 @@ export interface FilaMenu {
   uid: number;
   codigo: string | null;
   nombre: string;
-  sincronizada: boolean;
+  /// Alguien decidio que flujos le aplican. Las que nadie ha mirado no llegan
+  /// hasta aqui.
+  analizada: boolean;
+  /// Puede venir VACIO: la tarea se reviso y no le aplica ningun flujo.
   restricciones: CeldaMenu[];
 }
 
@@ -72,10 +75,15 @@ export function MenuEvidencia({
   const [tareaAbierta, setTareaAbierta] = useState<number | null>(null);
   const [evidenciaEn, setEvidenciaEn] = useState<string | null>(null);
 
-  // Solo lo sincronizado: una tarea sin analizar no tiene restricciones a las
-  // que colgar la foto, y ofrecerla seria un callejon sin salida.
+  // Solo lo analizado: una tarea que nadie ha mirado no tiene restricciones a
+  // las que colgar la foto, y ofrecerla seria un callejon sin salida.
+  //
+  // Las analizadas SIN restricciones si se listan, aunque tampoco admitan
+  // foto: si desaparecieran, quien esta en obra veria faltar una tarea que
+  // sabe que existe y pensaria que la aplicacion esta rota. Se listan, y se
+  // dice por que no tienen donde adjuntar.
   const tareas = useMemo(
-    () => datos.filas.filter((f) => f.sincronizada),
+    () => datos.filas.filter((f) => f.analizada),
     [datos.filas],
   );
 
@@ -90,9 +98,11 @@ export function MenuEvidencia({
   if (tareas.length === 0) {
     return (
       <p className="text-sm opacity-70">
-        No hay tareas analizadas en las próximas {datos.semanas} semanas. Alguien
-        con acceso al Lookahead tiene que pulsar <strong>Sincronizar ventana</strong>{" "}
-        antes de que se pueda adjuntar evidencia aquí.
+        No hay tareas analizadas en las próximas {datos.semanas} semanas.
+        Alguien con acceso al Lookahead tiene que decir{" "}
+        <strong>qué restricciones le aplican</strong> a cada tarea antes de que
+        se pueda adjuntar evidencia aquí: la foto siempre cuelga de una
+        restricción.
       </p>
     );
   }
@@ -151,8 +161,9 @@ export function MenuEvidencia({
                       {fila.nombre}
                     </span>
                     <span className="block text-xs opacity-70">
-                      {resueltas}/{fila.restricciones.length} restricciones
-                      resueltas
+                      {fila.restricciones.length === 0
+                        ? "Sin restricciones: nada que documentar"
+                        : `${resueltas}/${fila.restricciones.length} restricciones resueltas`}
                       {fotos > 0 && ` · ${fotos} foto(s)`}
                     </span>
                   </span>
@@ -163,7 +174,20 @@ export function MenuEvidencia({
                   )}
                 </button>
 
-                {abierta && (
+                {abierta && fila.restricciones.length === 0 && (
+                  <p
+                    className="border-t px-3 py-3 text-sm opacity-70"
+                    style={{ borderColor: "var(--borde)" }}
+                  >
+                    Esta tarea se revisó y no le aplica ninguna restricción, así
+                    que no hay dónde colgar la foto. La evidencia demuestra que
+                    una restricción quedó levantada; si hace falta documentar
+                    algo de este frente, pide que le añadan el flujo que
+                    corresponda.
+                  </p>
+                )}
+
+                {abierta && fila.restricciones.length > 0 && (
                   <ul className="border-t" style={{ borderColor: "var(--borde)" }}>
                     {fila.restricciones.map((c) => {
                       if (!c.id) return null;

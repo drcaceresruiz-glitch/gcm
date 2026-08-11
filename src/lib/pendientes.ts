@@ -57,12 +57,17 @@ export interface ConteoPendientes {
   tareasEmpezadasSinAvance: number;
   /// Semanas CERRADAS donde algun compromiso quedo sin % alcanzado.
   semanasSinPorcentaje: number;
-  /// Tareas de la ventana del Lookahead que aun no se han traido.
+  /// Tareas de la ventana del Lookahead que nadie ha analizado: nadie ha
+  /// dicho que flujos les aplican, ni siquiera que no les aplica ninguno.
   lookaheadSinAnalizar: number;
   /// Confiabilidad que se esta mostrando hoy (0..100). Solo para el texto.
   confiabilidadMostrada: number | null;
-  /// Tareas que arrancan pronto y aun tienen restricciones sin liberar.
+  /// Tareas que arrancan pronto, YA ANALIZADAS, y con restricciones sin
+  /// liberar. Las que nadie ha mirado van en `tareasProximasSinAnalizar`: son
+  /// dos problemas distintos y se arreglan de forma distinta.
   tareasProximasBloqueadas: number;
+  /// Tareas que arrancan pronto y que nadie ha analizado todavia.
+  tareasProximasSinAnalizar: number;
   /// Dias de la ventana con que se miran "las que arrancan pronto".
   diasVentana: number;
   /// Tareas que arrancan pronto y cuya partida no tiene a nadie contratado.
@@ -161,6 +166,20 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
     });
   }
 
+  if (c.tareasProximasSinAnalizar > 0) {
+    const n = c.tareasProximasSinAnalizar;
+    salida.push({
+      clave: "proximas-sin-analizar",
+      bloque: "procesos",
+      gravedad: "critica",
+      titulo: `${n} ${plural(n, "tarea arranca", "tareas arrancan")} en ${c.diasVentana} dias y nadie las ha analizado`,
+      consecuencia:
+        "Nadie ha mirado si les falta plano, material o frente libre. Si falta algo se descubre el lunes que arranca, cuando ya no hay margen para conseguirlo.",
+      camino: "/lookahead",
+      cuantos: n,
+    });
+  }
+
   if (c.lookaheadSinAnalizar > 0) {
     const n = c.lookaheadSinAnalizar;
     const conf =
@@ -168,7 +187,7 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
         ? ` Ahora mismo muestra ${Math.round(c.confiabilidadMostrada)}%.`
         : "";
     salida.push({
-      clave: "lookahead-sin-sincronizar",
+      clave: "lookahead-sin-analizar",
       bloque: "procesos",
       gravedad: "aviso",
       titulo: `${n} ${plural(n, "tarea de la ventana", "tareas de la ventana")} sin analizar`,

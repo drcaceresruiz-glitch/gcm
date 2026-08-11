@@ -31,7 +31,23 @@ abajo.
    seccion 1. `app.js` ya no descomprime: lo hace el cron con el script, que
    es quien sabe hacerlo sin cronometro. Lo que hay que vigilar ahora es que
    el cron exista, y eso se ve con un `curl` a `/api/health`.
-4. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
+4. ~~**Las restricciones del Lookahead se eligen, no se siembran.**~~ **HECHO
+   el 11 de agosto**, puntos 1 a 4 de lo que pidio el usuario final. Ver la
+   seccion 6h.
+5. **Avisar de las restricciones a los implicados** (punto 5, aplazado a
+   proposito para no ensanchar el trabajo anterior). Pedido por el usuario
+   final: un aviso DENTRO de GCM cuando una tarea queda lista o cuando una
+   restriccion lleva demasiado sin levantarse, y ademas por **SMS y correo** a
+   los implicados, que tienen que poder **configurarse**. Lo que hay que
+   decidir antes de escribir codigo:
+   - **Quien es un implicado**: por obra, por rol, o por flujo de restriccion
+     (el de MATERIALES no es el de INFORMACION). Lo tercero es lo util y lo
+     que mas trabajo cuesta.
+   - **Cuando se avisa**: al analizar, al levantar la ultima, o por
+     antiguedad. Un aviso por cada casilla marcada seria ruido en tres dias.
+   - **Con que se manda**: la cola de SMS por empresa ya existe (6g) y el
+     correo tambien. La pieza que falta es a QUIEN.
+6. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
    worktree. Investigacion hecha el 11 de agosto, plan sin escribir.
 
 Y sigue sin existir el **parte diario**, que es el Bloque 1 entero de la
@@ -550,10 +566,13 @@ estaba armado pero no se habia disparado.
 5. **Curva S / EVM leen otro conjunto de tareas** que la pantalla de avance
    (base vs vigente): dos cifras con el mismo nombre en la misma pantalla.
 6. **Los hitos entran al Lookahead y al PPC**: `tareasDeLaSemana` filtra
-   `esResumen` pero no `esHito`, y `TareaProgramada` ni declara el campo. Se
-   siembran 7 restricciones a un evento de duracion cero y entra al
-   denominador del PPC. Otros modulos (`mapeo.service`, `control-avance`) SI
+   `esResumen` pero no `esHito`, y `TareaProgramada` ni declara el campo. Entra
+   al denominador del PPC. Otros modulos (`mapeo.service`, `control-avance`) SI
    lo excluyen, con el razonamiento escrito.
+   > La mitad de este defecto se cerro el 11 de agosto de 2026: ya no se
+   > siembran 7 restricciones a un evento de duracion cero, porque no se
+   > siembra ninguna. Lo que sigue abierto es que el hito entre al denominador
+   > del PPC y a la ventana del Lookahead.
 7. **Celda de importe editable en filas ALCANCE** (`TablaPartidas.tsx`):
    `parcialCalculado` solo es true para PRECIOS_UNITARIOS, y
    `actualizarPartida` no comprueba `tipo` ni `modalidad`. Un ALCANCE con
@@ -1065,6 +1084,70 @@ case es un 401.
 siguen saliendo con el token nuevo. Y queda pendiente el **emparejamiento por
 codigo**, que evitaria copiar el token a mano pero obliga a tocar el APK.
 
+## 6h. Las restricciones se eligen, no se siembran — HECHO (11 de agosto)
+
+Lo pidio el usuario final con estas palabras: «en el lookahead actual todas las
+tareas nacen con restricciones (...) que mejor que todas nazcan sin
+restricciones, que si las hay debe ser posible decir o seleccionar cuales».
+Cinco puntos; se hicieron **los cuatro primeros** y el quinto (avisos a los
+implicados) quedo aplazado a proposito: ver la lista del principio.
+
+**El obstaculo no era la siembra, era la ambiguedad.** Con las 7 sembradas,
+«cero restricciones» y «nadie la ha mirado» eran la MISMA fila, y sobre esa
+equivalencia se apoyaba medio sistema: `estadoDeTarea([])` daba PENDIENTE, el
+panel «Que falta» contaba «tareas sin analizar» como «sin sincronizar», y el
+pase de obra solo ofrecia tareas sincronizadas porque eran las que tenian donde
+colgar una foto. Dejar de sembrar sin mas habria clavado la confiabilidad en
+0%, convertido el aviso de «comprometes sin liberar» en ruido permanente y
+hecho que «Que falta» acusara de tener restricciones sin liberar a tareas que
+no tienen ninguna.
+
+La pieza que lo desbloquea es **`analizadaAt`/`analizadaPor`**: la decision, con
+quien y cuando. Con ella, analizada + cero restricciones = **LISTA**, que es el
+caso que antes no se podia expresar.
+
+Migracion `20260811180000_lookahead_analisis`. En CRIOCORD retiro 203 de las 210
+restricciones sembradas (29 tareas que nadie habia tocado vuelven a «sin
+analizar») y conservo entera la unica con trabajo encima, marcandola analizada.
+Cero fotos huerfanas, cero estados divergentes, cero flujos duplicados.
+
+**Lo que no se debe deshacer sin pensarlo:**
+
+1. **`planificarFlujos` vive en `@/lib/lookahead`, no en el servicio.** Es la
+   regla que decide que se borra al reelegir flujos, y en este proyecto **no
+   hay tests de servicio**: si vive en `lookahead.service` no la prueba nadie.
+   Nunca borra una restriccion resuelta, con fotos o con nota:
+   `FotoEvidencia.restriccionId` es `SET NULL`, asi que borrarla dejaria la foto
+   sin ninguno de sus dos anclajes e invisible para siempre en toda pantalla.
+   Se conserva y **se informa en la propia pantalla**, que es la linea de
+   «informa, no bloquea» del panel «Que falta».
+2. **`recalcularEstados` es el UNICO escritor de `LookaheadTask.estado`.** Antes
+   lo era `alternarRestriccion` por accidente —era la unica funcion que tocaba
+   restricciones—. Con cuatro escritores eso deja de ser una propiedad. Si
+   aparece un segundo `lookaheadTask.update({ data: { estado } })`, la columna y
+   `estadoDeTarea` divergen y el aviso de `comprometerAlPts` miente sin que
+   nada falle. De paso arreglo que `alternarRestriccion` pisara el `BLOQUEADO`
+   manual, que hacia ese valor del enum inalcanzable en la practica.
+3. **`@@unique([lookaheadTaskId, tipo])`.** Solo habia un INDEX. Con la siembra
+   fija no dolia; ahora los flujos se anaden de uno en uno y un duplicado seria
+   INVISIBLE: la matriz indexa por tipo, ensenaria uno y el otro contaria para
+   el estado.
+4. **«Sin analizar» y «sin liberar» son avisos DISTINTOS**, en `pendientes.ts`,
+   en el tablero y en el dialogo del PTS. Juntarlos era acusar dos veces del
+   mismo hueco, y encima con gravedad critica sobre tareas sin restricciones.
+   Un aviso falso ensena a saltarse el dialogo entero.
+5. **La casilla de seleccion cuelga de `lookahead:gestionar` O
+   `plan_semanal:gestionar`.** Colgaba solo del segundo, de cuando la seleccion
+   servia unicamente para comprometer.
+
+**Sin restriccion no hay evidencia, y es coherente**: la foto existe para probar
+que una restriccion quedo levantada. Una tarea analizada sin ninguna sale en el
+menu del pase pero deshabilitada, con el motivo escrito —si desapareciera, el de
+campo veria faltar una tarea que sabe que existe y concluiria que la aplicacion
+esta rota—. Anclar la foto a la tarea entera se valoro y se descarto: obliga a
+una tercera rama en `DestinoEvidencia` y toca subida, consulta, QR y pase. Queda
+anotado por si el uso lo pide.
+
 ## 6d. Panel «Que falta» (10 de agosto)
 
 La ayuda visual permanente que pidio el usuario: un modulo del tablero que
@@ -1082,7 +1165,10 @@ GCM sabia muchas cosas que no decia. Ocho reglas, en
 - Tareas que arrancan en 14 dias sin nadie contratado -> **la idea del
   usuario**: cruza el mapeo con los encargos vigentes. Es el aviso que
   ninguna hoja de calculo puede dar.
-- Tareas que arrancan con restricciones sin liberar.
+- Tareas que arrancan con restricciones sin liberar (solo las ANALIZADAS: ver
+  6h, antes acusaba tambien a las que nadie habia mirado).
+- Tareas que arrancan en 14 dias y nadie ha analizado -> critica, anadida el
+  11 de agosto: ahi ya no queda margen para conseguir lo que falte.
 - Tareas de la ventana sin analizar -> la confiabilidad miente.
 - Partidas sobregiradas, PPC bajo o cayendo, cobertura de mapeo baja.
 

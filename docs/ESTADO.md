@@ -111,16 +111,36 @@ constructoras están suspendidas para cualquiera que supiera un correo.
 
 - **Lookahead** (`/obras/[id]/lookahead`): matriz de tareas × los 7 flujos de
   restricción. El enum ya deletrea SIEMPRE (Seguridad, Información, Espacio,
-  Materiales, Mano de obra, Requisitos, Equipos). Semáforo LISTO/PENDIENTE y %
-  de confiabilidad. Las tareas se DERIVAN del cronograma vigente por `uid`; se
-  materializan con el botón «Sincronizar ventana».
+  Materiales, Mano de obra, Requisitos, Equipos). Las tareas se DERIVAN del
+  cronograma vigente por `uid`.
+- **Las restricciones se ELIGEN, no se siembran** (11 de agosto de 2026). Antes
+  toda tarea nacía con las siete puestas, y de ahí venía que «cero
+  restricciones» y «nadie la ha mirado» fueran la misma fila —con la
+  confiabilidad midiendo la falta de análisis en vez de la obra—. Ahora
+  `LookaheadTask.analizadaAt`/`analizadaPor` registran la decisión, y la fase
+  tiene TRES valores (`FaseAnalisis`: SIN_ANALIZAR / CON_PENDIENTES / LISTA).
+  Analizada sin ninguna restricción **es LISTA**: es el caso que antes no se
+  podía expresar. La columna `estado` sigue siendo el semáforo «¿se puede
+  comprometer?» y se deriva de la fase, con un único escritor
+  (`recalcularEstados`) para que no puedan divergir.
+- **Qué flujos aplican y qué se puede retirar** lo decide `planificarFlujos`,
+  puro y con tests: una restricción resuelta, con fotos o con nota **nunca** se
+  borra. `FotoEvidencia.restriccionId` es `SET NULL`, así que borrarla dejaría
+  la foto sin anclaje e invisible para siempre. Se conserva y se informa.
+- **En lote**: selección múltiple de tareas (incluida la casilla maestra) para
+  analizar, marcar «no les aplica ninguna» o levantar todas sus pendientes. La
+  casilla de fila cuelga de `lookahead:gestionar` **o** `plan_semanal:gestionar`:
+  antes solo del segundo, y quien gestionaba el Lookahead se quedaba sin
+  seleccionar.
 - **Ventana configurable de 1 a 12 semanas**, 3 por defecto, en la URL
-  (`?semanas=6`). Sincronizar usa las mismas semanas que se están viendo: con
-  otra cifra quedarían tareas a la vista sin analizar y sin explicación.
+  (`?semanas=6`). «Traer al Lookahead» usa las mismas semanas que se están
+  viendo. Ya no es un paso obligatorio: analizar crea la fila que falte.
 - **Del Lookahead al PTS**: selección múltiple y «Comprometer al PTS», con
-  cantidad y unidad tomadas de la partida mapeada. Si algo no está LISTO o ya
-  está en otra semana, **el servidor no escribe** y devuelve los avisos; hace
-  falta confirmar de forma explícita. La decisión no queda en el cliente.
+  cantidad y unidad tomadas de la partida mapeada. Si algo no está LISTO, no se
+  ha analizado, o ya está en otra semana, **el servidor no escribe** y devuelve
+  los avisos —en tres cubos distintos, porque «nadie la ha mirado» y «le falta
+  levantar algo» no se arreglan igual—; hace falta confirmar de forma
+  explícita. La decisión no queda en el cliente.
 - **Cierre por cantidad**: la semana pregunta cuánto se EJECUTÓ, y la semana
   cerrada muestra «90 / 120 m2».
 

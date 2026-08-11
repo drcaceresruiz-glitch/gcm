@@ -6,11 +6,16 @@ import { hoy } from "@/utils/fechas";
 import { tareasDeLaSemana, type TareaProgramada } from "@/lib/plan-semanal";
 import {
   ventanaLookahead,
+  faseDeTarea,
   estadoDeTarea,
   confiabilidad,
+  planificarFlujos,
   normalizarSemanas,
   TIPOS_RESTRICCION,
   type Confiabilidad,
+  type FaseAnalisis,
+  type ModoFlujos,
+  type MotivoConservada,
 } from "@/lib/lookahead";
 import { planesAbiertos, type SemanaAbierta } from "@/services/plan-semanal.service";
 import {
@@ -19,7 +24,8 @@ import {
   type FotoResumen,
 } from "@/services/evidencia.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
-import type { EstadoLookahead, TipoRestriccion } from "@/generated/prisma/enums";
+import type { TipoRestriccion } from "@/generated/prisma/enums";
+import type { Prisma } from "@/generated/prisma/client";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { PaseActivo } from "@/services/pase.service";
 
@@ -30,21 +36,77 @@ import type { PaseActivo } from "@/services/pase.service";
  * Las tareas se DERIVAN del cronograma vigente (no se crean a mano): son las de
  * trabajo cuyo rango solapa la ventana [hoy, hoy+3 semanas], ancladas por `uid`
  * como `AvanceTarea`. La lectura (`obtenerLookahead`) es pura; los `LookaheadTask`
- * y sus restricciones nacen con la accion `sincronizarLookahead`. La aritmetica
- * (ventana, semaforo, confiabilidad) vive en `@/lib/lookahead`, probada.
+ * nacen con `sincronizarLookahead`. La aritmetica (ventana, fase, confiabilidad,
+ * que flujos crear y cuales se pueden retirar) vive en `@/lib/lookahead`, probada.
+ *
+ * Las restricciones NO se siembran: una tarea nace vacia y sin analizar, y es
+ * quien la analiza el que dice cuales de los 7 flujos le aplican —incluida la
+ * respuesta "ninguno"—. Esa respuesta se registra con `analizadaAt`, que es lo
+ * unico que distingue "revisada, no le aplica nada" de "nadie la ha mirado".
  */
 
 function quien(sesion: SesionActiva): string {
   return `${sesion.nombres} ${sesion.apellidos}`.trim().slice(0, 150);
 }
 
+type Tx = Prisma.TransactionClient;
+
+/**
+ * Recalcula y persiste `estado` de varias tareas. UNICO sitio que escribe esa
+ * columna.
+ *
+ * Antes lo hacia solo `alternarRestriccion`, y era el unico escritor por
+ * accidente: era la unica funcion que tocaba restricciones. Con cuatro, eso
+ * deja de ser una propiedad y pasa a ser una invariante que hay que sostener:
+ * si aparece un segundo `lookaheadTask.update({ data: { estado } })`, la
+ * columna y `estadoDeTarea` empiezan a divergir y el aviso de
+ * `comprometerAlPts` miente sin que nada falle.
+ *
+ * Dos consultas fijas y no una por tarea: un lote de treinta tareas por N+1 es
+ * justo el patron que tumbo produccion el 10 de agosto.
+ *
+ * BLOQUEADO se respeta: es una marca manual, no se deduce de nada.
+ */
+async function recalcularEstados(tx: Tx, ids: readonly string[]): Promise<void> {
+  if (ids.length === 0) return;
+
+  const tareas = await tx.lookaheadTask.findMany({
+    where: { id: { in: [...ids] }, estado: { not: "BLOQUEADO" } },
+    select: {
+      id: true,
+      analizadaAt: true,
+      restricciones: { select: { resuelta: true } },
+    },
+  });
+
+  const listas = tareas.filter((t) => estadoDeTarea(t) === "LISTO").map((t) => t.id);
+  const resto = tareas.filter((t) => estadoDeTarea(t) !== "LISTO").map((t) => t.id);
+
+  if (listas.length > 0) {
+    await tx.lookaheadTask.updateMany({
+      where: { id: { in: listas } },
+      data: { estado: "LISTO" },
+    });
+  }
+  if (resto.length > 0) {
+    await tx.lookaheadTask.updateMany({
+      where: { id: { in: resto } },
+      data: { estado: "PENDIENTE" },
+    });
+  }
+}
+
 export interface CeldaRestriccion {
-  /// null si la tarea aun no se sincronizo (no hay fila de restriccion todavia).
+  /// null = este flujo NO APLICA a esta tarea (o nadie la ha analizado aun):
+  /// no hay fila de restriccion, asi que no hay nada que marcar ni donde
+  /// colgar una foto. OJO: antes esto significaba "tarea sin sincronizar".
   id: string | null;
   tipo: TipoRestriccion;
   resuelta: boolean;
+  /// Nota de quien la abrio ("falta el plano de detalle"). Va al tooltip.
+  detalle: string | null;
   /// Fotos que demuestran que este flujo quedo liberado. Vacio si no hay, y
-  /// siempre vacio en las celdas sin sincronizar (no existe a que colgarlas).
+  /// siempre vacio en las celdas sin restriccion (no existe a que colgarlas).
   fotos: FotoResumen[];
 }
 
@@ -63,12 +125,19 @@ export interface FilaLookahead {
   fin: Date;
   faseBloque: string | null;
   zona: string | null;
-  estado: EstadoLookahead;
-  /// Tiene ya `LookaheadTask` + restricciones (se sincronizo).
-  sincronizada: boolean;
+  /// En que punto del analisis esta. Sustituye al viejo `estado`: la pantalla
+  /// necesita separar "nadie la ha mirado" de "revisada y sin restricciones".
+  fase: FaseAnalisis;
+  /// Cuando se decidio que flujos le aplican, y quien. Null = sin analizar.
+  analizadaAt: Date | null;
+  analizadaPor: string | null;
+  /// Tiene fila `LookaheadTask`. NO implica que nadie la haya analizado: es
+  /// solo el contenedor de fase/zona/proveedor y el ancla de los compromisos.
+  enMatriz: boolean;
   /// Para enlazar el compromiso con la tarea que lo origino (trazabilidad).
   lookaheadTaskId: string | null;
-  /// Las 7 restricciones, en el orden de `TIPOS_RESTRICCION`.
+  /// Los 7 flujos, en el orden de `TIPOS_RESTRICCION`. Los que no aplican
+  /// vienen con `id: null`: la matriz tiene siete columnas siempre.
   restricciones: CeldaRestriccion[];
   /// Semanas del PTS donde ya se comprometio (para no duplicar a ciegas).
   comprometida: CompromisoDeTarea[];
@@ -79,8 +148,12 @@ export interface LookaheadDatos {
   hasta: Date;
   filas: FilaLookahead[];
   confiabilidad: Confiabilidad;
-  /// Tareas de la ventana que aun no tienen `LookaheadTask` (a sincronizar).
+  /// Tareas de la ventana que aun no tienen `LookaheadTask` (a traer).
   pendientesDeSincronizar: number;
+  /// Tareas de la ventana que nadie ha analizado. Es el numero que importa:
+  /// cuentan como no listas y hunden la confiabilidad sin que sea culpa de la
+  /// obra.
+  sinAnalizar: number;
   /// Cuantas semanas mira esta ventana (ya acotado).
   semanas: number;
   puedeGestionar: boolean;
@@ -159,7 +232,11 @@ export async function obtenerLookahead(
           uid: true,
           faseBloque: true,
           zona: true,
-          restricciones: { select: { id: true, tipo: true, resuelta: true } },
+          analizadaAt: true,
+          analizadaPor: true,
+          restricciones: {
+            select: { id: true, tipo: true, resuelta: true, detalle: true },
+          },
         },
       })
     : [];
@@ -210,13 +287,16 @@ export async function obtenerLookahead(
         fin: t.fin,
         faseBloque: null,
         zona: null,
-        estado: "PENDIENTE",
-        sincronizada: false,
+        fase: "SIN_ANALIZAR",
+        analizadaAt: null,
+        analizadaPor: null,
+        enMatriz: false,
         lookaheadTaskId: null,
         restricciones: TIPOS_RESTRICCION.map((tipo) => ({
           id: null,
           tipo,
           resuelta: false,
+          detalle: null,
           fotos: [],
         })),
         comprometida: comprometidaPorUid.get(t.uid) ?? [],
@@ -229,6 +309,7 @@ export async function obtenerLookahead(
         id: r?.id ?? null,
         tipo,
         resuelta: r?.resuelta ?? false,
+        detalle: r?.detalle ?? null,
         fotos: r ? (fotosPorRestriccion.get(r.id) ?? []) : [],
       };
     });
@@ -240,10 +321,18 @@ export async function obtenerLookahead(
       fin: t.fin,
       faseBloque: lk.faseBloque,
       zona: lk.zona,
-      // Se recalcula del estado real de las restricciones (fuente de verdad); el
-      // `estado` guardado se mantiene en sincronia al alternar una restriccion.
-      estado: estadoDeTarea(restricciones),
-      sincronizada: true,
+      // Se recalcula de los datos reales (fuente de verdad); la columna
+      // `estado` se mantiene en sincronia con `recalcularEstados`. Se pasan
+      // solo las restricciones QUE EXISTEN: las celdas de relleno con
+      // `id: null` no son restricciones sin resolver, son flujos que no
+      // aplican, y colarlas aqui dejaria toda tarea en CON_PENDIENTES.
+      fase: faseDeTarea({
+        analizadaAt: lk.analizadaAt,
+        restricciones: lk.restricciones,
+      }),
+      analizadaAt: lk.analizadaAt,
+      analizadaPor: lk.analizadaPor,
+      enMatriz: true,
       lookaheadTaskId: lk.id,
       restricciones,
       comprometida: comprometidaPorUid.get(t.uid) ?? [],
@@ -259,7 +348,8 @@ export async function obtenerLookahead(
     hasta,
     filas,
     confiabilidad: confiabilidad(filas),
-    pendientesDeSincronizar: filas.filter((f) => !f.sincronizada).length,
+    pendientesDeSincronizar: filas.filter((f) => !f.enMatriz).length,
+    sinAnalizar: filas.filter((f) => f.fase === "SIN_ANALIZAR").length,
     semanas,
     puedeGestionar: puede(sesion, "lookahead:gestionar"),
     semanasAbiertas: puedeComprometer ? await planesAbiertos(sesion, obraId) : [],
@@ -279,7 +369,10 @@ export interface MenuPaseDatos {
     uid: number;
     codigo: string | null;
     nombre: string;
-    sincronizada: boolean;
+    /// Alguien decidio que flujos le aplican. Solo salen las analizadas.
+    analizada: boolean;
+    /// SOLO los flujos que aplican de verdad, en el orden de la matriz. Puede
+    /// estar vacio: la tarea se reviso y no le aplica ninguno.
     restricciones: CeldaRestriccion[];
   }[];
   semanas: number;
@@ -298,10 +391,15 @@ export interface MenuPaseDatos {
  * El `obraId` sale SIEMPRE de la fila del pase, nunca de la peticion: por eso
  * recibe el `PaseActivo` entero y no un id suelto.
  *
- * Solo devuelve tareas SINCRONIZADAS. Una tarea sin analizar no tiene
+ * Solo devuelve tareas ANALIZADAS. Una tarea que nadie ha mirado no tiene
  * restricciones a las que colgar la foto, y ofrecerla en el telefono seria un
- * callejon sin salida; ademas sincronizar es cosa de quien gestiona el
- * Lookahead, no del personal de campo.
+ * callejon sin salida; ademas analizar es cosa de quien gestiona el Lookahead,
+ * no del personal de campo.
+ *
+ * Las analizadas SIN restricciones si salen, con la lista vacia. Podrian
+ * omitirse —tampoco tienen donde colgar nada— pero entonces el de campo, con
+ * el movil en la mano, veria faltar una tarea que sabe que existe y concluiria
+ * que la aplicacion esta rota. Sale, y el menu dice por que no admite fotos.
  */
 export async function menuDePase(
   pase: PaseActivo,
@@ -341,10 +439,16 @@ export async function menuDePase(
   const uids = tareas.map((t) => t.uid);
   const analizadas = uids.length
     ? await prisma.lookaheadTask.findMany({
-        where: { projectId: pase.obraId, uid: { in: uids } },
+        where: {
+          projectId: pase.obraId,
+          uid: { in: uids },
+          analizadaAt: { not: null },
+        },
         select: {
           uid: true,
-          restricciones: { select: { id: true, tipo: true, resuelta: true } },
+          restricciones: {
+            select: { id: true, tipo: true, resuelta: true, detalle: true },
+          },
         },
       })
     : [];
@@ -368,16 +472,22 @@ export async function menuDePase(
         uid: t.uid,
         codigo: t.codigo,
         nombre: t.nombre,
-        sincronizada: true,
-        restricciones: TIPOS_RESTRICCION.map((tipo) => {
-          const r = porTipo.get(tipo);
-          return {
-            id: r?.id ?? null,
-            tipo,
-            resuelta: r?.resuelta ?? false,
-            fotos: r ? (fotosPorRestriccion.get(r.id) ?? []) : [],
-          };
-        }),
+        analizada: true,
+        // Solo los flujos que existen, no siete celdas de las que casi todas
+        // serian null: en el movil eso son siete filas muertas que no hacen
+        // nada al tocarlas.
+        restricciones: TIPOS_RESTRICCION.filter((tipo) => porTipo.has(tipo)).map(
+          (tipo) => {
+            const r = porTipo.get(tipo)!;
+            return {
+              id: r.id,
+              tipo,
+              resuelta: r.resuelta,
+              detalle: r.detalle,
+              fotos: fotosPorRestriccion.get(r.id) ?? [],
+            };
+          },
+        ),
       };
     });
 
@@ -390,12 +500,7 @@ export async function menuDePase(
 export interface ConfiabilidadVentana extends Confiabilidad {
   /// Cuantas semanas mira la ventana.
   semanas: number;
-  /// Tareas de la ventana sin analizar. Cuentan como NO listas, y sin decirlo
-  /// el porcentaje engana: parece mala ejecucion cuando es falta de analisis.
-  sinSincronizar: number;
-  /// Restricciones marcadas como resueltas en toda la ventana. Cero significa
-  /// que NADIE ha usado la matriz todavia: un 0% de confiabilidad en rojo ahi
-  /// seria un artefacto de adopcion, no una foto de la obra.
+  /// Restricciones marcadas como resueltas en toda la ventana.
   restriccionesResueltas: number;
 }
 
@@ -438,23 +543,33 @@ export async function confiabilidadDeVentana(
           uid: { in: uids },
           project: { companyId: sesion.companyId },
         },
-        select: { uid: true, restricciones: { select: { resuelta: true } } },
+        select: {
+          uid: true,
+          analizadaAt: true,
+          restricciones: { select: { resuelta: true } },
+        },
       })
     : [];
 
-  const porUid = new Map(analizadas.map((l) => [l.uid, l.restricciones]));
+  const porUid = new Map(analizadas.map((l) => [l.uid, l]));
 
-  // Una tarea sin sincronizar no tiene restricciones, y `estadoDeTarea`
-  // devuelve PENDIENTE con la lista vacia: cuenta como no lista, igual que en
-  // la matriz.
-  const filas = tareas.map((t) => ({
-    estado: estadoDeTarea(porUid.get(t.uid) ?? []),
-  }));
+  // Una tarea sin fila `LookaheadTask` es, por definicion, sin analizar: no
+  // hay donde guardar la fecha. Los dos numeros que antes se contaban por
+  // separado —"sin traer" y "sin analizar"— se funden en uno, que es el que
+  // de verdad explica por que la confiabilidad sale baja.
+  const filas = tareas.map((t) => {
+    const lk = porUid.get(t.uid);
+    return {
+      fase: faseDeTarea({
+        analizadaAt: lk?.analizadaAt ?? null,
+        restricciones: lk?.restricciones ?? [],
+      }),
+    };
+  });
 
   return {
     ...confiabilidad(filas),
     semanas,
-    sinSincronizar: tareas.filter((t) => !porUid.has(t.uid)).length,
     restriccionesResueltas: analizadas.reduce(
       (n, l) => n + l.restricciones.filter((r) => r.resuelta).length,
       0,
@@ -464,8 +579,14 @@ export async function confiabilidadDeVentana(
 
 /**
  * Trae al Lookahead las tareas de la ventana que aun no estan: crea su
- * `LookaheadTask` y siembra sus 7 restricciones (sin resolver). Idempotente: no
- * duplica las que ya existen.
+ * `LookaheadTask` VACIO, sin restricciones y sin analizar.
+ *
+ * Ya no siembra los 7 flujos. Sembrarlos hacia que toda tarea naciera con
+ * siete casillas que nadie eligio —incluidos los hitos de duracion cero, que
+ * no tienen ni materiales ni cuadrilla— y que "cero restricciones" no pudiera
+ * distinguirse de "nadie la ha mirado". Cuales aplican lo dice `fijarFlujos`.
+ *
+ * Idempotente: no duplica las que ya existen.
  */
 export async function sincronizarLookahead(
   sesion: SesionActiva,
@@ -504,15 +625,14 @@ export async function sincronizarLookahead(
   if (nuevas.length === 0) return { ok: true, creadas: 0 };
 
   await prisma.$transaction(async (tx) => {
-    for (const t of nuevas) {
-      const lk = await tx.lookaheadTask.create({
-        data: { projectId: obraId, uid: t.uid },
-        select: { id: true },
-      });
-      await tx.restriccion.createMany({
-        data: TIPOS_RESTRICCION.map((tipo) => ({ lookaheadTaskId: lk.id, tipo })),
-      });
-    }
+    // Un solo `createMany` en vez de un `create` + `createMany` por tarea:
+    // eran 2N consultas por sincronizacion. `skipDuplicates` cubre a dos
+    // usuarios pulsando a la vez, que antes reventaba con P2002 contra el
+    // unico (projectId, uid).
+    await tx.lookaheadTask.createMany({
+      data: nuevas.map((t) => ({ projectId: obraId, uid: t.uid })),
+      skipDuplicates: true,
+    });
 
     await tx.auditLog.create({
       data: {
@@ -530,10 +650,343 @@ export async function sincronizarLookahead(
   return { ok: true, creadas: nuevas.length };
 }
 
+// --- Analizar y levantar ---------------------------------------------------
+
 /**
- * Marca una restriccion como resuelta o no, y recalcula el estado de su tarea
- * (LISTO cuando todas quedan resueltas). Comprueba que la restriccion sea de una
- * tarea de ESTA obra y empresa.
+ * Tope de tareas por lote.
+ *
+ * "Elegir todas" con una ventana de 12 semanas puede ser mucho, y una
+ * transaccion larga bloquea la tabla para el resto de la obra mientras dura.
+ */
+export const MAX_LOTE = 200;
+
+export interface Conservada {
+  uid: number;
+  tipo: TipoRestriccion;
+  motivo: MotivoConservada;
+}
+
+export type ResultadoAnalisis =
+  | {
+      ok: true;
+      /// Cuantas tareas quedaron tocadas.
+      tareas: number;
+      creadas: number;
+      borradas: number;
+      levantadas: number;
+      /// Flujos que se pidio quitar y se quedaron porque tenian algo dentro.
+      /// La pantalla lo dice: no se pierde nada en silencio.
+      conservadas: Conservada[];
+    }
+  | { ok: false; error: string };
+
+const NADA: ResultadoAnalisis = {
+  ok: true,
+  tareas: 0,
+  creadas: 0,
+  borradas: 0,
+  levantadas: 0,
+  conservadas: [],
+};
+
+/**
+ * Permiso, obra abierta y obra de la empresa, en ese orden. Devuelve el motivo
+ * si no se puede escribir, o null si via libre.
+ */
+async function puertaDeEscritura(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<string | null> {
+  if (!puede(sesion, "lookahead:gestionar")) {
+    return "No tienes permiso para gestionar el Lookahead.";
+  }
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return cerrada;
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { id: true },
+  });
+  return obra ? null : "Obra no encontrada.";
+}
+
+/**
+ * Fija QUE flujos aplican a una o varias tareas, y las marca como ANALIZADAS.
+ *
+ * Cubre las tres cosas de una vez: elegir en lote, decir cuales aplican y
+ * decir que no aplica ninguno (`tipos: []`). Crea el `LookaheadTask` que falte,
+ * asi que no hace falta haber traido la tarea antes.
+ *
+ * La decision de que se crea y que se puede borrar es de `planificarFlujos`,
+ * que esta en `@/lib/lookahead` y tiene tests: es la regla que impide dejar
+ * fotos de evidencia huerfanas, y no puede vivir en un servicio sin probar.
+ *
+ * Nunca pide confirmacion, al reves que `comprometerAlPts`: alli la accion es
+ * irreversible, aqui no se pierde nada —lo que tiene trabajo dentro se
+ * conserva y se informa—, asi que no hay nada que confirmar.
+ */
+export async function fijarFlujos(
+  sesion: SesionActiva,
+  obraId: string,
+  datos: {
+    uids: readonly number[];
+    tipos: readonly TipoRestriccion[];
+    modo?: ModoFlujos;
+  },
+): Promise<ResultadoAnalisis> {
+  return analizar(sesion, obraId, datos, "fijar-flujos");
+}
+
+/**
+ * "Revisadas: no les aplica ninguna restriccion." Atajo de `fijarFlujos` con
+ * la lista vacia; funcion propia para que el registro de auditoria diga el
+ * evento de verdad y no un `fijar-flujos` con `tipos: []` que hay que
+ * interpretar.
+ */
+export async function marcarSinRestricciones(
+  sesion: SesionActiva,
+  obraId: string,
+  uids: readonly number[],
+): Promise<ResultadoAnalisis> {
+  return analizar(sesion, obraId, { uids, tipos: [] }, "sin-restricciones");
+}
+
+async function analizar(
+  sesion: SesionActiva,
+  obraId: string,
+  datos: {
+    uids: readonly number[];
+    tipos: readonly TipoRestriccion[];
+    modo?: ModoFlujos;
+  },
+  evento: "fijar-flujos" | "sin-restricciones",
+): Promise<ResultadoAnalisis> {
+  const error = await puertaDeEscritura(sesion, obraId);
+  if (error) return { ok: false, error };
+
+  const pedidos = [...new Set(datos.tipos)];
+  const uids = [...new Set(datos.uids)].slice(0, MAX_LOTE);
+  if (uids.length === 0) return NADA;
+
+  // Los uid llegan del cliente: solo valen los que existen en el cronograma
+  // vigente de ESTA obra. Sin esto se podrian crear filas de Lookahead para
+  // tareas inventadas, que luego no se veria en ninguna pantalla.
+  const cronograma = await cronogramaVigente(sesion, obraId);
+  const delCronograma = new Set((cronograma?.tareas ?? []).map((t) => t.uid));
+  const validos = uids.filter((u) => delCronograma.has(u));
+  if (validos.length === 0) return NADA;
+
+  const ahora = new Date();
+  const autor = quien(sesion);
+
+  return prisma.$transaction(async (tx) => {
+    // Las que aun no estan en la matriz se crean vacias sobre la marcha.
+    await tx.lookaheadTask.createMany({
+      data: validos.map((uid) => ({ projectId: obraId, uid })),
+      skipDuplicates: true,
+    });
+
+    const tareas = await tx.lookaheadTask.findMany({
+      where: { projectId: obraId, uid: { in: validos } },
+      select: {
+        id: true,
+        uid: true,
+        restricciones: {
+          select: {
+            id: true,
+            tipo: true,
+            resuelta: true,
+            detalle: true,
+            requiereDoc: true,
+            documentoId: true,
+            _count: { select: { fotos: true } },
+          },
+        },
+      },
+    });
+
+    const crear: { lookaheadTaskId: string; tipo: TipoRestriccion }[] = [];
+    const borrar: string[] = [];
+    const conservadas: Conservada[] = [];
+
+    for (const t of tareas) {
+      const plan = planificarFlujos(
+        t.restricciones.map((r) => ({
+          id: r.id,
+          tipo: r.tipo,
+          resuelta: r.resuelta,
+          detalle: r.detalle,
+          requiereDoc: r.requiereDoc,
+          documentoId: r.documentoId,
+          fotos: r._count.fotos,
+        })),
+        pedidos,
+        datos.modo ?? "reemplazar",
+      );
+      for (const tipo of plan.crear) crear.push({ lookaheadTaskId: t.id, tipo });
+      borrar.push(...plan.borrar);
+      for (const c of plan.conservadas) {
+        conservadas.push({ uid: t.uid, tipo: c.tipo, motivo: c.motivo });
+      }
+    }
+
+    if (borrar.length > 0) {
+      await tx.restriccion.deleteMany({ where: { id: { in: borrar } } });
+    }
+    if (crear.length > 0) {
+      await tx.restriccion.createMany({ data: crear, skipDuplicates: true });
+    }
+
+    const ids = tareas.map((t) => t.id);
+    await tx.lookaheadTask.updateMany({
+      where: { id: { in: ids } },
+      data: { analizadaAt: ahora, analizadaPor: autor },
+    });
+    await recalcularEstados(tx, ids);
+
+    // Queda registrado QUIEN descarto que flujo. La doctrina del Last Planner
+    // es que las siete preguntas se hacen siempre; poder responder "a esta no
+    // le aplica" es lo que se acaba de abrir, y tiene que ser auditable.
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "LookaheadTask",
+        entidadId: obraId,
+        accion: "UPDATE",
+        despues: {
+          evento,
+          uids: validos,
+          tipos: pedidos,
+          modo: datos.modo ?? "reemplazar",
+          creadas: crear.length,
+          borradas: borrar.length,
+          conservadas: conservadas.length,
+        },
+      },
+    });
+
+    return {
+      ok: true as const,
+      tareas: tareas.length,
+      creadas: crear.length,
+      borradas: borrar.length,
+      levantadas: 0,
+      conservadas,
+    };
+  });
+}
+
+/**
+ * Levanta (o vuelve a bajar) restricciones concretas, una o muchas.
+ *
+ * Los ids llegan del cliente, asi que primero se comprueba cuales son de una
+ * tarea de ESTA obra y empresa y se opera solo sobre esas. Se filtran ademas
+ * las que ya estaban como se pide, para que el numero que se devuelve sea el
+ * de cambios reales y no el de casillas tocadas.
+ */
+export async function levantarRestricciones(
+  sesion: SesionActiva,
+  obraId: string,
+  datos: { ids: readonly string[]; resuelta: boolean },
+): Promise<ResultadoAnalisis> {
+  const error = await puertaDeEscritura(sesion, obraId);
+  if (error) return { ok: false, error };
+
+  const ids = [...new Set(datos.ids)];
+  if (ids.length === 0) return NADA;
+
+  const suyas = await prisma.restriccion.findMany({
+    where: {
+      id: { in: ids },
+      resuelta: !datos.resuelta,
+      tarea: { projectId: obraId, project: { companyId: sesion.companyId } },
+    },
+    select: { id: true, lookaheadTaskId: true },
+  });
+  if (suyas.length === 0) return NADA;
+
+  const tareas = [...new Set(suyas.map((r) => r.lookaheadTaskId))];
+  const ahora = new Date();
+  const autor = quien(sesion);
+
+  return prisma.$transaction(async (tx) => {
+    await tx.restriccion.updateMany({
+      where: { id: { in: suyas.map((r) => r.id) } },
+      data: {
+        resuelta: datos.resuelta,
+        resueltaAt: datos.resuelta ? ahora : null,
+        resueltaPor: datos.resuelta ? autor : null,
+      },
+    });
+
+    await recalcularEstados(tx, tareas);
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "Restriccion",
+        entidadId: obraId,
+        accion: "UPDATE",
+        despues: {
+          evento: datos.resuelta ? "levantar" : "reabrir",
+          restricciones: suyas.length,
+          tareas: tareas.length,
+        },
+      },
+    });
+
+    return {
+      ok: true as const,
+      tareas: tareas.length,
+      creadas: 0,
+      borradas: 0,
+      levantadas: suyas.length,
+      conservadas: [],
+    };
+  });
+}
+
+/**
+ * Levanta TODAS las pendientes de las tareas elegidas. Es el boton de lote:
+ * en obra lo normal es que un frente se libere entero de golpe.
+ */
+export async function levantarTodasDeTareas(
+  sesion: SesionActiva,
+  obraId: string,
+  uids: readonly number[],
+): Promise<ResultadoAnalisis> {
+  const error = await puertaDeEscritura(sesion, obraId);
+  if (error) return { ok: false, error };
+
+  const lista = [...new Set(uids)].slice(0, MAX_LOTE);
+  if (lista.length === 0) return NADA;
+
+  const pendientes = await prisma.restriccion.findMany({
+    where: {
+      resuelta: false,
+      tarea: {
+        projectId: obraId,
+        uid: { in: lista },
+        project: { companyId: sesion.companyId },
+      },
+    },
+    select: { id: true },
+  });
+
+  return levantarRestricciones(sesion, obraId, {
+    ids: pendientes.map((r) => r.id),
+    resuelta: true,
+  });
+}
+
+/**
+ * Una sola casilla de la matriz. Delega en `levantarRestricciones` para que el
+ * camino de una y el de muchas sean el mismo: si divergieran, uno de los dos
+ * acabaria olvidandose de recalcular el semaforo.
  */
 export async function alternarRestriccion(
   sesion: SesionActiva,
@@ -541,43 +994,9 @@ export async function alternarRestriccion(
   restriccionId: string,
   resuelta: boolean,
 ): Promise<ResultadoLookahead> {
-  if (!puede(sesion, "lookahead:gestionar")) {
-    return { ok: false, error: "No tienes permiso para gestionar el Lookahead." };
-  }
-
-  const cerrada = await motivoSiObraCerrada(sesion, obraId);
-  if (cerrada) return { ok: false, error: cerrada };
-
-  const restr = await prisma.restriccion.findFirst({
-    where: {
-      id: restriccionId,
-      tarea: { projectId: obraId, project: { companyId: sesion.companyId } },
-    },
-    select: { id: true, lookaheadTaskId: true },
+  const r = await levantarRestricciones(sesion, obraId, {
+    ids: [restriccionId],
+    resuelta,
   });
-  if (!restr) return { ok: false, error: "Restriccion no encontrada." };
-
-  await prisma.$transaction(async (tx) => {
-    await tx.restriccion.update({
-      where: { id: restriccionId },
-      data: {
-        resuelta,
-        resueltaAt: resuelta ? new Date() : null,
-        resueltaPor: resuelta ? quien(sesion) : null,
-      },
-    });
-
-    // Recalcular el semaforo de la tarea con TODAS sus restricciones ya
-    // actualizadas, y guardarlo para que el PTS pueda filtrar por LISTO.
-    const todas = await tx.restriccion.findMany({
-      where: { lookaheadTaskId: restr.lookaheadTaskId },
-      select: { resuelta: true },
-    });
-    await tx.lookaheadTask.update({
-      where: { id: restr.lookaheadTaskId },
-      data: { estado: estadoDeTarea(todas) },
-    });
-  });
-
-  return { ok: true };
+  return r.ok ? { ok: true } : { ok: false, error: r.error };
 }

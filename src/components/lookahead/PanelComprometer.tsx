@@ -50,6 +50,7 @@ export function PanelComprometer({
   const [planId, setPlanId] = useState<string>(semanasAbiertas[0]?.id ?? "");
   const [avisos, setAvisos] = useState<{
     noListas: Aviso[];
+    sinAnalizar: Aviso[];
     enOtraSemana: Aviso[];
   } | null>(null);
   const [acepto, setAcepto] = useState(false);
@@ -174,6 +175,21 @@ export function PanelComprometer({
             <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />
             Revisa antes de comprometer
           </p>
+          {/* Dos listas y no una: "nadie la ha mirado" y "le falta levantar
+              algo" se arreglan de forma distinta, y meterlas en el mismo saco
+              hacia que el aviso mintiera sobre las que no tienen ninguna. */}
+          {avisos.sinAnalizar.length > 0 && (
+            <div>
+              <p className="opacity-80">
+                Nadie ha analizado sus restricciones ({avisos.sinAnalizar.length}):
+              </p>
+              <ul className="ml-4 list-disc opacity-70">
+                {avisos.sinAnalizar.map((a) => (
+                  <li key={a.uid}>{a.nombre}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {avisos.noListas.length > 0 && (
             <div>
               <p className="opacity-80">

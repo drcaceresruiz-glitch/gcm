@@ -855,7 +855,9 @@ function MiniBarras({
 // ---------------------------------------------------------------------------
 
 /**
- * Cuantas tareas de la ventana estan LISTAS (sus 7 restricciones resueltas).
+ * Cuantas tareas de la ventana estan LISTAS: analizadas y sin ninguna
+ * restriccion pendiente. Una tarea analizada a la que no le aplica ningun
+ * flujo tambien esta lista; una que nadie ha mirado, no.
  *
  * Es el indicador que anticipa al PPC: lo que se compromete sin liberar es lo
  * que se incumple la semana que viene. Por eso vive al lado y no dentro del
@@ -882,10 +884,15 @@ function Confiabilidad({
     );
   }
 
-  // Sin UNA sola restriccion marcada, el 0% no es una foto de la obra: es que
-  // nadie ha usado la matriz todavia. Gritarlo en rojo junto a un avance "al
-  // dia" se lee como catastrofe; se dice en neutro y se invita a empezar.
-  if (lk.restriccionesResueltas === 0) {
+  // Con la ventana entera sin analizar, el 0% no es una foto de la obra: es
+  // que nadie ha usado la matriz todavia. Gritarlo en rojo junto a un avance
+  // "al dia" se lee como catastrofe; se dice en neutro y se invita a empezar.
+  //
+  // El corte es "nadie ha analizado nada", no "cero restricciones resueltas":
+  // desde que una tarea puede quedar lista sin ninguna restriccion, se puede
+  // tener la ventana al 100% y cero resueltas, y con el corte viejo la
+  // tarjeta habria dicho "aun sin analisis" encima de un trabajo terminado.
+  if (lk.sinAnalizar === lk.total) {
     return (
       <>
         <Titulo icono={Telescope}>Lookahead</Titulo>
@@ -894,8 +901,8 @@ function Confiabilidad({
         </p>
         <p className="mt-1 text-xs opacity-50">
           {lk.total} {lk.total === 1 ? "tarea" : "tareas"} en la ventana de{" "}
-          {lk.semanas} semanas. Entra y marca lo que ya esté resuelto: el
-          porcentaje aparecerá con la primera restricción.
+          {lk.semanas} semanas. Entra y di qué flujos le aplican a cada una: el
+          porcentaje aparecerá con la primera analizada.
         </p>
         <EnlaceModulo href={href}>Ver lookahead</EnlaceModulo>
       </>
@@ -934,11 +941,10 @@ function Confiabilidad({
         />
       </div>
 
-      {lk.sinSincronizar > 0 && (
+      {lk.sinAnalizar > 0 && (
         <p className="mt-1.5 text-xs" style={{ color: "var(--color-alerta)" }}>
-          {lk.sinSincronizar}{" "}
-          {lk.sinSincronizar === 1 ? "tarea" : "tareas"} sin analizar: el
-          porcentaje las cuenta como no listas.
+          {lk.sinAnalizar} {lk.sinAnalizar === 1 ? "tarea" : "tareas"} sin
+          analizar: el porcentaje las cuenta como no listas.
         </p>
       )}
 

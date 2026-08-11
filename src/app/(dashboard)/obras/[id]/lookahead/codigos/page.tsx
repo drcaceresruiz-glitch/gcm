@@ -66,9 +66,11 @@ export default async function CodigosEvidenciaPage({
   const modo = normalizarModo(por);
   const datos = await obtenerLookahead(sesion, id, semanas);
 
-  // Solo las tareas ya sincronizadas: una sin analizar no tiene restricciones
-  // a las que colgar la foto, y su codigo llevaria a una fila vacia.
-  const filas = (datos?.filas ?? []).filter((f) => f.sincronizada);
+  // Solo las tareas ya analizadas: una que nadie ha mirado no tiene
+  // restricciones a las que colgar la foto, y su codigo llevaria a una fila
+  // vacia. Se imprimen menos codigos que antes, y eso es la mejora: ya no
+  // salen siete por tarea de los que la mayoria no se escanea nunca.
+  const filas = (datos?.filas ?? []).filter((f) => f.fase !== "SIN_ANALIZAR");
 
   const codigos: Codigo[] = [];
 
@@ -130,10 +132,10 @@ export default async function CodigosEvidenciaPage({
 
       {codigos.length === 0 ? (
         <p className="mx-auto max-w-[210mm] text-sm opacity-70">
-          No hay tareas analizadas en esta ventana, así que no hay nada que
-          imprimir. Vuelve al Lookahead y pulsa{" "}
-          <strong>Sincronizar ventana</strong> para traer las tareas del
-          cronograma, o amplía la ventana de semanas.
+          No hay restricciones que imprimir en esta ventana. Vuelve al
+          Lookahead, elige las tareas y di{" "}
+          <strong>qué flujos le aplican</strong> a cada una —el código QR cuelga
+          de una restricción—, o amplía la ventana de semanas.
         </p>
       ) : (
         paginas.map((pagina, i) => (

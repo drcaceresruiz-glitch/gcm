@@ -5,7 +5,7 @@ Cómo se usa el sistema, en lenguaje de obra. No hace falta saber de informátic
 Si eres desarrollador y buscas el estado técnico del proyecto, ese documento es
 `docs/ESTADO.md`. Lo que falta por hacer está en `docs/PENDIENTES.md`.
 
-Última actualización: 10 de agosto de 2026 (tarde).
+Última actualización: 11 de agosto de 2026.
 
 ---
 
@@ -129,25 +129,46 @@ evita.
 
 **Qué hago aquí.**
 
-1. Pulsa **«Sincronizar ventana»**: trae las tareas del cronograma vigente y
-   les crea sus siete restricciones en blanco.
-2. Marca cada flujo cuando quede resuelto de verdad.
-3. Cuando los siete están marcados, la tarea pasa a **LISTA** y el porcentaje
-   de confiabilidad sube.
-4. Selecciona las listas y pulsa **«Comprometer al PTS»**.
+1. **Selecciona las tareas** que vas a revisar. Puedes marcarlas una a una, usar
+   la casilla de la cabecera para coger todas, o el atajo *«Elegir las N sin
+   analizar»*.
+2. Pulsa **«Analizar»** y responde las siete preguntas: marca solo los flujos
+   que de verdad frenan ese trabajo. Si no le aplica ninguno —y a muchas tareas
+   no le aplica— pulsa **«No les aplica ninguna»**.
+3. Marca cada restricción cuando quede levantada de verdad. Para liberar un
+   frente entero de golpe, selecciona sus tareas y pulsa **«Levantar
+   restricciones»**.
+4. Una tarea **analizada y sin nada pendiente** pasa a **LISTA** y el porcentaje
+   de confiabilidad sube. Una analizada a la que no le aplica ninguna
+   restricción está lista desde el primer momento.
+5. Selecciona las listas y pulsa **«Comprometer al PTS»**.
+
+> **Las tareas nacen sin restricciones, y eso es lo correcto.** Antes toda tarea
+> nacía con las siete puestas —incluidos los hitos, que duran cero días y no
+> tienen ni materiales ni cuadrilla—. Eran 210 casillas que nadie marcaba, y una
+> casilla que nadie marca no informa de nada. Lo que se registra ahora es la
+> **decisión**: quién miró la tarea, cuándo, y qué dijo.
+>
+> Por eso *«sin analizar»* y *«sin restricciones»* son cosas distintas, y la
+> matriz las distingue. La primera cuenta como no lista: nadie sabe si se puede
+> hacer. La segunda está lista: alguien lo miró y dijo que no falta nada.
+
+**«Traer al Lookahead»** solo crea la ficha de las tareas nuevas de la ventana.
+No hace falta pulsarlo antes de analizar: analizar también las trae.
 
 **La ventana es configurable**: el selector admite de 3 a 12 semanas. Tres es el
 mínimo útil; lo habitual son cuatro a seis. Una obra con acero importado
 necesita mirar más lejos que una de acabados.
 
 **En el móvil** la tabla se convierte en tarjetas: cada tarea muestra
-«Restricciones 3/7 resueltas» y se despliega al tocarla.
+«Restricciones 3/5 levantadas» —sobre las que le aplican, no sobre siete
+fijas— y se despliega al tocarla.
 
 ---
 
 ## 3. Las 7 restricciones — la palabra SIEMPRE
 
-Siete preguntas que hay que responder antes de prometer una tarea. Las
+Siete **preguntas** que hay que hacerse antes de prometer una tarea. Las
 iniciales forman **SIEMPRE**, y así se recuerdan sin consultar nada:
 
 | | Flujo | Está resuelto cuando… |
@@ -160,8 +181,19 @@ iniciales forman **SIEMPRE**, y así se recuerdan sin consultar nada:
 | **R** | Requisitos | Las tareas previas y los permisos están |
 | **E** | Equipos | La maquinaria y la herramienta están disponibles |
 
-**Si falta una sola, la tarea no está lista.** Comprometerla igual es la causa
-número uno de incumplimiento en obra.
+**Si falta una sola de las que aplican, la tarea no está lista.** Comprometerla
+igual es la causa número uno de incumplimiento en obra.
+
+**Las siete preguntas se hacen siempre; las siete restricciones no aplican
+siempre.** Esa distinción sostiene todo lo demás. Excavar no necesita planos
+aprobados; un vaciado en un frente vacío no necesita que le liberen el espacio.
+Lo que el sistema te pide es que **respondas** las siete, no que inventes siete
+problemas. Responder «a ésta no le aplica» es una respuesta válida, y queda
+registrada con tu nombre.
+
+> Ahí está el filo, y conviene decirlo: la misma puerta que evita 210 casillas
+> vacías permite descartar un flujo que sí importaba. Por eso cada análisis
+> queda en el registro de auditoría con quién lo hizo y qué descartó.
 
 ---
 
@@ -259,16 +291,33 @@ Viene marcada por Project; GCM no la deduce. Lo que sí hace es quitar los
 capítulos y los hitos, que Project también marca pero sobre los que no se puede
 actuar: meter cuadrilla en un capítulo no significa nada.
 
-### Marqué las 7 restricciones y la tarea no pasa a LISTA
+### La tarea sigue sin pasar a LISTA
 
-Comprueba si dice **«Sin analizar»**. Eso significa que todavía no tiene
-restricciones creadas: pulsa «Sincronizar ventana» primero.
+Dos causas posibles, y la matriz las distingue:
+
+- Dice **«Sin analizar»**: nadie ha dicho todavía qué restricciones le aplican.
+  Selecciónala y pulsa «Analizar». Si no le aplica ninguna, «No les aplica
+  ninguna» la deja lista al momento.
+- Le queda alguna casilla sin marcar. Fíjate en las columnas: un **guion** es un
+  flujo que no aplica; una casilla vacía es uno pendiente.
+
+### Quité un flujo y sigue ahí
+
+A propósito. Una restricción **ya levantada, con fotos de evidencia o con una
+nota escrita** no se borra: sería tirar trabajo hecho, y las fotos quedarían sin
+sitio donde verse nunca más. El panel te dice cuántas se conservaron y por qué.
+Solo se retiran las que están en blanco.
 
 ### ¿Por qué me pide confirmar al comprometer?
 
-Porque algo de lo que elegiste no está liberado, o ya está comprometido en otra
-semana. No se prohíbe —la obra a veces arranca igual— pero queda constancia de
-que se decidió a sabiendas.
+Por una de tres, y el aviso dice cuál:
+
+- **Nadie la ha analizado**: no se sabe si se puede hacer.
+- **Le quedan restricciones sin liberar**: se sabe que falta algo.
+- **Ya está comprometida en otra semana.**
+
+No se prohíbe —la obra a veces arranca igual— pero queda constancia de que se
+decidió a sabiendas.
 
 ### Cambié la meta de un compromiso y perdí la cantidad
 

@@ -34,8 +34,10 @@ interface TareaOpcion {
   conRestriccion: boolean;
   /// Texto de la restriccion, si la hay.
   restriccion: string | null;
-  /// LISTO = sus 7 flujos del Lookahead estan resueltos.
+  /// LISTO = analizada en el Lookahead y sin restricciones pendientes.
   estadoLookahead: EstadoLookahead | null;
+  /// Alguien decidio que restricciones le aplican (aunque sea ninguna).
+  analizadaLookahead: boolean;
   cantidadSugerida: string | null;
   unidadSugerida: string | null;
 }
@@ -180,7 +182,16 @@ export function FormularioPlanSemanal({
               // Planner, deberia comprometerse. El resto sigue disponible.
               const listas = tareas.filter((t) => t.estadoLookahead === "LISTO");
               const resto = tareas.filter((t) => t.estadoLookahead !== "LISTO");
-              const deSemana = resto.filter((t) => t.enSemana);
+              // "Sin liberar" y "sin analizar" van en grupos distintos: a una
+              // tarea que nadie ha mirado no le falta levantar nada, le falta
+              // que alguien diga que le aplica. Meterlas juntas hacia que la
+              // etiqueta mintiera sobre la mitad del grupo.
+              const deSemana = resto.filter(
+                (t) => t.enSemana && t.analizadaLookahead,
+              );
+              const sinAnalizar = resto.filter(
+                (t) => t.enSemana && !t.analizadaLookahead,
+              );
               const adelantar = resto.filter((t) => !t.enSemana && !t.conRestriccion);
               const restringidas = resto.filter((t) => !t.enSemana && t.conRestriccion);
               return (
@@ -195,6 +206,13 @@ export function FormularioPlanSemanal({
                   {deSemana.length > 0 && (
                     <optgroup label="De esta semana (sin liberar)">
                       {deSemana.map((t) => (
+                        <option key={t.uid} value={t.uid}>{etiqueta(t)}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {sinAnalizar.length > 0 && (
+                    <optgroup label="De esta semana (sin analizar)">
+                      {sinAnalizar.map((t) => (
                         <option key={t.uid} value={t.uid}>{etiqueta(t)}</option>
                       ))}
                     </optgroup>

@@ -13,6 +13,7 @@ function limpio(cambios: Partial<ConteoPendientes> = {}): ConteoPendientes {
     lookaheadSinAnalizar: 0,
     confiabilidadMostrada: null,
     tareasProximasBloqueadas: 0,
+    tareasProximasSinAnalizar: 0,
     diasVentana: 14,
     tareasProximasSinCobertura: 0,
     partidasSobregiradas: 0,
@@ -86,6 +87,28 @@ describe("pendientesDeObra", () => {
       );
       expect(p?.consecuencia).not.toContain("Ahora mismo muestra");
     });
+
+    it("la que arranca pronto sin analizar es critica, no un aviso mas", () => {
+      const [p] = pendientesDeObra(
+        limpio({ tareasProximasSinAnalizar: 3, diasVentana: 14 }),
+      );
+      expect(p?.clave).toBe("proximas-sin-analizar");
+      expect(p?.gravedad).toBe("critica");
+      expect(p?.titulo).toContain("14 dias");
+      expect(p?.camino).toBe("/lookahead");
+    });
+
+    it("'sin analizar' y 'sin liberar' son avisos DISTINTOS", () => {
+      // Antes eran el mismo hueco contado dos veces: una tarea sin analizar
+      // no tiene restricciones, asi que acusarla de tenerlas sin liberar era
+      // un falso positivo, y encima con gravedad critica.
+      expect(claves({ tareasProximasSinAnalizar: 2 })).toEqual([
+        "proximas-sin-analizar",
+      ]);
+      expect(claves({ tareasProximasBloqueadas: 2 })).toEqual([
+        "restricciones-sin-liberar",
+      ]);
+    });
   });
 
   describe("salidas", () => {
@@ -155,13 +178,14 @@ describe("pendientesDeObra", () => {
         semanasSinPorcentaje: 1,
         lookaheadSinAnalizar: 1,
         tareasProximasBloqueadas: 1,
+        tareasProximasSinAnalizar: 1,
         tareasProximasSinCobertura: 1,
         partidasSobregiradas: 1,
         ppcUltimo: 50,
         coberturaMapeo: 10,
       }),
     );
-    expect(todos).toHaveLength(8);
+    expect(todos).toHaveLength(9);
     for (const p of todos) {
       expect(p.camino.startsWith("/")).toBe(true);
       expect(p.consecuencia.length).toBeGreaterThan(20);
