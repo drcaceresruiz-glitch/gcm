@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard,
   SlidersHorizontal,
   Check,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
+  Minimize2,
 } from "lucide-react";
 import {
   MODULOS,
@@ -71,6 +74,23 @@ export function Tablero({
   );
   const [configurando, setConfigurando] = useState(false);
 
+  /**
+   * El tablero arranca CERRADO, siempre.
+   *
+   * No se recuerda en cookie a proposito: lo pedido es que cada visita empiece
+   * plegada. El panel es la lista de obras; el tablero es una herramienta que
+   * se abre cuando se va a supervisar, no un muro de once tarjetas que hay
+   * que pasar cada vez para llegar a lo demas.
+   *
+   * Esto NO cambia lo que se carga: el servidor sigue trayendo solo los datos
+   * de los modulos encendidos. Plegar es visual; el ahorro de verdad lo hace
+   * el configurador.
+   */
+  const [desplegado, setDesplegado] = useState(false);
+
+  /// Modulo abierto en grande, o null. Uno cada vez.
+  const [ampliado, setAmpliado] = useState<ModuloTablero | null>(null);
+
   const hayCronograma = datos?.cronograma != null;
 
   // Un modulo que necesita cronograma no se pinta si la obra no tiene: en su
@@ -110,6 +130,19 @@ export function Tablero({
       iniciar(() => router.refresh());
     }
   }
+
+  // Escape cierra el modulo ampliado. Es lo que espera cualquiera que abra
+  // algo que tapa la pantalla, y evita quedarse atrapado si el boton de
+  // cerrar queda fuera de vista en un movil.
+  useEffect(() => {
+    if (!ampliado) return;
+
+    const alPulsar = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAmpliado(null);
+    };
+    window.addEventListener("keydown", alPulsar);
+    return () => window.removeEventListener("keydown", alPulsar);
+  }, [ampliado]);
 
   function elegirObra(obraId: string) {
     // Navega en vez de mutar estado: son cifras nuevas y las calcula el
@@ -167,7 +200,7 @@ export function Tablero({
             <AlertasEmpresa alertas={alertas} />
           </span>
 
-          {obras.length > 0 && datos && (
+          {desplegado && obras.length > 0 && datos && (
             <label className="flex items-center gap-1.5">
               <span className="sr-only">Obra a supervisar</span>
               <select
@@ -190,25 +223,58 @@ export function Tablero({
             </label>
           )}
 
+          {desplegado && (
+            <button
+              type="button"
+              onClick={() => setConfigurando((p) => !p)}
+              aria-expanded={configurando}
+              aria-label="Configurar módulos del tablero"
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
+              style={{
+                borderColor: configurando
+                  ? "var(--color-marca-600)"
+                  : "var(--borde)",
+              }}
+            >
+              <SlidersHorizontal className="size-3.5" aria-hidden="true" />
+              <span className="hidden sm:inline">Configurar</span>
+            </button>
+          )}
+
+          {/* El interruptor. Dice lo que va a pasar («Desplegar» / «Plegar»),
+              no el estado en que esta: un boton que se llama como su estado
+              se lee al reves la mitad de las veces. */}
           <button
             type="button"
-            onClick={() => setConfigurando((p) => !p)}
-            aria-expanded={configurando}
-            aria-label="Configurar módulos del tablero"
-            className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
-            style={{
-              borderColor: configurando
-                ? "var(--color-marca-600)"
-                : "var(--borde)",
+            onClick={() => {
+              setDesplegado((p) => !p);
+              setConfigurando(false);
+              setAmpliado(null);
             }}
+            aria-expanded={desplegado}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white"
+            style={{ backgroundColor: "var(--color-marca-600)" }}
           >
-            <SlidersHorizontal className="size-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Configurar</span>
+            {desplegado ? (
+              <ChevronUp className="size-3.5" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="size-3.5" aria-hidden="true" />
+            )}
+            {desplegado ? "Plegar" : "Desplegar"}
           </button>
         </div>
       </header>
 
-      {configurando && (
+      {/* Plegado: una linea que dice QUE obra se supervisaria al abrir. Sin
+          esto, el cajon cerrado no dice nada y hay que abrirlo para saber si
+          interesa. */}
+      {!desplegado && datos && (
+        <p className="mt-3 truncate text-xs opacity-60">
+          {datos.obra.nombre}
+        </p>
+      )}
+
+      {desplegado && configurando && (
         <Configurador
           visibles={visibles}
           hayCronograma={hayCronograma}
@@ -216,7 +282,7 @@ export function Tablero({
         />
       )}
 
-      {datos ? (
+      {desplegado && datos ? (
         <>
           <div className="mt-4 flex items-center gap-2">
             <Chip tono={TONO_ESTADO_OBRA[datos.obra.estado as EstadoObra]}>
@@ -246,20 +312,126 @@ export function Tablero({
               }`}
             >
               {aPintar.map((m) => (
-                <ModuloContenido key={m.clave} modulo={m} datos={datos} />
+                <div
+                  key={m.clave}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Ampliar ${m.etiqueta}`}
+                  onClick={() => setAmpliado(m.clave)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setAmpliado(m.clave);
+                    }
+                  }}
+                  // El enlace del pie sigue navegando: su clic no debe
+                  // ampliar. Se corta aqui, en la captura, y no en cada
+                  // modulo, que son once y bastaria olvidar uno.
+                  onClickCapture={(e) => {
+                    if ((e.target as HTMLElement).closest("a,button")) {
+                      e.stopPropagation();
+                    }
+                  }}
+                  className="cursor-pointer rounded-xl transition-transform hover:-translate-y-0.5"
+                >
+                  <ModuloContenido modulo={m} datos={datos} />
+                </div>
               ))}
             </div>
           )}
         </>
-      ) : (
+      ) : desplegado ? (
         <p
           className="mt-4 rounded-xl border border-dashed p-6 text-center text-sm opacity-60"
           style={{ borderColor: "var(--borde)" }}
         >
           Crea una obra para empezar a supervisarla desde aquí.
         </p>
+      ) : null}
+
+      {ampliado && datos && (
+        <ModuloAmpliado
+          clave={ampliado}
+          datos={datos}
+          onCerrar={() => setAmpliado(null)}
+        />
       )}
     </section>
+  );
+}
+
+/**
+ * Un modulo a pantalla casi completa, encima de todo.
+ *
+ * Para mirar UNA cifra con calma: en la rejilla cada modulo vive en un cuarto
+ * de ancho, y ahi las curvas y las listas se aprietan. Aqui tiene sitio.
+ *
+ * Se cierra por tres caminos —el boton de la esquina, tocar fuera y Escape—
+ * porque es lo que la gente prueba, en ese orden, y quedarse encerrado en una
+ * capa que tapa la pantalla es de las cosas que mas enfadan.
+ */
+function ModuloAmpliado({
+  clave,
+  datos,
+  onCerrar,
+}: {
+  clave: ModuloTablero;
+  datos: DatosTablero;
+  onCerrar: () => void;
+}) {
+  const modulo = MODULOS.find((m) => m.clave === clave);
+  if (!modulo) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "color-mix(in oklab, black 55%, transparent)" }}
+      onClick={onCerrar}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={modulo.etiqueta}
+        // Se para la propagacion: tocar DENTRO no puede cerrar, o seria
+        // imposible usar nada de lo que hay dentro.
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border-2 shadow-2xl"
+        style={{
+          borderColor:
+            "color-mix(in oklab, var(--color-marca-500) 40%, var(--borde))",
+          backgroundColor:
+            "color-mix(in oklab, var(--color-marca-500) 6%, var(--superficie))",
+        }}
+      >
+        <header
+          className="flex items-start justify-between gap-3 border-b p-4"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold">{modulo.etiqueta}</h3>
+            {/* La nota del modulo solo cabe aqui: en la rejilla se omite por
+                falta de sitio, y es justo lo que explica que significa la
+                cifra que se esta mirando. */}
+            <p className="mt-0.5 text-xs opacity-70">{modulo.nota}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <Minimize2 className="size-3.5" aria-hidden="true" />
+            Volver al tablero
+          </button>
+        </header>
+
+        <div className="overflow-y-auto p-4">
+          <ModuloContenido modulo={modulo} datos={datos} />
+        </div>
+      </div>
+    </div>
   );
 }
 
