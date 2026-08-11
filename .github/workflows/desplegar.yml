@@ -21,6 +21,15 @@ name: Desplegar a cPanel
 on:
   push:
     branches: [main]
+    # La aplicacion movil (`movil/`) no forma parte de lo que se despliega
+    # aqui: es un APK que se compila aparte y se instala a mano en un
+    # telefono. Sin este filtro, cambiar una linea de Kotlin reconstruia GCM
+    # entero y lo resubia por FTP —y cada subida es otra tirada de dados con
+    # el fallo conocido de que el FTP deja caer archivos—. Se desplegaba
+    # produccion para nada, y con riesgo.
+    paths-ignore:
+      - "movil/**"
+      - ".github/workflows/apk-emisor-sms.yml"
   workflow_dispatch:
 
 concurrency:
