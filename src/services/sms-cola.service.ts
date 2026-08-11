@@ -36,13 +36,39 @@ export interface MensajePendiente {
   texto: string;
 }
 
+/**
+ * Cuanto tiene que medir el secreto para que la cola se encienda.
+ *
+ * La comprobacion vive AQUI y no en `env.ts` a proposito: alli tumbaria el
+ * arranque de toda la aplicacion por una funcion opcional. Aqui, un token
+ * corto deja la cola apagada —la ruta responde 404, los codigos siguen
+ * saliendo por correo y por pantalla— y avisa en el log. Lo que NO puede
+ * pasar es que un secreto debil quede protegiendo una cola con codigos en
+ * claro sin que nadie se entere.
+ */
+const LARGO_MINIMO_TOKEN = 32;
+
 export function hayColaSms(): boolean {
-  return Boolean(env.SMS_COLA_TOKEN);
+  const token = env.SMS_COLA_TOKEN;
+  if (!token) return false;
+
+  if (token.length < LARGO_MINIMO_TOKEN) {
+    console.error(
+      `[sms-cola] SMS_COLA_TOKEN mide ${token.length} caracteres y hacen falta ` +
+        `${LARGO_MINIMO_TOKEN}. La cola queda APAGADA: los codigos saldran por ` +
+        `correo o los dictara el residente.`,
+    );
+    return false;
+  }
+
+  return true;
 }
 
 /** Comprueba la credencial del emisor. */
 export function emisorAutorizado(token: string | null): boolean {
-  if (!token || !env.SMS_COLA_TOKEN) return false;
+  // `hayColaSms` primero: con un token demasiado corto no se autoriza a
+  // nadie, ni siquiera a quien lo acierte.
+  if (!token || !hayColaSms() || !env.SMS_COLA_TOKEN) return false;
   return tokenValido(token, env.SMS_COLA_TOKEN);
 }
 

@@ -93,12 +93,21 @@ const envSchema = z.object({
    * OPCIONAL, como el SMTP: sin ella la ruta de la cola responde 404 y el
    * codigo del pase sale por correo o lo dicta el residente.
    *
-   * MINIMO 32 CARACTERES, y que sea aleatorio. Es la unica credencial que
-   * protege la cola, y por esa cola viajan los codigos del pase EN CLARO
+   * Debe medir 32 caracteres o mas y ser aleatorio: es la unica credencial
+   * que protege la cola, y por esa cola viajan los codigos del pase EN CLARO
    * hasta que salen. Generarlo con `openssl rand -base64 48` o equivalente,
    * y no reutilizar ningun otro secreto.
+   *
+   * OJO A COMO SE VALIDA, que es deliberado: un token corto NO tumba la
+   * aplicacion, la deja sin cola. Antes esto era `.min(32)`, y eso convertia
+   * una funcion opcional en un punto unico de fallo de TODO el sistema:
+   * bastaba escribir un secreto de treinta caracteres en cPanel para que el
+   * proceso Node no arrancara y la obra entera se quedara sin GCM, con el
+   * agravante de que el fallo aparece al REINICIAR y no al guardar, asi que
+   * nadie relacionaria una cosa con la otra. La regla de la casa es que lo
+   * opcional degrada, como el SMTP; esto se habia saltado la regla.
    */
-  SMS_COLA_TOKEN: z.string().min(32).optional(),
+  SMS_COLA_TOKEN: z.string().optional(),
 
   // --- Correo saliente (alta de usuarios y recuperacion de clave) ---
   SMTP_HOST: z.string().optional(),
