@@ -29,6 +29,101 @@ export const ETIQUETA_CNC: Record<CausaNoCumplimiento, string> = {
   OTRA: "Otra",
 };
 
+/**
+ * Un compromiso tal como llega del servidor a la pantalla de cierre.
+ *
+ * Vive aqui, y no en el componente, porque lo que se hace con el —decidir que
+ * se conserva cuando los compromisos cambian bajo los pies— es aritmetica y
+ * tiene que estar probado.
+ */
+export interface CompromisoDeCierre {
+  id: string;
+  descripcion: string;
+  /// uid de la tarea del cronograma; null si es una linea libre.
+  uid: number | null;
+  metaPorcentaje: string | null;
+  cumplido: boolean | null;
+  causa: CausaNoCumplimiento | null;
+  notaCierre: string | null;
+  porcentajeReal: string | null;
+  cantidadPlan: string | null;
+  unidad: string | null;
+  cantidadEjec: string | null;
+}
+
+/// La fila editable de la pantalla de cierre.
+export interface FilaCierre {
+  id: string;
+  descripcion: string;
+  /// uid de la tarea del cronograma; null si es una linea libre (no propaga avance).
+  uid: number | null;
+  cumplido: boolean;
+  causa: CausaNoCumplimiento;
+  nota: string;
+  /// % alcanzado (acumulado 0-100) de la tarea; se propaga a su avance al cerrar.
+  porcentajeReal: string;
+  /// Cuanto se ejecuto, en la unidad del compromiso. Solo se pide si se
+  /// comprometio por cantidad.
+  cantidadEjec: string;
+  cantidadPlan: string | null;
+  unidad: string | null;
+}
+
+/**
+ * Construye las filas editables del cierre a partir de lo que manda el
+ * servidor, conservando lo que la persona ya estaba tecleando.
+ *
+ * POR QUE HACE FALTA CONSERVAR NADA: guardar la planificacion BORRA los
+ * compromisos y los vuelve a crear (`deleteMany` + `createMany` en
+ * `guardarCompromisos`), asi que despues de guardar los ids son otros. Y las
+ * dos cosas viven en la misma pantalla: arriba se planifica, abajo se cierra.
+ * Sin esto, quien ajustaba los compromisos y cerraba sin recargar mandaba ids
+ * que ya no existian y se topaba con un callejon sin salida.
+ *
+ * El emparejamiento es por `uid` —y por descripcion en las lineas libres, que
+ * no tienen uid—, NUNCA por `id`, que es justo lo que no sobrevive. Es la
+ * misma idea que `mapaPreservablePorUid` en el servicio, y por la misma
+ * razon: lo que la persona escribio no puede perderse porque una fila haya
+ * cambiado de identidad por debajo.
+ *
+ * El orden de preferencia de cada campo es: lo que la persona acaba de
+ * teclear, luego lo ya guardado, luego el punto de partida razonable.
+ */
+export function construirFilasCierre(
+  compromisos: readonly CompromisoDeCierre[],
+  previas?: readonly FilaCierre[],
+): FilaCierre[] {
+  const porUid = new Map<number, FilaCierre>();
+  const porDescripcion = new Map<string, FilaCierre>();
+  for (const f of previas ?? []) {
+    if (f.uid !== null) porUid.set(f.uid, f);
+    else porDescripcion.set(f.descripcion, f);
+  }
+
+  return compromisos.map((c) => {
+    const antes =
+      c.uid !== null ? porUid.get(c.uid) : porDescripcion.get(c.descripcion);
+
+    return {
+      id: c.id,
+      descripcion: c.descripcion,
+      uid: c.uid,
+      // Si el compromiso nunca se evaluo (cumplido null) arranca SIN tildar:
+      // darlo por cumplido inflaba el PPC y tildaba hasta tareas al 0%.
+      cumplido: antes?.cumplido ?? c.cumplido ?? false,
+      causa: antes?.causa ?? c.causa ?? "PRERREQUISITO",
+      nota: antes?.nota ?? c.notaCierre ?? "",
+      porcentajeReal:
+        antes?.porcentajeReal ?? c.porcentajeReal ?? c.metaPorcentaje ?? "",
+      // Se arranca de lo comprometido, que es la respuesta mas probable ("se
+      // hizo lo previsto") y se corrige encima.
+      cantidadEjec: antes?.cantidadEjec ?? c.cantidadEjec ?? c.cantidadPlan ?? "",
+      cantidadPlan: c.cantidadPlan,
+      unidad: c.unidad,
+    };
+  });
+}
+
 /// El orden fijo de las causas, para el select y el Pareto.
 export const CAUSAS_CNC = Object.keys(ETIQUETA_CNC) as CausaNoCumplimiento[];
 

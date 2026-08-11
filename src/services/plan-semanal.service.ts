@@ -701,7 +701,16 @@ export async function cerrarPlanSemanal(
   const porId = new Map<string, Evaluacion>();
   for (const e of evaluaciones) {
     if (!idsPlan.has(e.compromisoId)) {
-      return { ok: false, error: "Un compromiso evaluado no pertenece a esta semana." };
+      // Casi siempre significa que la pantalla quedo desfasada: guardar la
+      // planificacion borra los compromisos y los recrea con otros ids, y
+      // hasta el 11 de agosto de 2026 el formulario de cierre se quedaba con
+      // los viejos. Ya no deberia pasar, pero si pasa hay que decir que hacer
+      // y no dejar a nadie delante de un callejon sin salida.
+      return {
+        ok: false,
+        error:
+          "La lista de compromisos cambió mientras cerrabas la semana. Recarga la página y vuelve a marcarla.",
+      };
     }
     if (!e.cumplido) {
       if (!e.causa || !CAUSAS_CNC.includes(e.causa)) {

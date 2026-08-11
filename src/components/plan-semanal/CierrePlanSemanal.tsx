@@ -3,7 +3,13 @@
 import { useState, useTransition } from "react";
 import { Check, LoaderCircle } from "lucide-react";
 import { accionCerrarPlanSemanal } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
-import { CAUSAS_CNC, ETIQUETA_CNC } from "@/lib/plan-semanal";
+import {
+  CAUSAS_CNC,
+  ETIQUETA_CNC,
+  construirFilasCierre,
+  type CompromisoDeCierre,
+  type FilaCierre,
+} from "@/lib/plan-semanal";
 import {
   BotonEvidencia,
   PanelEvidencia,
@@ -18,22 +24,10 @@ import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
  * util el cierre—.
  */
 
-interface Fila {
-  id: string;
-  descripcion: string;
-  /// uid de la tarea del cronograma; null si es una linea libre (no propaga avance).
-  uid: number | null;
-  cumplido: boolean;
-  causa: CausaNoCumplimiento;
-  nota: string;
-  /// % alcanzado (acumulado 0-100) de la tarea; se propaga a su avance al cerrar.
-  porcentajeReal: string;
-  /// Cuanto se ejecuto, en la unidad del compromiso. Solo se pide si se
-  /// comprometio por cantidad.
-  cantidadEjec: string;
-  cantidadPlan: string | null;
-  unidad: string | null;
-}
+/// La fila editable vive en `@/lib/plan-semanal`, con sus pruebas: lo que
+/// decide que se conserva al cambiar los compromisos bajo los pies es
+/// aritmetica, no interfaz.
+type Fila = FilaCierre;
 
 /**
  * Las fotos NO entran en `Fila`: esa es la parte editable, que se manda al
@@ -42,6 +36,9 @@ interface Fila {
  * aparece sola cuando la accion repinta la pantalla—.
  */
 
+/// Lo que llega del servidor, mas las fotos (que no se editan aqui).
+type CompromisoProp = CompromisoDeCierre & { fotos: FotoResumen[] };
+
 export function CierrePlanSemanal({
   obraId,
   planId,
@@ -49,43 +46,37 @@ export function CierrePlanSemanal({
 }: {
   obraId: string;
   planId: string;
-  compromisos: {
-    id: string;
-    descripcion: string;
-    uid: number | null;
-    metaPorcentaje: string | null;
-    cumplido: boolean | null;
-    causa: CausaNoCumplimiento | null;
-    notaCierre: string | null;
-    porcentajeReal: string | null;
-    cantidadPlan: string | null;
-    unidad: string | null;
-    cantidadEjec: string | null;
-    fotos: FotoResumen[];
-  }[];
+  compromisos: CompromisoProp[];
 }) {
   const [filas, setFilas] = useState<Fila[]>(() =>
-    compromisos.map((c) => ({
-      id: c.id,
-      descripcion: c.descripcion,
-      uid: c.uid,
-      // Restaura lo YA guardado: al reabrir una semana no se pierde nada. Si el
-      // compromiso nunca se evaluo (cumplido null), recien ahi arranca SIN
-      // tildar —dar por cumplido por defecto inflaba el PPC y tildaba hasta
-      // tareas al 0%—.
-      cumplido: c.cumplido ?? false,
-      causa: c.causa ?? "PRERREQUISITO",
-      nota: c.notaCierre ?? "",
-      // % alcanzado: lo ya registrado por este plan al reabrir; si no, la meta
-      // como punto de partida editable.
-      porcentajeReal: c.porcentajeReal ?? c.metaPorcentaje ?? "",
-      // Lo ya anotado al cerrar; si no, se arranca de lo comprometido, que es
-      // la respuesta mas probable ("se hizo lo previsto") y se corrige encima.
-      cantidadEjec: c.cantidadEjec ?? c.cantidadPlan ?? "",
-      cantidadPlan: c.cantidadPlan,
-      unidad: c.unidad,
-    })),
+    construirFilasCierre(compromisos),
   );
+
+  /**
+   * Los ids que se estan editando ahora mismo.
+   *
+   * ESTO NO ES UNA OPTIMIZACION, ES UN ARREGLO. Guardar la planificacion
+   * borra los compromisos y los vuelve a crear (`deleteMany` + `createMany` en
+   * `guardarCompromisos`), asi que despues de guardar los ids son OTROS.
+   *
+   * Y las dos cosas viven en la MISMA pantalla: arriba se planifica, abajo se
+   * cierra. Con el estado congelado en el primer montaje, cualquiera que
+   * ajustara los compromisos y cerrara la semana sin recargar mandaba ids que
+   * ya no existian, y el servidor —con razon— respondia «Un compromiso
+   * evaluado no pertenece a esta semana», un callejon sin salida del que no se
+   * salia mas que recargando a ciegas.
+   *
+   * Se ajusta el estado DURANTE el render, que es como React admite responder
+   * a un cambio de props sin un efecto de por medio (y sin chocar con la regla
+   * que prohibe `setState` dentro de `useEffect`).
+   */
+  const idsDelServidor = compromisos.map((c) => c.id).join("|");
+  const [idsVistos, setIdsVistos] = useState(idsDelServidor);
+  if (idsVistos !== idsDelServidor) {
+    setIdsVistos(idsDelServidor);
+    setFilas((previas) => construirFilasCierre(compromisos, previas));
+  }
+
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
   /// Compromiso con la evidencia abierta (uno a la vez).
