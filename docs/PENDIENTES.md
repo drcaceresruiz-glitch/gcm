@@ -666,8 +666,10 @@ Piezas:
 **Como se activa** (lo hace el usuario, no se puede desde aqui):
 
 1. Generar un secreto largo (`openssl rand -base64 48`) y ponerlo como
-   `SMS_COLA_TOKEN` en Setup Node.js App de cPanel. Minimo 32 caracteres: lo
-   valida `env.ts` y sin eso la aplicacion no arranca.
+   `SMS_COLA_TOKEN` en Setup Node.js App de cPanel. Minimo 32 caracteres.
+   **Un token mas corto ya NO tumba la aplicacion** (lo hacia hasta el 11 de
+   agosto, con `.min(32)` en `env.ts`): ahora deja la cola apagada y lo dice
+   en el log. Lo opcional degrada, como el SMTP.
 2. En el telefono emisor, MacroDroid o Tasker con dos pasos que se repitan
    cada ~20 s:
    - `GET https://gcm.drcaceresruiz.com/api/sms/cola` con la cabecera
@@ -696,6 +698,40 @@ debil del diseno y se acepto a sabiendas.
 
 **FALTA**: probarla con un telefono de verdad. Desde aqui solo se puede
 verificar que la ruta responde 404 sin token y 401 con uno equivocado.
+
+### Si un SMS no llega: el orden en que hay que mirarlo (11 de agosto)
+
+Sacado de un caso real. **La primera comprobacion no necesita entrar al
+servidor**: pedir `GET https://gcm.drcaceresruiz.com/api/sms/cola` sin
+cabecera y leer el codigo de respuesta.
+
+| Respuesta | Que significa | Que hacer |
+|---|---|---|
+| **404** «No disponible» | No hay `SMS_COLA_TOKEN` en cPanel, o mide menos de 32 | Ponerlo y reiniciar |
+| **401** «No autorizado» | El token esta puesto y la cola esta encendida | Seguir por la tabla |
+| Otra cosa | El despliegue no entro, o la app esta caida | Mirar el despliegue |
+
+Con 401, el siguiente sospechoso es **la tabla `mensajes_sms`**: la migracion
+`20260811010133_cola_de_sms` es un paso MANUAL y el workflow no la aplica. Si
+no esta, `encolarSms` revienta, el error se traga en el log y no sale ningun
+SMS. Se comprueba en phpMyAdmin, y se arregla con el SQL de la migracion mas
+`migrate resolve --applied`.
+
+Y si la tabla existe, lo dice el telefono: la notificacion permanente de la
+app. `Sin mensajes · 14:32` **con la hora avanzando** significa que pregunta
+bien y que GCM no tiene nada que darle; la hora parada significa que Android
+la durmio (falta quitar el ahorro de bateria, y en Xiaomi/Huawei/Oppo/Samsung
+ademas la lista del fabricante); un 401 ahi significa que el token del
+telefono no coincide con el de cPanel.
+
+**Lo que ese caso destapo, y ya esta arreglado**: la cola encendida ANULABA el
+respaldo de json.pe —`enviarSms` no lo probaba ni cuando el encolado
+fallaba—, y la pantalla de Personal afirmaba «tambien se le envio por SMS y
+correo» pasara lo que pasara. Ahora los canales se recorren en orden
+(`canalesAProbar`, en `lib/sms.ts`, probado) y la pantalla avisa de que no
+salio y de que hay que dictar el codigo. El aviso NO se da en la pantalla
+publica del pase: alli decir que el SMS fallo confirmaria que ese numero esta
+dado de alta, que es justo lo que el silencio protege.
 
 ## 6d. Panel «Que falta» (10 de agosto)
 

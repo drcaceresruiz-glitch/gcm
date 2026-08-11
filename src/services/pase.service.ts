@@ -63,8 +63,12 @@ export type ResultadoPase = { ok: true } | { ok: false; error: string };
 /// Lo que se devuelve al pedir codigo. `codigo` solo viaja cuando lo pide
 /// quien gestiona la obra desde su pantalla (para dictarlo o mandarlo por
 /// WhatsApp); en la pantalla publica JAMAS sale.
+///
+/// `aviso` dice que un canal fallo, y SOLO se rellena en la via con permiso.
+/// En la publica seria una fuga: contar que el SMS no salio ya confirma que
+/// ese numero esta dado de alta, que es justo lo que el silencio protege.
 export type ResultadoCodigo =
-  | { ok: true; codigo?: string; enviadoA?: string }
+  | { ok: true; codigo?: string; enviadoA?: string; aviso?: string }
   | { ok: false; error: string };
 
 function quien(sesion: SesionActiva): string {
@@ -526,6 +530,11 @@ export async function generarCodigoParaEntregar(
       ? (pase.email ?? undefined)
       : undefined;
 
+  // Que el residente sepa que tiene que dictarlo, en vez de suponer que ya
+  // llego. Antes esto solo quedaba en el registro de auditoria, que nadie
+  // mira: la pantalla decia lo mismo saliera el SMS o no.
+  const aviso = avisoDeReparto(pase, repartido);
+
   await prisma.auditLog.create({
     data: {
       companyId: sesion.companyId,
@@ -543,7 +552,28 @@ export async function generarCodigoParaEntregar(
     },
   });
 
-  return { ok: true, codigo, enviadoA };
+  return { ok: true, codigo, enviadoA, aviso };
+}
+
+/**
+ * Que decirle a quien acaba de generar un codigo, cuando algo no salio.
+ *
+ * Solo habla de los canales que ese pase TIENE: avisar de que no salio el
+ * correo a quien nunca dio uno es ruido, y el ruido ensena a la gente a no
+ * leer los avisos.
+ */
+function avisoDeReparto(
+  pase: { email: string | null; celular: string | null },
+  repartido: { porSms: boolean; porCorreo: boolean },
+): string | undefined {
+  const fallaron: string[] = [];
+
+  if (pase.celular && !repartido.porSms) fallaron.push("SMS");
+  if (pase.email && !repartido.porCorreo) fallaron.push("correo");
+
+  if (fallaron.length === 0) return undefined;
+
+  return `No se pudo enviar por ${fallaron.join(" ni por ")}. Díctale el código.`;
 }
 
 /** Demasiados codigos en poco rato. Frena el bombardeo de un buzon. */

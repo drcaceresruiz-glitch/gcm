@@ -9,6 +9,7 @@ import {
   Pencil,
   RotateCcw,
   Trash2,
+  TriangleAlert,
   UserPlus,
 } from "lucide-react";
 import {
@@ -52,9 +53,13 @@ export function PanelPersonal({
 
   // El codigo recien generado, para leerlo en voz alta. Vive solo en pantalla
   // y se pierde al recargar: no es un dato que haya que conservar.
-  const [codigo, setCodigo] = useState<{ paseId: string; valor: string } | null>(
-    null,
-  );
+  const [codigo, setCodigo] = useState<{
+    paseId: string;
+    valor: string;
+    /// Que canal no salio, si alguno. Lo redacta el servicio, que es quien
+    /// sabe que contactos tiene el pase.
+    aviso?: string;
+  } | null>(null);
 
   /// Pase que se esta editando, con sus valores en curso.
   const [editando, setEditando] = useState<{
@@ -131,7 +136,8 @@ export function PanelPersonal({
     setCodigo(null);
     iniciar(async () => {
       const r = await accionGenerarCodigo(obraId, paseId);
-      if (r.ok && r.codigo) setCodigo({ paseId, valor: r.codigo });
+      if (r.ok && r.codigo)
+        setCodigo({ paseId, valor: r.codigo, aviso: r.aviso });
       else if (!r.ok) setError(r.error);
     });
   }
@@ -519,9 +525,27 @@ export function PanelPersonal({
                     {codigo.valor}
                   </strong>
                   <span className="mt-1 block text-xs opacity-70">
-                    Caduca en unos minutos y solo sirve una vez. También se le
-                    envió por SMS y correo, si los tiene.
+                    Caduca en unos minutos y solo sirve una vez.
+                    {!codigo.aviso &&
+                      " También se le envió por SMS y correo, si los tiene."}
                   </span>
+
+                  {/* Antes esta pantalla afirmaba SIEMPRE que el codigo se
+                      habia enviado, saliera o no. Quien lo leia se quedaba
+                      esperando a que llegara un SMS que nunca salio. Color e
+                      icono juntos, nunca el color solo. */}
+                  {codigo.aviso && (
+                    <span
+                      className="mt-2 flex items-start gap-1.5 text-xs font-medium"
+                      style={{ color: "var(--color-alerta)" }}
+                    >
+                      <TriangleAlert
+                        className="mt-0.5 size-3.5 shrink-0"
+                        aria-hidden="true"
+                      />
+                      {codigo.aviso}
+                    </span>
+                  )}
                 </p>
               )}
             </li>

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { env } from "@/lib/env";
+import { canalesAProbar } from "@/lib/sms";
 import { encolarSms, hayColaSms } from "@/services/sms-cola.service";
 
 /**
@@ -17,6 +18,12 @@ import { encolarSms, hayColaSms } from "@/services/sms-cola.service";
  * 2. **json.pe** (`SMS_TOKEN`). La pasarela de antes, que TAMPOCO enviaba
  *    desde la nube: salia del movil Android del cliente con su app instalada.
  *    Se conserva como respaldo.
+ *
+ * Respaldo quiere decir respaldo: si el primero falla se prueba el segundo.
+ * Durante un tiempo no fue asi —tener la cola configurada apagaba json.pe
+ * incluso cuando el encolado reventaba— y eso convirtio un fallo de base de
+ * datos en una obra entera sin SMS, en silencio. El orden lo decide
+ * `canalesAProbar` en `@/lib/sms`, que es puro y esta probado.
  *
  * Sin ninguno de los dos no pasa nada grave: el codigo del pase sale por
  * correo, o lo genera el residente en su pantalla y lo dicta. Por eso los dos
@@ -63,16 +70,12 @@ export async function enviarSms(
   numero: string,
   mensaje: string,
 ): Promise<ResultadoSms> {
-  // La cola manda cuando esta configurada: es la linea de la empresa, no la
-  // de un tercero.
-  if (hayColaSms()) {
-    const encolado = await encolarSms(numero, mensaje);
-    return encolado
-      ? { enviado: true, encolado: true }
-      : { enviado: false, motivo: "cola" };
-  }
+  const canales = canalesAProbar({
+    cola: hayColaSms(),
+    pasarela: Boolean(env.SMS_TOKEN),
+  });
 
-  if (!env.SMS_TOKEN) {
+  if (canales.length === 0) {
     if (env.NODE_ENV !== "production") {
       // En desarrollo se imprime, como hace el correo: asi se puede probar el
       // ciclo entero del pase sin contratar nada.
@@ -81,7 +84,40 @@ export async function enviarSms(
     return { enviado: false, motivo: "sin-canal" };
   }
 
-  return enviarPorPasarela(numero, mensaje);
+  // Gana el primero que acepte. Se acumulan los motivos de los que fallaron
+  // para que el log diga «cola+http-500» y no solo el ultimo: saber que la
+  // cola tambien estaba caida es la mitad del diagnostico.
+  const motivos: string[] = [];
+
+  for (const canal of canales) {
+    const r =
+      canal === "cola"
+        ? await porLaCola(numero, mensaje)
+        : await enviarPorPasarela(numero, mensaje);
+
+    if (r.enviado) return r;
+    if (r.motivo) motivos.push(r.motivo);
+  }
+
+  return { enviado: false, motivo: motivos.join("+") };
+}
+
+/**
+ * La cola propia.
+ *
+ * Encolar no es enviar: el SMS sale cuando el telefono de la empresa recoge
+ * el mensaje. Por eso `enviado: true` viene con `encolado: true`, para que
+ * quien lo lea sepa que promete menos.
+ */
+async function porLaCola(
+  numero: string,
+  mensaje: string,
+): Promise<ResultadoSms> {
+  const encolado = await encolarSms(numero, mensaje);
+
+  return encolado
+    ? { enviado: true, encolado: true }
+    : { enviado: false, motivo: "cola" };
 }
 
 /** El canal viejo: json.pe. */
