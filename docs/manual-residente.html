@@ -1,0 +1,2179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light">
+<title>GCM — Manual del Residente de Obra</title>
+<style>
+  @page { size: A4; margin: 17mm 15mm 17mm 15mm; }
+
+  :root{
+    --tinta:#16202b;
+    --suave:#5b6875;
+    --linea:#d7dee6;
+    --azul:#1f5f8b;
+    --azulclaro:#e8f1f7;
+    --verde:#2f7d4f;
+    --verdeclaro:#e7f4ec;
+    --ambar:#a8710b;
+    --ambarclaro:#fdf3de;
+    --rojo:#a8322d;
+    --rojoclaro:#fbeceb;
+    --gris:#f4f6f8;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    font-size:10.2pt;
+    line-height:1.52;
+    color:var(--tinta);
+    background:#fff;
+    margin:0;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+
+  h1,h2,h3,h4{ line-height:1.22; margin:0 0 .45em; page-break-after:avoid; }
+  h1{ font-size:21pt; color:var(--azul); }
+  h2{
+    font-size:15pt; color:var(--azul);
+    margin-top:0; padding-bottom:.22em;
+    border-bottom:2.5px solid var(--azul);
+  }
+  h3{ font-size:12pt; margin-top:1.5em; color:#123c57; }
+  h4{ font-size:10.6pt; margin-top:1.2em; color:#123c57; }
+
+  p{ margin:0 0 .7em; }
+  ul,ol{ margin:0 0 .8em; padding-left:1.35em; }
+  li{ margin-bottom:.28em; }
+
+  code,.mono{ font-family:"Consolas","Courier New",monospace; font-size:9.2pt; background:var(--gris); padding:.06em .3em; border-radius:3px; }
+
+  .cap{ page-break-before:always; }
+  .nobreak{ page-break-inside:avoid; }
+
+  .portada{ height:250mm; display:flex; flex-direction:column; justify-content:center; text-align:center; }
+  .portada .marca{ font-size:58pt; font-weight:800; letter-spacing:-2px; color:var(--azul); line-height:1; }
+  .portada .sub{ font-size:11pt; color:var(--suave); letter-spacing:3px; text-transform:uppercase; margin-top:.4em; }
+  .portada .titulo{ font-size:29pt; font-weight:700; margin-top:1.6em; color:var(--tinta); }
+  .portada .bajada{ font-size:13pt; color:var(--suave); margin-top:.5em; }
+  .portada .regla{ width:70mm; height:3px; background:var(--azul); margin:2.2em auto; }
+  .portada .pie{ font-size:9.5pt; color:var(--suave); margin-top:2em; }
+
+  table{ width:100%; border-collapse:collapse; margin:.6em 0 1em; font-size:9.3pt; page-break-inside:avoid; }
+  thead th{ background:var(--azul); color:#fff; text-align:left; padding:.42em .55em; font-weight:600; font-size:9.1pt; }
+  td,th{ border:1px solid var(--linea); padding:.38em .55em; vertical-align:top; }
+  tbody tr:nth-child(even){ background:#fafbfc; }
+  td.c,th.c{ text-align:center; }
+  .si{ color:var(--verde); font-weight:700; }
+  .no{ color:#b9c2cb; }
+
+  .caja{ border-left:4px solid var(--azul); background:var(--azulclaro); padding:.62em .85em; margin:.9em 0; page-break-inside:avoid; }
+  .caja.ok{ border-color:var(--verde); background:var(--verdeclaro); }
+  .caja.ojo{ border-color:var(--ambar); background:var(--ambarclaro); }
+  .caja.alto{ border-color:var(--rojo); background:var(--rojoclaro); }
+  .caja p:last-child{ margin-bottom:0; }
+  .caja .et{ display:block; font-weight:700; font-size:8.6pt; letter-spacing:1.1px; text-transform:uppercase; margin-bottom:.3em; color:var(--azul); }
+  .caja.ok .et{ color:var(--verde); }
+  .caja.ojo .et{ color:var(--ambar); }
+  .caja.alto .et{ color:var(--rojo); }
+
+  ol.pasos{ list-style:none; padding-left:0; counter-reset:paso; }
+  ol.pasos > li{ counter-increment:paso; position:relative; padding-left:2.1em; margin-bottom:.55em; }
+  ol.pasos > li::before{
+    content:counter(paso); position:absolute; left:0; top:.05em;
+    width:1.45em; height:1.45em; border-radius:50%;
+    background:var(--azul); color:#fff; font-size:8.4pt; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  figure{ margin:1.1em 0; page-break-inside:avoid; text-align:center; }
+  figure svg{ max-width:100%; height:auto; }
+  figcaption{ font-size:8.7pt; color:var(--suave); margin-top:.45em; text-align:center; }
+  .fig-t{ font-size:9pt; font-weight:700; color:var(--azul); text-transform:uppercase; letter-spacing:1px; }
+
+  .toc{ font-size:10pt; }
+  .toc ol{ list-style:none; padding-left:0; }
+  .toc > ol > li{ margin:.42em 0; font-weight:600; border-bottom:1px dotted var(--linea); padding-bottom:.25em; }
+  .toc ol ol{ margin:.22em 0 .4em .1em; font-weight:400; font-size:9.2pt; color:var(--suave); }
+  .toc ol ol li{ margin:.1em 0; border:0; }
+  .toc .n{ display:inline-block; width:2.3em; color:var(--azul); font-weight:700; }
+  .toc ol ol .n{ width:3.1em; color:var(--suave); font-weight:600; }
+
+  .lead{ font-size:11pt; color:var(--suave); margin-bottom:1.3em; }
+  .kicker{ font-size:8.6pt; letter-spacing:1.6px; text-transform:uppercase; color:var(--suave); font-weight:700; margin-bottom:.2em; }
+
+  .tag{ display:inline-block; font-size:7.8pt; font-weight:700; padding:.14em .5em; border-radius:3px; letter-spacing:.5px; }
+  .tag.a{ background:var(--azulclaro); color:var(--azul); }
+  .tag.v{ background:var(--verdeclaro); color:var(--verde); }
+  .tag.m{ background:var(--ambarclaro); color:var(--ambar); }
+  .tag.r{ background:var(--rojoclaro); color:var(--rojo); }
+</style>
+</head>
+<body>
+
+<section class="portada">
+  <div>
+    <div class="marca">GCM</div>
+    <div class="sub">Gestor de Construcción y Mantenimiento</div>
+    <div class="regla"></div>
+    <div class="titulo">Manual del Residente de Obra</div>
+    <div class="bajada">Cómo funciona el sistema, paso a paso:<br>usuarios, roles, flujos, entradas y salidas</div>
+    <div class="regla"></div>
+    <div class="pie">
+      Documento operativo · Versión 1.0 · 11 de agosto de 2026<br>
+      gcm.drcaceresruiz.com
+    </div>
+  </div>
+</section>
+
+<section class="cap toc">
+  <h2>Índice</h2>
+  <ol>
+    <li><span class="n">1</span> Antes de empezar
+      <ol>
+        <li><span class="n">1.1</span> Para quién es este manual</li>
+        <li><span class="n">1.2</span> Qué problema resuelve GCM</li>
+        <li><span class="n">1.3</span> Las tres verdades: Project, presupuesto y GCM</li>
+        <li><span class="n">1.4</span> Mapa general del sistema</li>
+      </ol>
+    </li>
+    <li><span class="n">2</span> El vocabulario del sistema
+      <ol>
+        <li><span class="n">2.1</span> Empresa, obra y equipo</li>
+        <li><span class="n">2.2</span> Capítulo, partida y tarea</li>
+        <li><span class="n">2.3</span> Modalidad de contratación</li>
+        <li><span class="n">2.4</span> Revisión, línea base y presupuesto vigente</li>
+        <li><span class="n">2.5</span> El UID: el ancla del cronograma</li>
+      </ol>
+    </li>
+    <li><span class="n">3</span> Usuarios, roles y permisos
+      <ol>
+        <li><span class="n">3.1</span> Los cinco roles</li>
+        <li><span class="n">3.2</span> Qué puede hacer cada rol (matriz completa)</li>
+        <li><span class="n">3.3</span> Permisos que no se pueden mover</li>
+        <li><span class="n">3.4</span> El rol se asigna por obra, no por persona</li>
+        <li><span class="n">3.5</span> El pase de obra no es un usuario</li>
+      </ol>
+    </li>
+    <li><span class="n">4</span> Entrar al sistema
+      <ol>
+        <li><span class="n">4.1</span> El flujo de acceso, paso a paso</li>
+        <li><span class="n">4.2</span> Verificación en dos pasos (SMS o correo)</li>
+        <li><span class="n">4.3</span> Olvidé mi clave</li>
+        <li><span class="n">4.4</span> Tu perfil y las solicitudes de cambio</li>
+        <li><span class="n">4.5</span> GCM en el celular</li>
+      </ol>
+    </li>
+    <li><span class="n">5</span> El panel: leer la obra en un minuto
+      <ol>
+        <li><span class="n">5.1</span> Los doce módulos</li>
+        <li><span class="n">5.2</span> La pareja que hay que leer junta</li>
+        <li><span class="n">5.3</span> Configurar el panel</li>
+        <li><span class="n">5.4</span> Los avisos no se filtran por obra</li>
+      </ol>
+    </li>
+    <li><span class="n">6</span> Moverse por el sistema</li>
+    <li><span class="n">7</span> Flujo 1 — El presupuesto
+      <ol>
+        <li><span class="n">7.1</span> Preparar el Excel</li>
+        <li><span class="n">7.2</span> Importar: analizar, revisar, aplicar</li>
+        <li><span class="n">7.3</span> Qué detecta el importador por su cuenta</li>
+        <li><span class="n">7.4</span> El riesgo de reemplazo</li>
+        <li><span class="n">7.5</span> Editar el árbol a mano</li>
+        <li><span class="n">7.6</span> Revisiones y línea base</li>
+        <li><span class="n">7.7</span> Movimientos: reconversión, adicional, deductivo</li>
+      </ol>
+    </li>
+    <li><span class="n">8</span> Flujo 2 — El cronograma
+      <ol>
+        <li><span class="n">8.1</span> Importar de MS Project</li>
+        <li><span class="n">8.2</span> Versiones y fecha de corte</li>
+        <li><span class="n">8.3</span> Fijar la línea base del cronograma</li>
+        <li><span class="n">8.4</span> Mapear tareas con partidas</li>
+        <li><span class="n">8.5</span> Registrar avance</li>
+        <li><span class="n">8.6</span> Gantt, informe y ruta crítica</li>
+        <li><span class="n">8.7</span> La curva S</li>
+      </ol>
+    </li>
+    <li><span class="n">9</span> Flujo 3 — Last Planner
+      <ol>
+        <li><span class="n">9.1</span> El calendario laboral de la obra</li>
+        <li><span class="n">9.2</span> Lookahead: la ventana de mediano plazo</li>
+        <li><span class="n">9.3</span> Las 7 restricciones — la palabra SIEMPRE</li>
+        <li><span class="n">9.4</span> Comprometer al PTS</li>
+        <li><span class="n">9.5</span> El Plan Semanal</li>
+        <li><span class="n">9.6</span> Cerrar la semana: PPC y causas</li>
+        <li><span class="n">9.7</span> El ciclo completo, semana a semana</li>
+      </ol>
+    </li>
+    <li><span class="n">10</span> Flujo 4 — Proveedores, encargos y órdenes
+      <ol>
+        <li><span class="n">10.1</span> Qué ve y qué no ve el residente</li>
+        <li><span class="n">10.2</span> Encargos y valorización</li>
+        <li><span class="n">10.3</span> El ciclo de una orden de compra</li>
+      </ol>
+    </li>
+    <li><span class="n">11</span> Evidencia fotográfica y pases de obra</li>
+    <li><span class="n">12</span> Valor ganado (EVM): qué se muestra y qué no</li>
+    <li><span class="n">13</span> Entradas y salidas del sistema</li>
+    <li><span class="n">14</span> La rutina del residente: día, semana y mes</li>
+    <li><span class="n">15</span> Problemas frecuentes</li>
+    <li><span class="n">16</span> Glosario</li>
+    <li><span class="n">17</span> Qué falta por construir</li>
+  </ol>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 1</div>
+  <h2>1. Antes de empezar</h2>
+
+  <h3>1.1 Para quién es este manual</h3>
+  <p>Para el <strong>residente de obra</strong> y para quien lo acompaña en campo: administrador
+  de obra, planificador, almacenero y supervisión. No hace falta saber de informática. Todo lo
+  que se explica aquí se hace desde un navegador, en la computadora de la caseta o en el
+  celular.</p>
+
+  <p>El manual está ordenado como se usa el sistema: primero el vocabulario, después quién puede
+  hacer qué, y luego los cuatro flujos de trabajo en el orden en que ocurren en una obra real —
+  presupuesto, cronograma, planificación semanal y compras.</p>
+
+  <div class="caja">
+    <span class="et">Cómo leerlo</span>
+    <p>Si es tu primera vez, lee los capítulos 1 al 6 de corrido: son treinta minutos y te dan
+    el mapa completo. Los capítulos 7 al 11 se leen cuando toca hacer esa tarea. El capítulo 14
+    es la chuleta del día a día: imprímelo aparte y pégalo en la caseta.</p>
+  </div>
+
+  <h3>1.2 Qué problema resuelve GCM</h3>
+  <p>En una obra conviven tres documentos que nadie logra mirar juntos:</p>
+  <ul>
+    <li>El <strong>cronograma de MS Project</strong>, que dice <em>cuándo</em>.</li>
+    <li>El <strong>presupuesto en Excel</strong>, que dice <em>cuánto</em>.</li>
+    <li>Los <strong>papeles de compras</strong>, que dicen <em>en qué se está yendo la plata</em>.</li>
+  </ul>
+  <p>Cada uno vive en su archivo, cada uno se actualiza en su momento y ninguno sabe del otro.
+  El resultado es conocido: el avance se reporta en porcentajes que nadie sabe traducir a soles,
+  las órdenes de compra se aprueban sin saber cuánto queda de la partida, y el lunes se
+  programa trabajo que el miércoles no se puede hacer porque falta el fierro.</p>
+
+  <p><strong>GCM junta los tres y añade el cuarto que faltaba: el compromiso.</strong> No solo qué
+  toca hacer, sino qué se <em>puede</em> hacer de verdad, qué se prometió y qué se cumplió.</p>
+
+  <h3>1.3 Las tres verdades: Project, presupuesto y GCM</h3>
+  <p>Hay un reparto de autoridad que conviene entender desde el primer día, porque explica casi
+  todo el comportamiento del sistema:</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Fuente</th><th style="width:37%">Manda sobre…</th><th>Qué hace GCM con eso</th></tr></thead>
+    <tbody>
+      <tr><td><strong>MS Project</strong></td><td>Qué tareas hay, cuándo, en qué orden, cuál es la ruta crítica</td><td>Lo lee y lo muestra. <strong>No lo recalcula.</strong></td></tr>
+      <tr><td><strong>El presupuesto (Excel)</strong></td><td>Qué partidas hay, con qué metrado y a qué precio</td><td>Lo importa a un árbol editable y lo congela en revisiones</td></tr>
+      <tr><td><strong>GCM</strong></td><td>El avance real, quién lo reportó, qué se comprometió y qué se cumplió</td><td>Es la única fuente. Aquí sí manda.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caja ojo">
+    <span class="et">La consecuencia práctica</span>
+    <p>Si la ruta crítica está mal, se corrige en Project y se vuelve a importar. Si el precio
+    unitario está mal, se corrige en el árbol de partidas o se reimporta el Excel. Pero si el
+    avance está mal, se corrige <strong>aquí</strong>: no existe en ningún otro sitio.</p>
+  </div>
+
+  <h3>1.4 Mapa general del sistema</h3>
+  <p>Todo lo que hace GCM cabe en un dibujo. A la izquierda, lo que entra. En el centro, lo que
+  el sistema construye con ello. A la derecha, lo que sale y se lee.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs>
+        <marker id="fl" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+          <path d="M0,0 L8,3.2 L0,6.4 z" fill="#5b6875"/>
+        </marker>
+      </defs>
+
+      <text x="88" y="20" font-size="10" font-weight="700" fill="#5b6875" text-anchor="middle" letter-spacing="1.2">ENTRADAS</text>
+      <text x="380" y="20" font-size="10" font-weight="700" fill="#1f5f8b" text-anchor="middle" letter-spacing="1.2">GCM</text>
+      <text x="672" y="20" font-size="10" font-weight="700" fill="#5b6875" text-anchor="middle" letter-spacing="1.2">SALIDAS</text>
+
+      <g>
+        <rect x="8" y="38" width="160" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+        <text x="88" y="58" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Presupuesto Excel</text>
+        <text x="88" y="72" font-size="8.6" text-anchor="middle" fill="#5b6875">capítulos y partidas</text>
+
+        <rect x="8" y="96" width="160" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+        <text x="88" y="116" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">MS Project</text>
+        <text x="88" y="130" font-size="8.6" text-anchor="middle" fill="#5b6875">.mpp o .xml</text>
+
+        <rect x="8" y="154" width="160" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+        <text x="88" y="174" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Avance de campo</text>
+        <text x="88" y="188" font-size="8.6" text-anchor="middle" fill="#5b6875">lo que reporta el residente</text>
+
+        <rect x="8" y="212" width="160" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+        <text x="88" y="232" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Órdenes de compra</text>
+        <text x="88" y="246" font-size="8.6" text-anchor="middle" fill="#5b6875">y encargos a proveedores</text>
+
+        <rect x="8" y="270" width="160" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+        <text x="88" y="290" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Fotos de obra</text>
+        <text x="88" y="304" font-size="8.6" text-anchor="middle" fill="#5b6875">evidencia con pase</text>
+      </g>
+
+      <g stroke="#5b6875" stroke-width="1.3" marker-end="url(#fl)" fill="none">
+        <path d="M170,61 L242,90"/>
+        <path d="M170,119 L242,119"/>
+        <path d="M170,177 L242,150"/>
+        <path d="M170,235 L242,230"/>
+        <path d="M170,293 L242,262"/>
+      </g>
+
+      <rect x="250" y="34" width="260" height="288" rx="8" fill="#e8f1f7" stroke="#1f5f8b" stroke-width="1.6"/>
+
+      <rect x="264" y="50" width="232" height="40" rx="5" fill="#fff" stroke="#1f5f8b"/>
+      <text x="380" y="66" font-size="10.3" font-weight="700" text-anchor="middle" fill="#1f5f8b">Presupuesto por partidas</text>
+      <text x="380" y="80" font-size="8.4" text-anchor="middle" fill="#5b6875">árbol EDT + revisiones congeladas</text>
+
+      <rect x="264" y="98" width="232" height="40" rx="5" fill="#fff" stroke="#1f5f8b"/>
+      <text x="380" y="114" font-size="10.3" font-weight="700" text-anchor="middle" fill="#1f5f8b">Cronograma versionado</text>
+      <text x="380" y="128" font-size="8.4" text-anchor="middle" fill="#5b6875">tareas ancladas por UID</text>
+
+      <rect x="264" y="146" width="232" height="40" rx="5" fill="#fff" stroke="#2f7d4f" stroke-width="1.6"/>
+      <text x="380" y="162" font-size="10.3" font-weight="700" text-anchor="middle" fill="#2f7d4f">Mapeo tarea ↔ partida</text>
+      <text x="380" y="176" font-size="8.4" text-anchor="middle" fill="#5b6875">lo que convierte % en soles</text>
+
+      <rect x="264" y="194" width="232" height="40" rx="5" fill="#fff" stroke="#1f5f8b"/>
+      <text x="380" y="210" font-size="10.3" font-weight="700" text-anchor="middle" fill="#1f5f8b">Last Planner</text>
+      <text x="380" y="224" font-size="8.4" text-anchor="middle" fill="#5b6875">Lookahead · PTS · PPC · causas</text>
+
+      <rect x="264" y="242" width="232" height="40" rx="5" fill="#fff" stroke="#1f5f8b"/>
+      <text x="380" y="258" font-size="10.3" font-weight="700" text-anchor="middle" fill="#1f5f8b">Control económico</text>
+      <text x="380" y="272" font-size="8.4" text-anchor="middle" fill="#5b6875">comprometido, movimientos, saldo</text>
+
+      <rect x="264" y="290" width="232" height="20" rx="4" fill="#16202b"/>
+      <text x="380" y="304" font-size="8.7" font-weight="700" text-anchor="middle" fill="#fff" letter-spacing="1">AUDITORÍA · TODO QUEDA REGISTRADO</text>
+
+      <g stroke="#5b6875" stroke-width="1.3" marker-end="url(#fl)" fill="none">
+        <path d="M516,90 L584,61"/>
+        <path d="M516,119 L584,119"/>
+        <path d="M516,150 L584,177"/>
+        <path d="M516,230 L584,235"/>
+        <path d="M516,262 L584,293"/>
+      </g>
+
+      <g>
+        <rect x="592" y="38" width="160" height="46" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+        <text x="672" y="58" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Panel de indicadores</text>
+        <text x="672" y="72" font-size="8.6" text-anchor="middle" fill="#5b6875">12 módulos configurables</text>
+
+        <rect x="592" y="96" width="160" height="46" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+        <text x="672" y="116" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Curva S y EVM</text>
+        <text x="672" y="130" font-size="8.6" text-anchor="middle" fill="#5b6875">plan, real y proyección</text>
+
+        <rect x="592" y="154" width="160" height="46" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+        <text x="672" y="174" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">PPC y Pareto de causas</text>
+        <text x="672" y="188" font-size="8.6" text-anchor="middle" fill="#5b6875">el cuello de botella real</text>
+
+        <rect x="592" y="212" width="160" height="46" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+        <text x="672" y="232" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Órdenes impresas</text>
+        <text x="672" y="246" font-size="8.6" text-anchor="middle" fill="#5b6875">documento para el proveedor</text>
+
+        <rect x="592" y="270" width="160" height="46" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+        <text x="672" y="290" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Informes y Gantt</text>
+        <text x="672" y="304" font-size="8.6" text-anchor="middle" fill="#5b6875">para reunión y para el cliente</text>
+      </g>
+
+      <rect x="8" y="336" width="744" height="54" rx="6" fill="#fdf3de" stroke="#a8710b"/>
+      <text x="20" y="356" font-size="9.6" font-weight="700" fill="#a8710b">La frontera de seguridad</text>
+      <text x="20" y="371" font-size="9.2" fill="#16202b">Todo dato pertenece a una empresa, y el filtro por empresa sale siempre de la sesión — nunca de lo que pida el navegador.</text>
+      <text x="20" y="384" font-size="9.2" fill="#16202b">Es lo que impide que una constructora vea las obras de otra.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 1</span> — Mapa general: entradas, núcleo y salidas del sistema.</figcaption>
+  </figure>
+</section>
+<section class="cap">
+  <div class="kicker">Capítulo 2</div>
+  <h2>2. El vocabulario del sistema</h2>
+  <p class="lead">Seis palabras. Si estas seis quedan claras, el resto del manual se lee solo.</p>
+
+  <h3>2.1 Empresa, obra y equipo</h3>
+  <p>GCM está pensado para que varias constructoras usen la misma instalación sin verse entre
+  ellas. La jerarquía es siempre la misma:</p>
+
+  <figure>
+    <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs>
+        <marker id="f2" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto">
+          <path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/>
+        </marker>
+      </defs>
+
+      <rect x="20" y="20" width="150" height="52" rx="6" fill="#16202b"/>
+      <text x="95" y="42" font-size="11.5" font-weight="700" text-anchor="middle" fill="#fff">EMPRESA</text>
+      <text x="95" y="58" font-size="8.4" text-anchor="middle" fill="#c8d2db">razón social · RUC</text>
+
+      <rect x="230" y="20" width="150" height="52" rx="6" fill="#1f5f8b"/>
+      <text x="305" y="42" font-size="11.5" font-weight="700" text-anchor="middle" fill="#fff">OBRA</text>
+      <text x="305" y="58" font-size="8.4" text-anchor="middle" fill="#d3e6f2">OB-000001 · cliente</text>
+
+      <rect x="440" y="20" width="240" height="52" rx="6" fill="#2f7d4f"/>
+      <text x="560" y="42" font-size="11.5" font-weight="700" text-anchor="middle" fill="#fff">EQUIPO DE LA OBRA</text>
+      <text x="560" y="58" font-size="8.4" text-anchor="middle" fill="#d4ebdd">cada persona con SU rol en ESTA obra</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#f2)" fill="none">
+        <path d="M172,46 L226,46"/>
+        <path d="M382,46 L436,46"/>
+      </g>
+      <text x="199" y="38" font-size="8" text-anchor="middle" fill="#5b6875">1 : N</text>
+      <text x="409" y="38" font-size="8" text-anchor="middle" fill="#5b6875">1 : N</text>
+
+      <rect x="20" y="96" width="660" height="88" rx="6" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="36" y="116" font-size="9.8" font-weight="700" fill="#16202b">Lo que cuelga de una obra</text>
+      <text x="36" y="134" font-size="9" fill="#16202b">· Presupuesto (árbol de capítulos y partidas) y sus revisiones congeladas</text>
+      <text x="36" y="149" font-size="9" fill="#16202b">· Cronogramas importados, con sus versiones y su línea base</text>
+      <text x="36" y="164" font-size="9" fill="#16202b">· Lookahead, planes semanales, movimientos, encargos, órdenes, fotos y pases</text>
+      <text x="36" y="178" font-size="8.5" fill="#5b6875">Nada de esto se comparte entre obras. Borrar una obra se lleva todo lo suyo.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 2</span> — Jerarquía: empresa → obra → equipo.</figcaption>
+  </figure>
+
+  <p>Cada obra recibe un <strong>correlativo</strong> que asigna el sistema y que nunca se
+  recicla (<code>OB-000001</code>, <code>OB-000002</code>…). Es distinto del
+  <em>código de obra</em> que pone la persona, que puede faltar. El correlativo sirve para
+  buscar y para auditoría: si se borra una obra, su número no se le da a otra.</p>
+
+  <p>Una obra tiene además cuatro estados: <span class="tag a">PLANIFICACIÓN</span>
+  <span class="tag v">EN EJECUCIÓN</span> <span class="tag m">PARALIZADA</span>
+  <span class="tag r">CERRADA</span>. Con la obra cerrada, el sistema bloquea las operaciones
+  que modifican datos y te dice por qué.</p>
+
+  <h3>2.2 Capítulo, partida y tarea</h3>
+  <p>Es la distinción que más confusión causa, y la que hay que tener grabada:</p>
+
+  <table>
+    <thead><tr><th style="width:17%">Concepto</th><th style="width:20%">De dónde viene</th><th style="width:22%">Qué lleva</th><th>Es la unidad de…</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Capítulo</strong></td><td>Presupuesto</td><td>Solo agrupa. Sin metrado ni costo propio</td><td>organización</td></tr>
+      <tr><td><strong>Partida</strong></td><td>Presupuesto</td><td>Unidad, metrado, precio unitario y parcial</td><td><strong>dinero</strong></td></tr>
+      <tr><td><strong>Tarea</strong></td><td>MS Project</td><td>Fechas, duración, % planeado, si es crítica</td><td><strong>tiempo</strong></td></tr>
+    </tbody>
+  </table>
+
+  <p><strong>Son dos árboles distintos.</strong> El presupuesto suele ser dos o tres veces más
+  fino que el cronograma: en una obra real hay 314 partidas para 106 tareas. Los dos árboles se
+  cruzan con un <em>mapeo</em> que confirma una persona, y ese cruce es el que permite hablar de
+  avance en soles (capítulo 8.4).</p>
+
+  <h3>2.3 Modalidad de contratación</h3>
+  <p>No es una etiqueta decorativa: cambia cómo se calcula el importe y quién asume el riesgo si
+  el metrado real difiere del previsto.</p>
+
+  <table>
+    <thead><tr><th style="width:24%">Modalidad</th><th style="width:34%">Cómo se calcula el importe</th><th>Quién asume el riesgo del metrado</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Precios unitarios</strong></td><td>metrado × precio unitario</td><td>El cliente: si se ejecuta más, se paga más</td></tr>
+      <tr><td><strong>Suma alzada</strong></td><td>Precio cerrado por el alcance completo. El metrado es referencial</td><td>El contratista: aunque se ejecute más, el importe no cambia</td></tr>
+      <tr><td><strong>Alcance</strong></td><td>Sin importe propio. Detalla qué incluye una partida a suma alzada</td><td>El dinero está en la partida padre</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.4 Revisión, línea base y presupuesto vigente</h3>
+  <p>Tres palabras que suenan parecido y significan cosas muy distintas:</p>
+  <ul>
+    <li><strong>Revisión (línea base del presupuesto).</strong> Una foto congelada del
+    presupuesto en un momento: sus partidas, sus porcentajes de gastos generales y utilidad, sus
+    cláusulas. Mientras es <em>borrador</em> se puede editar; una vez <strong>aprobada, es
+    inmutable</strong>.</li>
+    <li><strong>Presupuesto vigente.</strong> La última revisión aprobada <em>más</em> los
+    movimientos aprobados después (adicionales, deductivos y reconversiones). Es contra lo que se
+    controla hoy.</li>
+    <li><strong>Línea base del cronograma.</strong> Otra cosa: la versión congelada del
+    <em>cronograma</em> contra la que se mide el valor ganado. Ésta sí se puede volver a fijar,
+    con confirmación y dejando registro.</li>
+  </ul>
+
+  <div class="caja alto">
+    <span class="et">Por qué una revisión aprobada no se puede editar</span>
+    <p>Porque todos los indicadores se miden <em>contra</em> ella. Si se pudiera cambiar hacia
+    atrás, el avance de la semana pasada dejaría de significar lo mismo y el sistema mentiría sin
+    avisar. Un error en una revisión aprobada se corrige con un <strong>movimiento</strong> de
+    signo contrario, nunca borrando.</p>
+  </div>
+
+  <h3>2.5 El UID: el ancla del cronograma</h3>
+  <p>Cada tarea de MS Project tiene un número interno llamado <strong>UID</strong>. GCM guarda el
+  avance, el Lookahead y los compromisos contra ese número, no contra el nombre ni contra la fila.</p>
+
+  <p>El motivo es práctico: al reimportar un cronograma, los <em>GUID</em> se regeneran enteros,
+  el <em>ID</em> se corre al insertar o borrar una fila, el <em>WBS</em> se recalcula con la
+  posición y el nombre lo edita cualquiera. Todos ellos fallan en silencio. El UID no.</p>
+
+  <div class="caja ok">
+    <span class="et">Qué significa para ti</span>
+    <p>Puedes reimportar el cronograma tantas veces como cambie el plan: <strong>el avance
+    reportado no se pierde</strong>. Lo que sí se pierde es el avance de una tarea que
+    desaparezca del archivo, porque ya no existe a qué anclarlo.</p>
+  </div>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 3</div>
+  <h2>3. Usuarios, roles y permisos</h2>
+  <p class="lead">Quién puede hacer qué, y por qué está repartido así.</p>
+
+  <h3>3.1 Los cinco roles</h3>
+
+  <table>
+    <thead><tr><th style="width:20%">Rol</th><th style="width:33%">Quién es en la obra</th><th>Qué hace en GCM</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Administrador</strong><br><span style="font-size:8.4pt;color:#5b6875">ADMIN</span></td>
+        <td>La gerencia de la constructora</td>
+        <td>Control total sobre su empresa. Es el único que <strong>aprueba</strong> revisiones,
+        movimientos y órdenes, y el único que administra usuarios y permisos.</td>
+      </tr>
+      <tr>
+        <td><strong>Residente</strong><br><span style="font-size:8.4pt;color:#5b6875">RESIDENTE</span></td>
+        <td>El responsable técnico en obra</td>
+        <td>Construye y mantiene el presupuesto, importa el cronograma, reporta avance, lleva el
+        Lookahead y el Plan Semanal, y valoriza los encargos. <strong>No aprueba nada
+        contractual.</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Administrador de obra</strong><br><span style="font-size:8.4pt;color:#5b6875">ADMIN_OBRA</span></td>
+        <td>El perfil económico-administrativo</td>
+        <td>Lleva proveedores, encargos y órdenes, y redacta movimientos presupuestales. Consulta
+        el presupuesto pero no lo modifica.</td>
+      </tr>
+      <tr>
+        <td><strong>Almacenero</strong><br><span style="font-size:8.4pt;color:#5b6875">ALMACENERO</span></td>
+        <td>Almacén de obra</td>
+        <td>Ve la obra y las partidas para poder imputar materiales. Nada más.</td>
+      </tr>
+      <tr>
+        <td><strong>Consultor</strong><br><span style="font-size:8.4pt;color:#5b6875">CONSULTOR</span></td>
+        <td>Cliente, supervisión, auditoría externa</td>
+        <td>Lectura estricta de todo lo que se le dé acceso. No escribe nunca.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="caja">
+    <span class="et">La lógica del reparto</span>
+    <p>Lo que se sabe <strong>estando en obra</strong> lo lleva el residente: el avance, las
+    restricciones, la valorización de un encargo. Lo que se <strong>negocia o compromete
+    dinero</strong> lo lleva el administrador de obra. Lo que es <strong>contractual e
+    irreversible</strong> —aprobar— se queda en el administrador de la empresa.</p>
+  </div>
+
+  <h3>3.2 Qué puede hacer cada rol (matriz completa)</h3>
+  <p>Ésta es la plantilla que trae el sistema. Un permiso que no aparece <strong>no se
+  concede</strong>: la regla es denegación por defecto.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:38%">Puede…</th>
+        <th class="c">Admin</th>
+        <th class="c">Residente</th>
+        <th class="c">Adm. obra</th>
+        <th class="c">Almac.</th>
+        <th class="c">Consultor</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Empresa y personas</td></tr>
+      <tr><td>Ver los datos de la empresa</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td></tr>
+      <tr><td>Editar los datos de la empresa</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Ver usuarios</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Crear, editar y desactivar usuarios</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Resetear la clave de otro</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Obras</td></tr>
+      <tr><td>Ver obras</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Crear y eliminar obras</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Editar la obra</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Asignar el equipo de la obra</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Presupuesto</td></tr>
+      <tr><td>Ver partidas</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Crear, editar y eliminar partidas</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Importar el presupuesto desde Excel</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Ver revisiones</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td></tr>
+      <tr><td>Crear una revisión (borrador)</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td><strong>Aprobar una revisión</strong></td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Cronograma y avance</td></tr>
+      <tr><td>Ver el cronograma</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td></tr>
+      <tr><td>Importar el cronograma</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Registrar avance</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Fijar la línea base del cronograma</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Last Planner</td></tr>
+      <tr><td>Ver el Lookahead y el Plan Semanal</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td></tr>
+      <tr><td>Gestionar el Lookahead (restricciones)</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Gestionar el Plan Semanal (PTS, cierre)</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Movimientos presupuestales</td></tr>
+      <tr><td>Ver movimientos</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td></tr>
+      <tr><td>Redactar un movimiento</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td><strong>Aprobar un movimiento</strong></td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Compras</td></tr>
+      <tr><td>Ver proveedores</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Crear y editar proveedores</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Ver encargos</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Repartir encargos (alcance y monto)</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Valorizar un encargo</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Ver órdenes de compra</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Crear una orden</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td><strong>Aprobar o anular una orden</strong></td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Administración</td></tr>
+      <tr><td>Ver y editar la matriz de permisos</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Editar la configuración (canal SMS)</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Leer la auditoría</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+    </tbody>
+  </table>
+
+  <p>Cada empresa puede <strong>ajustar esta plantilla</strong> desde <em>Personas → Permisos</em>:
+  conceder un permiso suelto a un rol que no lo trae, o quitárselo. Lo que decide en cada
+  operación es el permiso <em>efectivo</em>, no el rol.</p>
+
+  <h3>3.3 Permisos que no se pueden mover</h3>
+  <p>Cinco permisos están fuera de esa negociación, y por razones concretas:</p>
+
+  <table>
+    <thead><tr><th style="width:32%">Permiso</th><th>Por qué es innegociable</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Aprobar una revisión</strong></td><td rowspan="2">Son actos contractuales irreversibles que mueven la cifra contra la que se mide toda la obra. Si fueran configurables, un día alguien se los concede a quien no debe.</td></tr>
+      <tr><td><strong>Aprobar un movimiento</strong></td></tr>
+      <tr><td><strong>Ver la matriz de permisos</strong></td><td rowspan="2">Reparten todos los demás. Si se pudieran conceder, un administrador podría dárselos a un consultor y ése repartirse el resto: escalada de privilegios con dos clics.</td></tr>
+      <tr><td><strong>Editar la matriz de permisos</strong></td></tr>
+      <tr><td><strong>Editar la configuración</strong></td><td>Gobierna el teléfono por el que salen los SMS de la empresa, y por esa cola viajan los códigos de acceso en claro. Quien pueda vincular un emisor puede leer el segundo factor de sus compañeros.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.4 El rol se asigna por obra, no por persona</h3>
+  <p>Una misma persona puede ser <strong>residente en una obra y consultor en otra</strong>. El
+  rol efectivo se resuelve en el momento en que entras a una obra concreta, mirando la asignación
+  del equipo de esa obra.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 210" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs>
+        <marker id="f3" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto">
+          <path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/>
+        </marker>
+      </defs>
+
+      <rect x="14" y="16" width="120" height="44" rx="5" fill="#fff" stroke="#1f5f8b" stroke-width="1.5"/>
+      <text x="74" y="34" font-size="10" font-weight="700" text-anchor="middle" fill="#1f5f8b">Pides algo</text>
+      <text x="74" y="49" font-size="8.2" text-anchor="middle" fill="#5b6875">«guardar esta partida»</text>
+
+      <rect x="168" y="16" width="140" height="44" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="238" y="34" font-size="10" font-weight="700" text-anchor="middle" fill="#16202b">¿Hay sesión válida?</text>
+      <text x="238" y="49" font-size="8.2" text-anchor="middle" fill="#5b6875">y sin 2FA pendiente</text>
+
+      <rect x="342" y="16" width="150" height="44" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="417" y="34" font-size="10" font-weight="700" text-anchor="middle" fill="#16202b">¿La obra es de tu</text>
+      <text x="417" y="49" font-size="10" font-weight="700" text-anchor="middle" fill="#16202b">empresa?</text>
+
+      <rect x="526" y="16" width="160" height="44" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="606" y="34" font-size="10" font-weight="700" text-anchor="middle" fill="#16202b">¿Tu rol en ESA obra</text>
+      <text x="606" y="49" font-size="10" font-weight="700" text-anchor="middle" fill="#16202b">tiene el permiso?</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#f3)" fill="none">
+        <path d="M136,38 L164,38"/>
+        <path d="M310,38 L338,38"/>
+        <path d="M494,38 L522,38"/>
+      </g>
+
+      <path d="M606,62 L606,88" stroke="#2f7d4f" stroke-width="1.6" marker-end="url(#f3)" fill="none"/>
+      <rect x="500" y="90" width="186" height="36" rx="5" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="1.5"/>
+      <text x="593" y="113" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Se ejecuta y se audita</text>
+
+      <g stroke="#a8322d" stroke-width="1.4" fill="none" marker-end="url(#f3)">
+        <path d="M238,62 L238,146"/>
+        <path d="M417,62 L417,146"/>
+      </g>
+      <rect x="140" y="148" width="360" height="36" rx="5" fill="#fbeceb" stroke="#a8322d" stroke-width="1.5"/>
+      <text x="320" y="171" font-size="10.5" font-weight="700" text-anchor="middle" fill="#a8322d">Se rechaza — y no se dice por qué en detalle</text>
+
+      <text x="14" y="200" font-size="8.4" fill="#5b6875">La decisión real se toma en el servidor, en la capa de servicios. Que una pantalla no se vea es comodidad; que una operación se rechace es la seguridad.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 3</span> — Las cuatro puertas que atraviesa cada operación.</figcaption>
+  </figure>
+
+  <h3>3.5 El pase de obra no es un usuario</h3>
+  <p>En obra hay gente que necesita <strong>aportar fotos</strong> pero que no debe tener cuenta:
+  el capataz del subcontratista, el prevencionista, el maestro. Para ellos existe el
+  <strong>pase de obra</strong>.</p>
+
+  <table>
+    <thead><tr><th style="width:30%"></th><th style="width:35%">Usuario de GCM</th><th>Pase de obra</th></tr></thead>
+    <tbody>
+      <tr><td>Cómo entra</td><td>Correo y clave + verificación</td><td>Solo un código de un único uso al celular o correo</td></tr>
+      <tr><td>Alcance</td><td>Todas las obras donde esté asignado</td><td><strong>Una sola obra</strong>, siempre</td></tr>
+      <tr><td>Rol y permisos</td><td>Sí</td><td><strong>Ninguno</strong></td></tr>
+      <tr><td>Qué puede hacer</td><td>Lo que diga su rol</td><td>Solo adjuntar fotos de evidencia</td></tr>
+      <tr><td>Vigencia</td><td>Mientras esté activo</td><td>Limitada, y revocable en un clic</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caja ojo">
+    <span class="et">Dos reglas que protegen la obra</span>
+    <p><strong>Solo entra quien ya estaba registrado.</strong> El código se envía únicamente a un
+    contacto que el residente dio de alta en esa obra.</p>
+    <p><strong>Nunca se dice si un contacto existe.</strong> La pantalla pública responde igual
+    exista o no el número. Si respondiera distinto, se convertiría en un detector de quién
+    trabaja en la obra.</p>
+  </div>
+</section>
+<section class="cap">
+  <div class="kicker">Capítulo 4</div>
+  <h2>4. Entrar al sistema</h2>
+
+  <h3>4.1 El flujo de acceso, paso a paso</h3>
+  <p>GCM se abre en <code>https://gcm.drcaceresruiz.com</code> desde cualquier navegador. No se
+  instala nada.</p>
+
+  <figure>
+    <svg viewBox="0 0 730 330" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs>
+        <marker id="f4" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto">
+          <path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/>
+        </marker>
+        <marker id="f4r" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto">
+          <path d="M0,0 L7,2.8 L0,5.6 z" fill="#a8322d"/>
+        </marker>
+      </defs>
+
+      <rect x="270" y="10" width="190" height="38" rx="5" fill="#1f5f8b"/>
+      <text x="365" y="34" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">Correo y contraseña</text>
+
+      <path d="M365,50 L365,72" stroke="#5b6875" stroke-width="1.4" marker-end="url(#f4)"/>
+
+      <polygon points="365,74 480,104 365,134 250,104" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="365" y="101" font-size="9.6" font-weight="700" text-anchor="middle" fill="#16202b">¿Es correcta?</text>
+      <text x="365" y="115" font-size="8.2" text-anchor="middle" fill="#5b6875">y la cuenta está activa</text>
+
+      <path d="M250,104 L120,104" stroke="#a8322d" stroke-width="1.4" marker-end="url(#f4r)" fill="none"/>
+      <text x="185" y="97" font-size="8.2" font-weight="700" text-anchor="middle" fill="#a8322d">NO</text>
+      <rect x="8" y="86" width="108" height="36" rx="5" fill="#fbeceb" stroke="#a8322d"/>
+      <text x="62" y="102" font-size="9" font-weight="700" text-anchor="middle" fill="#a8322d">Se rechaza</text>
+      <text x="62" y="114" font-size="7.8" text-anchor="middle" fill="#a8322d">y queda registrado</text>
+
+      <path d="M365,136 L365,158" stroke="#5b6875" stroke-width="1.4" marker-end="url(#f4)"/>
+      <text x="380" y="151" font-size="8.2" font-weight="700" fill="#2f7d4f">SÍ</text>
+
+      <polygon points="365,160 495,190 365,220 235,190" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="365" y="187" font-size="9.6" font-weight="700" text-anchor="middle" fill="#16202b">¿Tienes verificación</text>
+      <text x="365" y="200" font-size="9.6" font-weight="700" text-anchor="middle" fill="#16202b">en dos pasos?</text>
+
+      <path d="M495,190 L560,190" stroke="#5b6875" stroke-width="1.4" marker-end="url(#f4)" fill="none"/>
+      <text x="527" y="183" font-size="8.2" font-weight="700" text-anchor="middle" fill="#1f5f8b">SÍ</text>
+      <rect x="564" y="160" width="158" height="60" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="643" y="180" font-size="9.6" font-weight="700" text-anchor="middle" fill="#1f5f8b">Código de 6 cifras</text>
+      <text x="643" y="194" font-size="8.4" text-anchor="middle" fill="#5b6875">por SMS o por correo</text>
+      <text x="643" y="209" font-size="8.4" text-anchor="middle" fill="#5b6875">caduca y tiene tope de intentos</text>
+
+      <path d="M643,222 L643,252 L495,252" stroke="#5b6875" stroke-width="1.4" marker-end="url(#f4)" fill="none"/>
+      <path d="M365,222 L365,252" stroke="#5b6875" stroke-width="1.4" fill="none"/>
+      <text x="336" y="240" font-size="8.2" font-weight="700" fill="#5b6875">NO</text>
+
+      <polygon points="365,254 480,282 365,310 250,282" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="365" y="279" font-size="9.4" font-weight="700" text-anchor="middle" fill="#16202b">¿Clave provisional?</text>
+      <text x="365" y="292" font-size="8.2" text-anchor="middle" fill="#5b6875">la que te dio el administrador</text>
+
+      <path d="M250,282 L120,282" stroke="#a8710b" stroke-width="1.4" marker-end="url(#f4)" fill="none"/>
+      <text x="185" y="275" font-size="8.2" font-weight="700" text-anchor="middle" fill="#a8710b">SÍ</text>
+      <rect x="8" y="264" width="108" height="36" rx="5" fill="#fdf3de" stroke="#a8710b"/>
+      <text x="62" y="280" font-size="9" font-weight="700" text-anchor="middle" fill="#a8710b">Cambiar clave</text>
+      <text x="62" y="292" font-size="7.8" text-anchor="middle" fill="#a8710b">obligatorio</text>
+
+      <path d="M480,282 L600,282" stroke="#2f7d4f" stroke-width="1.6" marker-end="url(#f4)" fill="none"/>
+      <text x="540" y="275" font-size="8.2" font-weight="700" text-anchor="middle" fill="#2f7d4f">NO</text>
+      <rect x="604" y="264" width="118" height="36" rx="5" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="1.5"/>
+      <text x="663" y="286" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Al panel</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 4</span> — Flujo de acceso, con sus dos desvíos.</figcaption>
+  </figure>
+
+  <h3>4.2 Verificación en dos pasos (SMS o correo)</h3>
+  <p>Es el candado que hace que saber tu contraseña no baste. Lo activas tú desde tu perfil y
+  eliges por dónde quieres recibir el código:</p>
+
+  <table>
+    <thead><tr><th style="width:16%">Canal</th><th style="width:36%">Cuándo conviene</th><th>Qué hace falta antes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Correo</strong></td><td>Siempre disponible. Es la opción por defecto</td><td>Nada: ya tienes correo registrado</td></tr>
+      <tr><td><strong>SMS</strong></td><td>En obra, donde el correo tarda o no hay datos</td><td>Registrar el celular <em>y verificarlo</em> con un código previo</td></tr>
+    </tbody>
+  </table>
+
+  <p>El código son <strong>seis cifras</strong>, caduca a los pocos minutos y tiene un tope de
+  intentos. Al agotarlo, el desafío se borra y hay que volver a empezar por la contraseña — es lo
+  que impide que alguien pruebe seis cifras a fuerza bruta.</p>
+
+  <div class="caja">
+    <span class="et">Por qué el SMS sale del teléfono de tu empresa</span>
+    <p>Cada constructora vincula <strong>su propio teléfono emisor</strong>. Con un único emisor
+    para toda la plataforma, los códigos de acceso de una empresa saldrían por el móvil de otra.
+    Conviene tener un segundo teléfono de respaldo vinculado: si el primero se queda sin batería,
+    la obra no se queda sin SMS.</p>
+  </div>
+
+  <h3>4.3 Olvidé mi clave</h3>
+  <ol class="pasos">
+    <li>En la pantalla de acceso, pulsa <strong>«Recuperar clave»</strong> y escribe tu correo.</li>
+    <li>La pantalla responde siempre lo mismo, exista o no ese correo. No es un fallo: si
+    respondiera distinto, cualquiera podría averiguar quién tiene cuenta.</li>
+    <li>Si el correo existe, llega un enlace con un vale de un solo uso y caducidad corta.</li>
+    <li>Abres el enlace, eliges clave nueva y entras.</li>
+  </ol>
+  <p>Si no llega, avisa al administrador de tu empresa: él puede <strong>resetear la clave</strong>
+  y darte una provisional, que el sistema te obligará a cambiar al primer ingreso.</p>
+
+  <h3>4.4 Tu perfil y las solicitudes de cambio</h3>
+  <p>Desde <em>Perfil</em> puedes hacer tú mismo, sin pedir permiso:</p>
+  <ul>
+    <li>Cambiar tu contraseña.</li>
+    <li>Registrar y verificar tu celular.</li>
+    <li>Elegir el canal de verificación (SMS o correo) y activarla o desactivarla.</li>
+    <li>Poner tu foto.</li>
+  </ul>
+  <p>Lo que <strong>no</strong> cambias tú son tus datos de identidad —nombre y correo—: eso se
+  pide con una <strong>solicitud de cambio</strong> que queda <span class="tag m">PENDIENTE</span>
+  hasta que un administrador la <span class="tag v">APRUEBA</span> o la
+  <span class="tag r">RECHAZA</span>. Mientras esté pendiente puedes cancelarla.</p>
+
+  <h3>4.5 GCM en el celular</h3>
+  <p>GCM se instala en el teléfono como una aplicación: se abre la web en el navegador del móvil
+  y se elige «Añadir a la pantalla de inicio». A partir de ahí tiene su ícono y se abre a pantalla
+  completa.</p>
+  <p>Las pantallas de campo están pensadas para eso. En el Lookahead, por ejemplo, la tabla se
+  convierte en tarjetas: cada tarea muestra «Restricciones 3/7 resueltas» y se despliega al
+  tocarla.</p>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 5</div>
+  <h2>5. El panel: leer la obra en un minuto</h2>
+  <p class="lead">Es lo primero que ves al entrar. Eliges una obra arriba y debajo salen sus indicadores.</p>
+
+  <h3>5.1 Los doce módulos</h3>
+
+  <table>
+    <thead><tr><th style="width:23%">Módulo</th><th style="width:44%">Contesta a…</th><th class="c" style="width:16%">Necesita cronograma</th><th class="c">Familia</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Qué falta</strong></td><td>Lo que hay que completar, y qué se rompe si no</td><td class="c no">no</td><td class="c">guía</td></tr>
+      <tr><td><strong>Avance físico</strong></td><td>¿Voy por delante o por detrás del plan?</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Curva de avance</strong></td><td>¿Cómo llegué hasta aquí y dónde acabo a este paso?</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Plazo</strong></td><td>¿Cuántos días quedan, y cuántos de ésos se trabaja?</td><td class="c no">no</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Presupuesto</strong></td><td>¿Cuánto queda por comprometer?</td><td class="c no">no</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Valor ganado (EVM)</strong></td><td>SPI y CPI: plazo y costo contra el plan</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr style="background:#e8f1f7"><td><strong>PPC</strong></td><td>¿Se cumple lo que prometemos cada semana?</td><td class="c no">no</td><td class="c"><strong>avisa antes</strong></td></tr>
+      <tr style="background:#e8f1f7"><td><strong>Lookahead</strong></td><td>¿Cuánto del trabajo que viene está liberado?</td><td class="c si">sí</td><td class="c"><strong>avisa antes</strong></td></tr>
+      <tr style="background:#e8f1f7"><td><strong>Causa que más frena</strong></td><td>¿Cuál es el cuello de botella que se repite?</td><td class="c no">no</td><td class="c"><strong>avisa antes</strong></td></tr>
+      <tr><td><strong>Partidas atrasadas</strong></td><td>¿Cuántas van por detrás y cuál urge?</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Cadena crítica</strong></td><td>¿Qué mueve la fecha de fin?</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Capítulos</strong></td><td>¿Cuáles se desvían más?</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Órdenes de compra</strong></td><td>¿Cuántas hay y en qué estado?</td><td class="c no">no</td><td class="c">pasado</td></tr>
+    </tbody>
+  </table>
+
+  <p>Los tres resaltados son los de Last Planner, y son los únicos que avisan
+  <strong>antes</strong> de que el problema ocurra. Los demás cuentan lo que ya pasó.</p>
+
+  <h3>5.2 La pareja que hay que leer junta</h3>
+
+  <figure>
+    <svg viewBox="0 0 700 180" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs>
+        <marker id="f5" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+          <path d="M0,0 L8,3.2 L0,6.4 z" fill="#a8710b"/>
+        </marker>
+      </defs>
+
+      <rect x="30" y="30" width="200" height="70" rx="6" fill="#e8f1f7" stroke="#1f5f8b" stroke-width="1.6"/>
+      <text x="130" y="54" font-size="12" font-weight="700" text-anchor="middle" fill="#1f5f8b">LOOKAHEAD hoy</text>
+      <text x="130" y="72" font-size="9" text-anchor="middle" fill="#16202b">cuánto del trabajo que viene</text>
+      <text x="130" y="86" font-size="9" text-anchor="middle" fill="#16202b">está liberado</text>
+
+      <path d="M234,65 L316,65" stroke="#a8710b" stroke-width="2" marker-end="url(#f5)" fill="none"/>
+      <text x="275" y="56" font-size="8.6" font-weight="700" text-anchor="middle" fill="#a8710b">2 semanas</text>
+
+      <rect x="322" y="30" width="200" height="70" rx="6" fill="#fdf3de" stroke="#a8710b" stroke-width="1.6"/>
+      <text x="422" y="54" font-size="12" font-weight="700" text-anchor="middle" fill="#a8710b">PPC después</text>
+      <text x="422" y="72" font-size="9" text-anchor="middle" fill="#16202b">cuánto de lo prometido</text>
+      <text x="422" y="86" font-size="9" text-anchor="middle" fill="#16202b">se cumplió</text>
+
+      <rect x="30" y="118" width="640" height="46" rx="6" fill="#fbeceb" stroke="#a8322d"/>
+      <text x="46" y="137" font-size="9.6" font-weight="700" fill="#a8322d">Un Lookahead bajo hoy es un PPC bajo dentro de dos semanas.</text>
+      <text x="46" y="153" font-size="9.2" fill="#16202b">Lo que se compromete sin liberar es exactamente lo que se incumple. No hay excepción.</text>
+
+      <rect x="540" y="30" width="130" height="70" rx="6" fill="#fff" stroke="#d7dee6" stroke-dasharray="3 3"/>
+      <text x="605" y="52" font-size="9" font-weight="700" text-anchor="middle" fill="#5b6875">CAUSAS</text>
+      <text x="605" y="68" font-size="8.4" text-anchor="middle" fill="#5b6875">el Pareto dice</text>
+      <text x="605" y="81" font-size="8.4" text-anchor="middle" fill="#5b6875">dónde atacar</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 5</span> — Lookahead y PPC: el mismo problema, con dos semanas de diferencia.</figcaption>
+  </figure>
+
+  <div class="caja alto">
+    <span class="et">La trampa más común</span>
+    <p>Se puede ir <strong>al día en la curva con un PPC del 50 %</strong>. Significa que el ritmo
+    está tapando una planificación que no se cumple. Se paga más adelante, cuando ya no queda
+    holgura para compensar.</p>
+  </div>
+
+  <h3>5.3 Configurar el panel</h3>
+  <p>Con el botón <strong>Configurar</strong> enciendes y apagas los módulos que quieras. Dos
+  detalles que conviene saber:</p>
+  <ul>
+    <li><strong>El orden no cambia nunca.</strong> Configurar decide qué se ve, no dónde se
+    coloca. Que cada indicador esté siempre en el mismo sitio es la mitad de lo que hace útil un
+    tablero.</li>
+    <li><strong>Apagar lo que no miras hace que cargue más rápido</strong>, porque el panel solo
+    va a buscar los datos de los módulos encendidos. Apagar es inmediato; encender uno apagado
+    tarda un instante la primera vez.</li>
+  </ul>
+
+  <h3>5.4 Los avisos no se filtran por obra</h3>
+  <p>Los avisos de la parte de arriba son de <strong>toda la empresa</strong>, aunque hayas
+  elegido una obra concreta. Es deliberado: el problema que hay que ver es justo el de la obra que
+  <em>no</em> estás mirando.</p>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 6</div>
+  <h2>6. Moverse por el sistema</h2>
+
+  <h3>Las secciones de una obra van en dos filas</h3>
+  <p>Arriba, tres grupos. Debajo, las secciones del grupo que estés mirando.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <rect x="10" y="10" width="680" height="34" rx="5" fill="#16202b"/>
+      <text x="30" y="32" font-size="12" font-weight="800" fill="#fff">GCM</text>
+      <text x="80" y="31" font-size="8.4" fill="#8fa3b5">(lleva siempre al panel)</text>
+      <rect x="470" y="17" width="100" height="20" rx="10" fill="#2b3947"/>
+      <text x="520" y="31" font-size="8.4" text-anchor="middle" fill="#c8d2db">Menú empresa</text>
+      <rect x="580" y="17" width="98" height="20" rx="10" fill="#2b3947"/>
+      <text x="629" y="31" font-size="8.4" text-anchor="middle" fill="#c8d2db">Constructoras</text>
+
+      <rect x="10" y="56" width="130" height="30" rx="5" fill="#1f5f8b"/>
+      <text x="75" y="76" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">Plan</text>
+      <circle cx="75" cy="92" r="2.6" fill="#1f5f8b"/>
+
+      <rect x="150" y="56" width="130" height="30" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="215" y="76" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Ejecución</text>
+
+      <rect x="290" y="56" width="130" height="30" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="355" y="76" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Compras</text>
+
+      <rect x="10" y="100" width="410" height="34" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="40" y="121" font-size="9.6" font-weight="700" fill="#1f5f8b">Presupuesto</text>
+      <text x="150" y="121" font-size="9.6" fill="#1f5f8b">Cronograma</text>
+      <text x="260" y="121" font-size="9.6" fill="#1f5f8b">Revisiones</text>
+
+      <text x="440" y="76" font-size="8.6" fill="#5b6875">Elegir un grupo NO te saca de donde estás:</text>
+      <text x="440" y="90" font-size="8.6" fill="#5b6875">despliega sus secciones y la pantalla</text>
+      <text x="440" y="104" font-size="8.6" fill="#5b6875">no cambia hasta que pulsas una.</text>
+      <text x="440" y="122" font-size="8.6" fill="#5b6875">El puntito marca el grupo de la</text>
+      <text x="440" y="136" font-size="8.6" fill="#5b6875">sección que tienes abierta.</text>
+
+      <rect x="10" y="150" width="330" height="90" rx="5" fill="#fafbfc" stroke="#d7dee6"/>
+      <text x="26" y="170" font-size="9.4" font-weight="700" fill="#1f5f8b">Ejecución</text>
+      <text x="26" y="186" font-size="9" fill="#16202b">Lookahead · Plan Semanal · Movimientos</text>
+      <text x="26" y="208" font-size="9.4" font-weight="700" fill="#1f5f8b">Compras</text>
+      <text x="26" y="224" font-size="9" fill="#16202b">Proveedores · Órdenes</text>
+
+      <rect x="352" y="150" width="338" height="90" rx="5" fill="#fafbfc" stroke="#d7dee6"/>
+      <text x="368" y="170" font-size="9.4" font-weight="700" fill="#1f5f8b">Menú de la empresa (arriba a la derecha)</text>
+      <text x="368" y="187" font-size="9" fill="#16202b">Compras — proveedores, formas de pago</text>
+      <text x="368" y="203" font-size="9" fill="#16202b">Personas — usuarios, permisos, solicitudes</text>
+      <text x="368" y="219" font-size="9" fill="#16202b">Empresa — datos, configuración</text>
+      <text x="368" y="234" font-size="8.4" fill="#5b6875">«Constructoras» va aparte: es de quien opera la plataforma.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 6</span> — La navegación: grupos arriba, secciones debajo.</figcaption>
+  </figure>
+
+  <p>Saltar de un grupo a otro cuesta un clic de más. Dentro del ciclo diario —Lookahead y Plan
+  Semanal, que son el mismo grupo— sigues yendo de un clic.</p>
+</section>
+<section class="cap">
+  <div class="kicker">Capítulo 7 · Flujo 1</div>
+  <h2>7. El presupuesto</h2>
+  <p class="lead">De un Excel a un árbol de partidas con el que se puede controlar dinero.</p>
+
+  <figure>
+    <svg viewBox="0 0 720 130" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs><marker id="f7" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto"><path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/></marker></defs>
+      <rect x="6" y="30" width="118" height="52" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="65" y="52" font-size="9.6" font-weight="700" text-anchor="middle" fill="#16202b">Excel del</text>
+      <text x="65" y="66" font-size="9.6" font-weight="700" text-anchor="middle" fill="#16202b">presupuesto</text>
+
+      <rect x="152" y="30" width="118" height="52" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="211" y="52" font-size="9.6" font-weight="700" text-anchor="middle" fill="#1f5f8b">Vista previa</text>
+      <text x="211" y="66" font-size="8.2" text-anchor="middle" fill="#5b6875">nada se escribe aún</text>
+
+      <rect x="298" y="30" width="118" height="52" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="357" y="52" font-size="9.6" font-weight="700" text-anchor="middle" fill="#1f5f8b">Árbol EDT</text>
+      <text x="357" y="66" font-size="8.2" text-anchor="middle" fill="#5b6875">editable</text>
+
+      <rect x="444" y="30" width="118" height="52" rx="5" fill="#fdf3de" stroke="#a8710b"/>
+      <text x="503" y="52" font-size="9.6" font-weight="700" text-anchor="middle" fill="#a8710b">Revisión</text>
+      <text x="503" y="66" font-size="8.2" text-anchor="middle" fill="#5b6875">borrador</text>
+
+      <rect x="590" y="30" width="124" height="52" rx="5" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="1.6"/>
+      <text x="652" y="52" font-size="9.6" font-weight="700" text-anchor="middle" fill="#2f7d4f">APROBADA</text>
+      <text x="652" y="66" font-size="8.2" text-anchor="middle" fill="#5b6875">inmutable</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#f7)" fill="none">
+        <path d="M126,56 L148,56"/><path d="M272,56 L294,56"/><path d="M418,56 L440,56"/><path d="M564,56 L586,56"/>
+      </g>
+      <text x="137" y="48" font-size="7.6" text-anchor="middle" fill="#5b6875">analizar</text>
+      <text x="283" y="48" font-size="7.6" text-anchor="middle" fill="#5b6875">aplicar</text>
+      <text x="429" y="48" font-size="7.6" text-anchor="middle" fill="#5b6875">crear</text>
+      <text x="575" y="48" font-size="7.6" text-anchor="middle" fill="#5b6875">aprobar</text>
+      <text x="360" y="106" font-size="8.6" text-anchor="middle" fill="#a8322d" font-weight="700">A partir de aquí, el presupuesto solo cambia con movimientos.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 7</span> — El camino del presupuesto, de extremo a extremo.</figcaption>
+  </figure>
+
+  <h3>7.1 Preparar el Excel</h3>
+  <p>El importador es tolerante: no exige una plantilla. Lo que necesita es reconocer la fila de
+  cabecera y, a partir de ella, seis columnas. Reconoce los nombres habituales del oficio:</p>
+
+  <table>
+    <thead><tr><th style="width:22%">Columna</th><th>Nombres que reconoce</th><th class="c" style="width:14%">¿Obligatoria?</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Código</strong></td><td>Item · Código · Cod · Nro · N° · Num</td><td class="c si">sí</td></tr>
+      <tr><td><strong>Descripción</strong></td><td>Descripción · Partida · Detalle · Concepto · Actividad</td><td class="c si">sí</td></tr>
+      <tr><td><strong>Unidad</strong></td><td>Und · Und. · Unidad · U.M. · UM · Medida · Unid</td><td class="c">recomendada</td></tr>
+      <tr><td><strong>Metrado</strong></td><td>Metrado · Cantidad · Cant · Cant. · Metrados</td><td class="c">al menos una</td></tr>
+      <tr><td><strong>Precio unitario</strong></td><td>Precio unitario · P.U. · PU · Precio · Unitario · Costo unitario</td><td class="c">de estas dos</td></tr>
+      <tr><td><strong>Parcial</strong></td><td>Parcial · Subtotal · Importe · Total · Monto</td><td class="c">recomendada</td></tr>
+    </tbody>
+  </table>
+
+  <p>Los códigos son números separados por punto: <code>4</code>, <code>4.3</code>,
+  <code>01.02.01</code>. Vale el formato S10 peruano. Del código sale también la jerarquía: un
+  código con más puntos cuelga del que tiene menos.</p>
+
+  <div class="caja ok">
+    <span class="et">Buena práctica antes de subir</span>
+    <p>Saca el metrado de dentro del nombre. Si la partida se llama
+    <em>«Excavación para zapatas (4.25 m³)»</em>, el 4,25 tiene que estar en la columna Metrado y
+    <code>m3</code> en la columna Unidad. Mientras el metrado viva como texto dentro del nombre,
+    no hay control económico posible.</p>
+  </div>
+
+  <h3>7.2 Importar: analizar, revisar, aplicar</h3>
+  <p>El importador <strong>nunca escribe por su cuenta</strong>. Son dos pasos separados a
+  propósito: un presupuesto importado a ciegas es peor que no importarlo.</p>
+
+  <ol class="pasos">
+    <li>Entra a la obra → <strong>Plan → Presupuesto → Importar</strong> y sube el archivo.</li>
+    <li>El sistema <strong>analiza</strong> y te devuelve una vista previa: qué fila tomó como
+    cabecera, qué columna asignó a cada campo, cuántos capítulos y cuántas partidas encontró y
+    cuál es el monto total.</li>
+    <li>Revisa los <strong>errores</strong> (fila y columna concretas) y los <strong>avisos</strong>
+    (la fila se importa igual, pero conviene mirarla).</li>
+    <li>Si todo cuadra, pulsa <strong>Aplicar</strong>. Ése es el único momento en que se escribe.</li>
+  </ol>
+
+  <h3>7.3 Qué detecta el importador por su cuenta</h3>
+
+  <table>
+    <thead><tr><th style="width:30%">Situación en el Excel</th><th>Qué hace GCM</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Celdas combinadas verticalmente</strong> en las columnas de cifras</td>
+        <td>Lo lee como una partida a <strong>suma alzada</strong> cuyo alcance se detalla en varias
+        líneas: la fila maestra lleva el importe y las demás quedan como <em>alcance</em>, sin
+        importe propio. Es la señal autoritativa, mejor que adivinar comparando importes.</td>
+      </tr>
+      <tr>
+        <td><strong>Filas de texto sin código</strong> — notas, subtítulos, cláusulas</td>
+        <td>Las omite y te dice cuántas omitió.</td>
+      </tr>
+      <tr>
+        <td><strong>Filas ocultas</strong> en la hoja</td>
+        <td>No las importa —quedaron fuera de alcance— pero te dice cuántas son y
+        <strong>cuánto suman</strong>, para que veas qué se dejó fuera.</td>
+      </tr>
+      <tr>
+        <td><strong>Importes idénticos en filas consecutivas</strong></td>
+        <td>Te muestra el total normal y el total <em>contando una sola vez</em> cada grupo
+        repetido, para que decidas si es un desglose o son partidas distintas que casualmente
+        cuestan lo mismo.</td>
+      </tr>
+      <tr>
+        <td><strong>Una partida con cifras pero sin descripción</strong></td>
+        <td>Error bloqueante, con el número de fila.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>7.4 El riesgo de reemplazo</h3>
+  <p>Reimportar un Excel corregido <strong>reemplaza</strong> el árbol. Antes de hacerlo, el
+  sistema contesta la única pregunta que importa: <em>de lo que voy a borrar, ¿qué no está en
+  ningún archivo?</em></p>
+
+  <table>
+    <thead><tr><th style="width:34%">Tipo de partida</th><th>Qué pasa si se reemplaza</th></tr></thead>
+    <tbody>
+      <tr><td>Importada y no tocada</td><td>Se puede perder sin drama: el Excel la vuelve a traer</td></tr>
+      <tr><td><strong>Creada a mano</strong></td><td class="si">No existe en ningún otro sitio. Borrarla destruye trabajo</td></tr>
+      <tr><td><strong>Importada y editada después</strong></td><td class="si">Su corrección tampoco está en el Excel. Se perdería</td></tr>
+    </tbody>
+  </table>
+
+  <p>Por eso el aviso no dice «se borrarán 360 partidas» —que se lee como rutina—, sino cuántas de
+  ésas son irrecuperables.</p>
+
+  <h3>7.5 Editar el árbol a mano</h3>
+  <p>El árbol es editable en cualquier momento: crear una partida, cambiar unidad, metrado o
+  precio unitario, o eliminarla. El <strong>parcial</strong> se recalcula solo
+  (metrado × precio unitario) y sube por el árbol hasta el total.</p>
+
+  <div class="caja">
+    <span class="et">Regla de la casa</span>
+    <p>Todo importe se guarda con precisión decimal exacta, nunca con números aproximados. Un
+    céntimo perdido por redondeo en un presupuesto de obra es un error contable, no un detalle.</p>
+  </div>
+
+  <h3>7.6 Revisiones y línea base</h3>
+  <p>Una <strong>revisión</strong> congela el presupuesto en una fecha. Y el presupuesto no es la
+  simple suma de partidas: sobre el costo directo se aplica una cascada.</p>
+
+  <figure>
+    <svg viewBox="0 0 640 250" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <rect x="120" y="10" width="400" height="30" rx="4" fill="#1f5f8b"/>
+      <text x="140" y="30" font-size="10" font-weight="700" fill="#fff">Costo directo</text>
+      <text x="500" y="30" font-size="9" text-anchor="end" fill="#d3e6f2">suma de todas las partidas</text>
+
+      <rect x="120" y="46" width="400" height="28" rx="4" fill="#fbeceb" stroke="#a8322d"/>
+      <text x="140" y="65" font-size="10" font-weight="700" fill="#a8322d">− Descuentos comerciales</text>
+      <text x="500" y="65" font-size="9" text-anchor="end" fill="#5b6875">negativos</text>
+
+      <rect x="120" y="80" width="400" height="28" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="140" y="99" font-size="10" font-weight="700" fill="#1f5f8b">+ Gastos generales</text>
+      <text x="500" y="99" font-size="9" text-anchor="end" fill="#5b6875">% propio de esta revisión</text>
+
+      <rect x="120" y="114" width="400" height="28" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="140" y="133" font-size="10" font-weight="700" fill="#1f5f8b">+ Utilidad</text>
+      <text x="500" y="133" font-size="9" text-anchor="end" fill="#5b6875">% propio de esta revisión</text>
+
+      <rect x="120" y="150" width="400" height="32" rx="4" fill="#2f7d4f"/>
+      <text x="140" y="171" font-size="11" font-weight="700" fill="#fff">= MONTO TOTAL (sin IGV)</text>
+      <text x="500" y="171" font-size="9" text-anchor="end" fill="#d4ebdd">la cifra de control</text>
+
+      <rect x="120" y="188" width="400" height="26" rx="4" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="140" y="206" font-size="9.6" fill="#5b6875">+ IGV (18 % por defecto) · tipo de cambio para verlo en dólares</text>
+
+      <text x="120" y="236" font-size="8.6" fill="#5b6875">Los porcentajes viven en la revisión y no en la obra: si se guardaran en la obra, recalcular una revisión antigua daría otro</text>
+      <text x="120" y="247" font-size="8.6" fill="#5b6875">número y comparar revisiones dejaría de tener sentido.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 8</span> — La cascada del presupuesto dentro de una revisión.</figcaption>
+  </figure>
+
+  <p>La revisión guarda además las <strong>cláusulas</strong> de esa versión: alcance, forma de
+  pago, garantía y vigencia. La cláusula de alcance es la que define después cuándo procede un
+  adicional y cuándo una reconversión.</p>
+
+  <ol class="pasos">
+    <li><strong>Plan → Revisiones → Nueva.</strong> Nace como borrador con el costo directo actual del árbol.</li>
+    <li>Completa fecha de revisión, descuentos, porcentajes, tipo de cambio y cláusulas.</li>
+    <li>Revisa el resumen. Mientras sea borrador, se puede corregir todo.</li>
+    <li>El <strong>administrador</strong> la aprueba. Desde ese momento es inmutable y pasa a ser el
+    presupuesto contra el que se mide la obra.</li>
+  </ol>
+
+  <h3>7.7 Movimientos: reconversión, adicional y deductivo</h3>
+  <p>Con la revisión aprobada, el presupuesto solo se mueve con documentos. Un movimiento se
+  redacta como <span class="tag m">BORRADOR</span>, se cita en un acta y el administrador lo
+  <span class="tag v">APRUEBA</span>. Aprobar es irreversible: un movimiento aprobado se corrige
+  con otro de signo contrario, no borrándolo.</p>
+
+  <table>
+    <thead><tr><th style="width:20%">Tipo</th><th style="width:30%">Qué hace</th><th style="width:22%">Sus líneas</th><th>Cuándo procede</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Reconversión</strong></td><td>Saca de una partida y mete en otra</td><td>Suman <strong>cero</strong></td><td>El alcance no cambia; cambia el reparto</td></tr>
+      <tr><td><strong>Adicional</strong></td><td>Aumenta el presupuesto aprobado</td><td>Solo entradas</td><td>Vicios ocultos o cambios de diseño (cláusula de alcance)</td></tr>
+      <tr><td><strong>Deductivo</strong></td><td>Reduce el presupuesto aprobado</td><td>Solo salidas</td><td>Se retira alcance contratado</td></tr>
+    </tbody>
+  </table>
+
+  <p>Cada movimiento lleva concepto, <strong>motivo</strong> (donde se invoca la cláusula) y
+  <strong>referencia</strong> al documento del cliente que lo autoriza: carta, acta o correo. Un
+  adicional puede además <strong>dar de alta partidas nuevas</strong>: nacen marcadas con su
+  movimiento de origen, y en pantalla se distinguen de lo contratado porque su presupuesto base
+  es cero.</p>
+
+  <div class="caja">
+    <span class="et">Dónde se ve el resultado</span>
+    <p>En <em>Ejecución → Movimientos</em> tienes el histórico y el <strong>presupuesto
+    vigente</strong>: la revisión aprobada más todos los movimientos aprobados. Es la cifra contra
+    la que se compara lo comprometido con proveedores.</p>
+  </div>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 8 · Flujo 2</div>
+  <h2>8. El cronograma</h2>
+  <p class="lead">De MS Project a un plan versionado contra el que se puede reportar avance.</p>
+
+  <h3>8.1 Importar de MS Project</h3>
+  <p><strong>Plan → Cronograma → Importar.</strong> Acepta <code>.mpp</code> y <code>.xml</code>.
+  De cada tarea se copia fielmente lo que trae el archivo:</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Dato</th><th>De dónde sale y por qué así</th></tr></thead>
+    <tbody>
+      <tr><td><strong>UID</strong></td><td>El identificador interno. Es el ancla del avance (ver 2.5)</td></tr>
+      <tr><td>Fila</td><td>Para ordenar y para escribir las predecesoras del informe («24FC+3 días»). Jamás como clave</td></tr>
+      <tr><td>Código</td><td>El «4.4» del principio del nombre. No sale del campo WBS de Project, que lleva otra numeración</td></tr>
+      <tr><td>Nivel</td><td>La profundidad de esquema. <strong>Única fuente de jerarquía</strong>: el código es solo una etiqueta</td></tr>
+      <tr><td>Inicio y fin</td><td>Fechas de calendario</td></tr>
+      <tr><td>Duración</td><td>Del campo Duración, nunca de restar fechas: una partida de un día puede abarcar tres por el calendario. Admite fracción</td></tr>
+      <tr><td>% planeado</td><td>Se <strong>lee</strong> del archivo, no se calcula: así las cifras coinciden con el informe que ya emite el cliente</td></tr>
+      <tr><td>Es resumen / es hito / <strong>es crítica</strong></td><td>Vienen dados por el archivo. La ruta crítica no se deduce de la holgura</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.2 Versiones y fecha de corte</h3>
+  <p>Cada importación crea una <strong>versión</strong>. La versión se identifica por su
+  <strong>fecha de corte</strong>, que sale del propio archivo (<em>Status Date</em>) — no de
+  cuándo se guardó ni de cuándo se subió. Es lo que permite avisarte de que ese corte ya se cargó:
+  hay archivos del mismo corte guardados con horas de diferencia.</p>
+
+  <div class="caja ojo">
+    <span class="et">Regla simple</span>
+    <p><strong>Si el plan no cambió, no crees una versión nueva.</strong> Sube archivo cuando el
+    plan cambie de verdad.</p>
+  </div>
+
+  <h3>8.3 Fijar la línea base del cronograma</h3>
+  <p>Una de las versiones se marca como <strong>línea base</strong>: es el plan congelado contra el
+  que se calculan el valor planificado y el índice de plazo. Solo una a la vez.</p>
+  <p>Se puede volver a fijar en otra versión —con confirmación y dejando registro de quién y
+  cuándo—. No es contractual como la del presupuesto, pero re-fijarla cambia todos los índices
+  hacia atrás: hazlo cuando el plan se replanifique formalmente, no cada semana.</p>
+
+  <h3>8.4 Mapear tareas con partidas</h3>
+  <p><strong>Es lo más importante que se hace en esta pantalla.</strong> Sin mapeo, el avance se
+  pondera por <em>duración</em>, que es lo único que trae Project. Con mapeo, se pondera por
+  <em>dinero</em>.</p>
+
+  <table>
+    <thead><tr><th>Tarea</th><th class="c">Duración</th><th class="c">Costo</th><th class="c">Avance</th></tr></thead>
+    <tbody>
+      <tr><td>Curado de concreto en zapatas</td><td class="c">60 d</td><td class="c">S/ 10 000</td><td class="c">20 %</td></tr>
+      <tr><td>Suministro y montaje de estructura</td><td class="c">5 d</td><td class="c">S/ 200 000</td><td class="c">100 %</td></tr>
+      <tr style="background:#fdf3de"><td colspan="3"><strong>Ponderado por duración</strong></td><td class="c"><strong>26 %</strong></td></tr>
+      <tr style="background:#e7f4ec"><td colspan="3"><strong>Ponderado por dinero</strong></td><td class="c"><strong>96 %</strong></td></tr>
+    </tbody>
+  </table>
+
+  <p>El curado dura mucho y no cuesta casi nada. Los dos números son ciertos; solo uno sirve para
+  contrastarlo con lo gastado.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <text x="120" y="18" font-size="9.4" font-weight="700" text-anchor="middle" fill="#1f5f8b">CRONOGRAMA (tiempo)</text>
+      <text x="560" y="18" font-size="9.4" font-weight="700" text-anchor="middle" fill="#2f7d4f">PRESUPUESTO (dinero)</text>
+
+      <rect x="30" y="34" width="180" height="34" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="44" y="55" font-size="9.2" fill="#16202b">Tarea UID 118 — Instalaciones piso 1</text>
+
+      <rect x="30" y="86" width="180" height="34" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="44" y="107" font-size="9.2" fill="#16202b">Tarea UID 142 — Concreto zapatas A</text>
+
+      <rect x="30" y="138" width="180" height="34" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="44" y="159" font-size="9.2" fill="#16202b">Tarea UID 143 — Concreto zapatas B</text>
+
+      <rect x="470" y="26" width="200" height="28" rx="4" fill="#e7f4ec" stroke="#2f7d4f"/>
+      <text x="484" y="45" font-size="9.2" fill="#16202b">6.1 Tubería PVC — S/ 18 400</text>
+
+      <rect x="470" y="60" width="200" height="28" rx="4" fill="#e7f4ec" stroke="#2f7d4f"/>
+      <text x="484" y="79" font-size="9.2" fill="#16202b">6.2 Cableado — S/ 22 100</text>
+
+      <rect x="470" y="94" width="200" height="28" rx="4" fill="#e7f4ec" stroke="#2f7d4f"/>
+      <text x="484" y="113" font-size="9.2" fill="#16202b">6.3 Accesorios — S/ 5 900</text>
+
+      <rect x="470" y="132" width="200" height="28" rx="4" fill="#e7f4ec" stroke="#2f7d4f"/>
+      <text x="484" y="151" font-size="9.2" fill="#16202b">3.4 Concreto f'c=210 — S/ 96 300</text>
+
+      <g stroke="#a8710b" stroke-width="1.5" fill="none">
+        <path d="M212,44 L466,40"/>
+        <path d="M212,51 L466,74"/>
+        <path d="M212,58 L466,108"/>
+        <path d="M212,103 L466,142"/>
+        <path d="M212,155 L466,148"/>
+      </g>
+
+      <rect x="240" y="176" width="220" height="20" rx="4" fill="#fdf3de" stroke="#a8710b"/>
+      <text x="350" y="190" font-size="8.6" font-weight="700" text-anchor="middle" fill="#a8710b">Relación de muchos a muchos</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 9</span> — Una tarea puede tocar varias partidas, y una partida repartirse en varias tareas.</figcaption>
+  </figure>
+
+  <h4>Por qué se confirma a mano</h4>
+  <p>GCM <strong>propone</strong> las partidas que más se parecen, por código y por parecido de
+  descripción. Lo que no hace es confirmar solo, y la razón está medida sobre archivos reales: de
+  56 coincidencias de código, <strong>36 apuntaban a otra cosa</strong> — el capítulo 5 del
+  cronograma iba desplazado una posición respecto al del presupuesto, y el «5.5» habría caído
+  sobre un descuento comercial.</p>
+
+  <div class="caja alto">
+    <span class="et">Lo que hace peligroso un mapeo automático</span>
+    <p>Un mapeo equivocado <strong>no da ningún síntoma</strong>. La curva sale bonita y miente. Por
+    eso la fila solo se escribe cuando una persona acepta, y queda registrado quién y cuándo.</p>
+  </div>
+
+  <p>No hace falta mapear todo de golpe: <strong>empieza por los capítulos que concentran el
+  dinero</strong>. Con el 20 % de las partidas suele cubrirse el 80 % del presupuesto. Y como el
+  mapeo se guarda contra el <em>código</em> de la partida y no contra su identificador interno,
+  reimportar el Excel corregido no lo rompe.</p>
+
+  <p>Cuando una tarea toca partidas con unidades distintas (m² y kg), el sistema
+  <strong>no inventa</strong> una cantidad: te la pide.</p>
+
+  <h3>8.5 Registrar avance</h3>
+  <p>El avance se reporta contra el UID de la tarea, con fecha, porcentaje y una nota opcional.
+  Queda firmado con tu nombre.</p>
+  <p>Hay dos vías, y conviene saber cuál usaste:</p>
+  <ul>
+    <li><strong>Manual</strong> — desde la pantalla del cronograma, tarea por tarea.</li>
+    <li><strong>Desde el cierre del Plan Semanal</strong> — el avance nace del PTS y queda ligado a
+    ese plan, de modo que si se reabre y se vuelve a cerrar la semana, se reemplaza en vez de
+    duplicarse.</li>
+  </ul>
+
+  <h3>8.6 Gantt, informe y ruta crítica</h3>
+  <p>Tres vistas sobre la misma versión:</p>
+  <ul>
+    <li><strong>Gantt</strong> — las barras en el tiempo, para mirar solapes y secuencia.</li>
+    <li><strong>Informe</strong> — la tabla con códigos, duraciones, fechas y cadenas de
+    predecesoras, en el formato que se lleva a reunión.</li>
+    <li><strong>Cadena crítica</strong> (en el panel) — las tareas donde un día perdido es un día
+    perdido de obra entera.</li>
+  </ul>
+  <p>De la ruta crítica GCM <strong>quita capítulos e hitos</strong>. Project también los marca
+  como críticos, pero sobre ellos no se puede actuar: meter cuadrilla en un capítulo no significa
+  nada.</p>
+
+  <h3>8.7 La curva S</h3>
+  <p>Tres líneas sobre el mismo eje: lo planificado, lo real y la proyección a este ritmo.</p>
+
+  <figure>
+    <svg viewBox="0 0 620 230" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <line x1="60" y1="20" x2="60" y2="180" stroke="#5b6875" stroke-width="1"/>
+      <line x1="60" y1="180" x2="580" y2="180" stroke="#5b6875" stroke-width="1"/>
+      <text x="34" y="26" font-size="8.4" fill="#5b6875">100%</text>
+      <text x="42" y="184" font-size="8.4" fill="#5b6875">0%</text>
+      <text x="320" y="202" font-size="8.6" fill="#5b6875" text-anchor="middle">tiempo</text>
+
+      <line x1="330" y1="20" x2="330" y2="180" stroke="#a8710b" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="330" y="16" font-size="8.4" font-weight="700" fill="#a8710b" text-anchor="middle">hoy</text>
+
+      <path d="M60,180 C160,172 220,120 330,74 C420,38 500,26 520,22" fill="none" stroke="#1f5f8b" stroke-width="2.2"/>
+      <text x="524" y="22" font-size="8.6" font-weight="700" fill="#1f5f8b">plan</text>
+
+      <path d="M60,180 C160,176 225,146 330,110" fill="none" stroke="#2f7d4f" stroke-width="2.6"/>
+      <text x="286" y="128" font-size="8.6" font-weight="700" fill="#2f7d4f">real</text>
+
+      <path d="M330,110 C420,80 530,44 578,36" fill="none" stroke="#a8322d" stroke-width="2" stroke-dasharray="5 3"/>
+      <text x="520" y="52" font-size="8.6" font-weight="700" fill="#a8322d">proyección</text>
+
+      <line x1="330" y1="74" x2="330" y2="110" stroke="#a8322d" stroke-width="4"/>
+      <text x="342" y="96" font-size="8.4" font-weight="700" fill="#a8322d">desvío de hoy</text>
+
+      <rect x="60" y="208" width="520" height="18" rx="4" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="70" y="221" font-size="8.4" fill="#16202b">Con mapeo tarea↔partida, los tres ejes están en soles. Sin mapeo, en porcentaje ponderado por duración.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 10</span> — La curva S y lo que dice cada línea.</figcaption>
+  </figure>
+
+  <p>La curva estima <strong>cuánto te vas a pasar</strong>, no solo si llegas: a mitad de ritmo,
+  tardas el doble de lo que queda. Solo dice «no se llega» cuando el ritmo es <strong>cero</strong>,
+  y ahí es literal. El porcentaje de ritmo tampoco redondea: un 99,6 % se muestra como 99,6 %,
+  porque decirle «vas al día» a quien no va es la peor ayuda posible.</p>
+</section>
+<section class="cap">
+  <div class="kicker">Capítulo 9 · Flujo 3</div>
+  <h2>9. Last Planner: de lo que toca a lo que se puede</h2>
+  <p class="lead">Éste es el corazón del sistema y el trabajo propio del residente. Los tres pasos
+  anteriores preparan el terreno; aquí es donde se gana o se pierde la obra.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 230" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs><marker id="f9" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto"><path d="M0,0 L8,3.2 L0,6.4 z" fill="#1f5f8b"/></marker>
+      <marker id="f9v" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto"><path d="M0,0 L8,3.2 L0,6.4 z" fill="#2f7d4f"/></marker></defs>
+
+      <rect x="20" y="60" width="140" height="66" rx="6" fill="#16202b"/>
+      <text x="90" y="86" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">CRONOGRAMA</text>
+      <text x="90" y="102" font-size="8.4" text-anchor="middle" fill="#a9b8c6">largo plazo</text>
+      <text x="90" y="115" font-size="8.4" text-anchor="middle" fill="#a9b8c6">lo que TOCA hacer</text>
+
+      <rect x="190" y="60" width="140" height="66" rx="6" fill="#1f5f8b"/>
+      <text x="260" y="86" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">LOOKAHEAD</text>
+      <text x="260" y="102" font-size="8.4" text-anchor="middle" fill="#d3e6f2">3 a 12 semanas</text>
+      <text x="260" y="115" font-size="8.4" text-anchor="middle" fill="#d3e6f2">lo que se PUEDE hacer</text>
+
+      <rect x="360" y="60" width="140" height="66" rx="6" fill="#2f7d4f"/>
+      <text x="430" y="86" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">PLAN SEMANAL</text>
+      <text x="430" y="102" font-size="8.4" text-anchor="middle" fill="#d4ebdd">esta semana</text>
+      <text x="430" y="115" font-size="8.4" text-anchor="middle" fill="#d4ebdd">lo que se PROMETE</text>
+
+      <rect x="530" y="60" width="150" height="66" rx="6" fill="#a8710b"/>
+      <text x="605" y="86" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">PPC Y CAUSAS</text>
+      <text x="605" y="102" font-size="8.4" text-anchor="middle" fill="#f6e5c4">cierre</text>
+      <text x="605" y="115" font-size="8.4" text-anchor="middle" fill="#f6e5c4">lo que se CUMPLIÓ</text>
+
+      <g stroke="#1f5f8b" stroke-width="1.8" marker-end="url(#f9)" fill="none">
+        <path d="M162,93 L186,93"/>
+        <path d="M332,93 L356,93"/>
+        <path d="M502,93 L526,93"/>
+      </g>
+
+      <path d="M605,130 L605,180 L260,180 L260,130" stroke="#2f7d4f" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#f9v)" fill="none"/>
+      <text x="432" y="196" font-size="9" font-weight="700" text-anchor="middle" fill="#2f7d4f">lo aprendido afina la próxima ventana</text>
+
+      <text x="350" y="30" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Project dice cuándo. El presupuesto dice cuánto.</text>
+      <text x="350" y="45" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f5f8b">GCM dice qué se puede hacer de verdad, qué se prometió y qué se cumplió.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 11</span> — El ciclo completo, en una imagen.</figcaption>
+  </figure>
+
+  <h3>9.1 El calendario laboral de la obra</h3>
+  <p>Antes de nada, define qué días se trabaja y cuántas horas. Es <strong>por obra</strong>, no por
+  empresa: el sábado laborable de una obra puede no aplicar a otra.</p>
+  <ul>
+    <li>Para cada día de la semana: si es laborable, cuántas horas y qué turno
+    (<em>normal</em>, <em>noche</em> o <em>turnos</em>).</li>
+    <li>Aparte, el <strong>día de corte semanal</strong> de la obra — el día en que se cierra la
+    semana. Viernes por defecto.</li>
+  </ul>
+  <p>De aquí salen los «días laborables que quedan» del indicador de plazo y el reparto de tareas
+  en la ventana del Lookahead.</p>
+
+  <h3>9.2 Lookahead: la ventana de mediano plazo</h3>
+  <p>Una tabla con las tareas que el cronograma trae en las próximas semanas y el análisis de qué
+  les falta para poder ejecutarse.</p>
+
+  <ol class="pasos">
+    <li>Entra a <strong>Ejecución → Lookahead</strong> y elige el tamaño de la ventana. El selector
+    admite de <strong>3 a 12 semanas</strong>. Tres es el mínimo útil; lo habitual son cuatro a
+    seis. Una obra con acero importado necesita mirar más lejos que una de acabados.</li>
+    <li>Pulsa <strong>«Sincronizar ventana»</strong>. Trae las tareas del cronograma vigente que
+    caen en ese rango y les crea sus <strong>siete restricciones en blanco</strong>.</li>
+    <li>Completa lo que añade la planificación operativa y el cronograma no trae: <strong>fase o
+    bloque</strong> («FASE 2: ESTRUCTURAS»), <strong>zona</strong> («PISO 1», «ZONA A») y
+    <strong>subcontratista</strong> responsable.</li>
+    <li>Marca cada flujo cuando quede resuelto <em>de verdad</em>, con su detalle y su fecha.</li>
+    <li>Cuando los siete están marcados, la tarea pasa a <span class="tag v">LISTA</span> y sube el
+    porcentaje de confiabilidad de la ventana.</li>
+  </ol>
+
+  <figure>
+    <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs><marker id="fa" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto"><path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/></marker></defs>
+
+      <rect x="18" y="46" width="130" height="46" rx="6" fill="#f4f6f8" stroke="#d7dee6" stroke-dasharray="4 3"/>
+      <text x="83" y="66" font-size="10" font-weight="700" text-anchor="middle" fill="#5b6875">SIN ANALIZAR</text>
+      <text x="83" y="81" font-size="8.2" text-anchor="middle" fill="#5b6875">aún no sincronizada</text>
+
+      <rect x="200" y="46" width="130" height="46" rx="6" fill="#fdf3de" stroke="#a8710b" stroke-width="1.5"/>
+      <text x="265" y="66" font-size="10" font-weight="700" text-anchor="middle" fill="#a8710b">PENDIENTE</text>
+      <text x="265" y="81" font-size="8.2" text-anchor="middle" fill="#5b6875">le faltan restricciones</text>
+
+      <rect x="382" y="46" width="130" height="46" rx="6" fill="#fbeceb" stroke="#a8322d" stroke-width="1.5"/>
+      <text x="447" y="66" font-size="10" font-weight="700" text-anchor="middle" fill="#a8322d">BLOQUEADA</text>
+      <text x="447" y="81" font-size="8.2" text-anchor="middle" fill="#5b6875">hay un impedimento firme</text>
+
+      <rect x="556" y="46" width="130" height="46" rx="6" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="2"/>
+      <text x="621" y="66" font-size="10" font-weight="700" text-anchor="middle" fill="#2f7d4f">LISTA</text>
+      <text x="621" y="81" font-size="8.2" text-anchor="middle" fill="#5b6875">7 de 7 resueltas</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#fa)" fill="none">
+        <path d="M150,69 L196,69"/>
+        <path d="M332,69 L378,69"/>
+      </g>
+      <path d="M330,58 C400,20 500,20 554,52" stroke="#2f7d4f" stroke-width="1.6" marker-end="url(#fa)" fill="none"/>
+      <text x="440" y="24" font-size="8.4" font-weight="700" text-anchor="middle" fill="#2f7d4f">se resuelven las 7</text>
+      <text x="83" y="112" font-size="8.2" text-anchor="middle" fill="#5b6875">«Sincronizar ventana»</text>
+
+      <rect x="18" y="122" width="668" height="22" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="32" y="137" font-size="8.8" fill="#16202b"><tspan font-weight="700">Solo lo LISTO se puede comprometer al Plan Semanal.</tspan> Es el filtro de confiabilidad, y es todo el método en una frase.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 12</span> — Estados de una tarea en el Lookahead.</figcaption>
+  </figure>
+
+  <h3>9.3 Las 7 restricciones — la palabra SIEMPRE</h3>
+  <p>Siete preguntas que hay que responder antes de prometer una tarea. Las iniciales forman
+  <strong>SIEMPRE</strong>, y así se recuerdan sin consultar nada.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 312" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <g>
+        <rect x="14" y="10" width="672" height="38" rx="6" fill="#1f5f8b"/>
+        <text x="40" y="36" font-size="20" font-weight="800" fill="#fff" letter-spacing="14">SIEMPRE</text>
+        <text x="470" y="35" font-size="9.6" fill="#d3e6f2">las siete restricciones del Last Planner</text>
+      </g>
+
+      <g>
+        <rect x="14" y="56" width="672" height="32" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+        <circle cx="34" cy="72" r="12" fill="#1f5f8b"/><text x="34" y="77" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">S</text>
+        <text x="58" y="70" font-size="10.4" font-weight="700" fill="#16202b">Seguridad</text>
+        <text x="58" y="83" font-size="8.8" fill="#5b6875">Hay permisos, PETAR y ATS</text>
+
+        <rect x="14" y="92" width="672" height="32" rx="4" fill="#fff" stroke="#d7dee6"/>
+        <circle cx="34" cy="108" r="12" fill="#1f5f8b"/><text x="34" y="113" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">I</text>
+        <text x="58" y="106" font-size="10.4" font-weight="700" fill="#16202b">Información</text>
+        <text x="58" y="119" font-size="8.8" fill="#5b6875">Los planos están aprobados y la RFI respondida</text>
+
+        <rect x="14" y="128" width="672" height="32" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+        <circle cx="34" cy="144" r="12" fill="#1f5f8b"/><text x="34" y="149" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">E</text>
+        <text x="58" y="142" font-size="10.4" font-weight="700" fill="#16202b">Espacio</text>
+        <text x="58" y="155" font-size="8.8" fill="#5b6875">El frente o la zona está liberada</text>
+
+        <rect x="14" y="164" width="672" height="32" rx="4" fill="#fff" stroke="#d7dee6"/>
+        <circle cx="34" cy="180" r="12" fill="#1f5f8b"/><text x="34" y="185" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">M</text>
+        <text x="58" y="178" font-size="10.4" font-weight="700" fill="#16202b">Materiales</text>
+        <text x="58" y="191" font-size="8.8" fill="#5b6875">Están en obra o con entrega confirmada</text>
+
+        <rect x="14" y="200" width="672" height="32" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+        <circle cx="34" cy="216" r="12" fill="#1f5f8b"/><text x="34" y="221" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">P</text>
+        <text x="58" y="214" font-size="10.4" font-weight="700" fill="#16202b">Personas</text>
+        <text x="58" y="227" font-size="8.8" fill="#5b6875">La cuadrilla está asignada</text>
+
+        <rect x="14" y="236" width="672" height="32" rx="4" fill="#fff" stroke="#d7dee6"/>
+        <circle cx="34" cy="252" r="12" fill="#1f5f8b"/><text x="34" y="257" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">R</text>
+        <text x="58" y="250" font-size="10.4" font-weight="700" fill="#16202b">Requisitos</text>
+        <text x="58" y="263" font-size="8.8" fill="#5b6875">Las tareas previas y los permisos están</text>
+
+        <rect x="14" y="272" width="672" height="32" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+        <circle cx="34" cy="288" r="12" fill="#1f5f8b"/><text x="34" y="293" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">E</text>
+        <text x="58" y="286" font-size="10.4" font-weight="700" fill="#16202b">Equipos</text>
+        <text x="58" y="299" font-size="8.8" fill="#5b6875">La maquinaria y la herramienta están disponibles</text>
+      </g>
+    </svg>
+    <figcaption><span class="fig-t">Figura 13</span> — Las 7 restricciones, en el orden que forma la palabra.</figcaption>
+  </figure>
+
+  <div class="caja alto">
+    <span class="et">La regla que no admite excepción</span>
+    <p>Si falta <strong>una sola</strong>, la tarea no está lista. Comprometerla igual es la causa
+    número uno de incumplimiento en obra.</p>
+  </div>
+
+  <h3>9.4 Comprometer al PTS</h3>
+  <p>Selecciona las tareas listas y pulsa <strong>«Comprometer al PTS»</strong>. Pasan al Plan
+  Semanal abierto, arrastrando su trazabilidad: de qué tarea del Lookahead nacieron, su zona y su
+  subcontratista.</p>
+  <p>Si algo de lo que elegiste <strong>no está liberado</strong>, o ya está comprometido en otra
+  semana, el sistema te pide confirmar. <strong>No lo prohíbe</strong> —la obra a veces arranca
+  igual— pero queda constancia de que se decidió a sabiendas.</p>
+
+  <h3>9.5 El Plan Semanal</h3>
+  <p>Un plan por semana, con su número correlativo («Semana 12») y anclado a la fecha de corte de
+  la obra. Nace <span class="tag a">ABIERTO</span>.</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Campo de cada compromiso</th><th>Qué poner</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Descripción</strong></td><td>Viene de la tarea, o se escribe libre si es trabajo que no está en Project</td></tr>
+      <tr><td><strong>Meta en %</strong></td><td>A qué porcentaje te comprometes a llegar. Opcional</td></tr>
+      <tr><td><strong>Cantidad y unidad</strong></td><td>La medida real del compromiso: 120 m². Si la tarea tiene partida mapeada, viene propuesta</td></tr>
+      <tr><td><strong>Zona</strong></td><td>El sector fino del trabajo: «P2-S1»</td></tr>
+      <tr><td><strong>Subcontratista</strong></td><td>Quién lo ejecuta, si aplica</td></tr>
+      <tr><td><strong>Color</strong></td><td>Para la vista de zonificación</td></tr>
+    </tbody>
+  </table>
+
+  <p>Quita lo que no corresponda y añade líneas libres para el trabajo que no está en el
+  cronograma: limpieza, apoyo, trabajos de garantía.</p>
+
+  <h3>9.6 Cerrar la semana: PPC y causas</h3>
+  <p>El día de corte, marcas qué se cumplió, qué no y por qué.</p>
+
+  <ol class="pasos">
+    <li>Marca <strong>cumplido</strong> o <strong>no cumplido</strong> en cada compromiso.</li>
+    <li>Anota <strong>cuánto se ejecutó de verdad</strong>: 90 de los 120 m² comprometidos.</li>
+    <li>Si no se cumplió, elige la <strong>causa</strong>. Es obligatorio.</li>
+    <li>Cierra el plan. El avance reportado pasa al cronograma ligado a esta semana.</li>
+  </ol>
+
+  <p>El plan cerrado se puede <strong>reabrir</strong> si hubo un error: al volver a cerrarlo, los
+  avances que generó se reemplazan en vez de duplicarse.</p>
+
+  <h4>Cómo se calcula el PPC</h4>
+  <div class="caja">
+    <p style="text-align:center;font-size:12pt;font-weight:700;margin:.2em 0">
+      PPC = tareas cumplidas ÷ tareas prometidas × 100
+    </p>
+    <p>Nada más. Una tarea a medias cuenta como <strong>no cumplida</strong>. Esa dureza es
+    intencional: el PPC no mide avance, mide si cumples lo que prometes.</p>
+  </div>
+
+  <p>Una obra puede ir adelantada y tener un PPC malo. Significa que planifica mal, aunque el
+  ritmo la salve — por ahora.</p>
+
+  <h4>El catálogo de causas (CNC)</h4>
+  <p>Es un catálogo <strong>fijo</strong>, y lo es para poder comparar semanas entre sí y construir
+  el Pareto:</p>
+
+  <table>
+    <thead><tr><th style="width:24%">Causa</th><th>Cuándo se elige</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Prerrequisito</strong></td><td>La tarea previa no terminó</td></tr>
+      <tr><td><strong>Materiales</strong></td><td>No llegaron, llegaron mal o no alcanzaron</td></tr>
+      <tr><td><strong>Mano de obra</strong></td><td>Faltó cuadrilla o no tenía la calificación</td></tr>
+      <tr><td><strong>Equipos</strong></td><td>Máquina averiada, ocupada o no disponible</td></tr>
+      <tr><td><strong>Información</strong></td><td>Plano no aprobado, RFI sin respuesta, detalle sin definir</td></tr>
+      <tr><td><strong>Cliente / terceros</strong></td><td>Falta una autorización, un permiso o una decisión ajena</td></tr>
+      <tr><td><strong>Clima</strong></td><td>Lluvia, viento o condiciones que impiden trabajar</td></tr>
+      <tr><td><strong>Reprogramación</strong></td><td>Se decidió cambiar la prioridad</td></tr>
+      <tr><td><strong>Otra</strong></td><td>Solo cuando ninguna encaja. Si la usas mucho, algo falla en el análisis</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caja ok">
+    <span class="et">Lo que de verdad enseña</span>
+    <p>El PPC dice <em>cuánto</em> fallaste. La <strong>causa</strong> dice <em>por qué</em>, y es lo
+    único accionable. Sin causa, cerrar la semana no sirve para nada. El Pareto ordena las causas
+    de mayor a menor: la que más se repite es tu cuello de botella real, y ahí es donde hay que
+    atacar — no donde más ruido hace.</p>
+  </div>
+
+  <h3>9.7 El ciclo completo, semana a semana</h3>
+
+  <figure>
+    <svg viewBox="0 0 700 210" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <line x1="40" y1="60" x2="660" y2="60" stroke="#d7dee6" stroke-width="2"/>
+
+      <circle cx="90" cy="60" r="8" fill="#1f5f8b"/>
+      <text x="90" y="44" font-size="9.4" font-weight="700" text-anchor="middle" fill="#1f5f8b">LUNES</text>
+      <rect x="24" y="76" width="132" height="58" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="90" y="94" font-size="8.8" font-weight="700" text-anchor="middle" fill="#1f5f8b">Reunión de arranque</text>
+      <text x="34" y="108" font-size="8.2" fill="#16202b">· Revisar el PTS de la semana</text>
+      <text x="34" y="120" font-size="8.2" fill="#16202b">· Confirmar cuadrillas y zonas</text>
+      <text x="34" y="131" font-size="8.2" fill="#16202b">· Repartir compromisos</text>
+
+      <circle cx="280" cy="60" r="8" fill="#5b6875"/>
+      <text x="280" y="44" font-size="9.4" font-weight="700" text-anchor="middle" fill="#5b6875">MARTES A JUEVES</text>
+      <rect x="200" y="76" width="160" height="58" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="280" y="94" font-size="8.8" font-weight="700" text-anchor="middle" fill="#16202b">Ejecución y liberación</text>
+      <text x="210" y="108" font-size="8.2" fill="#16202b">· Marcar restricciones resueltas</text>
+      <text x="210" y="120" font-size="8.2" fill="#16202b">· Subir fotos de evidencia</text>
+      <text x="210" y="131" font-size="8.2" fill="#16202b">· Avisar de lo que se traba</text>
+
+      <circle cx="470" cy="60" r="8" fill="#a8710b"/>
+      <text x="470" y="44" font-size="9.4" font-weight="700" text-anchor="middle" fill="#a8710b">JUEVES</text>
+      <rect x="396" y="76" width="148" height="58" rx="5" fill="#fdf3de" stroke="#a8710b"/>
+      <text x="470" y="94" font-size="8.8" font-weight="700" text-anchor="middle" fill="#a8710b">Preparar la siguiente</text>
+      <text x="406" y="108" font-size="8.2" fill="#16202b">· Sincronizar la ventana</text>
+      <text x="406" y="120" font-size="8.2" fill="#16202b">· Cerrar las 7 que falten</text>
+      <text x="406" y="131" font-size="8.2" fill="#16202b">· Comprometer al PTS</text>
+
+      <circle cx="620" cy="60" r="8" fill="#2f7d4f"/>
+      <text x="620" y="44" font-size="9.4" font-weight="700" text-anchor="middle" fill="#2f7d4f">VIERNES · CORTE</text>
+      <rect x="552" y="76" width="134" height="58" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+      <text x="619" y="94" font-size="8.8" font-weight="700" text-anchor="middle" fill="#2f7d4f">Cerrar la semana</text>
+      <text x="562" y="108" font-size="8.2" fill="#16202b">· Cumplido / no cumplido</text>
+      <text x="562" y="120" font-size="8.2" fill="#16202b">· Cantidad ejecutada</text>
+      <text x="562" y="131" font-size="8.2" fill="#16202b">· Causa de cada fallo</text>
+
+      <rect x="24" y="154" width="662" height="42" rx="5" fill="#16202b"/>
+      <text x="40" y="172" font-size="9.4" font-weight="700" fill="#fff">Y el lunes se empieza mirando el Pareto de la semana anterior.</text>
+      <text x="40" y="188" font-size="8.8" fill="#c8d2db">Si la causa que más se repite es «materiales», el trabajo de esta semana no es programar más: es arreglar el abastecimiento.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 14</span> — La semana tipo del residente, con el día de corte en viernes.</figcaption>
+  </figure>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 10 · Flujo 4</div>
+  <h2>10. Proveedores, encargos y órdenes</h2>
+
+  <h3>10.1 Qué ve y qué no ve el residente</h3>
+  <p>Este flujo es sobre todo del <strong>administrador de obra</strong>. El residente participa en
+  dos puntos concretos, y son justo los que se saben estando en obra.</p>
+
+  <table>
+    <thead><tr><th style="width:40%">Acción</th><th class="c" style="width:20%">Residente</th><th class="c" style="width:20%">Adm. de obra</th><th class="c">Administrador</th></tr></thead>
+    <tbody>
+      <tr><td>Ver proveedores y lo comprometido</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Dar de alta y editar proveedores</td><td class="c no">·</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Repartir encargos (alcance y monto)</td><td class="c no">·</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td><strong>Valorizar un encargo</strong></td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Redactar una orden de compra</td><td class="c no">·</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Aprobar o anular una orden</td><td class="c no">·</td><td class="c no">·</td><td class="c si">✓</td></tr>
+    </tbody>
+  </table>
+
+  <p>El residente <strong>ve</strong> a quién se le compra y cuánto se ha comprometido contra su
+  presupuesto, pero no pide ni aprueba: eso es administración.</p>
+
+  <h3>10.2 Encargos y valorización</h3>
+  <p>Un <strong>encargo</strong> es el frente de un proveedor en la obra: «E-003 — Estructura
+  metálica ZONA 1». Lleva su monto contratado (sin IGV, para poder compararlo con el parcial del
+  presupuesto), las partidas que cubre, sus fechas y su estado
+  (<span class="tag v">VIGENTE</span> <span class="tag a">CERRADO</span>
+  <span class="tag r">ANULADO</span>).</p>
+
+  <p><strong>Valorizar</strong> es decir cuánto de ese frente está ejecutado. Lo hace quien está en
+  obra, igual que el avance de las tareas. El monto del encargo es el precio <em>del proveedor</em>,
+  que puede quedar por encima o por debajo de tu costo presupuestado — y esa diferencia es
+  exactamente lo que interesa ver.</p>
+
+  <h3>10.3 El ciclo de una orden de compra</h3>
+
+  <figure>
+    <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs><marker id="fb" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto"><path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/></marker></defs>
+
+      <rect x="16" y="24" width="120" height="44" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="76" y="43" font-size="9.4" font-weight="700" text-anchor="middle" fill="#16202b">Se redacta</text>
+      <text x="76" y="57" font-size="8" text-anchor="middle" fill="#5b6875">a mano o importada</text>
+
+      <rect x="176" y="24" width="120" height="44" rx="5" fill="#fdf3de" stroke="#a8710b" stroke-width="1.5"/>
+      <text x="236" y="43" font-size="9.4" font-weight="700" text-anchor="middle" fill="#a8710b">BORRADOR</text>
+      <text x="236" y="57" font-size="8" text-anchor="middle" fill="#5b6875">no compromete nada</text>
+
+      <rect x="336" y="24" width="120" height="44" rx="5" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="2"/>
+      <text x="396" y="43" font-size="9.4" font-weight="700" text-anchor="middle" fill="#2f7d4f">APROBADA</text>
+      <text x="396" y="57" font-size="8" text-anchor="middle" fill="#5b6875">ya compromete</text>
+
+      <rect x="496" y="24" width="120" height="44" rx="5" fill="#fbeceb" stroke="#a8322d"/>
+      <text x="556" y="43" font-size="9.4" font-weight="700" text-anchor="middle" fill="#a8322d">ANULADA</text>
+      <text x="556" y="57" font-size="8" text-anchor="middle" fill="#5b6875">deja de contar</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#fb)" fill="none">
+        <path d="M138,46 L172,46"/>
+        <path d="M298,46 L332,46"/>
+        <path d="M458,46 L492,46"/>
+      </g>
+      <text x="396" y="18" font-size="8" font-weight="700" text-anchor="middle" fill="#5b6875">solo el ADMINISTRADOR</text>
+
+      <rect x="16" y="88" width="600" height="46" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="32" y="106" font-size="9.4" font-weight="700" fill="#1f5f8b">Anular no es borrar.</text>
+      <text x="32" y="122" font-size="8.8" fill="#16202b">La orden se conserva con su motivo: cancelar un pedido a un proveedor es corriente, y el papel tiene que seguir existiendo.</text>
+
+      <rect x="16" y="146" width="600" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="32" y="164" font-size="9.4" font-weight="700" fill="#16202b">Lo comprometido = suma de las órdenes APROBADAS.</text>
+      <text x="32" y="180" font-size="8.8" fill="#16202b">Es lo que resta del saldo en el módulo «Presupuesto» del panel, y lo que se compara con el presupuesto vigente.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 15</span> — Estados de una orden y qué significa cada uno.</figcaption>
+  </figure>
+
+  <p>Cada orden imputa sus líneas a partidas concretas del presupuesto — eso es lo que permite
+  saber cuánto queda de cada partida, no solo del total. Desde la orden aprobada se genera el
+  <strong>documento para imprimir</strong>, con los datos bancarios del proveedor, el
+  representante legal que firma y las observaciones de la empresa al pie.</p>
+
+  <div class="caja ojo">
+    <span class="et">Un detalle que descoloca</span>
+    <p>El número de orden lo escribe el cliente y <strong>no es cronológico</strong>: puede haber
+    una de mayo con un correlativo posterior a una de julio. Por eso el listado ordena por
+    <em>fecha del documento</em>, nunca por número.</p>
+  </div>
+</section>
+<section class="cap">
+  <div class="kicker">Capítulo 11</div>
+  <h2>11. Evidencia fotográfica y pases de obra</h2>
+  <p class="lead">Una restricción marcada como resuelta sin foto es una afirmación. Con foto, es un hecho.</p>
+
+  <h3>11.1 A qué se adosa una foto</h3>
+  <p>Cada foto se cuelga de <strong>exactamente una</strong> de estas dos cosas:</p>
+  <ul>
+    <li>Una <strong>restricción</strong> del Lookahead — «llegó el fierro de 3/8», «el frente está
+    vacío», el PETAR firmado.</li>
+    <li>Un <strong>compromiso</strong> del Plan Semanal — cómo quedó el trabajo al cierre.</li>
+  </ul>
+  <p>De cada archivo se guarda el nombre original, el tipo, el tamaño, una nota corta y la
+  <strong>huella SHA-256</strong> del contenido. Esa huella es la que sobrevive aunque el archivo
+  se purgue del disco por espacio: el registro sigue diciendo qué se subió, quién lo subió y
+  cuándo, aunque la imagen ya no esté.</p>
+
+  <h3>11.2 Quién puede subir fotos</h3>
+
+  <figure>
+    <svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs><marker id="fc" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto"><path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/></marker></defs>
+
+      <rect x="16" y="16" width="200" height="52" rx="6" fill="#e8f1f7" stroke="#1f5f8b" stroke-width="1.5"/>
+      <text x="116" y="38" font-size="10.4" font-weight="700" text-anchor="middle" fill="#1f5f8b">Usuario de GCM</text>
+      <text x="116" y="55" font-size="8.4" text-anchor="middle" fill="#5b6875">entra con su cuenta y su rol</text>
+
+      <rect x="16" y="86" width="200" height="52" rx="6" fill="#fdf3de" stroke="#a8710b" stroke-width="1.5"/>
+      <text x="116" y="108" font-size="10.4" font-weight="700" text-anchor="middle" fill="#a8710b">Pase de obra</text>
+      <text x="116" y="125" font-size="8.4" text-anchor="middle" fill="#5b6875">sin cuenta, solo con código</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#fc)" fill="none">
+        <path d="M220,42 L286,66"/>
+        <path d="M220,112 L286,88"/>
+      </g>
+
+      <rect x="292" y="52" width="180" height="48" rx="6" fill="#2f7d4f"/>
+      <text x="382" y="72" font-size="10.4" font-weight="700" text-anchor="middle" fill="#fff">Foto de evidencia</text>
+      <text x="382" y="88" font-size="8.4" text-anchor="middle" fill="#d4ebdd">firmada con su nombre</text>
+
+      <path d="M476,76 L536,76" stroke="#5b6875" stroke-width="1.4" marker-end="url(#fc)" fill="none"/>
+      <rect x="540" y="52" width="146" height="48" rx="6" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="613" y="72" font-size="9.4" font-weight="700" text-anchor="middle" fill="#16202b">Restricción</text>
+      <text x="613" y="88" font-size="9.4" font-weight="700" text-anchor="middle" fill="#16202b">o compromiso</text>
+
+      <rect x="16" y="160" width="670" height="80" rx="6" fill="#fafbfc" stroke="#d7dee6"/>
+      <text x="34" y="180" font-size="9.6" font-weight="700" fill="#1f5f8b">Cómo funciona un pase, paso a paso</text>
+      <text x="34" y="197" font-size="8.8" fill="#16202b">1 · El residente da de alta a la persona en la obra: nombres, cargo, empresa y AL MENOS un contacto (celular o correo).</text>
+      <text x="34" y="211" font-size="8.8" fill="#16202b">2 · Esa persona abre el enlace público de la obra —o escanea el QR pegado en la caseta— y pide su código.</text>
+      <text x="34" y="225" font-size="8.8" fill="#16202b">3 · Recibe seis cifras de un solo uso, entra y solo ve una pantalla: la de cargar fotos de esa obra.</text>
+      <text x="34" y="238" font-size="8.4" fill="#5b6875">Si el pase se revoca, se puede revisar de golpe todo lo que aportó esa persona — su nombre sigue firmando cada foto.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 16</span> — Las dos vías de entrada de evidencia.</figcaption>
+  </figure>
+
+  <h3>11.3 Gestionar los pases</h3>
+  <p>Desde <strong>la obra → Personal</strong> das de alta, editas, desactivas o eliminas pases. Y
+  puedes generar el código tú mismo para dictarlo o mandarlo por WhatsApp, en vez de esperar a que
+  la persona lo pida.</p>
+
+  <div class="caja ojo">
+    <span class="et">Por qué la pantalla pública parece poco habladora</span>
+    <p>Cuando alguien pide un código desde la pantalla pública, la respuesta es siempre la misma
+    exista o no ese contacto — y tampoco dice si el SMS falló. Contar que el SMS no salió ya
+    confirmaría que ese número está dado de alta, que es justo lo que el silencio protege.</p>
+    <p>Cuando el código lo pides <strong>tú</strong>, desde tu pantalla con permiso, sí ves el
+    código y sí te avisa si un canal falló.</p>
+  </div>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 12</div>
+  <h2>12. Valor ganado (EVM): qué se muestra y qué no</h2>
+
+  <h3>12.1 Los tres números que se leen desde el primer día</h3>
+
+  <table>
+    <thead><tr><th style="width:14%">Sigla</th><th style="width:28%">Qué significa</th><th>Cómo se lee</th></tr></thead>
+    <tbody>
+      <tr><td><strong>SPI</strong></td><td>Índice de rendimiento del plazo</td><td>Mayor que 1, vas adelantado. Menor que 1, atrasado. No depende del gasto</td></tr>
+      <tr><td><strong>SV</strong></td><td>Desviación de plazo</td><td>Lo ganado menos lo planificado, en soles</td></tr>
+      <tr><td><strong>CV</strong></td><td>Desviación de costo</td><td>Lo ganado menos lo gastado. Es un hecho de hoy, no una predicción</td></tr>
+    </tbody>
+  </table>
+
+  <p>Y la <strong>curva</strong> de las tres líneas, que ya viste en la figura 10.</p>
+
+  <h3>12.2 Los tres que se ocultan, y por qué</h3>
+  <p>CPI, EAC y VAC <strong>no se muestran hasta que haya con qué sostenerlos</strong>. La razón
+  llegó después de un susto real: la pantalla anunció en verde un ahorro de
+  <strong>S/ 633 873</strong> en una obra. Falso.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 190" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <rect x="16" y="14" width="320" height="76" rx="6" fill="#fbeceb" stroke="#a8322d" stroke-width="1.5"/>
+      <text x="34" y="34" font-size="9.6" font-weight="700" fill="#a8322d">El problema</text>
+      <text x="34" y="51" font-size="8.8" fill="#16202b">El «costo al final» se calcula con lo que llevas gastado.</text>
+      <text x="34" y="65" font-size="8.8" fill="#16202b">Pero en GCM el gasto son las ÓRDENES APROBADAS,</text>
+      <text x="34" y="79" font-size="8.8" fill="#16202b">y las órdenes se aprueban DESPUÉS del trabajo.</text>
+
+      <rect x="360" y="14" width="326" height="76" rx="6" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="378" y="34" font-size="9.6" font-weight="700" fill="#16202b">El número que salió</text>
+      <text x="378" y="51" font-size="8.8" fill="#16202b">Ganado: S/ 62 000 · Órdenes aprobadas: S/ 11 000</text>
+      <text x="378" y="65" font-size="8.8" fill="#16202b">Divide una cosa por la otra y sale que la obra</text>
+      <text x="378" y="79" font-size="8.8" fill="#16202b">costará la quinta parte. Nadie construye tan barato.</text>
+
+      <rect x="16" y="102" width="670" height="76" rx="6" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="1.5"/>
+      <text x="34" y="122" font-size="9.6" font-weight="700" fill="#2f7d4f">Las dos condiciones para que aparezcan</text>
+      <text x="34" y="141" font-size="9.2" fill="#16202b">1 · Al menos un <tspan font-weight="700">15 % de obra ejecutada</tspan>.</text>
+      <text x="34" y="157" font-size="9.2" fill="#16202b">2 · Que el <tspan font-weight="700">costo registrado cubra la mitad de lo ganado</tspan>.</text>
+      <text x="34" y="172" font-size="8.4" fill="#5b6875">Mientras tanto la pantalla dice por qué falta cada una, en vez de dejar un guion.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 17</span> — Por qué el sistema se calla tres cifras.</figcaption>
+  </figure>
+
+  <div class="caja ok">
+    <span class="et">Qué puedes hacer para que aparezcan antes</span>
+    <p><strong>Registra las órdenes de compra al día.</strong> Cuanto menos se retrase el papeleo
+    respecto de la obra, antes sirve la proyección. Es la única palanca que tienes sobre esto.</p>
+  </div>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 13</div>
+  <h2>13. Entradas y salidas del sistema</h2>
+  <p class="lead">Resumen de una página: qué come GCM, qué produce y quién lo alimenta.</p>
+
+  <h3>13.1 Entradas</h3>
+  <table>
+    <thead><tr><th style="width:22%">Entrada</th><th style="width:14%">Formato</th><th style="width:20%">Quién la aporta</th><th style="width:14%">Cadencia</th><th>Qué habilita</th></tr></thead>
+    <tbody>
+      <tr><td>Presupuesto</td><td>Excel</td><td>Residente</td><td>Al inicio y en cada corrección</td><td>Todo el control económico</td></tr>
+      <tr><td>Cronograma</td><td>.mpp / .xml</td><td>Residente</td><td>Cuando cambia el plan</td><td>Fechas, ruta crítica, Lookahead</td></tr>
+      <tr><td>Mapeo tarea↔partida</td><td>En pantalla</td><td>Residente</td><td>Una vez, y al añadir partidas</td><td>Avance en soles, curva S, EVM</td></tr>
+      <tr><td>Calendario laboral</td><td>En pantalla</td><td>Residente</td><td>Al inicio</td><td>Días laborables, ventana del Lookahead</td></tr>
+      <tr><td>Restricciones resueltas</td><td>En pantalla</td><td>Residente / Adm. obra</td><td>Continua</td><td>Confiabilidad, tareas LISTAS</td></tr>
+      <tr><td>Compromisos y cierre</td><td>En pantalla</td><td>Residente</td><td>Semanal</td><td>PPC, causas, Pareto, avance</td></tr>
+      <tr><td>Avance de tareas</td><td>En pantalla</td><td>Residente</td><td>Semanal o al cierre del PTS</td><td>Curva real, SPI, atrasos</td></tr>
+      <tr><td>Proveedores y encargos</td><td>En pantalla</td><td>Adm. de obra</td><td>Según se contrata</td><td>Reparto de la obra, valorización</td></tr>
+      <tr><td>Órdenes de compra</td><td>Pantalla o importación</td><td>Adm. de obra</td><td>Continua</td><td>Comprometido, saldo, CPI</td></tr>
+      <tr><td>Movimientos</td><td>En pantalla</td><td>Residente / Adm. obra</td><td>Cuando el cliente autoriza</td><td>Presupuesto vigente</td></tr>
+      <tr><td>Fotos de evidencia</td><td>Imagen</td><td>Cualquiera con pase</td><td>Continua</td><td>Respaldo de restricciones y cierre</td></tr>
+    </tbody>
+  </table>
+
+  <h3>13.2 Salidas</h3>
+  <table>
+    <thead><tr><th style="width:24%">Salida</th><th style="width:26%">Dónde se ve</th><th>Para quién y para qué</th></tr></thead>
+    <tbody>
+      <tr><td>Panel de 12 indicadores</td><td>Panel</td><td>Residente y gerencia: el estado de la obra en un minuto</td></tr>
+      <tr><td>Curva S y EVM</td><td>Panel · Cronograma</td><td>Reunión de obra y reporte al cliente</td></tr>
+      <tr><td>PPC y Pareto de causas</td><td>Panel · Plan Semanal</td><td>Reunión de arranque del lunes: dónde atacar</td></tr>
+      <tr><td>Matriz del Lookahead</td><td>Lookahead</td><td>Coordinación con subcontratistas y almacén</td></tr>
+      <tr><td>Gantt e informe</td><td>Cronograma</td><td>Documento de plan para reunión y cliente</td></tr>
+      <tr><td>Presupuesto vigente y saldo</td><td>Movimientos · Panel</td><td>Control económico y decisiones de compra</td></tr>
+      <tr><td>Orden de compra impresa</td><td>Órdenes</td><td>El proveedor: es el documento que se le manda</td></tr>
+      <tr><td>Registro de auditoría</td><td>Actividad</td><td>Quién hizo qué y cuándo. Para cuando una cifra no cuadra</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caja">
+    <span class="et">La cadena de dependencias, en una línea</span>
+    <p>Sin <strong>presupuesto</strong> no hay dinero que repartir. Sin <strong>cronograma</strong>
+    no hay Lookahead. Sin <strong>mapeo</strong> no hay avance en soles. Sin
+    <strong>calendario</strong> no hay días laborables. Sin <strong>cierre semanal</strong> no hay
+    PPC ni causas — y sin causas, el sistema no enseña nada.</p>
+  </div>
+</section>
+<section class="cap">
+  <div class="kicker">Capítulo 14</div>
+  <h2>14. La rutina del residente: día, semana y mes</h2>
+  <p class="lead">Ésta es la página que conviene imprimir aparte y pegar en la caseta.</p>
+
+  <h3>14.1 Puesta en marcha de una obra nueva</h3>
+  <p>Una sola vez, y en este orden. Cada paso habilita el siguiente.</p>
+  <ol class="pasos">
+    <li><strong>Crear la obra</strong> (lo hace el administrador): cliente, ubicación, fechas y día
+    de corte semanal.</li>
+    <li><strong>Importar el presupuesto</strong> desde Excel. Revisar la vista previa antes de
+    aplicar.</li>
+    <li><strong>Ajustar el árbol</strong>: unidades, metrados y precios que el Excel no traía bien.</li>
+    <li><strong>Crear la revisión</strong> con sus porcentajes y cláusulas, y pedir su aprobación.</li>
+    <li><strong>Importar el cronograma</strong> de Project y <strong>fijarlo como línea base</strong>.</li>
+    <li><strong>Mapear tareas con partidas</strong>, empezando por los capítulos que concentran el dinero.</li>
+    <li><strong>Configurar el calendario laboral</strong> de la obra.</li>
+    <li><strong>Dar de alta los pases</strong> de quienes van a documentar en campo.</li>
+    <li><strong>Sincronizar la primera ventana</strong> del Lookahead y empezar a liberar.</li>
+  </ol>
+
+  <h3>14.2 Cada día</h3>
+  <ul>
+    <li>Mirar el panel: <strong>avisos</strong> primero — son de toda la empresa, no solo de tu obra.</li>
+    <li>Marcar en el Lookahead las <strong>restricciones que se resolvieron</strong> hoy, con su detalle.</li>
+    <li>Subir <strong>fotos</strong> de lo que se liberó y de lo que se trabó.</li>
+    <li>Anotar lo que amenaza los compromisos de la semana, para no descubrirlo el viernes.</li>
+  </ul>
+
+  <h3>14.3 Cada semana</h3>
+  <table>
+    <thead><tr><th style="width:18%">Momento</th><th>Qué hacer</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Lunes</strong></td><td>Reunión de arranque con el <strong>Pareto de la semana anterior</strong> delante. Repartir los compromisos del PTS entre las cuadrillas.</td></tr>
+      <tr><td><strong>Martes a jueves</strong></td><td>Ejecutar, liberar restricciones, documentar. Escalar lo que no se puede resolver en obra.</td></tr>
+      <tr><td><strong>Jueves</strong></td><td>Sincronizar la ventana del Lookahead, cerrar las restricciones que falten y <strong>comprometer al PTS</strong> de la semana siguiente.</td></tr>
+      <tr><td><strong>Día de corte</strong></td><td>Cerrar la semana: cumplido / no cumplido, <strong>cantidad ejecutada</strong> y <strong>causa</strong> de cada fallo. Revisar PPC y confiabilidad.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>14.4 Cada mes</h3>
+  <ul>
+    <li>Reimportar el cronograma <strong>si el plan cambió</strong>. Si no cambió, no crear versión.</li>
+    <li>Revisar el <strong>mapeo</strong>: las partidas nuevas que entraron por adicionales aún no están mapeadas.</li>
+    <li>Contrastar <strong>lo comprometido</strong> con el presupuesto vigente, capítulo por capítulo.</li>
+    <li>Valorizar los <strong>encargos</strong> vigentes.</li>
+    <li>Mirar la tendencia del PPC: tres semanas seguidas por debajo del 70 % es un problema de
+    planificación, no de ejecución.</li>
+  </ul>
+
+  <h3>14.5 Los cinco errores que más caro salen</h3>
+  <table>
+    <thead><tr><th style="width:36%">Error</th><th>Qué provoca</th></tr></thead>
+    <tbody>
+      <tr><td>Comprometer tareas <strong>no liberadas</strong></td><td>PPC bajo dos semanas después. Es la causa número uno de incumplimiento</td></tr>
+      <tr><td>Cerrar la semana <strong>sin causa</strong></td><td>El Pareto queda vacío y el sistema no enseña nada</td></tr>
+      <tr><td><strong>No mapear</strong> tareas con partidas</td><td>El avance se pondera por duración y la curva no significa nada</td></tr>
+      <tr><td>Registrar las <strong>órdenes tarde</strong></td><td>CPI, EAC y VAC no aparecen, y el saldo miente</td></tr>
+      <tr><td>Reimportar el Excel <strong>sin leer el aviso</strong></td><td>Se pierden las partidas creadas o corregidas a mano</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 15</div>
+  <h2>15. Problemas frecuentes</h2>
+
+  <h4>Marqué las 7 restricciones y la tarea no pasa a LISTA</h4>
+  <p>Comprueba si dice <strong>«Sin analizar»</strong>. Eso significa que todavía no tiene
+  restricciones creadas: pulsa <strong>«Sincronizar ventana»</strong> primero.</p>
+
+  <h4>¿Por qué me pide confirmar al comprometer?</h4>
+  <p>Porque algo de lo que elegiste no está liberado, o ya está comprometido en otra semana. No se
+  prohíbe —la obra a veces arranca igual— pero queda constancia de que se decidió a sabiendas.</p>
+
+  <h4>Mi avance físico no está en soles</h4>
+  <p>Falta el mapeo tarea↔partida. Mientras no lo haya, se pondera por duración, que es lo único
+  que trae Project. Ver el capítulo 8.4.</p>
+
+  <h4>El valor ganado no me muestra el EAC ni el VAC</h4>
+  <p>Es a propósito, y el capítulo 12 explica por qué. Resumen: hasta que no haya un 15 % de obra
+  ejecutada y el costo registrado no cubra la mitad de lo ganado, esas cifras mentirían. Registra
+  las órdenes al día para que aparezcan antes.</p>
+
+  <h4>La curva S dice que «no se llega»</h4>
+  <p>Solo lo dice cuando el ritmo es <strong>cero</strong>, y ahí es literal. En cualquier otro caso
+  estima <em>cuánto te vas a pasar</em>: a mitad de ritmo, tardas el doble de lo que queda.</p>
+
+  <h4>Cambié la meta de un compromiso y perdí la cantidad</h4>
+  <p>Era un fallo y está corregido. Guardar la semana reemplaza los compromisos, y antes se llevaba
+  por delante lo que la pantalla no reenviaba. Ahora la cantidad, la unidad y la zona sobreviven.</p>
+
+  <h4>Aparecieron módulos nuevos en el panel y perdí mi configuración</h4>
+  <p>Pasó una sola vez, y a propósito. El panel recordaba qué módulos tenías <em>encendidos</em>, así
+  que cualquier módulo añadido después nacía apagado para ti — los tres de Last Planner, justo los
+  más importantes, no habrían aparecido nunca. Ahora recuerda los que tienes
+  <strong>apagados</strong>, así que lo nuevo entra encendido solo. El precio fue reiniciar la
+  selección una vez.</p>
+
+  <h4>Desplegué un cambio y no aparece</h4>
+  <p>El despliegue es automático: en menos de un minuto el servidor toma la versión nueva. Da un
+  margen de dos o tres minutos y recarga. Si sigue sin aparecer, hay que comprobar que el paquete
+  se aplicó — eso ya es tarea técnica, no de obra.</p>
+
+  <h4>No me llega el SMS del código</h4>
+  <p>Los SMS salen del <strong>teléfono emisor de tu empresa</strong>. Si ese teléfono está apagado
+  o sin batería, la cola no se vacía. Avisa al administrador: puede ver cuándo consultó por última
+  vez cada emisor y activar el de respaldo. Mientras tanto, cambia tu canal a
+  <strong>correo</strong> desde tu perfil.</p>
+
+  <h4>No puedo guardar nada en una obra</h4>
+  <p>Comprueba el estado de la obra. Si está <strong>CERRADA</strong>, el sistema bloquea las
+  operaciones que modifican datos y te dice el motivo.</p>
+
+  <h4>Una cifra no cuadra y nadie sabe de dónde salió</h4>
+  <p>Todo queda registrado: quién, qué, cuándo y sobre qué obra. La primera pregunta cuando un
+  total no cuadra —«¿esta cifra la tecleó alguien o la leyó un importador?»— tiene respuesta
+  guardada en cada orden y en cada partida.</p>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 16</div>
+  <h2>16. Glosario</h2>
+
+  <table>
+    <thead><tr><th style="width:24%">Término</th><th>Qué significa</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Last Planner</strong></td><td>Método de planificación donde quien ejecuta es quien compromete</td></tr>
+      <tr><td><strong>Lookahead</strong></td><td>La ventana de mediano plazo (3 a 12 semanas), donde se liberan restricciones</td></tr>
+      <tr><td><strong>PTS</strong></td><td>Plan de Trabajo Semanal: los compromisos de la semana</td></tr>
+      <tr><td><strong>PPC</strong></td><td>Porcentaje de Plan Cumplido: cumplidas ÷ prometidas × 100</td></tr>
+      <tr><td><strong>CNC</strong></td><td>Causa de No Cumplimiento: por qué falló un compromiso</td></tr>
+      <tr><td><strong>Pareto</strong></td><td>El gráfico que ordena las causas de mayor a menor</td></tr>
+      <tr><td><strong>Confiabilidad</strong></td><td>Qué porcentaje de las tareas de la ventana está LISTA</td></tr>
+      <tr><td><strong>Restricción</strong></td><td>Cada uno de los 7 flujos que hay que liberar antes de comprometer</td></tr>
+      <tr><td><strong>EDT</strong></td><td>El árbol del presupuesto: capítulos y partidas</td></tr>
+      <tr><td><strong>Capítulo</strong></td><td>Nivel del árbol que solo agrupa. Sin metrado ni costo propio</td></tr>
+      <tr><td><strong>Partida</strong></td><td>La hoja del presupuesto: unidad, metrado y precio. La unidad de dinero</td></tr>
+      <tr><td><strong>Tarea</strong></td><td>La fila del cronograma: fechas y duración. La unidad de tiempo</td></tr>
+      <tr><td><strong>UID</strong></td><td>El número que identifica una tarea entre versiones del cronograma</td></tr>
+      <tr><td><strong>Revisión</strong></td><td>Foto congelada del presupuesto. Aprobada, es inmutable</td></tr>
+      <tr><td><strong>Línea base</strong></td><td>La versión congelada contra la que se mide: la del presupuesto o la del cronograma</td></tr>
+      <tr><td><strong>Presupuesto vigente</strong></td><td>La revisión aprobada más los movimientos aprobados después</td></tr>
+      <tr><td><strong>Movimiento</strong></td><td>Reconversión, adicional o deductivo: la única forma de mover un presupuesto aprobado</td></tr>
+      <tr><td><strong>Comprometido</strong></td><td>La suma de las órdenes de compra aprobadas</td></tr>
+      <tr><td><strong>Encargo</strong></td><td>El frente de un proveedor en la obra, con su alcance y su monto</td></tr>
+      <tr><td><strong>Valorizar</strong></td><td>Declarar cuánto de un encargo está ejecutado</td></tr>
+      <tr><td><strong>EVM / Valor ganado</strong></td><td>Compara lo planificado, lo ejecutado y lo gastado</td></tr>
+      <tr><td><strong>SPI / CPI</strong></td><td>Índices de rendimiento de plazo y de costo</td></tr>
+      <tr><td><strong>SV / CV</strong></td><td>Desviaciones de plazo y de costo, en soles</td></tr>
+      <tr><td><strong>EAC</strong></td><td>Lo que costará la obra al final si sigues rindiendo igual</td></tr>
+      <tr><td><strong>VAC</strong></td><td>Lo que sobrará (o faltará) del presupuesto al terminar</td></tr>
+      <tr><td><strong>Ritmo</strong></td><td>A qué porcentaje del avance previsto vas realmente</td></tr>
+      <tr><td><strong>Días laborables</strong></td><td>De los días que quedan, los que se trabaja según el calendario de la obra</td></tr>
+      <tr><td><strong>Ruta crítica</strong></td><td>La cadena donde un día perdido es un día perdido de obra entera</td></tr>
+      <tr><td><strong>Pase de obra</strong></td><td>Acceso limitado a una obra, solo para subir fotos. No es un usuario</td></tr>
+      <tr><td><strong>Suma alzada</strong></td><td>Precio cerrado por el alcance. El riesgo del metrado lo asume el contratista</td></tr>
+      <tr><td><strong>Precios unitarios</strong></td><td>Importe = metrado × precio. Si el metrado real cambia, el costo cambia</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 17</div>
+  <h2>17. Qué falta por construir</h2>
+  <p class="lead">Para que sepas qué esperar y qué no pedirle todavía al sistema.</p>
+
+  <table>
+    <thead><tr><th style="width:16%">Fase</th><th style="width:14%">Estado</th><th>Qué incluye</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Fase 1</strong></td>
+        <td><span class="tag v">HECHA</span></td>
+        <td>Calendario laboral editable · GCM se instala en el móvil como una aplicación ·
+        Lookahead y PTS usables en obra · tablero con los indicadores de Last Planner</td>
+      </tr>
+      <tr>
+        <td><strong>Fase 2</strong></td>
+        <td><span class="tag m">SIGUIENTE</span></td>
+        <td>Documentos: planos, protocolos y guías, con validación automática de restricciones —
+        que una restricción de <em>Información</em> se cierre sola cuando el plano se apruebe</td>
+      </tr>
+      <tr>
+        <td><strong>Fase 3</strong></td>
+        <td><span class="tag a">PREVISTA</span></td>
+        <td>Sectores de color en el PTS y aviso cuando dos cuadrillas coinciden en el mismo sitio
+        el mismo día</td>
+      </tr>
+      <tr>
+        <td><strong>Fase 4</strong></td>
+        <td><span class="tag a">PREVISTA</span></td>
+        <td>Que «cumplió» se calcule desde la <strong>cantidad ejecutada</strong> y no a mano, más
+        el formulario de causa raíz y plan de recuperación</td>
+      </tr>
+      <tr>
+        <td><strong>Fase 5</strong></td>
+        <td><span class="tag a">PREVISTA</span></td>
+        <td>Sugerencias automáticas según la causa que más se repite</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="caja">
+    <span class="et">Mientras tanto</span>
+    <p>Lo que la Fase 2 automatizará hoy se hace a mano, y funciona igual de bien: marcar la
+    restricción de <em>Información</em> cuando el plano llegue aprobado, y adjuntar la foto del
+    documento como evidencia.</p>
+  </div>
+
+  <div style="margin-top:3.5em;padding-top:1.2em;border-top:2.5px solid #1f5f8b;text-align:center">
+    <p style="font-size:13pt;font-weight:700;color:#1f5f8b;margin-bottom:.3em">
+      Project dice cuándo. El presupuesto dice cuánto.
+    </p>
+    <p style="font-size:13pt;font-weight:700;color:#16202b">
+      GCM dice qué se puede hacer de verdad, qué se prometió y qué se cumplió.
+    </p>
+    <p style="font-size:9pt;color:#5b6875;margin-top:2em">
+      Manual del Residente de Obra · GCM · Versión 1.0 · 11 de agosto de 2026<br>
+      gcm.drcaceresruiz.com
+    </p>
+  </div>
+</section>
+
+</body>
+</html>
