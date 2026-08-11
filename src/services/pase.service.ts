@@ -191,6 +191,141 @@ export async function crearPase(
 }
 
 /**
+ * Corrige los datos de un pase.
+ *
+ * Existe porque los datos se teclean en la caseta y se equivocan: un digito
+ * del celular mal y esa persona no recibe ningun codigo nunca, sin que nada
+ * lo avise —el servicio calla a proposito ante un contacto que no existe—.
+ *
+ * Cambiar el contacto TIRA sus sesiones y sus codigos pendientes. Si no, un
+ * telefono reconocido con el numero viejo seguiria entrando un ano, que es
+ * justo lo que se quiere cortar al corregirlo.
+ */
+export async function editarPase(
+  sesion: SesionActiva,
+  obraId: string,
+  paseId: string,
+  datos: DatosAltaPase,
+): Promise<ResultadoPase> {
+  if (!puede(sesion, "lookahead:gestionar")) {
+    return { ok: false, error: "No tienes permiso para editar los pases." };
+  }
+
+  const previo = await prisma.paseObra.findFirst({
+    where: { id: paseId, projectId: obraId, project: { companyId: sesion.companyId } },
+    select: { id: true, celular: true, email: true },
+  });
+  if (!previo) return { ok: false, error: "Pase no encontrado." };
+
+  const v = validarAltaPase(datos);
+  if (!v.ok) return { ok: false, error: v.error };
+
+  // El mismo contacto no puede estar en dos pases de la obra; se excluye el
+  // propio, o corregir el cargo sin tocar el telefono chocaria consigo mismo.
+  const repetido = await prisma.paseObra.findFirst({
+    where: {
+      projectId: obraId,
+      id: { not: paseId },
+      OR: [
+        ...(v.datos.email ? [{ email: v.datos.email }] : []),
+        ...(v.datos.celular ? [{ celular: v.datos.celular }] : []),
+      ],
+    },
+    select: { nombres: true, apellidos: true },
+  });
+  if (repetido) {
+    return {
+      ok: false,
+      error: `Ese contacto ya lo tiene ${repetido.nombres} ${repetido.apellidos} en esta obra.`,
+    };
+  }
+
+  const cambioElContacto =
+    previo.celular !== v.datos.celular || previo.email !== v.datos.email;
+
+  await prisma.paseObra.update({ where: { id: paseId }, data: v.datos });
+
+  if (cambioElContacto) {
+    await prisma.sesionPase.deleteMany({ where: { paseId } });
+    await prisma.codigoPase.deleteMany({ where: { paseId } });
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      companyId: sesion.companyId,
+      userId: sesion.userId,
+      projectId: obraId,
+      entidad: "PaseObra",
+      entidadId: paseId,
+      accion: "UPDATE",
+      antes: { celular: previo.celular, email: previo.email },
+      despues: {
+        nombre: `${v.datos.nombres} ${v.datos.apellidos}`,
+        celular: v.datos.celular,
+        email: v.datos.email,
+        contactoCambiado: cambioElContacto,
+      },
+    },
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Borra un pase de la obra.
+ *
+ * Se puede borrar SIN perder evidencia, y no por casualidad: `FotoEvidencia`
+ * apunta al pase con `onDelete: SetNull` y guarda ademas `subidaPor` con el
+ * nombre en TEXTO. Las fotos sobreviven firmadas por quien las tomo aunque su
+ * pase ya no exista. Sus codigos y sesiones si se van en cascada, que es lo
+ * correcto: son credenciales, no historia.
+ *
+ * El nombre se copia al registro de auditoria ANTES de borrar, porque despues
+ * ya no habria de donde sacarlo y el rastro diria «se borro algo».
+ */
+export async function eliminarPase(
+  sesion: SesionActiva,
+  obraId: string,
+  paseId: string,
+): Promise<ResultadoPase> {
+  if (!puede(sesion, "lookahead:gestionar")) {
+    return { ok: false, error: "No tienes permiso para eliminar los pases." };
+  }
+
+  const pase = await prisma.paseObra.findFirst({
+    where: { id: paseId, projectId: obraId, project: { companyId: sesion.companyId } },
+    select: {
+      nombres: true, apellidos: true, celular: true, email: true,
+      _count: { select: { fotos: true } },
+    },
+  });
+  if (!pase) return { ok: false, error: "Pase no encontrado." };
+
+  await prisma.paseObra.delete({ where: { id: paseId } });
+
+  await prisma.auditLog.create({
+    data: {
+      companyId: sesion.companyId,
+      userId: sesion.userId,
+      projectId: obraId,
+      entidad: "PaseObra",
+      entidadId: paseId,
+      accion: "DELETE",
+      antes: {
+        nombre: `${pase.nombres} ${pase.apellidos}`,
+        celular: pase.celular,
+        email: pase.email,
+        // Cuantas fotos quedan huerfanas de pase pero firmadas con su
+        // nombre: es el dato que explica el registro dentro de un ano.
+        fotosConservadas: pase._count.fotos,
+      },
+    },
+  });
+
+  return { ok: true };
+}
+
+/**
  * Revoca (o devuelve) el acceso de un pase.
  *
  * Revocar NO borra: sus fotos siguen siendo evidencia y su autoria tiene que

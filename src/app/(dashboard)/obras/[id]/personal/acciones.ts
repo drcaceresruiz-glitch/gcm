@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
   crearPase,
+  editarPase,
+  eliminarPase,
   cambiarEstadoPase,
   generarCodigoParaEntregar,
   type ResultadoPase,
@@ -27,6 +29,38 @@ export async function accionCrearPase(
   if (!sesion) redirect("/login");
 
   const r = await crearPase(sesion, obraId, datos);
+  if (r.ok) revalidatePath(`/obras/${obraId}/personal`);
+
+  return r;
+}
+
+export async function accionEditarPase(
+  obraId: string,
+  paseId: string,
+  datos: DatosAltaPase,
+): Promise<ResultadoPase> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await editarPase(sesion, obraId, paseId, datos);
+  if (r.ok) revalidatePath(`/obras/${obraId}/personal`);
+
+  return r;
+}
+
+/**
+ * Borra el pase. Sus fotos NO se van con el: quedan firmadas con su nombre.
+ * La pantalla lo dice antes de confirmar, porque desde fuera cualquiera
+ * supondria lo contrario.
+ */
+export async function accionEliminarPase(
+  obraId: string,
+  paseId: string,
+): Promise<ResultadoPase> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await eliminarPase(sesion, obraId, paseId);
   if (r.ok) revalidatePath(`/obras/${obraId}/personal`);
 
   return r;

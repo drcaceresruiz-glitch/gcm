@@ -6,11 +6,15 @@ import {
   Camera,
   KeyRound,
   LoaderCircle,
+  Pencil,
   RotateCcw,
+  Trash2,
   UserPlus,
 } from "lucide-react";
 import {
   accionCrearPase,
+  accionEditarPase,
+  accionEliminarPase,
   accionCambiarEstadoPase,
   accionGenerarCodigo,
 } from "@/app/(dashboard)/obras/[id]/personal/acciones";
@@ -52,6 +56,17 @@ export function PanelPersonal({
     null,
   );
 
+  /// Pase que se esta editando, con sus valores en curso.
+  const [editando, setEditando] = useState<{
+    id: string;
+    datos: typeof VACIO;
+  } | null>(null);
+
+  /// Pase cuyo borrado espera confirmacion. Borrar no se deshace, asi que no
+  /// puede depender de no haber errado el dedo en una lista de nombres
+  /// parecidos.
+  const [borrando, setBorrando] = useState<string | null>(null);
+
   function crear() {
     setError(null);
     iniciar(async () => {
@@ -62,6 +77,43 @@ export function PanelPersonal({
       } else {
         setError(r.error);
       }
+    });
+  }
+
+  function abrirEdicion(p: PaseLista) {
+    setError(null);
+    setBorrando(null);
+    setEditando({
+      id: p.id,
+      datos: {
+        nombres: p.nombres,
+        apellidos: p.apellidos,
+        cargo: p.cargo ?? "",
+        empresa: p.empresa ?? "",
+        celular: p.celular ?? "",
+        email: p.email ?? "",
+      },
+    });
+  }
+
+  function guardarEdicion() {
+    const enCurso = editando;
+    if (!enCurso) return;
+
+    setError(null);
+    iniciar(async () => {
+      const r = await accionEditarPase(obraId, enCurso.id, enCurso.datos);
+      if (r.ok) setEditando(null);
+      else setError(r.error);
+    });
+  }
+
+  function eliminar(paseId: string) {
+    setError(null);
+    iniciar(async () => {
+      const r = await accionEliminarPase(obraId, paseId);
+      if (r.ok) setBorrando(null);
+      else setError(r.error);
     });
   }
 
@@ -299,8 +351,160 @@ export function PanelPersonal({
                       </>
                     )}
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      editando?.id === p.id ? setEditando(null) : abrirEdicion(p)
+                    }
+                    disabled={pendiente}
+                    aria-expanded={editando?.id === p.id}
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs disabled:opacity-60"
+                    style={{ borderColor: "var(--borde)" }}
+                  >
+                    <Pencil className="size-3.5" aria-hidden="true" />
+                    Editar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setBorrando(borrando === p.id ? null : p.id)
+                    }
+                    disabled={pendiente}
+                    aria-expanded={borrando === p.id}
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs disabled:opacity-60"
+                    style={{
+                      borderColor: "var(--borde)",
+                      color: "var(--color-peligro)",
+                    }}
+                  >
+                    <Trash2 className="size-3.5" aria-hidden="true" />
+                    Eliminar
+                  </button>
                 </div>
               </div>
+
+              {editando?.id === p.id && (
+                <div
+                  className="mt-3 grid gap-2 rounded-lg border p-3 sm:grid-cols-2"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  {(
+                    [
+                      ["nombres", "Nombres"],
+                      ["apellidos", "Apellidos"],
+                      ["cargo", "Cargo"],
+                      ["empresa", "Empresa"],
+                      ["celular", "Celular"],
+                      ["email", "Correo"],
+                    ] as const
+                  ).map(([campoNombre, etiqueta]) => (
+                    <label key={campoNombre} className="text-xs">
+                      <span className="mb-1 block opacity-70">{etiqueta}</span>
+                      <input
+                        value={editando.datos[campoNombre]}
+                        onChange={(e) =>
+                          setEditando({
+                            ...editando,
+                            datos: {
+                              ...editando.datos,
+                              [campoNombre]: e.target.value,
+                            },
+                          })
+                        }
+                        className={campo}
+                        style={estiloCampo}
+                      />
+                    </label>
+                  ))}
+
+                  <p className="text-xs opacity-60 sm:col-span-2">
+                    Si cambias el celular o el correo, su teléfono dejará de
+                    estar reconocido y tendrá que pedir un código nuevo. Es lo
+                    correcto: el aparato viejo no debe seguir entrando.
+                  </p>
+
+                  <div className="flex gap-2 sm:col-span-2">
+                    <button
+                      type="button"
+                      onClick={guardarEdicion}
+                      disabled={pendiente}
+                      className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                      style={{ backgroundColor: "var(--color-marca-600)" }}
+                    >
+                      {pendiente && (
+                        <LoaderCircle
+                          className="size-3.5 animate-spin"
+                          aria-hidden="true"
+                        />
+                      )}
+                      Guardar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditando(null)}
+                      className="rounded-lg border px-3 py-1.5 text-xs"
+                      style={{ borderColor: "var(--borde)" }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {borrando === p.id && (
+                <div
+                  className="mt-3 rounded-lg border p-3"
+                  style={{ borderColor: "var(--color-peligro)" }}
+                >
+                  <p className="text-sm">
+                    ¿Eliminar a <strong>{p.nombres} {p.apellidos}</strong> de
+                    esta obra?
+                  </p>
+                  <p className="mt-1 text-xs opacity-70">
+                    {p.fotos > 0 ? (
+                      <>
+                        Sus <strong>{p.fotos} foto(s) se conservan</strong>,
+                        firmadas con su nombre: la evidencia de la obra no se
+                        toca. Lo que desaparece es su acceso.
+                      </>
+                    ) : (
+                      <>
+                        No ha aportado ninguna foto todavía, así que no se
+                        pierde nada.
+                      </>
+                    )}{" "}
+                    Si solo quieres que deje de entrar, usa <em>Revocar</em>.
+                  </p>
+
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => eliminar(p.id)}
+                      disabled={pendiente}
+                      className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                      style={{ backgroundColor: "var(--color-peligro)" }}
+                    >
+                      {pendiente && (
+                        <LoaderCircle
+                          className="size-3.5 animate-spin"
+                          aria-hidden="true"
+                        />
+                      )}
+                      Sí, eliminar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBorrando(null)}
+                      className="rounded-lg border px-3 py-1.5 text-xs"
+                      style={{ borderColor: "var(--borde)" }}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {codigo?.paseId === p.id && (
                 <p
