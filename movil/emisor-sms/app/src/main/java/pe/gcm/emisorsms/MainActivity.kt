@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.text.InputType
@@ -32,6 +34,24 @@ class MainActivity : Activity() {
     private lateinit var campoToken: EditText
     private lateinit var etiquetaEstado: TextView
     private lateinit var boton: Button
+
+    /**
+     * Relee el estado mientras la pantalla esta a la vista.
+     *
+     * Sin esto la etiqueta se quedaba clavada en «Arrancando…» para siempre:
+     * el servicio escribe el estado en cada vuelta, pero la pantalla solo lo
+     * leia al crearse y al volver. Quien configuraba la app se quedaba mirando
+     * un texto muerto creyendo que no funcionaba, cuando el estado de verdad
+     * estaba en la notificacion. Dos segundos: lo bastante para que se note
+     * vivo sin repintar por gusto.
+     */
+    private val reloj = Handler(Looper.getMainLooper())
+    private val latido = object : Runnable {
+        override fun run() {
+            refrescar()
+            reloj.postDelayed(this, 2_000L)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -104,7 +124,15 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        refrescar()
+        reloj.removeCallbacks(latido)
+        reloj.post(latido)
+    }
+
+    override fun onPause() {
+        // Fuera de la vista no hay nada que repintar, y dejarlo corriendo
+        // gastaria bateria en el unico telefono que no puede quedarse sin.
+        reloj.removeCallbacks(latido)
+        super.onPause()
     }
 
     private fun refrescar() {
@@ -134,9 +162,11 @@ class MainActivity : Activity() {
             return
         }
 
+        // El estado se deja ANTES de arrancar: al reves, este «Arrancando…»
+        // pisaba el primer estado real que el servicio ya habia escrito.
+        ajustes.estado = "Arrancando…"
         ajustes.activo = true
         ServicioEmisor.arrancar(this)
-        ajustes.estado = "Arrancando…"
         refrescar()
     }
 
