@@ -268,10 +268,15 @@ intercambio lo moveria mientras se ejecuta— y lo lanza un cron cada minuto.
 El arbol viejo se va entero y con el su sedimento, asi que lo de abajo deja
 de aplicar.
 
-**Queda una pregunta abierta**: la primera ejecucion manual aplico el paquete
-—`server.js` nuevo y `restart.txt` escrito— pero **no dejo nada en
-`tmp/despliegue.log`**, y no se encontro explicacion. Si la primera aplicacion
-por cron tampoco escribe, hay algo real que mirar en `registrar()`.
+**Probado de punta a punta el 12 de agosto**: un commit paso de `push` a estar
+sirviendo en produccion sin que nadie tocara el servidor —ni abrir la web, ni
+`touch restart.txt`, ni descomprimir a mano—, y dejo su
+`OK: aplicado (23 entradas)` en `tmp/despliegue.log`.
+
+> Una rareza que se queda sin explicar, por si reaparece: la primera ejecucion
+> MANUAL del script aplico el paquete pero no escribio nada en el log. No es
+> reproducible y por el cron registra bien, asi que no se persiguio mas. Si
+> alguna vez falta un despliegue sin linea en el log, empezar por ahi.
 
 ### Como era antes: el despliegue no borraba nada
 
