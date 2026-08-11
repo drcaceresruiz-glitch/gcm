@@ -1,0 +1,401 @@
+<section class="cap">
+  <div class="kicker">Capítulo 7 · Flujo 1</div>
+  <h2>7. El presupuesto</h2>
+  <p class="lead">De un Excel a un árbol de partidas con el que se puede controlar dinero.</p>
+
+  <figure>
+    <svg viewBox="0 0 720 130" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs><marker id="f7" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto"><path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/></marker></defs>
+      <rect x="6" y="30" width="118" height="52" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="65" y="52" font-size="9.6" font-weight="700" text-anchor="middle" fill="#16202b">Excel del</text>
+      <text x="65" y="66" font-size="9.6" font-weight="700" text-anchor="middle" fill="#16202b">presupuesto</text>
+
+      <rect x="152" y="30" width="118" height="52" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="211" y="52" font-size="9.6" font-weight="700" text-anchor="middle" fill="#1f5f8b">Vista previa</text>
+      <text x="211" y="66" font-size="8.2" text-anchor="middle" fill="#5b6875">nada se escribe aún</text>
+
+      <rect x="298" y="30" width="118" height="52" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="357" y="52" font-size="9.6" font-weight="700" text-anchor="middle" fill="#1f5f8b">Árbol EDT</text>
+      <text x="357" y="66" font-size="8.2" text-anchor="middle" fill="#5b6875">editable</text>
+
+      <rect x="444" y="30" width="118" height="52" rx="5" fill="#fdf3de" stroke="#a8710b"/>
+      <text x="503" y="52" font-size="9.6" font-weight="700" text-anchor="middle" fill="#a8710b">Revisión</text>
+      <text x="503" y="66" font-size="8.2" text-anchor="middle" fill="#5b6875">borrador</text>
+
+      <rect x="590" y="30" width="124" height="52" rx="5" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="1.6"/>
+      <text x="652" y="52" font-size="9.6" font-weight="700" text-anchor="middle" fill="#2f7d4f">APROBADA</text>
+      <text x="652" y="66" font-size="8.2" text-anchor="middle" fill="#5b6875">inmutable</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#f7)" fill="none">
+        <path d="M126,56 L148,56"/><path d="M272,56 L294,56"/><path d="M418,56 L440,56"/><path d="M564,56 L586,56"/>
+      </g>
+      <text x="137" y="48" font-size="7.6" text-anchor="middle" fill="#5b6875">analizar</text>
+      <text x="283" y="48" font-size="7.6" text-anchor="middle" fill="#5b6875">aplicar</text>
+      <text x="429" y="48" font-size="7.6" text-anchor="middle" fill="#5b6875">crear</text>
+      <text x="575" y="48" font-size="7.6" text-anchor="middle" fill="#5b6875">aprobar</text>
+      <text x="360" y="106" font-size="8.6" text-anchor="middle" fill="#a8322d" font-weight="700">A partir de aquí, el presupuesto solo cambia con movimientos.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 7</span> — El camino del presupuesto, de extremo a extremo.</figcaption>
+  </figure>
+
+  <h3>7.1 Preparar el Excel</h3>
+  <p>El importador es tolerante: no exige una plantilla. Lo que necesita es reconocer la fila de
+  cabecera y, a partir de ella, seis columnas. Reconoce los nombres habituales del oficio:</p>
+
+  <table>
+    <thead><tr><th style="width:22%">Columna</th><th>Nombres que reconoce</th><th class="c" style="width:14%">¿Obligatoria?</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Código</strong></td><td>Item · Código · Cod · Nro · N° · Num</td><td class="c si">sí</td></tr>
+      <tr><td><strong>Descripción</strong></td><td>Descripción · Partida · Detalle · Concepto · Actividad</td><td class="c si">sí</td></tr>
+      <tr><td><strong>Unidad</strong></td><td>Und · Und. · Unidad · U.M. · UM · Medida · Unid</td><td class="c">recomendada</td></tr>
+      <tr><td><strong>Metrado</strong></td><td>Metrado · Cantidad · Cant · Cant. · Metrados</td><td class="c">al menos una</td></tr>
+      <tr><td><strong>Precio unitario</strong></td><td>Precio unitario · P.U. · PU · Precio · Unitario · Costo unitario</td><td class="c">de estas dos</td></tr>
+      <tr><td><strong>Parcial</strong></td><td>Parcial · Subtotal · Importe · Total · Monto</td><td class="c">recomendada</td></tr>
+    </tbody>
+  </table>
+
+  <p>Los códigos son números separados por punto: <code>4</code>, <code>4.3</code>,
+  <code>01.02.01</code>. Vale el formato S10 peruano. Del código sale también la jerarquía: un
+  código con más puntos cuelga del que tiene menos.</p>
+
+  <div class="caja ok">
+    <span class="et">Buena práctica antes de subir</span>
+    <p>Saca el metrado de dentro del nombre. Si la partida se llama
+    <em>«Excavación para zapatas (4.25 m³)»</em>, el 4,25 tiene que estar en la columna Metrado y
+    <code>m3</code> en la columna Unidad. Mientras el metrado viva como texto dentro del nombre,
+    no hay control económico posible.</p>
+  </div>
+
+  <h3>7.2 Importar: analizar, revisar, aplicar</h3>
+  <p>El importador <strong>nunca escribe por su cuenta</strong>. Son dos pasos separados a
+  propósito: un presupuesto importado a ciegas es peor que no importarlo.</p>
+
+  <ol class="pasos">
+    <li>Entra a la obra → <strong>Plan → Presupuesto → Importar</strong> y sube el archivo.</li>
+    <li>El sistema <strong>analiza</strong> y te devuelve una vista previa: qué fila tomó como
+    cabecera, qué columna asignó a cada campo, cuántos capítulos y cuántas partidas encontró y
+    cuál es el monto total.</li>
+    <li>Revisa los <strong>errores</strong> (fila y columna concretas) y los <strong>avisos</strong>
+    (la fila se importa igual, pero conviene mirarla).</li>
+    <li>Si todo cuadra, pulsa <strong>Aplicar</strong>. Ése es el único momento en que se escribe.</li>
+  </ol>
+
+  <h3>7.3 Qué detecta el importador por su cuenta</h3>
+
+  <table>
+    <thead><tr><th style="width:30%">Situación en el Excel</th><th>Qué hace GCM</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Celdas combinadas verticalmente</strong> en las columnas de cifras</td>
+        <td>Lo lee como una partida a <strong>suma alzada</strong> cuyo alcance se detalla en varias
+        líneas: la fila maestra lleva el importe y las demás quedan como <em>alcance</em>, sin
+        importe propio. Es la señal autoritativa, mejor que adivinar comparando importes.</td>
+      </tr>
+      <tr>
+        <td><strong>Filas de texto sin código</strong> — notas, subtítulos, cláusulas</td>
+        <td>Las omite y te dice cuántas omitió.</td>
+      </tr>
+      <tr>
+        <td><strong>Filas ocultas</strong> en la hoja</td>
+        <td>No las importa —quedaron fuera de alcance— pero te dice cuántas son y
+        <strong>cuánto suman</strong>, para que veas qué se dejó fuera.</td>
+      </tr>
+      <tr>
+        <td><strong>Importes idénticos en filas consecutivas</strong></td>
+        <td>Te muestra el total normal y el total <em>contando una sola vez</em> cada grupo
+        repetido, para que decidas si es un desglose o son partidas distintas que casualmente
+        cuestan lo mismo.</td>
+      </tr>
+      <tr>
+        <td><strong>Una partida con cifras pero sin descripción</strong></td>
+        <td>Error bloqueante, con el número de fila.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>7.4 El riesgo de reemplazo</h3>
+  <p>Reimportar un Excel corregido <strong>reemplaza</strong> el árbol. Antes de hacerlo, el
+  sistema contesta la única pregunta que importa: <em>de lo que voy a borrar, ¿qué no está en
+  ningún archivo?</em></p>
+
+  <table>
+    <thead><tr><th style="width:34%">Tipo de partida</th><th>Qué pasa si se reemplaza</th></tr></thead>
+    <tbody>
+      <tr><td>Importada y no tocada</td><td>Se puede perder sin drama: el Excel la vuelve a traer</td></tr>
+      <tr><td><strong>Creada a mano</strong></td><td class="si">No existe en ningún otro sitio. Borrarla destruye trabajo</td></tr>
+      <tr><td><strong>Importada y editada después</strong></td><td class="si">Su corrección tampoco está en el Excel. Se perdería</td></tr>
+    </tbody>
+  </table>
+
+  <p>Por eso el aviso no dice «se borrarán 360 partidas» —que se lee como rutina—, sino cuántas de
+  ésas son irrecuperables.</p>
+
+  <h3>7.5 Editar el árbol a mano</h3>
+  <p>El árbol es editable en cualquier momento: crear una partida, cambiar unidad, metrado o
+  precio unitario, o eliminarla. El <strong>parcial</strong> se recalcula solo
+  (metrado × precio unitario) y sube por el árbol hasta el total.</p>
+
+  <div class="caja">
+    <span class="et">Regla de la casa</span>
+    <p>Todo importe se guarda con precisión decimal exacta, nunca con números aproximados. Un
+    céntimo perdido por redondeo en un presupuesto de obra es un error contable, no un detalle.</p>
+  </div>
+
+  <h3>7.6 Revisiones y línea base</h3>
+  <p>Una <strong>revisión</strong> congela el presupuesto en una fecha. Y el presupuesto no es la
+  simple suma de partidas: sobre el costo directo se aplica una cascada.</p>
+
+  <figure>
+    <svg viewBox="0 0 640 250" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <rect x="120" y="10" width="400" height="30" rx="4" fill="#1f5f8b"/>
+      <text x="140" y="30" font-size="10" font-weight="700" fill="#fff">Costo directo</text>
+      <text x="500" y="30" font-size="9" text-anchor="end" fill="#d3e6f2">suma de todas las partidas</text>
+
+      <rect x="120" y="46" width="400" height="28" rx="4" fill="#fbeceb" stroke="#a8322d"/>
+      <text x="140" y="65" font-size="10" font-weight="700" fill="#a8322d">− Descuentos comerciales</text>
+      <text x="500" y="65" font-size="9" text-anchor="end" fill="#5b6875">negativos</text>
+
+      <rect x="120" y="80" width="400" height="28" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="140" y="99" font-size="10" font-weight="700" fill="#1f5f8b">+ Gastos generales</text>
+      <text x="500" y="99" font-size="9" text-anchor="end" fill="#5b6875">% propio de esta revisión</text>
+
+      <rect x="120" y="114" width="400" height="28" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="140" y="133" font-size="10" font-weight="700" fill="#1f5f8b">+ Utilidad</text>
+      <text x="500" y="133" font-size="9" text-anchor="end" fill="#5b6875">% propio de esta revisión</text>
+
+      <rect x="120" y="150" width="400" height="32" rx="4" fill="#2f7d4f"/>
+      <text x="140" y="171" font-size="11" font-weight="700" fill="#fff">= MONTO TOTAL (sin IGV)</text>
+      <text x="500" y="171" font-size="9" text-anchor="end" fill="#d4ebdd">la cifra de control</text>
+
+      <rect x="120" y="188" width="400" height="26" rx="4" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="140" y="206" font-size="9.6" fill="#5b6875">+ IGV (18 % por defecto) · tipo de cambio para verlo en dólares</text>
+
+      <text x="120" y="236" font-size="8.6" fill="#5b6875">Los porcentajes viven en la revisión y no en la obra: si se guardaran en la obra, recalcular una revisión antigua daría otro</text>
+      <text x="120" y="247" font-size="8.6" fill="#5b6875">número y comparar revisiones dejaría de tener sentido.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 8</span> — La cascada del presupuesto dentro de una revisión.</figcaption>
+  </figure>
+
+  <p>La revisión guarda además las <strong>cláusulas</strong> de esa versión: alcance, forma de
+  pago, garantía y vigencia. La cláusula de alcance es la que define después cuándo procede un
+  adicional y cuándo una reconversión.</p>
+
+  <ol class="pasos">
+    <li><strong>Plan → Revisiones → Nueva.</strong> Nace como borrador con el costo directo actual del árbol.</li>
+    <li>Completa fecha de revisión, descuentos, porcentajes, tipo de cambio y cláusulas.</li>
+    <li>Revisa el resumen. Mientras sea borrador, se puede corregir todo.</li>
+    <li>El <strong>administrador</strong> la aprueba. Desde ese momento es inmutable y pasa a ser el
+    presupuesto contra el que se mide la obra.</li>
+  </ol>
+
+  <h3>7.7 Movimientos: reconversión, adicional y deductivo</h3>
+  <p>Con la revisión aprobada, el presupuesto solo se mueve con documentos. Un movimiento se
+  redacta como <span class="tag m">BORRADOR</span>, se cita en un acta y el administrador lo
+  <span class="tag v">APRUEBA</span>. Aprobar es irreversible: un movimiento aprobado se corrige
+  con otro de signo contrario, no borrándolo.</p>
+
+  <table>
+    <thead><tr><th style="width:20%">Tipo</th><th style="width:30%">Qué hace</th><th style="width:22%">Sus líneas</th><th>Cuándo procede</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Reconversión</strong></td><td>Saca de una partida y mete en otra</td><td>Suman <strong>cero</strong></td><td>El alcance no cambia; cambia el reparto</td></tr>
+      <tr><td><strong>Adicional</strong></td><td>Aumenta el presupuesto aprobado</td><td>Solo entradas</td><td>Vicios ocultos o cambios de diseño (cláusula de alcance)</td></tr>
+      <tr><td><strong>Deductivo</strong></td><td>Reduce el presupuesto aprobado</td><td>Solo salidas</td><td>Se retira alcance contratado</td></tr>
+    </tbody>
+  </table>
+
+  <p>Cada movimiento lleva concepto, <strong>motivo</strong> (donde se invoca la cláusula) y
+  <strong>referencia</strong> al documento del cliente que lo autoriza: carta, acta o correo. Un
+  adicional puede además <strong>dar de alta partidas nuevas</strong>: nacen marcadas con su
+  movimiento de origen, y en pantalla se distinguen de lo contratado porque su presupuesto base
+  es cero.</p>
+
+  <div class="caja">
+    <span class="et">Dónde se ve el resultado</span>
+    <p>En <em>Ejecución → Movimientos</em> tienes el histórico y el <strong>presupuesto
+    vigente</strong>: la revisión aprobada más todos los movimientos aprobados. Es la cifra contra
+    la que se compara lo comprometido con proveedores.</p>
+  </div>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 8 · Flujo 2</div>
+  <h2>8. El cronograma</h2>
+  <p class="lead">De MS Project a un plan versionado contra el que se puede reportar avance.</p>
+
+  <h3>8.1 Importar de MS Project</h3>
+  <p><strong>Plan → Cronograma → Importar.</strong> Acepta <code>.mpp</code> y <code>.xml</code>.
+  De cada tarea se copia fielmente lo que trae el archivo:</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Dato</th><th>De dónde sale y por qué así</th></tr></thead>
+    <tbody>
+      <tr><td><strong>UID</strong></td><td>El identificador interno. Es el ancla del avance (ver 2.5)</td></tr>
+      <tr><td>Fila</td><td>Para ordenar y para escribir las predecesoras del informe («24FC+3 días»). Jamás como clave</td></tr>
+      <tr><td>Código</td><td>El «4.4» del principio del nombre. No sale del campo WBS de Project, que lleva otra numeración</td></tr>
+      <tr><td>Nivel</td><td>La profundidad de esquema. <strong>Única fuente de jerarquía</strong>: el código es solo una etiqueta</td></tr>
+      <tr><td>Inicio y fin</td><td>Fechas de calendario</td></tr>
+      <tr><td>Duración</td><td>Del campo Duración, nunca de restar fechas: una partida de un día puede abarcar tres por el calendario. Admite fracción</td></tr>
+      <tr><td>% planeado</td><td>Se <strong>lee</strong> del archivo, no se calcula: así las cifras coinciden con el informe que ya emite el cliente</td></tr>
+      <tr><td>Es resumen / es hito / <strong>es crítica</strong></td><td>Vienen dados por el archivo. La ruta crítica no se deduce de la holgura</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.2 Versiones y fecha de corte</h3>
+  <p>Cada importación crea una <strong>versión</strong>. La versión se identifica por su
+  <strong>fecha de corte</strong>, que sale del propio archivo (<em>Status Date</em>) — no de
+  cuándo se guardó ni de cuándo se subió. Es lo que permite avisarte de que ese corte ya se cargó:
+  hay archivos del mismo corte guardados con horas de diferencia.</p>
+
+  <div class="caja ojo">
+    <span class="et">Regla simple</span>
+    <p><strong>Si el plan no cambió, no crees una versión nueva.</strong> Sube archivo cuando el
+    plan cambie de verdad.</p>
+  </div>
+
+  <h3>8.3 Fijar la línea base del cronograma</h3>
+  <p>Una de las versiones se marca como <strong>línea base</strong>: es el plan congelado contra el
+  que se calculan el valor planificado y el índice de plazo. Solo una a la vez.</p>
+  <p>Se puede volver a fijar en otra versión —con confirmación y dejando registro de quién y
+  cuándo—. No es contractual como la del presupuesto, pero re-fijarla cambia todos los índices
+  hacia atrás: hazlo cuando el plan se replanifique formalmente, no cada semana.</p>
+
+  <h3>8.4 Mapear tareas con partidas</h3>
+  <p><strong>Es lo más importante que se hace en esta pantalla.</strong> Sin mapeo, el avance se
+  pondera por <em>duración</em>, que es lo único que trae Project. Con mapeo, se pondera por
+  <em>dinero</em>.</p>
+
+  <table>
+    <thead><tr><th>Tarea</th><th class="c">Duración</th><th class="c">Costo</th><th class="c">Avance</th></tr></thead>
+    <tbody>
+      <tr><td>Curado de concreto en zapatas</td><td class="c">60 d</td><td class="c">S/ 10 000</td><td class="c">20 %</td></tr>
+      <tr><td>Suministro y montaje de estructura</td><td class="c">5 d</td><td class="c">S/ 200 000</td><td class="c">100 %</td></tr>
+      <tr style="background:#fdf3de"><td colspan="3"><strong>Ponderado por duración</strong></td><td class="c"><strong>26 %</strong></td></tr>
+      <tr style="background:#e7f4ec"><td colspan="3"><strong>Ponderado por dinero</strong></td><td class="c"><strong>96 %</strong></td></tr>
+    </tbody>
+  </table>
+
+  <p>El curado dura mucho y no cuesta casi nada. Los dos números son ciertos; solo uno sirve para
+  contrastarlo con lo gastado.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <text x="120" y="18" font-size="9.4" font-weight="700" text-anchor="middle" fill="#1f5f8b">CRONOGRAMA (tiempo)</text>
+      <text x="560" y="18" font-size="9.4" font-weight="700" text-anchor="middle" fill="#2f7d4f">PRESUPUESTO (dinero)</text>
+
+      <rect x="30" y="34" width="180" height="34" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="44" y="55" font-size="9.2" fill="#16202b">Tarea UID 118 — Instalaciones piso 1</text>
+
+      <rect x="30" y="86" width="180" height="34" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="44" y="107" font-size="9.2" fill="#16202b">Tarea UID 142 — Concreto zapatas A</text>
+
+      <rect x="30" y="138" width="180" height="34" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="44" y="159" font-size="9.2" fill="#16202b">Tarea UID 143 — Concreto zapatas B</text>
+
+      <rect x="470" y="26" width="200" height="28" rx="4" fill="#e7f4ec" stroke="#2f7d4f"/>
+      <text x="484" y="45" font-size="9.2" fill="#16202b">6.1 Tubería PVC — S/ 18 400</text>
+
+      <rect x="470" y="60" width="200" height="28" rx="4" fill="#e7f4ec" stroke="#2f7d4f"/>
+      <text x="484" y="79" font-size="9.2" fill="#16202b">6.2 Cableado — S/ 22 100</text>
+
+      <rect x="470" y="94" width="200" height="28" rx="4" fill="#e7f4ec" stroke="#2f7d4f"/>
+      <text x="484" y="113" font-size="9.2" fill="#16202b">6.3 Accesorios — S/ 5 900</text>
+
+      <rect x="470" y="132" width="200" height="28" rx="4" fill="#e7f4ec" stroke="#2f7d4f"/>
+      <text x="484" y="151" font-size="9.2" fill="#16202b">3.4 Concreto f'c=210 — S/ 96 300</text>
+
+      <g stroke="#a8710b" stroke-width="1.5" fill="none">
+        <path d="M212,44 L466,40"/>
+        <path d="M212,51 L466,74"/>
+        <path d="M212,58 L466,108"/>
+        <path d="M212,103 L466,142"/>
+        <path d="M212,155 L466,148"/>
+      </g>
+
+      <rect x="240" y="176" width="220" height="20" rx="4" fill="#fdf3de" stroke="#a8710b"/>
+      <text x="350" y="190" font-size="8.6" font-weight="700" text-anchor="middle" fill="#a8710b">Relación de muchos a muchos</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 9</span> — Una tarea puede tocar varias partidas, y una partida repartirse en varias tareas.</figcaption>
+  </figure>
+
+  <h4>Por qué se confirma a mano</h4>
+  <p>GCM <strong>propone</strong> las partidas que más se parecen, por código y por parecido de
+  descripción. Lo que no hace es confirmar solo, y la razón está medida sobre archivos reales: de
+  56 coincidencias de código, <strong>36 apuntaban a otra cosa</strong> — el capítulo 5 del
+  cronograma iba desplazado una posición respecto al del presupuesto, y el «5.5» habría caído
+  sobre un descuento comercial.</p>
+
+  <div class="caja alto">
+    <span class="et">Lo que hace peligroso un mapeo automático</span>
+    <p>Un mapeo equivocado <strong>no da ningún síntoma</strong>. La curva sale bonita y miente. Por
+    eso la fila solo se escribe cuando una persona acepta, y queda registrado quién y cuándo.</p>
+  </div>
+
+  <p>No hace falta mapear todo de golpe: <strong>empieza por los capítulos que concentran el
+  dinero</strong>. Con el 20 % de las partidas suele cubrirse el 80 % del presupuesto. Y como el
+  mapeo se guarda contra el <em>código</em> de la partida y no contra su identificador interno,
+  reimportar el Excel corregido no lo rompe.</p>
+
+  <p>Cuando una tarea toca partidas con unidades distintas (m² y kg), el sistema
+  <strong>no inventa</strong> una cantidad: te la pide.</p>
+
+  <h3>8.5 Registrar avance</h3>
+  <p>El avance se reporta contra el UID de la tarea, con fecha, porcentaje y una nota opcional.
+  Queda firmado con tu nombre.</p>
+  <p>Hay dos vías, y conviene saber cuál usaste:</p>
+  <ul>
+    <li><strong>Manual</strong> — desde la pantalla del cronograma, tarea por tarea.</li>
+    <li><strong>Desde el cierre del Plan Semanal</strong> — el avance nace del PTS y queda ligado a
+    ese plan, de modo que si se reabre y se vuelve a cerrar la semana, se reemplaza en vez de
+    duplicarse.</li>
+  </ul>
+
+  <h3>8.6 Gantt, informe y ruta crítica</h3>
+  <p>Tres vistas sobre la misma versión:</p>
+  <ul>
+    <li><strong>Gantt</strong> — las barras en el tiempo, para mirar solapes y secuencia.</li>
+    <li><strong>Informe</strong> — la tabla con códigos, duraciones, fechas y cadenas de
+    predecesoras, en el formato que se lleva a reunión.</li>
+    <li><strong>Cadena crítica</strong> (en el panel) — las tareas donde un día perdido es un día
+    perdido de obra entera.</li>
+  </ul>
+  <p>De la ruta crítica GCM <strong>quita capítulos e hitos</strong>. Project también los marca
+  como críticos, pero sobre ellos no se puede actuar: meter cuadrilla en un capítulo no significa
+  nada.</p>
+
+  <h3>8.7 La curva S</h3>
+  <p>Tres líneas sobre el mismo eje: lo planificado, lo real y la proyección a este ritmo.</p>
+
+  <figure>
+    <svg viewBox="0 0 620 230" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <line x1="60" y1="20" x2="60" y2="180" stroke="#5b6875" stroke-width="1"/>
+      <line x1="60" y1="180" x2="580" y2="180" stroke="#5b6875" stroke-width="1"/>
+      <text x="34" y="26" font-size="8.4" fill="#5b6875">100%</text>
+      <text x="42" y="184" font-size="8.4" fill="#5b6875">0%</text>
+      <text x="320" y="202" font-size="8.6" fill="#5b6875" text-anchor="middle">tiempo</text>
+
+      <line x1="330" y1="20" x2="330" y2="180" stroke="#a8710b" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="330" y="16" font-size="8.4" font-weight="700" fill="#a8710b" text-anchor="middle">hoy</text>
+
+      <path d="M60,180 C160,172 220,120 330,74 C420,38 500,26 520,22" fill="none" stroke="#1f5f8b" stroke-width="2.2"/>
+      <text x="524" y="22" font-size="8.6" font-weight="700" fill="#1f5f8b">plan</text>
+
+      <path d="M60,180 C160,176 225,146 330,110" fill="none" stroke="#2f7d4f" stroke-width="2.6"/>
+      <text x="286" y="128" font-size="8.6" font-weight="700" fill="#2f7d4f">real</text>
+
+      <path d="M330,110 C420,80 530,44 578,36" fill="none" stroke="#a8322d" stroke-width="2" stroke-dasharray="5 3"/>
+      <text x="520" y="52" font-size="8.6" font-weight="700" fill="#a8322d">proyección</text>
+
+      <line x1="330" y1="74" x2="330" y2="110" stroke="#a8322d" stroke-width="4"/>
+      <text x="342" y="96" font-size="8.4" font-weight="700" fill="#a8322d">desvío de hoy</text>
+
+      <rect x="60" y="208" width="520" height="18" rx="4" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="70" y="221" font-size="8.4" fill="#16202b">Con mapeo tarea↔partida, los tres ejes están en soles. Sin mapeo, en porcentaje ponderado por duración.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 10</span> — La curva S y lo que dice cada línea.</figcaption>
+  </figure>
+
+  <p>La curva estima <strong>cuánto te vas a pasar</strong>, no solo si llegas: a mitad de ritmo,
+  tardas el doble de lo que queda. Solo dice «no se llega» cuando el ritmo es <strong>cero</strong>,
+  y ahí es literal. El porcentaje de ritmo tampoco redondea: un 99,6 % se muestra como 99,6 %,
+  porque decirle «vas al día» a quien no va es la peor ayuda posible.</p>
+</section>

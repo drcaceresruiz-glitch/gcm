@@ -1,0 +1,339 @@
+<section class="cap">
+  <div class="kicker">Capítulo 2</div>
+  <h2>2. El vocabulario del sistema</h2>
+  <p class="lead">Seis palabras. Si estas seis quedan claras, el resto del manual se lee solo.</p>
+
+  <h3>2.1 Empresa, obra y equipo</h3>
+  <p>GCM está pensado para que varias constructoras usen la misma instalación sin verse entre
+  ellas. La jerarquía es siempre la misma:</p>
+
+  <figure>
+    <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs>
+        <marker id="f2" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto">
+          <path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/>
+        </marker>
+      </defs>
+
+      <rect x="20" y="20" width="150" height="52" rx="6" fill="#16202b"/>
+      <text x="95" y="42" font-size="11.5" font-weight="700" text-anchor="middle" fill="#fff">EMPRESA</text>
+      <text x="95" y="58" font-size="8.4" text-anchor="middle" fill="#c8d2db">razón social · RUC</text>
+
+      <rect x="230" y="20" width="150" height="52" rx="6" fill="#1f5f8b"/>
+      <text x="305" y="42" font-size="11.5" font-weight="700" text-anchor="middle" fill="#fff">OBRA</text>
+      <text x="305" y="58" font-size="8.4" text-anchor="middle" fill="#d3e6f2">OB-000001 · cliente</text>
+
+      <rect x="440" y="20" width="240" height="52" rx="6" fill="#2f7d4f"/>
+      <text x="560" y="42" font-size="11.5" font-weight="700" text-anchor="middle" fill="#fff">EQUIPO DE LA OBRA</text>
+      <text x="560" y="58" font-size="8.4" text-anchor="middle" fill="#d4ebdd">cada persona con SU rol en ESTA obra</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#f2)" fill="none">
+        <path d="M172,46 L226,46"/>
+        <path d="M382,46 L436,46"/>
+      </g>
+      <text x="199" y="38" font-size="8" text-anchor="middle" fill="#5b6875">1 : N</text>
+      <text x="409" y="38" font-size="8" text-anchor="middle" fill="#5b6875">1 : N</text>
+
+      <rect x="20" y="96" width="660" height="88" rx="6" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="36" y="116" font-size="9.8" font-weight="700" fill="#16202b">Lo que cuelga de una obra</text>
+      <text x="36" y="134" font-size="9" fill="#16202b">· Presupuesto (árbol de capítulos y partidas) y sus revisiones congeladas</text>
+      <text x="36" y="149" font-size="9" fill="#16202b">· Cronogramas importados, con sus versiones y su línea base</text>
+      <text x="36" y="164" font-size="9" fill="#16202b">· Lookahead, planes semanales, movimientos, encargos, órdenes, fotos y pases</text>
+      <text x="36" y="178" font-size="8.5" fill="#5b6875">Nada de esto se comparte entre obras. Borrar una obra se lleva todo lo suyo.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 2</span> — Jerarquía: empresa → obra → equipo.</figcaption>
+  </figure>
+
+  <p>Cada obra recibe un <strong>correlativo</strong> que asigna el sistema y que nunca se
+  recicla (<code>OB-000001</code>, <code>OB-000002</code>…). Es distinto del
+  <em>código de obra</em> que pone la persona, que puede faltar. El correlativo sirve para
+  buscar y para auditoría: si se borra una obra, su número no se le da a otra.</p>
+
+  <p>Una obra tiene además cuatro estados: <span class="tag a">PLANIFICACIÓN</span>
+  <span class="tag v">EN EJECUCIÓN</span> <span class="tag m">PARALIZADA</span>
+  <span class="tag r">CERRADA</span>. Con la obra cerrada, el sistema bloquea las operaciones
+  que modifican datos y te dice por qué.</p>
+
+  <h3>2.2 Capítulo, partida y tarea</h3>
+  <p>Es la distinción que más confusión causa, y la que hay que tener grabada:</p>
+
+  <table>
+    <thead><tr><th style="width:17%">Concepto</th><th style="width:20%">De dónde viene</th><th style="width:22%">Qué lleva</th><th>Es la unidad de…</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Capítulo</strong></td><td>Presupuesto</td><td>Solo agrupa. Sin metrado ni costo propio</td><td>organización</td></tr>
+      <tr><td><strong>Partida</strong></td><td>Presupuesto</td><td>Unidad, metrado, precio unitario y parcial</td><td><strong>dinero</strong></td></tr>
+      <tr><td><strong>Tarea</strong></td><td>MS Project</td><td>Fechas, duración, % planeado, si es crítica</td><td><strong>tiempo</strong></td></tr>
+    </tbody>
+  </table>
+
+  <p><strong>Son dos árboles distintos.</strong> El presupuesto suele ser dos o tres veces más
+  fino que el cronograma: en una obra real hay 314 partidas para 106 tareas. Los dos árboles se
+  cruzan con un <em>mapeo</em> que confirma una persona, y ese cruce es el que permite hablar de
+  avance en soles (capítulo 8.4).</p>
+
+  <h3>2.3 Modalidad de contratación</h3>
+  <p>No es una etiqueta decorativa: cambia cómo se calcula el importe y quién asume el riesgo si
+  el metrado real difiere del previsto.</p>
+
+  <table>
+    <thead><tr><th style="width:24%">Modalidad</th><th style="width:34%">Cómo se calcula el importe</th><th>Quién asume el riesgo del metrado</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Precios unitarios</strong></td><td>metrado × precio unitario</td><td>El cliente: si se ejecuta más, se paga más</td></tr>
+      <tr><td><strong>Suma alzada</strong></td><td>Precio cerrado por el alcance completo. El metrado es referencial</td><td>El contratista: aunque se ejecute más, el importe no cambia</td></tr>
+      <tr><td><strong>Alcance</strong></td><td>Sin importe propio. Detalla qué incluye una partida a suma alzada</td><td>El dinero está en la partida padre</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.4 Revisión, línea base y presupuesto vigente</h3>
+  <p>Tres palabras que suenan parecido y significan cosas muy distintas:</p>
+  <ul>
+    <li><strong>Revisión (línea base del presupuesto).</strong> Una foto congelada del
+    presupuesto en un momento: sus partidas, sus porcentajes de gastos generales y utilidad, sus
+    cláusulas. Mientras es <em>borrador</em> se puede editar; una vez <strong>aprobada, es
+    inmutable</strong>.</li>
+    <li><strong>Presupuesto vigente.</strong> La última revisión aprobada <em>más</em> los
+    movimientos aprobados después (adicionales, deductivos y reconversiones). Es contra lo que se
+    controla hoy.</li>
+    <li><strong>Línea base del cronograma.</strong> Otra cosa: la versión congelada del
+    <em>cronograma</em> contra la que se mide el valor ganado. Ésta sí se puede volver a fijar,
+    con confirmación y dejando registro.</li>
+  </ul>
+
+  <div class="caja alto">
+    <span class="et">Por qué una revisión aprobada no se puede editar</span>
+    <p>Porque todos los indicadores se miden <em>contra</em> ella. Si se pudiera cambiar hacia
+    atrás, el avance de la semana pasada dejaría de significar lo mismo y el sistema mentiría sin
+    avisar. Un error en una revisión aprobada se corrige con un <strong>movimiento</strong> de
+    signo contrario, nunca borrando.</p>
+  </div>
+
+  <h3>2.5 El UID: el ancla del cronograma</h3>
+  <p>Cada tarea de MS Project tiene un número interno llamado <strong>UID</strong>. GCM guarda el
+  avance, el Lookahead y los compromisos contra ese número, no contra el nombre ni contra la fila.</p>
+
+  <p>El motivo es práctico: al reimportar un cronograma, los <em>GUID</em> se regeneran enteros,
+  el <em>ID</em> se corre al insertar o borrar una fila, el <em>WBS</em> se recalcula con la
+  posición y el nombre lo edita cualquiera. Todos ellos fallan en silencio. El UID no.</p>
+
+  <div class="caja ok">
+    <span class="et">Qué significa para ti</span>
+    <p>Puedes reimportar el cronograma tantas veces como cambie el plan: <strong>el avance
+    reportado no se pierde</strong>. Lo que sí se pierde es el avance de una tarea que
+    desaparezca del archivo, porque ya no existe a qué anclarlo.</p>
+  </div>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 3</div>
+  <h2>3. Usuarios, roles y permisos</h2>
+  <p class="lead">Quién puede hacer qué, y por qué está repartido así.</p>
+
+  <h3>3.1 Los cinco roles</h3>
+
+  <table>
+    <thead><tr><th style="width:20%">Rol</th><th style="width:33%">Quién es en la obra</th><th>Qué hace en GCM</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Administrador</strong><br><span style="font-size:8.4pt;color:#5b6875">ADMIN</span></td>
+        <td>La gerencia de la constructora</td>
+        <td>Control total sobre su empresa. Es el único que <strong>aprueba</strong> revisiones,
+        movimientos y órdenes, y el único que administra usuarios y permisos.</td>
+      </tr>
+      <tr>
+        <td><strong>Residente</strong><br><span style="font-size:8.4pt;color:#5b6875">RESIDENTE</span></td>
+        <td>El responsable técnico en obra</td>
+        <td>Construye y mantiene el presupuesto, importa el cronograma, reporta avance, lleva el
+        Lookahead y el Plan Semanal, y valoriza los encargos. <strong>No aprueba nada
+        contractual.</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Administrador de obra</strong><br><span style="font-size:8.4pt;color:#5b6875">ADMIN_OBRA</span></td>
+        <td>El perfil económico-administrativo</td>
+        <td>Lleva proveedores, encargos y órdenes, y redacta movimientos presupuestales. Consulta
+        el presupuesto pero no lo modifica.</td>
+      </tr>
+      <tr>
+        <td><strong>Almacenero</strong><br><span style="font-size:8.4pt;color:#5b6875">ALMACENERO</span></td>
+        <td>Almacén de obra</td>
+        <td>Ve la obra y las partidas para poder imputar materiales. Nada más.</td>
+      </tr>
+      <tr>
+        <td><strong>Consultor</strong><br><span style="font-size:8.4pt;color:#5b6875">CONSULTOR</span></td>
+        <td>Cliente, supervisión, auditoría externa</td>
+        <td>Lectura estricta de todo lo que se le dé acceso. No escribe nunca.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="caja">
+    <span class="et">La lógica del reparto</span>
+    <p>Lo que se sabe <strong>estando en obra</strong> lo lleva el residente: el avance, las
+    restricciones, la valorización de un encargo. Lo que se <strong>negocia o compromete
+    dinero</strong> lo lleva el administrador de obra. Lo que es <strong>contractual e
+    irreversible</strong> —aprobar— se queda en el administrador de la empresa.</p>
+  </div>
+
+  <h3>3.2 Qué puede hacer cada rol (matriz completa)</h3>
+  <p>Ésta es la plantilla que trae el sistema. Un permiso que no aparece <strong>no se
+  concede</strong>: la regla es denegación por defecto.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:38%">Puede…</th>
+        <th class="c">Admin</th>
+        <th class="c">Residente</th>
+        <th class="c">Adm. obra</th>
+        <th class="c">Almac.</th>
+        <th class="c">Consultor</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Empresa y personas</td></tr>
+      <tr><td>Ver los datos de la empresa</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td></tr>
+      <tr><td>Editar los datos de la empresa</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Ver usuarios</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Crear, editar y desactivar usuarios</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Resetear la clave de otro</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Obras</td></tr>
+      <tr><td>Ver obras</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Crear y eliminar obras</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Editar la obra</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Asignar el equipo de la obra</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Presupuesto</td></tr>
+      <tr><td>Ver partidas</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Crear, editar y eliminar partidas</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Importar el presupuesto desde Excel</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Ver revisiones</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td></tr>
+      <tr><td>Crear una revisión (borrador)</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td><strong>Aprobar una revisión</strong></td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Cronograma y avance</td></tr>
+      <tr><td>Ver el cronograma</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td></tr>
+      <tr><td>Importar el cronograma</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Registrar avance</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Fijar la línea base del cronograma</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Last Planner</td></tr>
+      <tr><td>Ver el Lookahead y el Plan Semanal</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td></tr>
+      <tr><td>Gestionar el Lookahead (restricciones)</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Gestionar el Plan Semanal (PTS, cierre)</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Movimientos presupuestales</td></tr>
+      <tr><td>Ver movimientos</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td></tr>
+      <tr><td>Redactar un movimiento</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td><strong>Aprobar un movimiento</strong></td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Compras</td></tr>
+      <tr><td>Ver proveedores</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Crear y editar proveedores</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Ver encargos</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Repartir encargos (alcance y monto)</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Valorizar un encargo</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Ver órdenes de compra</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Crear una orden</td><td class="c si">✓</td><td class="c no">·</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td><strong>Aprobar o anular una orden</strong></td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+
+      <tr><td colspan="6" style="background:#e8f1f7;font-weight:700;color:#1f5f8b">Administración</td></tr>
+      <tr><td>Ver y editar la matriz de permisos</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Editar la configuración (canal SMS)</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+      <tr><td>Leer la auditoría</td><td class="c si">✓</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td><td class="c no">·</td></tr>
+    </tbody>
+  </table>
+
+  <p>Cada empresa puede <strong>ajustar esta plantilla</strong> desde <em>Personas → Permisos</em>:
+  conceder un permiso suelto a un rol que no lo trae, o quitárselo. Lo que decide en cada
+  operación es el permiso <em>efectivo</em>, no el rol.</p>
+
+  <h3>3.3 Permisos que no se pueden mover</h3>
+  <p>Cinco permisos están fuera de esa negociación, y por razones concretas:</p>
+
+  <table>
+    <thead><tr><th style="width:32%">Permiso</th><th>Por qué es innegociable</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Aprobar una revisión</strong></td><td rowspan="2">Son actos contractuales irreversibles que mueven la cifra contra la que se mide toda la obra. Si fueran configurables, un día alguien se los concede a quien no debe.</td></tr>
+      <tr><td><strong>Aprobar un movimiento</strong></td></tr>
+      <tr><td><strong>Ver la matriz de permisos</strong></td><td rowspan="2">Reparten todos los demás. Si se pudieran conceder, un administrador podría dárselos a un consultor y ése repartirse el resto: escalada de privilegios con dos clics.</td></tr>
+      <tr><td><strong>Editar la matriz de permisos</strong></td></tr>
+      <tr><td><strong>Editar la configuración</strong></td><td>Gobierna el teléfono por el que salen los SMS de la empresa, y por esa cola viajan los códigos de acceso en claro. Quien pueda vincular un emisor puede leer el segundo factor de sus compañeros.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.4 El rol se asigna por obra, no por persona</h3>
+  <p>Una misma persona puede ser <strong>residente en una obra y consultor en otra</strong>. El
+  rol efectivo se resuelve en el momento en que entras a una obra concreta, mirando la asignación
+  del equipo de esa obra.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 210" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs>
+        <marker id="f3" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto">
+          <path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/>
+        </marker>
+      </defs>
+
+      <rect x="14" y="16" width="120" height="44" rx="5" fill="#fff" stroke="#1f5f8b" stroke-width="1.5"/>
+      <text x="74" y="34" font-size="10" font-weight="700" text-anchor="middle" fill="#1f5f8b">Pides algo</text>
+      <text x="74" y="49" font-size="8.2" text-anchor="middle" fill="#5b6875">«guardar esta partida»</text>
+
+      <rect x="168" y="16" width="140" height="44" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="238" y="34" font-size="10" font-weight="700" text-anchor="middle" fill="#16202b">¿Hay sesión válida?</text>
+      <text x="238" y="49" font-size="8.2" text-anchor="middle" fill="#5b6875">y sin 2FA pendiente</text>
+
+      <rect x="342" y="16" width="150" height="44" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="417" y="34" font-size="10" font-weight="700" text-anchor="middle" fill="#16202b">¿La obra es de tu</text>
+      <text x="417" y="49" font-size="10" font-weight="700" text-anchor="middle" fill="#16202b">empresa?</text>
+
+      <rect x="526" y="16" width="160" height="44" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="606" y="34" font-size="10" font-weight="700" text-anchor="middle" fill="#16202b">¿Tu rol en ESA obra</text>
+      <text x="606" y="49" font-size="10" font-weight="700" text-anchor="middle" fill="#16202b">tiene el permiso?</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#f3)" fill="none">
+        <path d="M136,38 L164,38"/>
+        <path d="M310,38 L338,38"/>
+        <path d="M494,38 L522,38"/>
+      </g>
+
+      <path d="M606,62 L606,88" stroke="#2f7d4f" stroke-width="1.6" marker-end="url(#f3)" fill="none"/>
+      <rect x="500" y="90" width="186" height="36" rx="5" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="1.5"/>
+      <text x="593" y="113" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Se ejecuta y se audita</text>
+
+      <g stroke="#a8322d" stroke-width="1.4" fill="none" marker-end="url(#f3)">
+        <path d="M238,62 L238,146"/>
+        <path d="M417,62 L417,146"/>
+      </g>
+      <rect x="140" y="148" width="360" height="36" rx="5" fill="#fbeceb" stroke="#a8322d" stroke-width="1.5"/>
+      <text x="320" y="171" font-size="10.5" font-weight="700" text-anchor="middle" fill="#a8322d">Se rechaza — y no se dice por qué en detalle</text>
+
+      <text x="14" y="200" font-size="8.4" fill="#5b6875">La decisión real se toma en el servidor, en la capa de servicios. Que una pantalla no se vea es comodidad; que una operación se rechace es la seguridad.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 3</span> — Las cuatro puertas que atraviesa cada operación.</figcaption>
+  </figure>
+
+  <h3>3.5 El pase de obra no es un usuario</h3>
+  <p>En obra hay gente que necesita <strong>aportar fotos</strong> pero que no debe tener cuenta:
+  el capataz del subcontratista, el prevencionista, el maestro. Para ellos existe el
+  <strong>pase de obra</strong>.</p>
+
+  <table>
+    <thead><tr><th style="width:30%"></th><th style="width:35%">Usuario de GCM</th><th>Pase de obra</th></tr></thead>
+    <tbody>
+      <tr><td>Cómo entra</td><td>Correo y clave + verificación</td><td>Solo un código de un único uso al celular o correo</td></tr>
+      <tr><td>Alcance</td><td>Todas las obras donde esté asignado</td><td><strong>Una sola obra</strong>, siempre</td></tr>
+      <tr><td>Rol y permisos</td><td>Sí</td><td><strong>Ninguno</strong></td></tr>
+      <tr><td>Qué puede hacer</td><td>Lo que diga su rol</td><td>Solo adjuntar fotos de evidencia</td></tr>
+      <tr><td>Vigencia</td><td>Mientras esté activo</td><td>Limitada, y revocable en un clic</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caja ojo">
+    <span class="et">Dos reglas que protegen la obra</span>
+    <p><strong>Solo entra quien ya estaba registrado.</strong> El código se envía únicamente a un
+    contacto que el residente dio de alta en esa obra.</p>
+    <p><strong>Nunca se dice si un contacto existe.</strong> La pantalla pública responde igual
+    exista o no el número. Si respondiera distinto, se convertiría en un detector de quién
+    trabaja en la obra.</p>
+  </div>
+</section>

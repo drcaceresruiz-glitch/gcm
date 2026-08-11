@@ -1,0 +1,273 @@
+<section class="cap">
+  <div class="kicker">Capítulo 4</div>
+  <h2>4. Entrar al sistema</h2>
+
+  <h3>4.1 El flujo de acceso, paso a paso</h3>
+  <p>GCM se abre en <code>https://gcm.drcaceresruiz.com</code> desde cualquier navegador. No se
+  instala nada.</p>
+
+  <figure>
+    <svg viewBox="0 0 730 330" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs>
+        <marker id="f4" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto">
+          <path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/>
+        </marker>
+        <marker id="f4r" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto">
+          <path d="M0,0 L7,2.8 L0,5.6 z" fill="#a8322d"/>
+        </marker>
+      </defs>
+
+      <rect x="270" y="10" width="190" height="38" rx="5" fill="#1f5f8b"/>
+      <text x="365" y="34" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">Correo y contraseña</text>
+
+      <path d="M365,50 L365,72" stroke="#5b6875" stroke-width="1.4" marker-end="url(#f4)"/>
+
+      <polygon points="365,74 480,104 365,134 250,104" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="365" y="101" font-size="9.6" font-weight="700" text-anchor="middle" fill="#16202b">¿Es correcta?</text>
+      <text x="365" y="115" font-size="8.2" text-anchor="middle" fill="#5b6875">y la cuenta está activa</text>
+
+      <path d="M250,104 L120,104" stroke="#a8322d" stroke-width="1.4" marker-end="url(#f4r)" fill="none"/>
+      <text x="185" y="97" font-size="8.2" font-weight="700" text-anchor="middle" fill="#a8322d">NO</text>
+      <rect x="8" y="86" width="108" height="36" rx="5" fill="#fbeceb" stroke="#a8322d"/>
+      <text x="62" y="102" font-size="9" font-weight="700" text-anchor="middle" fill="#a8322d">Se rechaza</text>
+      <text x="62" y="114" font-size="7.8" text-anchor="middle" fill="#a8322d">y queda registrado</text>
+
+      <path d="M365,136 L365,158" stroke="#5b6875" stroke-width="1.4" marker-end="url(#f4)"/>
+      <text x="380" y="151" font-size="8.2" font-weight="700" fill="#2f7d4f">SÍ</text>
+
+      <polygon points="365,160 495,190 365,220 235,190" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="365" y="187" font-size="9.6" font-weight="700" text-anchor="middle" fill="#16202b">¿Tienes verificación</text>
+      <text x="365" y="200" font-size="9.6" font-weight="700" text-anchor="middle" fill="#16202b">en dos pasos?</text>
+
+      <path d="M495,190 L560,190" stroke="#5b6875" stroke-width="1.4" marker-end="url(#f4)" fill="none"/>
+      <text x="527" y="183" font-size="8.2" font-weight="700" text-anchor="middle" fill="#1f5f8b">SÍ</text>
+      <rect x="564" y="160" width="158" height="60" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="643" y="180" font-size="9.6" font-weight="700" text-anchor="middle" fill="#1f5f8b">Código de 6 cifras</text>
+      <text x="643" y="194" font-size="8.4" text-anchor="middle" fill="#5b6875">por SMS o por correo</text>
+      <text x="643" y="209" font-size="8.4" text-anchor="middle" fill="#5b6875">caduca y tiene tope de intentos</text>
+
+      <path d="M643,222 L643,252 L495,252" stroke="#5b6875" stroke-width="1.4" marker-end="url(#f4)" fill="none"/>
+      <path d="M365,222 L365,252" stroke="#5b6875" stroke-width="1.4" fill="none"/>
+      <text x="336" y="240" font-size="8.2" font-weight="700" fill="#5b6875">NO</text>
+
+      <polygon points="365,254 480,282 365,310 250,282" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="365" y="279" font-size="9.4" font-weight="700" text-anchor="middle" fill="#16202b">¿Clave provisional?</text>
+      <text x="365" y="292" font-size="8.2" text-anchor="middle" fill="#5b6875">la que te dio el administrador</text>
+
+      <path d="M250,282 L120,282" stroke="#a8710b" stroke-width="1.4" marker-end="url(#f4)" fill="none"/>
+      <text x="185" y="275" font-size="8.2" font-weight="700" text-anchor="middle" fill="#a8710b">SÍ</text>
+      <rect x="8" y="264" width="108" height="36" rx="5" fill="#fdf3de" stroke="#a8710b"/>
+      <text x="62" y="280" font-size="9" font-weight="700" text-anchor="middle" fill="#a8710b">Cambiar clave</text>
+      <text x="62" y="292" font-size="7.8" text-anchor="middle" fill="#a8710b">obligatorio</text>
+
+      <path d="M480,282 L600,282" stroke="#2f7d4f" stroke-width="1.6" marker-end="url(#f4)" fill="none"/>
+      <text x="540" y="275" font-size="8.2" font-weight="700" text-anchor="middle" fill="#2f7d4f">NO</text>
+      <rect x="604" y="264" width="118" height="36" rx="5" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="1.5"/>
+      <text x="663" y="286" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Al panel</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 4</span> — Flujo de acceso, con sus dos desvíos.</figcaption>
+  </figure>
+
+  <h3>4.2 Verificación en dos pasos (SMS o correo)</h3>
+  <p>Es el candado que hace que saber tu contraseña no baste. Lo activas tú desde tu perfil y
+  eliges por dónde quieres recibir el código:</p>
+
+  <table>
+    <thead><tr><th style="width:16%">Canal</th><th style="width:36%">Cuándo conviene</th><th>Qué hace falta antes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Correo</strong></td><td>Siempre disponible. Es la opción por defecto</td><td>Nada: ya tienes correo registrado</td></tr>
+      <tr><td><strong>SMS</strong></td><td>En obra, donde el correo tarda o no hay datos</td><td>Registrar el celular <em>y verificarlo</em> con un código previo</td></tr>
+    </tbody>
+  </table>
+
+  <p>El código son <strong>seis cifras</strong>, caduca a los pocos minutos y tiene un tope de
+  intentos. Al agotarlo, el desafío se borra y hay que volver a empezar por la contraseña — es lo
+  que impide que alguien pruebe seis cifras a fuerza bruta.</p>
+
+  <div class="caja">
+    <span class="et">Por qué el SMS sale del teléfono de tu empresa</span>
+    <p>Cada constructora vincula <strong>su propio teléfono emisor</strong>. Con un único emisor
+    para toda la plataforma, los códigos de acceso de una empresa saldrían por el móvil de otra.
+    Conviene tener un segundo teléfono de respaldo vinculado: si el primero se queda sin batería,
+    la obra no se queda sin SMS.</p>
+  </div>
+
+  <h3>4.3 Olvidé mi clave</h3>
+  <ol class="pasos">
+    <li>En la pantalla de acceso, pulsa <strong>«Recuperar clave»</strong> y escribe tu correo.</li>
+    <li>La pantalla responde siempre lo mismo, exista o no ese correo. No es un fallo: si
+    respondiera distinto, cualquiera podría averiguar quién tiene cuenta.</li>
+    <li>Si el correo existe, llega un enlace con un vale de un solo uso y caducidad corta.</li>
+    <li>Abres el enlace, eliges clave nueva y entras.</li>
+  </ol>
+  <p>Si no llega, avisa al administrador de tu empresa: él puede <strong>resetear la clave</strong>
+  y darte una provisional, que el sistema te obligará a cambiar al primer ingreso.</p>
+
+  <h3>4.4 Tu perfil y las solicitudes de cambio</h3>
+  <p>Desde <em>Perfil</em> puedes hacer tú mismo, sin pedir permiso:</p>
+  <ul>
+    <li>Cambiar tu contraseña.</li>
+    <li>Registrar y verificar tu celular.</li>
+    <li>Elegir el canal de verificación (SMS o correo) y activarla o desactivarla.</li>
+    <li>Poner tu foto.</li>
+  </ul>
+  <p>Lo que <strong>no</strong> cambias tú son tus datos de identidad —nombre y correo—: eso se
+  pide con una <strong>solicitud de cambio</strong> que queda <span class="tag m">PENDIENTE</span>
+  hasta que un administrador la <span class="tag v">APRUEBA</span> o la
+  <span class="tag r">RECHAZA</span>. Mientras esté pendiente puedes cancelarla.</p>
+
+  <h3>4.5 GCM en el celular</h3>
+  <p>GCM se instala en el teléfono como una aplicación: se abre la web en el navegador del móvil
+  y se elige «Añadir a la pantalla de inicio». A partir de ahí tiene su ícono y se abre a pantalla
+  completa.</p>
+  <p>Las pantallas de campo están pensadas para eso. En el Lookahead, por ejemplo, la tabla se
+  convierte en tarjetas: cada tarea muestra «Restricciones 3/7 resueltas» y se despliega al
+  tocarla.</p>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 5</div>
+  <h2>5. El panel: leer la obra en un minuto</h2>
+  <p class="lead">Es lo primero que ves al entrar. Eliges una obra arriba y debajo salen sus indicadores.</p>
+
+  <h3>5.1 Los doce módulos</h3>
+
+  <table>
+    <thead><tr><th style="width:23%">Módulo</th><th style="width:44%">Contesta a…</th><th class="c" style="width:16%">Necesita cronograma</th><th class="c">Familia</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Qué falta</strong></td><td>Lo que hay que completar, y qué se rompe si no</td><td class="c no">no</td><td class="c">guía</td></tr>
+      <tr><td><strong>Avance físico</strong></td><td>¿Voy por delante o por detrás del plan?</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Curva de avance</strong></td><td>¿Cómo llegué hasta aquí y dónde acabo a este paso?</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Plazo</strong></td><td>¿Cuántos días quedan, y cuántos de ésos se trabaja?</td><td class="c no">no</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Presupuesto</strong></td><td>¿Cuánto queda por comprometer?</td><td class="c no">no</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Valor ganado (EVM)</strong></td><td>SPI y CPI: plazo y costo contra el plan</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr style="background:#e8f1f7"><td><strong>PPC</strong></td><td>¿Se cumple lo que prometemos cada semana?</td><td class="c no">no</td><td class="c"><strong>avisa antes</strong></td></tr>
+      <tr style="background:#e8f1f7"><td><strong>Lookahead</strong></td><td>¿Cuánto del trabajo que viene está liberado?</td><td class="c si">sí</td><td class="c"><strong>avisa antes</strong></td></tr>
+      <tr style="background:#e8f1f7"><td><strong>Causa que más frena</strong></td><td>¿Cuál es el cuello de botella que se repite?</td><td class="c no">no</td><td class="c"><strong>avisa antes</strong></td></tr>
+      <tr><td><strong>Partidas atrasadas</strong></td><td>¿Cuántas van por detrás y cuál urge?</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Cadena crítica</strong></td><td>¿Qué mueve la fecha de fin?</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Capítulos</strong></td><td>¿Cuáles se desvían más?</td><td class="c si">sí</td><td class="c">pasado</td></tr>
+      <tr><td><strong>Órdenes de compra</strong></td><td>¿Cuántas hay y en qué estado?</td><td class="c no">no</td><td class="c">pasado</td></tr>
+    </tbody>
+  </table>
+
+  <p>Los tres resaltados son los de Last Planner, y son los únicos que avisan
+  <strong>antes</strong> de que el problema ocurra. Los demás cuentan lo que ya pasó.</p>
+
+  <h3>5.2 La pareja que hay que leer junta</h3>
+
+  <figure>
+    <svg viewBox="0 0 700 180" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs>
+        <marker id="f5" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+          <path d="M0,0 L8,3.2 L0,6.4 z" fill="#a8710b"/>
+        </marker>
+      </defs>
+
+      <rect x="30" y="30" width="200" height="70" rx="6" fill="#e8f1f7" stroke="#1f5f8b" stroke-width="1.6"/>
+      <text x="130" y="54" font-size="12" font-weight="700" text-anchor="middle" fill="#1f5f8b">LOOKAHEAD hoy</text>
+      <text x="130" y="72" font-size="9" text-anchor="middle" fill="#16202b">cuánto del trabajo que viene</text>
+      <text x="130" y="86" font-size="9" text-anchor="middle" fill="#16202b">está liberado</text>
+
+      <path d="M234,65 L316,65" stroke="#a8710b" stroke-width="2" marker-end="url(#f5)" fill="none"/>
+      <text x="275" y="56" font-size="8.6" font-weight="700" text-anchor="middle" fill="#a8710b">2 semanas</text>
+
+      <rect x="322" y="30" width="200" height="70" rx="6" fill="#fdf3de" stroke="#a8710b" stroke-width="1.6"/>
+      <text x="422" y="54" font-size="12" font-weight="700" text-anchor="middle" fill="#a8710b">PPC después</text>
+      <text x="422" y="72" font-size="9" text-anchor="middle" fill="#16202b">cuánto de lo prometido</text>
+      <text x="422" y="86" font-size="9" text-anchor="middle" fill="#16202b">se cumplió</text>
+
+      <rect x="30" y="118" width="640" height="46" rx="6" fill="#fbeceb" stroke="#a8322d"/>
+      <text x="46" y="137" font-size="9.6" font-weight="700" fill="#a8322d">Un Lookahead bajo hoy es un PPC bajo dentro de dos semanas.</text>
+      <text x="46" y="153" font-size="9.2" fill="#16202b">Lo que se compromete sin liberar es exactamente lo que se incumple. No hay excepción.</text>
+
+      <rect x="540" y="30" width="130" height="70" rx="6" fill="#fff" stroke="#d7dee6" stroke-dasharray="3 3"/>
+      <text x="605" y="52" font-size="9" font-weight="700" text-anchor="middle" fill="#5b6875">CAUSAS</text>
+      <text x="605" y="68" font-size="8.4" text-anchor="middle" fill="#5b6875">el Pareto dice</text>
+      <text x="605" y="81" font-size="8.4" text-anchor="middle" fill="#5b6875">dónde atacar</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 5</span> — Lookahead y PPC: el mismo problema, con dos semanas de diferencia.</figcaption>
+  </figure>
+
+  <div class="caja alto">
+    <span class="et">La trampa más común</span>
+    <p>Se puede ir <strong>al día en la curva con un PPC del 50 %</strong>. Significa que el ritmo
+    está tapando una planificación que no se cumple. Se paga más adelante, cuando ya no queda
+    holgura para compensar.</p>
+  </div>
+
+  <h3>5.3 Configurar el panel</h3>
+  <p>Con el botón <strong>Configurar</strong> enciendes y apagas los módulos que quieras. Dos
+  detalles que conviene saber:</p>
+  <ul>
+    <li><strong>El orden no cambia nunca.</strong> Configurar decide qué se ve, no dónde se
+    coloca. Que cada indicador esté siempre en el mismo sitio es la mitad de lo que hace útil un
+    tablero.</li>
+    <li><strong>Apagar lo que no miras hace que cargue más rápido</strong>, porque el panel solo
+    va a buscar los datos de los módulos encendidos. Apagar es inmediato; encender uno apagado
+    tarda un instante la primera vez.</li>
+  </ul>
+
+  <h3>5.4 Los avisos no se filtran por obra</h3>
+  <p>Los avisos de la parte de arriba son de <strong>toda la empresa</strong>, aunque hayas
+  elegido una obra concreta. Es deliberado: el problema que hay que ver es justo el de la obra que
+  <em>no</em> estás mirando.</p>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 6</div>
+  <h2>6. Moverse por el sistema</h2>
+
+  <h3>Las secciones de una obra van en dos filas</h3>
+  <p>Arriba, tres grupos. Debajo, las secciones del grupo que estés mirando.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <rect x="10" y="10" width="680" height="34" rx="5" fill="#16202b"/>
+      <text x="30" y="32" font-size="12" font-weight="800" fill="#fff">GCM</text>
+      <text x="80" y="31" font-size="8.4" fill="#8fa3b5">(lleva siempre al panel)</text>
+      <rect x="470" y="17" width="100" height="20" rx="10" fill="#2b3947"/>
+      <text x="520" y="31" font-size="8.4" text-anchor="middle" fill="#c8d2db">Menú empresa</text>
+      <rect x="580" y="17" width="98" height="20" rx="10" fill="#2b3947"/>
+      <text x="629" y="31" font-size="8.4" text-anchor="middle" fill="#c8d2db">Constructoras</text>
+
+      <rect x="10" y="56" width="130" height="30" rx="5" fill="#1f5f8b"/>
+      <text x="75" y="76" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">Plan</text>
+      <circle cx="75" cy="92" r="2.6" fill="#1f5f8b"/>
+
+      <rect x="150" y="56" width="130" height="30" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="215" y="76" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Ejecución</text>
+
+      <rect x="290" y="56" width="130" height="30" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="355" y="76" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Compras</text>
+
+      <rect x="10" y="100" width="410" height="34" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="40" y="121" font-size="9.6" font-weight="700" fill="#1f5f8b">Presupuesto</text>
+      <text x="150" y="121" font-size="9.6" fill="#1f5f8b">Cronograma</text>
+      <text x="260" y="121" font-size="9.6" fill="#1f5f8b">Revisiones</text>
+
+      <text x="440" y="76" font-size="8.6" fill="#5b6875">Elegir un grupo NO te saca de donde estás:</text>
+      <text x="440" y="90" font-size="8.6" fill="#5b6875">despliega sus secciones y la pantalla</text>
+      <text x="440" y="104" font-size="8.6" fill="#5b6875">no cambia hasta que pulsas una.</text>
+      <text x="440" y="122" font-size="8.6" fill="#5b6875">El puntito marca el grupo de la</text>
+      <text x="440" y="136" font-size="8.6" fill="#5b6875">sección que tienes abierta.</text>
+
+      <rect x="10" y="150" width="330" height="90" rx="5" fill="#fafbfc" stroke="#d7dee6"/>
+      <text x="26" y="170" font-size="9.4" font-weight="700" fill="#1f5f8b">Ejecución</text>
+      <text x="26" y="186" font-size="9" fill="#16202b">Lookahead · Plan Semanal · Movimientos</text>
+      <text x="26" y="208" font-size="9.4" font-weight="700" fill="#1f5f8b">Compras</text>
+      <text x="26" y="224" font-size="9" fill="#16202b">Proveedores · Órdenes</text>
+
+      <rect x="352" y="150" width="338" height="90" rx="5" fill="#fafbfc" stroke="#d7dee6"/>
+      <text x="368" y="170" font-size="9.4" font-weight="700" fill="#1f5f8b">Menú de la empresa (arriba a la derecha)</text>
+      <text x="368" y="187" font-size="9" fill="#16202b">Compras — proveedores, formas de pago</text>
+      <text x="368" y="203" font-size="9" fill="#16202b">Personas — usuarios, permisos, solicitudes</text>
+      <text x="368" y="219" font-size="9" fill="#16202b">Empresa — datos, configuración</text>
+      <text x="368" y="234" font-size="8.4" fill="#5b6875">«Constructoras» va aparte: es de quien opera la plataforma.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 6</span> — La navegación: grupos arriba, secciones debajo.</figcaption>
+  </figure>
+
+  <p>Saltar de un grupo a otro cuesta un clic de más. Dentro del ciclo diario —Lookahead y Plan
+  Semanal, que son el mismo grupo— sigues yendo de un clic.</p>
+</section>

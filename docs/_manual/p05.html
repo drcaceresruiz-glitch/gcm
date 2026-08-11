@@ -1,0 +1,380 @@
+<section class="cap">
+  <div class="kicker">Capítulo 9 · Flujo 3</div>
+  <h2>9. Last Planner: de lo que toca a lo que se puede</h2>
+  <p class="lead">Éste es el corazón del sistema y el trabajo propio del residente. Los tres pasos
+  anteriores preparan el terreno; aquí es donde se gana o se pierde la obra.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 230" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs><marker id="f9" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto"><path d="M0,0 L8,3.2 L0,6.4 z" fill="#1f5f8b"/></marker>
+      <marker id="f9v" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto"><path d="M0,0 L8,3.2 L0,6.4 z" fill="#2f7d4f"/></marker></defs>
+
+      <rect x="20" y="60" width="140" height="66" rx="6" fill="#16202b"/>
+      <text x="90" y="86" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">CRONOGRAMA</text>
+      <text x="90" y="102" font-size="8.4" text-anchor="middle" fill="#a9b8c6">largo plazo</text>
+      <text x="90" y="115" font-size="8.4" text-anchor="middle" fill="#a9b8c6">lo que TOCA hacer</text>
+
+      <rect x="190" y="60" width="140" height="66" rx="6" fill="#1f5f8b"/>
+      <text x="260" y="86" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">LOOKAHEAD</text>
+      <text x="260" y="102" font-size="8.4" text-anchor="middle" fill="#d3e6f2">3 a 12 semanas</text>
+      <text x="260" y="115" font-size="8.4" text-anchor="middle" fill="#d3e6f2">lo que se PUEDE hacer</text>
+
+      <rect x="360" y="60" width="140" height="66" rx="6" fill="#2f7d4f"/>
+      <text x="430" y="86" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">PLAN SEMANAL</text>
+      <text x="430" y="102" font-size="8.4" text-anchor="middle" fill="#d4ebdd">esta semana</text>
+      <text x="430" y="115" font-size="8.4" text-anchor="middle" fill="#d4ebdd">lo que se PROMETE</text>
+
+      <rect x="530" y="60" width="150" height="66" rx="6" fill="#a8710b"/>
+      <text x="605" y="86" font-size="11" font-weight="700" text-anchor="middle" fill="#fff">PPC Y CAUSAS</text>
+      <text x="605" y="102" font-size="8.4" text-anchor="middle" fill="#f6e5c4">cierre</text>
+      <text x="605" y="115" font-size="8.4" text-anchor="middle" fill="#f6e5c4">lo que se CUMPLIÓ</text>
+
+      <g stroke="#1f5f8b" stroke-width="1.8" marker-end="url(#f9)" fill="none">
+        <path d="M162,93 L186,93"/>
+        <path d="M332,93 L356,93"/>
+        <path d="M502,93 L526,93"/>
+      </g>
+
+      <path d="M605,130 L605,180 L260,180 L260,130" stroke="#2f7d4f" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#f9v)" fill="none"/>
+      <text x="432" y="196" font-size="9" font-weight="700" text-anchor="middle" fill="#2f7d4f">lo aprendido afina la próxima ventana</text>
+
+      <text x="350" y="30" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Project dice cuándo. El presupuesto dice cuánto.</text>
+      <text x="350" y="45" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f5f8b">GCM dice qué se puede hacer de verdad, qué se prometió y qué se cumplió.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 11</span> — El ciclo completo, en una imagen.</figcaption>
+  </figure>
+
+  <h3>9.1 El calendario laboral de la obra</h3>
+  <p>Antes de nada, define qué días se trabaja y cuántas horas. Es <strong>por obra</strong>, no por
+  empresa: el sábado laborable de una obra puede no aplicar a otra.</p>
+  <ul>
+    <li>Para cada día de la semana: si es laborable, cuántas horas y qué turno
+    (<em>normal</em>, <em>noche</em> o <em>turnos</em>).</li>
+    <li>Aparte, el <strong>día de corte semanal</strong> de la obra — el día en que se cierra la
+    semana. Viernes por defecto.</li>
+  </ul>
+  <p>De aquí salen los «días laborables que quedan» del indicador de plazo y el reparto de tareas
+  en la ventana del Lookahead.</p>
+
+  <h3>9.2 Lookahead: la ventana de mediano plazo</h3>
+  <p>Una tabla con las tareas que el cronograma trae en las próximas semanas y el análisis de qué
+  les falta para poder ejecutarse.</p>
+
+  <ol class="pasos">
+    <li>Entra a <strong>Ejecución → Lookahead</strong> y elige el tamaño de la ventana. El selector
+    admite de <strong>3 a 12 semanas</strong>. Tres es el mínimo útil; lo habitual son cuatro a
+    seis. Una obra con acero importado necesita mirar más lejos que una de acabados.</li>
+    <li>Pulsa <strong>«Sincronizar ventana»</strong>. Trae las tareas del cronograma vigente que
+    caen en ese rango y les crea sus <strong>siete restricciones en blanco</strong>.</li>
+    <li>Completa lo que añade la planificación operativa y el cronograma no trae: <strong>fase o
+    bloque</strong> («FASE 2: ESTRUCTURAS»), <strong>zona</strong> («PISO 1», «ZONA A») y
+    <strong>subcontratista</strong> responsable.</li>
+    <li>Marca cada flujo cuando quede resuelto <em>de verdad</em>, con su detalle y su fecha.</li>
+    <li>Cuando los siete están marcados, la tarea pasa a <span class="tag v">LISTA</span> y sube el
+    porcentaje de confiabilidad de la ventana.</li>
+  </ol>
+
+  <figure>
+    <svg viewBox="0 0 700 150" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs><marker id="fa" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto"><path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/></marker></defs>
+
+      <rect x="18" y="46" width="130" height="46" rx="6" fill="#f4f6f8" stroke="#d7dee6" stroke-dasharray="4 3"/>
+      <text x="83" y="66" font-size="10" font-weight="700" text-anchor="middle" fill="#5b6875">SIN ANALIZAR</text>
+      <text x="83" y="81" font-size="8.2" text-anchor="middle" fill="#5b6875">aún no sincronizada</text>
+
+      <rect x="200" y="46" width="130" height="46" rx="6" fill="#fdf3de" stroke="#a8710b" stroke-width="1.5"/>
+      <text x="265" y="66" font-size="10" font-weight="700" text-anchor="middle" fill="#a8710b">PENDIENTE</text>
+      <text x="265" y="81" font-size="8.2" text-anchor="middle" fill="#5b6875">le faltan restricciones</text>
+
+      <rect x="382" y="46" width="130" height="46" rx="6" fill="#fbeceb" stroke="#a8322d" stroke-width="1.5"/>
+      <text x="447" y="66" font-size="10" font-weight="700" text-anchor="middle" fill="#a8322d">BLOQUEADA</text>
+      <text x="447" y="81" font-size="8.2" text-anchor="middle" fill="#5b6875">hay un impedimento firme</text>
+
+      <rect x="556" y="46" width="130" height="46" rx="6" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="2"/>
+      <text x="621" y="66" font-size="10" font-weight="700" text-anchor="middle" fill="#2f7d4f">LISTA</text>
+      <text x="621" y="81" font-size="8.2" text-anchor="middle" fill="#5b6875">7 de 7 resueltas</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#fa)" fill="none">
+        <path d="M150,69 L196,69"/>
+        <path d="M332,69 L378,69"/>
+      </g>
+      <path d="M330,58 C400,20 500,20 554,52" stroke="#2f7d4f" stroke-width="1.6" marker-end="url(#fa)" fill="none"/>
+      <text x="440" y="24" font-size="8.4" font-weight="700" text-anchor="middle" fill="#2f7d4f">se resuelven las 7</text>
+      <text x="83" y="112" font-size="8.2" text-anchor="middle" fill="#5b6875">«Sincronizar ventana»</text>
+
+      <rect x="18" y="122" width="668" height="22" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="32" y="137" font-size="8.8" fill="#16202b"><tspan font-weight="700">Solo lo LISTO se puede comprometer al Plan Semanal.</tspan> Es el filtro de confiabilidad, y es todo el método en una frase.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 12</span> — Estados de una tarea en el Lookahead.</figcaption>
+  </figure>
+
+  <h3>9.3 Las 7 restricciones — la palabra SIEMPRE</h3>
+  <p>Siete preguntas que hay que responder antes de prometer una tarea. Las iniciales forman
+  <strong>SIEMPRE</strong>, y así se recuerdan sin consultar nada.</p>
+
+  <figure>
+    <svg viewBox="0 0 700 300" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <g>
+        <rect x="14" y="10" width="672" height="38" rx="6" fill="#1f5f8b"/>
+        <text x="40" y="36" font-size="20" font-weight="800" fill="#fff" letter-spacing="14">SIEMPRE</text>
+        <text x="470" y="35" font-size="9.6" fill="#d3e6f2">las siete restricciones del Last Planner</text>
+      </g>
+
+      <g>
+        <rect x="14" y="56" width="672" height="32" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+        <circle cx="34" cy="72" r="12" fill="#1f5f8b"/><text x="34" y="77" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">S</text>
+        <text x="58" y="70" font-size="10.4" font-weight="700" fill="#16202b">Seguridad</text>
+        <text x="58" y="83" font-size="8.8" fill="#5b6875">Hay permisos, PETAR y ATS</text>
+
+        <rect x="14" y="92" width="672" height="32" rx="4" fill="#fff" stroke="#d7dee6"/>
+        <circle cx="34" cy="108" r="12" fill="#1f5f8b"/><text x="34" y="113" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">I</text>
+        <text x="58" y="106" font-size="10.4" font-weight="700" fill="#16202b">Información</text>
+        <text x="58" y="119" font-size="8.8" fill="#5b6875">Los planos están aprobados y la RFI respondida</text>
+
+        <rect x="14" y="128" width="672" height="32" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+        <circle cx="34" cy="144" r="12" fill="#1f5f8b"/><text x="34" y="149" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">E</text>
+        <text x="58" y="142" font-size="10.4" font-weight="700" fill="#16202b">Espacio</text>
+        <text x="58" y="155" font-size="8.8" fill="#5b6875">El frente o la zona está liberada</text>
+
+        <rect x="14" y="164" width="672" height="32" rx="4" fill="#fff" stroke="#d7dee6"/>
+        <circle cx="34" cy="180" r="12" fill="#1f5f8b"/><text x="34" y="185" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">M</text>
+        <text x="58" y="178" font-size="10.4" font-weight="700" fill="#16202b">Materiales</text>
+        <text x="58" y="191" font-size="8.8" fill="#5b6875">Están en obra o con entrega confirmada</text>
+
+        <rect x="14" y="200" width="672" height="32" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+        <circle cx="34" cy="216" r="12" fill="#1f5f8b"/><text x="34" y="221" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">P</text>
+        <text x="58" y="214" font-size="10.4" font-weight="700" fill="#16202b">Personas</text>
+        <text x="58" y="227" font-size="8.8" fill="#5b6875">La cuadrilla está asignada</text>
+
+        <rect x="14" y="236" width="672" height="32" rx="4" fill="#fff" stroke="#d7dee6"/>
+        <circle cx="34" cy="252" r="12" fill="#1f5f8b"/><text x="34" y="257" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">R</text>
+        <text x="58" y="250" font-size="10.4" font-weight="700" fill="#16202b">Requisitos</text>
+        <text x="58" y="263" font-size="8.8" fill="#5b6875">Las tareas previas y los permisos están</text>
+
+        <rect x="14" y="272" width="672" height="32" rx="4" fill="#e8f1f7" stroke="#1f5f8b"/>
+        <circle cx="34" cy="288" r="12" fill="#1f5f8b"/><text x="34" y="293" font-size="13" font-weight="800" text-anchor="middle" fill="#fff">E</text>
+        <text x="58" y="286" font-size="10.4" font-weight="700" fill="#16202b">Equipos</text>
+        <text x="58" y="299" font-size="8.8" fill="#5b6875">La maquinaria y la herramienta están disponibles</text>
+      </g>
+    </svg>
+    <figcaption><span class="fig-t">Figura 13</span> — Las 7 restricciones, en el orden que forma la palabra.</figcaption>
+  </figure>
+
+  <div class="caja alto">
+    <span class="et">La regla que no admite excepción</span>
+    <p>Si falta <strong>una sola</strong>, la tarea no está lista. Comprometerla igual es la causa
+    número uno de incumplimiento en obra.</p>
+  </div>
+
+  <h3>9.4 Comprometer al PTS</h3>
+  <p>Selecciona las tareas listas y pulsa <strong>«Comprometer al PTS»</strong>. Pasan al Plan
+  Semanal abierto, arrastrando su trazabilidad: de qué tarea del Lookahead nacieron, su zona y su
+  subcontratista.</p>
+  <p>Si algo de lo que elegiste <strong>no está liberado</strong>, o ya está comprometido en otra
+  semana, el sistema te pide confirmar. <strong>No lo prohíbe</strong> —la obra a veces arranca
+  igual— pero queda constancia de que se decidió a sabiendas.</p>
+
+  <h3>9.5 El Plan Semanal</h3>
+  <p>Un plan por semana, con su número correlativo («Semana 12») y anclado a la fecha de corte de
+  la obra. Nace <span class="tag a">ABIERTO</span>.</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Campo de cada compromiso</th><th>Qué poner</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Descripción</strong></td><td>Viene de la tarea, o se escribe libre si es trabajo que no está en Project</td></tr>
+      <tr><td><strong>Meta en %</strong></td><td>A qué porcentaje te comprometes a llegar. Opcional</td></tr>
+      <tr><td><strong>Cantidad y unidad</strong></td><td>La medida real del compromiso: 120 m². Si la tarea tiene partida mapeada, viene propuesta</td></tr>
+      <tr><td><strong>Zona</strong></td><td>El sector fino del trabajo: «P2-S1»</td></tr>
+      <tr><td><strong>Subcontratista</strong></td><td>Quién lo ejecuta, si aplica</td></tr>
+      <tr><td><strong>Color</strong></td><td>Para la vista de zonificación</td></tr>
+    </tbody>
+  </table>
+
+  <p>Quita lo que no corresponda y añade líneas libres para el trabajo que no está en el
+  cronograma: limpieza, apoyo, trabajos de garantía.</p>
+
+  <h3>9.6 Cerrar la semana: PPC y causas</h3>
+  <p>El día de corte, marcas qué se cumplió, qué no y por qué.</p>
+
+  <ol class="pasos">
+    <li>Marca <strong>cumplido</strong> o <strong>no cumplido</strong> en cada compromiso.</li>
+    <li>Anota <strong>cuánto se ejecutó de verdad</strong>: 90 de los 120 m² comprometidos.</li>
+    <li>Si no se cumplió, elige la <strong>causa</strong>. Es obligatorio.</li>
+    <li>Cierra el plan. El avance reportado pasa al cronograma ligado a esta semana.</li>
+  </ol>
+
+  <p>El plan cerrado se puede <strong>reabrir</strong> si hubo un error: al volver a cerrarlo, los
+  avances que generó se reemplazan en vez de duplicarse.</p>
+
+  <h4>Cómo se calcula el PPC</h4>
+  <div class="caja">
+    <p style="text-align:center;font-size:12pt;font-weight:700;margin:.2em 0">
+      PPC = tareas cumplidas ÷ tareas prometidas × 100
+    </p>
+    <p>Nada más. Una tarea a medias cuenta como <strong>no cumplida</strong>. Esa dureza es
+    intencional: el PPC no mide avance, mide si cumples lo que prometes.</p>
+  </div>
+
+  <p>Una obra puede ir adelantada y tener un PPC malo. Significa que planifica mal, aunque el
+  ritmo la salve — por ahora.</p>
+
+  <h4>El catálogo de causas (CNC)</h4>
+  <p>Es un catálogo <strong>fijo</strong>, y lo es para poder comparar semanas entre sí y construir
+  el Pareto:</p>
+
+  <table>
+    <thead><tr><th style="width:24%">Causa</th><th>Cuándo se elige</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Prerrequisito</strong></td><td>La tarea previa no terminó</td></tr>
+      <tr><td><strong>Materiales</strong></td><td>No llegaron, llegaron mal o no alcanzaron</td></tr>
+      <tr><td><strong>Mano de obra</strong></td><td>Faltó cuadrilla o no tenía la calificación</td></tr>
+      <tr><td><strong>Equipos</strong></td><td>Máquina averiada, ocupada o no disponible</td></tr>
+      <tr><td><strong>Información</strong></td><td>Plano no aprobado, RFI sin respuesta, detalle sin definir</td></tr>
+      <tr><td><strong>Cliente / terceros</strong></td><td>Falta una autorización, un permiso o una decisión ajena</td></tr>
+      <tr><td><strong>Clima</strong></td><td>Lluvia, viento o condiciones que impiden trabajar</td></tr>
+      <tr><td><strong>Reprogramación</strong></td><td>Se decidió cambiar la prioridad</td></tr>
+      <tr><td><strong>Otra</strong></td><td>Solo cuando ninguna encaja. Si la usas mucho, algo falla en el análisis</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caja ok">
+    <span class="et">Lo que de verdad enseña</span>
+    <p>El PPC dice <em>cuánto</em> fallaste. La <strong>causa</strong> dice <em>por qué</em>, y es lo
+    único accionable. Sin causa, cerrar la semana no sirve para nada. El Pareto ordena las causas
+    de mayor a menor: la que más se repite es tu cuello de botella real, y ahí es donde hay que
+    atacar — no donde más ruido hace.</p>
+  </div>
+
+  <h3>9.7 El ciclo completo, semana a semana</h3>
+
+  <figure>
+    <svg viewBox="0 0 700 210" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <line x1="40" y1="60" x2="660" y2="60" stroke="#d7dee6" stroke-width="2"/>
+
+      <circle cx="90" cy="60" r="8" fill="#1f5f8b"/>
+      <text x="90" y="44" font-size="9.4" font-weight="700" text-anchor="middle" fill="#1f5f8b">LUNES</text>
+      <rect x="24" y="76" width="132" height="58" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="90" y="94" font-size="8.8" font-weight="700" text-anchor="middle" fill="#1f5f8b">Reunión de arranque</text>
+      <text x="34" y="108" font-size="8.2" fill="#16202b">· Revisar el PTS de la semana</text>
+      <text x="34" y="120" font-size="8.2" fill="#16202b">· Confirmar cuadrillas y zonas</text>
+      <text x="34" y="131" font-size="8.2" fill="#16202b">· Repartir compromisos</text>
+
+      <circle cx="280" cy="60" r="8" fill="#5b6875"/>
+      <text x="280" y="44" font-size="9.4" font-weight="700" text-anchor="middle" fill="#5b6875">MARTES A JUEVES</text>
+      <rect x="200" y="76" width="160" height="58" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="280" y="94" font-size="8.8" font-weight="700" text-anchor="middle" fill="#16202b">Ejecución y liberación</text>
+      <text x="210" y="108" font-size="8.2" fill="#16202b">· Marcar restricciones resueltas</text>
+      <text x="210" y="120" font-size="8.2" fill="#16202b">· Subir fotos de evidencia</text>
+      <text x="210" y="131" font-size="8.2" fill="#16202b">· Avisar de lo que se traba</text>
+
+      <circle cx="470" cy="60" r="8" fill="#a8710b"/>
+      <text x="470" y="44" font-size="9.4" font-weight="700" text-anchor="middle" fill="#a8710b">JUEVES</text>
+      <rect x="396" y="76" width="148" height="58" rx="5" fill="#fdf3de" stroke="#a8710b"/>
+      <text x="470" y="94" font-size="8.8" font-weight="700" text-anchor="middle" fill="#a8710b">Preparar la siguiente</text>
+      <text x="406" y="108" font-size="8.2" fill="#16202b">· Sincronizar la ventana</text>
+      <text x="406" y="120" font-size="8.2" fill="#16202b">· Cerrar las 7 que falten</text>
+      <text x="406" y="131" font-size="8.2" fill="#16202b">· Comprometer al PTS</text>
+
+      <circle cx="620" cy="60" r="8" fill="#2f7d4f"/>
+      <text x="620" y="44" font-size="9.4" font-weight="700" text-anchor="middle" fill="#2f7d4f">VIERNES · CORTE</text>
+      <rect x="552" y="76" width="134" height="58" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+      <text x="619" y="94" font-size="8.8" font-weight="700" text-anchor="middle" fill="#2f7d4f">Cerrar la semana</text>
+      <text x="562" y="108" font-size="8.2" fill="#16202b">· Cumplido / no cumplido</text>
+      <text x="562" y="120" font-size="8.2" fill="#16202b">· Cantidad ejecutada</text>
+      <text x="562" y="131" font-size="8.2" fill="#16202b">· Causa de cada fallo</text>
+
+      <rect x="24" y="154" width="662" height="42" rx="5" fill="#16202b"/>
+      <text x="40" y="172" font-size="9.4" font-weight="700" fill="#fff">Y el lunes se empieza mirando el Pareto de la semana anterior.</text>
+      <text x="40" y="188" font-size="8.8" fill="#c8d2db">Si la causa que más se repite es «materiales», el trabajo de esta semana no es programar más: es arreglar el abastecimiento.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 14</span> — La semana tipo del residente, con el día de corte en viernes.</figcaption>
+  </figure>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 10 · Flujo 4</div>
+  <h2>10. Proveedores, encargos y órdenes</h2>
+
+  <h3>10.1 Qué ve y qué no ve el residente</h3>
+  <p>Este flujo es sobre todo del <strong>administrador de obra</strong>. El residente participa en
+  dos puntos concretos, y son justo los que se saben estando en obra.</p>
+
+  <table>
+    <thead><tr><th style="width:40%">Acción</th><th class="c" style="width:20%">Residente</th><th class="c" style="width:20%">Adm. de obra</th><th class="c">Administrador</th></tr></thead>
+    <tbody>
+      <tr><td>Ver proveedores y lo comprometido</td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Dar de alta y editar proveedores</td><td class="c no">·</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Repartir encargos (alcance y monto)</td><td class="c no">·</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td><strong>Valorizar un encargo</strong></td><td class="c si">✓</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Redactar una orden de compra</td><td class="c no">·</td><td class="c si">✓</td><td class="c si">✓</td></tr>
+      <tr><td>Aprobar o anular una orden</td><td class="c no">·</td><td class="c no">·</td><td class="c si">✓</td></tr>
+    </tbody>
+  </table>
+
+  <p>El residente <strong>ve</strong> a quién se le compra y cuánto se ha comprometido contra su
+  presupuesto, pero no pide ni aprueba: eso es administración.</p>
+
+  <h3>10.2 Encargos y valorización</h3>
+  <p>Un <strong>encargo</strong> es el frente de un proveedor en la obra: «E-003 — Estructura
+  metálica ZONA 1». Lleva su monto contratado (sin IGV, para poder compararlo con el parcial del
+  presupuesto), las partidas que cubre, sus fechas y su estado
+  (<span class="tag v">VIGENTE</span> <span class="tag a">CERRADO</span>
+  <span class="tag r">ANULADO</span>).</p>
+
+  <p><strong>Valorizar</strong> es decir cuánto de ese frente está ejecutado. Lo hace quien está en
+  obra, igual que el avance de las tareas. El monto del encargo es el precio <em>del proveedor</em>,
+  que puede quedar por encima o por debajo de tu costo presupuestado — y esa diferencia es
+  exactamente lo que interesa ver.</p>
+
+  <h3>10.3 El ciclo de una orden de compra</h3>
+
+  <figure>
+    <svg viewBox="0 0 700 200" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs><marker id="fb" markerWidth="8" markerHeight="8" refX="7" refY="2.8" orient="auto"><path d="M0,0 L7,2.8 L0,5.6 z" fill="#5b6875"/></marker></defs>
+
+      <rect x="16" y="24" width="120" height="44" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="76" y="43" font-size="9.4" font-weight="700" text-anchor="middle" fill="#16202b">Se redacta</text>
+      <text x="76" y="57" font-size="8" text-anchor="middle" fill="#5b6875">a mano o importada</text>
+
+      <rect x="176" y="24" width="120" height="44" rx="5" fill="#fdf3de" stroke="#a8710b" stroke-width="1.5"/>
+      <text x="236" y="43" font-size="9.4" font-weight="700" text-anchor="middle" fill="#a8710b">BORRADOR</text>
+      <text x="236" y="57" font-size="8" text-anchor="middle" fill="#5b6875">no compromete nada</text>
+
+      <rect x="336" y="24" width="120" height="44" rx="5" fill="#e7f4ec" stroke="#2f7d4f" stroke-width="2"/>
+      <text x="396" y="43" font-size="9.4" font-weight="700" text-anchor="middle" fill="#2f7d4f">APROBADA</text>
+      <text x="396" y="57" font-size="8" text-anchor="middle" fill="#5b6875">ya compromete</text>
+
+      <rect x="496" y="24" width="120" height="44" rx="5" fill="#fbeceb" stroke="#a8322d"/>
+      <text x="556" y="43" font-size="9.4" font-weight="700" text-anchor="middle" fill="#a8322d">ANULADA</text>
+      <text x="556" y="57" font-size="8" text-anchor="middle" fill="#5b6875">deja de contar</text>
+
+      <g stroke="#5b6875" stroke-width="1.4" marker-end="url(#fb)" fill="none">
+        <path d="M138,46 L172,46"/>
+        <path d="M298,46 L332,46"/>
+        <path d="M458,46 L492,46"/>
+      </g>
+      <text x="396" y="18" font-size="8" font-weight="700" text-anchor="middle" fill="#5b6875">solo el ADMINISTRADOR</text>
+
+      <rect x="16" y="88" width="600" height="46" rx="5" fill="#e8f1f7" stroke="#1f5f8b"/>
+      <text x="32" y="106" font-size="9.4" font-weight="700" fill="#1f5f8b">Anular no es borrar.</text>
+      <text x="32" y="122" font-size="8.8" fill="#16202b">La orden se conserva con su motivo: cancelar un pedido a un proveedor es corriente, y el papel tiene que seguir existiendo.</text>
+
+      <rect x="16" y="146" width="600" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+      <text x="32" y="164" font-size="9.4" font-weight="700" fill="#16202b">Lo comprometido = suma de las órdenes APROBADAS.</text>
+      <text x="32" y="180" font-size="8.8" fill="#16202b">Es lo que resta del saldo en el módulo «Presupuesto» del panel, y lo que se compara con el presupuesto vigente.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 15</span> — Estados de una orden y qué significa cada uno.</figcaption>
+  </figure>
+
+  <p>Cada orden imputa sus líneas a partidas concretas del presupuesto — eso es lo que permite
+  saber cuánto queda de cada partida, no solo del total. Desde la orden aprobada se genera el
+  <strong>documento para imprimir</strong>, con los datos bancarios del proveedor, el
+  representante legal que firma y las observaciones de la empresa al pie.</p>
+
+  <div class="caja ojo">
+    <span class="et">Un detalle que descoloca</span>
+    <p>El número de orden lo escribe el cliente y <strong>no es cronológico</strong>: puede haber
+    una de mayo con un correlativo posterior a una de julio. Por eso el listado ordena por
+    <em>fecha del documento</em>, nunca por número.</p>
+  </div>
+</section>

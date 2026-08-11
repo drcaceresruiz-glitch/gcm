@@ -258,14 +258,22 @@ El mecanismo y sus cuatro reglas estan en `REVELADO-REACT.md`. **Leelo antes
 de anadir otro `loading.tsx` o `<Suspense>`**, y sobre todo si algun dia se
 actualiza React: `$RB` y `$RV` son internos, no API publica.
 
-### ~~El despliegue no borra nada~~ SCRIPT LISTO, FALTA CABLEARLO
+### ~~El despliegue no borra nada~~ RESUELTO el 12 de agosto
 
 `scripts/desplegar.sh` (10 de agosto) descomprime a un directorio de
 preparacion y hace un intercambio atomico con `mv`, con lo que los restos de
-compilaciones viejas desaparecen. **Aun no esta cableado**: ni el workflow lo
-sube ni el cron lo invoca. Hasta entonces sigue vigente lo de abajo.
+compilaciones viejas desaparecen. **Ya esta cableado** (12 de agosto): el
+workflow lo sube por FTP junto a `app.js` —fuera del comprimido, o el
+intercambio lo moveria mientras se ejecuta— y lo lanza un cron cada minuto.
+El arbol viejo se va entero y con el su sedimento, asi que lo de abajo deja
+de aplicar.
 
-### El despliegue no borra nada (mientras el script no este cableado)
+**Queda una pregunta abierta**: la primera ejecucion manual aplico el paquete
+—`server.js` nuevo y `restart.txt` escrito— pero **no dejo nada en
+`tmp/despliegue.log`**, y no se encontro explicacion. Si la primera aplicacion
+por cron tampoco escribe, hay algo real que mirar en `registrar()`.
+
+### Como era antes: el despliegue no borraba nada
 
 `tar -xzf` descomprime ENCIMA del arbol anterior. Los ficheros de
 compilaciones viejas se quedan para siempre. Comprobado en produccion: en

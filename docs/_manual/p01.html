@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>GCM — Manual del Residente de Obra</title>
+<style>
+  @page { size: A4; margin: 17mm 15mm 17mm 15mm; }
+
+  :root{
+    --tinta:#16202b;
+    --suave:#5b6875;
+    --linea:#d7dee6;
+    --azul:#1f5f8b;
+    --azulclaro:#e8f1f7;
+    --verde:#2f7d4f;
+    --verdeclaro:#e7f4ec;
+    --ambar:#a8710b;
+    --ambarclaro:#fdf3de;
+    --rojo:#a8322d;
+    --rojoclaro:#fbeceb;
+    --gris:#f4f6f8;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;
+    font-size:10.2pt;
+    line-height:1.52;
+    color:var(--tinta);
+    margin:0;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+
+  h1,h2,h3,h4{ line-height:1.22; margin:0 0 .45em; page-break-after:avoid; }
+  h1{ font-size:21pt; color:var(--azul); }
+  h2{
+    font-size:15pt; color:var(--azul);
+    margin-top:0; padding-bottom:.22em;
+    border-bottom:2.5px solid var(--azul);
+  }
+  h3{ font-size:12pt; margin-top:1.5em; color:#123c57; }
+  h4{ font-size:10.6pt; margin-top:1.2em; color:#123c57; }
+
+  p{ margin:0 0 .7em; }
+  ul,ol{ margin:0 0 .8em; padding-left:1.35em; }
+  li{ margin-bottom:.28em; }
+
+  code,.mono{ font-family:"Consolas","Courier New",monospace; font-size:9.2pt; background:var(--gris); padding:.06em .3em; border-radius:3px; }
+
+  .cap{ page-break-before:always; }
+  .nobreak{ page-break-inside:avoid; }
+
+  .portada{ height:250mm; display:flex; flex-direction:column; justify-content:center; text-align:center; }
+  .portada .marca{ font-size:58pt; font-weight:800; letter-spacing:-2px; color:var(--azul); line-height:1; }
+  .portada .sub{ font-size:11pt; color:var(--suave); letter-spacing:3px; text-transform:uppercase; margin-top:.4em; }
+  .portada .titulo{ font-size:29pt; font-weight:700; margin-top:1.6em; color:var(--tinta); }
+  .portada .bajada{ font-size:13pt; color:var(--suave); margin-top:.5em; }
+  .portada .regla{ width:70mm; height:3px; background:var(--azul); margin:2.2em auto; }
+  .portada .pie{ font-size:9.5pt; color:var(--suave); margin-top:2em; }
+
+  table{ width:100%; border-collapse:collapse; margin:.6em 0 1em; font-size:9.3pt; page-break-inside:avoid; }
+  thead th{ background:var(--azul); color:#fff; text-align:left; padding:.42em .55em; font-weight:600; font-size:9.1pt; }
+  td,th{ border:1px solid var(--linea); padding:.38em .55em; vertical-align:top; }
+  tbody tr:nth-child(even){ background:#fafbfc; }
+  td.c,th.c{ text-align:center; }
+  .si{ color:var(--verde); font-weight:700; }
+  .no{ color:#b9c2cb; }
+
+  .caja{ border-left:4px solid var(--azul); background:var(--azulclaro); padding:.62em .85em; margin:.9em 0; page-break-inside:avoid; }
+  .caja.ok{ border-color:var(--verde); background:var(--verdeclaro); }
+  .caja.ojo{ border-color:var(--ambar); background:var(--ambarclaro); }
+  .caja.alto{ border-color:var(--rojo); background:var(--rojoclaro); }
+  .caja p:last-child{ margin-bottom:0; }
+  .caja .et{ display:block; font-weight:700; font-size:8.6pt; letter-spacing:1.1px; text-transform:uppercase; margin-bottom:.3em; color:var(--azul); }
+  .caja.ok .et{ color:var(--verde); }
+  .caja.ojo .et{ color:var(--ambar); }
+  .caja.alto .et{ color:var(--rojo); }
+
+  ol.pasos{ list-style:none; padding-left:0; counter-reset:paso; }
+  ol.pasos > li{ counter-increment:paso; position:relative; padding-left:2.1em; margin-bottom:.55em; }
+  ol.pasos > li::before{
+    content:counter(paso); position:absolute; left:0; top:.05em;
+    width:1.45em; height:1.45em; border-radius:50%;
+    background:var(--azul); color:#fff; font-size:8.4pt; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  figure{ margin:1.1em 0; page-break-inside:avoid; text-align:center; }
+  figure svg{ max-width:100%; height:auto; }
+  figcaption{ font-size:8.7pt; color:var(--suave); margin-top:.45em; text-align:center; }
+  .fig-t{ font-size:9pt; font-weight:700; color:var(--azul); text-transform:uppercase; letter-spacing:1px; }
+
+  .toc{ font-size:10pt; }
+  .toc ol{ list-style:none; padding-left:0; }
+  .toc > ol > li{ margin:.42em 0; font-weight:600; border-bottom:1px dotted var(--linea); padding-bottom:.25em; }
+  .toc ol ol{ margin:.22em 0 .4em .1em; font-weight:400; font-size:9.2pt; color:var(--suave); }
+  .toc ol ol li{ margin:.1em 0; border:0; }
+  .toc .n{ display:inline-block; width:2.3em; color:var(--azul); font-weight:700; }
+  .toc ol ol .n{ width:3.1em; color:var(--suave); font-weight:600; }
+
+  .lead{ font-size:11pt; color:var(--suave); margin-bottom:1.3em; }
+  .kicker{ font-size:8.6pt; letter-spacing:1.6px; text-transform:uppercase; color:var(--suave); font-weight:700; margin-bottom:.2em; }
+
+  .tag{ display:inline-block; font-size:7.8pt; font-weight:700; padding:.14em .5em; border-radius:3px; letter-spacing:.5px; }
+  .tag.a{ background:var(--azulclaro); color:var(--azul); }
+  .tag.v{ background:var(--verdeclaro); color:var(--verde); }
+  .tag.m{ background:var(--ambarclaro); color:var(--ambar); }
+  .tag.r{ background:var(--rojoclaro); color:var(--rojo); }
+</style>
+</head>
+<body>
+
+<section class="portada">
+  <div>
+    <div class="marca">GCM</div>
+    <div class="sub">Gestor de Construcción y Mantenimiento</div>
+    <div class="regla"></div>
+    <div class="titulo">Manual del Residente de Obra</div>
+    <div class="bajada">Cómo funciona el sistema, paso a paso:<br>usuarios, roles, flujos, entradas y salidas</div>
+    <div class="regla"></div>
+    <div class="pie">
+      Documento operativo · Versión 1.0 · 11 de agosto de 2026<br>
+      gcm.drcaceresruiz.com
+    </div>
+  </div>
+</section>
+
+<section class="cap toc">
+  <h2>Índice</h2>
+  <ol>
+    <li><span class="n">1</span> Antes de empezar
+      <ol>
+        <li><span class="n">1.1</span> Para quién es este manual</li>
+        <li><span class="n">1.2</span> Qué problema resuelve GCM</li>
+        <li><span class="n">1.3</span> Las tres verdades: Project, presupuesto y GCM</li>
+        <li><span class="n">1.4</span> Mapa general del sistema</li>
+      </ol>
+    </li>
+    <li><span class="n">2</span> El vocabulario del sistema
+      <ol>
+        <li><span class="n">2.1</span> Empresa, obra y equipo</li>
+        <li><span class="n">2.2</span> Capítulo, partida y tarea</li>
+        <li><span class="n">2.3</span> Modalidad de contratación</li>
+        <li><span class="n">2.4</span> Revisión, línea base y presupuesto vigente</li>
+        <li><span class="n">2.5</span> El UID: el ancla del cronograma</li>
+      </ol>
+    </li>
+    <li><span class="n">3</span> Usuarios, roles y permisos
+      <ol>
+        <li><span class="n">3.1</span> Los cinco roles</li>
+        <li><span class="n">3.2</span> Qué puede hacer cada rol (matriz completa)</li>
+        <li><span class="n">3.3</span> Permisos que no se pueden mover</li>
+        <li><span class="n">3.4</span> El rol se asigna por obra, no por persona</li>
+        <li><span class="n">3.5</span> El pase de obra no es un usuario</li>
+      </ol>
+    </li>
+    <li><span class="n">4</span> Entrar al sistema
+      <ol>
+        <li><span class="n">4.1</span> El flujo de acceso, paso a paso</li>
+        <li><span class="n">4.2</span> Verificación en dos pasos (SMS o correo)</li>
+        <li><span class="n">4.3</span> Olvidé mi clave</li>
+        <li><span class="n">4.4</span> Tu perfil y las solicitudes de cambio</li>
+        <li><span class="n">4.5</span> GCM en el celular</li>
+      </ol>
+    </li>
+    <li><span class="n">5</span> El panel: leer la obra en un minuto
+      <ol>
+        <li><span class="n">5.1</span> Los doce módulos</li>
+        <li><span class="n">5.2</span> La pareja que hay que leer junta</li>
+        <li><span class="n">5.3</span> Configurar el panel</li>
+        <li><span class="n">5.4</span> Los avisos no se filtran por obra</li>
+      </ol>
+    </li>
+    <li><span class="n">6</span> Moverse por el sistema</li>
+    <li><span class="n">7</span> Flujo 1 — El presupuesto
+      <ol>
+        <li><span class="n">7.1</span> Preparar el Excel</li>
+        <li><span class="n">7.2</span> Importar: analizar, revisar, aplicar</li>
+        <li><span class="n">7.3</span> Qué detecta el importador por su cuenta</li>
+        <li><span class="n">7.4</span> El riesgo de reemplazo</li>
+        <li><span class="n">7.5</span> Editar el árbol a mano</li>
+        <li><span class="n">7.6</span> Revisiones y línea base</li>
+        <li><span class="n">7.7</span> Movimientos: reconversión, adicional, deductivo</li>
+      </ol>
+    </li>
+    <li><span class="n">8</span> Flujo 2 — El cronograma
+      <ol>
+        <li><span class="n">8.1</span> Importar de MS Project</li>
+        <li><span class="n">8.2</span> Versiones y fecha de corte</li>
+        <li><span class="n">8.3</span> Fijar la línea base del cronograma</li>
+        <li><span class="n">8.4</span> Mapear tareas con partidas</li>
+        <li><span class="n">8.5</span> Registrar avance</li>
+        <li><span class="n">8.6</span> Gantt, informe y ruta crítica</li>
+        <li><span class="n">8.7</span> La curva S</li>
+      </ol>
+    </li>
+    <li><span class="n">9</span> Flujo 3 — Last Planner
+      <ol>
+        <li><span class="n">9.1</span> El calendario laboral de la obra</li>
+        <li><span class="n">9.2</span> Lookahead: la ventana de mediano plazo</li>
+        <li><span class="n">9.3</span> Las 7 restricciones — la palabra SIEMPRE</li>
+        <li><span class="n">9.4</span> Comprometer al PTS</li>
+        <li><span class="n">9.5</span> El Plan Semanal</li>
+        <li><span class="n">9.6</span> Cerrar la semana: PPC y causas</li>
+        <li><span class="n">9.7</span> El ciclo completo, semana a semana</li>
+      </ol>
+    </li>
+    <li><span class="n">10</span> Flujo 4 — Proveedores, encargos y órdenes
+      <ol>
+        <li><span class="n">10.1</span> Qué ve y qué no ve el residente</li>
+        <li><span class="n">10.2</span> Encargos y valorización</li>
+        <li><span class="n">10.3</span> El ciclo de una orden de compra</li>
+      </ol>
+    </li>
+    <li><span class="n">11</span> Evidencia fotográfica y pases de obra</li>
+    <li><span class="n">12</span> Valor ganado (EVM): qué se muestra y qué no</li>
+    <li><span class="n">13</span> Entradas y salidas del sistema</li>
+    <li><span class="n">14</span> La rutina del residente: día, semana y mes</li>
+    <li><span class="n">15</span> Problemas frecuentes</li>
+    <li><span class="n">16</span> Glosario</li>
+    <li><span class="n">17</span> Qué falta por construir</li>
+  </ol>
+</section>
+
+<section class="cap">
+  <div class="kicker">Capítulo 1</div>
+  <h2>1. Antes de empezar</h2>
+
+  <h3>1.1 Para quién es este manual</h3>
+  <p>Para el <strong>residente de obra</strong> y para quien lo acompaña en campo: administrador
+  de obra, planificador, almacenero y supervisión. No hace falta saber de informática. Todo lo
+  que se explica aquí se hace desde un navegador, en la computadora de la caseta o en el
+  celular.</p>
+
+  <p>El manual está ordenado como se usa el sistema: primero el vocabulario, después quién puede
+  hacer qué, y luego los cuatro flujos de trabajo en el orden en que ocurren en una obra real —
+  presupuesto, cronograma, planificación semanal y compras.</p>
+
+  <div class="caja">
+    <span class="et">Cómo leerlo</span>
+    <p>Si es tu primera vez, lee los capítulos 1 al 6 de corrido: son treinta minutos y te dan
+    el mapa completo. Los capítulos 7 al 11 se leen cuando toca hacer esa tarea. El capítulo 14
+    es la chuleta del día a día: imprímelo aparte y pégalo en la caseta.</p>
+  </div>
+
+  <h3>1.2 Qué problema resuelve GCM</h3>
+  <p>En una obra conviven tres documentos que nadie logra mirar juntos:</p>
+  <ul>
+    <li>El <strong>cronograma de MS Project</strong>, que dice <em>cuándo</em>.</li>
+    <li>El <strong>presupuesto en Excel</strong>, que dice <em>cuánto</em>.</li>
+    <li>Los <strong>papeles de compras</strong>, que dicen <em>en qué se está yendo la plata</em>.</li>
+  </ul>
+  <p>Cada uno vive en su archivo, cada uno se actualiza en su momento y ninguno sabe del otro.
+  El resultado es conocido: el avance se reporta en porcentajes que nadie sabe traducir a soles,
+  las órdenes de compra se aprueban sin saber cuánto queda de la partida, y el lunes se
+  programa trabajo que el miércoles no se puede hacer porque falta el fierro.</p>
+
+  <p><strong>GCM junta los tres y añade el cuarto que faltaba: el compromiso.</strong> No solo qué
+  toca hacer, sino qué se <em>puede</em> hacer de verdad, qué se prometió y qué se cumplió.</p>
+
+  <h3>1.3 Las tres verdades: Project, presupuesto y GCM</h3>
+  <p>Hay un reparto de autoridad que conviene entender desde el primer día, porque explica casi
+  todo el comportamiento del sistema:</p>
+
+  <table>
+    <thead><tr><th style="width:26%">Fuente</th><th style="width:37%">Manda sobre…</th><th>Qué hace GCM con eso</th></tr></thead>
+    <tbody>
+      <tr><td><strong>MS Project</strong></td><td>Qué tareas hay, cuándo, en qué orden, cuál es la ruta crítica</td><td>Lo lee y lo muestra. <strong>No lo recalcula.</strong></td></tr>
+      <tr><td><strong>El presupuesto (Excel)</strong></td><td>Qué partidas hay, con qué metrado y a qué precio</td><td>Lo importa a un árbol editable y lo congela en revisiones</td></tr>
+      <tr><td><strong>GCM</strong></td><td>El avance real, quién lo reportó, qué se comprometió y qué se cumplió</td><td>Es la única fuente. Aquí sí manda.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="caja ojo">
+    <span class="et">La consecuencia práctica</span>
+    <p>Si la ruta crítica está mal, se corrige en Project y se vuelve a importar. Si el precio
+    unitario está mal, se corrige en el árbol de partidas o se reimporta el Excel. Pero si el
+    avance está mal, se corrige <strong>aquí</strong>: no existe en ningún otro sitio.</p>
+  </div>
+
+  <h3>1.4 Mapa general del sistema</h3>
+  <p>Todo lo que hace GCM cabe en un dibujo. A la izquierda, lo que entra. En el centro, lo que
+  el sistema construye con ello. A la derecha, lo que sale y se lee.</p>
+
+  <figure>
+    <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
+      <defs>
+        <marker id="fl" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+          <path d="M0,0 L8,3.2 L0,6.4 z" fill="#5b6875"/>
+        </marker>
+      </defs>
+
+      <text x="88" y="20" font-size="10" font-weight="700" fill="#5b6875" text-anchor="middle" letter-spacing="1.2">ENTRADAS</text>
+      <text x="380" y="20" font-size="10" font-weight="700" fill="#1f5f8b" text-anchor="middle" letter-spacing="1.2">GCM</text>
+      <text x="672" y="20" font-size="10" font-weight="700" fill="#5b6875" text-anchor="middle" letter-spacing="1.2">SALIDAS</text>
+
+      <g>
+        <rect x="8" y="38" width="160" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+        <text x="88" y="58" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Presupuesto Excel</text>
+        <text x="88" y="72" font-size="8.6" text-anchor="middle" fill="#5b6875">capítulos y partidas</text>
+
+        <rect x="8" y="96" width="160" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+        <text x="88" y="116" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">MS Project</text>
+        <text x="88" y="130" font-size="8.6" text-anchor="middle" fill="#5b6875">.mpp o .xml</text>
+
+        <rect x="8" y="154" width="160" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+        <text x="88" y="174" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Avance de campo</text>
+        <text x="88" y="188" font-size="8.6" text-anchor="middle" fill="#5b6875">lo que reporta el residente</text>
+
+        <rect x="8" y="212" width="160" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+        <text x="88" y="232" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Órdenes de compra</text>
+        <text x="88" y="246" font-size="8.6" text-anchor="middle" fill="#5b6875">y encargos a proveedores</text>
+
+        <rect x="8" y="270" width="160" height="46" rx="5" fill="#f4f6f8" stroke="#d7dee6"/>
+        <text x="88" y="290" font-size="10.5" font-weight="700" text-anchor="middle" fill="#16202b">Fotos de obra</text>
+        <text x="88" y="304" font-size="8.6" text-anchor="middle" fill="#5b6875">evidencia con pase</text>
+      </g>
+
+      <g stroke="#5b6875" stroke-width="1.3" marker-end="url(#fl)" fill="none">
+        <path d="M170,61 L242,90"/>
+        <path d="M170,119 L242,119"/>
+        <path d="M170,177 L242,150"/>
+        <path d="M170,235 L242,230"/>
+        <path d="M170,293 L242,262"/>
+      </g>
+
+      <rect x="250" y="34" width="260" height="288" rx="8" fill="#e8f1f7" stroke="#1f5f8b" stroke-width="1.6"/>
+
+      <rect x="264" y="50" width="232" height="40" rx="5" fill="#fff" stroke="#1f5f8b"/>
+      <text x="380" y="66" font-size="10.3" font-weight="700" text-anchor="middle" fill="#1f5f8b">Presupuesto por partidas</text>
+      <text x="380" y="80" font-size="8.4" text-anchor="middle" fill="#5b6875">árbol EDT + revisiones congeladas</text>
+
+      <rect x="264" y="98" width="232" height="40" rx="5" fill="#fff" stroke="#1f5f8b"/>
+      <text x="380" y="114" font-size="10.3" font-weight="700" text-anchor="middle" fill="#1f5f8b">Cronograma versionado</text>
+      <text x="380" y="128" font-size="8.4" text-anchor="middle" fill="#5b6875">tareas ancladas por UID</text>
+
+      <rect x="264" y="146" width="232" height="40" rx="5" fill="#fff" stroke="#2f7d4f" stroke-width="1.6"/>
+      <text x="380" y="162" font-size="10.3" font-weight="700" text-anchor="middle" fill="#2f7d4f">Mapeo tarea ↔ partida</text>
+      <text x="380" y="176" font-size="8.4" text-anchor="middle" fill="#5b6875">lo que convierte % en soles</text>
+
+      <rect x="264" y="194" width="232" height="40" rx="5" fill="#fff" stroke="#1f5f8b"/>
+      <text x="380" y="210" font-size="10.3" font-weight="700" text-anchor="middle" fill="#1f5f8b">Last Planner</text>
+      <text x="380" y="224" font-size="8.4" text-anchor="middle" fill="#5b6875">Lookahead · PTS · PPC · causas</text>
+
+      <rect x="264" y="242" width="232" height="40" rx="5" fill="#fff" stroke="#1f5f8b"/>
+      <text x="380" y="258" font-size="10.3" font-weight="700" text-anchor="middle" fill="#1f5f8b">Control económico</text>
+      <text x="380" y="272" font-size="8.4" text-anchor="middle" fill="#5b6875">comprometido, movimientos, saldo</text>
+
+      <rect x="264" y="290" width="232" height="20" rx="4" fill="#16202b"/>
+      <text x="380" y="304" font-size="8.7" font-weight="700" text-anchor="middle" fill="#fff" letter-spacing="1">AUDITORÍA · TODO QUEDA REGISTRADO</text>
+
+      <g stroke="#5b6875" stroke-width="1.3" marker-end="url(#fl)" fill="none">
+        <path d="M516,90 L584,61"/>
+        <path d="M516,119 L584,119"/>
+        <path d="M516,150 L584,177"/>
+        <path d="M516,230 L584,235"/>
+        <path d="M516,262 L584,293"/>
+      </g>
+
+      <g>
+        <rect x="592" y="38" width="160" height="46" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+        <text x="672" y="58" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Panel de indicadores</text>
+        <text x="672" y="72" font-size="8.6" text-anchor="middle" fill="#5b6875">12 módulos configurables</text>
+
+        <rect x="592" y="96" width="160" height="46" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+        <text x="672" y="116" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Curva S y EVM</text>
+        <text x="672" y="130" font-size="8.6" text-anchor="middle" fill="#5b6875">plan, real y proyección</text>
+
+        <rect x="592" y="154" width="160" height="46" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+        <text x="672" y="174" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">PPC y Pareto de causas</text>
+        <text x="672" y="188" font-size="8.6" text-anchor="middle" fill="#5b6875">el cuello de botella real</text>
+
+        <rect x="592" y="212" width="160" height="46" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+        <text x="672" y="232" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Órdenes impresas</text>
+        <text x="672" y="246" font-size="8.6" text-anchor="middle" fill="#5b6875">documento para el proveedor</text>
+
+        <rect x="592" y="270" width="160" height="46" rx="5" fill="#e7f4ec" stroke="#2f7d4f"/>
+        <text x="672" y="290" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f7d4f">Informes y Gantt</text>
+        <text x="672" y="304" font-size="8.6" text-anchor="middle" fill="#5b6875">para reunión y para el cliente</text>
+      </g>
+
+      <rect x="8" y="336" width="744" height="54" rx="6" fill="#fdf3de" stroke="#a8710b"/>
+      <text x="20" y="356" font-size="9.6" font-weight="700" fill="#a8710b">La frontera de seguridad</text>
+      <text x="20" y="371" font-size="9.2" fill="#16202b">Todo dato pertenece a una empresa, y el filtro por empresa sale siempre de la sesión — nunca de lo que pida el navegador.</text>
+      <text x="20" y="384" font-size="9.2" fill="#16202b">Es lo que impide que una constructora vea las obras de otra.</text>
+    </svg>
+    <figcaption><span class="fig-t">Figura 1</span> — Mapa general: entradas, núcleo y salidas del sistema.</figcaption>
+  </figure>
+</section>
