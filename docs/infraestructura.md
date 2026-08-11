@@ -135,6 +135,29 @@ Passenger reinicia al detectar que cambió `tmp/restart.txt`. El workflow lo sub
 **el último**, para que el reinicio nunca se dispare antes de que el paquete esté
 completo.
 
+> ⚠️ **Una instancia vieja puede sobrevivir días, y `restart.txt` no siempre se
+> la lleva.** El 11/08/2026 había **dos** `next-server` a la vez: uno recién
+> arrancado y otro de **26 horas**, los dos con `cwd` en `~/gcm`. Cada
+> petición caía en uno o en otro, así que la aplicación respondía con dos
+> compilaciones distintas según la suerte —y de ahí salen tanto el 404 en
+> `POST /login` como que un SMS se enviara unas veces sí y otras no—.
+>
+> No lo cubre el candado de `app.js`: ese impide que dos instancias
+> descompriman a la vez, no que una instancia de ayer siga en pie con el árbol
+> de ayer ya cargado en memoria. Son dos problemas distintos.
+>
+> **Comprobar después de cada despliegue**, una vez abierto el sitio:
+>
+> ```bash
+> ps -u "$USER" -o pid,etime,cmd | grep next-server | grep -v grep
+> ```
+>
+> Debe salir **uno solo** y con pocos minutos. Si hay más, confirma que es GCM
+> con `ls -l /proc/<pid>/cwd` —en la cuenta conviven otras aplicaciones— y
+> retira el viejo con `kill <pid>`, sin `-9`: Passenger levanta uno nuevo con
+> la siguiente petición y el corte son un par de segundos. En ese caso
+> `touch tmp/restart.txt` **no** bastó.
+
 ### Secretos del repositorio
 
 `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD` y **`FTP_SERVER_DIR`** (la ruta
@@ -196,11 +219,32 @@ lo que pasa:
 - **`--yes prisma@7`** y no `npx prisma`: Next empaqueta Prisma dentro del
   código compilado y no queda como módulo suelto que `npx` pueda encontrar.
 
-**No hace falta exportar `DATABASE_URL`.** Se comprobó el 08/08/2026: activar
-el entorno con `source` ya deja en el shell las variables que la aplicación
-tiene configuradas en cPanel, y Prisma resuelve la base sin más. Este
-documento pedía exportarla a mano y era un paso de sobra —además con el
-riesgo de pegar mal la cadena y apuntar a otro sitio.
+**SÍ hace falta conseguir `DATABASE_URL`, y no la trae el `source`.**
+
+> Este párrafo decía lo contrario hasta el 11/08/2026, apoyándose en una
+> comprobación del 08/08. **Ya no se cumple**: con el entorno activado,
+> `$DATABASE_URL` viene vacía y Prisma no arranca. Se perdió un buen rato
+> siguiendo esta receta antes de darse cuenta, así que queda escrito el
+> desmentido en vez de borrarlo sin más.
+
+Y **no la busques en un `.env`**: no existe en el servidor, a propósito. El
+workflow lo borra del paquete (`rm -f deploy/.env`) para que la configuración
+de desarrollo no pise la del servidor.
+
+La vía que funciona es tomársela prestada al proceso vivo, que sí la tiene
+porque se la inyectó cPanel al arrancar. **Sin que la contraseña aparezca en
+pantalla:**
+
+```bash
+PID=$(ps -u "$USER" -o pid,cmd | grep next-server | grep -v grep | awk '{print $1}' | head -1)
+export DATABASE_URL="$(tr '\0' '\n' < /proc/$PID/environ | sed -n 's/^DATABASE_URL=//p')"
+[ -n "$DATABASE_URL" ] && echo cargada || echo no
+```
+
+Si `PID` sale vacío es que Passenger no ha levantado la aplicación todavía:
+abre el sitio (o `curl` a `/api/health`) y repítelo. La alternativa manual es
+copiarla de cPanel → *Setup Node.js App* → *Environment variables* y pegarla
+entre **comillas simples**, que la contraseña suele traer `$` o `!`.
 
 > **El despliegue no se aplica hasta la primera petición.** El workflow sube
 > `gcm.tar.gz` y toca `tmp/restart.txt`, pero quien descomprime el paquete es
@@ -233,6 +277,27 @@ riesgo de pegar mal la cadena y apuntar a otro sitio.
 > ```bash
 > npx --yes prisma@7 migrate resolve --applied <nombre_de_la_migracion>
 > ```
+
+> **`migrate status` no detecta una migración que el despliegue perdió.**
+> Visto el 11/08/2026: respondió *«Database schema is up to date!»* con **28**
+> migraciones cuando el repositorio tenía **29**. No miente —está al día con
+> las que ve—, pero el archivo de `20260811010133_cola_de_sms` no había
+> llegado, y una carpeta que no está no puede figurar como pendiente.
+>
+> Es el «vicio de dejar caer archivos» del FTP aplicado a algo que importa.
+> Se comprueba contando, no preguntando:
+>
+> ```bash
+> ls ~/gcm/prisma/migrations | grep -c '^2026'
+> ```
+>
+> Ese número tiene que coincidir con el del repositorio. Si falta alguna, se
+> recrea la carpeta con su `migration.sql` (cópialo del repositorio) y se
+> lanza `migrate deploy`. **`migrate resolve` no sirve aquí**: necesita que el
+> archivo exista.
+>
+> Conviene hacer esta cuenta después de cada despliegue que traiga migración,
+> porque el paquete vuelve a extraer `prisma/` encima cada vez.
 
 Validar pronto las migraciones contra MariaDB 10.11: en desarrollo corre 12.3.
 
