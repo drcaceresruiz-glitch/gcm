@@ -10,30 +10,120 @@ import {
   type Persona,
   type SuscripcionResuelta,
 } from "@/lib/avisos";
-import type { EventoAviso, TipoRestriccion } from "@/generated/prisma/enums";
+import type {
+  CanalAviso,
+  EventoAviso,
+  TipoRestriccion,
+} from "@/generated/prisma/enums";
 
 /**
- * El despacho de avisos DENTRO de GCM.
+ * El despacho de avisos: quien recibe que, y la reserva que impide repetir.
  *
  * Va en su propio archivo y no en `avisos.service` por una diferencia que
  * importa: aquello es configuracion y exige sesion y permiso; esto lo llama
- * una accion que ya paso su puerta, o —mas adelante— el reloj, que no tiene
- * sesion ninguna. Mezclarlos obligaria a inventar una sesion falsa para el
- * cron, que es como se cuelan los agujeros.
- *
- * Aqui solo se escribe la campanita. El correo y el SMS no salen de una
- * peticion del usuario: `enviarCorreo` es sincrono y sin cola, y treinta
- * correos dentro de una accion de servidor la dejarian colgada hasta que
- * LiteSpeed la corte. Eso lo hara el reloj, por lotes.
+ * una accion que ya paso su puerta, o el reloj, que no tiene sesion ninguna.
+ * Mezclarlos obligaria a inventar una sesion falsa para el cron, que es como
+ * se cuelan los agujeros.
  */
-
-/// Cuantos avisos se escriben de una vez, pase lo que pase. Un lote absurdo
-/// —alguien analiza doscientas tareas— no puede alargar la accion que lo pidio.
-const MAX_AVISOS_POR_TANDA = 200;
 
 export interface ContextoAviso {
   companyId: string;
   projectId: string;
+}
+
+/// Cuantos avisos se despachan de una vez por canal, pase lo que pase. Un
+/// lote absurdo —alguien analiza doscientas tareas— no puede alargar sin
+/// limite la operacion que lo pidio.
+const MAX_POR_TANDA = 200;
+
+/**
+ * Reparte un evento por UN canal y entrega lo que toque.
+ *
+ * El orden es lo unico que importa aqui, y es este:
+ *
+ *   1. reservar la clave en `envios_aviso`
+ *   2. solo si la reserva entro, entregar
+ *   3. anotar si salio
+ *
+ * La reserva va ANTES de entregar porque es lo unico que impide mandar dos
+ * veces lo mismo: si dos pasadas del cron se solapan, o si una accion se
+ * reintenta, la segunda choca contra el indice unico y se calla. Comprobar
+ * antes con un `findFirst` no valdria: entre la lectura y la escritura cabe
+ * la otra pasada.
+ */
+export async function despacharPorCanal(args: {
+  contexto: ContextoAviso;
+  evento: EventoAviso;
+  motivos: readonly MotivoAviso[];
+  resueltas: readonly SuscripcionResuelta[];
+  canal: CanalAviso;
+  /// El dia, para las claves de lo que se repite (recordatorio, resumen).
+  dia: string;
+  /// Tope de entregas de esta tanda. Sin el, el de `MAX_POR_TANDA`.
+  tope?: number;
+  /// Que hacer con cada destinatario. Devuelve si de verdad salio.
+  entregar: (persona: Persona, motivos: MotivoAviso[]) => Promise<boolean>;
+}): Promise<number> {
+  const { contexto, evento, motivos, resueltas, canal, dia, entregar } = args;
+  if (motivos.length === 0) return 0;
+
+  const lotes = repartirAvisos(resueltas, motivos, evento)
+    .filter((l) => l.canal === canal)
+    .slice(0, Math.min(args.tope ?? MAX_POR_TANDA, MAX_POR_TANDA));
+
+  let entregados = 0;
+
+  for (const lote of lotes) {
+    const clave = claveDeAviso(
+      evento,
+      anclaDe(lote.motivos),
+      lote.persona.clave,
+      dia,
+    );
+
+    let reserva: { id: string };
+    try {
+      reserva = await prisma.envioAviso.create({
+        data: {
+          companyId: contexto.companyId,
+          projectId: contexto.projectId,
+          evento,
+          canal,
+          userId: idDeUsuario(lote.persona),
+          contactoId: idDeContacto(lote.persona),
+          clave,
+          destino: destinoDe(lote.persona, canal),
+          // Optimista: se corrige justo debajo si no salio. Nunca al reves,
+          // porque lo que no se puede es dejar de reservar.
+          enviado: false,
+        },
+        select: { id: true },
+      });
+    } catch {
+      // Ya estaba reservado: este aviso ya se dio. No es un error.
+      continue;
+    }
+
+    let salio = false;
+    try {
+      salio = await entregar(lote.persona, lote.motivos);
+    } catch (e) {
+      console.error(`[avisos] Fallo al entregar por ${canal}:`, e);
+    }
+
+    await prisma.envioAviso
+      .update({
+        where: { id: reserva.id },
+        data: { enviado: salio, motivo: salio ? null : "no-salio" },
+      })
+      .catch(() => {
+        /* Anotar el resultado no puede tumbar la pasada. */
+      });
+
+    if (salio) entregados += 1;
+  }
+
+  return entregados;
 }
 
 /**
@@ -52,96 +142,83 @@ export async function avisarEnApp(
   if (motivos.length === 0) return { creados: 0 };
 
   try {
-    return await despachar(contexto, evento, motivos);
+    const ajustes = await prisma.ajustesAvisosObra.findUnique({
+      where: { projectId: contexto.projectId },
+      select: { activo: true },
+    });
+    // Sin fila, la obra nunca lo configuro: se avisa igual, con los valores
+    // por defecto. Lo que apaga es haberlo apagado a mano.
+    if (ajustes && !ajustes.activo) return { creados: 0 };
+
+    const resueltas = await suscripcionesResueltas(contexto.projectId);
+    if (resueltas.length === 0) return { creados: 0 };
+
+    const creados = await despacharPorCanal({
+      contexto,
+      evento,
+      motivos,
+      resueltas,
+      canal: "APP",
+      dia: diaDeClave(new Date()),
+      entregar: async (persona, suyos) => {
+        const userId = idDeUsuario(persona);
+        // Solo los usuarios de GCM tienen bandeja. `canalesEfectivos` ya lo
+        // filtra; esto es la red por si algun dia deja de hacerlo.
+        if (userId === null) return false;
+
+        const texto = textoAviso(evento, suyos);
+        await prisma.aviso.create({
+          data: {
+            companyId: contexto.companyId,
+            projectId: contexto.projectId,
+            userId,
+            evento,
+            titulo: texto.titulo.slice(0, 200),
+            cuerpo: texto.cuerpo.slice(0, 400),
+            camino: "/lookahead",
+          },
+        });
+        return true;
+      },
+    });
+
+    return { creados };
   } catch (e) {
     console.error("[avisos] No se pudo avisar:", e);
     return { creados: 0 };
   }
 }
 
-async function despachar(
-  contexto: ContextoAviso,
-  evento: EventoAviso,
-  motivos: readonly MotivoAviso[],
-): Promise<{ creados: number }> {
-  const { companyId, projectId } = contexto;
+// ---------------------------------------------------------------------------
 
-  const ajustes = await prisma.ajustesAvisosObra.findUnique({
-    where: { projectId },
-    select: { activo: true },
-  });
-  // Sin fila, la obra nunca configuro nada: se avisa igual, con los valores
-  // por defecto. Lo que apaga es haberlo apagado a mano.
-  if (ajustes && !ajustes.activo) return { creados: 0 };
-
-  const resueltas = await suscripcionesResueltas(projectId);
-  if (resueltas.length === 0) return { creados: 0 };
-
-  // El reparto agrupa por persona: quien tiene seis restricciones recibe UN
-  // aviso, no seis.
-  const lotes = repartirAvisos(resueltas, motivos, evento).filter(
-    (l) => l.canal === "APP",
-  );
-  if (lotes.length === 0) return { creados: 0 };
-
-  const dia = diaDeClave(new Date());
-  let creados = 0;
-
-  for (const lote of lotes.slice(0, MAX_AVISOS_POR_TANDA)) {
-    // Solo los usuarios de GCM tienen bandeja. `canalesEfectivos` ya lo
-    // filtra, pero el id hace falta para escribir la fila.
-    const userId = idDeUsuario(lote.persona);
-    if (userId === null) continue;
-
-    const texto = textoAviso(evento, lote.motivos);
-    const ancla = lote.motivos
-      .map((m) => `${m.uid}:${m.tipo}`)
-      .sort()
-      .join(",");
-    const clave = claveDeAviso(evento, ancla, lote.persona.clave, dia);
-
-    try {
-      // La reserva va ANTES de escribir el aviso: es lo unico que impide que
-      // el mismo aviso salga dos veces si la accion se reintenta o si dos
-      // pasadas se solapan. El unico de la base es quien decide, no un `find`
-      // previo, que tendria carrera.
-      await prisma.envioAviso.create({
-        data: {
-          companyId,
-          projectId,
-          evento,
-          canal: "APP",
-          userId,
-          clave,
-          destino: userId,
-          enviado: true,
-        },
-      });
-    } catch {
-      // Ya estaba: este aviso ya se le dio. No es un error.
-      continue;
-    }
-
-    await prisma.aviso.create({
-      data: {
-        companyId,
-        projectId,
-        userId,
-        evento,
-        titulo: texto.titulo.slice(0, 200),
-        cuerpo: texto.cuerpo.slice(0, 400),
-        camino: "/lookahead",
-      },
-    });
-    creados += 1;
-  }
-
-  return { creados };
+/// La clave de deduplicacion tiene que ser la MISMA para el mismo conjunto de
+/// motivos, venga en el orden que venga.
+function anclaDe(motivos: readonly MotivoAviso[]): string {
+  return motivos
+    .map((m) => `${m.uid}:${m.tipo}`)
+    .sort()
+    .join(",");
 }
 
 /// "u:<id>" -> "<id>". Null para quien no es usuario de GCM.
 function idDeUsuario(persona: Persona): string | null {
   return persona.clave.startsWith("u:") ? persona.clave.slice(2) : null;
+}
+
+/// "c:<id>" -> "<id>". Null para quien si es usuario de GCM.
+function idDeContacto(persona: Persona): string | null {
+  return persona.clave.startsWith("c:") ? persona.clave.slice(2) : null;
+}
+
+/// A donde fue, para poder responder "¿le llego?" sin reconstruirlo.
+function destinoDe(persona: Persona, canal: CanalAviso): string {
+  const valor =
+    canal === "CORREO"
+      ? persona.email
+      : canal === "SMS"
+        ? persona.celular
+        : persona.clave;
+  return (valor ?? persona.clave).slice(0, 150);
 }
 
 /**
@@ -151,7 +228,7 @@ function idDeUsuario(persona: Persona): string | null {
  * empresa: un residente puede llevar una obra y solo mirar otra, y avisarle de
  * la que no lleva es ruido que ademas le ensena cosas que no le tocan.
  */
-async function suscripcionesResueltas(
+export async function suscripcionesResueltas(
   projectId: string,
 ): Promise<SuscripcionResuelta[]> {
   const [suscripciones, miembros, contactos] = await Promise.all([
@@ -179,6 +256,8 @@ async function suscripcionesResueltas(
     }),
   ]);
 
+  if (suscripciones.length === 0) return [];
+
   // Un usuario desactivado no recibe nada: sigue en la obra pero ya no
   // trabaja aqui.
   const activos = miembros.filter((m) => m.user.estado === "ACTIVO");
@@ -205,6 +284,8 @@ async function suscripcionesResueltas(
         nombre: c.nombre,
         email: c.email,
         celular: c.celular,
+        // Lo normalizo quien lo dio de alta y no hay a quien pedirle que se
+        // verifique: si hay numero, sirve.
         celularUtil: c.celular !== null,
         tieneBandeja: false,
       },
@@ -257,8 +338,7 @@ async function suscripcionesResueltas(
  *
  * Los nombres viven en el cronograma vigente y no en el Lookahead —que se
  * ancla por `uid` a proposito— asi que hay que ir a buscarlos. Se hace aqui y
- * no en `lookahead.service` porque el nombre solo hace falta para redactar el
- * aviso.
+ * no en `lookahead.service` porque el nombre solo hace falta para redactar.
  */
 export async function motivosDeHechos(
   projectId: string,
@@ -294,9 +374,9 @@ export async function motivosDeHechos(
       tipo: a.tipo,
       diasAbierta: 0,
     })),
-    // Que una tarea quede lista no cuelga de un flujo concreto, pero el
-    // motivo necesita uno para agrupar. Se usa el primero de la matriz: el
-    // texto de "quedo lista" no lo menciona.
+    // Que una tarea quede lista no cuelga de un flujo, pero `MotivoAviso`
+    // necesita uno. Da igual cual: `seFiltraPorFlujo` no filtra el evento
+    // LISTA y su texto no menciona flujos.
     listas: listas.map((uid) => ({
       uid,
       tarea: como(uid),

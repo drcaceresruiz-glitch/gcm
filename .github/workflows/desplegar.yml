@@ -221,7 +221,7 @@ jobs:
             exit 1
           fi
 
-      # Tres archivos, y el ORDEN es parte del diseno.
+      # Cuatro archivos, y el ORDEN es parte del diseno.
       #
       # Quien aplica el paquete es `desplegar.sh`, que un cron del servidor
       # lanza cada minuto y que actua en cuanto ve un `gcm.tar.gz`. De ahi las
@@ -269,6 +269,7 @@ jobs:
             cd '$FTP_SERVER_DIR';
             mkdir -f tmp;
             put scripts/desplegar.sh -o desplegar.sh;
+            put scripts/avisos.sh -o avisos.sh;
             put envio/app.js -o app.js;
             put envio/gcm.tar.gz -o gcm.tar.gz.subiendo;
             rm -f gcm.tar.gz;

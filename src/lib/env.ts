@@ -109,6 +109,27 @@ const envSchema = z.object({
    */
   SMS_COLA_TOKEN: z.string().optional(),
 
+  /**
+   * Secreto del RELOJ de avisos: lo unico de GCM que corre solo.
+   *
+   * Un cron de cPanel llama cada pocos minutos a `/api/avisos/reloj` con este
+   * token en la cabecera. De ahi salen los recordatorios de restricciones que
+   * llevan dias sin levantarse y el resumen del dia.
+   *
+   * OPCIONAL, con la misma regla de la casa que el SMTP: sin el, la ruta
+   * responde 401 SIEMPRE y no salen ni correos ni SMS de aviso. Los avisos
+   * DENTRO de GCM siguen llegando, porque no dependen del reloj.
+   *
+   * Nunca "abierto por defecto": una ruta que dispara correos a terceros no
+   * puede quedarse sin puerta porque falte una variable de entorno. Ausente es
+   * cerrado, que es el fallo seguro.
+   *
+   * Generarlo con `openssl rand -base64 48` y no reutilizar ningun otro
+   * secreto. Se valida como el de la cola —sin `.min()`— para que un token
+   * corto deje a GCM sin avisos y no sin arrancar.
+   */
+  AVISOS_CRON_TOKEN: z.string().optional(),
+
   // --- Correo saliente (alta de usuarios y recuperacion de clave) ---
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),

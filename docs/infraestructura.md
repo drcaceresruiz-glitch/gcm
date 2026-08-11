@@ -162,6 +162,53 @@ Y el paquete se sube como `gcm.tar.gz.subiendo` y se renombra al final. Durante
 la subida de 20 MB el archivo ya existe y está a medias; sin ese rodeo, el cron
 lo cogría a mitad y fallaría al descomprimir.
 
+### El segundo cron: el reloj de los avisos
+
+GCM tiene **dos** cosas que corren solas, y esta es la otra. Los recordatorios
+de restricciones sin levantar y el repaso diario no los provoca nadie pulsando
+nada: los provoca que pase el tiempo. `scripts/avisos.sh` lo sube el mismo
+workflow, junto a `desplegar.sh`.
+
+En cPanel → *Trabajos cron*, **cada cinco minutos**:
+
+```bash
+bash ~/RUTA_DE_LA_APP/avisos.sh
+```
+
+El minuto ya lo ocupa el del despliegue, y un aviso de restricción no necesita
+latencia de segundos.
+
+**El token no va en esa línea.** cPanel la muestra en pantalla y `ps` la enseña
+a cualquiera con shell mientras el trabajo corre. Va en un archivo aparte que
+solo puede leer su dueño:
+
+```bash
+printf 'header = "Authorization: Bearer %s"\n' 'EL_TOKEN' > ~/.gcm-avisos.curl
+chmod 600 ~/.gcm-avisos.curl
+```
+
+Y el mismo valor en `AVISOS_CRON_TOKEN` (cPanel → *Setup Node.js App* →
+*Environment variables*). Se genera con `openssl rand -base64 48` y no se
+reutiliza ningún otro secreto. **Si esa variable no está puesta, `/api/reloj`
+responde 401 siempre**: nunca abierta por defecto.
+
+Sin ese cron los avisos simplemente no salen, y —a diferencia del despliegue—
+**nadie lo echa de menos**, porque lo que falla es justamente lo que avisaba. Por
+eso se ve desde fuera:
+
+```bash
+curl -s https://gcm.drcaceresruiz.com/api/health
+```
+
+- `"reloj":"vivo"` → corriendo.
+- `"reloj":"nunca"` → **falta crear la línea del cron**.
+- `"reloj":"parado"` → existe y lleva media hora sin correr; el porqué está en
+  `tmp/avisos.log`.
+
+Esa distinción entre *nunca* y *parado* es deliberada: el consejo que hay que
+dar es distinto, y deducirlo de fechas de archivos ya costó una hora el
+12/08/2026.
+
 > ⚠️ **Una instancia vieja puede sobrevivir días, y `restart.txt` no siempre se
 > la lleva.** El 11/08/2026 había **dos** `next-server` a la vez: uno recién
 > arrancado y otro de **26 horas**, los dos con `cwd` en `~/gcm`. Cada

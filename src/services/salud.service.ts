@@ -2,6 +2,7 @@ import "server-only";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { prisma } from "@/lib/prisma";
+import { estadoDelReloj, type EstadoReloj } from "@/lib/avisos";
 
 export interface EstadoSalud {
   baseDatosConectada: boolean;
@@ -20,6 +21,19 @@ export interface EstadoSalud {
    * esta fallando; en `tmp/despliegue.log` esta el porque.
    */
   desplieguePendiente: boolean;
+  /**
+   * Si el reloj de los avisos esta corriendo.
+   *
+   * Es la misma leccion que la de arriba, aplicada antes de que cueste la
+   * hora: el cron hay que crearlo a mano en cPanel, y cuando no existe **nadie
+   * se entera, por definicion** —lo que falla es justamente lo que avisaba—.
+   * Los recordatorios simplemente no salen y la obra concluye que GCM no
+   * avisa.
+   *
+   * `nunca` no es lo mismo que `parado`: recien desplegado significa que falta
+   * crear la linea del cron, y el consejo que hay que dar es otro.
+   */
+  reloj: EstadoReloj;
 }
 
 /**
@@ -39,13 +53,36 @@ export async function verificarSalud(): Promise<EstadoSalud> {
       baseDatosConectada: true,
       latenciaMs: Date.now() - inicio,
       desplieguePendiente,
+      reloj: await estadoDelRelojDeAvisos(),
     };
   } catch {
     return {
       baseDatosConectada: false,
       latenciaMs: Date.now() - inicio,
       desplieguePendiente,
+      // Sin base no se puede saber, y decir "parado" seria una segunda alarma
+      // por la misma causa. La de la base ya se esta dando.
+      reloj: "nunca",
     };
+  }
+}
+
+/**
+ * Cuando corrio el reloj por ultima vez.
+ *
+ * Se lee `iniciadaAt` si no hay `terminadaAt`: una pasada en curso tambien es
+ * senal de vida, y esperar a que termine daria "parado" durante los veinte
+ * segundos que dura.
+ */
+async function estadoDelRelojDeAvisos(): Promise<EstadoReloj> {
+  try {
+    const fila = await prisma.relojTarea.findUnique({
+      where: { clave: "avisos" },
+      select: { terminadaAt: true, iniciadaAt: true },
+    });
+    return estadoDelReloj(fila?.terminadaAt ?? fila?.iniciadaAt ?? null, new Date());
+  } catch {
+    return "nunca";
   }
 }
 

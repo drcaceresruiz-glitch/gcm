@@ -29,6 +29,10 @@ export async function GET() {
       // NO es la ultima version. Se dice aqui para poder saberlo con un curl,
       // sin entrar al servidor a mirar fechas de archivos.
       despliegue: salud.desplieguePendiente ? "pendiente" : "al dia",
+      // "nunca" = falta crear la linea del cron en cPanel; "parado" = existe
+      // y lleva media hora sin correr. Sin esto, unos avisos que no salen se
+      // ven exactamente igual que unos avisos que no hacian falta.
+      reloj: salud.reloj,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

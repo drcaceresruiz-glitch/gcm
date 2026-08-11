@@ -278,6 +278,85 @@ export function correoCodigoAcceso(datos: {
 }
 
 /**
+ * Correo de restricciones del Lookahead.
+ *
+ * Cuatro variantes del mismo formato, una por momento: lo que se acaba de
+ * abrir, lo que lleva dias sin levantarse, lo que ya quedo listo y el repaso
+ * del dia.
+ *
+ * Cada linea dice la CONSECUENCIA y no solo el hecho, igual que el panel «Que
+ * falta»: "3 restricciones" no mueve a nadie; "estas tres tareas no se van a
+ * poder comprometer el lunes" si.
+ *
+ * NUNCA se manda con varios en el "para". Se envia uno a uno, como la curva de
+ * avance: en un correo de obra la lista puede incluir al cliente y al
+ * proveedor a la vez, y ninguno tiene por que ver al otro.
+ *
+ * Este SI lleva enlace, al contrario que el SMS: el correo no tiene el
+ * problema de las operadoras marcando como spam lo que lleva URL.
+ */
+export function correoRestricciones(datos: {
+  nombre: string;
+  obra: string;
+  titulo: string;
+  cuerpo: string;
+  lineas: { tarea: string; flujo: string; dias: number | null }[];
+  /// Las que no caben en la tabla.
+  masCuantas: number;
+  /// A donde se va a resolverlo. Vacio si no hay direccion publica.
+  enlace: string | null;
+}): Omit<Correo, "para"> {
+  const linea = (l: (typeof datos.lineas)[number]) =>
+    `- ${l.tarea} — ${l.flujo}${l.dias !== null && l.dias > 0 ? ` (${l.dias} d)` : ""}`;
+
+  const texto = [
+    `Hola ${datos.nombre},`,
+    ``,
+    `${datos.obra}: ${datos.titulo}`,
+    ``,
+    datos.cuerpo,
+    ``,
+    ...datos.lineas.map(linea),
+    ...(datos.masCuantas > 0 ? [`- y otras ${datos.masCuantas}`] : []),
+    ...(datos.enlace ? [``, datos.enlace] : []),
+  ].join("\n");
+
+  const filas = datos.lineas
+    .map(
+      (l) => `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;">${l.tarea}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;color:#0f7186;white-space:nowrap;">${l.flujo}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;text-align:right;white-space:nowrap;color:${
+          l.dias !== null && l.dias >= 3 ? "#b42318" : "#6b7a82"
+        };">${l.dias !== null && l.dias > 0 ? `${l.dias} d` : ""}</td>
+      </tr>`,
+    )
+    .join("");
+
+  const html = plantilla(
+    datos.titulo,
+    `<p>Hola <strong>${datos.nombre}</strong>,</p>
+     <p style="color:#6b7a82;">${datos.obra}</p>
+     <p>${datos.cuerpo}</p>
+     <table style="width:100%;border-collapse:collapse;font-size:14px;margin:16px 0;">${filas}</table>
+     ${
+       datos.masCuantas > 0
+         ? `<p style="color:#6b7a82;font-size:13px;">Y otras ${datos.masCuantas} más.</p>`
+         : ""
+     }
+     ${
+       datos.enlace
+         ? `<p style="margin:20px 0;">
+              <a href="${datos.enlace}" style="background:#0f7186;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:bold;">Ver el Lookahead</a>
+            </p>`
+         : ""
+     }`,
+  );
+
+  return { asunto: `${datos.obra}: ${datos.titulo}`, texto, html };
+}
+
+/**
  * Correo con la curva de avance de una obra.
  *
  * La imagen va como ADJUNTO y no incrustada en el HTML: casi todos los
