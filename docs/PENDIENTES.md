@@ -12,9 +12,29 @@ el orden acordado. El recorrido entero esta verificado en el navegador contra
 CRIOCORD; lo unico que no se pudo probar desde aqui es adjuntar un archivo de
 verdad, que hay que hacer a mano desde un telefono.
 
-Queda, en este orden: **la cola de SMS con la linea propia** y despues el
-**parte diario**, que no existe y es el Bloque 1 entero de la matriz de
-control.
+La **cola de SMS con la linea propia ya funciona y esta probada de punta a
+punta** (11 de agosto, mensaje recibido en un telefono real). Lo que costo
+hacerla llegar no fue la cola sino una instancia vieja: ver el aviso de mas
+abajo.
+
+**LO SIGUIENTE, ACORDADO EL 11 DE AGOSTO, EN ESTE ORDEN:**
+
+1. **Segundo factor y recuperacion de clave por SMS.** Hoy los dos van solo
+   por correo (`dosFactores.service`, `recuperacion.service`) y en obra nadie
+   mira el correo, pero el telefono lo tienen en la mano. Los flujos ya
+   existen y `enviarSms` se reutiliza tal cual: es el cambio mas pequeno con
+   mas efecto. **Es por donde se empieza.**
+2. **Cablear `scripts/desplegar.sh`** (seccion 1). Sigue sin hacerse y sigue
+   siendo la raiz de casi todo. **No es solo codigo**: hay que decidir quien
+   manda al descomprimir —hoy `app.js` lo hace por su cuenta, y anadir el
+   script deja DOS candados con caducidades distintas (3 min y 10 min) sobre
+   el mismo directorio— y crear el cron en cPanel, que solo se puede hacer
+   desde el panel.
+3. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
+   worktree. Investigacion hecha el 11 de agosto, plan sin escribir.
+
+Y sigue sin existir el **parte diario**, que es el Bloque 1 entero de la
+matriz de control y lo que le falta a GCM frente a Foco en Obra.
 
 > **DESPLEGAR CON LA APP ABIERTA ROMPE LA PESTANA** (visto el 11 de agosto).
 > Sintoma: «This page couldn't load» al pulsar cualquier boton —le paso al
@@ -790,6 +810,43 @@ correo» pasara lo que pasara. Ahora los canales se recorren en orden
 salio y de que hay que dictar el codigo. El aviso NO se da en la pantalla
 publica del pase: alli decir que el SMS fallo confirmaria que ese numero esta
 dado de alta, que es justo lo que el silencio protege.
+
+### Que mas puede hacer el canal de SMS (ideas del 11 de agosto)
+
+**El hallazgo de fondo, que vale mas que cualquier mensaje concreto**: el
+telefono pregunta cada ~20 segundos, y `recogerPendientes` ya aprovecha ese
+golpe para purgar la cola. Este hosting **no tiene cron para la logica de la
+aplicacion** —esta anotado como limitacion— y de repente hay algo que late
+solo. Es la pieza que faltaba para que GCM avise de cosas sin que nadie abra
+una pantalla. **Con una advertencia**: si el telefono se duerme, ese reloj se
+para, asi que nada critico puede colgar SOLO de ahi.
+
+Por orden de lo que aporta:
+
+1. **2FA y recuperacion de clave por SMS.** Elegida para empezar; ver arriba.
+2. **Los avisos del panel «Que falta», empujados.** `lib/pendientes.ts` ya
+   calcula las ocho reglas, incluida la mejor —tareas que arrancan en 14 dias
+   sin nadie contratado—. Hoy solo existen si alguien abre el tablero; por SMS
+   llegan la manana en que todavia se puede hacer algo.
+3. **Recordatorio del dia de corte** para cerrar el plan semanal. El PPC
+   honesto depende de que alguien cierre a tiempo y hoy no lo recuerda nadie.
+4. **«Tienes 3 ordenes esperando tu aprobacion»**, para quien tiene
+   `orden:aprobar` o `movimiento:aprobar`.
+5. **Los recordatorios de las Notas** (seccion 5), para los que no esperan.
+
+**Lo que NO da de si, y conviene no prometerlo:**
+
+- **Es solo de SALIDA.** La app Android manda, no recibe. Un parte diario por
+  SMS entrante —que seria justo lo que falta— no se puede sin tocar la app y
+  anadir lectura de SMS, que es otro producto.
+- **Un telefono y una SIM.** Punto unico de fallo, y la operadora corta por
+  antispam el trafico repetitivo. Eso condiciona el diseno entero: **avisos
+  escasos y valiosos, no notificaciones de todo.**
+
+**Regla a poner desde el primer dia**: preferencias por usuario y un tope
+diario por numero. Si el primer mes la gente recibe seis SMS al dia, silencia
+el numero y ya no lee un aviso nunca mas —el mismo motivo por el que en el
+tablero se decidio que nada parpadee—.
 
 ## 6d. Panel «Que falta» (10 de agosto)
 
