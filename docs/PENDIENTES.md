@@ -799,11 +799,26 @@ supuestas:
 
 **Y un aviso sobre `migrate status`**: dijo «Database schema is up to date!»
 teniendo **28** migraciones cuando el repositorio tiene **29**. No miente
-—esta al dia con las que ve— pero **no detecta un archivo de migracion que el
-deploy dejo caer**. Para eso hay que contar carpetas:
-`ls ~/gcm/prisma/migrations | wc -l` contra las del repositorio. En este caso
-faltaba `20260811010133_cola_de_sms` aunque la tabla SI existia: se aplico
-cuando el archivo estaba y un despliegue posterior lo tiro.
+—esta al dia con las que ve— pero **no detecta una migracion que no llego al
+servidor**. Para eso hay que contar carpetas:
+`ls ~/gcm/prisma/migrations | grep -c '^2026'` contra las del repositorio.
+
+> **CORRECCION DEL 12 DE AGOSTO: la causa NO era que el deploy tirara
+> archivos.** Ese dia se dijo aqui que el FTP habia dejado caer
+> `20260811010133_cola_de_sms`, y era falso. El paquete SIEMPRE las llevo: el
+> workflow hacia `cp -r prisma deploy/prisma` y, como el build de Next ya
+> habia creado `deploy/prisma`, `cp -r` metia el directorio DENTRO. Las
+> migraciones viajaban a `prisma/prisma/migrations` y las de
+> `prisma/migrations` eran restos de un despliegue antiguo.
+>
+> Se vio al mirar `ls ~/gcm/prisma/prisma/migrations`, que las tenia TODAS.
+> Ayer se «recreo a mano» una carpeta que ya estaba, un nivel mas abajo.
+>
+> **Arreglado en el workflow** (`mkdir -p deploy/prisma` + `cp -r prisma/.`),
+> con una comprobacion que compara cuantas migraciones tiene el repositorio y
+> cuantas el paquete, y **falla en rojo** si no coinciden. La leccion vale mas
+> que el arreglo: el sintoma —«falta un archivo»— apuntaba al FTP, que ya
+> tenia fama de perder cosas, y esa fama hizo de coartada durante dos dias.
 
 **Lo que ese caso destapo, y ya esta arreglado**: la cola encendida ANULABA el
 respaldo de json.pe —`enviarSms` no lo probaba ni cuando el encolado

@@ -110,7 +110,27 @@ jobs:
           # se pueden crear las tablas en el servidor, y la base de produccion
           # no acepta conexiones desde fuera, asi que `prisma migrate deploy`
           # solo puede ejecutarse alli.
-          cp -r prisma deploy/prisma
+          #
+          # OJO AL `/.` Y AL `mkdir`, que no son adorno. Esto decia
+          # `cp -r prisma deploy/prisma`, y como el build de Next ya habia
+          # creado `deploy/prisma`, `cp -r` metia el directorio DENTRO: las
+          # migraciones acababan en `prisma/prisma/migrations` y al servidor
+          # no llegaba ninguna nueva. Costo dos incidentes (10 y 11 de
+          # agosto) porque el sintoma enganaba: `migrate status` respondia
+          # "up to date" —esta al dia con las que ve— y las que faltaban
+          # parecian perdidas por el FTP.
+          mkdir -p deploy/prisma
+          cp -r prisma/. deploy/prisma/
+          # Que el paquete lleve TODAS las migraciones del repositorio no es
+          # negociable: si esto vuelve a fallar, que falle aqui y en rojo, no
+          # en produccion y en silencio.
+          esperadas=$(ls -d prisma/migrations/*/ | wc -l)
+          enviadas=$(ls -d deploy/prisma/migrations/*/ | wc -l)
+          if [ "$esperadas" != "$enviadas" ]; then
+            echo "El paquete lleva $enviadas migraciones y el repositorio tiene $esperadas."
+            exit 1
+          fi
+          echo "Migraciones en el paquete: $enviadas"
           # Crea la empresa y el usuario administrador. Va en JS plano para
           # poder ejecutarse con el Node de cPanel, sin tsx ni devDependencies.
           mkdir -p deploy/scripts

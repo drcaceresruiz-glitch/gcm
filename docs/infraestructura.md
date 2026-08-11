@@ -278,22 +278,29 @@ entre **comillas simples**, que la contraseña suele traer `$` o `!`.
 > npx --yes prisma@7 migrate resolve --applied <nombre_de_la_migracion>
 > ```
 
-> **`migrate status` no detecta una migración que el despliegue perdió.**
+> **`migrate status` no detecta una migración que no llegó al servidor.**
 > Visto el 11/08/2026: respondió *«Database schema is up to date!»* con **28**
 > migraciones cuando el repositorio tenía **29**. No miente —está al día con
-> las que ve—, pero el archivo de `20260811010133_cola_de_sms` no había
-> llegado, y una carpeta que no está no puede figurar como pendiente.
+> las que ve—, pero una carpeta que no está no puede figurar como pendiente.
 >
-> Es el «vicio de dejar caer archivos» del FTP aplicado a algo que importa.
+> **La causa, encontrada el 12/08 y ya corregida**, no era el FTP: el workflow
+> hacía `cp -r prisma deploy/prisma` y, como el build de Next ya había creado
+> `deploy/prisma`, `cp -r` metía el directorio DENTRO. Las migraciones
+> viajaban a `prisma/prisma/migrations`. Si alguna vez vuelve a faltar una,
+> **mira ahí antes de culpar al FTP**: `ls ~/gcm/prisma/prisma/migrations`.
+> Ahora el workflow compara cuántas hay en el repositorio y cuántas en el
+> paquete, y falla en rojo si no coinciden.
+>
 > Se comprueba contando, no preguntando:
 >
 > ```bash
 > ls ~/gcm/prisma/migrations | grep -c '^2026'
 > ```
 >
-> Ese número tiene que coincidir con el del repositorio. Si falta alguna, se
-> recrea la carpeta con su `migration.sql` (cópialo del repositorio) y se
-> lanza `migrate deploy`. **`migrate resolve` no sirve aquí**: necesita que el
+> Ese número tiene que coincidir con el del repositorio. Si falta alguna,
+> primero mira si está en `prisma/prisma/`; y si de verdad no llegó, se recrea
+> la carpeta con su `migration.sql` (cópialo del repositorio) y se lanza
+> `migrate deploy`. **`migrate resolve` no sirve ahí**: necesita que el
 > archivo exista.
 >
 > Conviene hacer esta cuenta después de cada despliegue que traiga migración,
