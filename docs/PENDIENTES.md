@@ -47,7 +47,11 @@ abajo.
      antiguedad. Un aviso por cada casilla marcada seria ruido en tres dias.
    - **Con que se manda**: la cola de SMS por empresa ya existe (6g) y el
      correo tambien. La pieza que falta es a QUIEN.
-6. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
+6. **El arrastre de lo incumplido** (acordado el 11 de agosto: se construye
+   DESPUES de los avisos). Un compromiso que se incumple no va a ninguna parte:
+   se queda dentro de su semana cerrada y nadie vuelve a abrirla. Detalle y
+   razonamiento en la seccion 6i.
+7. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
    worktree. Investigacion hecha el 11 de agosto, plan sin escribir.
 
 Y sigue sin existir el **parte diario**, que es el Bloque 1 entero de la
@@ -1147,6 +1151,69 @@ campo veria faltar una tarea que sabe que existe y concluiria que la aplicacion
 esta rota—. Anclar la foto a la tarea entera se valoro y se descarto: obliga a
 una tercera rama en `DestinoEvidencia` y toca subida, consulta, QR y pase. Queda
 anotado por si el uso lo pide.
+
+## 6i. Lo incumplido no se arrastra a ninguna parte (visto el 11 de agosto)
+
+Encontrado mirando CRIOCORD con el usuario, despues del rework del Lookahead.
+**Se construye DESPUES de los avisos a los implicados** (decision suya).
+
+### Lo que hace hoy
+
+Al cerrar una semana, un compromiso incumplido se queda ahi: alimenta el PPC y
+el Pareto —que es su trabajo— y no se propaga a nada mas. No se registra avance
+fisico (`porcentajeARegistrar` se abstiene sin porcentaje ni meta, y eso esta
+bien: antes escribia un 100 falso). Y **no existe ninguna lista de «lo que
+quedo pendiente de la semana pasada»**.
+
+Para recuperarlo hay que ir al Lookahead, reconocer la tarea por la marca «En
+S-2» y volver a comprometerla, aceptando el aviso de «ya comprometida en otra
+semana». Funciona, pero exige que alguien se acuerde.
+
+### El agujero
+
+El Lookahead solo muestra tareas cuyo rango solapa **[hoy, hoy + N semanas]**.
+Una tarea incumplida **cuya fecha programada ya paso desaparece de las dos
+pantallas** y queda solo dentro de una semana cerrada que nadie reabre.
+
+Red de seguridad parcial que YA existe: el panel «Que falta» avisa de «N tareas
+empezaron y nadie ha reportado avance», que las pescaria por otro camino. Pero
+no dice lo que importa: **«esto lo prometiste, fallo, y sigue sin hacerse»**.
+
+### Por que pesa mas de lo que parece en esta obra
+
+El Pareto de CRIOCORD al 11 de agosto: **5 de 5 incumplimientos con la MISMA
+causa, «Prerrequisito / tarea previa»**. Ni una sola barra mas. A esta obra no
+le falta material ni cuadrilla: le falta secuencia, se promete trabajo cuya
+tarea previa no esta terminada. Y el PPC cayo de 100% a 62% cuando eso empezo a
+acumularse.
+
+Con ese diagnostico, lo que hay que vigilar es justo lo que quedo a medias, que
+es lo que hoy se pierde de vista. Ademas da el argumento contra descartar el
+flujo REQUISITOS a la ligera en esta obra: es el unico que le esta rompiendo la
+semana.
+
+### Forma probable
+
+Una regla mas en `pendientes.ts` —compromiso incumplido en semana CERRADA, sin
+avance posterior— y una forma de traerlos a la semana nueva sin buscarlos a
+mano. Ojo con el ruido: si arrastra todo lo que fallo alguna vez, en dos meses
+es una lista que nadie lee. Probablemente haya que acotar por antiguedad o por
+que la tarea siga sin terminarse.
+
+### Dos defectos pequenos vistos el mismo dia
+
+1. **La numeracion de semanas no sigue a la fecha.** En CRIOCORD la Semana 3
+   cierra el 14/08 y la Semana 2 el 15/08. El correlativo es `max(numero) + 1`
+   y no mira `fechaCorte`, asi que crear una semana con corte anterior deja el
+   numero a contramano. Lo demas es coherente —tarjetas y tendencia se ordenan
+   por fecha, y el tablero toma como «ultima» la de fecha mayor—: el que
+   confunde es el rotulo. **Arreglo recomendado: avisar al crear** una semana
+   con fecha anterior a otra existente. Renumerar NO: cambiaria numeros de
+   semanas cerradas que pueden estar citados en actas.
+2. **El texto del PPC bajo miente entre 50% y 70%.** `pendientes.ts` dice
+   «Menos de la mitad de lo prometido se cumple con regularidad» con un PPC de
+   62%, y el umbral de critica es 70. La frase es fija y no mira el valor. Son
+   dos lineas y un test.
 
 ## 6d. Panel «Que falta» (10 de agosto)
 
