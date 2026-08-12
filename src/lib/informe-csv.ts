@@ -111,7 +111,11 @@ const ROTULO_SEVERIDAD = { alta: "Alta", media: "Media", baja: "Baja" } as const
 
 /// Una linea en blanco entre bloques: es lo que deja seleccionar una tabla
 /// suelta en Excel con Ctrl+Mayus+flecha sin arrastrar la de al lado.
-const VACIA: CeldaCsv[] = [];
+///
+/// Devuelve una fila NUEVA cada vez, y no una constante compartida: la misma
+/// referencia repetida por todo el documento es una mina para el primero que
+/// necesite retocar una separacion.
+const vacia = (): CeldaCsv[] => [];
 
 /**
  * Un bloque con su titulo y su cabecera.
@@ -127,7 +131,7 @@ function bloque(
   cuerpo: readonly CeldaCsv[][],
   siNoHay: string,
 ): void {
-  destino.push(VACIA, [titulo]);
+  destino.push(vacia(), [titulo]);
   if (cuerpo.length === 0) {
     destino.push([siNoHay]);
     return;
@@ -171,7 +175,7 @@ export function filasDelInformeCsv(
 }
 
 function resumen(filas: CeldaCsv[][], d: DatosCsvInforme): void {
-  filas.push(VACIA, ["RESUMEN"], ["Concepto", "Valor"]);
+  filas.push(vacia(), ["RESUMEN"], ["Concepto", "Valor"]);
   filas.push(["Avance real (%)", d.real]);
   filas.push(["Avance planeado (%)", d.planeado]);
   filas.push(["Desviación (puntos)", d.desviacion]);
@@ -187,7 +191,7 @@ function resumen(filas: CeldaCsv[][], d: DatosCsvInforme): void {
 }
 
 function periodo(filas: CeldaCsv[][], p: PeriodoCsv): void {
-  filas.push(VACIA, ["LO QUE PASÓ EN EL PERIODO"]);
+  filas.push(vacia(), ["LO QUE PASÓ EN EL PERIODO"]);
 
   if (p.desde === null) {
     filas.push(["Es el primer informe de la obra: no hay periodo anterior."]);
@@ -299,7 +303,7 @@ function alertas(filas: CeldaCsv[][], avisos: readonly AlertaAtraso[]): void {
 }
 
 function lastPlanner(filas: CeldaCsv[][], lp: LastPlannerCsv | null): void {
-  filas.push(VACIA, ["LAST PLANNER"]);
+  filas.push(vacia(), ["LAST PLANNER"]);
 
   // Null es «quien descarga no tiene permiso de plan semanal», no «no hay
   // Last Planner». Decirlo evita que alguien concluya que la obra no lo usa.
