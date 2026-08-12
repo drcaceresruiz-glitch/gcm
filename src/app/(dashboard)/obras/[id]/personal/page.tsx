@@ -4,9 +4,11 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import { listarPases } from "@/services/pase.service";
 import { obtenerImplicados } from "@/services/avisos.service";
+import { auditoriaDeAvisos } from "@/services/avisos-auditoria";
 import { puede } from "@/lib/rbac";
 import { PanelPersonal } from "@/components/pase/PanelPersonal";
 import { PanelAvisos } from "@/components/avisos/PanelAvisos";
+import { RegistroAvisos } from "@/components/avisos/RegistroAvisos";
 
 export const metadata: Metadata = { title: "Personal y avisos" };
 
@@ -38,15 +40,20 @@ export default async function PersonalObraPage({
 
   // En paralelo: son dos consultas independientes y la pantalla las pinta
   // juntas.
-  const [pases, implicados] = await Promise.all([
+  const [pases, implicados, registro] = await Promise.all([
     listarPases(sesion, id),
     obtenerImplicados(sesion, id),
+    auditoriaDeAvisos(sesion, id),
   ]);
 
   return (
     <div className="space-y-6">
       <PanelPersonal obraId={id} pases={pases} />
       {implicados && <PanelAvisos obraId={id} datos={implicados} />}
+      {/* El registro va DEBAJO de la configuracion, no arriba: primero se
+          decide a quien se avisa y luego se comprueba si llego. Al reves, la
+          pantalla abriria con una tabla vacia que parece un error. */}
+      {registro && <RegistroAvisos datos={registro} />}
     </div>
   );
 }
