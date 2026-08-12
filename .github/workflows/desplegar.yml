@@ -237,13 +237,69 @@ jobs:
       #    pide DESPUES del intercambio, y lo hace el propio script: subirlo
       #    aqui reiniciaria antes de haber aplicado nada.
       #
+      # QUE certificado presenta el servidor. No bloquea: es diagnostico.
+      #
+      # Existe porque el paso siguiente ya SI verifica, y una verificacion que
+      # falla sin decir por que convierte un despliegue en una tarde de
+      # adivinanzas. Con esto, justo encima del fallo queda escrito si el
+      # certificado esta a nombre de otro, si caduco, o si lo firma una CA que
+      # el runner no conoce — que son los tres motivos, y cada uno se arregla
+      # distinto.
+      - name: Ver que certificado presenta el FTPS
+        continue-on-error: true
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        run: |
+          TLS="$(openssl s_client -connect "$FTP_SERVER:21" -starttls ftp \
+                   -servername "$FTP_SERVER" </dev/null 2>&1 || true)"
+
+          if printf '%s' "$TLS" | grep -q "BEGIN CERTIFICATE"; then
+            printf '%s' "$TLS" | openssl x509 -noout \
+              -subject -issuer -dates -fingerprint -sha256 2>/dev/null || true
+            printf '%s' "$TLS" | grep -E "Verify return code" || true
+          else
+            echo "No se pudo negociar TLS en el puerto 21. Ultimas lineas:"
+            printf '%s' "$TLS" | tail -n 5
+          fi
+
       # ftp:ssl-force        -> control CIFRADO: la contrasena no viaja en claro.
       # ftp:ssl-protect-data -> datos SIN cifrar: este ProFTPD resetea la
       #                         conexion de datos cuando va sobre TLS. Lo que
       #                         viaja es la compilacion de un repo publico.
+      # ssl:verify-certificate -> se comprueba QUIEN esta al otro lado.
+      #
+      # ESO ULTIMO DECIA `no` HASTA HOY, y no era un detalle. Cifrar sin
+      # verificar deja el canal de control cifrado pero SIN AUTENTICAR: quien
+      # se ponga en medio presenta su propio certificado, lftp lo acepta sin
+      # rechistar, y por ese canal viaja la CONTRASENA DEL FTP DE PRODUCCION.
+      # Que los datos vayan en claro esta razonado arriba —es la compilacion de
+      # un repo publico— pero la credencial es otra cosa.
+      #
+      # Aqui se falla CERRADO, al reves que las migraciones de `desplegar.sh`:
+      # alli seguir adelante sin migrar deja las cosas como estaban, y aqui
+      # seguir adelante sin verificar es exactamente el agujero que se cierra.
+      # Si esto tumba el despliegue, la version viva sigue sirviendo.
+      #
+      # SI ESTO FALLA, hay dos motivos y NO se arreglan igual. El paso de
+      # arriba imprime cual de los dos es, mirando `subject` y `Verify return
+      # code`:
+      #
+      # 1. **Certificado autofirmado o de una CA que el runner no conoce.** La
+      #    salida no es volver a `no`: es copiar ESE certificado al secreto
+      #    `FTP_CA_PEM`. Se sigue verificando, contra un certificado concreto
+      #    en vez de contra una CA publica.
+      # 2. **Certificado bueno pero A NOMBRE DE OTRO** —lo normal en cPanel: se
+      #    conecta a `ftp.midominio.com` y el certificado es del servidor de la
+      #    casa, `servidorNN.hosting.com`—. Aqui anclarlo NO sirve: el nombre
+      #    se comprueba igual. Lo que hay que hacer es apuntar el secreto
+      #    `FTP_SERVER` al nombre QUE FIGURA EN EL CERTIFICADO, que es el mismo
+      #    servidor por su nombre real.
+      #
+      # Lo que no es respuesta a ninguno de los dos es apagar la comprobacion.
       - name: Subir por FTPS
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_CA_PEM: ${{ secrets.FTP_CA_PEM }}
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
@@ -257,11 +313,25 @@ jobs:
             "$FTP_SERVER" "$FTP_USERNAME" "$LFTP_PASSWORD" > ~/.netrc
           chmod 600 ~/.netrc
 
+          # Contra QUE se verifica. Por defecto, el almacen de CA del runner.
+          # Con `FTP_CA_PEM` puesto, contra ese certificado y solo ese, que es
+          # lo que hace falta cuando el hosting usa uno autofirmado.
+          ANCLA=/etc/ssl/certs/ca-certificates.crt
+          if [ -n "${FTP_CA_PEM:-}" ]; then
+            printf '%s\n' "$FTP_CA_PEM" > "$HOME/.ftp-ca.pem"
+            chmod 600 "$HOME/.ftp-ca.pem"
+            ANCLA="$HOME/.ftp-ca.pem"
+            echo "Ancla de confianza: el certificado del secreto FTP_CA_PEM."
+          else
+            echo "Ancla de confianza: el almacen de CA del sistema."
+          fi
+
           lftp -c "
             set cmd:fail-exit true;
             set ftp:ssl-force true;
             set ftp:ssl-protect-data false;
-            set ssl:verify-certificate no;
+            set ssl:verify-certificate true;
+            set ssl:ca-file '$ANCLA';
             set ftp:passive-mode true;
             set net:max-retries 2;
             set net:timeout 30;
@@ -277,5 +347,5 @@ jobs:
             bye
           "
 
-          rm -f ~/.netrc
+          rm -f ~/.netrc "$HOME/.ftp-ca.pem"
           echo "Subido. El cron del servidor aplicara el paquete en menos de un minuto."
