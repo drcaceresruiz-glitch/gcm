@@ -168,7 +168,14 @@ export async function accionAprobarMovimiento(
   // el arbol de la obra, no solo esta pantalla.
   revalidatePath(`/obras/${obraId}`);
   revalidatePath(`/obras/${obraId}/movimientos`);
-  redirect(`/obras/${obraId}/movimientos?aprobado=${resultado.numero}`);
+  // Si el adicional trajo partidas, se dice cuantas para poder ofrecer el
+  // enlace al mapeo en el mismo aviso. Sin eso, el aviso felicita y deja al
+  // residente sin saber que acaba de crear trabajo pendiente.
+  const nuevas =
+    resultado.partidasCreadas > 0 ? `&nuevas=${resultado.partidasCreadas}` : "";
+  redirect(
+    `/obras/${obraId}/movimientos?aprobado=${resultado.numero}${nuevas}`,
+  );
 }
 
 /**

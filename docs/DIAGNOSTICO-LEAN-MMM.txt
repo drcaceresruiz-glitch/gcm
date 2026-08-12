@@ -1565,13 +1565,19 @@ prioridad:
         pantalla; lo que se hizo fue elevarlo, con el despliegue sin aplicar,
         a los avisos de empresa.
 
-    Queda pendiente de la fase 2 en adelante: P-1 (capacidad empirica), P-6
-    (empuje del mapeo), P-7 (pruebas de aislamiento) y P-8 (la modalidad en el
-    calculo).
+    LAS FASES 3 Y 4 TAMBIEN SE CERRARON, EL 12 DE AGOSTO DE 2026
 
-    EFECTO ESPERADO SOBRE EL CUADRO DE MANDO
+      P-6  Empuje del mapeo tras un adicional ............. hecho  3e80ab8
+           + el atajo: el aviso de aprobacion ofrece el enlace
+      P-7  Pruebas de aislamiento entre empresas ......... hecho  92fc29d
+           Diez familias, 45 pruebas. Encontro y corrigio una
+           consulta sin acotar en obtenerLookahead (bf1f86b).
 
-       ENFOQUE                      ANTES   DESPUES
+    Fuera del plan, del mismo barrido: SinPermisoError estaba declarada tres
+    veces con el mismo nombre y ahora es una sola (59e9b52).
+
+    Queda pendiente: P-1 (capacidad empirica, con su criterio de entrada) y
+    P-8 (la modalidad en el calculo, que pide diseno antes de codigo).   ENFOQUE                      ANTES   DESPUES
        ---------------------------  -----   -------
        1  Estructura y estandares    4,0      4,0
        2  Informacion y sincroniz.   4,5      5,0     (+0,5)

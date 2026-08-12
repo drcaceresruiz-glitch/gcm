@@ -41,6 +41,7 @@ export default async function MovimientosPage({
     creado?: string;
     aprobado?: string;
     eliminado?: string;
+    nuevas?: string;
     todas?: string;
     p?: string;
   }>;
@@ -55,7 +56,12 @@ export default async function MovimientosPage({
   if (!puede(sesion, "movimiento:leer")) redirect(`/obras/${id}`);
 
   const consulta = await searchParams;
-  const { creado, aprobado, eliminado, todas } = consulta;
+  const { creado, aprobado, eliminado, nuevas, todas } = consulta;
+  // Llega de nuestra propia redireccion, pero se sanea igual: es un numero
+  // que se va a imprimir, y con manipularlo lo unico que se consigue es leer
+  // una cifra equivocada en el propio aviso.
+  const partidasNuevas = Number(nuevas);
+  const hayPartidasNuevas = Number.isInteger(partidasNuevas) && partidasNuevas > 0;
 
   /**
    * Sin linea base aprobada no existe el concepto de «encima de la base»,
@@ -103,6 +109,25 @@ export default async function MovimientosPage({
       {aprobado && (
         <Aviso icono={Lock} tono="exito">
           Movimiento {aprobado} aprobado. Ya cuenta en el presupuesto vigente.
+          {hayPartidasNuevas && (
+            <>
+              {" "}
+              Dio de alta{" "}
+              <strong>
+                {partidasNuevas}{" "}
+                {partidasNuevas === 1 ? "partida nueva" : "partidas nuevas"}
+              </strong>
+              , que todavía no cuentan en el avance porque no están enlazadas a
+              ninguna tarea.{" "}
+              <Link
+                href={`/obras/${id}/cronograma/mapeo`}
+                className="font-medium underline underline-offset-2"
+              >
+                Enlazarlas ahora
+              </Link>
+              .
+            </>
+          )}
         </Aviso>
       )}
 

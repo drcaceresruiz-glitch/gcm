@@ -608,7 +608,18 @@ export async function crearMovimiento(
 class FalloAprobacion extends Error {}
 
 export type ResultadoAprobacion =
-  | { ok: true; numero: number }
+  | {
+      ok: true;
+      numero: number;
+      /**
+       * Cuantas partidas dio de alta este adicional.
+       *
+       * Viaja de vuelta para poder ofrecer el mapeo AHI MISMO. Nacen sin
+       * enlazar a ninguna tarea, y quien acaba de aprobar es quien sabe a
+       * cual va cada una; semanas despues, reconstruirlo cuesta mucho mas.
+       */
+      partidasCreadas: number;
+    }
   | { ok: false; error: string };
 
 /**
@@ -840,7 +851,18 @@ export async function aprobarMovimiento(
       return mov.numero;
     });
 
-    return { ok: true, numero };
+    // Se cuenta DESPUES y no dentro de la transaccion, a proposito: es una
+    // consulta de mas en el unico momento en que a nadie le importa —acaba de
+    // aprobarse un adicional— y a cambio la transaccion, que mueve dinero, no
+    // gana ni una linea por una cifra que solo sirve para un enlace.
+    const partidasCreadas = await prisma.wbsItem.count({
+      where: {
+        origenMovimientoId: movimientoId,
+        project: { companyId: sesion.companyId },
+      },
+    });
+
+    return { ok: true, numero, partidasCreadas };
   } catch (e) {
     if (e instanceof FalloAprobacion) return { ok: false, error: e.message };
     throw e;
