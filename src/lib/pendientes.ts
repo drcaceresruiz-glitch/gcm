@@ -42,7 +42,26 @@ export interface Pendiente {
   titulo: string;
   /// Que se rompe si no se hace. Esto es lo que mueve a alguien.
   consecuencia: string;
-  /// Ruta relativa a la obra donde se arregla ("/lookahead", "/plan-semanal").
+  /**
+   * Que hay que hacer, en imperativo y nombrando el boton REAL de la pantalla.
+   *
+   * Sin esto el panel solo informaba: decia que algo esta mal y por que
+   * importa, y dejaba al residente buscando donde se arregla. Nombrar el
+   * control con su texto literal —«Analizar», «Solo las N sin enlazar»— es lo
+   * que convierte el aviso en una instruccion.
+   *
+   * Si cambia el texto de un boton, hay que cambiarlo tambien aqui: una
+   * instruccion que nombra un boton que ya no existe es peor que ninguna.
+   */
+  accion: string;
+  /**
+   * Ruta relativa a la obra donde se arregla, CON sus parametros.
+   *
+   * No es solo la pantalla: cuando la pantalla sabe leer parametros se usan,
+   * para aterrizar en la vista exacta. Hoy leen parametros el Lookahead
+   * (`?semanas=`, `?tarea=`) y las ordenes (`?estado=`, `?q=`...). Donde no
+   * los hay se enlaza la pantalla y es `accion` quien dice donde mirar.
+   */
   camino: string;
   /// Cuantos elementos afecta, para ordenar dentro de la misma gravedad.
   cuantos: number;
@@ -181,6 +200,21 @@ function plural(n: number, singular: string, prural: string): string {
 }
 
 /**
+ * Cuantas semanas de ventana hacen falta para cubrir unos dias.
+ *
+ * Se redondea HACIA ARRIBA: con 10 dias, dos semanas de ventana muestran todo
+ * lo que el aviso cuenta y algo mas. Una semana mostraria menos tareas de las
+ * que el propio numero anuncia, y el residente veria "9 tareas" en el panel y
+ * seis en la matriz sin entender por que.
+ *
+ * Acotado al rango que admite el Lookahead (1..12), para que el enlace no
+ * lleve nunca a un parametro que la pantalla tenga que corregir por su cuenta.
+ */
+function semanasDe(dias: number): number {
+  return Math.min(12, Math.max(1, Math.ceil(dias / 7)));
+}
+
+/**
  * La lista de lo que falta, ya ordenada.
  *
  * Vacia significa que no hay nada pendiente, y eso hay que poder decirlo: un
@@ -200,6 +234,8 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       titulo: `${n} ${plural(n, "tarea empezo", "tareas empezaron")} y nadie ha reportado avance`,
       consecuencia:
         "La curva S las cuenta al 0%: la obra se ve mas atrasada de lo que esta, y el valor ganado tambien.",
+      accion:
+        "En la tabla del cronograma, pulsa «Reportar» en cada tarea y anota el % que lleva.",
       camino: "/cronograma",
       cuantos: n,
     });
@@ -214,6 +250,8 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       titulo: `${n} ${plural(n, "semana cerrada", "semanas cerradas")} sin % alcanzado`,
       consecuencia:
         "Esos compromisos cuentan para el PPC pero no movieron la curva S. El avance fisico se quedo sin registrar.",
+      accion:
+        "Abre la semana, pulsa «Reabrir», escribe el % alcanzado de cada compromiso y vuelve a cerrarla.",
       camino: "/plan-semanal",
       cuantos: n,
     });
@@ -230,6 +268,8 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       titulo: `${n} ${plural(n, "tarea arranca", "tareas arrancan")} en ${c.diasVentana} dias sin nadie contratado`,
       consecuencia:
         "Su partida no tiene encargo: no hay proveedor ni precio cerrado para ejecutarla, y a estas alturas contratar ya corre.",
+      accion:
+        "Registra el proveedor de esas partidas y despues la orden de compra que las cubre.",
       camino: "/proveedores",
       cuantos: n,
     });
@@ -244,7 +284,12 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       titulo: `${n} ${plural(n, "tarea arranca", "tareas arrancan")} con restricciones sin liberar`,
       consecuencia:
         "Comprometerlas asi es prometer trabajo que no se puede empezar, y es lo que hunde el PPC de la semana siguiente.",
-      camino: "/lookahead",
+      accion:
+        "En la matriz, marca la casilla de la restriccion cuando este resuelta, o elige las tareas y pulsa «Levantar restricciones».",
+      // Se aterriza con la ventana ACOTADA a los dias de los que habla el
+      // aviso: si dice "arrancan en 14 dias", la matriz tiene que abrirse
+      // mostrando esas y no tres semanas donde hay que buscarlas.
+      camino: `/lookahead?semanas=${semanasDe(c.diasVentana)}`,
       cuantos: n,
     });
   }
@@ -258,7 +303,9 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       titulo: `${n} ${plural(n, "tarea arranca", "tareas arrancan")} en ${c.diasVentana} dias y nadie las ha analizado`,
       consecuencia:
         "Nadie ha mirado si les falta plano, material o frente libre. Si falta algo se descubre el lunes que arranca, cuando ya no hay margen para conseguirlo.",
-      camino: "/lookahead",
+      accion:
+        "Pulsa «Elegir las sin analizar», quita las que no apliquen y despues «Analizar».",
+      camino: `/lookahead?semanas=${semanasDe(c.diasVentana)}`,
       cuantos: n,
     });
   }
@@ -275,6 +322,11 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       gravedad: "aviso",
       titulo: `${n} ${plural(n, "tarea de la ventana", "tareas de la ventana")} sin analizar`,
       consecuencia: `Cuentan como no listas, asi que tu confiabilidad sale mas baja de lo real por falta de analisis, no por la obra.${conf}`,
+      accion:
+        "Pulsa «Elegir las sin analizar» y luego «Analizar». Las que no tengan ninguna restriccion quedan listas en el acto.",
+      // Aqui NO se acota la ventana: este aviso cuenta la ventana ENTERA del
+      // Lookahead, no los proximos dias. Acotarla escondera parte de lo que el
+      // propio numero esta contando.
       camino: "/lookahead",
       cuantos: n,
     });
@@ -291,7 +343,11 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       titulo: `${n} ${plural(n, "partida comprometida", "partidas comprometidas")} por encima de su presupuesto`,
       consecuencia:
         "Ya se pidio mas dinero del que la partida tenia. O falta un adicional que lo respalde, o hay que reconvertir de otra.",
-      camino: "/ordenes",
+      accion:
+        "Revisa las ordenes aprobadas de esas partidas: o registras el adicional que las respalda, o reconviertes desde otra partida.",
+      // Filtradas a las APROBADAS, que son las que comprometen el dinero: un
+      // borrador todavia no ha sobregirado nada.
+      camino: "/ordenes?estado=APROBADA",
       cuantos: n,
     });
   }
@@ -306,7 +362,12 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       gravedad: ppc.gravedad,
       titulo: ppc.titulo,
       consecuencia: ppc.consecuencia,
-      camino: "/plan-semanal",
+      accion:
+        "Mira el Pareto: la causa mas alta es la que hay que atacar antes de comprometer la semana que viene.",
+      // El ancla lleva directo al Pareto de causas, que es lo unico que dice
+      // POR QUE cayo el PPC. Sin ella se aterriza en la lista de semanas y hay
+      // que bajar a buscarlo.
+      camino: "/plan-semanal#pareto",
       cuantos: 1,
     });
   }
@@ -322,6 +383,8 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       titulo: `Solo el ${Math.round(c.coberturaMapeo)}% del presupuesto esta enlazado al cronograma`,
       consecuencia:
         "Mientras no pase del 60%, el avance se pondera por duracion y no por dinero: una tarea barata pesa igual que una cara.",
+      accion:
+        "Pulsa «Solo las sin enlazar» y asigna a cada tarea su partida del presupuesto.",
       camino: "/cronograma/mapeo",
       cuantos: 1,
     });

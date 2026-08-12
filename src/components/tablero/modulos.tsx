@@ -17,6 +17,7 @@ import {
   TriangleAlert,
   Info,
   CircleCheck,
+  ArrowRight,
 } from "lucide-react";
 import type { DefinicionModulo } from "@/lib/tablero";
 import { resumirPendientes } from "@/lib/pendientes";
@@ -1291,16 +1292,29 @@ function Pendientes({
               />
             )}
             <div className="min-w-0">
-              <Link
-                href={`/obras/${obraId}${p.camino}`}
-                className="text-sm font-medium underline decoration-transparent underline-offset-2 hover:decoration-inherit"
-              >
-                {p.titulo}
-              </Link>
+              <p className="text-sm font-medium">{p.titulo}</p>
               {/* La consecuencia es lo que mueve a alguien: "12 tareas sin
                   analizar" no significa nada hasta que se dice que por eso la
                   confiabilidad esta mintiendo. */}
               <p className="text-xs opacity-70">{p.consecuencia}</p>
+
+              {/* Y la salida. Hasta el 12/08/2026 el enlace estaba escondido en
+                  el titulo con `decoration-transparent`: no se veia que fuera
+                  pulsable, asi que el panel se leia como una queja de la que no
+                  se podia salir a arreglar nada. Ahora es una linea propia, con
+                  color de enlace, flecha, y el texto de lo que hay que hacer
+                  nombrando el boton de la pantalla de destino. */}
+              <Link
+                href={`/obras/${obraId}${p.camino}`}
+                className="group mt-1 inline-flex items-start gap-1 text-xs font-medium underline decoration-dotted underline-offset-2 hover:decoration-solid"
+                style={{ color: "var(--color-marca-600)" }}
+              >
+                <span>{p.accion}</span>
+                <ArrowRight
+                  className="mt-0.5 size-3 shrink-0 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
+              </Link>
             </div>
           </li>
         ))}

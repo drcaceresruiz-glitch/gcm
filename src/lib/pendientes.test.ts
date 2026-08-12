@@ -33,6 +33,63 @@ describe("pendientesDeObra", () => {
     expect(pendientesDeObra(limpio())).toEqual([]);
   });
 
+  it("TODO pendiente dice donde se arregla y que hay que hacer alli", () => {
+    // Un aviso del que no se puede salir a arreglar la cosa es solo una queja.
+    // Este test enciende todas las reglas a la vez para que una nueva no se
+    // pueda anadir sin su salida.
+    const todos = pendientesDeObra(
+      limpio({
+        tareasEmpezadasSinAvance: 3,
+        semanasSinPorcentaje: 1,
+        lookaheadSinAnalizar: 18,
+        confiabilidadMostrada: 24,
+        tareasProximasBloqueadas: 1,
+        tareasProximasSinAnalizar: 9,
+        tareasProximasSinCobertura: 2,
+        partidasSobregiradas: 4,
+        ppcUltimo: 62,
+        ppcAnterior: 100,
+        coberturaMapeo: 40,
+      }),
+    );
+
+    expect(todos.length).toBe(9);
+    for (const p of todos) {
+      expect(p.camino, p.clave).toMatch(/^\//);
+      // En imperativo y con sustancia: "Ver" o "Ir" no dicen que hacer.
+      expect(p.accion.length, p.clave).toBeGreaterThan(20);
+    }
+  });
+
+  it("el enlace del Lookahead abre la ventana que el propio aviso anuncia", () => {
+    // Si el texto dice "arrancan en 14 dias", la matriz tiene que abrirse con
+    // dos semanas. Con tres, hay que buscar las tareas entre otras que no son.
+    const [p] = pendientesDeObra(
+      limpio({ tareasProximasSinAnalizar: 9, diasVentana: 14 }),
+    );
+    expect(p?.camino).toBe("/lookahead?semanas=2");
+
+    // Se redondea hacia arriba: con 10 dias, una sola semana esconderia parte
+    // de lo que el numero esta contando.
+    const [q] = pendientesDeObra(
+      limpio({ tareasProximasSinAnalizar: 9, diasVentana: 10 }),
+    );
+    expect(q?.camino).toBe("/lookahead?semanas=2");
+  });
+
+  it("el aviso de la ventana ENTERA no acota la ventana", () => {
+    // Cuenta las tareas sin analizar de todo el Lookahead, no de los proximos
+    // dias: acotarlo escondera parte de lo que el propio numero anuncia.
+    const [p] = pendientesDeObra(limpio({ lookaheadSinAnalizar: 18 }));
+    expect(p?.camino).toBe("/lookahead");
+  });
+
+  it("el PPC enlaza directo al Pareto, que es lo unico que dice por que", () => {
+    const [p] = pendientesDeObra(limpio({ ppcUltimo: 62 }));
+    expect(p?.camino).toBe("/plan-semanal#pareto");
+    expect(p?.accion).toContain("Pareto");
+  });
+
   it("no inventa pendientes con los datos aun sin cargar", () => {
     // Obra recien creada: sin PPC, sin cobertura, sin confiabilidad. Nada de
     // eso es un pendiente, es que todavia no hay obra que medir.
@@ -95,7 +152,9 @@ describe("pendientesDeObra", () => {
       expect(p?.clave).toBe("proximas-sin-analizar");
       expect(p?.gravedad).toBe("critica");
       expect(p?.titulo).toContain("14 dias");
-      expect(p?.camino).toBe("/lookahead");
+      // Con la ventana acotada a esos mismos 14 dias: el enlace tiene que
+      // abrir exactamente las tareas de las que habla el aviso.
+      expect(p?.camino).toBe("/lookahead?semanas=2");
     });
 
     it("'sin analizar' y 'sin liberar' son avisos DISTINTOS", () => {

@@ -30,8 +30,13 @@ export function GraficosPpc({
         <h3 className="mb-2 text-sm font-semibold">PPC por semana</h3>
         <Tendencia puntos={tendencia} />
       </div>
+      {/* `id` para poder enlazar aqui desde el panel «Que falta»: cuando el
+          PPC baja, lo unico que dice POR QUE es este Pareto, y aterrizar en la
+          lista de semanas obliga a bajar a buscarlo. `scroll-mt-20` deja sitio
+          para la cabecera fija. */}
       <div
-        className="rounded-xl border p-4"
+        id="pareto"
+        className="scroll-mt-20 rounded-xl border p-4"
         style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
       >
         <h3 className="mb-2 text-sm font-semibold">Causas de no cumplimiento</h3>
