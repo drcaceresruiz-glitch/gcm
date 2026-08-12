@@ -69,15 +69,22 @@ abajo.
      de `analizadaAt`.
    - Lo que SIGUE ABIERTO de esto esta en el punto 8.
 
-8. **Los cinco hilos que quedaron abiertos el 12 de agosto**, en orden de lo
-   que mas rinde primero:
-   - **El panel de auditoria de avisos**: que se envio, a quien, por donde, si
-     salio y si se leyo. **Los datos ya estan todos guardados** (`EnvioAviso`
-     con `enviado`/`motivo`/`destino`, `Aviso.leidoAt`); falta solo la
-     pantalla. Es lo mas barato y cierra la ceguera que obligo a diagnosticar
-     con SQL. **Honestidad obligatoria: "abierto" solo se puede decir de la
-     campanita.** En correo y SMS no se sabe sin un pixel espia, que ademas
-     medio mundo bloquea, asi que mentiria.
+8. **Los hilos que quedaron abiertos el 12 de agosto**, en orden de lo que mas
+   rinde primero:
+   - ~~**El panel de auditoria de avisos**~~ **HECHO el 12 de agosto de 2026**:
+     `avisos-auditoria.ts` + `RegistroAvisos.tsx`, en la pantalla de Personal
+     debajo de la configuracion. Dice cuando, a quien, por donde, con que
+     motivo y si salio, con el destino a la vista —que es lo que responde a
+     "¿pero a que correo fue?"—.
+     - **De "abierto" solo se dice la verdad donde se sabe**: en la campanita,
+       que es una columna real. En correo y SMS **no se puede** sin un pixel
+       que rastrea a quien recibe, y que ademas medio mundo bloquea: el dato
+       mentiria por defecto y por exceso. La tabla dice "salio" de los tres y
+       la lectura va aparte, solo de GCM. **No convertir esto en un porcentaje
+       de apertura de correo por mucho que se pida.**
+     - La lectura se cuenta por PERSONA y no por envio: `EnvioAviso` no apunta
+       al `Aviso` que creo, y emparejarlos por fecha fallaria justo cuando dos
+       caen en el mismo segundo.
    - **El aviso al RESPONSABLE de cada restriccion**, que hoy va solo por
      suscripcion de flujo. Se intento y se retiro: `repartirAvisos` reparte un
      lote COMUN y no sabe acotar motivos a una persona, y una segunda pasada
@@ -85,10 +92,10 @@ abajo.
      motivos dentro. Pide cambiar `repartirAvisos` para aceptar motivos por
      suscripcion. Escrito tambien en `avisos-reloj.ts`.
    - **La campanita que no se encendio en la prueba del 12 de agosto**: sin
-     diagnosticar. `SELECT canal, destino, enviado, motivo FROM envios_aviso
-     ORDER BY createdAt DESC` lo cierra. Si la suscripcion tenia `contactoId`
-     y no `userId`, el comportamiento era correcto: los externos no tienen
-     bandeja.
+     diagnosticar, pero ya no hace falta SQL. El registro de la pantalla de
+     Personal lo dice de una mirada: si hay una fila `correo` y ninguna `GCM`,
+     el suscrito es un contacto externo y el comportamiento era correcto —los
+     de fuera no tienen bandeja donde ensenarselo—.
    - **El enlace del correo aterriza en el login y no vuelve a la obra.** No
      existe ningun `?siguiente=` en el proyecto ni funcion que valide rutas
      internas; habria que escribirla (rechazar `//host`, esquema absoluto) y
