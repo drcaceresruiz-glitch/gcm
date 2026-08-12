@@ -692,6 +692,199 @@ function hoyUtc(): Date {
   return hoyCalendario();
 }
 
+export interface CorteDisponible {
+  /// "YYYY-MM-DD", que es como viaja en la URL del informe.
+  iso: string;
+  fecha: Date;
+  /// Numero de la semana del PTS que cierra ese dia, si la hay.
+  semana: number | null;
+  /// El corte por defecto: el ultimo que ya paso.
+  esUltimo: boolean;
+}
+
+export interface InformeAlCorte {
+  fechaCorte: Date;
+  /// Las tareas MEDIDAS a esa fecha: el avance que se conocia ese dia.
+  tareas: (TareaDelPlan & Medida)[];
+  /// % real ponderado por duracion a la fecha del informe.
+  real: string;
+  /// % planeado reconstruido dia a dia a esa misma fecha.
+  planeado: string;
+  /// Real menos planeado.
+  desviacion: string;
+  /// Las fechas que el selector puede ofrecer, de la mas reciente a la mas
+  /// antigua.
+  cortes: CorteDisponible[];
+  /// Version del cronograma con el que se midio, para el pie del documento.
+  version: number;
+  importadoPor: string;
+  /// Lo que el propio MS Project totaliza, para poder contrastar.
+  planeadoProject: string | null;
+  realProject: string | null;
+}
+
+/**
+ * El estado de la obra A UNA FECHA, para el informe semanal.
+ *
+ * El informe se anclaba a `cronograma.fechaCorte`, o sea a la fecha del ULTIMO
+ * XML IMPORTADO. Con el parte del dia entrando avance a diario eso lo dejaba
+ * congelado: el 12/08/2026 el informe de CRIOCORD encabezaba «Corte de
+ * control: 08 de agosto» y daba 11.3% real cuando el tablero ya iba por 22.6%,
+ * y su bloque de partidas activas decia «ninguna en marcha» porque miraba la
+ * semana del 8. Es el mismo defecto que se corrigio en la curva y en el panel;
+ * esta era su tercera guarida.
+ *
+ * Aqui la fecha es un PARAMETRO, y de ahi sale lo demas:
+ *
+ * - Se miden las tareas con los reportes de fecha menor o igual, asi que el
+ *   informe de una semana pasada ensena lo que se sabia ESA semana y no lo que
+ *   se sabe hoy. Sin esto, «ver el historico» daria el mismo documento con
+ *   otra cabecera.
+ * - El planeado se reconstruye dia a dia con `planeadoEnFecha`, la misma
+ *   funcion que la curva y el panel. El «% Planeado» del archivo solo existe
+ *   en las fechas de corte del propio archivo.
+ *
+ * Devuelve null si la obra no tiene cronograma: sin plan no hay informe.
+ */
+export async function informeAlCorte(
+  sesion: SesionActiva,
+  obraId: string,
+  corteISO?: string,
+): Promise<InformeAlCorte | null> {
+  if (!puede(sesion, "cronograma:leer")) return null;
+
+  const cronograma = await prisma.cronograma.findFirst({
+    where: { projectId: obraId, project: { companyId: sesion.companyId } },
+    orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
+    select: {
+      version: true,
+      importadoPor: true,
+      tareas: {
+        orderBy: { fila: "asc" },
+        select: {
+          uid: true, fila: true, codigo: true, nombre: true, nivel: true,
+          esResumen: true, esHito: true, esCritico: true,
+          inicio: true, fin: true, duracionDias: true,
+          porcentajePlaneado: true, porcentajeArchivo: true,
+          holguraDias: true, holguraInferida: true,
+        },
+      },
+    },
+  });
+  if (!cronograma) return null;
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { diaCorteSemanal: true },
+  });
+  if (!obra) return null;
+
+  const tareasBase: TareaDelPlan[] = cronograma.tareas.map((t) => ({
+    ...t,
+    duracionDias: t.duracionDias.toString(),
+    porcentajePlaneado: t.porcentajePlaneado.toString(),
+    porcentajeArchivo: t.porcentajeArchivo.toString(),
+    holguraDias: t.holguraDias.toString(),
+  }));
+
+  const trabajo = tareasBase.filter((t) => !t.esResumen);
+  const inicioObra = trabajo.reduce(
+    (m, t) => (t.inicio < m ? t.inicio : m),
+    trabajo[0]?.inicio ?? hoyUtc(),
+  );
+
+  // Los cortes que el selector puede ofrecer: los dias de cierre semanal de la
+  // obra que YA pasaron. Se cruzan con las semanas del PTS para poder
+  // rotularlos «Semana 2» en vez de una fecha suelta.
+  const ahora = hoyUtc();
+  const semanales = fechasSemanales(inicioObra, ahora, obra.diaCorteSemanal);
+  const planes = await prisma.planSemanal.findMany({
+    where: { projectId: obraId, project: { companyId: sesion.companyId } },
+    select: { numero: true, fechaCorte: true },
+  });
+  const semanaPorIso = new Map(
+    planes.map((p) => [p.fechaCorte.toISOString().slice(0, 10), p.numero]),
+  );
+
+  // Las semanas del PTS entran aunque su corte no caiga en el dia configurado:
+  // si el residente cerro una semana el viernes y la obra corta los sabados,
+  // ese informe tiene que poder emitirse igual.
+  const porIso = new Map<string, Date>();
+  for (const f of semanales) porIso.set(f.toISOString().slice(0, 10), f);
+  for (const p of planes) {
+    if (p.fechaCorte.getTime() <= ahora.getTime()) {
+      porIso.set(p.fechaCorte.toISOString().slice(0, 10), p.fechaCorte);
+    }
+  }
+  porIso.set(ahora.toISOString().slice(0, 10), ahora);
+
+  const ordenadas = [...porIso.entries()].sort(
+    (a, b) => b[1].getTime() - a[1].getTime(),
+  );
+  const ultimoIso = ordenadas[0]?.[0] ?? ahora.toISOString().slice(0, 10);
+
+  // La fecha pedida solo vale si es una de las ofrecidas: asi un `?corte=`
+  // manipulado no produce un informe de una fecha arbitraria.
+  const elegidoIso =
+    corteISO && porIso.has(corteISO) ? corteISO : ultimoIso;
+  const fechaCorte = porIso.get(elegidoIso)!;
+
+  const cortes: CorteDisponible[] = ordenadas.map(([iso, fecha]) => ({
+    iso,
+    fecha,
+    semana: semanaPorIso.get(iso) ?? null,
+    esUltimo: iso === ultimoIso,
+  }));
+
+  // El avance TAL COMO SE CONOCIA a esa fecha.
+  const avances = await prisma.avanceTarea.findMany({
+    where: { projectId: obraId, fecha: { lte: fechaCorte } },
+    orderBy: [{ fecha: "asc" }, { createdAt: "asc" }],
+    select: {
+      uid: true, porcentaje: true, fecha: true,
+      createdAt: true, reportadoPor: true, nota: true,
+    },
+  });
+
+  const medido = medirAvance(
+    tareasBase,
+    avances.map((a) => ({ ...a, porcentaje: a.porcentaje.toString() })),
+  );
+
+  const medibles = medido.tareas.map((t) => ({
+    esResumen: t.esResumen,
+    duracionDias: t.duracionDias,
+    real: t.porcentajeReal,
+  }));
+
+  const real = ponderarPorDuracion(medibles, (t) => t.real);
+  const planeado = planeadoEnFecha(
+    tareasBase.map((t) => ({
+      uid: t.uid,
+      esResumen: t.esResumen,
+      duracionDias: t.duracionDias,
+      inicio: t.inicio,
+      fin: t.fin,
+    })),
+    fechaCorte,
+  ).toFixed(2);
+
+  const resumen = tareasBase.find((t) => t.nivel === 1);
+
+  return {
+    fechaCorte,
+    tareas: medido.tareas,
+    real,
+    planeado,
+    desviacion: restar(real, planeado) ?? "0.00",
+    cortes,
+    version: cronograma.version,
+    importadoPor: cronograma.importadoPor,
+    planeadoProject: resumen?.porcentajePlaneado ?? null,
+    realProject: resumen?.porcentajeArchivo ?? null,
+  };
+}
+
 export interface ParteDelDia {
   grupos: GrupoParte[];
   /// Cuantas casillas se van a pintar. Es el numero del boton.

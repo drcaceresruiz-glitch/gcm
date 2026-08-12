@@ -33,6 +33,18 @@ export interface DatosInforme {
   /// Lo que dice el propio archivo del proyecto entero, para poder contrastar.
   planeadoProject: string | null;
   realProject: string | null;
+  /**
+   * Las tres cifras de cabecera, YA MEDIDAS A `fechaCorte` por el servicio.
+   *
+   * Antes se sacaban aqui del ultimo punto de `curva.cortes`, o sea de la
+   * ultima importacion de MS Project, y por eso el informe se quedaba clavado
+   * en la fecha del XML por mucho avance que entrara despues. Que vengan
+   * calculadas es lo que permite emitir el informe de CUALQUIER semana: para
+   * una pasada se miden solo los reportes que existian entonces.
+   */
+  real: string;
+  planeado: string;
+  desviacion: string;
   curva: DatosCurva;
   capitulos: Capitulo[];
   alertas: AlertaAtraso[];
@@ -41,10 +53,9 @@ export interface DatosInforme {
 }
 
 export function InformeSemanal({ datos }: { datos: DatosInforme }) {
-  const ultimo = datos.curva.cortes[datos.curva.cortes.length - 1];
-  const real = Number(ultimo?.real ?? "0");
-  const planeado = Number(ultimo?.planeado ?? "0");
-  const desviacion = real - planeado;
+  const real = Number(datos.real);
+  const planeado = Number(datos.planeado);
+  const desviacion = Number(datos.desviacion);
 
   // Solo los capitulos con trabajo medible y algo en marcha. Los que estan
   // enteros a cero no dicen nada y empujan fuera de la pagina a los que si; y
