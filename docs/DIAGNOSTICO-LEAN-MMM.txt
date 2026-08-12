@@ -8,8 +8,11 @@
 ================================================================================
 
   Documento          Diagnostico tecnico
-  Version            1.1   (reverificada contra el arbol real)
-  Fecha              11 de agosto de 2026
+  Version            1.3   (con el estado final del plan correctivo)
+  Fecha              11 de agosto de 2026, cerrado el 12
+  Estado             EJECUTADO. Lease la PARTE VI antes que nada: el
+                     diagnostico se acometio entero, y las notas de la
+                     parte III describen el sistema de ANTES.
   Alcance            La aplicacion GCM, no la obra que gestiona
   Marco              Lean Construction - las tres M (Mura, Muri, Muda)
                      desagregadas en seis enfoques
@@ -1764,6 +1767,122 @@ prioridad:
      a veces arranca igual", y quien esta en obra sabe cosas que el sistema
      no. Convertir el aviso en prohibicion produciria rodeos fuera del
      sistema, que es peor que el problema.
+
+
+================================================================================
+                            P A R T E   V I
+                       E S T A D O   F I N A L
+================================================================================
+
+  Escrito el 12 de agosto de 2026, cuando se cerro el ultimo punto del plan.
+  Las notas de la parte III describen el sistema ANTES de actuar; estas, el de
+  despues. Se conservan las dos porque un diagnostico sin su antes no se puede
+  juzgar.
+
+
+33. COMO QUEDO EL CUADRO DE MANDO
+--------------------------------------------------------------------------------
+
+  M     ENF  ENFOQUE                        v1.0   v1.1   FINAL
+  ----  ---  -----------------------------  -----  -----  -----
+  MURA   1   Estructura y estandares        4,0    4,5    4,5
+  MURA   2   Informacion y sincronizacion   4,5    5,0    5,0
+  MURI   3   Fatiga humana y perfiles       0,0    0,0    3,5
+  MURI   4   Capacidad tecnologica          2,5    3,0    4,0
+  MUDA   5   Tiempos muertos y esperas      4,5    5,0    5,0
+  MUDA   6   Reprocesos y calidad admin.    3,5    3,5    4,5
+
+  MEDIA GLOBAL                              3,2    3,4    4,4
+
+  LO QUE DE VERDAD CAMBIO NO ES LA MEDIA
+
+  Es que YA NO HAY NINGUN ENFOQUE EN CERO. El diagnostico decia que GCM sabia
+  decir «esto todavia no se puede hacer» y «esto no se cumplio», pero no «esto
+  no cabe». Ahora lo dice, en los dos momentos en que sirve: al armar la
+  semana, cuando aun se puede quitar trabajo, y en el panel cuando el patron
+  se repite.
+
+  El 3,5 del enfoque 3 no es un 5 a proposito. La capacidad se mide por un
+  proxy —compromisos cumplidos, no horas-hombre— y sus umbrales se eligieron
+  sin evidencia de campo. Es una medida honesta de una obra concreta, no un
+  estandar, y hasta que no se contraste no merece mas nota.
+
+
+34. LOS NUEVE HALLAZGOS, UNO POR UNO
+--------------------------------------------------------------------------------
+
+  ID   ESTADO FINAL                                          COMMIT
+  ---  ----------------------------------------------------  ----------
+  H-1  RETIRADO. La modalidad si gobierna, donde debe.        f9f4ab7
+       La v1.0 midio bien y dedujo mal. Ver el anexo D.
+  H-2  RESUELTO. El panel avisa si el cronograma pasa de      4566eb0
+       21 dias, la ventana por defecto del Lookahead.
+  H-3  ATACADO EN SU FASE A. La capacidad se observa en el    41dc958
+       historial y el PTS avisa al prometer de mas. La        4566eb0
+       fase B —horas-hombre— sigue sin datos que la
+       sostengan.
+  H-4  ABIERTO, y no por falta de trabajo: repartir el          --
+       analisis de restricciones entre residente y
+       administrador de obra no necesita una linea de
+       codigo. Es una decision organizativa.
+  H-5  RESUELTO. El emisor dormido y la version sin           6f53f64
+       aplicar suben a los avisos de empresa.
+  H-6  RESUELTO. La demora media por flujo tiene su modulo    0ee535a
+       y recomienda el tamano de la ventana.
+  H-7  ABIERTO. La doble captura del cierre esta prevista       --
+       en la Fase 4 del propio proyecto.
+  H-8  RESUELTO. Las partidas de un adicional se reclaman     3e80ab8
+       aparte, y el aviso de aprobacion ofrece enlazarlas     22471ef
+       en el momento.
+  H-9  RESUELTO, y con premio. Las pruebas de aislamiento     92fc29d
+       cubren diez familias, y al escribirlas aparecio una
+       consulta sin acotar por empresa en obtenerLookahead.   bf1f86b
+
+
+35. LO QUE APARECIO SIN ESTAR EN EL PLAN
+--------------------------------------------------------------------------------
+
+  UNA FUGA LATENTE, encontrada por la primera prueba de aislamiento escrita
+  fuera de las tres familias iniciales. `obtenerLookahead` leia los avances
+  con `where: { projectId }` a secas, y esa consulta corre tambien cuando la
+  obra es de otra empresa. No salian en la respuesta —lo devuelto se deriva de
+  las filas del cronograma, que quedan vacias—, asi que no era explotable;
+  pero bastaba con que alguien devolviera algo derivado de esos avances para
+  que lo fuera.
+
+  TRES CLASES LLAMADAS IGUAL. `SinPermisoError` estaba declarada en obras,
+  perfil y usuarios. Nadie la capturaba por tipo, asi que no fallaba nada,
+  pero el primer `instanceof` que alguien escribiera habria dejado pasar en
+  silencio las otras dos. Unificada en `lib/errores.ts` (59e9b52).
+
+  TRES DESAJUSTES DEL MANUAL, los tres provocados por cambios de esta misma
+  tanda: el recuento de modulos del panel dos veces (12 -> 13 -> 14) y la
+  frase «los tres resaltados» cuando ya eran cuatro. El criterio G6 de la
+  seccion 30 lo anticipaba —la documentacion se actualiza en el mismo commit
+  que cambia el comportamiento— y se incumplio tres veces antes de aplicarlo.
+
+
+36. QUE QUEDA, Y POR QUE
+--------------------------------------------------------------------------------
+
+  P-1 FASE B - capacidad en horas-hombre
+     Necesita dotacion por cuadrilla y rendimiento por partida. GCM no guarda
+     ninguno de los dos, y pedirlos es trabajo de captura para el residente:
+     no se hace hasta que la fase A demuestre que hace falta mas precision.
+
+  CONTRASTAR LOS UMBRALES DE LA FASE A
+     Tres semanas minimas, 1,0 y 1,3. Se eligieron por criterio porque la
+     fase A se construyo el mismo dia que P-2, sin esperar al criterio de
+     entrada que este plan fijaba. Quien los ajuste no contradice ninguna
+     medicion: no la hubo.
+
+  H-4 - repartir la carga del residente
+     Decision organizativa, sin desarrollo.
+
+  H-7 - «cumplio» desde la cantidad ejecutada
+     Fase 4 del proyecto. Y es la frontera que el anexo D marca: el dia que
+     una cantidad ejecutada alimente una valorizacion, hay que releerlo,
+     porque ahi si habria que preguntar la modalidad antes de recalcular.
 
 
 ================================================================================
