@@ -1,8 +1,9 @@
 import type { DatosCurva, PeriodoInforme } from "@/services/cronograma.service";
-import type {
-  AlertaAtraso,
-  Capitulo,
-  PartidaActiva,
+import {
+  capitulosDelInforme,
+  type AlertaAtraso,
+  type Capitulo,
+  type PartidaActiva,
 } from "@/lib/control-avance";
 import {
   ETIQUETA_CNC,
@@ -96,13 +97,9 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
   const planeado = Number(datos.planeado);
   const desviacion = Number(datos.desviacion);
 
-  // Solo los capitulos con trabajo medible y algo en marcha. Los que estan
-  // enteros a cero no dicen nada y empujan fuera de la pagina a los que si; y
-  // los de puros hitos saldrian con un planeado del 100% y un real de 0, que
-  // describe un atraso inexistente.
-  const capitulos = datos.capitulos.filter(
-    (c) => c.medible && (Number(c.real) > 0 || Number(c.planeado) > 0),
-  );
+  // La misma regla que usa la descarga en hoja de calculo: el papel y el
+  // archivo tienen que listar los mismos capitulos.
+  const capitulos = capitulosDelInforme(datos.capitulos);
 
   return (
     <article className="informe mx-auto max-w-[1180px] text-sm">

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Download } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
@@ -72,13 +73,30 @@ export default async function InformePage({
   // obligaria a resolver dos veces cual es el corte elegido.
   const lastPlanner = await lastPlannerAlCorte(sesion, id, informe.fechaCorte);
 
+  const corteIso = informe.fechaCorte.toISOString().slice(0, 10);
+
   return (
     <div className="space-y-4">
       {/* Todo este bloque desaparece al imprimir: el papel que recibe el
           cliente no puede salir con botones de navegacion encima. */}
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Volver href={`/obras/${id}/cronograma`}>Volver al cronograma</Volver>
-        <BotonImprimir />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Un enlace, no un boton con JavaScript: la descarga la resuelve el
+              navegador solo. Y lleva la fecha ESCRITA aunque la URL no la
+              traiga, para que el archivo no pueda salir de otro corte que el
+              que se esta mirando. */}
+          <a
+            href={`/obras/${id}/cronograma/informe/csv?corte=${corteIso}`}
+            download
+            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <Download className="size-4" aria-hidden="true" />
+            Descargar datos (CSV)
+          </a>
+          <BotonImprimir />
+        </div>
       </div>
 
       {/* El selector de semana. Enlaces y no un desplegable con JavaScript:

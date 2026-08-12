@@ -167,6 +167,32 @@ export function capituloDeCadaTarea(
   return mapa;
 }
 
+/**
+ * Los capitulos que el informe ensena, de los que salen de `agruparPorCapitulo`.
+ *
+ * Fuera quedan dos clases que ensucian el documento sin decir nada:
+ *
+ * - Los que no tienen trabajo MEDIBLE —los de puros hitos, cuyas partidas
+ *   duran cero dias—. Su real ponderado sale 0 por construccion, y junto a un
+ *   planeado del 100% describen un atraso que no existe.
+ * - Los que estan enteros a cero, ni planeados ni empezados a la fecha del
+ *   corte. Son capitulos de mas adelante y empujan fuera de la pagina a los
+ *   que si estan en marcha.
+ *
+ * Vive aqui y no en la pantalla porque el informe se emite ya de dos maneras
+ * —en papel y en hoja de calculo— y las dos tienen que listar exactamente los
+ * mismos capitulos. Con la regla escrita dos veces, el dia que alguien afine
+ * una el archivo y el papel empiezan a no cuadrar, y averiguar cual de los dos
+ * miente cuesta mas que este comentario.
+ */
+export function capitulosDelInforme(
+  capitulos: readonly Capitulo[],
+): Capitulo[] {
+  return capitulos.filter(
+    (c) => c.medible && (Number(c.real) > 0 || Number(c.planeado) > 0),
+  );
+}
+
 export type Severidad = "alta" | "media" | "baja";
 
 export interface AlertaAtraso {
