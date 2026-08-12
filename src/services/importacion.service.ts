@@ -176,42 +176,67 @@ export async function aplicarImportacion(
       }
     }
 
-    // Se insertan de menor a mayor profundidad real para que el padre
-    // exista siempre antes que el hijo.
-    const porProfundidad = [...filas].sort(
-      (a, b) =>
-        (profundidades.get(a.codigo) ?? 0) - (profundidades.get(b.codigo) ?? 0),
-    );
+    // Se insertan por NIVELES de profundidad real, de menor a mayor: el padre
+    // esta siempre en un nivel anterior, asi que su id ya se conoce cuando le
+    // toca el turno al hijo.
+    //
+    // Antes se creaba FILA A FILA, y cada fila era un viaje a la base dentro de
+    // la transaccion. Con las 348 partidas de una obra real eso se acercaba a
+    // los cinco segundos que Prisma concede por defecto a una transaccion; al
+    // pasarlos aborta con P2028 y revierte la importacion ENTERA, que es la peor
+    // forma de fallar: el presupuesto es lo primero que carga una constructora.
+    // Por niveles son tantas idas y venidas como profundidad tenga la EDT.
+    const porNivel = new Map<number, FilaImportada[]>();
+    for (const f of filas) {
+      const nivel = profundidades.get(f.codigo) ?? 0;
+      const grupo = porNivel.get(nivel);
+      if (grupo) grupo.push(f);
+      else porNivel.set(nivel, [f]);
+    }
+
     const idPorCodigo = new Map<string, string>();
 
-    for (const f of porProfundidad) {
-      const padre = codigoPadre(f.codigo, codigos);
+    for (const nivel of [...porNivel.keys()].sort((a, b) => a - b)) {
+      const grupo = porNivel.get(nivel) ?? [];
 
-      const creado = await tx.wbsItem.create({
-        data: {
-          projectId: obraId,
-          parentId: padre ? (idPorCodigo.get(padre) ?? null) : null,
-          codigoPartida: f.codigo,
-          tipo: f.tipo,
-          modalidad: f.modalidad,
-          descripcion: f.descripcion.slice(0, 500),
-          // Profundidad real en el arbol, no numero de segmentos del
-          // codigo: es la que gobierna la sangria en pantalla.
-          nivel: profundidades.get(f.codigo) ?? 0,
-          orden: ordenOriginal.get(f.codigo) ?? 0,
-          // Vino de un archivo. Perderla en un reemplazo posterior no es
-          // grave: el Excel la vuelve a traer. Lo que no vuelve es lo que
-          // alguien tecleo o corrigio a mano, y por eso se distinguen.
-          origen: "IMPORTADO",
-          unidad: f.unidad,
-          metrado: f.metrado,
-          precioUnitario: f.precioUnitario,
-          parcial: f.parcial,
-        },
-        select: { id: true },
+      await tx.wbsItem.createMany({
+        data: grupo.map((f) => {
+          const padre = codigoPadre(f.codigo, codigos);
+          return {
+            projectId: obraId,
+            parentId: padre ? (idPorCodigo.get(padre) ?? null) : null,
+            codigoPartida: f.codigo,
+            tipo: f.tipo,
+            modalidad: f.modalidad,
+            descripcion: f.descripcion.slice(0, 500),
+            // Profundidad real en el arbol, no numero de segmentos del
+            // codigo: es la que gobierna la sangria en pantalla.
+            nivel,
+            orden: ordenOriginal.get(f.codigo) ?? 0,
+            // Vino de un archivo. Perderla en un reemplazo posterior no es
+            // grave: el Excel la vuelve a traer. Lo que no vuelve es lo que
+            // alguien tecleo o corrigio a mano, y por eso se distinguen.
+            origen: "IMPORTADO" as const,
+            unidad: f.unidad,
+            metrado: f.metrado,
+            precioUnitario: f.precioUnitario,
+            parcial: f.parcial,
+          };
+        }),
       });
 
-      idPorCodigo.set(f.codigo, creado.id);
+      // `createMany` no devuelve los ids en MySQL/MariaDB, y el nivel siguiente
+      // los necesita para apuntar a su padre. Se releen de una vez: una consulta
+      // por nivel, no por fila. `@@unique([projectId, codigoPartida])` garantiza
+      // que cada codigo case con una sola fila y el mapa no sea ambiguo.
+      const creados = await tx.wbsItem.findMany({
+        where: {
+          projectId: obraId,
+          codigoPartida: { in: grupo.map((f) => f.codigo) },
+        },
+        select: { id: true, codigoPartida: true },
+      });
+      for (const c of creados) idPorCodigo.set(c.codigoPartida, c.id);
     }
 
     await tx.auditLog.create({
@@ -230,6 +255,21 @@ export async function aplicarImportacion(
         },
       },
     });
+  }, {
+    // Prisma da cinco segundos por defecto, y esta transaccion es la unica del
+    // sistema legitimamente larga: borra el presupuesto anterior por niveles e
+    // inserta cientos de partidas. Pasarse significa P2028 y la importacion
+    // revertida entera, asi que el techo se fija a proposito en vez de dejarlo
+    // al azar del tamano del Excel.
+    //
+    // No es una invitacion a que tarde: la insercion por niveles de arriba la
+    // deja en unos pocos viajes. Es el margen para un archivo grande o una base
+    // cargada, no el presupuesto de tiempo esperado.
+    timeout: 120_000,
+    // Y esto es lo que espera a que haya conexion libre en el pool antes de
+    // empezar a contar el tiempo de arriba. Bajo carga, sin este margen la
+    // importacion falla antes de haber hecho nada.
+    maxWait: 15_000,
   });
 
   return {

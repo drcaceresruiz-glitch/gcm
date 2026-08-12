@@ -101,6 +101,78 @@ if [ ! -f "$NUEVO/server.js" ] || [ ! -d "$NUEVO/.next" ]; then
   exit 1
 fi
 
+# LAS MIGRACIONES, ANTES DEL CAMBIO Y NO DESPUES
+#
+# Hasta ahora no se aplicaban aqui, y por eso cada push con esquema nuevo dejaba
+# el codigo nuevo hablando con la base vieja: el panel entero en 500 hasta que
+# alguien entraba por SSH a mano. Con una sola constructora era una ventana de
+# minutos; con clientes es una caida de todos a la vez, provocada por el propio
+# despliegue.
+#
+# Se aplican con el paquete NUEVO ya desempacado pero TODAVIA NO publicado. Si
+# fallan, se aborta y la version que estaba sirviendo sigue en pie, que es la
+# misma regla que gobierna el resto del script: media version desplegada es peor
+# que una version vieja.
+#
+# El precio, dicho en voz alta: entre la migracion y el intercambio hay unos
+# segundos en que el codigo VIEJO ve el esquema NUEVO. Para una migracion que
+# anade (columna, tabla, indice) eso es inocuo. Para una que quita o renombra,
+# esos segundos son de error. Es un cambio de minutos de caida segura por
+# segundos de riesgo acotado, y se prefiere; una migracion destructiva sigue
+# pidiendo el despliegue en dos pasos de siempre.
+#
+# EL ENTORNO NO SE HEREDA. Este cron no es la aplicacion: no tiene DATABASE_URL
+# —que vive en la configuracion Node de cPanel— ni `npx` en el PATH. Ambos
+# vienen de `~/.gcm-despliegue.env`, que solo puede leer su dueno, igual que
+# `~/.gcm-avisos.curl` hace con el token del reloj:
+#
+#   cat > ~/.gcm-despliegue.env <<'FIN'
+#   DATABASE_URL="mysql://USUARIO:CLAVE@localhost:3306/BASE"
+#   NODEVENV_ACTIVATE="/home/USUARIO/nodevenv/RUTA_DE_LA_APP/22/bin/activate"
+#   FIN
+#   chmod 600 ~/.gcm-despliegue.env
+#
+# SIN ESE ARCHIVO NO SE ABORTA: se despliega igual y se grita en la bitacora.
+# Que falte deja las cosas exactamente como estaban antes de este bloque (las
+# migraciones se aplican a mano), y eso es preferible a que un servidor sin
+# configurar deje de recibir despliegues.
+CONFIG_DESPLIEGUE="$HOME/.gcm-despliegue.env"
+
+if [ ! -r "$CONFIG_DESPLIEGUE" ]; then
+  registrar "AVISO: falta $CONFIG_DESPLIEGUE. Se aplica el paquete SIN migrar:" \
+            "si esta version trae migraciones, hay que correr 'migrate deploy' a mano."
+else
+  # En subshell: ni el activate del nodevenv ni DATABASE_URL deben sobrevivir al
+  # bloque y contaminar lo que viene despues.
+  if (
+    set -a
+    # shellcheck disable=SC1090
+    . "$CONFIG_DESPLIEGUE"
+    set +a
+
+    [ -n "${DATABASE_URL:-}" ] || { echo "sin DATABASE_URL en el archivo"; exit 1; }
+
+    if [ -n "${NODEVENV_ACTIVATE:-}" ]; then
+      # shellcheck disable=SC1090
+      . "$NODEVENV_ACTIVATE" || { echo "no se pudo activar $NODEVENV_ACTIVATE"; exit 1; }
+    fi
+
+    command -v npx >/dev/null 2>&1 || { echo "npx no esta en el PATH"; exit 1; }
+
+    # Desde el paquete NUEVO: alli estan prisma/migrations y prisma.config.js.
+    # Correrlo desde la raiz usaria el esquema de la version que aun sirve.
+    cd "$NUEVO" || { echo "no se pudo entrar en el paquete"; exit 1; }
+    npx --yes prisma@7 migrate deploy 2>&1
+  ) >> "$BITACORA" 2>&1; then
+    registrar "OK: migraciones al dia."
+  else
+    registrar "ERROR: 'migrate deploy' fallo. NO se aplica el paquete;" \
+              "la version anterior sigue sirviendo. Detalle justo arriba."
+    rm -rf "$NUEVO"
+    exit 1
+  fi
+fi
+
 # El cambio. Solo se sustituye lo que VIENE en el paquete: app.js, desplegar.sh,
 # tmp/, stderr.log y cualquier configuracion del servidor se quedan donde estan.
 rm -rf "$VIEJO"
