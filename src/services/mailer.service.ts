@@ -1,6 +1,7 @@
 import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
 import { env, isProduction } from "@/lib/env";
+import { escaparHtml as esc } from "@/lib/html";
 
 /**
  * Envio de correo.
@@ -146,12 +147,12 @@ export function correoBienvenida(datos: {
 
   const html = plantilla(
     "Tu cuenta esta lista",
-    `<p>Hola <strong>${datos.nombre}</strong>,</p>
+    `<p>Hola <strong>${esc(datos.nombre)}</strong>,</p>
      <p>Se ha creado tu cuenta. Estos son tus datos de acceso:</p>
      <table style="width:100%;border-collapse:collapse;margin:12px 0;">
-       <tr><td style="padding:6px 0;color:#6b7a82;">Acceso</td><td style="padding:6px 0;"><a href="${url}" style="color:#0f7186;">${url}</a></td></tr>
-       <tr><td style="padding:6px 0;color:#6b7a82;">Usuario</td><td style="padding:6px 0;">${datos.email}</td></tr>
-       <tr><td style="padding:6px 0;color:#6b7a82;">Clave temporal</td><td style="padding:6px 0;font-family:monospace;font-size:16px;letter-spacing:1px;">${datos.claveTemporal}</td></tr>
+       <tr><td style="padding:6px 0;color:#6b7a82;">Acceso</td><td style="padding:6px 0;"><a href="${esc(url)}" style="color:#0f7186;">${esc(url)}</a></td></tr>
+       <tr><td style="padding:6px 0;color:#6b7a82;">Usuario</td><td style="padding:6px 0;">${esc(datos.email)}</td></tr>
+       <tr><td style="padding:6px 0;color:#6b7a82;">Clave temporal</td><td style="padding:6px 0;font-family:monospace;font-size:16px;letter-spacing:1px;">${esc(datos.claveTemporal)}</td></tr>
      </table>
      <p style="color:#6b7a82;font-size:13px;">Por seguridad, deberas cambiarla la primera vez que entres.</p>`,
   );
@@ -184,12 +185,12 @@ export function correoClaveRestablecida(datos: {
 
   const html = plantilla(
     "Tu clave se restablecio",
-    `<p>Hola <strong>${datos.nombre}</strong>,</p>
+    `<p>Hola <strong>${esc(datos.nombre)}</strong>,</p>
      <p>Un administrador ha restablecido tu clave. Entra con esta clave temporal:</p>
      <table style="width:100%;border-collapse:collapse;margin:12px 0;">
-       <tr><td style="padding:6px 0;color:#6b7a82;">Acceso</td><td style="padding:6px 0;"><a href="${url}" style="color:#0f7186;">${url}</a></td></tr>
-       <tr><td style="padding:6px 0;color:#6b7a82;">Usuario</td><td style="padding:6px 0;">${datos.email}</td></tr>
-       <tr><td style="padding:6px 0;color:#6b7a82;">Nueva clave</td><td style="padding:6px 0;font-family:monospace;font-size:16px;letter-spacing:1px;">${datos.claveTemporal}</td></tr>
+       <tr><td style="padding:6px 0;color:#6b7a82;">Acceso</td><td style="padding:6px 0;"><a href="${esc(url)}" style="color:#0f7186;">${esc(url)}</a></td></tr>
+       <tr><td style="padding:6px 0;color:#6b7a82;">Usuario</td><td style="padding:6px 0;">${esc(datos.email)}</td></tr>
+       <tr><td style="padding:6px 0;color:#6b7a82;">Nueva clave</td><td style="padding:6px 0;font-family:monospace;font-size:16px;letter-spacing:1px;">${esc(datos.claveTemporal)}</td></tr>
      </table>
      <p style="color:#6b7a82;font-size:13px;">Deberas cambiarla al entrar. Si no pediste esto, avisa a tu administrador: tus sesiones anteriores ya se cerraron.</p>`,
   );
@@ -225,14 +226,14 @@ export function correoRecuperacion(datos: {
 
   const html = plantilla(
     "Restablece tu clave",
-    `<p>Hola <strong>${datos.nombre}</strong>,</p>
+    `<p>Hola <strong>${esc(datos.nombre)}</strong>,</p>
      <p>Alguien pidio restablecer la clave de tu cuenta. Si fuiste tu, elige una nueva aqui:</p>
      <p style="margin:20px 0;">
-       <a href="${datos.enlace}" style="background:#0f7186;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:bold;">Elegir clave nueva</a>
+       <a href="${esc(datos.enlace)}" style="background:#0f7186;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:bold;">Elegir clave nueva</a>
      </p>
      <p style="color:#6b7a82;font-size:13px;">El enlace caduca en ${datos.minutos} minutos y sirve una sola vez.</p>
      <p style="color:#6b7a82;font-size:13px;">Si no lo pediste, ignora este correo: tu clave sigue siendo la misma y nadie ha entrado en tu cuenta.</p>
-     <p style="color:#6b7a82;font-size:12px;word-break:break-all;">Si el boton no funciona, copia esta direccion: ${datos.enlace}</p>`,
+     <p style="color:#6b7a82;font-size:12px;word-break:break-all;">Si el boton no funciona, copia esta direccion: ${esc(datos.enlace)}</p>`,
   );
 
   return { asunto: `Restablece tu clave — ${MARCA}`, texto, html };
@@ -265,10 +266,10 @@ export function correoCodigoAcceso(datos: {
 
   const html = plantilla(
     "Tu codigo de acceso",
-    `<p>Hola <strong>${datos.nombre}</strong>,</p>
+    `<p>Hola <strong>${esc(datos.nombre)}</strong>,</p>
      <p>Escribe este codigo para terminar de entrar:</p>
      <p style="margin:20px 0;text-align:center;">
-       <span style="display:inline-block;background:#f1f5f6;border:1px solid #d9e2e5;border-radius:10px;padding:14px 24px;font-family:monospace;font-size:30px;letter-spacing:8px;font-weight:bold;color:#0f7186;">${datos.codigo}</span>
+       <span style="display:inline-block;background:#f1f5f6;border:1px solid #d9e2e5;border-radius:10px;padding:14px 24px;font-family:monospace;font-size:30px;letter-spacing:8px;font-weight:bold;color:#0f7186;">${esc(datos.codigo)}</span>
      </p>
      <p style="color:#6b7a82;font-size:13px;text-align:center;">Caduca en ${datos.minutos} minutos.</p>
      <p style="color:#6b7a82;font-size:13px;">Si no estabas entrando, alguien conoce tu clave: cambiala en cuanto puedas y avisa a tu administrador.</p>`,
@@ -324,8 +325,8 @@ export function correoRestricciones(datos: {
   const filas = datos.lineas
     .map(
       (l) => `<tr>
-        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;">${l.tarea}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;color:#0f7186;white-space:nowrap;">${l.flujo}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;">${esc(l.tarea)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;color:#0f7186;white-space:nowrap;">${esc(l.flujo)}</td>
         <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;text-align:right;white-space:nowrap;color:${
           l.dias !== null && l.dias >= 3 ? "#b42318" : "#6b7a82"
         };">${l.dias !== null && l.dias > 0 ? `${l.dias} d` : ""}</td>
@@ -334,10 +335,10 @@ export function correoRestricciones(datos: {
     .join("");
 
   const html = plantilla(
-    datos.titulo,
-    `<p>Hola <strong>${datos.nombre}</strong>,</p>
-     <p style="color:#6b7a82;">${datos.obra}</p>
-     <p>${datos.cuerpo}</p>
+    esc(datos.titulo),
+    `<p>Hola <strong>${esc(datos.nombre)}</strong>,</p>
+     <p style="color:#6b7a82;">${esc(datos.obra)}</p>
+     <p>${esc(datos.cuerpo)}</p>
      <table style="width:100%;border-collapse:collapse;font-size:14px;margin:16px 0;">${filas}</table>
      ${
        datos.masCuantas > 0
@@ -347,7 +348,7 @@ export function correoRestricciones(datos: {
      ${
        datos.enlace
          ? `<p style="margin:20px 0;">
-              <a href="${datos.enlace}" style="background:#0f7186;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:bold;">Ver el Lookahead</a>
+              <a href="${esc(datos.enlace)}" style="background:#0f7186;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:bold;">Ver el Lookahead</a>
             </p>`
          : ""
      }`,
@@ -397,13 +398,13 @@ export function correoCurvaAvance(datos: {
 
   const fila = (etiqueta: string, valor: string, destacado = false) =>
     `<tr>
-       <td style="padding:7px 0;color:#6b7a82;">${etiqueta}</td>
-       <td style="padding:7px 0;text-align:right;font-weight:bold;${destacado ? `color:${color};` : ""}">${valor}</td>
+       <td style="padding:7px 0;color:#6b7a82;">${esc(etiqueta)}</td>
+       <td style="padding:7px 0;text-align:right;font-weight:bold;${destacado ? `color:${color};` : ""}">${esc(valor)}</td>
      </tr>`;
 
   const html = plantilla(
-    `Curva de avance — ${datos.obra}`,
-    `<p style="margin:0 0 4px;color:#6b7a82;">Corte del ${datos.corte}</p>
+    `Curva de avance — ${esc(datos.obra)}`,
+    `<p style="margin:0 0 4px;color:#6b7a82;">Corte del ${esc(datos.corte)}</p>
      <table style="width:100%;border-collapse:collapse;margin:12px 0;">
        ${fila("Avance real", `${datos.real}%`)}
        ${fila("Avance planeado", `${datos.planeado}%`)}
@@ -411,9 +412,9 @@ export function correoCurvaAvance(datos: {
        ${fila("Ritmo actual", `${datos.ritmo} de lo previsto`)}
        ${fila("Termino proyectado", datos.termino)}
      </table>
-     ${datos.nota ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${datos.nota}</p>` : ""}
+     ${datos.nota ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${esc(datos.nota)}</p>` : ""}
      <p style="color:#6b7a82;font-size:13px;">El grafico va adjunto a este correo.</p>
-     <p style="color:#6b7a82;font-size:13px;">Enviado por ${datos.remitente}.</p>`,
+     <p style="color:#6b7a82;font-size:13px;">Enviado por ${esc(datos.remitente)}.</p>`,
   );
 
   return { asunto: `Curva de avance — ${datos.obra} (corte ${datos.corte})`, texto, html };
@@ -471,29 +472,33 @@ export function correoInformeObra(datos: {
     `Enviado por ${datos.remitente} desde ${MARCA}.`,
   ].join("\n");
 
+  // Todo lo que entra aqui se escapa: el nombre de la obra y el de cada
+  // partida salen de un XML que sube el usuario, y la nota la escribe quien
+  // envia. Un enlace colado en un nombre de tarea se convertiria en un enlace
+  // de verdad dentro de un correo con el membrete de la empresa.
   const fila = (etiqueta: string, valor: string) =>
     `<tr>
-       <td style="padding:7px 0;color:#6b7a82;">${etiqueta}</td>
-       <td style="padding:7px 0;text-align:right;font-weight:bold;">${valor}</td>
+       <td style="padding:7px 0;color:#6b7a82;">${esc(etiqueta)}</td>
+       <td style="padding:7px 0;text-align:right;font-weight:bold;">${esc(valor)}</td>
      </tr>`;
 
   const graves = datos.masGraves
     .map(
       (g) => `<tr>
-        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;">${g.partida}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;color:#b42318;white-space:nowrap;font-size:13px;">${g.detalle}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;">${esc(g.partida)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;color:#b42318;white-space:nowrap;font-size:13px;">${esc(g.detalle)}</td>
       </tr>`,
     )
     .join("");
 
   const html = plantilla(
-    `Informe de obra — ${datos.obra}`,
-    `<p style="margin:0 0 4px;color:#6b7a82;">Corte del ${datos.corte}</p>
-     <p style="font-size:15px;">${datos.estado}</p>
+    `Informe de obra — ${esc(datos.obra)}`,
+    `<p style="margin:0 0 4px;color:#6b7a82;">Corte del ${esc(datos.corte)}</p>
+     <p style="font-size:15px;">${esc(datos.estado)}</p>
      <table style="width:100%;border-collapse:collapse;margin:12px 0;">
        ${datos.cifras.map((c) => fila(c.etiqueta, c.valor)).join("")}
      </table>
-     ${datos.ppc ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${datos.ppc}</p>` : ""}
+     ${datos.ppc ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${esc(datos.ppc)}</p>` : ""}
      ${
        datos.masGraves.length > 0
          ? `<h2 style="font-size:14px;margin:18px 0 6px;">Lo que más frena</h2>
@@ -505,9 +510,9 @@ export function correoInformeObra(datos: {
             }`
          : ""
      }
-     ${datos.nota ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${datos.nota}</p>` : ""}
-     <p style="color:#6b7a82;font-size:13px;">Los datos completos van en el archivo adjunto (${datos.adjunto}), listo para abrir en Excel.</p>
-     <p style="color:#6b7a82;font-size:13px;">Enviado por ${datos.remitente}.</p>`,
+     ${datos.nota ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${esc(datos.nota)}</p>` : ""}
+     <p style="color:#6b7a82;font-size:13px;">Los datos completos van en el archivo adjunto (${esc(datos.adjunto)}), listo para abrir en Excel.</p>
+     <p style="color:#6b7a82;font-size:13px;">Enviado por ${esc(datos.remitente)}.</p>`,
   );
 
   return {
