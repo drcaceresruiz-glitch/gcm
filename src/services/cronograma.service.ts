@@ -1155,12 +1155,21 @@ export async function avanceFisicoPorObra(
       project: { companyId: sesion.companyId },
     },
     orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
-    select: { id: true, projectId: true, fechaCorte: true },
+    select: { id: true, projectId: true, fechaCorte: true, lineaBaseAt: true },
   });
 
+  // La fuente del PLAN es la misma que usa la curva: la version marcada como
+  // linea base si la hay, y si no el corte vigente. Medir el plan contra una
+  // version y dibujarlo contra otra daria dos cifras distintas de la misma
+  // obra en dos pantallas.
   const vigentes = new Map<string, { id: string; fechaCorte: Date }>();
   for (const c of cronogramas) {
     if (!vigentes.has(c.projectId)) {
+      vigentes.set(c.projectId, { id: c.id, fechaCorte: c.fechaCorte });
+    }
+  }
+  for (const c of cronogramas) {
+    if (c.lineaBaseAt !== null) {
       vigentes.set(c.projectId, { id: c.id, fechaCorte: c.fechaCorte });
     }
   }
@@ -1180,6 +1189,7 @@ export async function avanceFisicoPorObra(
         duracionDias: true,
         porcentajePlaneado: true,
         porcentajeArchivo: true,
+        inicio: true,
         fin: true,
       },
     }),
@@ -1218,11 +1228,35 @@ export async function avanceFisicoPorObra(
     const medibles = suyas.map((t) => ({
       esResumen: t.esResumen,
       duracionDias: t.duracionDias.toString(),
-      planeado: t.porcentajePlaneado.toString(),
       real: ultimos.get(t.uid)?.porcentaje ?? t.porcentajeArchivo.toString(),
     }));
 
-    const planeado = ponderarPorDuracion(medibles, (t) => t.planeado);
+    /**
+     * El plan A HOY, no el «% Planeado» que trae el archivo.
+     *
+     * El del archivo esta congelado en la fecha del corte, asi que la tarjeta
+     * comparaba el avance de HOY contra el plan de hace dias. En CRIOCORD eso
+     * daba «14.8% de 10.2%» en el panel y «14.78% sobre 11.99%» en la curva:
+     * la misma obra, dos cifras, y la del panel la pintaba mas adelantada de
+     * lo que iba. Un dato optimista falso es peor que uno pesimista, porque
+     * nadie va a comprobarlo.
+     *
+     * Es la misma reconstruccion dia a dia que usa la curva (`planeadoEnFecha`
+     * sobre `curvaPlaneada`), de modo que las dos pantallas no pueden
+     * discrepar por construccion.
+     */
+    const planificadas = suyas.map((t) => ({
+      uid: t.uid,
+      esResumen: t.esResumen,
+      duracionDias: t.duracionDias.toString(),
+      inicio: t.inicio,
+      fin: t.fin,
+    }));
+
+    // `planeadoEnFecha` trabaja en coma flotante a proposito —son coordenadas
+    // de una curva, no dinero—, asi que se fija a dos decimales al cruzar a
+    // texto, que es como viaja el resto de cifras del sistema.
+    const planeado = planeadoEnFecha(planificadas, hoyPanel).toFixed(2);
     const real = ponderarPorDuracion(medibles, (t) => t.real);
 
     resultado.set(projectId, {
