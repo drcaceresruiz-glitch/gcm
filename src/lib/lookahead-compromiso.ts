@@ -258,3 +258,54 @@ export function claveDeResponsable(r: RestriccionConPromesa): string | null {
   if (r.responsableContactoId !== null) return `c:${r.responsableContactoId}`;
   return null;
 }
+
+export interface CargaResponsable {
+  responsableUserId: string;
+  /// Restricciones abiertas a su nombre.
+  abiertas: number;
+  /// De esas, cuantas tienen la fecha prometida ya pasada.
+  vencidas: number;
+}
+
+/**
+ * Cuantas restricciones abiertas lleva cada persona.
+ *
+ * Existe para que un reparto se pueda sostener. El sistema ya permitia que el
+ * administrador de obra analizara restricciones —tiene `lookahead:gestionar`
+ * desde siempre— y ya permitia ponerle nombre a cada una. Lo que no habia era
+ * forma de VER como quedo el reparto, y un reparto que no se ve se deshace
+ * solo: todo acaba a nombre de quien mas mira la pantalla, normalmente el
+ * residente, y nadie se entera hasta que ese cuello de botella tiene nombre y
+ * apellidos.
+ *
+ * Cuenta solo a las personas de la empresa (`responsableUserId`), no a los
+ * contactos externos: el reparto del que habla esto es el interno. A un
+ * proveedor no se le reparte trabajo de analisis, se le persigue.
+ *
+ * Ordena por vencidas y luego por abiertas: quien mas promesas ha roto sale
+ * primero, que es a quien hay que preguntar antes.
+ */
+export function cargaPorResponsable(
+  restricciones: readonly RestriccionConPromesa[],
+  hoy: Date,
+): CargaResponsable[] {
+  const porPersona = new Map<string, CargaResponsable>();
+
+  for (const r of restricciones) {
+    if (r.resuelta) continue;
+    if (r.responsableUserId === null) continue;
+
+    const actual = porPersona.get(r.responsableUserId) ?? {
+      responsableUserId: r.responsableUserId,
+      abiertas: 0,
+      vencidas: 0,
+    };
+    actual.abiertas += 1;
+    if (estadoDePromesa(r, hoy) === "vencida") actual.vencidas += 1;
+    porPersona.set(r.responsableUserId, actual);
+  }
+
+  return [...porPersona.values()].sort(
+    (a, b) => b.vencidas - a.vencidas || b.abiertas - a.abiertas,
+  );
+}

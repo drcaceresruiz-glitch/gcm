@@ -18,6 +18,11 @@ const eslintConfig = [
       ".next/**",
       "node_modules/**",
       "next-env.d.ts",
+      // Los worktrees de trabajo son COPIAS enteras del repo. Sin esta linea
+      // cada fichero se audita dos veces y, peor, una rama ajena en curso
+      // puede tumbar el lint de main sin que nadie haya tocado main. Git ya
+      // los ignora (.gitignore linea 107); esto es lo mismo para ESLint.
+      ".claude/**",
     ],
   },
 

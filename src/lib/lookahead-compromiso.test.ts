@@ -3,6 +3,7 @@ import {
   estadoDePromesa,
   seLiberoATiempo,
   cumplimientoDeLiberacion,
+  cargaPorResponsable,
   validarCompromisoRestriccion,
   claveDeResponsable,
   type RestriccionConPromesa,
@@ -248,5 +249,80 @@ describe("claveDeResponsable", () => {
     expect(claveDeResponsable(r({ responsableUserId: "u1" }))).toBe("u:u1");
     expect(claveDeResponsable(r({ responsableContactoId: "c1" }))).toBe("c:c1");
     expect(claveDeResponsable(r())).toBeNull();
+  });
+});
+
+describe("cargaPorResponsable", () => {
+  const HOY2 = d("2026-08-12");
+  const de = (
+    responsableUserId: string | null,
+    extra: Partial<RestriccionConPromesa> = {},
+  ) => r({ responsableUserId, ...extra });
+
+  it("cuenta las abiertas de cada persona", () => {
+    const carga = cargaPorResponsable(
+      [de("ana"), de("ana"), de("beto")],
+      HOY2,
+    );
+    expect(carga).toEqual([
+      { responsableUserId: "ana", abiertas: 2, vencidas: 0 },
+      { responsableUserId: "beto", abiertas: 1, vencidas: 0 },
+    ]);
+  });
+
+  it("no cuenta las ya liberadas: el reparto es del trabajo pendiente", () => {
+    const carga = cargaPorResponsable(
+      [de("ana"), de("ana", { resuelta: true, resueltaAt: HOY2 })],
+      HOY2,
+    );
+    expect(carga[0]?.abiertas).toBe(1);
+  });
+
+  it("no cuenta a los contactos externos", () => {
+    // A un proveedor no se le reparte trabajo de analisis: se le persigue.
+    const carga = cargaPorResponsable(
+      [de(null, { responsableContactoId: "prov1" }), de("ana")],
+      HOY2,
+    );
+    expect(carga).toHaveLength(1);
+    expect(carga[0]?.responsableUserId).toBe("ana");
+  });
+
+  it("las sin asignar no aparecen: de esas avisa otra regla", () => {
+    expect(cargaPorResponsable([de(null)], HOY2)).toEqual([]);
+  });
+
+  it("separa las vencidas de las abiertas", () => {
+    const carga = cargaPorResponsable(
+      [
+        de("ana", { fechaCompromiso: d("2026-08-01") }),
+        de("ana", { fechaCompromiso: d("2026-08-30") }),
+      ],
+      HOY2,
+    );
+    expect(carga[0]).toEqual({
+      responsableUserId: "ana",
+      abiertas: 2,
+      vencidas: 1,
+    });
+  });
+
+  it("primero quien mas promesas ha roto, no quien mas lleva", () => {
+    // A quien hay que preguntar antes es a quien incumplio, aunque otro
+    // acumule mas trabajo por delante.
+    const carga = cargaPorResponsable(
+      [
+        de("ana"),
+        de("ana"),
+        de("ana"),
+        de("beto", { fechaCompromiso: d("2026-08-01") }),
+      ],
+      HOY2,
+    );
+    expect(carga.map((c) => c.responsableUserId)).toEqual(["beto", "ana"]);
+  });
+
+  it("sin restricciones, nadie", () => {
+    expect(cargaPorResponsable([], HOY2)).toEqual([]);
   });
 });

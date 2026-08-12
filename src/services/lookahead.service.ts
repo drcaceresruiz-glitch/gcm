@@ -29,11 +29,13 @@ import {
 } from "@/lib/lookahead";
 import {
   validarCompromisoRestriccion,
+  cargaPorResponsable,
   cumplimientoDeLiberacion,
   estadoDePromesa,
   claveDeResponsable,
   type CumplimientoLiberacion,
   type EstadoPromesa,
+  type RestriccionConPromesa,
 } from "@/lib/lookahead-compromiso";
 import { planesAbiertos, type SemanaAbierta } from "@/services/plan-semanal.service";
 import {
@@ -236,6 +238,23 @@ export interface LookaheadDatos {
   personas: PersonaAsignable[];
   /// Como va el cumplimiento de las promesas de liberacion en esta ventana.
   liberacion: CumplimientoLiberacion;
+  /**
+   * Cuantas restricciones abiertas lleva cada persona, con su nombre ya
+   * resuelto y de mas cargada a menos.
+   *
+   * Existe para que el reparto del analisis se pueda sostener. Permitirlo ya
+   * se permitia —ADMIN_OBRA tiene `lookahead:gestionar` desde siempre— y
+   * asignar tambien; lo que faltaba era VER como quedo, y un reparto que no
+   * se ve se deshace solo.
+   */
+  carga: CargaConNombre[];
+}
+
+export interface CargaConNombre {
+  userId: string;
+  nombre: string;
+  abiertas: number;
+  vencidas: number;
 }
 
 export type ResultadoLookahead = { ok: true } | { ok: false; error: string };
@@ -484,6 +503,11 @@ export async function obtenerLookahead(
   const puedeComprometer = puede(sesion, "plan_semanal:gestionar");
   const puedeGestionar = puede(sesion, "lookahead:gestionar");
 
+  // Solo si va a poder asignar: quien no gestiona no necesita la lista, y
+  // pedirla seria mandarle al navegador los nombres de toda la obra para nada.
+  // Se resuelve aqui y no dentro del objeto porque ahora la usan dos campos.
+  const personas = puedeGestionar ? await personasDeObra(obraId) : [];
+
   return {
     desde,
     hasta,
@@ -495,12 +519,14 @@ export async function obtenerLookahead(
     puedeGestionar,
     semanasAbiertas: puedeComprometer ? await planesAbiertos(sesion, obraId) : [],
     puedeComprometer,
-    // Solo si va a poder asignar: quien no gestiona no necesita la lista, y
-    // pedirla seria mandarle al navegador los nombres de toda la obra para
-    // nada.
-    personas: puedeGestionar ? await personasDeObra(obraId) : [],
+    personas,
     liberacion: cumplimientoDeLiberacion(
       lookaheadTareas.flatMap((l) => l.restricciones),
+      ahora,
+    ),
+    carga: cargaConNombre(
+      lookaheadTareas.flatMap((l) => l.restricciones),
+      personas,
       ahora,
     ),
   };
@@ -517,6 +543,40 @@ export async function obtenerLookahead(
  * proveedor es a quien esa persona persigue. La lista lo sugiere sin
  * prohibirlo.
  */
+/**
+ * La carga de cada persona, con su nombre puesto.
+ *
+ * Los nombres salen de la lista de asignables, que ya viaja. Sin permiso de
+ * gestion esa lista viene vacia y entonces la carga tambien: quien no puede
+ * repartir tampoco necesita ver el reparto.
+ */
+function cargaConNombre(
+  restricciones: readonly RestriccionConPromesa[],
+  personas: readonly PersonaAsignable[],
+  ahora: Date,
+): CargaConNombre[] {
+  const nombrePorId = new Map(
+    personas
+      .filter((p) => !p.externo)
+      .map((p) => [p.clave.slice("u:".length), p.nombre]),
+  );
+
+  return cargaPorResponsable(restricciones, ahora).flatMap((c) => {
+    const nombre = nombrePorId.get(c.responsableUserId);
+    // Sin nombre no se pinta: seria una fila con un identificador crudo.
+    // Pasa cuando la persona ya no es miembro de la obra.
+    if (nombre === undefined) return [];
+    return [
+      {
+        userId: c.responsableUserId,
+        nombre,
+        abiertas: c.abiertas,
+        vencidas: c.vencidas,
+      },
+    ];
+  });
+}
+
 async function personasDeObra(obraId: string): Promise<PersonaAsignable[]> {
   const [miembros, externos] = await Promise.all([
     prisma.projectMembership.findMany({

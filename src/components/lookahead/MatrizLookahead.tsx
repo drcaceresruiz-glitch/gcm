@@ -112,6 +112,7 @@ export function MatrizLookahead({
     puedeComprometer,
     personas,
     liberacion,
+    carga,
   } = datos;
 
   // El nombre de cada responsable, resuelto una vez para toda la matriz. El
@@ -364,6 +365,8 @@ export function MatrizLookahead({
           </button>
         )}
       </div>
+
+      <RepartoDeRestricciones carga={carga} />
 
       {/* Acciones en lote: aparecen solo cuando hay algo elegido. Cada boton
           mira su propio permiso, aunque la seleccion sea comun. */}
@@ -766,6 +769,49 @@ function LiberacionATiempo({
         <span className="opacity-60"> · {datos.sinAsignar} sin responsable</span>
       )}
     </span>
+  );
+}
+
+/**
+ * Como esta repartido el analisis de restricciones entre las personas de la
+ * obra.
+ *
+ * Repartirlo ya se podia: ADMIN_OBRA tiene `lookahead:gestionar` desde
+ * siempre, asi que asignar restricciones nunca estuvo cerrado. Lo que faltaba
+ * era VERLO. El total de abiertas sale igual lo lleve una persona o lo lleven
+ * tres, de modo que un reparto que nadie mira se deshace solo y todo vuelve a
+ * nombre del residente sin que se note.
+ *
+ * Solo salen los de dentro de la obra: a un proveedor se le promete una fecha,
+ * no se le reparte trabajo de analisis.
+ */
+function RepartoDeRestricciones({
+  carga,
+}: {
+  carga: LookaheadDatos["carga"];
+}) {
+  // Sin permiso de gestion el servidor manda la lista vacia, asi que esto
+  // tambien cubre el caso de quien solo mira.
+  if (carga.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+      <span className="opacity-70">Restricciones abiertas por responsable:</span>
+      {carga.map((p) => (
+        <span key={p.userId} className="inline-flex items-center gap-1.5">
+          <span>{p.nombre}</span>
+          <strong className="tabular-nums">{p.abiertas}</strong>
+          {p.vencidas > 0 && (
+            <span
+              className="tabular-nums"
+              style={{ color: "var(--color-peligro)" }}
+            >
+              ({p.vencidas} vencida{p.vencidas === 1 ? "" : "s"})
+            </span>
+          )}
+        </span>
+      ))}
+    </div>
   );
 }
 
