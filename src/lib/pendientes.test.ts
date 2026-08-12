@@ -125,12 +125,45 @@ describe("pendientesDeObra", () => {
       expect(p?.gravedad).toBe("critica");
     });
 
+    it("NO dice «menos de la mitad» cuando es mas de la mitad", () => {
+      // El defecto real de la primera obra: con 62% GCM afirmaba en pantalla
+      // algo que sus propios numeros desmentian. Un panel que exagera una vez
+      // deja de creerse tambien cuando dice algo grave.
+      const [p] = pendientesDeObra(limpio({ ppcUltimo: 62 }));
+      expect(p?.consecuencia).not.toContain("Menos de la mitad");
+      expect(p?.consecuencia).toContain("6 de cada 10");
+      expect(p?.gravedad).toBe("critica");
+    });
+
+    it("«menos de la mitad» solo por debajo del 50", () => {
+      const [p] = pendientesDeObra(limpio({ ppcUltimo: 45 }));
+      expect(p?.consecuencia).toContain("Menos de la mitad");
+
+      const [q] = pendientesDeObra(limpio({ ppcUltimo: 50 }));
+      expect(q?.consecuencia).not.toContain("Menos de la mitad");
+    });
+
+    it("no redondea al alza los «de cada 10»", () => {
+      // 69% no son 7 de cada 10: seria el mismo defecto en pequeno.
+      const [p] = pendientesDeObra(limpio({ ppcUltimo: 69 }));
+      expect(p?.consecuencia).toContain("6 de cada 10");
+    });
+
     it("un PPC bueno pero que CAE se avisa igual", () => {
       // 82% esta bien; venir de 95% es la senal.
       const [p] = pendientesDeObra(limpio({ ppcUltimo: 82, ppcAnterior: 95 }));
       expect(p?.clave).toBe("ppc-bajo");
       expect(p?.gravedad).toBe("aviso");
       expect(p?.consecuencia).toContain("95%");
+      // Y sobre todo: no lo trata como si fuera malo, porque no lo es.
+      expect(p?.consecuencia).not.toContain("Menos de la mitad");
+      expect(p?.consecuencia).toContain("sigue siendo bueno");
+    });
+
+    it("un PPC bajo que ademas cae dice las dos cosas", () => {
+      const [p] = pendientesDeObra(limpio({ ppcUltimo: 62, ppcAnterior: 71 }));
+      expect(p?.consecuencia).toContain("6 de cada 10");
+      expect(p?.consecuencia).toContain("71%");
     });
 
     it("un PPC bueno que sube no es pendiente", () => {

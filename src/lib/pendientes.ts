@@ -84,8 +84,91 @@ export interface ConteoPendientes {
 /// Por debajo de esto, el PPC ya no es un mal dato suelto sino un patron.
 export const PPC_PREOCUPANTE = 70;
 
+/// Por debajo de esto SI es literalmente cierto que se cumple menos de la
+/// mitad de lo prometido. Existe para que el texto no lo diga cuando no lo es.
+export const PPC_MENOS_DE_LA_MITAD = 50;
+
 /// El EVM no puede ponderar por dinero con menos mapeo que esto.
 export const COBERTURA_MINIMA_MAPEO = 60;
+
+export interface LecturaPpc {
+  gravedad: Gravedad;
+  titulo: string;
+  consecuencia: string;
+}
+
+/**
+ * Que decir del PPC de la ultima semana, sin decir nada que no sea cierto.
+ *
+ * Hasta el 12/08/2026 esto era una sola frase fija: **«Menos de la mitad de lo
+ * prometido se cumple con regularidad»**, y salia con cualquier PPC por debajo
+ * de 70 —y tambien con un 85% que hubiera bajado desde 88—. Con el 62% real de
+ * la primera obra, GCM afirmaba en pantalla algo que sus propios numeros
+ * desmentian: 62 no es menos de la mitad.
+ *
+ * Importa mas de lo que parece. El panel «Que falta» se gana la atencion del
+ * residente diciendo consecuencias exactas; una sola frase que exagera ensena
+ * que aqui se exagera, y entonces tampoco se cree la que si es grave.
+ *
+ * Asi que la lectura se deriva del numero:
+ *
+ * - por debajo de 50, «menos de la mitad» ES literalmente cierto;
+ * - entre 50 y 70, se dice cuantos de cada diez se cumplieron y por que 70 es
+ *   la raya —debajo de ahi el plan ya no predice—;
+ * - por encima de 70 solo se habla si CAYO, y entonces lo unico que se dice es
+ *   que cayo, porque el nivel esta bien.
+ *
+ * Devuelve null cuando no hay nada que decir: PPC sano y sin caida.
+ */
+export function lecturaDelPpc(
+  ultimo: number | null,
+  anterior: number | null,
+): LecturaPpc | null {
+  if (ultimo === null) return null;
+
+  const ppc = Math.round(ultimo);
+  const cayo = anterior !== null && ultimo < anterior;
+  const bajo = ppc < PPC_PREOCUPANTE;
+
+  if (!bajo && !cayo) return null;
+
+  const titulo = `El PPC de la última semana fue ${ppc}%`;
+  const caida = cayo ? ` Baja desde ${Math.round(anterior)}%.` : "";
+
+  if (ppc < PPC_MENOS_DE_LA_MITAD) {
+    return {
+      gravedad: "critica",
+      titulo,
+      consecuencia:
+        `Menos de la mitad de lo que se promete se cumple: el plan semanal ya no predice nada. ` +
+        `Mira el Pareto de causas antes de comprometer la semana que viene.${caida}`,
+    };
+  }
+
+  if (bajo) {
+    // Se redondea a la baja: prometer «7 de cada 10» con un 69% seria el mismo
+    // defecto que se esta arreglando, en pequeno.
+    const diez = Math.floor(ppc / 10);
+    return {
+      gravedad: "critica",
+      titulo,
+      consecuencia:
+        `Se cumplieron algo más de ${diez} de cada 10 compromisos. Por debajo del ${PPC_PREOCUPANTE}% ` +
+        `la semana que viene se planifica sobre promesas que ya fallaron: mira el Pareto de causas ` +
+        `antes de comprometer.${caida}`,
+    };
+  }
+
+  // Nivel bueno, pero a menos. Se avisa sin dramatizar: una alarma que grita
+  // con un 85% ensena a ignorar la que suene con un 45%.
+  return {
+    gravedad: "aviso",
+    titulo,
+    consecuencia:
+      `El nivel sigue siendo bueno, pero va a menos.${caida} ` +
+      `Mira el Pareto de causas: dos semanas seguidas a la baja ya son una tendencia.`,
+  };
+}
 
 const ORDEN_BLOQUE: Record<BloquePendiente, number> = {
   entradas: 0,
@@ -213,23 +296,16 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
     });
   }
 
-  if (
-    c.ppcUltimo !== null &&
-    (c.ppcUltimo < PPC_PREOCUPANTE ||
-      (c.ppcAnterior !== null && c.ppcUltimo < c.ppcAnterior))
-  ) {
-    const cayo =
-      c.ppcAnterior !== null && c.ppcUltimo < c.ppcAnterior
-        ? ` Baja desde ${Math.round(c.ppcAnterior)}%.`
-        : "";
+  const ppc = lecturaDelPpc(c.ppcUltimo, c.ppcAnterior);
+  if (ppc) {
     salida.push({
       clave: "ppc-bajo",
       bloque: "salidas",
       // Un PPC bajo no rompe ningun dato: senala un problema de gestion, y de
       // eso avisa el Pareto de causas. Por eso avisa y no grita.
-      gravedad: c.ppcUltimo < PPC_PREOCUPANTE ? "critica" : "aviso",
-      titulo: `El PPC de la ultima semana fue ${Math.round(c.ppcUltimo)}%`,
-      consecuencia: `Menos de la mitad de lo prometido se cumple con regularidad: mira el Pareto de causas antes de comprometer la semana que viene.${cayo}`,
+      gravedad: ppc.gravedad,
+      titulo: ppc.titulo,
+      consecuencia: ppc.consecuencia,
       camino: "/plan-semanal",
       cuantos: 1,
     });
