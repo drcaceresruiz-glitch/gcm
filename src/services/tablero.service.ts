@@ -15,7 +15,11 @@ import { totalDeObra } from "@/services/presupuesto-obra";
 import { datosCurvaS, obtenerCronograma } from "@/services/cronograma.service";
 import { obtenerCalendario } from "@/services/calendario.service";
 import { listarPlanesSemanales } from "@/services/plan-semanal.service";
-import { confiabilidadDeVentana } from "@/services/lookahead.service";
+import {
+  confiabilidadDeVentana,
+  demoraDeLiberacion,
+  type DemoraLiberacion,
+} from "@/services/lookahead.service";
 import { MODULOS_POR_DEFECTO, type ModuloTablero } from "@/lib/tablero";
 import { pendientesDeObra, type Pendiente } from "@/lib/pendientes";
 import { diasSinReportar } from "@/lib/parte-diario";
@@ -136,6 +140,8 @@ export interface DatosTablero {
   planSemanal: DatosPlanSemanalTablero | null;
   /// Null sin permiso `lookahead:leer`.
   lookahead: DatosLookaheadTablero | null;
+  /// Cuanto tarda cada flujo en liberarse. Null sin permiso `lookahead:leer`.
+  liberacion: DemoraLiberacion | null;
   /// El EVM en resumen. Null sin cronograma con cortes o sin presupuesto:
   /// sin esas dos patas no hay valor ganado que medir.
   valorGanado: { metricas: MetricasEvm; corte: string } | null;
@@ -446,6 +452,11 @@ export async function datosTablero(
       cronograma && curva ? armarCronograma(cronograma, curva) : null,
     planSemanal: planes,
     lookahead,
+    // Se pide solo si el modulo esta encendido, como el resto: el tablero no
+    // paga consultas de lo que nadie mira.
+    liberacion: encendido("liberacion")
+      ? await demoraDeLiberacion(sesion, obraId)
+      : null,
     valorGanado,
     pendientes,
   };

@@ -96,6 +96,20 @@ export const MODULOS = [
     requiereCronograma: true,
   },
   {
+    // Va pegado al Lookahead porque se leen juntos: aquel dice cuánto está
+    // liberado HOY, y este cuánto suele costar liberarlo. La ventana se elige
+    // con el segundo.
+    //
+    // `requiereCronograma` es false a propósito: esto sale de restricciones ya
+    // guardadas, así que sigue contestando aunque el cronograma no esté
+    // cargado en ese momento.
+    clave: "liberacion",
+    etiqueta: "Demora por flujo",
+    nota: "Cuánto tarda en liberarse cada restricción",
+    ancho: 1,
+    requiereCronograma: false,
+  },
+  {
     clave: "causas",
     etiqueta: "Causa que más frena",
     nota: "El cuello de botella que más se repite",

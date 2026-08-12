@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  demoraPorFlujo,
+  ventanaRecomendada,
+  type DemoraFlujo,
+} from "@/lib/liberacion";
 
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
@@ -1379,4 +1384,51 @@ export async function alternarRestriccion(
     resuelta,
   });
   return r.ok ? { ok: true } : { ok: false, error: r.error };
+}
+
+export interface DemoraLiberacion {
+  /// Los flujos con casos, de mayor demora a menor. Los que no tienen, fuera.
+  flujos: DemoraFlujo[];
+  /// Semanas de ventana que pide el flujo mas lento. Null sin casos bastantes.
+  ventana: number | null;
+}
+
+/**
+ * Cuanto tarda en liberarse cada flujo en esta obra.
+ *
+ * Lee las restricciones YA RESUELTAS y las agrega por tipo. Es la unica
+ * pregunta del Lookahead que mira hacia atras a proposito: las demas dicen
+ * que falta hoy, y esta dice cuanto suele costar, que es lo que permite
+ * dimensionar la ventana en vez de heredarla.
+ *
+ * El filtro por empresa viaja en la relacion y no en un parametro, como en
+ * todo el resto del servicio.
+ */
+export async function demoraDeLiberacion(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<DemoraLiberacion | null> {
+  if (!puede(sesion, "lookahead:leer")) return null;
+
+  const filas = await prisma.restriccion.findMany({
+    where: {
+      resuelta: true,
+      resueltaAt: { not: null },
+      tarea: { projectId: obraId, project: { companyId: sesion.companyId } },
+    },
+    select: { tipo: true, createdAt: true, resueltaAt: true },
+  });
+
+  // El `resueltaAt` nulo ya lo excluye la consulta; el flatMap esta para que
+  // el tipo lo sepa tambien, sin un `!` que la proxima persona tenga que
+  // creerse.
+  const flujos = demoraPorFlujo(
+    filas.flatMap((f) =>
+      f.resueltaAt === null
+        ? []
+        : [{ tipo: f.tipo, createdAt: f.createdAt, resueltaAt: f.resueltaAt }],
+    ),
+  );
+
+  return { flujos, ventana: ventanaRecomendada(flujos) };
 }

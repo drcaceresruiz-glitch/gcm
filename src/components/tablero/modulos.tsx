@@ -81,6 +81,13 @@ export function moduloConDatos(
       return datos.planSemanal !== null;
     case "confiabilidad":
       return datos.lookahead !== null;
+    case "liberacion":
+      // Sin ningun flujo con casos no se pinta: un modulo con siete ceros
+      // diria que todo se libera al instante, que es lo contrario de "aun no
+      // hay con que responder".
+      return (
+        datos.liberacion !== null && datos.liberacion.flujos.length > 0
+      );
     case "valorGanado":
       return datos.valorGanado !== null;
     case "pendientes":
@@ -124,6 +131,9 @@ export function ModuloContenido({
       )}
       {modulo.clave === "confiabilidad" && datos.lookahead && (
         <Confiabilidad lk={datos.lookahead} obraId={obraId} />
+      )}
+      {modulo.clave === "liberacion" && datos.liberacion && (
+        <Demora dem={datos.liberacion} obraId={obraId} />
       )}
       {modulo.clave === "causas" && datos.planSemanal && (
         <Causas plan={datos.planSemanal} obraId={obraId} />
@@ -1448,5 +1458,53 @@ function Fila({
       </dt>
       <dd className="font-semibold tabular-nums">{valor}</dd>
     </div>
+  );
+}
+
+/** Cuanto tarda en liberarse cada flujo, de lo que mas frena hacia abajo. */
+function Demora({
+  dem,
+  obraId,
+}: {
+  dem: NonNullable<DatosTablero["liberacion"]>;
+  obraId: string;
+}) {
+  const peor = dem.flujos[0];
+
+  return (
+    <>
+      <Titulo icono={CalendarClock}>Demora por flujo</Titulo>
+
+      {peor && (
+        <p className="mt-1 text-2xl font-semibold tabular-nums">
+          {peor.dias} <span className="text-base font-normal">días</span>
+          <span className="ml-2 text-sm font-normal opacity-70">
+            {peor.etiqueta}
+          </span>
+        </p>
+      )}
+
+      <ul className="mt-2 space-y-1 text-xs">
+        {dem.flujos.slice(0, 4).map((f) => (
+          <li key={f.tipo} className="flex items-baseline justify-between gap-2">
+            <span className="truncate">{f.etiqueta}</span>
+            <span className="shrink-0 tabular-nums opacity-70">
+              {f.dias} d · mediana {f.mediana} · {f.casos}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      {dem.ventana !== null && (
+        <p className="mt-2 text-xs opacity-70">
+          El flujo más lento pide una ventana de {dem.ventana}{" "}
+          {dem.ventana === 1 ? "semana" : "semanas"}.
+        </p>
+      )}
+
+      <EnlaceModulo href={`/obras/${obraId}/lookahead`}>
+        Ver el Lookahead
+      </EnlaceModulo>
+    </>
   );
 }
