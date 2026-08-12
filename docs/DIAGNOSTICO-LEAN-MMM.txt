@@ -839,6 +839,14 @@ lista MANDA el orden de la rejilla.
   plan_semanal:gestionar. Repartir el analisis de restricciones no requiere
   desarrollo, requiere decision.
 
+  [CORRECCION v1.5] La ultima frase era medio cierta, y la mitad falsa costo
+  media jornada. El PERMISO no necesitaba ni una linea: ADMIN_OBRA lleva los
+  dos desde que existe la matriz. Lo que si necesitaba codigo era VER el
+  reparto. cumplimientoDeLiberacion agrega en total, y ese total sale
+  identico lo lleve una persona o lo lleven tres, de modo que un reparto
+  acordado se deshacia sin dejar rastro y volvia al residente. Resuelto en
+  fa56cf0; ver la seccion 34.
+
 
 16. ENFOQUE 4 - CAPACIDAD TECNOLOGICA E INFRAESTRUCTURA              3,0 / 5
 --------------------------------------------------------------------------------
@@ -1659,10 +1667,16 @@ prioridad:
   FUERA DE FASES - DECISION ORGANIZATIVA
   ..............................................................................
 
-    H-4 no requiere desarrollo. Repartir lookahead:gestionar y
-    plan_semanal:gestionar entre residente y administrador de obra es una
-    decision que el sistema ya soporta hoy. Se puede tomar esta semana y su
+    H-4 es ante todo una decision: repartir lookahead:gestionar y
+    plan_semanal:gestionar entre residente y administrador de obra es algo
+    que el sistema soporta desde siempre. Se puede tomar esta semana y su
     efecto se mide con el PPC y la confiabilidad de las siguientes.
+
+    [v1.5] Pero no era SOLO decision, y darlo por tal fue un error de esta
+    misma seccion. Un reparto que nadie puede mirar no se sostiene, y GCM no
+    tenia donde mirarlo. El desglose por responsable (fa56cf0) es media
+    jornada de trabajo, no una fase, pero sin el la decision no aguanta un
+    mes.
 
 
 30. CRITERIOS DE ACEPTACION GLOBALES
@@ -1821,10 +1835,11 @@ prioridad:
        historial y el PTS avisa al prometer de mas. La        4566eb0
        fase B —horas-hombre— sigue sin datos que la
        sostengan.
-  H-4  ABIERTO, y no por falta de trabajo: repartir el          --
-       analisis de restricciones entre residente y
-       administrador de obra no necesita una linea de
-       codigo. Es una decision organizativa.
+  H-4  RESUELTO en lo que era codigo. El permiso ya          fa56cf0
+       estaba; lo que faltaba era ver el reparto, y la
+       matriz lista ya las abiertas y las vencidas de
+       cada persona. Tomar la decision sigue siendo
+       de la obra, no del sistema.
   H-5  RESUELTO. El emisor dormido y la version sin           6f53f64
        aplicar suben a los avisos de empresa.
   H-6  RESUELTO. La demora media por flujo tiene su modulo    0ee535a
@@ -1856,6 +1871,18 @@ prioridad:
   pero el primer `instanceof` que alguien escribiera habria dejado pasar en
   silencio las otras dos. Unificada en `lib/errores.ts` (59e9b52).
 
+  ESLINT AUDITABA LOS WORKTREES. .claude/ esta en .gitignore desde siempre,
+  pero ESLint no lo sabia, y cada worktree de trabajo es una copia entera del
+  repo: una rama ajena en curso podia tumbar el lint de main sin que nadie
+  hubiera tocado main. Es exactamente lo que paso al cerrar H-4. Excluido en
+  fa56cf0.
+
+  UN CUARTO DESAJUSTE DEL MANUAL, y del mismo criterio G6: el desglose por
+  responsable se subio sin el capitulo 9.2, y el capitulo llego en el commit
+  siguiente. Cuatro veces incumplido un criterio que esta escrito en la
+  seccion 30 de este mismo documento. Un criterio que solo vive en un txt no
+  es un criterio; el sitio donde tendria que vivir es el gancho de commit.
+
   TRES DESAJUSTES DEL MANUAL, los tres provocados por cambios de esta misma
   tanda: el recuento de modulos del panel dos veces (12 -> 13 -> 14) y la
   frase «los tres resaltados» cuando ya eran cuatro. El criterio G6 de la
@@ -1877,8 +1904,10 @@ prioridad:
      entrada que este plan fijaba. Quien los ajuste no contradice ninguna
      medicion: no la hubo.
 
-  H-4 - repartir la carga del residente
-     Decision organizativa, sin desarrollo.
+  H-4 - TOMAR la decision de repartir
+     El codigo ya no estorba: los permisos estaban y el desglose por
+     responsable se ve en el Lookahead. Lo que queda es que la obra acuerde
+     quien lleva que, y eso no lo decide una aplicacion.
 
   (H-7 se resolvio con la Fase 4. Ver la seccion 37.)
 
