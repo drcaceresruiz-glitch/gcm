@@ -1,4 +1,6 @@
 import "server-only";
+import { estadoDelEmisor } from "@/lib/emisor-sms";
+import { verificarSalud } from "@/services/salud.service";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
@@ -244,6 +246,7 @@ const datosAlertasEmpresa = cache(async function datosAlertasEmpresa(
           obraId,
           obraNombre: nombrePorId.get(obraId) ?? "Obra",
           clave: "sobregiro",
+          camino: `/obras/${obraId}`,
           texto:
             n === 1
               ? "1 partida comprometida por encima de su presupuesto"
@@ -258,18 +261,81 @@ const datosAlertasEmpresa = cache(async function datosAlertasEmpresa(
       obraId: obra.id,
       obraNombre: obra.nombreObra,
       clave: "plazo",
+      camino: `/obras/${obra.id}`,
       texto: `El plazo vencio hace ${diasEntre(obra.fechaFinProgramada, new Date())} dia(s)`,
     });
+  }
+
+  // --- Avisos de la EMPRESA, que no son de ninguna obra ---------------------
+  //
+  // Van con los demas y no en una pantalla aparte porque el sintoma se sufre
+  // en la obra: al residente no le llega el codigo, o esta mirando datos de
+  // una version que ya no corre. Los dos detectores existian desde hace
+  // tiempo; lo que faltaba era que hablaran donde alguien mira.
+  //
+  // Solo para quien puede actuar. `configuracion:editar` es justo el permiso
+  // que gobierna el telefono emisor, y es innegociable, asi que esto no puede
+  // acabar en la pantalla de un consultor por reconfiguracion de nadie.
+  if (puede(sesion, "configuracion:editar")) {
+    const ahora = new Date();
+
+    const emisores = await prisma.emisorSms.findMany({
+      where: { companyId: sesion.companyId, activo: true },
+      select: { ultimaConsultaAt: true },
+    });
+
+    // Basta UNO despierto: los otros son respaldo, y avisar porque un
+    // respaldo duerme seria una alarma encendida casi siempre.
+    const algunoVivo = emisores.some(
+      (e) => estadoDelEmisor(e.ultimaConsultaAt, ahora) === "vivo",
+    );
+
+    if (emisores.length > 0 && !algunoVivo) {
+      alertas.push({
+        obraId: null,
+        obraNombre: "Mensajeria de la empresa",
+        clave: "emisor-dormido",
+        texto:
+          "Ningun telefono emisor esta respondiendo: los codigos de acceso no estan saliendo.",
+        camino: "/empresa/configuracion",
+      });
+    }
+
+    const salud = await verificarSalud();
+    if (salud.desplieguePendiente) {
+      alertas.push({
+        obraId: null,
+        obraNombre: "Version del sistema",
+        clave: "despliegue-pendiente",
+        texto:
+          "Hay una version subida sin aplicar: lo que se ve no es la ultima.",
+        camino: "/empresa/configuracion",
+      });
+    }
   }
 
   return { alertas, partidasSobregiradas, obrasConPlazoVencido: vencidas.length };
 });
 
 export interface AlertaEmpresa {
-  obraId: string;
+  /// null cuando la alerta es de la EMPRESA y no de una obra concreta.
+  obraId: string | null;
+  /// El nombre de la obra, o el del ambito cuando no hay obra.
   obraNombre: string;
-  clave: "sobregiro" | "plazo";
+  clave:
+    | "sobregiro"
+    | "plazo"
+    | "emisor-dormido"
+    | "despliegue-pendiente";
   texto: string;
+  /**
+   * A donde se va a arreglar.
+   *
+   * Las de obra llevan a la obra; las de empresa, a su configuracion. Es
+   * obligatorio a proposito: un aviso que no dice donde se arregla obliga a
+   * buscarlo, y entonces se ignora.
+   */
+  camino: string;
 }
 
 /**

@@ -63,7 +63,7 @@ export function AlertasEmpresa({ alertas }: { alertas: AlertaEmpresa[] }) {
           <ul className="mt-2 space-y-2">
             {alertas.map((a, i) => (
               <li
-                key={`${a.obraId}-${a.clave}-${i}`}
+                key={`${a.obraId ?? "empresa"}-${a.clave}-${i}`}
                 className="flex items-start gap-2 text-xs"
               >
                 <AlertTriangle
@@ -72,8 +72,15 @@ export function AlertasEmpresa({ alertas }: { alertas: AlertaEmpresa[] }) {
                   aria-hidden="true"
                 />
                 <span className="min-w-0">
+                  {/*
+                    El enlace lo dice el aviso, no esta pantalla. Las de obra
+                    llevan a la obra; las de la empresa —el emisor dormido, la
+                    version sin aplicar— a su configuracion, que es donde se
+                    arreglan. Componer aqui la ruta obligaria a saber de que
+                    tipo es cada aviso, que es justo lo que el servicio ya sabe.
+                  */}
                   <Link
-                    href={`/obras/${a.obraId}`}
+                    href={a.camino}
                     className="font-medium underline underline-offset-2"
                   >
                     {a.obraNombre}
