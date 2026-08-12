@@ -572,7 +572,7 @@ lista MANDA el orden de la rejilla.
 
   M     ENF  ENFOQUE                        v1.0   v1.1   SEVERIDAD
   ----  ---  -----------------------------  -----  -----  -------------
-  MURA   1   Estructura y estandares        4,0    4,0    Media
+  MURA   1   Estructura y estandares        4,0    4,5    Baja
   MURA   2   Informacion y sincronizacion   4,5    5,0    Baja
   MURI   3   Fatiga humana y perfiles       0,0    0,0    *** CRITICA ***
   MURI   4   Capacidad tecnologica          2,5    3,0    Media
@@ -639,7 +639,7 @@ lista MANDA el orden de la rejilla.
   E1.5  WbsType separa lo que agrupa de lo que lleva dinero, e impide por
         construccion imputar costo a un capitulo.
 
-  HALLAZGO H-1  [SEVERIDAD MEDIA]   -- CONFIRMADO EN LA REVISION
+  HALLAZGO H-1  [SEVERIDAD MUY BAJA]   -- RETIRADO EN LA REVISION 1.2
   ..............................................................................
   LA MODALIDAD DE CONTRATACION ESTA REGISTRADA PERO NO GOBIERNA NINGUN CALCULO
 
@@ -652,18 +652,21 @@ lista MANDA el orden de la rejilla.
                         asume el contratista.
      ALCANCE            detalle dentro de una suma alzada, sin importe propio.
 
-  VERIFICACION, repetida sobre el arbol real: de los cuatro modulos que
-  calculan avance, curva y valor ganado -evm.service.ts,
-  cronograma.service.ts, presupuesto-obra.ts y curva-s.ts-, el numero de
-  ellos que menciona "modalidad" es CERO.
+  LO QUE SE MIDIO, Y LO QUE SE DEDUJO MAL DE ELLO
 
-  La modalidad se captura, se guarda, se muestra y se filtra, y DESAPARECE en
-  el momento del calculo. El avance, la curva S y el EVM tratan una suma
-  alzada igual que unos precios unitarios.
+  El dato era cierto: de los cuatro modulos que calculan avance, curva y
+  valor ganado -evm.service.ts, cronograma.service.ts, presupuesto-obra.ts y
+  curva-s.ts-, ninguno menciona "modalidad".
 
-  CONSECUENCIA: la misma cifra de avance significa cosas distintas segun la
-  partida y nada lo advierte. Es MURA en la unidad de medida, y contamina
-  todo lo que se calcula por encima.
+  La conclusion que se saco de ahi -"el avance trata igual una suma alzada
+  que unos precios unitarios"- es FALSA, y la fase de diseno de P-8 lo
+  demostro. Ver el anexo D.
+
+  En una linea: la modalidad gobierna el calculo UNA vez, donde se deriva el
+  importe, y todo lo de arriba pondera por ese importe. Los consumidores no
+  necesitan conocerla porque ya la heredan. Que no la mencionen no es un
+  descuido: es la senal de que la distincion se aplico en el sitio correcto y
+  no se re-litiga en cada pantalla.
 
 
 14. ENFOQUE 2 - INFORMACION Y SINCRONIZACION                         5,0 / 5
@@ -1026,7 +1029,7 @@ lista MANDA el orden de la rejilla.
 
   ID   ENF  TITULO                                    SEVER.   ESTADO v1.1
   ---  ---  ----------------------------------------  -------  ------------
-  H-1   1   La modalidad no gobierna el calculo       Media    Confirmado
+  H-1   1   La modalidad SI gobierna, donde debe      Muy baja RETIRADO v1.2
   H-2   2   Sin senal de cronograma desactualizado    Baja     Confirmado
   H-3   3   Capacidad a medias, carga sin agregar     CRITICA  Confirmado
   H-4   3   Concentracion de carga en el residente    Media    Confirmado
@@ -1475,9 +1478,15 @@ prioridad:
     empezar por una sola familia (obras) y decidir con ese coste medido.
 
 
-28. P-8  LA MODALIDAD GOBIERNA EL CALCULO                      [H-1]  BAJA*
+28. P-8  LA MODALIDAD GOBIERNA EL CALCULO            [H-1]  RETIRADA v1.2
 --------------------------------------------------------------------------------
-                                              * baja urgencia, alta profundidad
+  NO SE IMPLEMENTA. La fase de diseno que este plan exigia antes de tocar
+  codigo se hizo el 12 de agosto de 2026, y su conclusion fue que la
+  propuesta sobra: lo que pedia construir ya estaba construido, en el sitio
+  correcto. El razonamiento y las cuatro respuestas estan en el ANEXO D.
+
+  Lo que sigue es el texto original de la propuesta, que se conserva para que
+  se vea que se pregunto y por que la respuesta la retiro.
 
   PROBLEMA
     ModalidadPartida distingue tres casos con consecuencias economicas
@@ -1890,3 +1899,100 @@ ANEXO C - CORRECCIONES PENDIENTES EN EL MANUAL DEL RESIDENTE
    GCM - Diagnostico Lean (MMM)  ...  version 1.0  ...  11 de agosto de 2026
    Fuente: C:\Projects\PROYECTO_CONSTRUCCION  ...  gcm.drcaceresruiz.com
 ================================================================================
+
+
+ANEXO D - FASE DE DISENO DE P-8, Y POR QUE LA RETIRA
+--------------------------------------------------------------------------------
+
+  El plan exigia disenar antes de escribir codigo, con cuatro preguntas que
+  responder. Se respondieron el 12 de agosto de 2026 leyendo el codigo, y la
+  conclusion fue que la propuesta sobra.
+
+  D.1  LO QUE LA VERSION 1.0 AFIRMO, Y POR QUE PARECIA CIERTO
+
+  Se midio que ninguno de los cuatro modulos de calculo menciona "modalidad",
+  y de ahi se dedujo que el avance trata igual una suma alzada que unos
+  precios unitarios. El dato era correcto; la deduccion, no.
+
+  Faltaba mirar UNA capa mas abajo: donde nace el importe.
+
+  D.2  LAS CUATRO PREGUNTAS, RESPONDIDAS
+
+  1. En SUMA_ALZADA, .que significa "60 % ejecutado"?
+
+     El 60 % del ALCANCE PACTADO, que es lo que significa en el contrato. El
+     avance de la tarea se aplica sobre el `parcial` de la partida, y en una
+     suma alzada ese parcial es el precio cerrado. No hay ambiguedad que
+     resolver: ya se comporta como debe.
+
+  2. Las filas ALCANCE no tienen importe propio. .Como se reparte el avance
+     del padre entre ellas?
+
+     No se reparte, y no hace falta. Dos mecanismos ya lo resuelven:
+
+       - El importador les pone `parcial: null` y deja el importe entero en
+         la fila que encabeza el bloque (excel-presupuesto.ts).
+       - La pantalla de mapeo NO las ofrece: solo son enlazables las partidas
+         con parcial positivo (mapeo.service.ts:102).
+
+     Asi que un bloque a suma alzada se mapea por su cabecera, que lleva los
+     79.727,33 enteros. No hay peso perdido ni contado dos veces.
+
+  3. Si el metrado real supera al previsto, .puede el avance pasar del 100 %?
+
+     No, y ademas la pregunta no llega a plantearse: GCM no tiene el concepto
+     de "metrado real". La ejecucion se mide en porcentaje -que viene de
+     Project y esta acotado- y en dinero valorizado por encargos. No hay
+     ningun punto donde un metrado ejecutado pueda recalcular un importe.
+
+  4. .Que hace el EVM con una suma alzada?
+
+     Lo correcto: valor ganado = porcentaje x parcial pactado. Como el
+     parcial de una suma alzada ES el precio cerrado, el resultado ya es el
+     que pide el metodo.
+
+  D.3  DONDE SI GOBIERNA LA MODALIDAD, Y POR QUE ESO BASTA
+
+  partidas.service.ts lo dice en su propio comentario:
+
+     "El importe solo se recalcula en partidas a precios unitarios. En una
+      partida a suma alzada el precio esta cerrado y el metrado es
+      referencial: corregir ese metrado no puede alterar un importe ya
+      pactado con el contratista. Y en una fila de alcance el dinero vive en
+      su partida padre, asi que tampoco tiene importe propio que recalcular."
+
+  Es decir: la distincion se aplica UNA vez, en el unico sitio donde tiene
+  consecuencia -la derivacion de `parcial`-, y todo lo que viene despues
+  pondera por ese importe ya correcto.
+
+  Que los modulos de calculo no mencionen la modalidad no es un descuido: es
+  la senal de que no tienen que conocerla. Un avance, una curva y un EVM que
+  preguntaran por la modalidad estarian re-litigando en cada pantalla una
+  decision ya tomada, y bastaria que uno de los cuatro la interpretara
+  distinto para que dos cifras del mismo sistema dejaran de cuadrar.
+
+  Los encargos confirman el patron desde otro lado: valorizan sobre
+  `parcial x fraccion` -dinero-, no sobre metrado, asi que tampoco necesitan
+  saber de que modalidad viene ese dinero.
+
+  D.4  QUE HARIA FALTA PARA QUE P-8 VOLVIERA A HACER FALTA
+
+  Un solo cambio la resucita: que GCM empiece a guardar METRADO EJECUTADO y a
+  derivar de el algun importe. Ahi si habria que preguntar la modalidad antes
+  de recalcular, porque en suma alzada la respuesta seria "no toques el
+  importe".
+
+  La Fase 4 del proyecto -"que cumplio se calcule desde la cantidad
+  ejecutada"- se acerca a ese terreno sin llegar a pisarlo: usa la cantidad
+  para decidir si un compromiso se cumplio, no para mover dinero. Si algun
+  dia esa cantidad alimentara una valorizacion, hay que releer este anexo.
+
+  D.5  LECCION SOBRE EL METODO DEL DIAGNOSTICO
+
+  El paso 4 del metodo -verificar toda afirmacion de ausencia- se cumplio: se
+  comprobo que la palabra no aparece en esos cuatro archivos. Lo que fallo
+  fue el paso siguiente, que no estaba escrito: comprobar que la AUSENCIA
+  significa lo que uno cree que significa.
+
+  Una ausencia puede ser un hueco o puede ser una separacion de
+  responsabilidades bien hecha, y las dos se parecen mucho desde un grep.
