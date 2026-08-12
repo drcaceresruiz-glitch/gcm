@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { Permiso } from "@/lib/rbac";
+import { SinPermisoError } from "@/lib/errores";
 
 /**
  * El aislamiento entre empresas, que es la frontera que sostiene el producto.
@@ -162,6 +163,17 @@ describe("obras", () => {
 
   it("sin permiso no llega a consultar nada", async () => {
     await exigeNiTocarLaBase(() => listarObras(sesion(MIA, [])));
+  });
+
+  it("el error de permiso es la clase compartida, no una copia local", async () => {
+    // Estuvo declarada TRES veces, con el mismo nombre y el mismo cuerpo, en
+    // obras, perfil y usuarios. Nadie la capturaba por tipo, asi que no
+    // fallaba nada; pero el dia que alguien escriba un `instanceof`
+    // importandola de uno de los tres, dejaria pasar las de los otros dos en
+    // silencio. Si vuelve a declararse en local, esta prueba lo dice.
+    await expect(listarObras(sesion(MIA, []))).rejects.toBeInstanceOf(
+      SinPermisoError,
+    );
   });
 
   it("toda consulta lleva el companyId de la sesion", async () => {

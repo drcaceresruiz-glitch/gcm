@@ -1,4 +1,5 @@
 import "server-only";
+import { SinPermisoError } from "@/lib/errores";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
@@ -29,13 +30,6 @@ import type { SesionActiva } from "@/services/sesion.service";
  * Regla de aislamiento: el `companyId` sale SIEMPRE de la sesion, nunca de
  * un parametro de la peticion.
  */
-
-export class SinPermisoError extends Error {
-  constructor(mensaje = "No tienes permiso para esta operacion.") {
-    super(mensaje);
-    this.name = "SinPermisoError";
-  }
-}
 
 export type Resultado = { ok: true } | { ok: false; error: string };
 

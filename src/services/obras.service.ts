@@ -1,4 +1,5 @@
 import "server-only";
+import { SinPermisoError } from "@/lib/errores";
 import { estadoDelEmisor } from "@/lib/emisor-sms";
 import { verificarSalud } from "@/services/salud.service";
 import { cache } from "react";
@@ -37,13 +38,6 @@ import type { SesionActiva } from "@/services/sesion.service";
  * un parametro de la peticion. Es lo unico que impide que un usuario de una
  * empresa vea las obras de otra manipulando un identificador en la URL.
  */
-
-export class SinPermisoError extends Error {
-  constructor(mensaje = "No tienes permiso para esta operacion.") {
-    super(mensaje);
-    this.name = "SinPermisoError";
-  }
-}
 
 export interface ObraResumen {
   id: string;

@@ -1,4 +1,5 @@
 import "server-only";
+import { SinPermisoError } from "@/lib/errores";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { hashPassword } from "@/lib/password";
@@ -36,13 +37,6 @@ import type { Role } from "@/generated/prisma/enums";
  *  - Nadie se degrada ni se desactiva a si mismo. Evita el autobloqueo y
  *    cierra la puerta a errores irreversibles con un clic.
  */
-
-export class SinPermisoError extends Error {
-  constructor(mensaje = "No tienes permiso para esta operacion.") {
-    super(mensaje);
-    this.name = "SinPermisoError";
-  }
-}
 
 export type Resultado = { ok: true } | { ok: false; error: string };
 
