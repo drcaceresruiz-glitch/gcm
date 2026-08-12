@@ -9,6 +9,8 @@ import {
 function limpio(cambios: Partial<ConteoPendientes> = {}): ConteoPendientes {
   return {
     tareasEmpezadasSinAvance: 0,
+    tareasConAvanceViejo: 0,
+    diasSinReportar: 3,
     semanasSinPorcentaje: 0,
     incumplidosSinRetomar: 0,
     incumplidosCronicos: 0,
@@ -44,6 +46,7 @@ describe("pendientesDeObra", () => {
     const todos = pendientesDeObra(
       limpio({
         tareasEmpezadasSinAvance: 3,
+        tareasConAvanceViejo: 7,
         semanasSinPorcentaje: 1,
         lookaheadSinAnalizar: 18,
         confiabilidadMostrada: 24,
@@ -61,12 +64,27 @@ describe("pendientesDeObra", () => {
       }),
     );
 
-    expect(todos.length).toBe(12);
+    expect(todos.length).toBe(13);
     for (const p of todos) {
       expect(p.camino, p.clave).toMatch(/^\//);
       // En imperativo y con sustancia: "Ver" o "Ir" no dicen que hacer.
       expect(p.accion.length, p.clave).toBeGreaterThan(20);
     }
+  });
+
+  it("«nunca reportada» y «se quedo atras» son dos avisos distintos", () => {
+    // No se arreglan en el mismo sitio: la que nunca se toco se abre en el
+    // cronograma; las que se quedaron atras salen todas juntas en el parte del
+    // dia. Fundirlas en un aviso mandaria a la mitad al sitio equivocado.
+    expect(claves({ tareasEmpezadasSinAvance: 3 })).toEqual(["avance-sin-reportar"]);
+
+    const [p] = pendientesDeObra(limpio({ tareasConAvanceViejo: 7 }));
+    expect(p?.clave).toBe("avance-desatrasado");
+    expect(p?.camino).toBe("/avance");
+    // Es un aviso y no una critica: la tarea SE esta reportando, solo que
+    // tarde. Gritar aqui gasta la atencion que necesita lo que nunca se tocó.
+    expect(p?.gravedad).toBe("aviso");
+    expect(p?.titulo).toContain("3 días laborables");
   });
 
   it("el enlace del Lookahead abre la ventana que el propio aviso anuncia", () => {

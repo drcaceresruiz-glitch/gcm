@@ -18,6 +18,7 @@ import { listarPlanesSemanales } from "@/services/plan-semanal.service";
 import { confiabilidadDeVentana } from "@/services/lookahead.service";
 import { MODULOS_POR_DEFECTO, type ModuloTablero } from "@/lib/tablero";
 import { pendientesDeObra, type Pendiente } from "@/lib/pendientes";
+import { diasSinReportar } from "@/lib/parte-diario";
 import { arrastreDeIncumplidos } from "@/lib/plan-semanal";
 import { cumplimientoDeLiberacion } from "@/lib/lookahead-compromiso";
 import { cobertura } from "@/lib/mapeo-partidas";
@@ -243,6 +244,17 @@ const PUNTOS_MINI = 80;
  * que hace util un aviso.
  */
 const DIAS_PROXIMAS = 14;
+
+/**
+ * Cuantos dias laborables puede pasar una tarea abierta sin reportarse antes de
+ * que se avise.
+ *
+ * Tres: con el parte del dia, reportar cuesta un envio, asi que tres dias
+ * laborables sin tocar una partida viva ya no es «no me ha dado tiempo». Y es
+ * menos de una semana a proposito: el residente que lo deja para el viernes
+ * —antes del reporte del sabado— llega a tiempo de verlo.
+ */
+const DIAS_SIN_REPORTAR = 3;
 
 /**
  * El presupuesto cuando su modulo esta apagado.
@@ -738,6 +750,19 @@ async function pendientesDeLaObra(
     (t) => t.inicio <= ahora && t.avance === null,
   ).length;
 
+  // Las que SI se reportaron alguna vez y se estan quedando atras. Es otro
+  // problema y tiene otro arreglo —el parte del dia, que las saca todas
+  // juntas—, asi que se cuenta aparte. Se mide en dias LABORABLES: contar en
+  // dias naturales convertiria cualquier fin de semana en un aviso.
+  const calendario = await obtenerCalendario(sesion, obraId);
+  const tareasConAvanceViejo = trabajo.filter(
+    (t) =>
+      t.inicio <= ahora &&
+      t.avance !== null &&
+      Number(t.porcentajeReal) < 100 &&
+      diasSinReportar(t.avance.fecha, ahora, calendario) > DIAS_SIN_REPORTAR,
+  ).length;
+
   const proximas = trabajo.filter(
     (t) => t.inicio > ahora && t.inicio <= limite,
   );
@@ -921,6 +946,8 @@ async function pendientesDeLaObra(
 
   return pendientesDeObra({
     tareasEmpezadasSinAvance,
+    tareasConAvanceViejo,
+    diasSinReportar: DIAS_SIN_REPORTAR,
     semanasSinPorcentaje,
     restriccionesVencidas: promesas.vencidasAbiertas,
     restriccionesSinResponsable: promesas.sinAsignar,

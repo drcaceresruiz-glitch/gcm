@@ -1356,6 +1356,19 @@ reglas solo se han visto en pruebas.
 - **La cookie vieja `gcm-tablero`** sigue en los navegadores, ignorada desde
   que se paso a `gcm-tablero-off`. Inofensiva; caduca sola dentro de un ano.
 
+- **`src/lib/calendario.ts` cuenta los dias en hora LOCAL.** `diaIso` usa
+  `getDay()` y `diasLaborablesEntre` usa `setHours()`, pero las fechas de obra
+  vienen de columnas `@db.Date`, que Prisma devuelve a **medianoche UTC**. En
+  Peru (UTC−5) eso desplaza el dia entero: una fecha que es sabado se lee como
+  viernes, y `esLaborable` responde por el dia equivocado. Se descubrio el
+  12/08/2026 escribiendo el test del sabado de CRIOCORD.
+
+  No se arreglo de paso porque `diasLaborablesEntre` ya lo usan el plazo de la
+  obra y el Lookahead, y cambiarlo mueve numeros que hoy alguien esta mirando:
+  toca hacerlo con sus tests delante. Mientras tanto, **`parte-diario.ts` no lo
+  arrastra**: cuenta en UTC con sus propios ayudantes, igual que `curva-s.ts`.
+  Si se arregla `calendario.ts`, esos ayudantes privados sobran.
+
 ---
 
 ## 8. Documentacion

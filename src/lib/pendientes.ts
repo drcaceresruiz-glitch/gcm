@@ -74,6 +74,17 @@ export interface Pendiente {
 export interface ConteoPendientes {
   /// Tareas cuyo inicio ya paso y no tienen ningun avance reportado.
   tareasEmpezadasSinAvance: number;
+  /**
+   * Tareas abiertas que SI se reportaron alguna vez pero llevan demasiado sin
+   * volver a reportarse.
+   *
+   * No es lo mismo que `tareasEmpezadasSinAvance` y no se arregla igual:
+   * aquellas nunca se tocaron —hay que empezar—, y estas se estan quedando
+   * atras poco a poco, que es lo que no se ve mirando la tabla.
+   */
+  tareasConAvanceViejo: number;
+  /// Dias laborables a partir de los cuales se considera viejo un reporte.
+  diasSinReportar: number;
   /// Semanas CERRADAS donde algun compromiso quedo sin % alcanzado.
   semanasSinPorcentaje: number;
   /**
@@ -254,6 +265,26 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       accion:
         "En la tabla del cronograma, pulsa «Reportar» en cada tarea y anota el % que lleva.",
       camino: "/cronograma",
+      cuantos: n,
+    });
+  }
+
+  // Distinta de la anterior a proposito: aquella habla de tareas que NUNCA se
+  // reportaron; esta, de las que se estan quedando atras. Se arreglan en sitios
+  // distintos —esta, en el parte del dia, que las saca todas juntas— y por eso
+  // no se pueden fundir en un solo aviso.
+  if (c.tareasConAvanceViejo > 0) {
+    const n = c.tareasConAvanceViejo;
+    salida.push({
+      clave: "avance-desatrasado",
+      bloque: "entradas",
+      gravedad: "aviso",
+      titulo: `${n} ${plural(n, "tarea abierta lleva", "tareas abiertas llevan")} más de ${c.diasSinReportar} ${plural(c.diasSinReportar, "día laborable", "días laborables")} sin reportar`,
+      consecuencia:
+        "La curva S y el valor ganado siguen contando el último porcentaje conocido: la obra se ve más atrasada de lo que está.",
+      accion:
+        "Abre el parte del día: salen todas juntas y se guardan de una vez.",
+      camino: "/avance",
       cuantos: n,
     });
   }

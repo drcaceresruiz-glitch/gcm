@@ -111,6 +111,16 @@ export default async function ObraLayout({
       clave: "lookahead",
       grupo: "ejecucion",
     },
+    // El parte del dia va el primero de EJECUCION: es lo que se toca a diario,
+    // y desde el sale el avance que alimenta la curva S, el informe y el PPC.
+    // Manda `cronograma:leer` —no `avance:registrar`— porque la pantalla se
+    // puede mirar sin poder reportar; el boton es lo que exige el permiso.
+    puede(sesion, "cronograma:leer") && {
+      href: `${raiz}/avance`,
+      etiqueta: "Parte del día",
+      clave: "avance",
+      grupo: "ejecucion",
+    },
     // El plan semanal (Last Planner) cuelga del cronograma: es su corto plazo.
     puede(sesion, "plan_semanal:leer") && {
       href: `${raiz}/plan-semanal`,

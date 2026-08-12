@@ -56,7 +56,7 @@ export interface Capitulo {
 }
 
 /**
- * Agrupa las tareas por capitulo y pondera cada uno por duracion.
+ * Cada capitulo con las tareas que cuelgan de el, en el orden del documento.
  *
  * Los capitulos son el nivel de esquema inmediatamente por debajo del mas
  * alto: en el archivo real, la fila del proyecto esta en el nivel 1 y los
@@ -68,17 +68,22 @@ export interface Capitulo {
  * funciona un esquema: son las que vienen despues hasta la primera que vuelve
  * a su nivel o mas arriba. Buscarlas por prefijo de codigo fallaria, porque
  * "7.3.1" es hermana de "7.3" y no su hija.
+ *
+ * Se extrajo para que `agruparPorCapitulo` y `capituloDeCadaTarea` compartan la
+ * regla en vez de copiarla: son la misma pregunta —«¿que cuelga de que?»— y dos
+ * copias acabarian agrupando distinto sin que nada fallara.
  */
-export function agruparPorCapitulo(
+function recorrerCapitulos(
   tareas: readonly TareaControlada[],
-): Capitulo[] {
+): { cabecera: TareaControlada; descendientes: TareaControlada[] }[] {
   if (tareas.length === 0) return [];
 
   const orden = [...tareas].sort((a, b) => a.fila - b.fila);
   const nivelRaiz = Math.min(...orden.map((t) => t.nivel));
   const nivelCapitulo = nivelRaiz + 1;
 
-  const capitulos: Capitulo[] = [];
+  const salida: { cabecera: TareaControlada; descendientes: TareaControlada[] }[] =
+    [];
 
   for (let i = 0; i < orden.length; i++) {
     const cabecera = orden[i]!;
@@ -88,7 +93,19 @@ export function agruparPorCapitulo(
     for (let j = i + 1; j < orden.length && orden[j]!.nivel > nivelCapitulo; j++) {
       descendientes.push(orden[j]!);
     }
+    salida.push({ cabecera, descendientes });
+  }
 
+  return salida;
+}
+
+/** Agrupa las tareas por capitulo y pondera cada uno por duracion. */
+export function agruparPorCapitulo(
+  tareas: readonly TareaControlada[],
+): Capitulo[] {
+  const capitulos: Capitulo[] = [];
+
+  for (const { cabecera, descendientes } of recorrerCapitulos(tareas)) {
     // Un capitulo sin descendientes es el mismo una partida de trabajo: se
     // mide con sus propias cifras en vez de quedarse a cero.
     const medibles = descendientes.length > 0 ? descendientes : [cabecera];
@@ -125,6 +142,29 @@ export function agruparPorCapitulo(
   }
 
   return capitulos;
+}
+
+/**
+ * De que capitulo cuelga cada tarea: uid de la tarea -> uid del capitulo.
+ *
+ * Usa el MISMO recorrido que `agruparPorCapitulo` —`recorrerCapitulos`— y no
+ * una copia: si la regla de "que cuelga de que" divergiera, el parte diario
+ * agruparia de una forma y el informe de otra, y no habria manera de saber
+ * cual de las dos miente.
+ *
+ * La cabecera del capitulo tambien se apunta a si misma: un capitulo sin
+ * descendientes es el mismo una partida de trabajo, igual que en
+ * `agruparPorCapitulo`.
+ */
+export function capituloDeCadaTarea(
+  tareas: readonly TareaControlada[],
+): Map<number, number> {
+  const mapa = new Map<number, number>();
+  for (const { cabecera, descendientes } of recorrerCapitulos(tareas)) {
+    mapa.set(cabecera.uid, cabecera.uid);
+    for (const d of descendientes) mapa.set(d.uid, cabecera.uid);
+  }
+  return mapa;
 }
 
 export type Severidad = "alta" | "media" | "baja";

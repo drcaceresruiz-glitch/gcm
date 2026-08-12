@@ -9,6 +9,17 @@ import {
 } from "@/lib/cronograma";
 import { normalizarDecimal, restar } from "@/lib/decimal";
 import { obraAdmiteCambios, OBRA_CERRADA } from "@/lib/obras";
+import {
+  diasSinReportar,
+  filasDelParte,
+  tareasAbiertas,
+  ultimoDiaLaborableDeLaSemana,
+  validarLoteAvance,
+  type EntradaParte,
+  type GrupoParte,
+} from "@/lib/parte-diario";
+import { capituloDeCadaTarea } from "@/lib/control-avance";
+import { obtenerCalendario } from "@/services/calendario.service";
 import { hoy as hoyCalendario } from "@/utils/fechas";
 import {
   curvaPlaneada,
@@ -679,6 +690,181 @@ export async function registrarAvance(
 /** Hoy como fecha de calendario. Fuente unica: `hoy()` de `@/utils/fechas`. */
 function hoyUtc(): Date {
   return hoyCalendario();
+}
+
+export interface ParteDelDia {
+  grupos: GrupoParte[];
+  /// Cuantas casillas se van a pintar. Es el numero del boton.
+  tareas: number;
+  /// Cuantas quedaron fuera por empezar mas alla de la ventana.
+  fuera: number;
+  diasVista: number;
+  /// El ultimo dia laborable de esta semana: el dia en que toca cerrar.
+  cierraEl: Date;
+  /// Dias laborables desde el ultimo reporte de la obra, sea de la tarea que
+  /// sea. Null si nunca se reporto nada.
+  diasSinParte: number | null;
+}
+
+/**
+ * Lo que hay que pintar en el parte del dia.
+ *
+ * Se apoya entero en `obtenerCronograma`, que ya cruza el archivo con
+ * lo reportado: aqui no se vuelve a medir nada, solo se elige que tareas se
+ * ofrecen, de que capitulo cuelga cada una y cuanto hace que no se sabe de
+ * ellas.
+ */
+export async function obtenerParteDelDia(
+  sesion: SesionActiva,
+  obraId: string,
+  opciones: { diasVista?: number } = {},
+): Promise<ParteDelDia | null> {
+  if (!puede(sesion, "cronograma:leer")) return null;
+
+  const vigente = await obtenerCronograma(sesion, obraId);
+  if (!vigente) return null;
+
+  const calendario = await obtenerCalendario(sesion, obraId);
+  const ahora = hoyUtc();
+  const diasVista = opciones.diasVista ?? 7;
+
+  const { dentro, fuera } = tareasAbiertas(vigente.tareas, ahora, diasVista);
+
+  // El capitulo sale del orden del documento —`capituloDeCadaTarea`—, no del
+  // prefijo del codigo: "7.3.1" es hermana de "7.3" y no su hija.
+  const capituloUid = capituloDeCadaTarea(vigente.tareas);
+  const nombrePorUid = new Map(
+    vigente.tareas.map((t) => [t.uid, t.codigo ? `${t.codigo} ${t.nombre}` : t.nombre]),
+  );
+  const capituloPorUid = new Map<number, string>();
+  for (const [uid, cap] of capituloUid) {
+    const nombre = nombrePorUid.get(cap);
+    if (nombre) capituloPorUid.set(uid, nombre);
+  }
+
+  const ultimoReporte = new Map<number, Date>();
+  for (const t of vigente.tareas) {
+    if (t.avance) ultimoReporte.set(t.uid, t.avance.fecha);
+  }
+
+  const fechas = [...ultimoReporte.values()].map((f) => f.getTime());
+  const ultimoDeTodos = fechas.length > 0 ? new Date(Math.max(...fechas)) : null;
+
+  return {
+    grupos: filasDelParte(dentro, capituloPorUid, ultimoReporte, ahora, calendario),
+    tareas: dentro.length,
+    fuera,
+    diasVista,
+    cierraEl: ultimoDiaLaborableDeLaSemana(ahora, calendario),
+    diasSinParte:
+      ultimoDeTodos === null
+        ? null
+        : diasSinReportar(ultimoDeTodos, ahora, calendario),
+  };
+}
+
+export type ResultadoLoteAvance =
+  | { ok: true; escritas: number }
+  | { ok: false; error: string };
+
+/**
+ * Registra de una vez el avance de muchas tareas: el parte del dia.
+ *
+ * Existe por una razon muy concreta y muy poco teorica: reportar las ~107
+ * tareas de una obra de una en una son ~107 peticiones contra un hosting con
+ * 20 Entry Processes (`docs/infraestructura.md`). No es que fuera lento: es
+ * que no se hacia, y un avance que no se reporta sale en la curva S como una
+ * obra mas atrasada de lo que esta.
+ *
+ * Las reglas de que entra y que no las decide `validarLoteAvance`, que es
+ * logica pura y tiene tests. Aqui solo se anaden las dos cosas que necesitan
+ * la base: que los UID existan de verdad en el cronograma vigente y que todo
+ * se escriba junto o no se escriba nada.
+ *
+ * Un solo apunte de auditoria para el lote entero, por el mismo motivo que
+ * `importarCronograma`: cien apuntes por parte ahogarian el registro de
+ * actividad justo el dia que haga falta leerlo.
+ *
+ * Guardar dos veces el mismo dia no rompe nada. `ultimoAvancePorTarea`
+ * desempata por `createdAt`, asi que el segundo parte manda, que es
+ * exactamente lo que se quiere cuando el residente corrige por la tarde lo que
+ * dijo por la manana. Dentro de un mismo lote no hay empate posible porque
+ * `validarLoteAvance` rechaza el UID repetido.
+ */
+export async function registrarAvancesEnLote(
+  sesion: SesionActiva,
+  obraId: string,
+  datos: { fecha: string; entradas: readonly EntradaParte[] },
+): Promise<ResultadoLoteAvance> {
+  if (!puede(sesion, "avance:registrar")) {
+    return { ok: false, error: "No tienes permiso para reportar avance." };
+  }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
+  const validado = validarLoteAvance(datos.entradas, datos.fecha, hoyUtc());
+  if (!validado.ok) return validado;
+
+  // Cero casillas rellenas no es un error: es un parte en el que no se supo
+  // nada de ninguna tarea. Se responde bien y no se escribe nada.
+  if (validado.escribir.length === 0) return { ok: true, escritas: 0 };
+
+  // Los UID tienen que estar en el cronograma vigente de ESTA obra. Se
+  // comprueban todos de una consulta: reportar contra un UID que no existe
+  // crea un huerfano de nacimiento, y hacerlo por la puerta del lote no lo
+  // hace mas valido que por la de una tarea suelta.
+  const uids = validado.escribir.map((e) => e.uid);
+  const conocidas = await prisma.tareaCronograma.findMany({
+    where: {
+      uid: { in: uids },
+      cronograma: { projectId: obraId, project: { companyId: sesion.companyId } },
+    },
+    select: { uid: true },
+    distinct: ["uid"],
+  });
+
+  const existentes = new Set(conocidas.map((t) => t.uid));
+  const intrusas = uids.filter((u) => !existentes.has(u));
+  if (intrusas.length > 0) {
+    return {
+      ok: false,
+      error: `Hay ${intrusas.length} tarea(s) que no están en el cronograma de la obra.`,
+    };
+  }
+
+  const fecha = fechaDeObra(datos.fecha);
+  const reportadoPor = `${sesion.nombres} ${sesion.apellidos}`.trim().slice(0, 150);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.avanceTarea.createMany({
+      data: validado.escribir.map((e) => ({
+        projectId: obraId,
+        uid: e.uid,
+        fecha,
+        porcentaje: e.porcentaje,
+        reportadoPor,
+      })),
+    });
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "AvanceTarea",
+        entidadId: obraId,
+        accion: "CREATE",
+        despues: {
+          parteDelDia: datos.fecha,
+          tareas: validado.escribir.length,
+          uids: validado.escribir.map((e) => e.uid),
+        },
+      },
+    });
+  });
+
+  return { ok: true, escritas: validado.escribir.length };
 }
 
 export interface DatosCurva {
