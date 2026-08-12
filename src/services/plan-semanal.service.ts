@@ -27,6 +27,7 @@ import {
   type PuntoPpc,
   type EnlacePredecesora,
 } from "@/lib/plan-semanal";
+import { cumplidoAlCerrar } from "@/lib/cierre-cantidad";
 import { ultimoAvancePorTarea } from "@/lib/cronograma";
 import type {
   EstadoPlanSemanal,
@@ -993,7 +994,15 @@ export async function cerrarPlanSemanal(
       numero: true,
       fechaCorte: true,
       compromisos: {
-        select: { id: true, uid: true, metaPorcentaje: true, descripcion: true },
+        select: {
+          id: true,
+          uid: true,
+          metaPorcentaje: true,
+          descripcion: true,
+          // Lo comprometido en cantidad: es contra esto contra lo que se mide
+          // si se cumplio, cuando el compromiso se pacto por cantidad.
+          cantidadPlan: true,
+        },
       },
     },
   });
@@ -1035,6 +1044,35 @@ export async function cerrarPlanSemanal(
     porId.set(e.compromisoId, e);
   }
 
+  /**
+   * Lo que se va a guardar como cumplido, con la CANTIDAD mandando cuando la
+   * hay: 30 de los 120 m2 comprometidos no es cumplido aunque la casilla diga
+   * que si. Ver `lib/cierre-cantidad`.
+   *
+   * Se resuelve UNA vez y se usa en los dos sitios que dependen de ello —el
+   * aviso previo y la escritura—. Si el aviso mirara la casilla y la escritura
+   * la cantidad, se preguntaria por compromisos que acaban no cumplidos, que
+   * es la peor forma de pedir una confirmacion.
+   */
+  const ejecutadaDe = (e: Evaluacion | undefined): string | null => {
+    const v = validarCantidadPlan(e?.cantidadEjec);
+    return v.ok ? v.valor : null;
+  };
+  const cumplidoPorId = new Map<string, boolean>(
+    plan.compromisos.map((c) => {
+      const e = porId.get(c.id);
+      return [
+        c.id,
+        cumplidoAlCerrar({
+          // Sin evaluar se cierra como NO cumplido: no marcarlo no lo aprueba.
+          marcado: e?.cumplido ?? false,
+          cantidadPlan: c.cantidadPlan?.toString() ?? null,
+          cantidadEjec: ejecutadaDe(e),
+        }),
+      ];
+    }),
+  );
+
   // Los que se van a dar por cumplidos sin dejar avance. Se pregunta DESPUES de
   // validar —para no avisar de esto cuando ademas hay un error que corregir— y
   // ANTES de escribir nada.
@@ -1046,7 +1084,7 @@ export async function cerrarPlanSemanal(
           compromisoId: c.id,
           uid: c.uid,
           descripcion: c.descripcion,
-          cumplido: e?.cumplido ?? false,
+          cumplido: cumplidoPorId.get(c.id) ?? false,
           porcentajeReal: e?.porcentajeReal,
           metaPorcentaje: c.metaPorcentaje?.toString() ?? null,
         };
@@ -1062,7 +1100,7 @@ export async function cerrarPlanSemanal(
       const e = porId.get(c.id);
       // Un compromiso sin evaluar se cierra como NO cumplido (honesto: no
       // marcarlo no lo aprueba).
-      const cumplido = e?.cumplido ?? false;
+      const cumplido = cumplidoPorId.get(c.id) ?? false;
       await tx.compromisoSemanal.update({
         where: { id: c.id },
         data: {
