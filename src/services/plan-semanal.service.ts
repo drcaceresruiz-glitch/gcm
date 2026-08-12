@@ -1004,6 +1004,89 @@ export async function reabrirPlanSemanal(
 }
 
 /**
+ * Corrige la fecha de corte de una semana ABIERTA.
+ *
+ * Existe porque el numero de una semana es `max(numero) + 1` y no mira la
+ * fecha: crear la Semana 3 con corte 14/08 despues de una Semana 2 que cierra
+ * el 15/08 deja el rotulo cruzado para siempre. El aviso de `crearPlanSemanal`
+ * lo dice antes de crearla, pero las que ya estaban creadas cuando ese aviso no
+ * existia no tenian arreglo: solo borrar y rehacer, que sube el correlativo.
+ *
+ * Se corrige la FECHA y no el NUMERO, y esa eleccion es la de siempre en GCM:
+ * renumerar cambiaria el rotulo de semanas ya cerradas que estan citadas en
+ * actas y correos. La fecha, en cambio, describe un hecho —que dia cierra esta
+ * semana— y si esta mal, esta mal.
+ *
+ * Solo sobre semanas ABIERTAS. Mover el corte de una cerrada moveria su punto
+ * en la tendencia del PPC y el reparto de lo arrastrado, que ya se leyeron y se
+ * firmaron; para eso esta reabrir, que deja rastro.
+ */
+export async function corregirFechaCorte(
+  sesion: SesionActiva,
+  obraId: string,
+  planId: string,
+  fecha: string,
+): Promise<ResultadoPlan> {
+  if (!puede(sesion, "plan_semanal:gestionar")) {
+    return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
+  }
+
+  const cerradaObra = await motivoSiObraCerrada(sesion, obraId);
+  if (cerradaObra) return { ok: false, error: cerradaObra };
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+    return { ok: false, error: "La fecha no es válida." };
+  }
+
+  const plan = await prisma.planSemanal.findFirst({
+    where: { id: planId, projectId: obraId, project: { companyId: sesion.companyId } },
+    select: { id: true, numero: true, fechaCorte: true, estado: true },
+  });
+  if (!plan) return { ok: false, error: "Plan no encontrado." };
+  if (plan.estado === "CERRADO") {
+    return {
+      ok: false,
+      error: "La semana está cerrada. Reábrela si de verdad hay que mover su corte.",
+    };
+  }
+
+  const nueva = fechaDeObra(fecha);
+  if (nueva.getTime() === plan.fechaCorte.getTime()) return { ok: true, id: planId };
+
+  // El indice unico `(projectId, fechaCorte)` lo impediria igual, pero el error
+  // de base de datos no explica nada a quien esta mirando la pantalla.
+  const ocupada = await prisma.planSemanal.findFirst({
+    where: { projectId: obraId, fechaCorte: nueva, NOT: { id: planId } },
+    select: { numero: true },
+  });
+  if (ocupada) {
+    return { ok: false, error: `La Semana ${ocupada.numero} ya cierra ese día.` };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.planSemanal.update({
+      where: { id: planId },
+      data: { fechaCorte: nueva },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "PlanSemanal",
+        entidadId: planId,
+        accion: "UPDATE",
+        antes: { fechaCorte: plan.fechaCorte.toISOString().slice(0, 10) },
+        despues: { numero: plan.numero, fechaCorte: fecha },
+      },
+    });
+  });
+
+  return { ok: true, id: planId };
+}
+
+/**
  * Elimina la semana entera (cabecera y compromisos, en cascada). Para rehacerla
  * cuando se creo por error o quedo mal planteada. Es destructivo y no reversible;
  * el correlativo no se recicla (la siguiente semana sigue subiendo de numero),

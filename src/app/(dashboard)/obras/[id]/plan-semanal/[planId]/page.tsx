@@ -10,6 +10,7 @@ import { FormularioPlanSemanal } from "@/components/plan-semanal/FormularioPlanS
 import { CierrePlanSemanal } from "@/components/plan-semanal/CierrePlanSemanal";
 import { BotonReabrir } from "@/components/plan-semanal/BotonReabrir";
 import { BotonEliminarPlan } from "@/components/plan-semanal/BotonEliminarPlan";
+import { CorregirCorte } from "@/components/plan-semanal/CorregirCorte";
 import { GaleriaEvidencia } from "@/components/evidencia/GaleriaEvidencia";
 
 export const metadata: Metadata = { title: "Plan Semanal" };
@@ -87,7 +88,16 @@ export default async function DetallePlanSemanalPage({
       </div>
 
       {puedeGestionar && (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {/* Solo en las abiertas: mover el corte de una cerrada moveria su
+              punto en la tendencia del PPC, que ya se leyo y se firmo. */}
+          {abierto && (
+            <CorregirCorte
+              obraId={id}
+              planId={planId}
+              fechaCorte={plan.fechaCorte.toISOString().slice(0, 10)}
+            />
+          )}
           <BotonEliminarPlan
             obraId={id}
             planId={planId}

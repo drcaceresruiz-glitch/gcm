@@ -296,6 +296,30 @@ export function avisoNumeracionSemana(
   return desordenadas.length === 0 ? null : { numero, desordenadas };
 }
 
+/**
+ * Las semanas cuyo numero va a contramano de su fecha.
+ *
+ * El aviso de `avisoNumeracionSemana` se da ANTES de crearla, que es cuando
+ * todavia se puede cambiar la fecha. Pero las que ya quedaron cruzadas —o las
+ * que se crearon antes de que ese aviso existiera— no se lo dice nadie: la
+ * lista las ordena por fecha, y quien la mira ve «Semana 2, Semana 3, Semana 1»
+ * sin saber por que. Parece un fallo del sistema y es un dato mal metido.
+ *
+ * Va a contramano una semana que cierra ANTES que otra de numero MENOR. Se
+ * senala esa y no la otra: la de numero menor es la que estaba primero, y la
+ * que llego despues con fecha anterior es la que hay que corregir.
+ */
+export function semanasAContramano<T extends SemanaNumerada>(
+  semanas: readonly T[],
+): T[] {
+  return semanas.filter((s) =>
+    semanas.some(
+      (otra) =>
+        otra.numero < s.numero && otra.fechaCorte.getTime() > s.fechaCorte.getTime(),
+    ),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // El arrastre de lo incumplido
 // ---------------------------------------------------------------------------

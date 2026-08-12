@@ -13,6 +13,7 @@ import {
   validarCantidadPlan,
   uidsDuplicados,
   avisoNumeracionSemana,
+  semanasAContramano,
   arrastreDeIncumplidos,
   type CompromisoPrevio,
   type CompromisoEvaluado,
@@ -218,6 +219,34 @@ describe("avisoNumeracionSemana", () => {
     // El indice unico ya impide dos planes con el mismo corte; aqui solo se
     // comprueba que no se avise de un empate.
     expect(avisoNumeracionSemana(dc("2026-08-15"), existentes)).toBeNull();
+  });
+});
+
+describe("semanasAContramano", () => {
+  it("senala la que llego despues con fecha anterior", () => {
+    // El caso real: Semana 2 el 15/08 y Semana 3 el 14/08. La que hay que
+    // corregir es la 3, no la 2: la 2 ya estaba.
+    const cruzadas = semanasAContramano([
+      { numero: 1, fechaCorte: dc("2026-08-08") },
+      { numero: 2, fechaCorte: dc("2026-08-15") },
+      { numero: 3, fechaCorte: dc("2026-08-14") },
+    ]);
+    expect(cruzadas.map((s) => s.numero)).toEqual([3]);
+  });
+
+  it("calla cuando el orden de fechas sigue al de numeros", () => {
+    expect(
+      semanasAContramano([
+        { numero: 1, fechaCorte: dc("2026-08-08") },
+        { numero: 2, fechaCorte: dc("2026-08-15") },
+        { numero: 3, fechaCorte: dc("2026-08-22") },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("calla con una sola semana o con ninguna", () => {
+    expect(semanasAContramano([])).toEqual([]);
+    expect(semanasAContramano([{ numero: 1, fechaCorte: dc("2026-08-08") }])).toEqual([]);
   });
 });
 

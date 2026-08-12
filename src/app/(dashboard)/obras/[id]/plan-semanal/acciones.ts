@@ -8,6 +8,7 @@ import {
   guardarCompromisos,
   cerrarPlanSemanal,
   reabrirPlanSemanal,
+  corregirFechaCorte,
   eliminarPlanSemanal,
   type ResultadoPlan,
   type ResultadoCrearPlan,
@@ -78,6 +79,29 @@ export async function accionReabrirPlanSemanal(
   if (r.ok) {
     revalidatePath(`/obras/${obraId}/plan-semanal`);
     revalidatePath(`/obras/${obraId}/plan-semanal/${planId}`);
+  }
+  return r;
+}
+
+/**
+ * Corrige el dia en que cierra una semana abierta.
+ *
+ * Repinta tambien el tablero de la obra: de la fecha de corte cuelga cual es
+ * «la ultima semana», y con las fechas cruzadas eso senalaba a otra.
+ */
+export async function accionCorregirFechaCorte(
+  obraId: string,
+  planId: string,
+  fecha: string,
+): Promise<ResultadoPlan> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await corregirFechaCorte(sesion, obraId, planId, fecha);
+  if (r.ok) {
+    revalidatePath(`/obras/${obraId}/plan-semanal`);
+    revalidatePath(`/obras/${obraId}/plan-semanal/${planId}`);
+    revalidatePath(`/obras/${obraId}`);
   }
   return r;
 }
