@@ -8,7 +8,7 @@
 ================================================================================
 
   Documento          Diagnostico tecnico
-  Version            1.3   (con el estado final del plan correctivo)
+  Version            1.4   (con la Fase 4 del proyecto, que cierra H-7)
   Fecha              11 de agosto de 2026, cerrado el 12
   Estado             EJECUTADO. Lease la PARTE VI antes que nada: el
                      diagnostico se acometio entero, y las notas de la
@@ -1790,9 +1790,9 @@ prioridad:
   MURI   3   Fatiga humana y perfiles       0,0    0,0    3,5
   MURI   4   Capacidad tecnologica          2,5    3,0    4,0
   MUDA   5   Tiempos muertos y esperas      4,5    5,0    5,0
-  MUDA   6   Reprocesos y calidad admin.    3,5    3,5    4,5
+  MUDA   6   Reprocesos y calidad admin.    3,5    3,5    5,0
 
-  MEDIA GLOBAL                              3,2    3,4    4,4
+  MEDIA GLOBAL                              3,2    3,4    4,5
 
   LO QUE DE VERDAD CAMBIO NO ES LA MEDIA
 
@@ -1829,8 +1829,9 @@ prioridad:
        aplicar suben a los avisos de empresa.
   H-6  RESUELTO. La demora media por flujo tiene su modulo    0ee535a
        y recomienda el tamano de la ventana.
-  H-7  ABIERTO. La doble captura del cierre esta prevista       --
-       en la Fase 4 del propio proyecto.
+  H-7  RESUELTO. La cantidad ejecutada manda sobre la casilla   a3957c0
+       al cerrar. «30 de 120 m2, cumplido» ya no se puede
+       escribir.
   H-8  RESUELTO. Las partidas de un adicional se reclaman     3e80ab8
        aparte, y el aviso de aprobacion ofrece enlazarlas     22471ef
        en el momento.
@@ -1879,10 +1880,45 @@ prioridad:
   H-4 - repartir la carga del residente
      Decision organizativa, sin desarrollo.
 
-  H-7 - «cumplio» desde la cantidad ejecutada
-     Fase 4 del proyecto. Y es la frontera que el anexo D marca: el dia que
-     una cantidad ejecutada alimente una valorizacion, hay que releerlo,
-     porque ahi si habria que preguntar la modalidad antes de recalcular.
+  (H-7 se resolvio con la Fase 4. Ver la seccion 37.)
+
+
+37. LA FASE 4 DEL PROYECTO, HECHA A CONTINUACION
+--------------------------------------------------------------------------------
+
+  No formaba parte de este plan —es del roadmap del producto— pero se hizo
+  justo despues y cierra H-7, asi que queda anotada aqui para que el estado
+  final lo sea de verdad.
+
+  «CUMPLIO» SE CALCULA DESDE LA CANTIDAD                          a3957c0
+
+     El cierre pedia dos cosas que dicen lo mismo y podian contradecirse: «30
+     de 120 m2, cumplido» era un dato que el sistema aceptaba. Ahora la
+     cantidad manda cuando la hay, con corte EXACTO —119 de 120 no es
+     cumplido, la misma dureza que ya regia el PPC— y se resuelve en el
+     servicio, no solo en la pantalla, para que ninguna otra via de cierre
+     pueda volver a escribir la contradiccion.
+
+  EL ANALISIS DE CAUSA RAIZ          b5bdb88, 3c4d552, 7bc3fe1, 00a8d8d
+
+     Elegir la causa al cerrar decia QUE fallo. Ahora se puede decir por que
+     y que se va a hacer.
+
+     La decision que gobierna la funcion no es la pantalla sino CUANDO se
+     pide: solo cuando la causa demuestra ser un patron —dos semanas
+     distintas de las ultimas cuatro y al menos tres incumplimientos—.
+     Pedirlo en cada fallo habria sido exactamente la burocracia que el
+     enfoque 6 de este diagnostico mide y combate.
+
+  NO SE CRUZO LA FRONTERA QUE MARCA EL ANEXO D
+
+     Alli quedo escrito que el dia que una cantidad ejecutada alimentara una
+     VALORIZACION habria que releerlo, porque ahi si haria falta preguntar la
+     modalidad de la partida antes de recalcular un importe —en suma alzada
+     el precio esta cerrado—.
+
+     La Fase 4 usa la cantidad para decidir CUMPLIMIENTO, no para mover
+     dinero. La frontera sigue donde estaba, y el aviso sigue en pie.
 
 
 ================================================================================
