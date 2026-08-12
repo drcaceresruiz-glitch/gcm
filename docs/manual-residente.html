@@ -944,6 +944,26 @@
     holgura para compensar.</p>
   </div>
 
+  <div class="caja ojo">
+    <span class="et">Cuando liberas bien y aun así incumples: eso es sobrecarga</span>
+    <p>La pareja de arriba explica el caso normal: se incumple porque no estaba liberado. Pero hay
+    una combinación que significa lo contrario, y es la que más se lee mal:</p>
+    <table>
+      <thead><tr><th style="width:34%">Lo que ves</th><th>Lo que significa</th></tr></thead>
+      <tbody>
+        <tr><td>Lookahead <strong>bajo</strong> · PPC bajo</td><td>Se comprometió sin liberar. Hay que analizar antes</td></tr>
+        <tr><td>Lookahead <strong>alto</strong> · PPC bajo</td><td><strong>Se prometió más de lo que cabe.</strong> El trabajo estaba listo y aun así no se hizo</td></tr>
+      </tbody>
+    </table>
+    <p>El segundo caso no se arregla liberando restricciones: ya estaban liberadas. Se arregla
+    <strong>comprometiendo menos</strong>, que es lo contrario de lo que uno hace por instinto
+    cuando ve un PPC malo.</p>
+    <p>Por eso el panel lo nombra en <em>Qué falta</em> cuando ocurre —«liberas bien pero cumples
+    poco»—, en vez de dejarte deducirlo de dos cifras que están una al lado de la otra. Pide al
+    menos cinco compromisos en la semana: con dos tareas, un PPC del 50 % es una tarea, no un
+    patrón.</p>
+  </div>
+
   <h3>5.3 Configurar el panel</h3>
   <p>Con el botón <strong>Configurar</strong> enciendes y apagas los módulos que quieras. Dos
   detalles que conviene saber:</p>
@@ -1626,6 +1646,24 @@
 
   <p>Quita lo que no corresponda y añade líneas libres para el trabajo que no está en el
   cronograma: limpieza, apoyo, trabajos de garantía.</p>
+
+  <div class="caja ojo">
+    <span class="et">El aviso de que estás prometiendo de más</span>
+    <p>Mientras armas la semana, si lo que llevas comprometido pasa de lo que esta obra suele
+    cumplir, aparece un aviso:</p>
+    <p style="margin-left:1.2em;border-left:3px solid var(--color-peligro);padding-left:.8em">
+      <strong>Estás prometiendo 8 y sueles cumplir 4 por semana.</strong><br>
+      Es tu propia media de las últimas 6 semanas cerradas, no un estándar de nadie.
+    </p>
+    <p><strong>La comparación es contra ti, no contra un catálogo.</strong> No dice que ocho sea
+    mucho: dice que <em>tú</em> vienes cumpliendo cuatro. Si el equipo creció o el frente cambió,
+    la media se ajusta sola en las semanas siguientes.</p>
+    <p>Sale <strong>aquí y no en el panel</strong> a propósito. En el panel llegaría el lunes
+    siguiente, cuando ya no se puede hacer nada; aquí llega mientras todavía puedes quitar líneas.</p>
+    <p><strong>Cuándo no aparece</strong>, y no es un fallo: con menos de tres semanas cerradas no
+    hay historial del que fiarse; y si en la ventana no se cumplió ni un compromiso, tampoco dice
+    nada —no hay contra qué comparar, y de eso ya avisa el PPC—.</p>
+  </div>
 
   <h3>9.6 Cerrar la semana: PPC y causas</h3>
   <p>El día de corte, marcas qué se cumplió, qué no y por qué.</p>
