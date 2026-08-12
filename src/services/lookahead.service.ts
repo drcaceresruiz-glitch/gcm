@@ -286,8 +286,15 @@ async function tareasDeLaVentana(
   const cronograma = await cronogramaVigente(sesion, obraId);
   const filas = cronograma?.tareas ?? [];
 
+  // El filtro por empresa va TAMBIEN aqui, aunque `cronogramaVigente` ya
+  // haya comprobado la obra: esta consulta corre igual cuando aquella no
+  // encuentra nada, asi que con una obra ajena se leian sus avances. Hoy no
+  // salen —lo que se devuelve se deriva de las filas del cronograma, que
+  // quedan vacias—, pero es una fuga esperando a que alguien devuelva algo
+  // derivado de `avances`. La regla es que el companyId salga de la sesion en
+  // CADA consulta, no en la primera.
   const avances = await prisma.avanceTarea.findMany({
-    where: { projectId: obraId },
+    where: { projectId: obraId, project: { companyId: sesion.companyId } },
     orderBy: [{ fecha: "asc" }, { createdAt: "asc" }],
     select: {
       uid: true, porcentaje: true, fecha: true,

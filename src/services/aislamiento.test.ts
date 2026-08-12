@@ -81,6 +81,8 @@ vi.mock("@/lib/prisma", () => {
 const { listarObras } = await import("@/services/obras.service");
 const ordenes = await import("@/services/ordenes.service");
 const partidas = await import("@/services/partidas.service");
+const lookahead = await import("@/services/lookahead.service");
+const planSemanal = await import("@/services/plan-semanal.service");
 
 function sesion(companyId: string, permisos: Permiso[]): SesionActiva {
   return {
@@ -274,6 +276,98 @@ describe("partidas", () => {
     );
     await exigeNiTocarLaBase(() =>
       partidas.eliminarPartida(sesion(MIA, []), partidaAjena),
+    );
+  });
+});
+
+describe("lookahead", () => {
+  // Recibe el id de la obra desde la peticion, igual que ordenes.
+  const obraAjena = "obra-de-la-empresa-B";
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("la ventana de una obra ajena se pide acotada a mi empresa", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      lookahead.obtenerLookahead(sesion(MIA, ["lookahead:leer"]), obraAjena),
+    );
+  });
+
+  it("la demora por flujo va acotada", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      lookahead.demoraDeLiberacion(sesion(MIA, ["lookahead:leer"]), obraAjena),
+    );
+  });
+
+  it("sincronizar la ventana va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      lookahead.sincronizarLookahead(
+        sesion(MIA, ["lookahead:gestionar", "lookahead:leer"]),
+        obraAjena,
+      ),
+    );
+  });
+
+  it("sin permiso no se toca la base", async () => {
+    await exigeNiTocarLaBase(() =>
+      lookahead.obtenerLookahead(sesion(MIA, []), obraAjena),
+    );
+    await exigeNiTocarLaBase(() =>
+      lookahead.demoraDeLiberacion(sesion(MIA, []), obraAjena),
+    );
+  });
+});
+
+describe("plan semanal", () => {
+  const obraAjena = "obra-de-la-empresa-B";
+  const planAjeno = "plan-de-la-empresa-B";
+  const leer: Permiso[] = ["plan_semanal:leer"];
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("listar las semanas de una obra ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      planSemanal.listarPlanesSemanales(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("abrir un plan ajeno va acotado", async () => {
+    // Aqui llegan DOS identificadores de la peticion —la obra y el plan—, y
+    // ninguno de los dos puede bastar por si mismo para alcanzar el dato.
+    await exigeFiltroDeEmpresa(() =>
+      planSemanal.obtenerPlanSemanal(sesion(MIA, leer), obraAjena, planAjeno),
+    );
+  });
+
+  it("el corte de Last Planner va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      planSemanal.lastPlannerAlCorte(
+        sesion(MIA, leer),
+        obraAjena,
+        new Date("2026-08-14T00:00:00.000Z"),
+      ),
+    );
+  });
+
+  it("reabrir un plan ajeno va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      planSemanal.reabrirPlanSemanal(
+        sesion(MIA, ["plan_semanal:gestionar"]),
+        obraAjena,
+        planAjeno,
+      ),
+    );
+  });
+
+  it("sin permiso no se toca la base", async () => {
+    await exigeNiTocarLaBase(() =>
+      planSemanal.listarPlanesSemanales(sesion(MIA, []), obraAjena),
+    );
+    await exigeNiTocarLaBase(() =>
+      planSemanal.obtenerPlanSemanal(sesion(MIA, []), obraAjena, planAjeno),
     );
   });
 });
