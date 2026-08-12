@@ -1021,9 +1021,9 @@ export async function datosCurvaS(
     ? planeadoEnFecha(planificadas, ultimo.fecha)
     : null;
 
-  // La linea real POR SEMANA: se muestrea el avance en cada dia de corte
-  // (cadencia Last Planner) desde el inicio del plan hasta hoy. Usa las tareas
-  // fuente (base o vigente) y los mismos avances, con la tecnica ya probada.
+  // La linea real medida: se muestrea el avance desde el inicio del plan hasta
+  // hoy. Usa las tareas fuente (base o vigente) y los mismos avances, con la
+  // tecnica ya probada.
   const hoy = hoyUtc();
   const hastaMuestreo = new Date(Math.min(fin.getTime(), hoy.getTime()));
   const fechasSem = fechasSemanales(inicio, hastaMuestreo, diaCorteSemanal);
@@ -1034,15 +1034,33 @@ export async function datosCurvaS(
     porcentajePlaneado: t.porcentajePlaneado.toString(),
     porcentajeArchivo: t.porcentajeArchivo.toString(),
   }));
-  // Ademas de los cortes semanales, incluir HOY como punto final (la semana en
-  // curso) para que la linea real, el puntoActual y el EVM reflejen el avance
-  // del dia y no se queden en el ultimo corte semanal ya cerrado. `fechasSem`
-  // (solo cortes) se mantiene intacta para la cadencia (ultimoCorteEsperado).
-  const fechasReal =
-    fechasSem.length &&
-    fechasSem[fechasSem.length - 1]!.getTime() >= hastaMuestreo.getTime()
-      ? fechasSem
-      : [...fechasSem, hastaMuestreo];
+  /**
+   * Donde se mide la linea real: en los cortes semanales, en HOY, y **en cada
+   * dia que obra reporto algo**.
+   *
+   * Los cortes solos daban una curva que solo se movia una vez por semana:
+   * entre viernes y viernes era una recta interpolada, y el trabajo reportado
+   * el martes no se veia hasta el viernes. Con el parte del dia eso ya no
+   * describe la obra —el avance entra a diario—, asi que la curva tiene que
+   * medir donde hay medida.
+   *
+   * No se muestrea dia a dia a ciegas: un dia sin reporte no aporta un punto
+   * nuevo, aporta el mismo valor del dia anterior, y llenar la serie de puntos
+   * repetidos solo hace creer que se midio cuando no se midio.
+   *
+   * `fechasSem` (solo cortes) se mantiene intacta para la cadencia
+   * (`ultimoCorteEsperado`), que sigue siendo semanal: una cosa es cada cuanto
+   * TOCA cerrar y otra cada cuanto se sabe algo.
+   */
+  const marcas = new Map<number, Date>();
+  for (const f of fechasSem) marcas.set(f.getTime(), f);
+  for (const r of reportes) {
+    // Un reporte fechado despues del fin de obra no dibuja nada util y sacaria
+    // la linea del plazo.
+    if (r.fecha.getTime() <= hastaMuestreo.getTime()) marcas.set(r.fecha.getTime(), r.fecha);
+  }
+  marcas.set(hastaMuestreo.getTime(), hastaMuestreo);
+  const fechasReal = [...marcas.values()].sort((a, b) => a.getTime() - b.getTime());
   const realSemanal = serieRealPorFechas(tareasCurva, reportes, fechasReal);
 
   // La cadencia: el ultimo corte esperado que ya paso, y si falta reporte (el
