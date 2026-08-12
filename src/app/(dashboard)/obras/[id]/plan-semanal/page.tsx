@@ -11,6 +11,11 @@ import { hoy } from "@/utils/fechas";
 import { NuevaSemana } from "@/components/plan-semanal/NuevaSemana";
 import { GraficosPpc } from "@/components/plan-semanal/GraficosPpc";
 import { TarjetaSemana } from "@/components/plan-semanal/TarjetaSemana";
+import { AnalisisCausa } from "@/components/plan-semanal/AnalisisCausa";
+import {
+  causasParaAnalizar,
+  listarAnalisis,
+} from "@/services/causa-raiz.service";
 
 export const metadata: Metadata = { title: "Plan Semanal" };
 
@@ -27,7 +32,14 @@ export default async function PlanSemanalPage({
   if (!obra) redirect("/panel");
   if (!puede(sesion, "plan_semanal:leer")) redirect(`/obras/${id}`);
 
-  const datos = await listarPlanesSemanales(sesion, id);
+  // Las tres consultas del bloque de causa raiz van juntas con la del PPC: se
+  // pintan una al lado de la otra, asi que pedirlas en serie solo sumaria
+  // esperas.
+  const [datos, causas, analisis] = await Promise.all([
+    listarPlanesSemanales(sesion, id),
+    causasParaAnalizar(sesion, id),
+    listarAnalisis(sesion, id),
+  ]);
   const puedeGestionar = puede(sesion, "plan_semanal:gestionar");
   const fechaSugerida = proximoCorte(obra.diaCorteSemanal, hoy())
     .toISOString()
@@ -91,6 +103,20 @@ export default async function PlanSemanalPage({
       )}
 
       <GraficosPpc tendencia={datos.tendencia} pareto={datos.pareto} />
+
+      <AnalisisCausa
+        obraId={id}
+        pendientes={causas.pendientes}
+        analisis={analisis.map((a) => ({
+          id: a.id,
+          causa: a.causa,
+          porQue: a.porQue,
+          accion: a.accion,
+          responsable: a.responsable,
+          cerrado: a.cerradoAt !== null,
+        }))}
+        puedeGestionar={puedeGestionar}
+      />
 
       {datos.semanas.length === 0 ? (
         <p className="text-sm opacity-60">

@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
+  abrirAnalisis,
+  cerrarAnalisis,
+  type DatosAnalisis,
+  type ResultadoAnalisis,
+} from "@/services/causa-raiz.service";
+import {
   crearPlanSemanal,
   guardarCompromisos,
   cerrarPlanSemanal,
@@ -126,4 +132,31 @@ export async function accionEliminarPlanSemanal(
 
   revalidatePath(`/obras/${obraId}/plan-semanal`);
   redirect(`/obras/${obraId}/plan-semanal`);
+}
+
+export async function accionAbrirAnalisis(
+  obraId: string,
+  datos: DatosAnalisis,
+): Promise<ResultadoAnalisis> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const resultado = await abrirAnalisis(sesion, obraId, datos);
+  if (resultado.ok) revalidatePath(`/obras/${obraId}/plan-semanal`);
+  return resultado;
+}
+
+export async function accionCerrarAnalisis(
+  obraId: string,
+  analisisId: string,
+): Promise<ResultadoAnalisis> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const resultado = await cerrarAnalisis(sesion, analisisId);
+  // Se revalida la ruta de la OBRA que llega por parametro, no la del analisis:
+  // el servicio ya comprobo que ese analisis es de la empresa de la sesion, y
+  // aqui solo se refresca una pantalla.
+  if (resultado.ok) revalidatePath(`/obras/${obraId}/plan-semanal`);
+  return resultado;
 }
