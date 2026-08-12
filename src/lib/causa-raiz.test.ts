@@ -84,11 +84,11 @@ describe("causasQuePidenAnalisis", () => {
     const i = [
       ...fallos(1, "MANO_OBRA", 2),
       ...fallos(2, "MANO_OBRA", 2),
-      ...fallos(1, "ESPACIO", 2),
-      ...fallos(2, "ESPACIO", 1),
-      ...fallos(3, "ESPACIO", 1),
+      ...fallos(1, "CLIENTE_TERCEROS", 2),
+      ...fallos(2, "CLIENTE_TERCEROS", 1),
+      ...fallos(3, "CLIENTE_TERCEROS", 1),
     ];
-    expect(claves(i)).toEqual(["ESPACIO", "MANO_OBRA"]);
+    expect(claves(i)).toEqual(["CLIENTE_TERCEROS", "MANO_OBRA"]);
   });
 
   it("sin incumplimientos, no pide nada", () => {
