@@ -128,6 +128,114 @@ export async function listarPlanesSemanales(
   return { semanas, tendencia, pareto };
 }
 
+export interface CompromisoDelInforme {
+  descripcion: string;
+  cumplido: boolean | null;
+  causa: CausaNoCumplimiento | null;
+  notaCierre: string | null;
+}
+
+export interface LastPlannerAlCorte {
+  /// La semana que cierra EXACTAMENTE en la fecha del informe, si la hay. Un
+  /// corte del cronograma puede no coincidir con ninguna semana del PTS.
+  semana: {
+    numero: number;
+    cerrada: boolean;
+    total: number;
+    cumplidos: number;
+    /// Null mientras la semana no este cerrada: un PPC a medio evaluar no
+    /// significa nada, y en un informe impreso menos todavia.
+    ppc: number | null;
+  } | null;
+  compromisos: CompromisoDelInforme[];
+  /// PPC de las semanas CERRADAS hasta la fecha, para la tendencia.
+  tendencia: PuntoPpc[];
+  /// Causas acumuladas hasta la fecha, de mayor a menor.
+  pareto: FilaPareto[];
+}
+
+/**
+ * El Last Planner de la obra A UNA FECHA, para el informe semanal.
+ *
+ * El informe no mencionaba el Last Planner en absoluto: daba avance fisico,
+ * curva S, capitulos y alertas —todo lo que se saca de un cronograma— y ni una
+ * linea de PPC, causas o compromisos. En una herramienta construida sobre Last
+ * Planner, ese documento se dejaba fuera justo lo que la distingue de exportar
+ * el Gantt: se puede ir al dia en la curva con un PPC del 50%, y eso significa
+ * que el ritmo tapa una planificacion que no se cumple.
+ *
+ * TODO SE MIDE HASTA `fechaCorte`, igual que el resto del informe: la
+ * tendencia no incluye semanas posteriores y el Pareto no cuenta causas que
+ * aun no habian pasado. Un informe historico tiene que ensenar lo que se sabia
+ * entonces, o no es historico.
+ */
+export async function lastPlannerAlCorte(
+  sesion: SesionActiva,
+  obraId: string,
+  fechaCorte: Date,
+): Promise<LastPlannerAlCorte | null> {
+  if (!puede(sesion, "plan_semanal:leer")) return null;
+
+  const planes = await prisma.planSemanal.findMany({
+    where: {
+      projectId: obraId,
+      project: { companyId: sesion.companyId },
+      fechaCorte: { lte: fechaCorte },
+    },
+    orderBy: { fechaCorte: "asc" },
+    select: {
+      numero: true,
+      fechaCorte: true,
+      estado: true,
+      compromisos: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          descripcion: true,
+          cumplido: true,
+          causa: true,
+          notaCierre: true,
+        },
+      },
+    },
+  });
+
+  if (planes.length === 0) {
+    return { semana: null, compromisos: [], tendencia: [], pareto: [] };
+  }
+
+  const laDelCorte = planes.find(
+    (p) => p.fechaCorte.getTime() === fechaCorte.getTime(),
+  );
+
+  const tendencia = tendenciaPpc(
+    planes
+      .filter((p) => p.estado === "CERRADO")
+      .map((p) => ({ fecha: p.fechaCorte, ppc: ppcDePlan(p.compromisos).ppc })),
+  );
+
+  const pareto = paretoCausas(planes.flatMap((p) => p.compromisos));
+
+  if (!laDelCorte) {
+    return { semana: null, compromisos: [], tendencia, pareto };
+  }
+
+  const cerrada = laDelCorte.estado === "CERRADO";
+  const { total, cumplidos, ppc } = ppcDePlan(laDelCorte.compromisos);
+
+  return {
+    semana: {
+      numero: laDelCorte.numero,
+      cerrada,
+      total,
+      cumplidos,
+      ppc: cerrada ? ppc : null,
+    },
+    compromisos: laDelCorte.compromisos,
+    tendencia,
+    pareto,
+  };
+}
+
 export interface CompromisoDetalle {
   id: string;
   uid: number | null;

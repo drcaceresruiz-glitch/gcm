@@ -9,6 +9,7 @@ import {
   informeAlCorte,
   type CorteDisponible,
 } from "@/services/cronograma.service";
+import { lastPlannerAlCorte } from "@/services/plan-semanal.service";
 import { fechaCorta } from "@/utils/fechas";
 import {
   agruparPorCapitulo,
@@ -66,6 +67,11 @@ export default async function InformePage({
   const alertas = alertasDeAtraso(informe.tareas, informe.fechaCorte);
   const activas = partidasActivas(informe.tareas, informe.fechaCorte);
 
+  // El Last Planner de esa misma fecha. Va despues y no en el `Promise.all` de
+  // arriba porque necesita la fecha que decide `informeAlCorte`: pedirlo antes
+  // obligaria a resolver dos veces cual es el corte elegido.
+  const lastPlanner = await lastPlannerAlCorte(sesion, id, informe.fechaCorte);
+
   return (
     <div className="space-y-4">
       {/* Todo este bloque desaparece al imprimir: el papel que recibe el
@@ -101,6 +107,7 @@ export default async function InformePage({
           capitulos,
           alertas,
           activas,
+          lastPlanner,
           generadoPor: `${sesion.nombres} ${sesion.apellidos}`.trim(),
         }}
       />

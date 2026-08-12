@@ -4,6 +4,15 @@ import type {
   Capitulo,
   PartidaActiva,
 } from "@/lib/control-avance";
+import {
+  ETIQUETA_CNC,
+  PPC_OBJETIVO,
+  bandaDePpc,
+  filasDeParetoAcumulado,
+  type FilaPareto,
+  type PuntoPpc,
+} from "@/lib/plan-semanal";
+import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 import { fechaCorta, fechaEje, fechaLarga } from "@/utils/fechas";
 import { decimal } from "@/utils/formato";
 
@@ -49,8 +58,36 @@ export interface DatosInforme {
   capitulos: Capitulo[];
   alertas: AlertaAtraso[];
   activas: PartidaActiva[];
+  /// Null cuando quien mira no tiene permiso de plan semanal: el informe sale
+  /// igual, sin ese bloque, en vez de fallar entero.
+  lastPlanner: DatosLastPlanner | null;
   generadoPor: string;
 }
+
+/// Lo que el bloque Last Planner necesita, ya medido a la fecha del informe.
+export interface DatosLastPlanner {
+  semana: {
+    numero: number;
+    cerrada: boolean;
+    total: number;
+    cumplidos: number;
+    ppc: number | null;
+  } | null;
+  compromisos: {
+    descripcion: string;
+    cumplido: boolean | null;
+    causa: CausaNoCumplimiento | null;
+    notaCierre: string | null;
+  }[];
+  tendencia: PuntoPpc[];
+  pareto: FilaPareto[];
+}
+
+const COLOR_BANDA_INFORME = {
+  bueno: "var(--color-exito)",
+  flojo: "var(--color-alerta)",
+  malo: "var(--color-peligro)",
+} as const;
 
 export function InformeSemanal({ datos }: { datos: DatosInforme }) {
   const real = Number(datos.real);
@@ -280,6 +317,8 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
         </section>
       </div>
 
+      {datos.lastPlanner && <SeccionLastPlanner lp={datos.lastPlanner} />}
+
       <footer
         className="mt-8 border-t pt-3 text-center text-xs tracking-wider uppercase opacity-50"
         style={{ borderColor: "var(--borde)" }}
@@ -288,6 +327,163 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
         GCM &mdash; Gestión en Construcción Moderna
       </footer>
     </article>
+  );
+}
+
+/**
+ * El bloque Last Planner del informe.
+ *
+ * Hasta el 12/08/2026 este documento no mencionaba el Last Planner: daba
+ * avance fisico, curva S, capitulos y alertas —todo lo que se saca de un
+ * cronograma— y ni una linea de PPC, causas o compromisos. En una herramienta
+ * construida sobre Last Planner eso dejaba fuera justo lo que la distingue de
+ * exportar el Gantt.
+ *
+ * Y no es un adorno: se puede ir al dia en la curva con un PPC del 50%. Cuando
+ * pasa, significa que el ritmo tapa una planificacion que no se cumple, y eso
+ * se paga mas adelante. Las dos cifras juntas cuentan la obra; cada una por su
+ * lado, no.
+ *
+ * Va al final y no arriba a proposito: el cliente que recibe el papel busca
+ * primero el avance, y quien dirige la obra lee esto.
+ */
+function SeccionLastPlanner({ lp }: { lp: DatosLastPlanner }) {
+  const acumulado = filasDeParetoAcumulado(lp.pareto);
+  const media =
+    lp.tendencia.length > 0
+      ? lp.tendencia.reduce((s, p) => s + p.ppc, 0) / lp.tendencia.length
+      : null;
+
+  return (
+    <section className="mt-6 break-inside-avoid">
+      <Titulo>Last Planner &mdash; confiabilidad de la planificación</Titulo>
+
+      <div className="mt-3 grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
+        <div>
+          {lp.semana ? (
+            <>
+              <p className="text-xs opacity-60">Semana {lp.semana.numero}</p>
+              {lp.semana.ppc !== null ? (
+                <>
+                  <p
+                    className="text-4xl font-light tabular-nums"
+                    style={{ color: COLOR_BANDA_INFORME[bandaDePpc(lp.semana.ppc)] }}
+                  >
+                    {Math.round(lp.semana.ppc)}%
+                  </p>
+                  <p className="text-xs tracking-widest uppercase opacity-60">
+                    PPC
+                  </p>
+                  <p className="mt-1 text-xs opacity-70">
+                    {lp.semana.cumplidos} de {lp.semana.total} compromisos
+                    cumplidos.
+                  </p>
+                </>
+              ) : (
+                /* Una semana abierta no tiene PPC: los compromisos aun no se
+                   han evaluado, y un porcentaje a medias en un papel firmado
+                   es peor que no ponerlo. */
+                <p className="mt-1 text-sm opacity-70">
+                  Semana sin cerrar: {lp.semana.total} compromisos a la espera
+                  de evaluación. El PPC sale al cerrarla.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-sm opacity-70">
+              No hay una semana del plan que cierre en esta fecha.
+            </p>
+          )}
+
+          {media !== null && (
+            <p className="mt-3 text-xs opacity-70">
+              Media histórica: <strong>{Math.round(media)}%</strong> en{" "}
+              {lp.tendencia.length}{" "}
+              {lp.tendencia.length === 1 ? "semana" : "semanas"} cerradas.
+              {/* La referencia, para que el numero signifique algo a quien no
+                  vive dentro del Last Planner. */}
+              <span className="opacity-70"> Objetivo: {PPC_OBJETIVO}%.</span>
+            </p>
+          )}
+        </div>
+
+        <div>
+          {acumulado.length > 0 ? (
+            <>
+              <p className="mb-2 text-xs opacity-60">
+                Causas de no cumplimiento acumuladas hasta este corte
+              </p>
+              <ul className="space-y-1.5">
+                {acumulado.slice(0, 6).map((f) => (
+                  <li key={f.causa} className="text-xs">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="min-w-0 truncate">
+                        {f.dentroDel80 && "▸ "}
+                        {ETIQUETA_CNC[f.causa]}
+                      </span>
+                      <span className="shrink-0 tabular-nums opacity-70">
+                        {f.conteo} · {Math.round(f.porcentaje)}%
+                      </span>
+                    </div>
+                    <span
+                      className="mt-0.5 block h-1 rounded-full"
+                      style={{
+                        width: `${f.porcentaje}%`,
+                        backgroundColor: f.dentroDel80
+                          ? "var(--color-peligro)"
+                          : "color-mix(in oklab, var(--color-peligro) 45%, transparent)",
+                      }}
+                    />
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs opacity-60">
+                ▸ Las marcadas suman el 80% de los incumplimientos: son las que
+                hay que atacar.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs opacity-70">
+              Sin incumplimientos con causa registrada hasta este corte.
+            </p>
+          )}
+
+          {/* Lo prometido y lo que fallo, con nombre. Es el detalle que
+              convierte el PPC en una conversacion y no en una nota. */}
+          {lp.compromisos.length > 0 && (
+            <ul className="mt-4 space-y-1 text-xs">
+              {lp.compromisos.map((c, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span
+                    className="mt-0.5 shrink-0 font-semibold"
+                    style={{
+                      color:
+                        c.cumplido === true
+                          ? "var(--color-exito)"
+                          : c.cumplido === false
+                            ? "var(--color-peligro)"
+                            : "var(--texto)",
+                    }}
+                  >
+                    {c.cumplido === true ? "✓" : c.cumplido === false ? "✗" : "·"}
+                  </span>
+                  <span className="min-w-0">
+                    {c.descripcion}
+                    {c.cumplido === false && c.causa && (
+                      <span className="opacity-70">
+                        {" "}
+                        — {ETIQUETA_CNC[c.causa]}
+                        {c.notaCierre ? `: ${c.notaCierre}` : ""}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
