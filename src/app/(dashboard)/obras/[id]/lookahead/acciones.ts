@@ -9,7 +9,9 @@ import {
   fijarFlujos,
   marcarSinRestricciones,
   levantarTodasDeTareas,
+  comprometerRestricciones,
   type ResultadoAnalisis,
+  type ResultadoCompromiso,
 } from "@/services/lookahead.service";
 import { avisarDeHechos, motivosDeHechos } from "@/services/avisos-envio";
 import type { ModoFlujos } from "@/lib/lookahead";
@@ -109,6 +111,25 @@ async function avisar(
   } catch (e) {
     console.error("[avisos] No se pudo avisar del Lookahead:", e);
   }
+}
+
+/**
+ * Registra a quien le toca levantar unas restricciones, y para cuando.
+ *
+ * No avisa: asignar no abre ni cierra nada. Quien reciba el encargo se entera
+ * por el recordatorio, que ya lleva la fecha, o porque se lo dijeron —que es lo
+ * normal y lo que el sistema debe registrar, no sustituir—.
+ */
+export async function accionComprometerRestricciones(
+  obraId: string,
+  datos: { ids: string[]; responsable: string; fecha: string },
+): Promise<ResultadoCompromiso> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await comprometerRestricciones(sesion, obraId, datos);
+  if (r.ok) revalidar(obraId);
+  return r;
 }
 
 /**

@@ -20,7 +20,10 @@ import {
 import {
   validarCompromisoRestriccion,
   cumplimientoDeLiberacion,
+  estadoDePromesa,
+  claveDeResponsable,
   type CumplimientoLiberacion,
+  type EstadoPromesa,
 } from "@/lib/lookahead-compromiso";
 import { planesAbiertos, type SemanaAbierta } from "@/services/plan-semanal.service";
 import {
@@ -137,6 +140,35 @@ export interface CeldaRestriccion {
   /// Fotos que demuestran que este flujo quedo liberado. Vacio si no hay, y
   /// siempre vacio en las celdas sin restriccion (no existe a que colgarlas).
   fotos: FotoResumen[];
+  /**
+   * A quien le toca levantarla, en la MISMA clave que usa el reparto de avisos
+   * ("u:<id>" | "c:<id>"). Null = nadie se ha hecho cargo.
+   *
+   * Va la clave y no el nombre a proposito: resolver el nombre por cada celda
+   * serian siete consultas por tarea. La pantalla ya tiene la lista de personas
+   * y lo resuelve alli, gratis.
+   */
+  responsableClave: string | null;
+  /// Para cuando prometio tenerla levantada.
+  fechaCompromiso: Date | null;
+  /// En que punto esta esa promesa, ya calculado contra hoy.
+  promesa: EstadoPromesa;
+}
+
+/**
+ * Alguien a quien se le puede asignar una restriccion en esta obra.
+ *
+ * Los de dentro y los de fuera en la MISMA lista, con la misma forma de clave
+ * que `@/lib/avisos`: para quien asigna es una sola pregunta —«¿quien lo
+ * consigue?»— y partirla en dos desplegables obligaria a saber de antemano si
+ * la persona tiene cuenta, que es justo lo que no viene al caso.
+ */
+export interface PersonaAsignable {
+  clave: string;
+  nombre: string;
+  /// Cargo, o empresa si es de fuera. Para distinguir dos Juan Perez.
+  detalle: string | null;
+  externo: boolean;
 }
 
 /// En que semana del PTS esta ya comprometida una tarea.
@@ -190,6 +222,10 @@ export interface LookaheadDatos {
   semanasAbiertas: SemanaAbierta[];
   /// Comprometer escribe el PTS, asi que manda el permiso del plan semanal.
   puedeComprometer: boolean;
+  /// A quien se le puede asignar una restriccion. Vacio sin permiso de gestion.
+  personas: PersonaAsignable[];
+  /// Como va el cumplimiento de las promesas de liberacion en esta ventana.
+  liberacion: CumplimientoLiberacion;
 }
 
 export type ResultadoLookahead = { ok: true } | { ok: false; error: string };
@@ -251,6 +287,10 @@ export async function obtenerLookahead(
 
   const semanas = normalizarSemanas(semanasPedidas);
   const { desde, hasta, tareas } = await tareasDeLaVentana(sesion, obraId, semanas);
+  // Una sola vez para toda la matriz: si cada celda leyera la fecha por su
+  // cuenta, dos celdas de la misma pantalla podrian caer a distinto lado de la
+  // medianoche y una saldria vencida y la otra no.
+  const ahora = hoy();
 
   const uids = tareas.map((t) => t.uid);
   const lookaheadTareas = uids.length
@@ -264,7 +304,16 @@ export async function obtenerLookahead(
           analizadaAt: true,
           analizadaPor: true,
           restricciones: {
-            select: { id: true, tipo: true, resuelta: true, detalle: true },
+            select: {
+              id: true,
+              tipo: true,
+              resuelta: true,
+              detalle: true,
+              resueltaAt: true,
+              fechaCompromiso: true,
+              responsableUserId: true,
+              responsableContactoId: true,
+            },
           },
         },
       })
@@ -327,6 +376,11 @@ export async function obtenerLookahead(
           resuelta: false,
           detalle: null,
           fotos: [],
+          responsableClave: null,
+          fechaCompromiso: null,
+          // Sin fila no hay restriccion, asi que no hay promesa que juzgar.
+          // No es "sin asignar": no hay nada que asignar todavia.
+          promesa: "liberada" as EstadoPromesa,
         })),
         comprometida: comprometidaPorUid.get(t.uid) ?? [],
       };
@@ -340,6 +394,12 @@ export async function obtenerLookahead(
         resuelta: r?.resuelta ?? false,
         detalle: r?.detalle ?? null,
         fotos: r ? (fotosPorRestriccion.get(r.id) ?? []) : [],
+        responsableClave: r ? claveDeResponsable(r) : null,
+        fechaCompromiso: r?.fechaCompromiso ?? null,
+        // Sin fila, no hay promesa que juzgar. Se marca "liberada" porque es el
+        // unico estado que la pantalla no pinta: una celda que no existe no
+        // puede salir en rojo por no tener responsable.
+        promesa: r ? estadoDePromesa(r, ahora) : ("liberada" as EstadoPromesa),
       };
     });
     return {
@@ -371,6 +431,7 @@ export async function obtenerLookahead(
   // Comprometer escribe el PTS: el permiso que manda es el del plan semanal,
   // no el del Lookahead (un consultor ve la matriz pero no compromete).
   const puedeComprometer = puede(sesion, "plan_semanal:gestionar");
+  const puedeGestionar = puede(sesion, "lookahead:gestionar");
 
   return {
     desde,
@@ -380,11 +441,78 @@ export async function obtenerLookahead(
     pendientesDeSincronizar: filas.filter((f) => !f.enMatriz).length,
     sinAnalizar: filas.filter((f) => f.fase === "SIN_ANALIZAR").length,
     semanas,
-    puedeGestionar: puede(sesion, "lookahead:gestionar"),
+    puedeGestionar,
     semanasAbiertas: puedeComprometer ? await planesAbiertos(sesion, obraId) : [],
     puedeComprometer,
+    // Solo si va a poder asignar: quien no gestiona no necesita la lista, y
+    // pedirla seria mandarle al navegador los nombres de toda la obra para
+    // nada.
+    personas: puedeGestionar ? await personasDeObra(obraId) : [],
+    liberacion: cumplimientoDeLiberacion(
+      lookaheadTareas.flatMap((l) => l.restricciones),
+      ahora,
+    ),
   };
 }
+
+/**
+ * A quien se le puede asignar una restriccion en esta obra: los de dentro y los
+ * de fuera, en una sola lista.
+ *
+ * Los de la obra van primero. Es una decision de doctrina, no de orden
+ * alfabetico: el responsable de una restriccion casi nunca deberia ser el
+ * proveedor, sino quien puede levantarla dentro de la organizacion —el
+ * almacenero para MATERIALES, la oficina tecnica para INFORMACION—. El
+ * proveedor es a quien esa persona persigue. La lista lo sugiere sin
+ * prohibirlo.
+ */
+async function personasDeObra(obraId: string): Promise<PersonaAsignable[]> {
+  const [miembros, externos] = await Promise.all([
+    prisma.projectMembership.findMany({
+      where: { projectId: obraId, user: { estado: "ACTIVO" } },
+      select: {
+        user: { select: { id: true, nombres: true, apellidos: true, cargo: true } },
+      },
+    }),
+    prisma.contactoAviso.findMany({
+      where: { projectId: obraId, activo: true },
+      select: { id: true, nombre: true, empresa: true },
+    }),
+  ]);
+
+  const dentro = miembros.map((m) => ({
+    clave: `u:${m.user.id}`,
+    nombre: `${m.user.nombres} ${m.user.apellidos}`.trim(),
+    detalle: m.user.cargo,
+    externo: false,
+  }));
+
+  const fuera = externos.map((c) => ({
+    clave: `c:${c.id}`,
+    nombre: c.nombre,
+    detalle: c.empresa,
+    externo: true,
+  }));
+
+  const porNombre = (a: PersonaAsignable, b: PersonaAsignable) =>
+    a.nombre.localeCompare(b.nombre, "es");
+
+  return [...dentro.sort(porNombre), ...fuera.sort(porNombre)];
+}
+
+/**
+ * Lo que ve una celda DESDE UN PASE: menos que `CeldaRestriccion`.
+ *
+ * Sin responsable ni fecha comprometida a proposito. Quien sube una foto desde
+ * el andamio necesita saber que flujo esta documentando, no a quien le toca
+ * conseguirlo ni que se prometio al cliente: eso es informacion de gestion, y
+ * un pase no es un usuario. Reutilizar el tipo de la matriz habria mandado esos
+ * datos al telefono sin que nadie lo decidiera.
+ */
+export type CeldaPase = Pick<
+  CeldaRestriccion,
+  "id" | "tipo" | "resuelta" | "detalle" | "fotos"
+>;
 
 /**
  * Lo que el menu de evidencia necesita, y NADA mas.
@@ -402,7 +530,7 @@ export interface MenuPaseDatos {
     analizada: boolean;
     /// SOLO los flujos que aplican de verdad, en el orden de la matriz. Puede
     /// estar vacio: la tarea se reviso y no le aplica ninguno.
-    restricciones: CeldaRestriccion[];
+    restricciones: CeldaPase[];
   }[];
   semanas: number;
   puedeSubir: boolean;
