@@ -76,6 +76,13 @@ export interface ConteoPendientes {
   tareasEmpezadasSinAvance: number;
   /// Semanas CERRADAS donde algun compromiso quedo sin % alcanzado.
   semanasSinPorcentaje: number;
+  /**
+   * Tareas que se prometieron en una semana cerrada, fallaron y siguen sin
+   * hacerse ni volver a comprometerse.
+   */
+  incumplidosSinRetomar: number;
+  /// De esas, cuantas han fallado en dos semanas o mas.
+  incumplidosCronicos: number;
   /// Tareas de la ventana del Lookahead que nadie ha analizado: nadie ha
   /// dicho que flujos les aplican, ni siquiera que no les aplica ninguno.
   lookaheadSinAnalizar: number;
@@ -252,6 +259,33 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
         "Esos compromisos cuentan para el PPC pero no movieron la curva S. El avance fisico se quedo sin registrar.",
       accion:
         "Abre la semana, pulsa «Reabrir», escribe el % alcanzado de cada compromiso y vuelve a cerrarla.",
+      camino: "/plan-semanal",
+      cuantos: n,
+    });
+  }
+
+  if (c.incumplidosSinRetomar > 0) {
+    const n = c.incumplidosSinRetomar;
+    const cronicos = c.incumplidosCronicos;
+    // Lo cronico manda sobre el conteo: una tarea que lleva tres semanas
+    // prometiendose y fallando no es un retraso, es algo que la esta
+    // impidiendo, y hasta que se sepa el que volvera a fallar la cuarta.
+    const detalle =
+      cronicos > 0
+        ? ` ${cronicos} ${plural(cronicos, "lleva", "llevan")} dos semanas o mas fallando: eso ya no es retraso, es que algo lo impide.`
+        : "";
+
+    salida.push({
+      clave: "incumplidos-sin-retomar",
+      bloque: "entradas",
+      gravedad: cronicos > 0 ? "critica" : "aviso",
+      titulo: `${n} ${plural(n, "tarea prometida no se hizo", "tareas prometidas no se hicieron")} y nadie las ha retomado`,
+      consecuencia:
+        `Se quedaron dentro de una semana cerrada. Si su fecha programada ya pasó, ` +
+        `tampoco están en el Lookahead: no aparecen en ninguna pantalla y el trabajo ` +
+        `desaparece del plan sin que nadie lo decida.${detalle}`,
+      accion:
+        "Abre la semana en curso: salen arriba, en «Viene de semanas anteriores», con un botón para volver a comprometerlas.",
       camino: "/plan-semanal",
       cuantos: n,
     });

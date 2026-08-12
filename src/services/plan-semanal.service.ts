@@ -18,6 +18,7 @@ import {
   validarCantidadPlan,
   uidsDuplicados,
   avisoNumeracionSemana,
+  arrastreDeIncumplidos,
   CAUSAS_CNC,
   type AvisoNumeracion,
   type FilaPareto,
@@ -201,6 +202,29 @@ export interface PlanSemanalDetalle {
   /// Tareas cuyo trabajo cae en la semana del corte, para autocargar cuando la
   /// semana no tiene compromisos aun.
   sugeridas: CompromisoSugerido[];
+  /**
+   * Lo que se prometio en una semana cerrada, fallo y sigue sin hacerse.
+   *
+   * Va aparte de `sugeridas` porque no es lo mismo y no debe leerse igual: una
+   * sugerencia es trabajo que TOCA esta semana segun el cronograma; esto es
+   * trabajo que ya se prometio y no salio. Ademas no llega por la misma via —
+   * `sugeridas` sale de las fechas del cronograma, y una tarea cuya fecha ya
+   * paso no aparece ahi ni en el Lookahead—.
+   */
+  arrastradas: CompromisoArrastrado[];
+}
+
+/// Una tarea que vuelve, con lo que hay que saber para decidir si recomprometerla.
+export interface CompromisoArrastrado {
+  uid: number;
+  descripcion: string;
+  /// En cuantas semanas se prometio y fallo. 2 o mas es un bloqueo cronico.
+  veces: number;
+  ultimaSemana: number;
+  causa: CausaNoCumplimiento | null;
+  avance: number;
+  cantidadPlan: string | null;
+  unidad: string | null;
 }
 
 /**
@@ -376,6 +400,55 @@ export async function obtenerPlanSemanal(
       unidad: sugerenciaPorUid.get(t.uid)?.unidad ?? null,
     }));
 
+  // EL ARRASTRE: lo que se prometio en una semana ya CERRADA y no salio.
+  //
+  // Se traen tambien los CUMPLIDOS —no solo los fallidos— porque `arrastreDe
+  // Incumplidos` necesita saber cual fue la ULTIMA palabra de cada tarea: una
+  // que fallo la Semana 1 y se cumplio la Semana 2 va avanzando, y volver a
+  // sacarla seria el ruido que hace que nadie lea la lista.
+  const previos = await prisma.compromisoSemanal.findMany({
+    where: {
+      uid: { not: null },
+      cumplido: { not: null },
+      plan: { projectId: obraId, id: { not: planId }, estado: "CERRADO" },
+    },
+    select: {
+      uid: true,
+      descripcion: true,
+      cumplido: true,
+      causa: true,
+      plan: { select: { numero: true, fechaCorte: true } },
+    },
+  });
+
+  const yaEnLaSemana = new Set<number>(
+    plan.compromisos.map((c) => c.uid).filter((u): u is number => u !== null),
+  );
+
+  const arrastradas: CompromisoArrastrado[] = arrastreDeIncumplidos(
+    previos.map((c) => ({
+      uid: c.uid,
+      descripcion: c.descripcion,
+      numeroSemana: c.plan.numero,
+      fechaCorte: c.plan.fechaCorte,
+      cumplido: c.cumplido === true,
+      causa: c.causa,
+    })),
+    avancePorUid,
+    yaEnLaSemana,
+  ).map((a) => ({
+    uid: a.uid,
+    // El nombre vigente del cronograma manda sobre el que se guardo: si la
+    // tarea se renombro, el residente busca por el nombre de ahora.
+    descripcion: nombrePorUid.get(a.uid) ?? a.descripcion,
+    veces: a.veces,
+    ultimaSemana: a.ultimaSemana,
+    causa: a.causa,
+    avance: a.avance,
+    cantidadPlan: sugerenciaPorUid.get(a.uid)?.cantidad ?? null,
+    unidad: sugerenciaPorUid.get(a.uid)?.unidad ?? null,
+  }));
+
   // La evidencia de todos los compromisos en una consulta, no una por fila.
   const fotosPorCompromiso = plan.compromisos.length
     ? await fotosPorDestino(sesion, obraId, {
@@ -412,6 +485,7 @@ export async function obtenerPlanSemanal(
     creadoPor: plan.creadoPor,
     cerradoPor: plan.cerradoPor,
     cerradoAt: plan.cerradoAt,
+    arrastradas,
     compromisos,
     total,
     cumplidos,

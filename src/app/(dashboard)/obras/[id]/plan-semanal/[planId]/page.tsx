@@ -115,6 +115,7 @@ export default async function DetallePlanSemanalPage({
             obraId={id}
             planId={planId}
             tareas={tareas}
+            arrastradas={plan.arrastradas}
             inicial={inicial}
           />
         </Seccion>

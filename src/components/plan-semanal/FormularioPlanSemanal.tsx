@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, Trash2, LoaderCircle } from "lucide-react";
+import { useRef, useState, useTransition } from "react";
+import { Plus, Trash2, LoaderCircle, History } from "lucide-react";
 import { accionGuardarCompromisos } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
-import type { EstadoLookahead } from "@/generated/prisma/enums";
+import { ETIQUETA_CNC } from "@/lib/plan-semanal";
+import type {
+  EstadoLookahead,
+  CausaNoCumplimiento,
+} from "@/generated/prisma/enums";
 
 /**
  * Planificar la semana: elegir tareas del cronograma (por uid) y/o anadir
@@ -42,15 +46,29 @@ interface TareaOpcion {
   unidadSugerida: string | null;
 }
 
+/// Una tarea que ya se prometio en una semana cerrada y no salio.
+export interface Arrastrada {
+  uid: number;
+  descripcion: string;
+  veces: number;
+  ultimaSemana: number;
+  causa: CausaNoCumplimiento | null;
+  avance: number;
+  cantidadPlan: string | null;
+  unidad: string | null;
+}
+
 export function FormularioPlanSemanal({
   obraId,
   planId,
   tareas,
+  arrastradas,
   inicial,
 }: {
   obraId: string;
   planId: string;
   tareas: TareaOpcion[];
+  arrastradas: Arrastrada[];
   inicial: {
     uid: number | null;
     descripcion: string;
@@ -77,7 +95,12 @@ export function FormularioPlanSemanal({
   const [ok, setOk] = useState(false);
   const [pendiente, iniciar] = useTransition();
 
-  const nuevaKey = () => `n${Math.random().toString(36).slice(2)}`;
+  // Un contador y no `Math.random()`: la clave solo tiene que ser unica dentro
+  // de esta lista, y una impura en el cuerpo del componente puede dar valores
+  // distintos entre renders —React lo trata como un fallo de pureza, y con
+  // razon: la fila se remontaria sola y perderia el foco a media escritura—.
+  const contador = useRef(0);
+  const nuevaKey = () => `n${(contador.current += 1)}`;
 
   function agregarTarea() {
     const uid = Number(uidSel);
@@ -163,8 +186,92 @@ export function FormularioPlanSemanal({
     });
   }
 
+  /// Las que aun no se han metido en la semana. Al recomprometer una, ella sola
+  /// desaparece de la lista.
+  const pendientesDeArrastre = arrastradas.filter(
+    (a) => !items.some((it) => it.uid === a.uid),
+  );
+
+  function recomprometer(a: Arrastrada) {
+    setItems((p) => [
+      ...p,
+      {
+        key: nuevaKey(),
+        uid: a.uid,
+        descripcion: a.descripcion,
+        meta: "",
+        cantidad: a.cantidadPlan ?? "",
+        unidad: a.unidad ?? "",
+        lookaheadTaskId: null,
+      },
+    ]);
+    setOk(false);
+  }
+
   return (
     <div className="space-y-3">
+      {/* EL ARRASTRE. Va ARRIBA del desplegable y con su propio bloque, no como
+          un grupo mas de opciones: no es lo mismo "esto toca esta semana" que
+          "esto lo prometiste y no salio". Ademas muchas de estas ya no estan en
+          el desplegable —si su fecha programada paso, salieron tambien del
+          Lookahead—, que es justo por lo que se perdian. */}
+      {pendientesDeArrastre.length > 0 && (
+        <div
+          className="rounded-xl border p-3"
+          style={{
+            borderColor: "var(--color-alerta)",
+            backgroundColor: "color-mix(in srgb, var(--color-alerta) 6%, transparent)",
+          }}
+        >
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <History className="size-4 shrink-0" aria-hidden="true" />
+            Viene de semanas anteriores
+          </p>
+          <p className="mt-0.5 text-xs opacity-70">
+            Lo prometiste, no salió y sigue sin hacerse. Si no vuelve a un plan,
+            no vuelve a ninguna parte.
+          </p>
+
+          <ul className="mt-2 space-y-1.5">
+            {pendientesDeArrastre.map((a) => (
+              <li
+                key={a.uid}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5"
+                style={{
+                  borderColor: "var(--borde)",
+                  backgroundColor: "var(--superficie)",
+                }}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm">{a.descripcion}</p>
+                  <p className="text-xs opacity-70">
+                    {/* Las veces primero: dos o mas es un bloqueo cronico, y es
+                        lo unico que distingue "se atraso" de "algo lo impide". */}
+                    {a.veces > 1 ? (
+                      <strong style={{ color: "var(--color-peligro)" }}>
+                        Falló {a.veces} semanas
+                      </strong>
+                    ) : (
+                      <>Falló en la Semana {a.ultimaSemana}</>
+                    )}
+                    {a.causa && <> · {ETIQUETA_CNC[a.causa]}</>}
+                    {a.avance > 0 && <> · va por el {Math.round(a.avance)}%</>}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => recomprometer(a)}
+                  className="shrink-0 rounded-lg border px-2.5 py-1 text-xs font-medium"
+                  style={{ borderColor: "var(--color-marca-600)", color: "var(--color-marca-600)" }}
+                >
+                  Volver a comprometer
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-xs">
           <span className="block opacity-70">Tarea del cronograma</span>

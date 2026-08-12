@@ -10,6 +10,8 @@ function limpio(cambios: Partial<ConteoPendientes> = {}): ConteoPendientes {
   return {
     tareasEmpezadasSinAvance: 0,
     semanasSinPorcentaje: 0,
+    incumplidosSinRetomar: 0,
+    incumplidosCronicos: 0,
     lookaheadSinAnalizar: 0,
     confiabilidadMostrada: null,
     tareasProximasBloqueadas: 0,
@@ -47,13 +49,15 @@ describe("pendientesDeObra", () => {
         tareasProximasSinAnalizar: 9,
         tareasProximasSinCobertura: 2,
         partidasSobregiradas: 4,
+        incumplidosSinRetomar: 3,
+        incumplidosCronicos: 1,
         ppcUltimo: 62,
         ppcAnterior: 100,
         coberturaMapeo: 40,
       }),
     );
 
-    expect(todos.length).toBe(9);
+    expect(todos.length).toBe(10);
     for (const p of todos) {
       expect(p.camino, p.clave).toMatch(/^\//);
       // En imperativo y con sustancia: "Ver" o "Ir" no dicen que hacer.
@@ -109,6 +113,31 @@ describe("pendientesDeObra", () => {
       const [p] = pendientesDeObra(limpio({ tareasEmpezadasSinAvance: 1 }));
       expect(p?.titulo).toContain("1 tarea empezo");
       expect(p?.titulo).not.toContain("tareas");
+    });
+
+    it("dice lo que importa: esto lo prometiste, fallo y sigue sin hacerse", () => {
+      // El agujero de la seccion 6i: un compromiso incumplido se quedaba dentro
+      // de una semana cerrada, y si su fecha ya paso desaparecia tambien del
+      // Lookahead. No lo decia ninguna pantalla.
+      const [p] = pendientesDeObra(limpio({ incumplidosSinRetomar: 3 }));
+      expect(p?.clave).toBe("incumplidos-sin-retomar");
+      expect(p?.titulo).toContain("3 tareas prometidas");
+      expect(p?.consecuencia).toContain("Lookahead");
+      expect(p?.accion).toContain("Viene de semanas anteriores");
+    });
+
+    it("lo cronico es critico; un fallo suelto solo es aviso", () => {
+      // Tres semanas prometiendose y fallando no es un retraso: es que algo lo
+      // impide, y hasta que se sepa el que volvera a fallar la cuarta.
+      expect(
+        pendientesDeObra(limpio({ incumplidosSinRetomar: 1 }))[0]?.gravedad,
+      ).toBe("aviso");
+
+      const [p] = pendientesDeObra(
+        limpio({ incumplidosSinRetomar: 2, incumplidosCronicos: 1 }),
+      );
+      expect(p?.gravedad).toBe("critica");
+      expect(p?.consecuencia).toContain("algo lo impide");
     });
 
     it("las semanas cerradas sin % son aviso, no critica", () => {

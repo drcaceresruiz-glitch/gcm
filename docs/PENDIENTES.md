@@ -47,14 +47,14 @@ abajo.
      antiguedad. Un aviso por cada casilla marcada seria ruido en tres dias.
    - **Con que se manda**: la cola de SMS por empresa ya existe (6g) y el
      correo tambien. La pieza que falta es a QUIEN.
-6. **Los tres de la seccion 6i**, en este orden y TODOS despues de los avisos
-   (acordado con el usuario el 11 de agosto):
-   - **Aviso de numeracion de semanas**: crear una semana con fecha anterior a
-     otra existente deja el correlativo a contramano.
-   - **El arrastre de lo incumplido**: un compromiso que falla no va a ninguna
-     parte; se queda en su semana cerrada y, si su fecha ya paso, desaparece
-     tambien del Lookahead.
-   - **El texto del PPC bajo**, que miente entre 50% y 70%.
+6. ~~**Los tres de la seccion 6i**~~ **HECHOS el 12 de agosto de 2026**, en el
+   orden que fijo el usuario y todos despues de los avisos:
+   - ~~Aviso de numeracion de semanas~~ → avisa al crear, con «Crearla igual» /
+     «Cambiar la fecha». No renumera nunca: romperia las actas.
+   - ~~El arrastre de lo incumplido~~ → `arrastreDeIncumplidos` en
+     `@/lib/plan-semanal`, bloque «Viene de semanas anteriores» al planificar,
+     y regla `incumplidos-sin-retomar` en «Que falta».
+   - ~~El texto del PPC bajo~~ → `lecturaDelPpc`, tres tramos por umbral.
 7. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
    worktree. Investigacion hecha el 11 de agosto, plan sin escribir.
 

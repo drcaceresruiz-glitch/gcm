@@ -13,6 +13,8 @@ import {
   validarCantidadPlan,
   uidsDuplicados,
   avisoNumeracionSemana,
+  arrastreDeIncumplidos,
+  type CompromisoPrevio,
   type CompromisoEvaluado,
   type TareaProgramada,
   type EnlacePredecesora,
@@ -216,6 +218,141 @@ describe("avisoNumeracionSemana", () => {
     // El indice unico ya impide dos planes con el mismo corte; aqui solo se
     // comprueba que no se avise de un empate.
     expect(avisoNumeracionSemana(dc("2026-08-15"), existentes)).toBeNull();
+  });
+});
+
+describe("arrastreDeIncumplidos", () => {
+  const inc = (
+    uid: number | null,
+    numeroSemana: number,
+    fecha: string,
+    descripcion = `Tarea ${uid}`,
+  ): CompromisoPrevio => ({
+    uid,
+    descripcion,
+    numeroSemana,
+    fechaCorte: dc(fecha),
+    cumplido: false,
+    causa: "PRERREQUISITO",
+  });
+
+  const hecho = (
+    uid: number,
+    numeroSemana: number,
+    fecha: string,
+  ): CompromisoPrevio => ({
+    uid,
+    descripcion: `Tarea ${uid}`,
+    numeroSemana,
+    fechaCorte: dc(fecha),
+    cumplido: true,
+    causa: null,
+  });
+
+  it("arrastra lo que se prometio, fallo y sigue sin hacerse", () => {
+    const r = arrastreDeIncumplidos(
+      [inc(10, 1, "2026-08-07")],
+      new Map([[10, 30]]),
+      new Set(),
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0]?.uid).toBe(10);
+    expect(r[0]?.veces).toBe(1);
+    expect(r[0]?.avance).toBe(30);
+  });
+
+  it("NO arrastra lo que ya se termino", () => {
+    // Se cumplio tarde, pero se cumplio. Recordarlo seria mentir sobre el
+    // estado de la obra.
+    const r = arrastreDeIncumplidos(
+      [inc(10, 1, "2026-08-07")],
+      new Map([[10, 100]]),
+      new Set(),
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("NO arrastra lo que ya esta en la semana que se planifica", () => {
+    // El residente ya se acordo: proponerselo otra vez es ruido puro.
+    const r = arrastreDeIncumplidos(
+      [inc(10, 1, "2026-08-07")],
+      new Map(),
+      new Set([10]),
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("ignora las lineas libres, que no se pueden seguir entre semanas", () => {
+    // Lo unico que las identifica es un texto que se puede reescribir.
+    const r = arrastreDeIncumplidos([inc(null, 1, "2026-08-07")], new Map(), new Set());
+    expect(r).toEqual([]);
+  });
+
+  it("cuenta las veces que fallo y las pone primero", () => {
+    // Lo que lleva tres semanas prometiendose es un bloqueo cronico; hay que
+    // mirarlo antes que lo que fallo anteayer por primera vez.
+    const r = arrastreDeIncumplidos(
+      [
+        inc(10, 1, "2026-08-07"),
+        inc(10, 2, "2026-08-14"),
+        inc(10, 3, "2026-08-21"),
+        inc(20, 3, "2026-08-21"),
+      ],
+      new Map(),
+      new Set(),
+    );
+    expect(r.map((a) => [a.uid, a.veces])).toEqual([
+      [10, 3],
+      [20, 1],
+    ]);
+  });
+
+  it("«la ultima vez» se decide por FECHA, no por numero de semana", () => {
+    // El correlativo puede ir a contramano del calendario: la Semana 3 puede
+    // cerrar antes que la Semana 2.
+    const r = arrastreDeIncumplidos(
+      [
+        inc(10, 3, "2026-08-14", "nombre viejo"),
+        inc(10, 2, "2026-08-15", "nombre nuevo"),
+      ],
+      new Map(),
+      new Set(),
+    );
+    expect(r[0]?.ultimaSemana).toBe(2);
+    expect(r[0]?.descripcion).toBe("nombre nuevo");
+  });
+
+  it("se corta: una lista de cincuenta no se lee, se cierra", () => {
+    const muchos = Array.from({ length: 40 }, (_, i) =>
+      inc(i + 1, 1, "2026-08-07"),
+    );
+    expect(arrastreDeIncumplidos(muchos, new Map(), new Set(), 12)).toHaveLength(12);
+  });
+
+  it("NO arrastra lo que fallo una semana y se cumplio a la siguiente", () => {
+    // Va avanzando: insistir sobre algo que ya se recupero es exactamente el
+    // ruido que haria que nadie leyera esta lista.
+    const r = arrastreDeIncumplidos(
+      [inc(10, 1, "2026-08-07"), hecho(10, 2, "2026-08-14")],
+      new Map([[10, 60]]),
+      new Set(),
+    );
+    expect(r).toEqual([]);
+  });
+
+  it("SI arrastra lo que se cumplio una semana y volvio a fallar", () => {
+    // Manda la ultima palabra, no el historial.
+    const r = arrastreDeIncumplidos(
+      [hecho(10, 1, "2026-08-07"), inc(10, 2, "2026-08-14")],
+      new Map([[10, 60]]),
+      new Set(),
+    );
+    expect(r.map((a) => a.uid)).toEqual([10]);
+    expect(r[0]?.veces).toBe(1);
+  });
+
+  it("sin nada incumplido no arrastra nada", () => {
+    expect(arrastreDeIncumplidos([], new Map(), new Set())).toEqual([]);
   });
 });
 

@@ -296,6 +296,133 @@ export function avisoNumeracionSemana(
   return desordenadas.length === 0 ? null : { numero, desordenadas };
 }
 
+// ---------------------------------------------------------------------------
+// El arrastre de lo incumplido
+// ---------------------------------------------------------------------------
+
+/// Un compromiso de una semana ya CERRADA, se cumpliera o no.
+export interface CompromisoPrevio {
+  /// null en las lineas libres, que no se pueden seguir entre semanas.
+  uid: number | null;
+  descripcion: string;
+  numeroSemana: number;
+  fechaCorte: Date;
+  /// Se llega aqui con true o false; `null` no existe en una semana cerrada.
+  cumplido: boolean;
+  causa: CausaNoCumplimiento | null;
+}
+
+export interface Arrastrada {
+  uid: number;
+  descripcion: string;
+  /// En cuantas semanas se prometio y fallo. Dos o mas es un bloqueo cronico,
+  /// y es la cifra que de verdad importa.
+  veces: number;
+  /// La ultima vez que se prometio, para poder decir "desde la Semana 2".
+  ultimaSemana: number;
+  ultimaFecha: Date;
+  /// Por que fallo la ultima vez.
+  causa: CausaNoCumplimiento | null;
+  /// Que porcentaje lleva hoy. Siempre menor que 100: al 100 no se arrastra.
+  avance: number;
+}
+
+/**
+ * Cuantas se arrastran como mucho.
+ *
+ * Doce. El aviso es "esto lo prometiste y sigue sin hacerse", y una lista de
+ * cincuenta no se lee: se cierra. Si hay mas, es que el problema no es una
+ * tarea sino la planificacion entera, y eso lo dice el PPC, no esta lista.
+ */
+export const MAX_ARRASTRADAS = 12;
+
+/**
+ * Lo que se prometio, fallo y SIGUE sin hacerse.
+ *
+ * Este es el agujero que dejaba caer el trabajo. Al cerrar una semana, un
+ * compromiso incumplido alimenta el PPC y el Pareto —que es su trabajo— y no
+ * se propaga a nada mas. Para recuperarlo habia que acordarse de el, ir al
+ * Lookahead y reconocerlo; y si su fecha programada ya habia pasado,
+ * **desaparecia tambien de alli**, porque la ventana del Lookahead empieza en
+ * hoy. Se quedaba dentro de una semana cerrada que nadie reabre.
+ *
+ * Las cuatro condiciones para arrastrar, y cada una quita ruido de verdad:
+ *
+ * 1. **Que la ULTIMA vez que se prometio fallara.** Recibe todos los
+ *    compromisos cerrados, cumplidos incluidos, justamente para poder mirar
+ *    esto: una tarea que fallo la Semana 1 y se cumplio la Semana 2 va
+ *    avanzando, y recordarla seria insistir sobre algo que ya se recupero.
+ * 2. **Que no este terminada.** Una tarea al 100% se cumplio tarde, pero se
+ *    cumplio: recordarla seria mentir sobre el estado de la obra.
+ * 3. **Que no este ya en esta semana.** Si el residente ya la volvio a
+ *    comprometer, proponersela otra vez es ruido puro.
+ * 4. **Que tenga uid.** Una linea libre no se puede seguir entre semanas: no
+ *    hay nada que la identifique salvo un texto que se puede reescribir.
+ *
+ * Se ordenan por VECES QUE FALLO, no por fecha. Lo que lleva tres semanas
+ * prometiendose y fallando es un bloqueo cronico, y es lo que hay que mirar
+ * antes que lo que fallo anteayer por primera vez.
+ */
+export function arrastreDeIncumplidos(
+  previos: readonly CompromisoPrevio[],
+  avancePorUid: ReadonlyMap<number, number>,
+  yaEnLaSemana: ReadonlySet<number>,
+  max = MAX_ARRASTRADAS,
+): Arrastrada[] {
+  const porUid = new Map<number, Arrastrada>();
+  /// Que dijo la ULTIMA semana de cada tarea, y cuando lo dijo.
+  const ultimaPalabra = new Map<number, { cumplido: boolean; fecha: Date }>();
+
+  for (const c of previos) {
+    if (c.uid === null) continue;
+    if (yaEnLaSemana.has(c.uid)) continue;
+
+    const avance = avancePorUid.get(c.uid) ?? 0;
+    if (avance >= 100) continue;
+
+    // "La ultima" es la de FECHA mayor, no la de numero mayor: el correlativo
+    // puede ir a contramano del calendario (ver `avisoNumeracionSemana`).
+    const ultima = ultimaPalabra.get(c.uid);
+    if (!ultima || c.fechaCorte.getTime() > ultima.fecha.getTime()) {
+      ultimaPalabra.set(c.uid, { cumplido: c.cumplido, fecha: c.fechaCorte });
+    }
+
+    if (c.cumplido) continue;
+
+    const previa = porUid.get(c.uid);
+    if (!previa) {
+      porUid.set(c.uid, {
+        uid: c.uid,
+        descripcion: c.descripcion,
+        veces: 1,
+        ultimaSemana: c.numeroSemana,
+        ultimaFecha: c.fechaCorte,
+        causa: c.causa,
+        avance,
+      });
+      continue;
+    }
+
+    previa.veces += 1;
+    if (c.fechaCorte.getTime() > previa.ultimaFecha.getTime()) {
+      previa.ultimaFecha = c.fechaCorte;
+      previa.ultimaSemana = c.numeroSemana;
+      previa.causa = c.causa;
+      previa.descripcion = c.descripcion;
+    }
+  }
+
+  return [...porUid.values()]
+    .filter((a) => ultimaPalabra.get(a.uid)?.cumplido === false)
+    .sort(
+      (a, b) =>
+        b.veces - a.veces ||
+        b.ultimaFecha.getTime() - a.ultimaFecha.getTime() ||
+        a.uid - b.uid,
+    )
+    .slice(0, Math.max(0, max));
+}
+
 export interface RangoSemana {
   inicio: Date;
   fin: Date;

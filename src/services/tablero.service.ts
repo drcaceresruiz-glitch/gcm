@@ -18,6 +18,7 @@ import { listarPlanesSemanales } from "@/services/plan-semanal.service";
 import { confiabilidadDeVentana } from "@/services/lookahead.service";
 import { MODULOS_POR_DEFECTO, type ModuloTablero } from "@/lib/tablero";
 import { pendientesDeObra, type Pendiente } from "@/lib/pendientes";
+import { arrastreDeIncumplidos } from "@/lib/plan-semanal";
 import { cobertura } from "@/lib/mapeo-partidas";
 import { diasEntre, fechaCorta, hoy } from "@/utils/fechas";
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
@@ -741,7 +742,8 @@ async function pendientesDeLaObra(
   );
   const uidsProximos = proximas.map((t) => t.uid);
 
-  const [lkProximas, mapeos, partidas, planesCerrados] = await Promise.all([
+  const [lkProximas, mapeos, partidas, planesCerrados, yaRetomadas] =
+    await Promise.all([
     uidsProximos.length > 0
       ? prisma.lookaheadTask.findMany({
           where: { projectId: obraId, uid: { in: uidsProximos } },
@@ -770,13 +772,38 @@ async function pendientesDeLaObra(
 
     // Semanas cerradas que no dejaron ningun avance fisico: sus compromisos
     // con tarea contaron para el PPC y no movieron la curva.
+    //
+    // La misma consulta sirve para el ARRASTRE: se traen tambien `cumplido` y
+    // la fecha del corte, porque `arrastreDeIncumplidos` necesita saber cual
+    // fue la ULTIMA palabra de cada tarea —una que fallo y luego se cumplio va
+    // avanzando y no hay que sacarla—.
     prisma.planSemanal.findMany({
       where: { projectId: obraId, estado: "CERRADO" },
       select: {
         id: true,
+        numero: true,
+        fechaCorte: true,
         _count: { select: { avances: true } },
-        compromisos: { where: { uid: { not: null } }, select: { id: true } },
+        compromisos: {
+          where: { uid: { not: null } },
+          select: {
+            id: true,
+            uid: true,
+            descripcion: true,
+            cumplido: true,
+            causa: true,
+          },
+        },
       },
+    }),
+
+    // Lo ya retomado: comprometido otra vez en una semana que sigue ABIERTA.
+    prisma.compromisoSemanal.findMany({
+      where: {
+        uid: { not: null },
+        plan: { projectId: obraId, estado: "ABIERTO" },
+      },
+      select: { uid: true },
     }),
   ]);
 
@@ -825,6 +852,30 @@ async function pendientesDeLaObra(
     (p) => p.compromisos.length > 0 && p._count.avances === 0,
   ).length;
 
+  // El ARRASTRE: lo prometido que fallo y sigue sin hacerse ni retomarse.
+  const avancePorUid = new Map<number, number>(
+    trabajo.flatMap((t) =>
+      t.avance === null ? [] : [[t.uid, Number(t.avance.porcentaje)] as const],
+    ),
+  );
+
+  const arrastre = arrastreDeIncumplidos(
+    planesCerrados.flatMap((p) =>
+      p.compromisos.map((c) => ({
+        uid: c.uid,
+        descripcion: c.descripcion,
+        numeroSemana: p.numero,
+        fechaCorte: p.fechaCorte,
+        cumplido: c.cumplido === true,
+        causa: c.causa,
+      })),
+    ),
+    avancePorUid,
+    new Set(
+      yaRetomadas.map((c) => c.uid).filter((u): u is number => u !== null),
+    ),
+  );
+
   const cob = cobertura(
     mapeos,
     partidas.map((p) => ({
@@ -837,6 +888,8 @@ async function pendientesDeLaObra(
   return pendientesDeObra({
     tareasEmpezadasSinAvance,
     semanasSinPorcentaje,
+    incumplidosSinRetomar: arrastre.length,
+    incumplidosCronicos: arrastre.filter((a) => a.veces > 1).length,
     lookaheadSinAnalizar: lookahead?.sinAnalizar ?? 0,
     confiabilidadMostrada: lookahead?.porcentaje ?? null,
     tareasProximasBloqueadas,
