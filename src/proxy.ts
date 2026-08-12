@@ -44,6 +44,15 @@ const RUTAS_PUBLICAS = [
   // jamas va a tener cookie de sesion. Se identifica con su propio token en
   // la cabecera `Authorization`, que comprueba el route handler.
   "/api/sms",
+  // El reloj de los avisos: lo llama un cron de cPanel con curl, que tampoco
+  // va a tener cookie nunca. Se identifica con `AVISOS_CRON_TOKEN` en la
+  // cabecera `Authorization`, y sin el la ruta responde 401 SIEMPRE.
+  //
+  // Faltar aqui no daba error: daba un 307 al login, o sea un cron en verde y
+  // cero avisos, para siempre. Se descubrio el 12/08/2026 haciendo `curl` a
+  // produccion despues de desplegar, y es justo el fallo silencioso que
+  // `/api/health` existe para delatar.
+  "/api/reloj",
 ];
 
 export default function proxy(peticion: NextRequest) {
