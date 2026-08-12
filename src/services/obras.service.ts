@@ -18,7 +18,7 @@ import {
   ETIQUETA_ESTADO_OBRA,
   type EstadoObra,
 } from "@/lib/obras";
-import { diasEntre } from "@/utils/fechas";
+import { diasEntre, hoy } from "@/utils/fechas";
 import {
   contarPaginas,
   normalizarPagina,
@@ -566,6 +566,66 @@ export const hitosDeObra = cache(async function hitosDeObra(
     lookahead: lookahead !== null,
     planSemanal: plan !== null,
   };
+});
+
+/**
+ * Cuanto trabajo espera en cada seccion del menu.
+ *
+ * Alimenta las insignias del menu de la obra. Hasta ahora GCM calculaba todo
+ * esto para el panel «Que falta» del tablero y el menu no sabia nada: para
+ * enterarte de que tenias cinco restricciones vencidas habia que ir al tablero
+ * a mirarlas.
+ *
+ * SE CUENTA SOLO LO QUE SE PUEDE CONTAR BARATO, y esa restriccion manda sobre
+ * lo completo que sea. Esto corre en el layout, o sea en CADA navegacion
+ * dentro de la obra, sobre un hosting de 20 Entry Processes donde cargar el
+ * cronograma entero en una pantalla ya tumbo produccion dos veces. Por eso son
+ * dos `count` con indice y nada mas: no se cruzan tareas con avances ni se
+ * reconstruyen ventanas.
+ *
+ * Lo que queda fuera a proposito: las tareas del parte sin reportar y las
+ * tareas de la ventana sin analizar. Las dos exigen leer el cronograma
+ * completo y medirlo, que es justo lo que no puede hacerse aqui. Siguen
+ * saliendo en el panel «Que falta», que se calcula una vez y en su sitio.
+ */
+export interface AvisosSeccion {
+  /// Restricciones abiertas cuya fecha comprometida ya paso. Alguien dijo que
+  /// las tendria y no las tuvo: eso tiene nombre y apellidos, y por eso mueve.
+  lookahead: number;
+  /// Semanas ABIERTAS cuyo corte ya paso: estan sin cerrar y ya toca.
+  planSemanal: number;
+}
+
+export const avisosDeSeccion = cache(async function avisosDeSeccion(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<AvisosSeccion> {
+  if (!puede(sesion, "obra:leer")) return { lookahead: 0, planSemanal: 0 };
+
+  const hoyDia = hoy();
+  const deLaObra = {
+    projectId: obraId,
+    project: { companyId: sesion.companyId },
+  };
+
+  const [vencidas, sinCerrar] = await Promise.all([
+    puede(sesion, "lookahead:leer")
+      ? prisma.restriccion.count({
+          where: {
+            resuelta: false,
+            fechaCompromiso: { lt: hoyDia },
+            tarea: deLaObra,
+          },
+        })
+      : 0,
+    puede(sesion, "plan_semanal:leer")
+      ? prisma.planSemanal.count({
+          where: { ...deLaObra, estado: "ABIERTO", fechaCorte: { lte: hoyDia } },
+        })
+      : 0,
+  ]);
+
+  return { lookahead: vencidas, planSemanal: sinCerrar };
 });
 
 // ---------------------------------------------------------------------------

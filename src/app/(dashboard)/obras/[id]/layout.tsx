@@ -1,17 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { CalendarDays, MapPin, Pencil } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
-import { obtenerObra, hitosDeObra } from "@/services/obras.service";
+import { obtenerObra, hitosDeObra, avisosDeSeccion } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
 import { fechaCorta } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
 import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
-import {
-  PestanasObra,
-  type Pestana,
-} from "@/components/obras/PestanasObra";
 import { EliminarObra } from "@/components/obras/EliminarObra";
-import { RutaObra, type PasoRuta } from "@/components/obras/RutaObra";
+import { MenuObra, type FaseMenu } from "@/components/obras/MenuObra";
 import { EstadoObra } from "@/components/obras/EstadoObra";
 import type { EstadoObra as EstadoObraTipo } from "@/lib/obras";
 
@@ -41,135 +37,127 @@ export default async function ObraLayout({
   if (!obra) notFound();
 
   const raiz = `/obras/${id}`;
-  const hitos = await hitosDeObra(sesion, id);
+  const [hitos, avisos] = await Promise.all([
+    hitosDeObra(sesion, id),
+    avisosDeSeccion(sesion, id),
+  ]);
 
-  // La ruta de la obra: el ciclo en orden, solo los pasos que la persona
-  // puede ver. Los estados (hecho / estas aqui) los pinta el componente.
-  const pasos = [
-    puede(sesion, "partida:leer") && {
-      clave: "presupuesto",
-      titulo: "Presupuesto",
-      pregunta: "cuánto cuesta",
-      href: raiz,
-      hecho: hitos.presupuesto,
+  /**
+   * El mapa de la obra: fases, secciones y ramas.
+   *
+   * UNA SOLA navegacion. Antes habia dos —este riel con los cinco pasos del
+   * ciclo y unas pestanas con tres grupos— que nombraban las mismas secciones
+   * agrupadas de forma distinta, y ninguna de las dos conocia la mitad de la
+   * aplicacion: en el Parte del dia, en Personal o en Ordenes, el «diagrama de
+   * ubicacion» no marcaba nada.
+   *
+   * El orden dentro de cada fase es el del trabajo real, no el alfabetico.
+   * En Ejecucion manda el Parte del dia porque es lo unico que se toca todos
+   * los dias.
+   */
+  const fases = [
+    {
+      clave: "plan",
+      titulo: "Plan",
+      secciones: [
+        puede(sesion, "partida:leer") && {
+          clave: "presupuesto",
+          titulo: "Presupuesto",
+          pregunta: "cuánto cuesta",
+          href: raiz,
+          // El importador de partidas es presupuesto aunque cuelgue aparte.
+          prefijos: [`${raiz}/importar`],
+          hecho: hitos.presupuesto,
+        },
+        puede(sesion, "cronograma:leer") && {
+          clave: "cronograma",
+          titulo: "Cronograma",
+          pregunta: "cuándo se hace",
+          href: `${raiz}/cronograma`,
+          hecho: hitos.cronograma,
+          ramas: [
+            { titulo: "Diagrama de Gantt", href: `${raiz}/cronograma/gantt` },
+            { titulo: "Informe semanal", href: `${raiz}/cronograma/informe` },
+            { titulo: "Enlazar con partidas", href: `${raiz}/cronograma/mapeo` },
+          ],
+        },
+        puede(sesion, "linea_base:leer") && {
+          clave: "revisiones",
+          titulo: "Revisiones",
+          pregunta: "presupuesto congelado",
+          href: `${raiz}/revisiones`,
+          hecho: hitos.lineaBase,
+        },
+      ].filter(Boolean),
     },
-    puede(sesion, "cronograma:leer") && {
-      clave: "cronograma",
-      titulo: "Cronograma",
-      pregunta: "cuándo se hace",
-      href: `${raiz}/cronograma`,
-      hecho: hitos.cronograma,
+    {
+      clave: "ejecucion",
+      titulo: "Ejecución",
+      secciones: [
+        puede(sesion, "cronograma:leer") && {
+          clave: "avance",
+          titulo: "Parte del día",
+          pregunta: "cuánto se avanzó hoy",
+          href: `${raiz}/avance`,
+        },
+        puede(sesion, "lookahead:leer") && {
+          clave: "lookahead",
+          titulo: "Lookahead",
+          pregunta: "qué se prepara",
+          href: `${raiz}/lookahead`,
+          hecho: hitos.lookahead,
+          pendientes:
+            avisos.lookahead > 0
+              ? { cuantos: avisos.lookahead, critico: true }
+              : null,
+        },
+        puede(sesion, "plan_semanal:leer") && {
+          clave: "planSemanal",
+          titulo: "Plan semanal",
+          pregunta: "qué se compromete",
+          href: `${raiz}/plan-semanal`,
+          hecho: hitos.planSemanal,
+          pendientes:
+            avisos.planSemanal > 0
+              ? { cuantos: avisos.planSemanal, critico: false }
+              : null,
+        },
+        puede(sesion, "lookahead:gestionar") && {
+          clave: "personal",
+          titulo: "Personal",
+          pregunta: "quién documenta en obra",
+          href: `${raiz}/personal`,
+        },
+        puede(sesion, "movimiento:leer") &&
+          obra.lineaBaseVersion !== null && {
+            clave: "movimientos",
+            titulo: "Movimientos",
+            pregunta: "cambios sobre la base",
+            href: `${raiz}/movimientos`,
+          },
+      ].filter(Boolean),
     },
-    // OJO con el nombre: en la app conviven DOS "lineas base" (la del
-    // presupuesto —revision aprobada— y la del cronograma —contra la que se
-    // mide el PV—). Este paso apunta a Revisiones, asi que se titula como su
-    // destino; llamarlo "Linea base" a secas hizo esperar el cronograma.
-    puede(sesion, "linea_base:leer") && {
-      clave: "lineaBase",
-      titulo: "Revisiones",
-      pregunta: "presupuesto congelado",
-      href: `${raiz}/revisiones`,
-      hecho: hitos.lineaBase,
+    {
+      clave: "compras",
+      titulo: "Compras",
+      secciones: [
+        puede(sesion, "encargo:leer") && {
+          clave: "proveedores",
+          titulo: "Proveedores",
+          pregunta: "quién hace cada frente",
+          href: `${raiz}/proveedores`,
+        },
+        puede(sesion, "orden:leer") && {
+          clave: "ordenes",
+          titulo: "Órdenes",
+          pregunta: "qué se ha pedido",
+          href: `${raiz}/ordenes`,
+        },
+      ].filter(Boolean),
     },
-    puede(sesion, "lookahead:leer") && {
-      clave: "lookahead",
-      titulo: "Lookahead",
-      pregunta: "qué se prepara",
-      href: `${raiz}/lookahead`,
-      hecho: hitos.lookahead,
-    },
-    puede(sesion, "plan_semanal:leer") && {
-      clave: "planSemanal",
-      titulo: "Plan semanal",
-      pregunta: "qué se compromete",
-      href: `${raiz}/plan-semanal`,
-      hecho: hitos.planSemanal,
-    },
-  ].filter(Boolean) as PasoRuta[];
+  ].filter((f) => f.secciones.length > 0) as FaseMenu[];
 
-  const pestanas = [
-    puede(sesion, "partida:leer") && {
-      href: raiz,
-      etiqueta: "Presupuesto",
-      clave: "presupuesto",
-      grupo: "plan",
-    },
-    // Va junto al presupuesto y antes que las revisiones: el cronograma es
-    // la otra mitad del plan de la obra —el presupuesto dice cuanto y este
-    // dice cuando—, y no depende de nada para poder cargarse.
-    puede(sesion, "cronograma:leer") && {
-      href: `${raiz}/cronograma`,
-      etiqueta: "Cronograma",
-      clave: "cronograma",
-      grupo: "plan",
-    },
-    // El Lookahead (mediano plazo) va entre cronograma y plan semanal: prepara
-    // con analisis de restricciones lo que luego se comprometera en el PTS.
-    puede(sesion, "lookahead:leer") && {
-      href: `${raiz}/lookahead`,
-      etiqueta: "Lookahead",
-      clave: "lookahead",
-      grupo: "ejecucion",
-    },
-    // El parte del dia va el primero de EJECUCION: es lo que se toca a diario,
-    // y desde el sale el avance que alimenta la curva S, el informe y el PPC.
-    // Manda `cronograma:leer` —no `avance:registrar`— porque la pantalla se
-    // puede mirar sin poder reportar; el boton es lo que exige el permiso.
-    puede(sesion, "cronograma:leer") && {
-      href: `${raiz}/avance`,
-      etiqueta: "Parte del día",
-      clave: "avance",
-      grupo: "ejecucion",
-    },
-    // El plan semanal (Last Planner) cuelga del cronograma: es su corto plazo.
-    puede(sesion, "plan_semanal:leer") && {
-      href: `${raiz}/plan-semanal`,
-      etiqueta: "Plan Semanal",
-      clave: "planSemanal",
-      grupo: "ejecucion",
-    },
-    // El personal con pase va en EJECUCION, junto al Lookahead: son las
-    // personas que documentan lo que ese Lookahead pide liberar. Manda el
-    // mismo permiso que gestionar el Lookahead, que es el que el servicio de
-    // pases exige.
-    puede(sesion, "lookahead:gestionar") && {
-      href: `${raiz}/personal`,
-      etiqueta: "Personal",
-      clave: "personal",
-      grupo: "ejecucion",
-    },
-    puede(sesion, "linea_base:leer") && {
-      href: `${raiz}/revisiones`,
-      etiqueta: "Revisiones",
-      clave: "revisiones",
-      grupo: "plan",
-    },
-    // Los movimientos van encima de la linea base: sin ella aprobada, la
-    // pantalla no tiene nada que ensenar.
-    puede(sesion, "movimiento:leer") &&
-      obra.lineaBaseVersion !== null && {
-        href: `${raiz}/movimientos`,
-        etiqueta: "Movimientos",
-        clave: "movimientos",
-        grupo: "ejecucion",
-      },
-    // Los proveedores van antes que las ordenes: primero repartes la obra en
-    // frentes —quien hace que, por cuanto— y luego les emites los pedidos.
-    puede(sesion, "encargo:leer") && {
-      href: `${raiz}/proveedores`,
-      etiqueta: "Proveedores",
-      clave: "proveedores",
-      grupo: "compras",
-    },
-    // Las ordenes no dependen de la linea base: se puede pedir a un proveedor
-    // antes de congelar el presupuesto.
-    puede(sesion, "orden:leer") && {
-      href: `${raiz}/ordenes`,
-      etiqueta: "Órdenes",
-      clave: "ordenes",
-      grupo: "compras",
-    },
-  ].filter(Boolean) as Pestana[];
+
 
   return (
     // El riel de ubicacion vive a la izquierda de TODO el marco de la obra
@@ -177,8 +165,8 @@ export default async function ObraLayout({
     // encargo. En pantallas angostas se pliega a una fila arriba del todo.
     // `print:block` deshace la rejilla al imprimir: el riel va oculto y su
     // columna vacia correria el documento de la orden hacia la derecha.
-    <div className="space-y-4 lg:grid lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-8 lg:space-y-0 print:block">
-      <RutaObra pasos={pasos} raiz={raiz} />
+    <div className="space-y-4 lg:grid lg:grid-cols-[210px_minmax(0,1fr)] lg:gap-8 lg:space-y-0 print:block">
+      <MenuObra fases={fases} />
 
       <div className="space-y-6">
       {/* Todo el marco desaparece al imprimir: la vista del documento de la
@@ -241,8 +229,6 @@ export default async function ObraLayout({
             <EliminarObra obraId={obra.id} nombre={obra.nombreObra} />
           )}
         </div>
-
-        <PestanasObra pestanas={pestanas} raiz={raiz} />
       </div>
 
       {children}
