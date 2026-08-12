@@ -825,6 +825,10 @@ async function pendientesDeLaObra(
       select: {
         codigoPartida: true,
         parcial: true,
+        // De que movimiento nacio, para poder reclamar el mapeo de lo que
+        // entro por un adicional y no estaba en el Excel original.
+        origenMovimientoId: true,
+        tipo: true,
         encargos: {
           where: { encargo: { estado: "VIGENTE" } },
           select: { fraccion: true },
@@ -985,6 +989,20 @@ async function pendientesDeLaObra(
     null,
   );
 
+  // Las partidas que entraron por un adicional aprobado y siguen sin enlazar.
+  //
+  // Es mas fina que la cobertura global: una obra bien mapeada al 85% con tres
+  // partidas nuevas sueltas no dispara aquella, y sin embargo esas tres son
+  // exactamente las que hay que mapear —y las unicas identificables sin
+  // revisar el arbol entero, porque llevan de que movimiento nacieron—.
+  const codigosMapeados = new Set(mapeos.map((m) => m.codigoPartida));
+  const partidasDeAdicionalSinMapear = partidas.filter(
+    (p) =>
+      p.tipo === "PARTIDA" &&
+      p.origenMovimientoId !== null &&
+      !codigosMapeados.has(p.codigoPartida),
+  ).length;
+
   // Cuanto hace que el archivo del cronograma dice lo que dice. QUE es viejo
   // lo decide pendientes.ts; aqui solo se cuenta.
   const diasDeCronograma =
@@ -1014,6 +1032,7 @@ async function pendientesDeLaObra(
     ppcAnterior: planes?.anterior ?? null,
     coberturaMapeo: mapeos.length > 0 ? cob.porcentaje : null,
     compromisosUltimaSemana: ultimaCerrada?.compromisos.length ?? 0,
+    partidasDeAdicionalSinMapear,
     diasDesdeCorteCronograma: diasDeCronograma,
   });
 }

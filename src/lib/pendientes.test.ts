@@ -28,6 +28,7 @@ function limpio(cambios: Partial<ConteoPendientes> = {}): ConteoPendientes {
     coberturaMapeo: null,
     compromisosUltimaSemana: 0,
     diasDesdeCorteCronograma: null,
+    partidasDeAdicionalSinMapear: 0,
     ...cambios,
   };
 }
@@ -439,6 +440,36 @@ describe("cronograma viejo", () => {
     );
     expect(p?.gravedad).toBe("aviso");
     expect(p?.bloque).toBe("entradas");
+  });
+});
+
+describe("partidas de adicionales sin enlazar", () => {
+  it("las reclama aunque la cobertura global este bien", () => {
+    // Es el caso que la regla de cobertura NO ve: 85% esta por encima del
+    // minimo, asi que aquella calla justo cuando lo nuevo es lo que falta.
+    const cs = claves({ partidasDeAdicionalSinMapear: 3, coberturaMapeo: 85 });
+    expect(cs).toContain("adicional-sin-mapear");
+    expect(cs).not.toContain("mapeo-incompleto");
+  });
+
+  it("sin partidas nuevas no dice nada", () => {
+    expect(claves({ partidasDeAdicionalSinMapear: 0 })).not.toContain(
+      "adicional-sin-mapear",
+    );
+  });
+
+  it("el titulo lleva el numero, que es lo que hace ir a mirarlas", () => {
+    const p = pendientesDeObra(
+      limpio({ partidasDeAdicionalSinMapear: 4 }),
+    ).find((x) => x.clave === "adicional-sin-mapear");
+    expect(p?.titulo).toContain("4");
+    expect(p?.cuantos).toBe(4);
+  });
+
+  it("convive con la cobertura baja: son dos problemas distintos", () => {
+    const cs = claves({ partidasDeAdicionalSinMapear: 2, coberturaMapeo: 30 });
+    expect(cs).toContain("adicional-sin-mapear");
+    expect(cs).toContain("mapeo-incompleto");
   });
 });
 

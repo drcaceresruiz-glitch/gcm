@@ -138,6 +138,15 @@ export interface ConteoPendientes {
    * ninguno cargado —de eso ya avisan otros—.
    */
   diasDesdeCorteCronograma: number | null;
+  /**
+   * Partidas nacidas de un adicional aprobado que siguen sin enlazar con
+   * ninguna tarea del cronograma.
+   *
+   * No se funde con `coberturaMapeo`: aquella mira el total y calla mientras
+   * el conjunto siga por encima del 60%, justo cuando lo que acaba de entrar
+   * es lo unico que falta.
+   */
+  partidasDeAdicionalSinMapear: number;
 }
 
 /**
@@ -583,6 +592,22 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
         "Si el plan cambio, sube la version nueva desde «Importar». Si no cambio, no hay nada que hacer.",
       camino: "/cronograma",
       cuantos: 1,
+    });
+  }
+
+  if (c.partidasDeAdicionalSinMapear > 0) {
+    const n = c.partidasDeAdicionalSinMapear;
+    salida.push({
+      clave: "adicional-sin-mapear",
+      bloque: "salidas",
+      gravedad: "aviso",
+      titulo: `${n} ${plural(n, "partida de un adicional aprobado", "partidas de adicionales aprobados")} sin enlazar`,
+      consecuencia:
+        "Su importe ya cuenta en el presupuesto vigente pero no en el avance: la obra parece mas atrasada de lo que esta, y el valor ganado tambien.",
+      accion:
+        "Enlazalas con su tarea del cronograma. Son las ultimas del arbol: las creo el movimiento al aprobarse.",
+      camino: "/cronograma/mapeo",
+      cuantos: n,
     });
   }
 
