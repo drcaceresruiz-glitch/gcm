@@ -607,20 +607,28 @@ function armarCurva(
   const t = (fecha: Date) =>
     Math.min(1, Math.max(0, (fecha.getTime() - izquierda) / ancho));
 
-  // La linea real se ancla en (inicio, 0): los cortes empiezan a los pocos
-  // dias de arrancar la obra, y sin este punto la curva real salia como un
-  // trozo suelto flotando lejos del origen en vez de subir desde el principio
-  // del plazo, que es como se lee una curva S.
-  const real: PuntoMini[] = [
-    { t: 0, v: 0 },
-    ...curva.cortes.map((c) => ({ t: t(c.fecha), v: Number(c.real) })),
-    // Punto final VIVO a hoy: prolonga la linea real hasta el avance actual de
-    // GCM (no solo hasta el ultimo corte de import), en linea con el numero
-    // grande del modulo. Se omite si no hay avance vigente.
-    ...(curva.puntoActual
-      ? [{ t: t(curva.puntoActual.fecha), v: curva.puntoActual.real }]
-      : []),
-  ];
+  /**
+   * La linea real, MEDIDA IGUAL QUE EN LA CURVA GRANDE.
+   *
+   * Se dibujaba con `curva.cortes` —un punto por importacion de MS Project—
+   * mas el punto de hoy. La pantalla del cronograma usa `realSemanal`, que
+   * desde el 12/08/2026 trae un punto por cada dia con avance reportado. Eran
+   * dos lineas distintas de la misma obra: la miniatura saltaba de una
+   * importacion a otra en linea recta y se saltaba justo lo que el parte del
+   * dia habia registrado en medio.
+   *
+   * Se ancla en (inicio, 0) porque el primer punto medido cae a los pocos dias
+   * de arrancar, y sin el la curva real salia flotando lejos del origen en vez
+   * de subir desde el principio del plazo.
+   *
+   * `muestrear` la recorta a los puntos que caben en una miniatura; se aplica
+   * despues del ancla para no gastar en ella uno de los pocos huecos.
+   */
+  const medidos = curva.realSemanal.length
+    ? curva.realSemanal.map((p) => ({ t: t(p.fecha), v: p.valor }))
+    : curva.cortes.map((c) => ({ t: t(c.fecha), v: Number(c.real) }));
+
+  const real: PuntoMini[] = [{ t: 0, v: 0 }, ...muestrear(medidos)];
 
   return {
     plan: muestrear(curva.plan.map((p) => ({ t: t(p.fecha), v: p.valor }))),

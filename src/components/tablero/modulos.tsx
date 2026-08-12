@@ -1170,49 +1170,87 @@ function Capitulos({
   crono: DatosCronogramaTablero;
   obraId: string;
 }) {
+  /**
+   * Si de verdad hay alguno por detras.
+   *
+   * El servicio ordena por desfase ascendente y se queda con tres, asi que
+   * estos SON los mas atrasados: si ninguno de ellos baja de cero, ninguno del
+   * resto lo hace tampoco.
+   *
+   * Hace falta porque la tarjeta se titulaba «Capitulos criticos» pasara lo
+   * que pasara. En CRIOCORD, con la obra adelantada, listaba tres capitulos al
+   * dia bajo un rotulo que anunciaba una crisis. Un tablero que da la alarma
+   * cuando no hay nada ensena a ignorar la alarma.
+   */
+  const atrasados = crono.capitulos.filter((c) => c.desfase < 0).length;
+
   return (
     <>
-      <Titulo icono={Layers}>Capítulos críticos</Titulo>
+      <Titulo icono={Layers}>Capítulos</Titulo>
 
       {crono.capitulos.length === 0 ? (
         <p className="mt-2 text-xs opacity-60">
           Ningún capítulo medible por ahora.
         </p>
       ) : (
-        <ul className="mt-2 space-y-1.5">
-          {crono.capitulos.map((c) => {
-            const semaforo: Semaforo = semaforoDesfase(c.desfase);
-            return (
-              <li key={c.nombre} className="text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate opacity-80">
-                    {c.codigo ? `${c.codigo} ` : ""}
-                    {c.nombre}
-                  </span>
-                  <span
-                    className="shrink-0 tabular-nums"
-                    style={{ color: COLOR_SEMAFORO[semaforo] }}
-                  >
-                    {c.desfase >= 0 ? "+" : ""}
-                    {c.desfase.toFixed(0)}
-                  </span>
-                </div>
-                <div
-                  className="mt-0.5 h-1 overflow-hidden rounded-full"
-                  style={{ backgroundColor: "var(--borde)" }}
-                >
+        <>
+          <p className="mt-1 text-xs opacity-60">
+            {atrasados === 0
+              ? "Ninguno va por detrás del plan. Estos son los de menor margen:"
+              : `${atrasados} por detrás del plan:`}
+          </p>
+          <ul className="mt-1.5 space-y-1.5">
+            {crono.capitulos.map((c) => {
+              const semaforo: Semaforo = semaforoDesfase(c.desfase);
+              return (
+                <li key={c.nombre} className="text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate opacity-80">
+                      {c.codigo ? `${c.codigo} ` : ""}
+                      {c.nombre}
+                    </span>
+                    {/* Un decimal, no cero: con `toFixed(0)` un +0.4 y un 0
+                        exacto se leian igual —«+0»—, y la tarjeta entera
+                        parecia decir que no pasa nada en ningun sitio. */}
+                    <span
+                      className="shrink-0 tabular-nums"
+                      style={{ color: COLOR_SEMAFORO[semaforo] }}
+                    >
+                      {conSignoFijo(c.desfase, 1)}
+                    </span>
+                  </div>
+                  {/* La barra es el AVANCE y la marca es el PLAN. Antes la
+                      barra pintaba el avance con el color del desfase: dos
+                      magnitudes en un solo trazo, y no se veia contra que se
+                      comparaba. Con la marca se lee como en la tabla del
+                      cronograma —la barra alcanza la marca o no—. */}
                   <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${Math.min(c.real, 100)}%`,
-                      backgroundColor: COLOR_SEMAFORO[semaforo],
-                    }}
-                  />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                    className="relative mt-0.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: "var(--borde)" }}
+                    title={`Real ${c.real.toFixed(1)}% · Plan ${c.planeado.toFixed(1)}%`}
+                  >
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.min(Math.max(c.real, 0), 100)}%`,
+                        backgroundColor: COLOR_SEMAFORO[semaforo],
+                      }}
+                    />
+                    <span
+                      className="absolute -top-0.5 h-2.5 w-px"
+                      style={{
+                        left: `${Math.min(Math.max(c.planeado, 0), 100)}%`,
+                        backgroundColor: "var(--texto)",
+                        opacity: 0.55,
+                      }}
+                      aria-hidden="true"
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
       <EnlaceModulo href={`/obras/${obraId}/cronograma/informe`}>
