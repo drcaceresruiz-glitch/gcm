@@ -42,13 +42,31 @@ export function TarjetaSemana({
           {cerrada ? "Cerrada" : "Abierta"}
         </span>
       </div>
+      {/* EL PPC SOLO SE ENSENA EN LAS SEMANAS CERRADAS.
+          
+          Una semana abierta con 0 de 3 evaluados salia «0%» en rojo, que
+          afirma que se incumplio todo cuando lo cierto es que todavia no se ha
+          evaluado nada. Es el mismo error que el sistema ya evita en otros
+          sitios —«nunca reportada» no es «reportada al 0%»— y aqui daba la
+          alarma mas ruidosa del modulo sobre la semana en la que aun se esta
+          trabajando.
+          
+          El resto de GCM ya lo trataba bien: la tendencia solo grafica cerradas
+          y el tablero toma como «ultima» la ultima cerrada. Faltaba esta
+          tarjeta. */}
       <div className="mt-3 flex items-end justify-between">
         <span className="text-xs opacity-70">
-          {semana.cumplidos}/{semana.total} cumplidos
+          {cerrada
+            ? `${semana.cumplidos}/${semana.total} cumplidos`
+            : `${semana.total} ${semana.total === 1 ? "compromiso" : "compromisos"}`}
         </span>
-        <span className="text-2xl font-bold tabular-nums" style={{ color: colorPpc }}>
-          {semana.ppc === null ? "—" : `${semana.ppc.toFixed(0)}%`}
-        </span>
+        {cerrada ? (
+          <span className="text-2xl font-bold tabular-nums" style={{ color: colorPpc }}>
+            {semana.ppc === null ? "—" : `${semana.ppc.toFixed(0)}%`}
+          </span>
+        ) : (
+          <span className="text-xs opacity-60">PPC al cerrar</span>
+        )}
       </div>
     </Link>
   );
