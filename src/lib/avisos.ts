@@ -104,6 +104,36 @@ export interface Lote {
   motivos: MotivoAviso[];
 }
 
+/**
+ * Lo que le toca a alguien PORQUE SE HIZO CARGO, no porque este suscrito.
+ *
+ * Una suscripcion es una regla general —«avisame de todo lo de MATERIALES en
+ * esta obra»— y depende de que alguien la configurara bien. Un encargo directo
+ * es lo contrario: esta restriccion concreta tiene el nombre de esta persona
+ * escrito encima, con su fecha. Es mas preciso y no se puede olvidar de
+ * configurar.
+ *
+ * Sus motivos vienen YA ACOTADOS por quien lo construye: son los suyos, no el
+ * lote entero. Por eso no pasan por `cubreFlujo` —a quien se hizo cargo no se
+ * le pregunta si le interesa ese flujo— ni por `quiereEvento`, que es una
+ * preferencia de suscripcion y aqui no hay suscripcion.
+ */
+export interface EncargoDirecto {
+  persona: Persona;
+  /// SOLO las restricciones de esta persona.
+  motivos: MotivoAviso[];
+  /**
+   * Por donde. Quien construye el encargo decide, porque no hay suscripcion
+   * que lo diga.
+   *
+   * El SMS **por defecto no**, igual que en `SuscripcionAviso.porSms`: detras
+   * hay una SIM que se paga, y encender un gasto en nombre de alguien que no
+   * lo pidio es la clase de sorpresa que hace que se apaguen los avisos
+   * enteros.
+   */
+  canales: Canales;
+}
+
 /// Una suscripcion con sus personas ya resueltas por el servicio. Varias
 /// cuando el sujeto es un ROL: todos los que lo tienen EN ESA OBRA.
 export interface SuscripcionResuelta {
@@ -200,12 +230,39 @@ export function repartirAvisos(
   resueltas: readonly SuscripcionResuelta[],
   motivos: readonly MotivoAviso[],
   evento: EventoAviso,
+  directos: readonly EncargoDirecto[] = [],
 ): Lote[] {
   /// clave de persona -> canal -> motivos sin repetir
   const porPersona = new Map<
     string,
     { persona: Persona; porCanal: Map<CanalAviso, Map<string, MotivoAviso>> }
   >();
+
+  /// Acumula unos motivos en la cuenta de una persona, por canal.
+  ///
+  /// Aqui es donde se funden las dos vias —la suscripcion y el encargo
+  /// directo—, y tiene que ser ANTES de construir los lotes. Si cada via
+  /// produjera su propio lote, quien llegue por las dos recibiria dos avisos,
+  /// y ademas con claves de `EnvioAviso` distintas, asi que la reserva no
+  /// podria evitarlo. Fundiendolos aqui, recibe UNO con la union de todo.
+  function acumular(
+    persona: Persona,
+    canales: readonly CanalAviso[],
+    suyos: readonly MotivoAviso[],
+  ): void {
+    if (canales.length === 0 || suyos.length === 0) return;
+
+    const entrada =
+      porPersona.get(persona.clave) ??
+      { persona, porCanal: new Map<CanalAviso, Map<string, MotivoAviso>>() };
+
+    for (const canal of canales) {
+      const acumulado = entrada.porCanal.get(canal) ?? new Map<string, MotivoAviso>();
+      for (const m of suyos) acumulado.set(`${m.uid}:${m.tipo}`, m);
+      entrada.porCanal.set(canal, acumulado);
+    }
+    porPersona.set(persona.clave, entrada);
+  }
 
   for (const { suscripcion, personas } of resueltas) {
     if (!quiereEvento(suscripcion, evento)) continue;
@@ -217,19 +274,16 @@ export function repartirAvisos(
 
     for (const persona of personas) {
       const { canales } = canalesEfectivos(persona, suscripcion.canales);
-      if (canales.length === 0) continue;
-
-      const entrada =
-        porPersona.get(persona.clave) ??
-        { persona, porCanal: new Map<CanalAviso, Map<string, MotivoAviso>>() };
-
-      for (const canal of canales) {
-        const acumulado = entrada.porCanal.get(canal) ?? new Map<string, MotivoAviso>();
-        for (const m of suyos) acumulado.set(`${m.uid}:${m.tipo}`, m);
-        entrada.porCanal.set(canal, acumulado);
-      }
-      porPersona.set(persona.clave, entrada);
+      acumular(persona, canales, suyos);
     }
+  }
+
+  // Los encargos directos van DESPUES y no pasan por `cubreFlujo`: a quien se
+  // hizo cargo de una restriccion no se le pregunta si esta suscrito a ese
+  // flujo. Se hizo cargo, y punto.
+  for (const d of directos) {
+    const { canales } = canalesEfectivos(d.persona, d.canales);
+    acumular(d.persona, canales, d.motivos);
   }
 
   const lotes: Lote[] = [];

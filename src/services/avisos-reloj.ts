@@ -12,6 +12,7 @@ import {
   tocaRecordar,
   MAX_CORREOS_POR_PASADA,
   MAX_OBRAS_POR_PASADA,
+  type EncargoDirecto,
   type EstadoReloj,
   type MotivoAviso,
 } from "@/lib/avisos";
@@ -19,6 +20,7 @@ import {
   despacharLotes,
   entregarCorreo,
   entregarSms,
+  personasPorClave,
   repartoDeAviso,
   suscripcionesResueltas,
 } from "@/services/avisos-envio";
@@ -267,19 +269,45 @@ async function pasadaDeObra(
       : null,
   }));
 
-  // PENDIENTE: avisar ademas al RESPONSABLE de cada restriccion, aunque no
-  // este suscrito a ese flujo.
+  // A QUIEN LE TOCA, aunque no este suscrito a ese flujo.
   //
-  // No se hace aqui todavia porque `repartirAvisos` reparte un lote COMUN de
-  // motivos entre todas las suscripciones: no sabe acotar unos motivos a una
-  // persona. Despacharlo en una segunda pasada tampoco vale —la clave de
-  // `EnvioAviso` lleva el conjunto de motivos dentro, asi que un subconjunto
-  // distinto es otra clave y quien ya recibio el aviso general recibiria un
-  // segundo—. Hacerlo bien pide que `repartirAvisos` acepte motivos por
-  // suscripcion, y eso es tocar la funcion que sostiene todo el reparto.
-  //
-  // Mientras tanto lo cubre la suscripcion por flujo, que es como funcionaba
-  // hasta ahora, y el texto ya dice la fecha prometida.
+  // Una suscripcion es una regla general y depende de que alguien la
+  // configurara bien; esto es una restriccion con el nombre de una persona
+  // escrito encima. `repartirAvisos` funde las dos vias antes de armar los
+  // lotes, asi que quien llegue por ambas recibe UN aviso con la union.
+  const personas = await personasPorClave(obra.id);
+  const suyas = new Map<string, MotivoAviso[]>();
+
+  abiertas.forEach((r, i) => {
+    const clave = r.responsableUserId
+      ? `u:${r.responsableUserId}`
+      : r.responsableContactoId
+        ? `c:${r.responsableContactoId}`
+        : null;
+    // Sin persona resoluble no hay a quien escribir: se dio de baja o se
+    // desactivo despues de que le asignaran la restriccion. Lo cubre la
+    // suscripcion por flujo, y el panel «Que falta» lo cuenta como sin
+    // responsable.
+    if (!clave || !personas.has(clave)) return;
+    suyas.set(clave, [...(suyas.get(clave) ?? []), todos[i]!]);
+  });
+
+  /// Los encargos de un subconjunto de motivos. El SMS no se enciende solo:
+  /// detras hay una SIM que se paga, y nadie pidio gastarla en su nombre.
+  const encargosDe = (deEste: readonly MotivoAviso[]): EncargoDirecto[] => {
+    const enJuego = new Set(deEste.map((m) => `${m.uid}:${m.tipo}`));
+    return [...suyas.entries()].flatMap(([clave, ms]) => {
+      const suyosAhora = ms.filter((m) => enJuego.has(`${m.uid}:${m.tipo}`));
+      if (suyosAhora.length === 0) return [];
+      return [
+        {
+          persona: personas.get(clave)!,
+          motivos: suyosAhora,
+          canales: { app: true, correo: true, sms: false },
+        },
+      ];
+    });
+  };
 
   let avisosApp = 0;
   let correos = 0;
@@ -297,6 +325,7 @@ async function pasadaDeObra(
     const r = await despachar(obra, "RECORDAR", paraRecordar, resueltas, {
       maxSmsDia: ajustes.maxSmsDia,
       correosDisponibles: correosDisponibles - correos,
+      directos: encargosDe(paraRecordar),
     });
     avisosApp += r.avisosApp;
     correos += r.correos;
@@ -304,6 +333,11 @@ async function pasadaDeObra(
   }
 
   // Resumen: una vez al dia, a partir de la hora que diga la obra.
+  //
+  // Aqui SIN encargos directos: el resumen es una foto del dia para quien
+  // supervisa, y el responsable ya recibio el recordatorio de lo suyo. Volver
+  // a escribirle por la tarde lo mismo que le llego por la manana es
+  // exactamente como se ensena a la gente a no leer los avisos.
   if (ahora.getHours() >= ajustes.horaResumen) {
     const r = await despachar(obra, "RESUMEN", todos, resueltas, {
       maxSmsDia: ajustes.maxSmsDia,
@@ -329,7 +363,11 @@ async function despachar(
   evento: EventoAviso,
   motivos: readonly MotivoAviso[],
   resueltas: Awaited<ReturnType<typeof suscripcionesResueltas>>,
-  limites: { maxSmsDia: number; correosDisponibles: number },
+  limites: {
+    maxSmsDia: number;
+    correosDisponibles: number;
+    directos?: readonly EncargoDirecto[];
+  },
 ): Promise<{ avisosApp: number; correos: number; sms: number }> {
   const dia = diaDeClave(new Date());
   const contexto = { companyId: obra.companyId, projectId: obra.id };
@@ -341,6 +379,7 @@ async function despachar(
     resueltas,
     maxSmsDia: limites.maxSmsDia,
     dia,
+    directos: limites.directos,
   });
   if (todos.length === 0) return { avisosApp: 0, correos: 0, sms: 0 };
 

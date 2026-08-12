@@ -167,6 +167,91 @@ describe("repartirAvisos", () => {
     motivo(3, "INFORMACION"),
   ];
 
+  it("el encargo directo llega aunque NO haya suscripcion", () => {
+    // Es la razon de ser: quien se hizo cargo de una restriccion se entera
+    // aunque nadie configurara una suscripcion para ese flujo. La
+    // configuracion puede olvidarse; el nombre escrito en la restriccion, no.
+    const lotes = repartirAvisos([], motivos, "RECORDAR", [
+      {
+        persona: usuario("u9"),
+        motivos: [motivo(1, "MATERIALES")],
+        canales: SOLO_APP,
+      },
+    ]);
+    expect(lotes).toHaveLength(1);
+    expect(lotes[0]?.persona.clave).toBe("u:u9");
+    expect(lotes[0]?.motivos.map((m) => m.uid)).toEqual([1]);
+  });
+
+  it("el encargo directo NO se filtra por flujo", () => {
+    // A quien se hizo cargo no se le pregunta si le interesa ese flujo.
+    const lotes = repartirAvisos([], motivos, "RECORDAR", [
+      {
+        persona: usuario("u9"),
+        motivos: [motivo(3, "INFORMACION")],
+        canales: SOLO_APP,
+      },
+    ]);
+    expect(lotes[0]?.motivos.map((m) => m.tipo)).toEqual(["INFORMACION"]);
+  });
+
+  it("quien llega por suscripcion Y por encargo recibe UN aviso, no dos", () => {
+    // ESTA es la razon por la que los encargos se funden ANTES de construir
+    // los lotes. Si cada via produjera el suyo, el responsable que ademas esta
+    // suscrito recibiria dos correos con claves de `EnvioAviso` distintas, asi
+    // que ni la reserva podria evitarlo.
+    const lotes = repartirAvisos(
+      [
+        {
+          suscripcion: suscripcion({ tipo: "MATERIALES", canales: SOLO_APP }),
+          personas: [usuario("u1")],
+        },
+      ],
+      motivos,
+      "RECORDAR",
+      [
+        {
+          persona: usuario("u1"),
+          motivos: [motivo(3, "INFORMACION")],
+          canales: SOLO_APP,
+        },
+      ],
+    );
+
+    expect(lotes).toHaveLength(1);
+    // Y con la UNION: sus dos de MATERIALES por la suscripcion, mas la de
+    // INFORMACION que le encargaron.
+    expect(lotes[0]?.motivos.map((m) => m.uid).sort()).toEqual([1, 2, 3]);
+  });
+
+  it("el encargo directo respeta la caida a correo sin celular verificado", () => {
+    // La misma regla de siempre: el fallo seguro es "te llega por correo".
+    const lotes = repartirAvisos([], motivos, "RECORDAR", [
+      {
+        persona: usuario("u9", { celularUtil: false }),
+        motivos: [motivo(1, "MATERIALES")],
+        canales: SOLO_SMS,
+      },
+    ]);
+    expect(lotes.map((l) => l.canal)).toEqual(["CORREO"]);
+  });
+
+  it("sin encargos, el reparto es exactamente el de antes", () => {
+    // El parametro es opcional: nada de lo que ya funcionaba cambia.
+    const conLista = repartirAvisos(
+      [{ suscripcion: suscripcion({ canales: SOLO_APP }), personas: [usuario("u1")] }],
+      motivos,
+      "ABRIR",
+      [],
+    );
+    const sinLista = repartirAvisos(
+      [{ suscripcion: suscripcion({ canales: SOLO_APP }), personas: [usuario("u1")] }],
+      motivos,
+      "ABRIR",
+    );
+    expect(conLista).toEqual(sinLista);
+  });
+
   it("agrupa: seis motivos de una persona dan UN lote por canal", () => {
     // Sin esto, analizar diez tareas mandaria cuarenta SMS a una SIM personal.
     const lotes = repartirAvisos(

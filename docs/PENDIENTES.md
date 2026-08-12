@@ -85,12 +85,21 @@ abajo.
      - La lectura se cuenta por PERSONA y no por envio: `EnvioAviso` no apunta
        al `Aviso` que creo, y emparejarlos por fecha fallaria justo cuando dos
        caen en el mismo segundo.
-   - **El aviso al RESPONSABLE de cada restriccion**, que hoy va solo por
-     suscripcion de flujo. Se intento y se retiro: `repartirAvisos` reparte un
-     lote COMUN y no sabe acotar motivos a una persona, y una segunda pasada
-     duplicaria el aviso porque la clave de `EnvioAviso` lleva el conjunto de
-     motivos dentro. Pide cambiar `repartirAvisos` para aceptar motivos por
-     suscripcion. Escrito tambien en `avisos-reloj.ts`.
+   - ~~**El aviso al RESPONSABLE de cada restriccion**~~ **HECHO el 12 de
+     agosto de 2026.** `repartirAvisos` acepta un cuarto argumento,
+     `EncargoDirecto[]`: personas con SUS motivos ya acotados, que no pasan por
+     `cubreFlujo` ni por `quiereEvento` —a quien se hizo cargo no se le
+     pregunta si le interesa ese flujo—.
+     - **La clave esta en DONDE se funden**: los encargos se acumulan en el
+       mismo mapa por persona que las suscripciones, ANTES de armar los lotes.
+       Asi quien llega por las dos vias recibe UN aviso con la union. Si cada
+       via produjera su lote, serian dos correos con claves de `EnvioAviso`
+       distintas y ni la reserva podria evitarlo. Hay test.
+     - Los encargos van en el RECORDATORIO y no en el resumen del dia: el
+       responsable ya recibio lo suyo por la manana, y repetirselo por la tarde
+       es como se ensena a la gente a no leer los avisos.
+     - **Sin SMS por defecto**, igual que `SuscripcionAviso.porSms`: detras hay
+       una SIM que se paga y nadie pidio gastarla en su nombre.
    - **La campanita que no se encendio en la prueba del 12 de agosto**: sin
      diagnosticar, pero ya no hace falta SQL. El registro de la pantalla de
      Personal lo dice de una mirada: si hay una fila `correo` y ninguna `GCM`,

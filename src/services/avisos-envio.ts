@@ -12,6 +12,7 @@ import {
   textoAvisoSms,
   MAX_SMS_POR_PASADA,
   MAX_SMS_POR_PERSONA_DIA,
+  type EncargoDirecto,
   type Gastado,
   type Lote,
   type MotivoAviso,
@@ -63,8 +64,15 @@ export async function repartoDeAviso(args: {
   /// Tope diario de SMS de esta obra. Lo dice `AjustesAvisosObra.maxSmsDia`.
   maxSmsDia: number;
   dia: string;
+  /// Lo que le toca a alguien por haberse hecho cargo, no por estar suscrito.
+  directos?: readonly EncargoDirecto[];
 }): Promise<Lote[]> {
-  const crudo = repartirAvisos(args.resueltas, args.motivos, args.evento);
+  const crudo = repartirAvisos(
+    args.resueltas,
+    args.motivos,
+    args.evento,
+    args.directos ?? [],
+  );
   if (crudo.length === 0) return [];
 
   const gastado = await gastoDeSmsHoy(args.projectId, args.dia);
@@ -533,6 +541,71 @@ export async function suscripcionesResueltas(
       },
     ];
   });
+}
+
+/**
+ * Todas las personas alcanzables de una obra, indexadas por su clave.
+ *
+ * Sirve para los ENCARGOS DIRECTOS: la restriccion guarda solo el id de quien
+ * se hizo cargo, y para escribirle hacen falta su correo, su celular y si
+ * tiene bandeja. `suscripcionesResueltas` no vale aqui —solo resuelve a quien
+ * tiene suscripcion, y el responsable puede no tener ninguna: ese es
+ * precisamente el caso que esto viene a cubrir—.
+ *
+ * Un usuario desactivado no sale: sigue en la obra pero ya no trabaja aqui.
+ */
+export async function personasPorClave(
+  projectId: string,
+): Promise<Map<string, Persona>> {
+  const [miembros, contactos] = await Promise.all([
+    prisma.projectMembership.findMany({
+      where: { projectId, user: { estado: "ACTIVO" } },
+      select: {
+        user: {
+          select: {
+            id: true,
+            nombres: true,
+            apellidos: true,
+            email: true,
+            celular: true,
+            celularVerificadoAt: true,
+          },
+        },
+      },
+    }),
+    prisma.contactoAviso.findMany({
+      where: { projectId, activo: true },
+      select: { id: true, nombre: true, email: true, celular: true },
+    }),
+  ]);
+
+  const mapa = new Map<string, Persona>();
+
+  for (const m of miembros) {
+    mapa.set(`u:${m.user.id}`, {
+      clave: `u:${m.user.id}`,
+      nombre: `${m.user.nombres} ${m.user.apellidos}`.trim(),
+      email: m.user.email,
+      celular: m.user.celular,
+      celularUtil: m.user.celularVerificadoAt !== null,
+      tieneBandeja: true,
+    });
+  }
+
+  for (const c of contactos) {
+    mapa.set(`c:${c.id}`, {
+      clave: `c:${c.id}`,
+      nombre: c.nombre,
+      email: c.email,
+      celular: c.celular,
+      // Lo normalizo quien lo dio de alta y no hay a quien pedirle que se
+      // verifique: si hay numero, sirve.
+      celularUtil: c.celular !== null,
+      tieneBandeja: false,
+    });
+  }
+
+  return mapa;
 }
 
 /**
