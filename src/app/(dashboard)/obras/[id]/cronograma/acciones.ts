@@ -10,6 +10,7 @@ import {
 } from "@/services/cronograma.service";
 import { enviarCorreo, correoCurvaAvance } from "@/services/mailer.service";
 import { obtenerObra } from "@/services/obras.service";
+import { analizarDestinatarios } from "@/lib/destinatarios";
 import { puede } from "@/lib/rbac";
 
 export interface RespuestaAvance {
@@ -148,23 +149,12 @@ export async function accionEnviarCurva(
     return { ok: false, error: "No tienes permiso para ver este cronograma." };
   }
 
-  const destinatarios = String(datos.get("para") ?? "")
-    .split(/[,;\s]+/)
-    .map((d) => d.trim())
-    .filter(Boolean);
-
-  if (destinatarios.length === 0) {
-    return { ok: false, error: "Escribe al menos un correo de destino." };
-  }
-
-  // Validacion deliberadamente simple: lo que de verdad decide si una
-  // direccion existe es el propio envio.
-  const invalido = destinatarios.find((d) => !/^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(d));
-  if (invalido) return { ok: false, error: `"${invalido}" no parece un correo valido.` };
-
-  if (destinatarios.length > 10) {
-    return { ok: false, error: "Como mucho diez destinatarios por envio." };
-  }
+  // La misma lectura que el envio del informe, y con pruebas: aqui estaba
+  // escrita a mano y no quitaba repetidos, asi que pegar dos veces la misma
+  // direccion mandaba dos correos al mismo buzon.
+  const destinos = analizarDestinatarios(String(datos.get("para") ?? ""));
+  if (!destinos.ok) return { ok: false, error: destinos.error };
+  const destinatarios = destinos.lista;
 
   const imagen = String(datos.get("imagen") ?? "");
   if (!imagen) return { ok: false, error: "No se pudo preparar el grafico." };

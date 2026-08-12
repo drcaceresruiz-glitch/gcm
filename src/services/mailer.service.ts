@@ -418,3 +418,101 @@ export function correoCurvaAvance(datos: {
 
   return { asunto: `Curva de avance — ${datos.obra} (corte ${datos.corte})`, texto, html };
 }
+
+/**
+ * Correo con el informe de obra al corte, con los datos completos adjuntos.
+ *
+ * El cuerpo NO repite el informe: da el titular, cuatro cifras y las partidas
+ * que justifican abrir el adjunto. Quien lo recibe suele leerlo en el movil, y
+ * un volcado de siete tablas ahi no se lee —se archiva—.
+ *
+ * El adjunto es la hoja de calculo, no un PDF: generar PDF en el servidor
+ * exige un navegador sin ventana y este despliegue no puede correr binarios
+ * compilados. Quien quiera el PDF lo tiene en la pantalla del informe con
+ * «Imprimir / Guardar PDF», que es el mismo documento.
+ *
+ * Como el de restricciones y el de la curva, se manda UNO A UNO: la lista de
+ * un informe de obra puede llevar al cliente y al contratista a la vez, y
+ * ninguno tiene por que ver al otro.
+ */
+export function correoInformeObra(datos: {
+  obra: string;
+  corte: string;
+  estado: string;
+  cifras: { etiqueta: string; valor: string }[];
+  ppc: string | null;
+  masGraves: { partida: string; detalle: string }[];
+  gravesOmitidas: number;
+  nota?: string;
+  remitente: string;
+  adjunto: string;
+}): Omit<Correo, "para"> {
+  const texto = [
+    `Informe de obra — ${datos.obra}`,
+    ``,
+    `Corte: ${datos.corte}`,
+    datos.estado,
+    ``,
+    ...datos.cifras.map((c) => `${c.etiqueta}: ${c.valor}`),
+    ...(datos.ppc ? ["", datos.ppc] : []),
+    ...(datos.masGraves.length > 0
+      ? [
+          ``,
+          `Lo que mas frena:`,
+          ...datos.masGraves.map((g) => `- ${g.partida} — ${g.detalle}`),
+          ...(datos.gravesOmitidas > 0
+            ? [`- y otras ${datos.gravesOmitidas} con atraso grave`]
+            : []),
+        ]
+      : []),
+    ...(datos.nota ? ["", `Nota: ${datos.nota}`] : []),
+    ``,
+    `Los datos completos van en el archivo adjunto (${datos.adjunto}).`,
+    `Enviado por ${datos.remitente} desde ${MARCA}.`,
+  ].join("\n");
+
+  const fila = (etiqueta: string, valor: string) =>
+    `<tr>
+       <td style="padding:7px 0;color:#6b7a82;">${etiqueta}</td>
+       <td style="padding:7px 0;text-align:right;font-weight:bold;">${valor}</td>
+     </tr>`;
+
+  const graves = datos.masGraves
+    .map(
+      (g) => `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;">${g.partida}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8eef0;color:#b42318;white-space:nowrap;font-size:13px;">${g.detalle}</td>
+      </tr>`,
+    )
+    .join("");
+
+  const html = plantilla(
+    `Informe de obra — ${datos.obra}`,
+    `<p style="margin:0 0 4px;color:#6b7a82;">Corte del ${datos.corte}</p>
+     <p style="font-size:15px;">${datos.estado}</p>
+     <table style="width:100%;border-collapse:collapse;margin:12px 0;">
+       ${datos.cifras.map((c) => fila(c.etiqueta, c.valor)).join("")}
+     </table>
+     ${datos.ppc ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${datos.ppc}</p>` : ""}
+     ${
+       datos.masGraves.length > 0
+         ? `<h2 style="font-size:14px;margin:18px 0 6px;">Lo que más frena</h2>
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">${graves}</table>
+            ${
+              datos.gravesOmitidas > 0
+                ? `<p style="color:#6b7a82;font-size:13px;">Y otras ${datos.gravesOmitidas} con atraso grave, en el adjunto.</p>`
+                : ""
+            }`
+         : ""
+     }
+     ${datos.nota ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${datos.nota}</p>` : ""}
+     <p style="color:#6b7a82;font-size:13px;">Los datos completos van en el archivo adjunto (${datos.adjunto}), listo para abrir en Excel.</p>
+     <p style="color:#6b7a82;font-size:13px;">Enviado por ${datos.remitente}.</p>`,
+  );
+
+  return {
+    asunto: `Informe de obra — ${datos.obra} (corte ${datos.corte})`,
+    texto,
+    html,
+  };
+}

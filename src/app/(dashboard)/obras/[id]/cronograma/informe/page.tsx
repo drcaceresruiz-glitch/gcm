@@ -2,24 +2,13 @@ import type { Metadata } from "next";
 import { Download } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
-import { obtenerObra } from "@/services/obras.service";
-import { obtenerEmpresa } from "@/services/empresa.service";
 import Link from "next/link";
-import {
-  datosCurvaS,
-  informeAlCorte,
-  type CorteDisponible,
-} from "@/services/cronograma.service";
-import { lastPlannerAlCorte } from "@/services/plan-semanal.service";
+import type { CorteDisponible } from "@/services/cronograma.service";
+import { componerInforme } from "@/services/informe.service";
 import { fechaCorta, hoy } from "@/utils/fechas";
-import {
-  agruparPorCapitulo,
-  alertasDeAtraso,
-  partidasActivas,
-} from "@/lib/control-avance";
-import { puede } from "@/lib/rbac";
 import { Volver } from "@/components/ui/Volver";
 import { BotonImprimir } from "@/components/cronograma/BotonImprimir";
+import { EnviarInforme } from "@/components/cronograma/EnviarInforme";
 import { InformeSemanal } from "@/components/cronograma/InformeSemanal";
 
 export const metadata: Metadata = { title: "Informe semanal" };
@@ -42,38 +31,23 @@ export default async function InformePage({
   if (!sesion) redirect("/login");
 
   const { id } = await params;
-  const obra = await obtenerObra(sesion, id);
-  if (!obra) notFound();
-
-  if (!puede(sesion, "cronograma:leer")) redirect(`/obras/${id}`);
-
   const { corte } = await searchParams;
-
-  const [informe, curva, empresa] = await Promise.all([
-    informeAlCorte(sesion, id, corte),
-    datosCurvaS(sesion, id),
-    obtenerEmpresa(sesion),
-  ]);
-
-  // Sin cronograma no hay informe que dar: se devuelve a la pantalla que
-  // explica como cargarlo, en vez de imprimir una hoja vacia.
-  if (!informe) redirect(`/obras/${id}/cronograma`);
 
   // TODO el contenido se mide a la fecha elegida, no a la del ultimo XML
   // importado: las alertas, las partidas en marcha y los capitulos hablan de
   // ESA semana. Antes salian siempre del corte de la importacion, y por eso el
   // informe del 12 de agosto encabezaba «08 de agosto» y decia que no habia
   // ninguna partida en marcha.
-  const capitulos = agruparPorCapitulo(informe.tareas);
-  const alertas = alertasDeAtraso(informe.tareas, informe.fechaCorte);
-  const activas = partidasActivas(informe.tareas, informe.fechaCorte);
+  const informe = await componerInforme(sesion, id, corte);
 
-  // El Last Planner de esa misma fecha. Va despues y no en el `Promise.all` de
-  // arriba porque necesita la fecha que decide `informeAlCorte`: pedirlo antes
-  // obligaria a resolver dos veces cual es el corte elegido.
-  const lastPlanner = await lastPlannerAlCorte(sesion, id, informe.fechaCorte);
+  if (informe.estado === "sin-obra") notFound();
+  if (informe.estado === "sin-permiso") redirect(`/obras/${id}`);
+  // Sin cronograma no hay informe que dar: se devuelve a la pantalla que
+  // explica como cargarlo, en vez de imprimir una hoja vacia.
+  if (informe.estado === "sin-cronograma") redirect(`/obras/${id}/cronograma`);
 
-  const corteIso = informe.fechaCorte.toISOString().slice(0, 10);
+  const datos = informe.datos;
+  const corteIso = datos.fechaCorte.toISOString().slice(0, 10);
 
   return (
     <div className="space-y-4">
@@ -95,6 +69,7 @@ export default async function InformePage({
             <Download className="size-4" aria-hidden="true" />
             Descargar datos (CSV)
           </a>
+          <EnviarInforme obraId={id} corteIso={corteIso} />
           <BotonImprimir />
         </div>
       </div>
@@ -104,33 +79,12 @@ export default async function InformePage({
           imprimir, y no va a empezar ahora. */}
       <SelectorDeCorte
         obraId={id}
-        cortes={informe.cortes}
-        elegido={informe.fechaCorte}
+        cortes={datos.cortes}
+        elegido={datos.fechaCorte}
         hoyIso={hoy().toISOString().slice(0, 10)}
       />
 
-      <InformeSemanal
-        datos={{
-          empresa: empresa?.razonSocial ?? "",
-          obra: obra.nombreObra,
-          ubicacion: obra.ubicacion,
-          fechaCorte: informe.fechaCorte,
-          version: informe.version,
-          importadoPor: informe.importadoPor,
-          planeadoProject: informe.planeadoProject,
-          realProject: informe.realProject,
-          real: informe.real,
-          planeado: informe.planeado,
-          desviacion: informe.desviacion,
-          periodo: informe.periodo,
-          curva,
-          capitulos,
-          alertas,
-          activas,
-          lastPlanner,
-          generadoPor: `${sesion.nombres} ${sesion.apellidos}`.trim(),
-        }}
-      />
+      <InformeSemanal datos={datos} />
     </div>
   );
 }
