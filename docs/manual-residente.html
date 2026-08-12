@@ -206,7 +206,8 @@
         <li><span class="n">9.4</span> Comprometer al PTS</li>
         <li><span class="n">9.5</span> El Plan Semanal</li>
         <li><span class="n">9.6</span> Cerrar la semana: PPC y causas</li>
-        <li><span class="n">9.7</span> El ciclo completo, semana a semana</li>
+        <li><span class="n">9.7</span> Causa raíz: cuando una causa se repite</li>
+        <li><span class="n">9.8</span> El ciclo completo, semana a semana</li>
       </ol>
     </li>
     <li><span class="n">10</span> Flujo 4 — Proveedores, encargos y órdenes
@@ -1717,7 +1718,48 @@
     atacar — no donde más ruido hace.</p>
   </div>
 
-  <h3>9.7 El ciclo completo, semana a semana</h3>
+  <h3>9.7 Causa raíz: cuando una causa se repite</h3>
+  <p>Elegir la causa al cerrar dice <em>qué</em> falló. No dice <strong>por qué</strong> falló eso,
+  ni qué se va a hacer para que deje de fallar. De eso va este paso, y aparece
+  <strong>debajo del Pareto</strong>, que es justo el gráfico que demuestra la repetición.</p>
+
+  <div class="caja ojo">
+    <span class="et">No se pide en cada fallo, y es deliberado</span>
+    <p>Una semana con seis incumplimientos generaría seis formularios. A la tercera semana se
+    escribe «falta de material» seis veces y el análisis se convierte en un trámite —y un
+    formulario rellenado por trámite es peor que ninguno, porque además ensucia el historial—.</p>
+    <p>Así que el sistema lo reclama cuando la causa demuestra ser un <strong>patrón</strong>:
+    aparece en <strong>dos semanas distintas</strong> de las últimas cuatro y suma al menos
+    <strong>tres incumplimientos</strong>. Tres fallos en una sola semana no bastan: pudo ser el
+    mismo camión que no llegó.</p>
+  </div>
+
+  <p>Cuando eso pasa, sale un aviso como éste:</p>
+  <p style="margin-left:1.2em;border-left:3px solid var(--color-peligro);padding-left:.8em">
+    <strong>Materiales</strong> falló 4 veces en 2 semanas distintas. Eso ya no es un mal día.
+  </p>
+
+  <p>Y se responden <strong>dos preguntas, nada más</strong>:</p>
+  <table>
+    <thead><tr><th style="width:28%">Pregunta</th><th>Ejemplo</th></tr></thead>
+    <tbody>
+      <tr><td><strong>¿Por qué se repite?</strong></td><td>El proveedor entrega los viernes y hormigonamos los jueves</td></tr>
+      <tr><td><strong>¿Qué se va a hacer?</strong></td><td>Adelantar el pedido al lunes anterior</td></tr>
+    </tbody>
+  </table>
+
+  <ul>
+    <li><strong>Puedes analizar cualquier causa</strong>, aunque el sistema no la señale. Sugiere,
+    no impone.</li>
+    <li><strong>Solo un análisis abierto por causa.</strong> Mientras haya uno en curso, esa causa
+    deja de reclamarse: ya hay alguien en ello.</li>
+    <li><strong>«Dar por resuelto» no borra nada.</strong> Lo que se intentó —funcionara o no— es
+    lo más útil que hay el día que la causa vuelve.</li>
+    <li><strong>«Otra» no se analiza nunca.</strong> No es una causa: es la ausencia de una, y cada
+    «otra» tuvo su propio motivo. Si es la que más se repite, lo que falla es el catálogo.</li>
+  </ul>
+
+  <h3>9.8 El ciclo completo, semana a semana</h3>
 
   <figure>
     <svg viewBox="0 0 700 210" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI,Arial,sans-serif">
