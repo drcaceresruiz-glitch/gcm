@@ -28,6 +28,10 @@ import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 
 const dc = (s: string) => new Date(`${s}T00:00:00Z`);
 
+/// «Ninguna terminada»: el caso base de `tareasDeLaSemana` cuando lo que se
+/// prueba es el recorte por fechas y no el filtro de acabadas.
+const VACIO: ReadonlySet<number> = new Set();
+
 describe("porcentajeARegistrar", () => {
   it("NUNCA inventa un 100 cuando no hay porcentaje ni meta", () => {
     // ESTE es el fallo que falsificaba la curva S. Un compromiso venido del
@@ -338,9 +342,12 @@ describe("tareasTerminadas y la ventana", () => {
       },
     ];
 
-    // Sin el filtro salen las dos: es el comportamiento que fallaba.
+    // Con el conjunto vacio salen las dos: es el comportamiento que fallaba
+    // cuando el parametro era opcional y alguien se lo dejaba.
     expect(
-      tareasDeLaSemana(tareas, dc("2026-08-09"), dc("2026-08-15")).map((t) => t.uid),
+      tareasDeLaSemana(tareas, dc("2026-08-09"), dc("2026-08-15"), new Set()).map(
+        (t) => t.uid,
+      ),
     ).toEqual([1, 2]);
 
     expect(
@@ -551,7 +558,7 @@ describe("tareasDeLaSemana", () => {
       t(4, "1.4", "2026-08-01", "2026-08-01"), // borde inicio
       t(5, "1.5", "2026-08-07", "2026-08-07"), // borde fin
     ];
-    expect(tareasDeLaSemana(tareas, ini, fin).map((x) => x.uid).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
+    expect(tareasDeLaSemana(tareas, ini, fin, VACIO).map((x) => x.uid).sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("excluye las que quedan fuera del rango", () => {
@@ -559,12 +566,12 @@ describe("tareasDeLaSemana", () => {
       t(10, "a", "2026-07-20", "2026-07-31"), // termina antes
       t(11, "b", "2026-08-08", "2026-08-10"), // empieza despues
     ];
-    expect(tareasDeLaSemana(tareas, ini, fin)).toEqual([]);
+    expect(tareasDeLaSemana(tareas, ini, fin, VACIO)).toEqual([]);
   });
 
   it("excluye resumenes aunque solapen", () => {
     const tareas = [t(20, "R", "2026-08-01", "2026-08-07", true)];
-    expect(tareasDeLaSemana(tareas, ini, fin)).toEqual([]);
+    expect(tareasDeLaSemana(tareas, ini, fin, VACIO)).toEqual([]);
   });
 
   it("ordena por inicio y luego por codigo", () => {
@@ -573,7 +580,7 @@ describe("tareasDeLaSemana", () => {
       t(2, "a", "2026-08-02", "2026-08-03"),
       t(3, "b", "2026-08-02", "2026-08-04"),
     ];
-    expect(tareasDeLaSemana(tareas, ini, fin).map((x) => x.codigo)).toEqual(["a", "b", "z"]);
+    expect(tareasDeLaSemana(tareas, ini, fin, VACIO).map((x) => x.codigo)).toEqual(["a", "b", "z"]);
   });
 });
 

@@ -584,12 +584,21 @@ export interface TareaProgramada {
  * En una tarea terminada no hay nada que preparar ni nada que prometer, asi
  * que no pertenece ni al make-ready ni al PTS. Sigue en el cronograma, en el
  * parte y en la curva: solo desaparece de donde se planifica lo que falta.
+ *
+ * `terminadas` NO TIENE VALOR POR DEFECTO, y eso es deliberado. Nacio opcional
+ * el 12/08/2026 y ese mismo dia se colo el fallo que venia a evitar: se paso
+ * en la pantalla del Lookahead y se olvido en `confiabilidadDeVentana`, que
+ * alimenta el tablero. Resultado, la misma obra el mismo dia dando 19/19
+ * (100%) en una pantalla y 24/26 (92%) en la otra, sin que el compilador
+ * dijera nada. Siendo obligatorio, anadir una llamada nueva obliga a decidir
+ * que hacer con las terminadas. Quien de verdad las quiera todas pasa
+ * `new Set()` y queda escrito que fue una decision.
  */
 export function tareasDeLaSemana(
   tareas: readonly TareaProgramada[],
   inicioSemana: Date,
   finSemana: Date,
-  terminadas: ReadonlySet<number> = new Set(),
+  terminadas: ReadonlySet<number>,
 ): TareaProgramada[] {
   const ini = inicioSemana.getTime();
   const fin = finSemana.getTime();

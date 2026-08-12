@@ -343,7 +343,20 @@ export async function datosTablero(
   // tareas que ya estan en memoria. Antes esto releia el cronograma entero.
   const lookahead =
     (encendido("confiabilidad") || encendido("pendientes")) && cronograma
-      ? await confiabilidadDeVentana(sesion, obraId, cronograma.tareas)
+      ? await confiabilidadDeVentana(
+          sesion,
+          obraId,
+          cronograma.tareas,
+          // Las terminadas salen del cronograma YA MEDIDO que esta en memoria,
+          // sin consulta extra. Tienen que excluirse aqui igual que en la
+          // pantalla: contarlas como «no listas» hundia la confiabilidad del
+          // tablero con trabajo que ya estaba hecho.
+          new Set(
+            cronograma.tareas
+              .filter((t) => Number(t.porcentajeReal) >= 100)
+              .map((t) => t.uid),
+          ),
+        )
       : null;
 
   // Los pendientes van al final: necesitan lo que ya cargaron los demas, y

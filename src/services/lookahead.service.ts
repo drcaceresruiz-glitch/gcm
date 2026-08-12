@@ -630,6 +630,17 @@ export async function menuDePase(
     })),
     desde,
     hasta,
+    // AQUI NO SE FILTRAN LAS TERMINADAS, al reves que en la pantalla y el
+    // tablero, y es una decision, no un olvido.
+    //
+    // El menu del pase no sirve para planificar sino para DOCUMENTAR: quien lo
+    // usa esta en obra con el movil adjuntando fotos. Una tarea que acaba de
+    // terminarse es justo de las que se fotografian, y esconderla produciria
+    // exactamente lo que el comentario de arriba quiere evitar —ver faltar una
+    // tarea que se sabe que existe y concluir que la aplicacion esta rota—.
+    // Ademas aqui no se lee el avance: filtrarlo costaria una consulta mas en
+    // la ruta publica, que es la que menos debe pesar.
+    new Set(),
   );
 
   const uids = tareas.map((t) => t.uid);
@@ -732,13 +743,22 @@ export async function confiabilidadDeVentana(
   sesion: SesionActiva,
   obraId: string,
   tareasCronograma: readonly TareaProgramada[],
+  /**
+   * Las que ya estan al 100%, para excluirlas igual que hace la pantalla.
+   *
+   * Lo pide a quien llama en vez de calcularlo aqui porque el tablero ya tiene
+   * el cronograma MEDIDO en memoria —con `porcentajeReal` por tarea—, y el
+   * sentido de esta funcion es no volver a leer lo que quien llama acaba de
+   * leer.
+   */
+  terminadas: ReadonlySet<number>,
   semanasPedidas?: string | number,
 ): Promise<ConfiabilidadVentana | null> {
   if (!puede(sesion, "lookahead:leer")) return null;
 
   const semanas = normalizarSemanas(semanasPedidas);
   const { desde, hasta } = ventanaLookahead(hoy(), semanas);
-  const tareas = tareasDeLaSemana([...tareasCronograma], desde, hasta);
+  const tareas = tareasDeLaSemana([...tareasCronograma], desde, hasta, terminadas);
 
   const uids = tareas.map((t) => t.uid);
   const analizadas = uids.length
