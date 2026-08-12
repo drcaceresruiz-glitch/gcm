@@ -427,10 +427,10 @@ export function correoCurvaAvance(datos: {
  * que justifican abrir el adjunto. Quien lo recibe suele leerlo en el movil, y
  * un volcado de siete tablas ahi no se lee —se archiva—.
  *
- * El adjunto es la hoja de calculo, no un PDF: generar PDF en el servidor
- * exige un navegador sin ventana y este despliegue no puede correr binarios
- * compilados. Quien quiera el PDF lo tiene en la pantalla del informe con
- * «Imprimir / Guardar PDF», que es el mismo documento.
+ * Van DOS adjuntos: el informe completo en PDF —para leer, imprimir y
+ * archivar— y el mismo contenido en hoja de calculo, para quien vaya a
+ * cruzarlo con lo suyo. Mandar solo uno obliga a adivinar cual necesita quien
+ * lo recibe.
  *
  * Como el de restricciones y el de la curva, se manda UNO A UNO: la lista de
  * un informe de obra puede llevar al cliente y al contratista a la vez, y
@@ -446,7 +446,10 @@ export function correoInformeObra(datos: {
   gravesOmitidas: number;
   nota?: string;
   remitente: string;
+  /// El PDF: el informe para leer.
   adjunto: string;
+  /// La hoja de calculo: el mismo informe para cruzar con lo de cada uno.
+  adjuntoDatos: string;
 }): Omit<Correo, "para"> {
   const texto = [
     `Informe de obra — ${datos.obra}`,
@@ -468,7 +471,10 @@ export function correoInformeObra(datos: {
       : []),
     ...(datos.nota ? ["", `Nota: ${datos.nota}`] : []),
     ``,
-    `Los datos completos van en el archivo adjunto (${datos.adjunto}).`,
+    `Adjuntos:`,
+    `- ${datos.adjunto}: el informe completo, para leer o imprimir.`,
+    `- ${datos.adjuntoDatos}: los mismos datos en hoja de calculo.`,
+    ``,
     `Enviado por ${datos.remitente} desde ${MARCA}.`,
   ].join("\n");
 
@@ -511,7 +517,11 @@ export function correoInformeObra(datos: {
          : ""
      }
      ${datos.nota ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${esc(datos.nota)}</p>` : ""}
-     <p style="color:#6b7a82;font-size:13px;">Los datos completos van en el archivo adjunto (${esc(datos.adjunto)}), listo para abrir en Excel.</p>
+     <p style="color:#6b7a82;font-size:13px;margin-top:16px;">
+       Van dos archivos adjuntos:<br>
+       <strong>${esc(datos.adjunto)}</strong> — el informe completo, para leer o imprimir.<br>
+       <strong>${esc(datos.adjuntoDatos)}</strong> — los mismos datos en hoja de cálculo.
+     </p>
      <p style="color:#6b7a82;font-size:13px;">Enviado por ${esc(datos.remitente)}.</p>`,
   );
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Download } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import Link from "next/link";
@@ -60,6 +60,15 @@ export default async function InformePage({
               navegador solo. Y lleva la fecha ESCRITA aunque la URL no la
               traiga, para que el archivo no pueda salir de otro corte que el
               que se esta mirando. */}
+          <a
+            href={`/obras/${id}/cronograma/informe/pdf?corte=${corteIso}`}
+            download
+            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <FileText className="size-4" aria-hidden="true" />
+            Descargar PDF
+          </a>
           <a
             href={`/obras/${id}/cronograma/informe/csv?corte=${corteIso}`}
             download

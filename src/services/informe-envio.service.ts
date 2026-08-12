@@ -2,8 +2,14 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { componerInforme } from "./informe.service";
 import { correoInformeObra, enviarCorreo } from "./mailer.service";
+import { generarInformePdf } from "./informe-pdf.service";
 import { generarCsv } from "@/lib/csv";
-import { filasDelInformeCsv, nombreArchivoInformeCsv, fechaCsv } from "@/lib/informe-csv";
+import {
+  filasDelInformeCsv,
+  nombreArchivoInforme,
+  nombreArchivoInformeCsv,
+  fechaCsv,
+} from "@/lib/informe-csv";
 import { resumenParaCorreo } from "@/lib/informe-correo";
 import { analizarDestinatarios } from "@/lib/destinatarios";
 import type { SesionActiva } from "./sesion.service";
@@ -55,8 +61,16 @@ export async function enviarInformePorCorreo(
 
   const d = informe.datos;
   const resumen = resumenParaCorreo(d);
-  const archivo = nombreArchivoInformeCsv(d.obra, d.fechaCorte);
-  const csv = generarCsv(filasDelInformeCsv(d, new Date()));
+  const generadoEl = new Date();
+
+  const archivoPdf = nombreArchivoInforme(d.obra, d.fechaCorte, "pdf");
+  const archivoCsv = nombreArchivoInformeCsv(d.obra, d.fechaCorte);
+
+  // Los DOS: el PDF es el informe para leer y archivar, el CSV es el mismo
+  // contenido para cruzarlo con lo de cada uno. Quien recibe el correo no
+  // tiene por que saber cual necesita antes de abrirlo.
+  const pdf = await generarInformePdf(d, generadoEl);
+  const csv = generarCsv(filasDelInformeCsv(d, generadoEl));
 
   const cuerpo = correoInformeObra({
     obra: d.obra,
@@ -68,19 +82,25 @@ export async function enviarInformePorCorreo(
     gravesOmitidas: resumen.gravesOmitidas,
     nota: datos.nota?.trim().slice(0, MAX_NOTA) || undefined,
     remitente: d.generadoPor,
-    adjunto: archivo,
+    adjunto: archivoPdf,
+    adjuntoDatos: archivoCsv,
   });
 
-  const adjunto = {
-    nombre: archivo,
-    contenido: Buffer.from(csv, "utf8").toString("base64"),
-    tipo: "text/csv; charset=utf-8",
-  };
+  const adjuntos = [
+    {
+      nombre: archivoPdf,
+      contenido: Buffer.from(pdf).toString("base64"),
+      tipo: "application/pdf",
+    },
+    {
+      nombre: archivoCsv,
+      contenido: Buffer.from(csv, "utf8").toString("base64"),
+      tipo: "text/csv; charset=utf-8",
+    },
+  ];
 
   const resultados = await Promise.all(
-    destinos.lista.map((para) =>
-      enviarCorreo({ ...cuerpo, para, adjuntos: [adjunto] }),
-    ),
+    destinos.lista.map((para) => enviarCorreo({ ...cuerpo, para, adjuntos })),
   );
   const enviados = resultados.filter((r) => r.enviado).length;
 
@@ -112,10 +132,15 @@ export async function enviarInformePorCorreo(
         corte: d.fechaCorte.toISOString().slice(0, 10),
         para: destinos.lista,
         enviados,
-        archivo,
+        archivos: [archivoPdf, archivoCsv],
       },
     },
   });
 
-  return { ok: true, enviados, total: destinos.lista.length, archivo };
+  return {
+    ok: true,
+    enviados,
+    total: destinos.lista.length,
+    archivo: archivoPdf,
+  };
 }

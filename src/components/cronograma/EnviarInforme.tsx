@@ -107,9 +107,9 @@ export function EnviarInforme({
           </div>
 
           <p className="text-xs opacity-60">
-            Va el resumen en el cuerpo y los datos completos en un archivo
-            adjunto para Excel. Cada destinatario lo recibe por separado: nadie
-            ve la lista de los demás.
+            Va el resumen en el cuerpo y dos adjuntos: el informe completo en
+            PDF y los mismos datos en hoja de cálculo. Cada destinatario lo
+            recibe por separado: nadie ve la lista de los demás.
           </p>
 
           {estado.error && <Nota tono="peligro">{estado.error}</Nota>}
