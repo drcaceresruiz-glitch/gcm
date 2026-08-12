@@ -88,6 +88,7 @@ const movimientos = await import("@/services/movimientos.service");
 const encargos = await import("@/services/encargos.service");
 const proveedores = await import("@/services/proveedores.service");
 const usuarios = await import("@/services/usuarios.service");
+const causaRaiz = await import("@/services/causa-raiz.service");
 
 function sesion(companyId: string, permisos: Permiso[]): SesionActiva {
   return {
@@ -588,6 +589,56 @@ describe("usuarios", () => {
     await exigeNiTocarLaBase(() => usuarios.listarUsuarios(sesion(MIA, [])));
     await exigeNiTocarLaBase(() =>
       usuarios.resetearClave(sesion(MIA, []), usuarioAjeno),
+    );
+  });
+});
+
+describe("analisis de causa raiz", () => {
+  const obraAjena = "obra-de-la-empresa-B";
+  const analisisAjeno = "analisis-de-la-empresa-B";
+  const leer: Permiso[] = ["plan_semanal:leer"];
+  const gestionar: Permiso[] = ["plan_semanal:gestionar"];
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("listar los analisis de una obra ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      causaRaiz.listarAnalisis(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("las causas que piden analisis van acotadas", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      causaRaiz.causasParaAnalizar(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("abrir un analisis en una obra ajena va acotado", async () => {
+    // El texto tiene que ser valido: si no, la funcion se va por el error de
+    // validacion antes de tocar la base y la prueba no demostraria nada.
+    await exigeFiltroDeEmpresa(() =>
+      causaRaiz.abrirAnalisis(sesion(MIA, gestionar), obraAjena, {
+        causa: "MATERIALES",
+        porQue: "El proveedor entrega los viernes",
+        accion: "Adelantar el pedido al lunes anterior",
+      }),
+    );
+  });
+
+  it("cerrar un analisis ajeno va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      causaRaiz.cerrarAnalisis(sesion(MIA, gestionar), analisisAjeno),
+    );
+  });
+
+  it("sin permiso no se toca la base", async () => {
+    await exigeNiTocarLaBase(() =>
+      causaRaiz.listarAnalisis(sesion(MIA, []), obraAjena),
+    );
+    await exigeNiTocarLaBase(() =>
+      causaRaiz.cerrarAnalisis(sesion(MIA, []), analisisAjeno),
     );
   });
 });
