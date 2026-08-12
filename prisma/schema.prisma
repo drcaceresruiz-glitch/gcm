@@ -284,6 +284,9 @@ model User {
   /// relacion porque el dia que haya un segundo vinculo entre las dos tablas
   /// —quien la resolvio, por ejemplo— Prisma no sabria cual es cual.
   restriccionesACargo Restriccion[] @relation("RestriccionesResponsable")
+  /// Analisis de causa raiz de los que se hizo cargo. Mismo motivo que arriba
+  /// para llevar nombre de relacion.
+  analisisACargo AnalisisCausa[] @relation("AnalisisResponsable")
 
   @@unique([companyId, numDoc])
   @@index([companyId, estado])
@@ -491,6 +494,7 @@ model Project {
   lookaheadTareas      LookaheadTask[]
   fotosEvidencia       FotoEvidencia[]
   pasesObra            PaseObra[]
+  analisisCausa        AnalisisCausa[]
   contactosAviso       ContactoAviso[]
   suscripcionesAviso   SuscripcionAviso[]
   avisos               Aviso[]
@@ -1499,6 +1503,60 @@ enum CausaNoCumplimiento {
   CLIMA
   REPROGRAMACION
   OTRA
+}
+
+/// El analisis de causa raiz de una causa que se repite.
+///
+/// Cuelga del par OBRA + CAUSA, no del compromiso que fallo. La razon es que
+/// la raiz no es del fallo: es del patron. Los seis incumplimientos de
+/// MATERIALES de este mes no tienen seis raices, tienen una —«el proveedor
+/// entrega los viernes y nosotros hormigonamos los jueves»— y un solo plan
+/// que las resuelve todas. Colgarlo del compromiso obligaria a escribir seis
+/// veces lo mismo, que es justo la burocracia que este sistema mide.
+///
+/// Cuando se pide esta en `@/lib/causa-raiz`: solo si la causa demuestra ser
+/// patron. Aqui solo se guarda.
+///
+/// NO lleva unicidad por (obra, causa): un patron puede volver meses despues
+/// con otra raiz, y el historial de lo que se intento vale mas que la
+/// limpieza. Lo que si vale es que haya UNO abierto a la vez, y eso lo
+/// garantiza el servicio —MariaDB no tiene indice unico parcial, el mismo
+/// motivo por el que la linea base del cronograma se cuida desde el codigo—.
+model AnalisisCausa {
+  id        String              @id @default(cuid())
+  projectId String
+  causa     CausaNoCumplimiento
+
+  /// La raiz, en las palabras de quien la vio. No es la causa —esa ya la dice
+  /// el catalogo— sino POR QUE se repite esa causa en esta obra.
+  porQue String @db.Text
+
+  /// Que se va a hacer para que deje de pasar. Sin esto el analisis es un
+  /// desahogo: describe el problema y no cambia nada.
+  accion String @db.Text
+
+  /// Quien se hace cargo y para cuando, igual que en una restriccion. Un plan
+  /// sin nombre y sin fecha no es un plan.
+  responsableUserId String?
+  fechaCompromiso   DateTime? @db.Date
+
+  /// Con fecha, el analisis esta cerrado: se dio por resuelto. No se borra,
+  /// porque lo que se intento y no funciono es lo mas util del historial.
+  cerradoAt  DateTime?
+  cerradoPor String?   @db.VarChar(150)
+
+  creadoPor String   @db.VarChar(150)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// SetNull: dar de baja a alguien no puede borrar el analisis del que se
+  /// hizo cargo. Misma doctrina que las restricciones.
+  responsable User?   @relation("AnalisisResponsable", fields: [responsableUserId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, causa])
+  @@index([projectId, cerradoAt])
+  @@map("analisis_causa")
 }
 
 model EncargoProveedor {
