@@ -83,6 +83,11 @@ const ordenes = await import("@/services/ordenes.service");
 const partidas = await import("@/services/partidas.service");
 const lookahead = await import("@/services/lookahead.service");
 const planSemanal = await import("@/services/plan-semanal.service");
+const cronograma = await import("@/services/cronograma.service");
+const movimientos = await import("@/services/movimientos.service");
+const encargos = await import("@/services/encargos.service");
+const proveedores = await import("@/services/proveedores.service");
+const usuarios = await import("@/services/usuarios.service");
 
 function sesion(companyId: string, permisos: Permiso[]): SesionActiva {
   return {
@@ -134,7 +139,13 @@ const AJENA = "EMPRESA-B";
  */
 async function exigeFiltroDeEmpresa(correr: () => Promise<unknown>) {
   llamadas.length = 0;
-  await correr();
+
+  // Se traga el error a proposito. Con el doble vacio hay servicios que lanzan
+  // con toda la razon —no hay linea base aprobada, no hay cronograma vigente—,
+  // y lo que se audita aqui no es lo que devuelven sino lo que le PIDIERON a
+  // la base antes de rendirse. La exigencia de que haya al menos una consulta
+  // sigue impidiendo que esto se pase por alto en silencio.
+  await correr().catch(() => undefined);
 
   const hechas = consultas();
   expect(hechas.length).toBeGreaterThan(0);
@@ -368,6 +379,215 @@ describe("plan semanal", () => {
     );
     await exigeNiTocarLaBase(() =>
       planSemanal.obtenerPlanSemanal(sesion(MIA, []), obraAjena, planAjeno),
+    );
+  });
+});
+
+describe("cronograma", () => {
+  const obraAjena = "obra-de-la-empresa-B";
+  const leer: Permiso[] = ["cronograma:leer"];
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("el cronograma de una obra ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      cronograma.obtenerCronograma(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("el historial de cortes va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      cronograma.historialCronogramas(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("la linea base va acotada", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      cronograma.lineaBaseCronograma(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("fijar la linea base con dos ids ajenos va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      cronograma.marcarLineaBase(
+        sesion(MIA, ["cronograma:linea_base"]),
+        obraAjena,
+        "cronograma-de-la-empresa-B",
+      ),
+    );
+  });
+
+  it("sin permiso no se toca la base", async () => {
+    await exigeNiTocarLaBase(() =>
+      cronograma.obtenerCronograma(sesion(MIA, []), obraAjena),
+    );
+  });
+});
+
+describe("movimientos presupuestales", () => {
+  const obraAjena = "obra-de-la-empresa-B";
+  // Estas dos reciben SOLO el id del movimiento: no hay obra en la peticion
+  // que acompane, asi que el filtro por empresa es lo unico que separa el
+  // presupuesto de una constructora del de otra.
+  const movAjeno = "movimiento-de-la-empresa-B";
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("el presupuesto vigente de una obra ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      movimientos.obtenerPresupuestoVigente(
+        sesion(MIA, ["movimiento:leer"]),
+        obraAjena,
+      ),
+    );
+  });
+
+  it("listar movimientos va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      movimientos.listarMovimientos(sesion(MIA, ["movimiento:leer"]), obraAjena),
+    );
+  });
+
+  it("aprobar un movimiento ajeno va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      movimientos.aprobarMovimiento(sesion(MIA, ["movimiento:aprobar"]), movAjeno),
+    );
+  });
+
+  it("eliminar un borrador ajeno va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      movimientos.eliminarBorrador(sesion(MIA, ["movimiento:crear"]), movAjeno),
+    );
+  });
+
+  it("sin permiso no se toca la base", async () => {
+    await exigeNiTocarLaBase(() =>
+      movimientos.aprobarMovimiento(sesion(MIA, []), movAjeno),
+    );
+  });
+});
+
+describe("encargos", () => {
+  const obraAjena = "obra-de-la-empresa-B";
+  const leer: Permiso[] = ["encargo:leer"];
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("listar los encargos de una obra ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      encargos.listarEncargos(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("abrir un encargo ajeno va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      encargos.obtenerEncargo(
+        sesion(MIA, leer),
+        obraAjena,
+        "encargo-de-la-empresa-B",
+      ),
+    );
+  });
+
+  it("las partidas asignables van acotadas", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      encargos.partidasAsignables(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("sin permiso no se toca la base", async () => {
+    await exigeNiTocarLaBase(() =>
+      encargos.listarEncargos(sesion(MIA, []), obraAjena),
+    );
+  });
+});
+
+describe("proveedores", () => {
+  // El catalogo es de la EMPRESA, no de una obra: aqui no hay id de obra que
+  // valga, y el unico limite es la sesion.
+  const proveedorAjeno = "proveedor-de-la-empresa-B";
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("el catalogo sale acotado a mi empresa", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      proveedores.listarProveedores(sesion(MIA, ["proveedor:leer"])),
+    );
+  });
+
+  it("la lista paginada va acotada", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      proveedores.listarProveedoresPagina(sesion(MIA, ["proveedor:leer"])),
+    );
+  });
+
+  it("dar de baja un proveedor ajeno va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      proveedores.cambiarEstadoProveedor(
+        sesion(MIA, ["proveedor:editar"]),
+        proveedorAjeno,
+        false,
+      ),
+    );
+  });
+
+  it("sin permiso no se toca la base", async () => {
+    await exigeNiTocarLaBase(() =>
+      proveedores.listarProveedores(sesion(MIA, [])),
+    );
+  });
+});
+
+describe("usuarios", () => {
+  // La mas delicada de las cinco: reciben el id del USUARIO desde la
+  // peticion. Alcanzar uno de otra empresa no seria ver un dato ajeno, seria
+  // poder desactivarlo o resetearle la clave.
+  const usuarioAjeno = "usuario-de-la-empresa-B";
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("listar usuarios sale acotado a mi empresa", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      usuarios.listarUsuarios(sesion(MIA, ["usuario:leer"])),
+    );
+  });
+
+  it("desactivar un usuario ajeno va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      usuarios.cambiarEstadoUsuario(
+        sesion(MIA, ["usuario:desactivar"]),
+        usuarioAjeno,
+        false,
+      ),
+    );
+  });
+
+  it("resetear la clave de un usuario ajeno va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      usuarios.resetearClave(sesion(MIA, ["usuario:resetear_clave"]), usuarioAjeno),
+    );
+  });
+
+  it("eliminar un usuario ajeno va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      usuarios.eliminarUsuario(sesion(MIA, ["usuario:desactivar"]), usuarioAjeno),
+    );
+  });
+
+  it("sin permiso no se toca la base", async () => {
+    await exigeNiTocarLaBase(() => usuarios.listarUsuarios(sesion(MIA, [])));
+    await exigeNiTocarLaBase(() =>
+      usuarios.resetearClave(sesion(MIA, []), usuarioAjeno),
     );
   });
 });
