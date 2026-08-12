@@ -85,6 +85,14 @@ export default async function AvancePage({
             {parte.tareas} tarea(s) abiertas
             {parte.fuera > 0 && ` · ${parte.fuera} empiezan más adelante`}
           </span>
+          {/* Cuando la ventana esconde MAS de lo que ensena, decirlo no basta:
+              hay que sugerir el remedio. Con 4 tareas dentro y 50 fuera, la
+              pantalla parece decir que la obra tiene cuatro partidas. */}
+          {parte.fuera > parte.tareas && diasVista < 30 && (
+            <span style={{ color: "var(--color-alerta)" }}>
+              La mayoría queda fuera de esta ventana.
+            </span>
+          )}
           {DIAS.map((d) => (
             <Link
               key={d}

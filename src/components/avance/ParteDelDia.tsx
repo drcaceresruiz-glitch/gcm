@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import { LoaderCircle, Save, TriangleAlert, CircleCheck } from "lucide-react";
 import {
   accionGuardarParte,
   type EstadoParte,
 } from "@/app/(dashboard)/obras/[id]/avance/acciones";
 import type { GrupoParte } from "@/lib/parte-diario";
+import { conSignoFijo } from "@/lib/redondeo";
 
 /**
  * El barrido del dia: todas las tareas abiertas, una casilla cada una, un solo
@@ -20,6 +21,12 @@ import type { GrupoParte } from "@/lib/parte-diario";
  *    nadie escribio nada, que falsificaba la curva S al alza.
  * 2. **No hay «marcar todas».** Rellenar cien tareas de golpe es exactamente lo
  *    que no debe poder hacerse sin haberlas mirado.
+ *
+ * Y una de ergonomia que pesa mas que las dos: esto se rellena a teclado, de
+ * arriba abajo, con el movil o el portatil apoyado en cualquier sitio. Por eso
+ * ENTER salta a la casilla siguiente en vez de enviar el formulario, que es lo
+ * que hacia antes: a media captura de cien tareas, un Enter de reflejo
+ * guardaba lo que llevaras escrito y recargaba la pantalla.
  */
 export function ParteDelDia({
   obraId,
@@ -35,14 +42,51 @@ export function ParteDelDia({
     {},
   );
 
-  /// Solo para contar lo que se va a enviar y poder vaciarlo al guardar. El
-  /// valor que se guarda es el del propio campo.
+  /// Solo para contar lo que se va a enviar. El valor que se guarda es el del
+  /// propio campo.
   const [escritos, setEscritos] = useState<Record<number, string>>({});
+
+  /// El orden de captura, aplanado: es el que sigue el salto con Enter.
+  const orden = useMemo(
+    () => grupos.flatMap((g) => g.filas.map((f) => f.uid)),
+    [grupos],
+  );
+
+  const casillas = useRef(new Map<number, HTMLInputElement>());
 
   const cuantos = useMemo(
     () => Object.values(escritos).filter((v) => v.trim() !== "").length,
     [escritos],
   );
+
+  /// Cuantas no se han reportado NUNCA y cuantas van por detras. Sale del
+  /// mismo dato que ya se pinta por fila; arriba sirve para saber por donde
+  /// empezar cuando la lista es larga.
+  const resumen = useMemo(() => {
+    const filas = grupos.flatMap((g) => g.filas);
+    return {
+      total: filas.length,
+      nunca: filas.filter((f) => f.diasSinReportar === null).length,
+      atrasadas: filas.filter((f) => Number(f.desfase) < 0).length,
+    };
+  }, [grupos]);
+
+  function alTeclear(e: React.KeyboardEvent<HTMLInputElement>, uid: number) {
+    if (e.key !== "Enter") return;
+    // Sin esto, Enter envia el formulario: el comportamiento por defecto de un
+    // input suelto dentro de un <form>.
+    e.preventDefault();
+
+    const i = orden.indexOf(uid);
+    const siguiente = orden[i + 1];
+    if (siguiente === undefined) {
+      casillas.current.get(uid)?.blur();
+      return;
+    }
+    const campo = casillas.current.get(siguiente);
+    campo?.focus();
+    campo?.select();
+  }
 
   return (
     <form action={enviar} className="space-y-4">
@@ -67,6 +111,12 @@ export function ParteDelDia({
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
           />
         </label>
+
+        <p className="text-xs opacity-70">
+          {resumen.total} {resumen.total === 1 ? "tarea" : "tareas"}
+          {resumen.nunca > 0 && ` · ${resumen.nunca} sin reportar nunca`}
+          {resumen.atrasadas > 0 && ` · ${resumen.atrasadas} por detrás del plan`}
+        </p>
 
         <button
           type="submit"
@@ -111,87 +161,153 @@ export function ParteDelDia({
         </p>
       )}
 
-      {grupos.map((g) => (
-        <section key={g.capitulo}>
-          <h3 className="mb-1 text-sm font-semibold opacity-80">{g.capitulo}</h3>
-          <div
-            className="overflow-x-auto rounded-lg border"
-            style={{ borderColor: "var(--borde)" }}
+      {/* UNA SOLA TABLA, con el capitulo como fila separadora.
+          
+          Antes cada capitulo abria su propia tabla con su propia cabecera: con
+          cuatro tareas repartidas en dos capitulos salian dos juegos de
+          «Partida · Hoy · Desfase · Sin reportar · Nuevo %», mas cabecera que
+          datos. En una lista de cien filas y trece capitulos, eso son trece
+          cabeceras entre medias y las columnas bailando de sitio. */}
+      <div
+        className="overflow-x-auto rounded-lg border"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <table className="w-full text-sm">
+          <thead
+            className="sticky top-[73px] z-[5]"
+            style={{ backgroundColor: "var(--superficie)" }}
           >
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs opacity-70">
-                  <th className="px-3 py-2 font-medium">Partida</th>
-                  <th className="px-3 py-2 text-right font-medium">Hoy</th>
-                  <th className="px-3 py-2 text-right font-medium">Desfase</th>
-                  <th className="px-3 py-2 text-right font-medium">Sin reportar</th>
-                  <th className="px-3 py-2 text-right font-medium">Nuevo %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {g.filas.map((f) => (
-                  <tr
-                    key={f.uid}
-                    className="border-t"
-                    style={{ borderColor: "var(--borde)" }}
-                  >
-                    <td className="px-3 py-1.5">
-                      {f.codigo && <span className="opacity-60">{f.codigo} </span>}
-                      {f.nombre}
-                      {f.esCritico && (
-                        <span
-                          className="ml-2 rounded px-1 text-[10px] font-medium"
-                          style={{
-                            color: "var(--color-peligro)",
-                            backgroundColor:
-                              "color-mix(in srgb, var(--color-peligro) 12%, transparent)",
-                          }}
-                        >
-                          crítica
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums opacity-70">
-                      {f.porcentajeActual}%
-                    </td>
-                    <td
-                      className="px-3 py-1.5 text-right tabular-nums"
-                      style={
-                        Number(f.desfase) < 0 ? { color: "var(--color-peligro)" } : undefined
-                      }
-                    >
-                      {f.desfase}
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums opacity-70">
-                      {/* «Nunca» no es «hace mucho»: una tarea recien abierta no
-                          es una abandonada. */}
-                      {f.diasSinReportar === null ? "nunca" : `${f.diasSinReportar} d`}
-                    </td>
-                    <td className="px-3 py-1.5 text-right">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        name={`avance-${f.uid}`}
-                        value={escritos[f.uid] ?? ""}
-                        onChange={(e) =>
-                          setEscritos((p) => ({ ...p, [f.uid]: e.target.value }))
-                        }
-                        placeholder="—"
-                        aria-label={`Avance de ${f.nombre}`}
-                        className="w-20 rounded-lg border px-2 py-1 text-right text-sm"
-                        style={{
-                          borderColor: "var(--borde)",
-                          backgroundColor: "var(--fondo)",
-                        }}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ))}
+            <tr className="text-left text-xs opacity-70">
+              <th className="px-3 py-2 font-medium">Partida</th>
+              <th className="px-3 py-2 text-right font-medium">Hoy</th>
+              <th className="px-3 py-2 text-right font-medium">Desfase</th>
+              <th className="px-3 py-2 text-right font-medium">Sin reportar</th>
+              <th className="px-3 py-2 text-right font-medium">Nuevo %</th>
+            </tr>
+          </thead>
+          <tbody>
+            {grupos.map((g) => (
+              <Capitulo
+                key={g.capitulo}
+                grupo={g}
+                escritos={escritos}
+                setEscritos={setEscritos}
+                casillas={casillas}
+                alTeclear={alTeclear}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-xs opacity-60">
+        Enter salta a la casilla siguiente. Lo que dejes en blanco no se guarda.
+      </p>
     </form>
+  );
+}
+
+function Capitulo({
+  grupo,
+  escritos,
+  setEscritos,
+  casillas,
+  alTeclear,
+}: {
+  grupo: GrupoParte;
+  escritos: Record<number, string>;
+  setEscritos: React.Dispatch<React.SetStateAction<Record<number, string>>>;
+  casillas: React.RefObject<Map<number, HTMLInputElement>>;
+  alTeclear: (e: React.KeyboardEvent<HTMLInputElement>, uid: number) => void;
+}) {
+  return (
+    <>
+      <tr>
+        <th
+          colSpan={5}
+          scope="colgroup"
+          className="border-t px-3 py-1.5 text-left text-xs font-semibold"
+          style={{
+            borderColor: "var(--borde)",
+            backgroundColor: "color-mix(in oklab, var(--borde) 25%, transparent)",
+          }}
+        >
+          {grupo.capitulo}
+        </th>
+      </tr>
+      {grupo.filas.map((f) => {
+        const desfase = Number(f.desfase);
+        return (
+          <tr key={f.uid} className="border-t" style={{ borderColor: "var(--borde)" }}>
+            <td className="px-3 py-1.5">
+              {f.codigo && <span className="opacity-60">{f.codigo} </span>}
+              {f.nombre}
+              {f.esCritico && (
+                <span
+                  className="ml-2 rounded px-1 text-[10px] font-medium"
+                  style={{
+                    color: "var(--color-peligro)",
+                    backgroundColor:
+                      "color-mix(in srgb, var(--color-peligro) 12%, transparent)",
+                  }}
+                >
+                  crítica
+                </span>
+              )}
+            </td>
+            <td className="px-3 py-1.5 text-right tabular-nums opacity-70">
+              {f.porcentajeActual}%
+            </td>
+            {/* Con signo: un «70.00» a secas no dice si va setenta puntos por
+                delante o por detras del plan, que es justo lo que se pregunta
+                quien esta a punto de escribir el avance. */}
+            <td
+              className="px-3 py-1.5 text-right tabular-nums"
+              style={
+                desfase < 0
+                  ? { color: "var(--color-peligro)" }
+                  : desfase > 0
+                    ? { color: "var(--color-exito)" }
+                    : { opacity: 0.5 }
+              }
+            >
+              {conSignoFijo(desfase, 1)}
+            </td>
+            <td className="px-3 py-1.5 text-right tabular-nums opacity-70">
+              {/* «Nunca» no es «hace mucho»: una tarea recien abierta no es una
+                  abandonada. Se destaca porque es por donde hay que empezar. */}
+              {f.diasSinReportar === null ? (
+                <span style={{ color: "var(--color-alerta)" }}>nunca</span>
+              ) : (
+                `${f.diasSinReportar} d`
+              )}
+            </td>
+            <td className="px-3 py-1.5 text-right">
+              <input
+                type="text"
+                inputMode="decimal"
+                name={`avance-${f.uid}`}
+                value={escritos[f.uid] ?? ""}
+                onChange={(e) =>
+                  setEscritos((p) => ({ ...p, [f.uid]: e.target.value }))
+                }
+                onKeyDown={(e) => alTeclear(e, f.uid)}
+                ref={(el) => {
+                  if (el) casillas.current.set(f.uid, el);
+                  else casillas.current.delete(f.uid);
+                }}
+                placeholder="—"
+                aria-label={`Avance de ${f.nombre}`}
+                className="w-20 rounded-lg border px-2 py-1 text-right text-sm"
+                style={{
+                  borderColor: "var(--borde)",
+                  backgroundColor: "var(--fondo)",
+                }}
+              />
+            </td>
+          </tr>
+        );
+      })}
+    </>
   );
 }
