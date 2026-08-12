@@ -126,6 +126,18 @@ export interface ConteoPendientes {
   ppcAnterior: number | null;
   /// Cobertura del mapeo tarea-partida (0..100).
   coberturaMapeo: number | null;
+  /**
+   * Cuantos compromisos tenia la ultima semana cerrada.
+   *
+   * Solo se usa para NO hablar de sobrecarga con dos compromisos: un PPC del
+   * 50% sobre dos tareas no es un patron, es una tarea.
+   */
+  compromisosUltimaSemana: number;
+  /**
+   * Dias desde la fecha de corte del cronograma vigente, o null si no hay
+   * ninguno cargado —de eso ya avisan otros—.
+   */
+  diasDesdeCorteCronograma: number | null;
 }
 
 /**
@@ -142,6 +154,24 @@ import { PPC_PREOCUPANTE, PPC_MENOS_DE_LA_MITAD } from "@/lib/plan-semanal";
 
 /// El EVM no puede ponderar por dinero con menos mapeo que esto.
 export const COBERTURA_MINIMA_MAPEO = 60;
+
+/**
+ * Confiabilidad a partir de la cual "faltaba liberar" ya NO explica un PPC
+ * bajo. Por encima de esto el trabajo estaba listo, asi que si aun asi no se
+ * cumplio, lo que sobra es carga.
+ */
+export const CONFIABILIDAD_ALTA = 80;
+
+/// Por debajo de estos compromisos, un PPC bajo es una tarea, no un patron.
+export const MIN_COMPROMISOS_SOBRECARGA = 5;
+
+/**
+ * Dias tras los que el cronograma deja de respaldar lo que se calcula con el.
+ *
+ * Veintiuno, que es la ventana por defecto del Lookahead: a partir de ahi el
+ * analisis se apoya en fechas que el archivo ya no sostiene.
+ */
+export const DIAS_CRONOGRAMA_VIEJO = 21;
 
 export interface LecturaPpc {
   gravedad: Gravedad;
@@ -505,6 +535,53 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       accion:
         "Pulsa «Solo las sin enlazar» y asigna a cada tarea su partida del presupuesto.",
       camino: "/cronograma/mapeo",
+      cuantos: 1,
+    });
+  }
+
+  // Liberas bien y aun asi incumples: eso NO es falta de analisis, es que se
+  // compromete mas de lo que cabe. Es la unica lectura que el panel no daba, y
+  // la que lleva a la accion contraria si se lee mal —analizar mas, cuando lo
+  // que toca es prometer menos—.
+  if (
+    c.confiabilidadMostrada !== null &&
+    c.confiabilidadMostrada >= CONFIABILIDAD_ALTA &&
+    c.ppcUltimo !== null &&
+    c.ppcUltimo < PPC_PREOCUPANTE &&
+    c.compromisosUltimaSemana >= MIN_COMPROMISOS_SOBRECARGA
+  ) {
+    salida.push({
+      clave: "sobrecarga",
+      bloque: "salidas",
+      gravedad: "aviso",
+      titulo: `Liberas bien (${Math.round(c.confiabilidadMostrada)}%) pero cumples poco (${Math.round(c.ppcUltimo)}%)`,
+      consecuencia:
+        "El trabajo estaba liberado y aun asi no se cumplio, asi que no es un problema de analisis: se esta comprometiendo mas de lo que cabe en la semana.",
+      accion:
+        "Compromete menos tareas la semana que viene y compara el PPC: si sube, era carga y no planificacion.",
+      camino: "/plan-semanal",
+      cuantos: 1,
+    });
+  }
+
+  if (
+    c.diasDesdeCorteCronograma !== null &&
+    c.diasDesdeCorteCronograma > DIAS_CRONOGRAMA_VIEJO
+  ) {
+    const n = c.diasDesdeCorteCronograma;
+    salida.push({
+      clave: "cronograma-viejo",
+      bloque: "entradas",
+      // Aviso y no critica: una obra estable puede pasar semanas sin cambiar
+      // el plan, y el manual recomienda NO crear versiones si nada cambio. El
+      // texto pregunta en vez de afirmar.
+      gravedad: "aviso",
+      titulo: `El cronograma vigente tiene ${n} dias`,
+      consecuencia:
+        "La ventana del Lookahead, la ruta critica y las tareas que arrancan pronto se calculan sobre ese archivo. Si el plan cambio en Project y no se subio, todo eso mira un plan que ya no existe.",
+      accion:
+        "Si el plan cambio, sube la version nueva desde «Importar». Si no cambio, no hay nada que hacer.",
+      camino: "/cronograma",
       cuantos: 1,
     });
   }

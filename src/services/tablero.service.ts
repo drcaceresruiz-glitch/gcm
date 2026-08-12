@@ -963,6 +963,26 @@ async function pendientesDeLaObra(
     ahora,
   );
 
+  // La ultima semana CERRADA por fecha de corte, sin depender del orden con
+  // que llegue la consulta. Sus compromisos cuentan solo los ligados a una
+  // tarea —asi viene la consulta—, de modo que el guardia de sobrecarga peca
+  // de conservador: mejor callar un aviso que inventarlo.
+  const ultimaCerrada = planesCerrados.reduce<
+    (typeof planesCerrados)[number] | null
+  >(
+    (mejor, p) => (mejor === null || p.fechaCorte > mejor.fechaCorte ? p : mejor),
+    null,
+  );
+
+  // Cuanto hace que el archivo del cronograma dice lo que dice. QUE es viejo
+  // lo decide pendientes.ts; aqui solo se cuenta.
+  const diasDeCronograma =
+    cronograma === null
+      ? null
+      : Math.floor(
+          (ahora.getTime() - cronograma.fechaCorte.getTime()) / 86_400_000,
+        );
+
   return pendientesDeObra({
     tareasEmpezadasSinAvance,
     tareasConAvanceViejo,
@@ -982,6 +1002,8 @@ async function pendientesDeLaObra(
     ppcUltimo: planes?.ultima?.ppc ?? null,
     ppcAnterior: planes?.anterior ?? null,
     coberturaMapeo: mapeos.length > 0 ? cob.porcentaje : null,
+    compromisosUltimaSemana: ultimaCerrada?.compromisos.length ?? 0,
+    diasDesdeCorteCronograma: diasDeCronograma,
   });
 }
 

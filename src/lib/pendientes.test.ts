@@ -26,6 +26,8 @@ function limpio(cambios: Partial<ConteoPendientes> = {}): ConteoPendientes {
     ppcUltimo: null,
     ppcAnterior: null,
     coberturaMapeo: null,
+    compromisosUltimaSemana: 0,
+    diasDesdeCorteCronograma: null,
     ...cambios,
   };
 }
@@ -358,6 +360,85 @@ describe("pendientesDeObra", () => {
       expect(p.camino.startsWith("/")).toBe(true);
       expect(p.consecuencia.length).toBeGreaterThan(20);
     }
+  });
+});
+
+describe("sobrecarga: liberas bien pero cumples poco", () => {
+  // Confiabilidad alta + PPC bajo NO es falta de analisis: es que se
+  // compromete mas de lo que cabe. Si se lee mal, se corrige al reves.
+  const sobrecargada = {
+    confiabilidadMostrada: 92,
+    ppcUltimo: 55,
+    compromisosUltimaSemana: 12,
+  };
+
+  it("avisa cuando el trabajo estaba liberado y aun asi fallo", () => {
+    expect(claves(sobrecargada)).toContain("sobrecarga");
+  });
+
+  it("NO avisa si la confiabilidad es baja: ese es el otro problema", () => {
+    // Con poco liberado, el PPC bajo se explica por falta de analisis, y de
+    // eso ya avisa lookahead-sin-analizar.
+    expect(claves({ ...sobrecargada, confiabilidadMostrada: 40 })).not.toContain(
+      "sobrecarga",
+    );
+  });
+
+  it("NO avisa con pocos compromisos: eso es una tarea, no un patron", () => {
+    expect(claves({ ...sobrecargada, compromisosUltimaSemana: 3 })).not.toContain(
+      "sobrecarga",
+    );
+  });
+
+  it("NO avisa si el PPC es bueno", () => {
+    expect(claves({ ...sobrecargada, ppcUltimo: 88 })).not.toContain(
+      "sobrecarga",
+    );
+  });
+
+  it("sin PPC o sin confiabilidad no dice nada", () => {
+    expect(claves({ ...sobrecargada, ppcUltimo: null })).not.toContain(
+      "sobrecarga",
+    );
+    expect(
+      claves({ ...sobrecargada, confiabilidadMostrada: null }),
+    ).not.toContain("sobrecarga");
+  });
+
+  it("el titulo lleva las dos cifras, que es lo que hace entender el aviso", () => {
+    const p = pendientesDeObra(limpio(sobrecargada)).find(
+      (x) => x.clave === "sobrecarga",
+    );
+    expect(p?.titulo).toContain("92");
+    expect(p?.titulo).toContain("55");
+  });
+});
+
+describe("cronograma viejo", () => {
+  it("avisa pasados los 21 dias", () => {
+    expect(claves({ diasDesdeCorteCronograma: 34 })).toContain(
+      "cronograma-viejo",
+    );
+  });
+
+  it("no avisa dentro de la ventana", () => {
+    expect(claves({ diasDesdeCorteCronograma: 21 })).not.toContain(
+      "cronograma-viejo",
+    );
+  });
+
+  it("sin cronograma cargado no aparece: de eso avisan otros", () => {
+    expect(claves({ diasDesdeCorteCronograma: null })).not.toContain(
+      "cronograma-viejo",
+    );
+  });
+
+  it("es aviso y no critica: no cambiar el plan es legitimo", () => {
+    const p = pendientesDeObra(limpio({ diasDesdeCorteCronograma: 40 })).find(
+      (x) => x.clave === "cronograma-viejo",
+    );
+    expect(p?.gravedad).toBe("aviso");
+    expect(p?.bloque).toBe("entradas");
   });
 });
 
