@@ -12,6 +12,7 @@ import {
   eliminarPlanSemanal,
   type ResultadoPlan,
   type ResultadoCrearPlan,
+  type ResultadoCerrarPlan,
   type DatosCompromiso,
   type Evaluacion,
 } from "@/services/plan-semanal.service";
@@ -56,11 +57,13 @@ export async function accionCerrarPlanSemanal(
   obraId: string,
   planId: string,
   evaluaciones: Evaluacion[],
-): Promise<ResultadoPlan> {
+  /// El residente ya vio que hay cumplidos sin avance y cierra igual.
+  confirmado = false,
+): Promise<ResultadoCerrarPlan> {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
-  const r = await cerrarPlanSemanal(sesion, obraId, planId, evaluaciones);
+  const r = await cerrarPlanSemanal(sesion, obraId, planId, evaluaciones, confirmado);
   if (r.ok) {
     revalidatePath(`/obras/${obraId}/plan-semanal`);
     revalidatePath(`/obras/${obraId}/plan-semanal/${planId}`);

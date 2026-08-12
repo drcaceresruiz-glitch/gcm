@@ -193,6 +193,54 @@ export function porcentajeARegistrar(entrada: {
   return meta ? meta : null;
 }
 
+/// Un compromiso a punto de cerrarse, con lo minimo para saber si dejara
+/// rastro en la curva.
+export interface CompromisoACerrar {
+  compromisoId: string;
+  /// null en las lineas libres: no apuntan a ninguna tarea, asi que no hay
+  /// avance fisico que registrar y no son un problema.
+  uid: number | null;
+  descripcion: string;
+  cumplido: boolean;
+  porcentajeReal: string | null | undefined;
+  metaPorcentaje: string | null | undefined;
+}
+
+/**
+ * Los compromisos que se van a dar por CUMPLIDOS sin dejar ni un dato de
+ * avance.
+ *
+ * Es el hueco que se vio en CRIOCORD el 12/08/2026: la Semana 2 se cerro con
+ * cinco compromisos cumplidos y sin porcentaje, asi que el PPC dijo 100% y la
+ * curva siguio marcando esas cinco partidas al 0%. Durante dias el Lookahead
+ * las ofrecia como trabajo por preparar y la obra se veia mas atrasada de lo
+ * que estaba. Nadie mintio: falto escribir un numero que la pantalla no exigia.
+ *
+ * `porcentajeARegistrar` ya decide bien —usa la meta pactada cuando la hay y
+ * NUNCA inventa un 100—; lo que faltaba era avisar antes de cerrar de los
+ * casos en los que va a devolver null.
+ *
+ * Solo cuenta los que tienen `uid`: una linea libre no tiene tarea que mover.
+ * Y solo los CUMPLIDOS: en un incumplido, no registrar avance es lo normal
+ * —justamente no se hizo— y lo que se exige alli es la causa.
+ */
+export function cumplidosSinAvance(
+  compromisos: readonly CompromisoACerrar[],
+): { compromisoId: string; descripcion: string }[] {
+  return compromisos
+    .filter(
+      (c) =>
+        c.uid !== null &&
+        c.cumplido &&
+        porcentajeARegistrar({
+          porcentajeReal: c.porcentajeReal,
+          cumplido: c.cumplido,
+          metaPorcentaje: c.metaPorcentaje,
+        }) === null,
+    )
+    .map((c) => ({ compromisoId: c.compromisoId, descripcion: c.descripcion }));
+}
+
 export interface FilaPareto {
   causa: CausaNoCumplimiento;
   conteo: number;

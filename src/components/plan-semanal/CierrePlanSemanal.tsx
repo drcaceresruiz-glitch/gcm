@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, LoaderCircle } from "lucide-react";
+import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
 import { accionCerrarPlanSemanal } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
 import {
   CAUSAS_CNC,
@@ -81,13 +81,20 @@ export function CierrePlanSemanal({
   const [pendiente, iniciar] = useTransition();
   /// Compromiso con la evidencia abierta (uno a la vez).
   const [evidenciaEn, setEvidenciaEn] = useState<string | null>(null);
+  /// Los cumplidos que se cerrarian sin mover la curva. El servidor los
+  /// devuelve y hay que verlos antes de pasar.
+  const [sinAvance, setSinAvance] = useState<
+    { compromisoId: string; descripcion: string }[] | null
+  >(null);
 
   function set(id: string, cambios: Partial<Fila>) {
     setFilas((p) => p.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
   }
 
-  function cerrar() {
+  function cerrar(confirmado = false) {
     setError(null);
+    if (!confirmado) setSinAvance(null);
+
     iniciar(async () => {
       const r = await accionCerrarPlanSemanal(
         obraId,
@@ -101,9 +108,14 @@ export function CierrePlanSemanal({
             f.uid !== null ? (f.porcentajeReal.trim() || null) : null,
           cantidadEjec: f.cantidadEjec.trim() || null,
         })),
+        confirmado,
       );
-      if (!r.ok) setError(r.error ?? "No se pudo cerrar la semana.");
-      // En exito, revalidatePath repinta la pagina ya cerrada.
+      if (r.ok) return; // revalidatePath repinta la pagina ya cerrada.
+      if ("requiereConfirmacion" in r) {
+        setSinAvance(r.sinAvance);
+        return;
+      }
+      setError(r.error ?? "No se pudo cerrar la semana.");
     });
   }
 
@@ -232,10 +244,67 @@ export function CierrePlanSemanal({
           );
         })}
       </ul>
+      {/* Los cumplidos que no dejarian rastro en la curva. Se AVISA y no se
+          impide —a veces no se sabe el porcentaje, y bloquear el cierre por eso
+          dejaria la semana sin PPC, que es peor—, pero hay que verlo: en
+          CRIOCORD cinco compromisos asi dieron un PPC del 100% con la curva
+          marcando esas partidas al 0% durante dias. */}
+      {sinAvance && sinAvance.length > 0 && (
+        <div
+          className="rounded-lg border p-3 text-sm"
+          style={{
+            borderColor: "var(--color-alerta)",
+            backgroundColor: "color-mix(in srgb, var(--color-alerta) 8%, transparent)",
+          }}
+        >
+          <p className="flex items-start gap-2">
+            <TriangleAlert
+              className="mt-0.5 size-4 shrink-0"
+              style={{ color: "var(--color-alerta)" }}
+              aria-hidden="true"
+            />
+            <span>
+              {sinAvance.length === 1
+                ? "Vas a dar por cumplido 1 compromiso sin decir a qué % llegó su tarea:"
+                : `Vas a dar por cumplidos ${sinAvance.length} compromisos sin decir a qué % llegaron sus tareas:`}
+            </span>
+          </p>
+          <ul className="ml-6 mt-1 list-disc opacity-80">
+            {sinAvance.map((s) => (
+              <li key={s.compromisoId}>{s.descripcion}</li>
+            ))}
+          </ul>
+          <p className="mt-2 opacity-80">
+            El PPC contará el cumplimiento, pero <strong>la curva S no se moverá</strong>:
+            para GCM esas tareas seguirán en el porcentaje que ya tenían, y el
+            Lookahead las seguirá ofreciendo como trabajo por preparar.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSinAvance(null)}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium text-white"
+              style={{ backgroundColor: "var(--color-marca-600)" }}
+            >
+              Escribir los porcentajes
+            </button>
+            <button
+              type="button"
+              onClick={() => cerrar(true)}
+              disabled={pendiente}
+              className="rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              Cerrar igual
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={cerrar}
+          onClick={() => cerrar()}
           disabled={pendiente}
           className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
           style={{ backgroundColor: "var(--color-marca-600)" }}

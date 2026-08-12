@@ -18,6 +18,7 @@ import {
   validarCantidadPlan,
   uidsDuplicados,
   avisoNumeracionSemana,
+  cumplidosSinAvance,
   tareasTerminadas,
   arrastreDeIncumplidos,
   CAUSAS_CNC,
@@ -830,19 +831,45 @@ export interface Evaluacion {
   cantidadEjec?: string | null;
 }
 
+export type ResultadoCerrarPlan =
+  | { ok: true; id: string }
+  | { ok: false; error: string }
+  /**
+   * Hay compromisos que se van a dar por cumplidos sin dejar avance. No es un
+   * error: es un aviso que hay que ver antes de cerrar.
+   *
+   * Misma regla que el resto de GCM —se avisa, no se impide—. A veces el
+   * residente de verdad no sabe el porcentaje, y prohibirle cerrar la semana
+   * por eso le dejaria el PPC sin registrar, que es peor.
+   */
+  | {
+      ok: false;
+      requiereConfirmacion: true;
+      sinAvance: { compromisoId: string; descripcion: string }[];
+    };
+
 /**
  * Cierra la semana: marca cada compromiso cumplido/no y, si no, su causa; deja
  * el plan CERRADO. De aqui sale el PPC y el Pareto.
  *
  * Un no cumplido SIN causa se rechaza: la causa es justo lo que hace util el
  * cierre —sin ella no hay aprendizaje ni Pareto—.
+ *
+ * Y un CUMPLIDO sin porcentaje ni meta avisa antes de pasar. No se rechaza
+ * —cerrar la semana sigue siendo mas importante que el dato fino— pero tampoco
+ * se deja pasar en silencio: en CRIOCORD, cinco cumplidos asi dejaron el PPC
+ * al 100% con la curva marcando esas partidas al 0%, y durante dias el
+ * Lookahead las ofrecio como trabajo por preparar.
  */
 export async function cerrarPlanSemanal(
   sesion: SesionActiva,
   obraId: string,
   planId: string,
   evaluaciones: Evaluacion[],
-): Promise<ResultadoPlan> {
+  /// Segunda pasada: ya se vio el aviso de los cumplidos sin avance y se cierra
+  /// igual.
+  confirmado = false,
+): Promise<ResultadoCerrarPlan> {
   if (!puede(sesion, "plan_semanal:gestionar")) {
     return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
   }
@@ -857,7 +884,9 @@ export async function cerrarPlanSemanal(
       estado: true,
       numero: true,
       fechaCorte: true,
-      compromisos: { select: { id: true, uid: true, metaPorcentaje: true } },
+      compromisos: {
+        select: { id: true, uid: true, metaPorcentaje: true, descripcion: true },
+      },
     },
   });
   if (!plan) return { ok: false, error: "Plan no encontrado." };
@@ -896,6 +925,28 @@ export async function cerrarPlanSemanal(
     const ejec = validarCantidadPlan(e.cantidadEjec);
     if (!ejec.ok) return { ok: false, error: ejec.error };
     porId.set(e.compromisoId, e);
+  }
+
+  // Los que se van a dar por cumplidos sin dejar avance. Se pregunta DESPUES de
+  // validar —para no avisar de esto cuando ademas hay un error que corregir— y
+  // ANTES de escribir nada.
+  if (!confirmado) {
+    const sinAvance = cumplidosSinAvance(
+      plan.compromisos.map((c) => {
+        const e = porId.get(c.id);
+        return {
+          compromisoId: c.id,
+          uid: c.uid,
+          descripcion: c.descripcion,
+          cumplido: e?.cumplido ?? false,
+          porcentajeReal: e?.porcentajeReal,
+          metaPorcentaje: c.metaPorcentaje?.toString() ?? null,
+        };
+      }),
+    );
+    if (sinAvance.length > 0) {
+      return { ok: false, requiereConfirmacion: true, sinAvance };
+    }
   }
 
   await prisma.$transaction(async (tx) => {

@@ -15,8 +15,10 @@ import {
   avisoNumeracionSemana,
   semanasAContramano,
   causaQueMasFrena,
+  cumplidosSinAvance,
   tareasTerminadas,
   arrastreDeIncumplidos,
+  type CompromisoACerrar,
   type CompromisoPrevio,
   type CompromisoEvaluado,
   type TareaProgramada,
@@ -222,6 +224,45 @@ describe("avisoNumeracionSemana", () => {
     // El indice unico ya impide dos planes con el mismo corte; aqui solo se
     // comprueba que no se avise de un empate.
     expect(avisoNumeracionSemana(dc("2026-08-15"), existentes)).toBeNull();
+  });
+});
+
+describe("cumplidosSinAvance", () => {
+  const c = (campos: Partial<CompromisoACerrar> = {}): CompromisoACerrar => ({
+    compromisoId: "c1",
+    uid: 100,
+    descripcion: "4.5 Curado de concreto",
+    cumplido: true,
+    porcentajeReal: null,
+    metaPorcentaje: null,
+    ...campos,
+  });
+
+  it("SENALA el cumplido sin porcentaje ni meta", () => {
+    // El caso de CRIOCORD: la Semana 2 se cerro con cinco asi, el PPC dijo
+    // 100% y la curva siguio marcando esas partidas al 0%.
+    const r = cumplidosSinAvance([c()]);
+    expect(r).toEqual([{ compromisoId: "c1", descripcion: "4.5 Curado de concreto" }]);
+  });
+
+  it("calla cuando hay porcentaje escrito o meta pactada", () => {
+    // Con meta, `porcentajeARegistrar` registra la meta: cumplir es alcanzar
+    // lo prometido, y eso SI mueve la curva.
+    expect(cumplidosSinAvance([c({ porcentajeReal: "80" })])).toEqual([]);
+    expect(cumplidosSinAvance([c({ metaPorcentaje: "60" })])).toEqual([]);
+  });
+
+  it("no señala lo NO cumplido: ahi lo que se exige es la causa", () => {
+    // No registrar avance en algo que no se hizo es lo correcto, no un olvido.
+    expect(cumplidosSinAvance([c({ cumplido: false })])).toEqual([]);
+  });
+
+  it("no señala las lineas libres: no hay tarea que mover", () => {
+    expect(cumplidosSinAvance([c({ uid: null })])).toEqual([]);
+  });
+
+  it("un porcentaje en blanco no cuenta como escrito", () => {
+    expect(cumplidosSinAvance([c({ porcentajeReal: "   " })])).toHaveLength(1);
   });
 });
 
