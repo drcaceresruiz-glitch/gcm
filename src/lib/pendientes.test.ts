@@ -15,6 +15,8 @@ function limpio(cambios: Partial<ConteoPendientes> = {}): ConteoPendientes {
     lookaheadSinAnalizar: 0,
     confiabilidadMostrada: null,
     tareasProximasBloqueadas: 0,
+    restriccionesVencidas: 0,
+    restriccionesSinResponsable: 0,
     tareasProximasSinAnalizar: 0,
     diasVentana: 14,
     tareasProximasSinCobertura: 0,
@@ -51,13 +53,15 @@ describe("pendientesDeObra", () => {
         partidasSobregiradas: 4,
         incumplidosSinRetomar: 3,
         incumplidosCronicos: 1,
+        restriccionesVencidas: 2,
+        restriccionesSinResponsable: 5,
         ppcUltimo: 62,
         ppcAnterior: 100,
         coberturaMapeo: 40,
       }),
     );
 
-    expect(todos.length).toBe(10);
+    expect(todos.length).toBe(12);
     for (const p of todos) {
       expect(p.camino, p.clave).toMatch(/^\//);
       // En imperativo y con sustancia: "Ver" o "Ir" no dicen que hacer.
@@ -184,6 +188,31 @@ describe("pendientesDeObra", () => {
       // Con la ventana acotada a esos mismos 14 dias: el enlace tiene que
       // abrir exactamente las tareas de las que habla el aviso.
       expect(p?.camino).toBe("/lookahead?semanas=2");
+    });
+
+    it("una promesa vencida es critica y tiene nombre y apellidos", () => {
+      // «Algo no esta listo» es un estado; «dijiste que lo tendrias el jueves»
+      // es una conversacion pendiente, y es la que destraba la obra.
+      const [p] = pendientesDeObra(limpio({ restriccionesVencidas: 2 }));
+      expect(p?.clave).toBe("restricciones-vencidas");
+      expect(p?.gravedad).toBe("critica");
+      expect(p?.consecuencia).toContain("alguien dijo que lo tendría");
+      expect(p?.accion).toContain("fecha nueva");
+    });
+
+    it("sin responsable es AVISO: no hay cifra falsa, hay lista sin dueno", () => {
+      const [p] = pendientesDeObra(limpio({ restriccionesSinResponsable: 5 }));
+      expect(p?.clave).toBe("restricciones-sin-responsable");
+      expect(p?.gravedad).toBe("aviso");
+      expect(p?.consecuencia).toContain("da por hecho que la consigue otro");
+    });
+
+    it("vencidas y sin responsable son problemas DISTINTOS", () => {
+      // Uno es «¿para cuando?» y el otro «¿quien?». Los resuelve gente
+      // distinta, asi que juntarlos daria un texto que no lleva a nada.
+      expect(
+        claves({ restriccionesVencidas: 1, restriccionesSinResponsable: 1 }),
+      ).toEqual(["restricciones-vencidas", "restricciones-sin-responsable"]);
     });
 
     it("'sin analizar' y 'sin liberar' son avisos DISTINTOS", () => {

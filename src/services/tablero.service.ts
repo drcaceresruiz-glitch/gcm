@@ -19,6 +19,7 @@ import { confiabilidadDeVentana } from "@/services/lookahead.service";
 import { MODULOS_POR_DEFECTO, type ModuloTablero } from "@/lib/tablero";
 import { pendientesDeObra, type Pendiente } from "@/lib/pendientes";
 import { arrastreDeIncumplidos } from "@/lib/plan-semanal";
+import { cumplimientoDeLiberacion } from "@/lib/lookahead-compromiso";
 import { cobertura } from "@/lib/mapeo-partidas";
 import { diasEntre, fechaCorta, hoy } from "@/utils/fechas";
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
@@ -742,8 +743,14 @@ async function pendientesDeLaObra(
   );
   const uidsProximos = proximas.map((t) => t.uid);
 
-  const [lkProximas, mapeos, partidas, planesCerrados, yaRetomadas] =
-    await Promise.all([
+  const [
+    lkProximas,
+    mapeos,
+    partidas,
+    planesCerrados,
+    yaRetomadas,
+    restriccionesAbiertas,
+  ] = await Promise.all([
     uidsProximos.length > 0
       ? prisma.lookaheadTask.findMany({
           where: { projectId: obraId, uid: { in: uidsProximos } },
@@ -804,6 +811,18 @@ async function pendientesDeLaObra(
         plan: { projectId: obraId, estado: "ABIERTO" },
       },
       select: { uid: true },
+    }),
+
+    // Las promesas de liberacion que estan abiertas. Toda la obra, no solo la
+    // ventana: una restriccion que se prometio y vencio sigue siendo un
+    // compromiso roto aunque su tarea ya no este en las proximas tres semanas.
+    prisma.restriccion.findMany({
+      where: { resuelta: false, tarea: { projectId: obraId } },
+      select: {
+        fechaCompromiso: true,
+        responsableUserId: true,
+        responsableContactoId: true,
+      },
     }),
   ]);
 
@@ -885,9 +904,26 @@ async function pendientesDeLaObra(
     })),
   );
 
+  // Las promesas de liberacion. Se reutiliza la misma funcion pura que pinta
+  // el indicador del Lookahead: si aqui se contara a mano, el panel y la
+  // cabecera podrian decir numeros distintos del mismo dia.
+  const promesas = cumplimientoDeLiberacion(
+    restriccionesAbiertas.map((r) => ({
+      tipo: "MATERIALES" as const,
+      resuelta: false,
+      resueltaAt: null,
+      fechaCompromiso: r.fechaCompromiso,
+      responsableUserId: r.responsableUserId,
+      responsableContactoId: r.responsableContactoId,
+    })),
+    ahora,
+  );
+
   return pendientesDeObra({
     tareasEmpezadasSinAvance,
     semanasSinPorcentaje,
+    restriccionesVencidas: promesas.vencidasAbiertas,
+    restriccionesSinResponsable: promesas.sinAsignar,
     incumplidosSinRetomar: arrastre.length,
     incumplidosCronicos: arrastre.filter((a) => a.veces > 1).length,
     lookaheadSinAnalizar: lookahead?.sinAnalizar ?? 0,

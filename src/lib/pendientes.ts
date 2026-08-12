@@ -92,6 +92,16 @@ export interface ConteoPendientes {
   /// liberar. Las que nadie ha mirado van en `tareasProximasSinAnalizar`: son
   /// dos problemas distintos y se arreglan de forma distinta.
   tareasProximasBloqueadas: number;
+  /**
+   * Restricciones abiertas cuya fecha comprometida ya paso.
+   *
+   * Es distinto de `tareasProximasBloqueadas`: aquella dice que algo no esta
+   * listo; esta dice que ALGUIEN DIJO que lo tendria y no lo tuvo. Lo segundo
+   * tiene nombre y apellidos, y por eso mueve.
+   */
+  restriccionesVencidas: number;
+  /// Restricciones abiertas sin nadie asignado. El hueco silencioso.
+  restriccionesSinResponsable: number;
   /// Tareas que arrancan pronto y que nadie ha analizado todavia.
   tareasProximasSinAnalizar: number;
   /// Dias de la ventana con que se miran "las que arrancan pronto".
@@ -292,6 +302,45 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
   }
 
   // --- PROCESOS: lo que va a frenar la obra en las proximas semanas --------
+
+  if (c.restriccionesVencidas > 0) {
+    const n = c.restriccionesVencidas;
+    salida.push({
+      clave: "restricciones-vencidas",
+      bloque: "procesos",
+      gravedad: "critica",
+      titulo: `${n} ${plural(n, "restriccion paso", "restricciones pasaron")} la fecha que alguien prometio`,
+      // Aqui hay nombre y apellidos, y por eso mueve. "Algo no esta listo" es
+      // un estado; "dijiste que lo tendrias el jueves" es una conversacion
+      // pendiente, y esa es la que destraba la obra.
+      consecuencia:
+        "No es que falte algo: es que alguien dijo que lo tendría y no lo tuvo. " +
+        "Mientras nadie lo replantee, la tarea sigue prometida para una fecha que ya no se sostiene.",
+      accion:
+        "Abre la matriz: salen con el borde rojo. Habla con quien se comprometió y pon una fecha nueva, o cámbiale el responsable.",
+      camino: "/lookahead",
+      cuantos: n,
+    });
+  }
+
+  if (c.restriccionesSinResponsable > 0) {
+    const n = c.restriccionesSinResponsable;
+    salida.push({
+      clave: "restricciones-sin-responsable",
+      bloque: "procesos",
+      // Aviso y no critica: no hay ninguna cifra falsa ni nada a punto de
+      // romperse. Lo que hay es una lista que todavia no compromete a nadie.
+      gravedad: "aviso",
+      titulo: `${n} ${plural(n, "restriccion abierta no tiene", "restricciones abiertas no tienen")} responsable`,
+      consecuencia:
+        "Una restricción sin dueño no la levanta nadie: cada uno da por hecho que la consigue otro. " +
+        "Y cuando falle, no habrá a quién preguntar qué pasó.",
+      accion:
+        "Elige las tareas en la matriz y pulsa «Asignar responsable y fecha». Se hace en lote.",
+      camino: "/lookahead",
+      cuantos: n,
+    });
+  }
 
   if (c.tareasProximasSinCobertura > 0) {
     const n = c.tareasProximasSinCobertura;
