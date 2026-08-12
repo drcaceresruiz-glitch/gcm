@@ -19,7 +19,7 @@ import { confiabilidadDeVentana } from "@/services/lookahead.service";
 import { MODULOS_POR_DEFECTO, type ModuloTablero } from "@/lib/tablero";
 import { pendientesDeObra, type Pendiente } from "@/lib/pendientes";
 import { diasSinReportar } from "@/lib/parte-diario";
-import { arrastreDeIncumplidos } from "@/lib/plan-semanal";
+import { arrastreDeIncumplidos, causaQueMasFrena } from "@/lib/plan-semanal";
 import { cumplimientoDeLiberacion } from "@/lib/lookahead-compromiso";
 import { cobertura } from "@/lib/mapeo-partidas";
 import { diasEntre, fechaCorta, hoy } from "@/utils/fechas";
@@ -463,7 +463,10 @@ async function planSemanalDeObra(
   const ultimaCerrada = cerradas[0]; // `semanas` viene por fechaCorte desc
 
   const fallosConCausa = pareto.reduce((suma, f) => suma + f.conteo, 0);
-  const top = pareto[0];
+  // Se calla mientras el Pareto no signifique nada: hacen falta volumen y al
+  // menos dos causas distintas. La regla vive en `@/lib/plan-semanal` y tiene
+  // test, porque decide lo que el tablero AFIRMA.
+  const top = causaQueMasFrena(pareto);
 
   return {
     ultima:
@@ -478,14 +481,9 @@ async function planSemanalDeObra(
     cerradas: cerradas.length,
     abiertas: semanas.filter((s) => s.estado === "ABIERTO").length,
     tendencia: serie,
-    causaTop:
-      top && fallosConCausa > 0
-        ? {
-            causa: top.causa,
-            veces: top.conteo,
-            porcentaje: (top.conteo / fallosConCausa) * 100,
-          }
-        : null,
+    causaTop: top
+      ? { causa: top.causa, veces: top.veces, porcentaje: top.porcentaje }
+      : null,
     fallosConCausa,
   };
 }

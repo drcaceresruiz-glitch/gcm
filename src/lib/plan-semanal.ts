@@ -220,6 +220,52 @@ export function paretoCausas(
     .sort((a, b) => b.conteo - a.conteo);
 }
 
+/**
+ * Cuantos incumplimientos con causa hacen falta para que el Pareto signifique
+ * algo.
+ *
+ * Cinco. Por debajo de eso el «primer puesto» lo decide el azar de la semana:
+ * con tres fallos, uno mas de cualquier otra causa cambia el titular entero.
+ */
+export const MINIMO_PARA_PARETO = 5;
+
+/**
+ * La causa que mas frena, SOLO si hay evidencia para decirlo.
+ *
+ * El tablero enseñaba el primer puesto del Pareto desde el primer
+ * incumplimiento. Con los tres de CRIOCORD —los tres de la misma causa— salia
+ * «Prerrequisito / tarea previa · 3 veces · 100% de los 3», que es una frase
+ * que no informa de nada: cuando solo hay una causa registrada, el 100% es una
+ * tautologia, no un hallazgo.
+ *
+ * Y un tablero que afirma cosas vacias enseña a no leerlo. Es la misma regla
+ * que `lecturaDelPpc`, que se calla cuando no hay nada que decir.
+ *
+ * Se exigen las dos cosas:
+ *
+ * 1. **Volumen**: al menos `MINIMO_PARA_PARETO` incumplimientos con causa.
+ * 2. **Variedad**: al menos dos causas distintas. Un Pareto compara; con una
+ *    sola categoria no hay nada que comparar, por muchos casos que tenga.
+ *
+ * Devuelve null cuando no se cumple: quien llama decide si dice «todavia no
+ * hay suficiente» o no pinta nada, pero no puede pintar un titular falso.
+ */
+export function causaQueMasFrena(
+  pareto: readonly FilaPareto[],
+): { causa: CausaNoCumplimiento; veces: number; porcentaje: number; total: number } | null {
+  const total = pareto.reduce((suma, f) => suma + f.conteo, 0);
+  const lider = pareto[0];
+
+  if (!lider || total < MINIMO_PARA_PARETO || pareto.length < 2) return null;
+
+  return {
+    causa: lider.causa,
+    veces: lider.conteo,
+    porcentaje: (lider.conteo / total) * 100,
+    total,
+  };
+}
+
 export interface PuntoPpc {
   fecha: Date;
   ppc: number;

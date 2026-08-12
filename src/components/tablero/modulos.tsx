@@ -35,7 +35,7 @@ import type {
   DatosLookaheadTablero,
   PuntoMini,
 } from "@/services/tablero.service";
-import { ETIQUETA_CNC } from "@/lib/plan-semanal";
+import { ETIQUETA_CNC, MINIMO_PARA_PARETO } from "@/lib/plan-semanal";
 import { soles } from "@/utils/formato";
 import { conSignoFijo, redondearA } from "@/lib/redondeo";
 import { EnlaceModulo } from "@/components/tablero/Tablero";
@@ -978,13 +978,24 @@ function Causas({
     return (
       <>
         <Titulo icono={Ban}>Causa que más frena</Titulo>
+        {/* Tres estados distintos y tres mensajes distintos. El tercero es el
+            que faltaba: con pocos incumplimientos —o con todos de la misma
+            causa— el «primer puesto» del Pareto no es un hallazgo, es el azar
+            de la semana. Antes se pintaba igual, y un tablero que afirma cosas
+            vacias enseña a no leerlo. */}
         <p className="mt-2 text-sm opacity-60">
           {plan.cerradas === 0
             ? "Aún no hay semanas cerradas."
-            : "Ningún incumplimiento con causa anotada."}
+            : plan.fallosConCausa === 0
+              ? "Ningún incumplimiento con causa anotada."
+              : `Todavía no hay suficiente para señalar una causa: ${plan.fallosConCausa} ${
+                  plan.fallosConCausa === 1 ? "incumplimiento" : "incumplimientos"
+                } con causa.`}
         </p>
         <p className="mt-1 text-xs opacity-50">
-          Sin causa, cerrar la semana no enseña nada.
+          {plan.fallosConCausa === 0
+            ? "Sin causa, cerrar la semana no enseña nada."
+            : `Hacen falta ${MINIMO_PARA_PARETO} y al menos dos causas distintas: con menos, el primer puesto lo decide el azar.`}
         </p>
         <EnlaceModulo href={href}>Ver causas</EnlaceModulo>
       </>

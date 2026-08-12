@@ -14,6 +14,7 @@ import {
   uidsDuplicados,
   avisoNumeracionSemana,
   semanasAContramano,
+  causaQueMasFrena,
   tareasTerminadas,
   arrastreDeIncumplidos,
   type CompromisoPrevio,
@@ -21,6 +22,7 @@ import {
   type TareaProgramada,
   type EnlacePredecesora,
 } from "./plan-semanal";
+import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 
 const dc = (s: string) => new Date(`${s}T00:00:00Z`);
 
@@ -220,6 +222,41 @@ describe("avisoNumeracionSemana", () => {
     // El indice unico ya impide dos planes con el mismo corte; aqui solo se
     // comprueba que no se avise de un empate.
     expect(avisoNumeracionSemana(dc("2026-08-15"), existentes)).toBeNull();
+  });
+});
+
+describe("causaQueMasFrena", () => {
+  const f = (causa: CausaNoCumplimiento, conteo: number) => ({ causa, conteo });
+
+  it("SE CALLA cuando todos los fallos son de la MISMA causa", () => {
+    // El caso de CRIOCORD: «Prerrequisito · 3 veces · 100% de los 3». Con una
+    // sola causa registrada, el 100% es una tautologia, no un hallazgo.
+    expect(causaQueMasFrena([f("PRERREQUISITO", 3)])).toBeNull();
+    // Ni siquiera con volumen: un Pareto compara, y no hay con que comparar.
+    expect(causaQueMasFrena([f("PRERREQUISITO", 40)])).toBeNull();
+  });
+
+  it("se calla mientras haya pocos incumplimientos", () => {
+    // Con cuatro, uno mas de cualquier otra causa cambia el titular entero.
+    expect(
+      causaQueMasFrena([f("PRERREQUISITO", 3), f("MATERIALES", 1)]),
+    ).toBeNull();
+  });
+
+  it("habla cuando hay volumen y variedad", () => {
+    const r = causaQueMasFrena([
+      f("PRERREQUISITO", 6),
+      f("MATERIALES", 3),
+      f("MANO_OBRA", 1),
+    ]);
+    expect(r?.causa).toBe("PRERREQUISITO");
+    expect(r?.veces).toBe(6);
+    expect(r?.total).toBe(10);
+    expect(r?.porcentaje).toBe(60);
+  });
+
+  it("sin causas no hay nada que decir", () => {
+    expect(causaQueMasFrena([])).toBeNull();
   });
 });
 
