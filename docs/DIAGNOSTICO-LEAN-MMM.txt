@@ -1543,6 +1543,32 @@ prioridad:
 
     TOTAL FASE 1:  aproximadamente 4 dias de trabajo, cero migraciones.
 
+    ESTADO REAL A 12 DE AGOSTO DE 2026 - LA FASE 1 ESTA HECHA
+
+      P-2  Sobrecarga (PPC bajo + confiabilidad alta) ....... hecho  4566eb0
+      P-4  Aviso de cronograma desactualizado ............... hecho  4566eb0
+      P-5  Salud de infraestructura en los avisos .......... hecho  6f53f64
+      P-3  Demora por flujo, con su modulo en el panel ..... hecho  0ee535a
+
+    Se ejecuto en el orden previsto y con las condiciones que este plan fijaba:
+    la logica de decision vive en src/lib con su prueba, ningun indicador
+    muestra un numero sin sustento -un flujo sin casos no sale con cero, la
+    ventana recomendada calla con menos de tres casos, la sobrecarga exige
+    cinco compromisos- y ningun aviso bloquea nada.
+
+    Dos matices que la ejecucion anadio al plan:
+
+      - P-3 salio con alcance reducido, como anticipaba la revision 1.1: la
+        antiguedad por restriccion ya existia, asi que solo se construyo el
+        AGREGADO por flujo y la ventana recomendada.
+      - P-5 tambien: el estado del emisor ya se calculaba y se veia en su
+        pantalla; lo que se hizo fue elevarlo, con el despliegue sin aplicar,
+        a los avisos de empresa.
+
+    Queda pendiente de la fase 2 en adelante: P-1 (capacidad empirica), P-6
+    (empuje del mapeo), P-7 (pruebas de aislamiento) y P-8 (la modalidad en el
+    calculo).
+
     EFECTO ESPERADO SOBRE EL CUADRO DE MANDO
 
        ENFOQUE                      ANTES   DESPUES
