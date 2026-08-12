@@ -34,19 +34,22 @@ abajo.
 4. ~~**Las restricciones del Lookahead se eligen, no se siembran.**~~ **HECHO
    el 11 de agosto**, puntos 1 a 4 de lo que pidio el usuario final. Ver la
    seccion 6h.
-5. **Avisar de las restricciones a los implicados** (punto 5, aplazado a
-   proposito para no ensanchar el trabajo anterior). Pedido por el usuario
-   final: un aviso DENTRO de GCM cuando una tarea queda lista o cuando una
-   restriccion lleva demasiado sin levantarse, y ademas por **SMS y correo** a
-   los implicados, que tienen que poder **configurarse**. Lo que hay que
-   decidir antes de escribir codigo:
-   - **Quien es un implicado**: por obra, por rol, o por flujo de restriccion
-     (el de MATERIALES no es el de INFORMACION). Lo tercero es lo util y lo
-     que mas trabajo cuesta.
-   - **Cuando se avisa**: al analizar, al levantar la ultima, o por
-     antiguedad. Un aviso por cada casilla marcada seria ruido en tres dias.
-   - **Con que se manda**: la cola de SMS por empresa ya existe (6g) y el
-     correo tambien. La pieza que falta es a QUIEN.
+5. ~~**Avisar de las restricciones a los implicados**~~ **HECHO el 12 de agosto
+   de 2026**, y verificado en produccion. Configurable en las tres formas
+   —persona, rol de la obra, gente de FUERA de GCM— y en los cuatro momentos,
+   por los tres canales. Piezas: `@/lib/avisos` (61 tests), `avisos.service`
+   (configuracion), `avisos-envio` (reparto y reserva anti-duplicado),
+   `avisos-reloj` + `POST /api/reloj` (lo unico de GCM que corre solo, con su
+   cron en cPanel), y `avisos-bandeja` (la campanita).
+   - **Lo que se ve desde fuera**: `/api/health` publica `reloj`, y distingue
+     `nunca` (falta la linea del cron) de `parado` (existe y lleva media hora
+     sin correr). Un cron de avisos que no existe **no lo echa de menos
+     nadie**, porque lo que falla es justo lo que avisaba.
+   - **Dos fallos reales que solo aparecieron al probar en produccion**:
+     `/api/reloj` faltaba en `RUTAS_PUBLICAS` de `proxy.ts` y devolvia 307 al
+     login —cron en verde y cero avisos, para siempre—; y la campanita no se
+     actualizaba porque su cuenta vive en el LAYOUT y `revalidatePath` sin tipo
+     solo refresca la pagina.
 6. ~~**Los tres de la seccion 6i**~~ **HECHOS el 12 de agosto de 2026**, en el
    orden que fijo el usuario y todos despues de los avisos:
    - ~~Aviso de numeracion de semanas~~ → avisa al crear, con «Crearla igual» /
@@ -55,7 +58,50 @@ abajo.
      `@/lib/plan-semanal`, bloque «Viene de semanas anteriores» al planificar,
      y regla `incumplidos-sin-retomar` en «Que falta».
    - ~~El texto del PPC bajo~~ → `lecturaDelPpc`, tres tramos por umbral.
-7. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
+7. **El analisis de restricciones ya es un compromiso con fecha.** HECHO el 12
+   de agosto de 2026. `Restriccion` gana responsable —usuario o alguien de
+   fuera— y `fechaCompromiso`, mas `comprometidoAt`/`comprometidoPor`: en obra
+   la promesa llega por telefono y la escribe el residente, y quien PROMETE no
+   es quien ANOTA. Con eso aparece `cumplimientoDeLiberacion`, el PPC de la
+   fase de preparacion. Reglas puras en `@/lib/lookahead-compromiso` (22 tests).
+   - **Con cero prometidas el porcentaje es `null`, no 0.** "Nadie prometio" no
+     es "todos fallaron": la misma confusion que tenia la confiabilidad antes
+     de `analizadaAt`.
+   - Lo que SIGUE ABIERTO de esto esta en el punto 8.
+
+8. **Los cinco hilos que quedaron abiertos el 12 de agosto**, en orden de lo
+   que mas rinde primero:
+   - **El panel de auditoria de avisos**: que se envio, a quien, por donde, si
+     salio y si se leyo. **Los datos ya estan todos guardados** (`EnvioAviso`
+     con `enviado`/`motivo`/`destino`, `Aviso.leidoAt`); falta solo la
+     pantalla. Es lo mas barato y cierra la ceguera que obligo a diagnosticar
+     con SQL. **Honestidad obligatoria: "abierto" solo se puede decir de la
+     campanita.** En correo y SMS no se sabe sin un pixel espia, que ademas
+     medio mundo bloquea, asi que mentiria.
+   - **El aviso al RESPONSABLE de cada restriccion**, que hoy va solo por
+     suscripcion de flujo. Se intento y se retiro: `repartirAvisos` reparte un
+     lote COMUN y no sabe acotar motivos a una persona, y una segunda pasada
+     duplicaria el aviso porque la clave de `EnvioAviso` lleva el conjunto de
+     motivos dentro. Pide cambiar `repartirAvisos` para aceptar motivos por
+     suscripcion. Escrito tambien en `avisos-reloj.ts`.
+   - **La campanita que no se encendio en la prueba del 12 de agosto**: sin
+     diagnosticar. `SELECT canal, destino, enviado, motivo FROM envios_aviso
+     ORDER BY createdAt DESC` lo cierra. Si la suscripcion tenia `contactoId`
+     y no `userId`, el comportamiento era correcto: los externos no tienen
+     bandeja.
+   - **El enlace del correo aterriza en el login y no vuelve a la obra.** No
+     existe ningun `?siguiente=` en el proyecto ni funcion que valide rutas
+     internas; habria que escribirla (rechazar `//host`, esquema absoluto) y
+     propagar el destino tambien por el paso de 2FA, que hoy solo lleva la
+     cookie del desafio.
+   - **Fase B: que el proveedor responda desde el correo.** Decidido con el
+     usuario: **enlace de un solo uso sin clave** (patron de
+     `PasswordResetToken`, no el pase con codigo, porque un proveedor que solo
+     tiene que decir "llega el jueves" no va a entrar a ningun portal). Ojo:
+     `MIMES_PERMITIDOS` en `evidencia.service` es CERRADO a imagenes, asi que
+     un PDF no entra hoy y hay que decidirlo antes.
+
+9. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
    worktree. Investigacion hecha el 11 de agosto, plan sin escribir.
 
 Y sigue sin existir el **parte diario**, que es el Bloque 1 entero de la
