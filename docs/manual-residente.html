@@ -884,8 +884,23 @@
     </tbody>
   </table>
 
-  <p>Los tres resaltados son los de Last Planner, y son los únicos que avisan
+  <p>Los cuatro resaltados son los de Last Planner, y son los únicos que avisan
   <strong>antes</strong> de que el problema ocurra. Los demás cuentan lo que ya pasó.</p>
+
+  <div class="caja">
+    <span class="et">Demora por flujo: el que dice cuánta ventana necesitas</span>
+    <p>Los otros tres de Last Planner miran <em>esta</em> semana. Éste mira el historial: cuántos
+    días tarda de media en liberarse cada uno de los siete flujos <strong>en tu obra</strong>.</p>
+    <p>Se lee con dos cifras al lado: la <strong>media</strong> y la <strong>mediana</strong>. Si
+    se parecen, el número describe al flujo. Si la media es mucho mayor, hay un caso raro
+    arrastrándola —casi siempre una restricción que alguien se olvidó de cerrar—.</p>
+    <p><strong>Para qué sirve de verdad:</strong> la ventana del Lookahead debe cubrir tu flujo más
+    lento. Si Materiales tarda 9 días de media, mirar tres semanas va justo. El módulo lo dice:
+    «el flujo más lento pide una ventana de 2 semanas». Es elegir ese número con un dato en vez de
+    con una costumbre.</p>
+    <p>Un flujo sin casos <strong>no aparece</strong>. Un cero se leería como «se libera al
+    instante», que es lo contrario de «todavía no hay con qué responder».</p>
+  </div>
 
   <h3>5.2 La pareja que hay que leer junta</h3>
 
@@ -1214,6 +1229,18 @@
   adicional puede además <strong>dar de alta partidas nuevas</strong>: nacen marcadas con su
   movimiento de origen, y en pantalla se distinguen de lo contratado porque su presupuesto base
   es cero.</p>
+
+  <div class="caja ok">
+    <span class="et">Al aprobar un adicional, enlaza sus partidas en el momento</span>
+    <p>Las partidas que trae un adicional nacen <strong>sin enlazar a ninguna tarea</strong> del
+    cronograma. Su importe ya cuenta en el presupuesto vigente, pero <strong>no cuenta en el
+    avance</strong>: la obra se ve más atrasada de lo que está, y el valor ganado también.</p>
+    <p>Por eso el aviso de aprobación te dice cuántas creó y te ofrece <strong>«Enlazarlas
+    ahora»</strong>. Hazlo ahí mismo: acabas de redactar el movimiento y eres quien sabe a qué
+    tarea va cada partida. Semanas después, reconstruirlo cuesta mucho más.</p>
+    <p>Si lo dejas para luego no se pierde: el panel te lo reclama en <em>Qué falta</em>, con el
+    número de partidas que siguen sueltas.</p>
+  </div>
 
   <div class="caja">
     <span class="et">Dónde se ve el resultado</span>
