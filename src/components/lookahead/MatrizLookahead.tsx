@@ -13,6 +13,8 @@ import {
   CalendarPlus,
   ClipboardList,
   Unlock,
+  TriangleAlert,
+  UserRoundCheck,
 } from "lucide-react";
 import { Chip, type TonoChip } from "@/components/ui/Chip";
 import {
@@ -23,6 +25,7 @@ import {
 import { fechaCorta } from "@/utils/fechas";
 import { PanelComprometer } from "@/components/lookahead/PanelComprometer";
 import { PanelAnalizar } from "@/components/lookahead/PanelAnalizar";
+import { PanelAsignar } from "@/components/lookahead/PanelAsignar";
 import {
   BotonEvidencia,
   PanelEvidencia,
@@ -87,7 +90,9 @@ export function MatrizLookahead({
   const [elegidas, setElegidas] = useState<Set<number>>(new Set());
   /// Que panel de lote esta abierto. Uno solo a la vez: los dos empujan la
   /// pagina y abiertos juntos dejarian la matriz fuera de pantalla.
-  const [panel, setPanel] = useState<"comprometer" | "analizar" | null>(null);
+  const [panel, setPanel] = useState<
+    "comprometer" | "analizar" | "asignar" | null
+  >(null);
   // Que celda tiene la evidencia abierta. Se guarda el ID de la restriccion y
   // no la celda entera: asi, cuando la accion de subir repinta la pantalla, el
   // panel se vuelve a leer de los datos NUEVOS y ensena la foto recien subida.
@@ -105,7 +110,14 @@ export function MatrizLookahead({
     puedeGestionar,
     semanasAbiertas,
     puedeComprometer,
+    personas,
+    liberacion,
   } = datos;
+
+  // El nombre de cada responsable, resuelto una vez para toda la matriz. El
+  // servidor manda la clave y no el nombre por celda: serian siete consultas
+  // por tarea para un dato que aqui sale gratis.
+  const nombrePorClave = new Map(personas.map((p) => [p.clave, p.nombre]));
 
   // La casilla de fila sirve a DOS acciones con permisos distintos: analizar
   // (lookahead:gestionar) y comprometer (plan_semanal:gestionar). Colgarla
@@ -158,6 +170,17 @@ export function MatrizLookahead({
       elegidas.has(f.uid) &&
       f.restricciones.some((c) => c.id !== null && !c.resuelta),
   ).length;
+
+  /// Los ids de esas restricciones abiertas. Es lo que se asigna: la promesa es
+  /// de la RESTRICCION, no de la tarea —a una le puede faltar el plano y el
+  /// fierro, y no los consigue la misma persona ni el mismo dia—.
+  const idsPendientes = filas
+    .filter((f) => elegidas.has(f.uid))
+    .flatMap((f) =>
+      f.restricciones
+        .filter((c) => c.id !== null && !c.resuelta)
+        .map((c) => c.id as string),
+    );
 
   function alternar(restriccionId: string, resuelta: boolean) {
     iniciar(async () => {
@@ -316,6 +339,13 @@ export function MatrizLookahead({
           {selectorSemanas}
         </div>
 
+        {/* El OTRO indicador, y el que nadie tenia: la confiabilidad dice
+            cuantas tareas estan listas; esto dice si quien se comprometio a
+            dejarlas listas cumplio. Una obra puede tener confiabilidad baja
+            porque nadie analiza, o porque se analiza y luego nadie levanta lo
+            que prometio levantar, y son dos problemas distintos. */}
+        <LiberacionATiempo datos={liberacion} />
+
         {puedeGestionar && pendientesDeSincronizar > 0 && (
           <button
             type="button"
@@ -367,6 +397,18 @@ export function MatrizLookahead({
                     <Unlock className="size-4" aria-hidden="true" />
                   )}
                   Levantar restricciones ({conPendientes})
+                </button>
+              )}
+
+              {puedeGestionar && conPendientes > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPanel("asignar")}
+                  className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  <UserRoundCheck className="size-4" aria-hidden="true" />
+                  Asignar responsable y fecha ({conPendientes})
                 </button>
               )}
 
@@ -422,6 +464,23 @@ export function MatrizLookahead({
           // Igual que al comprometer: la seleccion se limpia al CERRAR y no al
           // guardar, para que el resultado se pueda leer antes de que el panel
           // se quede sin tareas y se desmonte.
+          onCerrar={() => {
+            setPanel(null);
+            setElegidas(new Set());
+          }}
+        />
+      )}
+
+      {panel === "asignar" && idsPendientes.length > 0 && (
+        <PanelAsignar
+          obraId={obraId}
+          restriccionIds={idsPendientes}
+          personas={personas}
+          fechaSugerida={fechaProximoCorte}
+          cuantasTareas={seleccionadas.length}
+          // Igual que los otros dos: la seleccion se limpia al CERRAR, para que
+          // el "listo, N asignadas" se pueda leer antes de que el panel se
+          // quede sin restricciones y se desmonte.
           onCerrar={() => {
             setPanel(null);
             setElegidas(new Set());
@@ -556,6 +615,7 @@ export function MatrizLookahead({
                         etiqueta={`${ETIQUETA_FLUJO.get(c.tipo) ?? c.tipo} de ${fila.nombre}`}
                         puedeGestionar={puedeGestionar}
                         pendiente={pendiente}
+                        nombrePorClave={nombrePorClave}
                         onAlternar={alternar}
                       />
                       {/* El clip solo donde hay a que colgar la foto, y solo
@@ -599,6 +659,7 @@ export function MatrizLookahead({
             elegida={elegidas.has(fila.uid)}
             puedeElegir={puedeSeleccionar}
             puedeGestionar={puedeGestionar}
+            nombrePorClave={nombrePorClave}
             pendiente={pendiente}
             onElegir={() => alternarEleccion(fila.uid)}
             onAlternar={alternar}
@@ -661,6 +722,86 @@ function MarcaAnalisis({ fila }: { fila: LookaheadDatos["filas"][number] }) {
 }
 
 /**
+ * El cumplimiento de las promesas de liberacion: el PPC de la preparacion.
+ *
+ * Con NADIE que haya prometido nada no dice 0%, dice que no hay nada que medir.
+ * "Nadie prometio" no es "todos fallaron", y confundirlos es exactamente lo que
+ * hacia la confiabilidad antes de `analizadaAt`: una obra sin analizar salia al
+ * 0% como si lo hubiera hecho mal.
+ */
+function LiberacionATiempo({
+  datos,
+}: {
+  datos: LookaheadDatos["liberacion"];
+}) {
+  // Lo vencido manda sobre el porcentaje: es lo unico que pide algo HOY.
+  if (datos.vencidasAbiertas > 0) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 text-sm font-medium"
+        style={{ color: "var(--color-peligro)" }}
+      >
+        <TriangleAlert className="size-4" aria-hidden="true" />
+        {datos.vencidasAbiertas} restricci
+        {datos.vencidasAbiertas === 1 ? "ón vencida" : "ones vencidas"}
+      </span>
+    );
+  }
+
+  if (datos.porcentaje === null) {
+    return (
+      <span className="text-sm opacity-60">
+        {datos.sinAsignar > 0
+          ? `${datos.sinAsignar} sin responsable`
+          : "Sin promesas de liberación todavía"}
+      </span>
+    );
+  }
+
+  return (
+    <span className="text-sm">
+      Liberadas a tiempo:{" "}
+      <strong className="tabular-nums">{Math.round(datos.porcentaje)}%</strong>
+      {datos.sinAsignar > 0 && (
+        <span className="opacity-60"> · {datos.sinAsignar} sin responsable</span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Quien responde de una restriccion y para cuando, en una linea.
+ *
+ * En un solo sitio para que la matriz de escritorio y las tarjetas del movil
+ * digan LO MISMO. Si divergieran, el residente veria una cosa en la oficina y
+ * otra en la caseta y no sabria cual creer.
+ */
+function textoPromesa(
+  celda: LookaheadDatos["filas"][number]["restricciones"][number],
+  nombrePorClave: Map<string, string>,
+): string {
+  const quien = celda.responsableClave
+    ? (nombrePorClave.get(celda.responsableClave) ?? "alguien de fuera")
+    : null;
+  const cuando = celda.fechaCompromiso ? fechaCorta(celda.fechaCompromiso) : "";
+
+  switch (celda.promesa) {
+    case "sin-asignar":
+      return "nadie se ha hecho cargo";
+    case "sin-fecha":
+      return `${quien}, sin fecha`;
+    case "vencida":
+      return `${quien} lo prometió para el ${cuando} y ya pasó`;
+    case "vence-hoy":
+      return `${quien}, vence HOY`;
+    case "a-tiempo":
+      return `${quien} para el ${cuando}`;
+    default:
+      return "";
+  }
+}
+
+/**
  * Una casilla de la matriz, con sus TRES estados.
  *
  * Un `input type="checkbox"` no da para esto: solo sabe decir si o no, y
@@ -678,12 +819,15 @@ function Celda({
   etiqueta,
   puedeGestionar,
   pendiente,
+  nombrePorClave,
   onAlternar,
 }: {
   celda: LookaheadDatos["filas"][number]["restricciones"][number];
   etiqueta: string;
   puedeGestionar: boolean;
   pendiente: boolean;
+  /// Para poder decir el nombre del responsable sin traerlo por cada celda.
+  nombrePorClave: Map<string, string>;
   onAlternar: (restriccionId: string, resuelta: boolean) => void;
 }) {
   // No aplica: se pinta el hueco y no se toca. Anadir el flujo se hace desde
@@ -701,26 +845,51 @@ function Celda({
   }
 
   const id = celda.id;
+
+  // La promesa en palabras, tambien aqui: la regla de la casa es color + icono
+  // + TEXTO, nunca color solo, y en 24 px el color es lo unico que cabe. El
+  // texto va al `title` y al `aria-label`.
+  const promesa = celda.resuelta ? "" : ` · ${textoPromesa(celda, nombrePorClave)}`;
+
+  const borde = celda.resuelta
+    ? "var(--color-exito)"
+    : celda.promesa === "vencida"
+      ? "var(--color-peligro)"
+      : celda.promesa === "vence-hoy"
+        ? "var(--color-alerta)"
+        : "var(--borde)";
+
   return (
     <button
       type="button"
       disabled={!puedeGestionar || pendiente}
       onClick={() => onAlternar(id, !celda.resuelta)}
-      title={celda.detalle ?? undefined}
+      title={`${etiqueta}${promesa}${celda.detalle ? ` — ${celda.detalle}` : ""}`}
       aria-label={
         celda.resuelta
           ? `${etiqueta}: levantada. Pulsa para volver a bajarla.`
-          : `${etiqueta}: pendiente. Pulsa para levantarla.`
+          : `${etiqueta}: pendiente${promesa}. Pulsa para levantarla.`
       }
       className="grid size-6 place-items-center rounded border disabled:opacity-50"
-      style={{
-        borderColor: celda.resuelta ? "var(--color-exito)" : "var(--borde)",
-      }}
+      style={{ borderColor: borde }}
     >
       {celda.resuelta ? (
         <Check
           className="size-4"
           style={{ color: "var(--color-exito)" }}
+          aria-hidden="true"
+        />
+      ) : celda.promesa === "vencida" || celda.promesa === "vence-hoy" ? (
+        // Un icono ademas del color: quien no distingue el rojo del ambar tiene
+        // que poder ver que esta celda pide algo.
+        <TriangleAlert
+          className="size-3.5"
+          style={{
+            color:
+              celda.promesa === "vencida"
+                ? "var(--color-peligro)"
+                : "var(--color-alerta)",
+          }}
           aria-hidden="true"
         />
       ) : (
@@ -754,12 +923,14 @@ function TarjetaTarea({
   onEvidencia,
   panelEvidencia,
   resaltada,
+  nombrePorClave,
 }: {
   fila: LookaheadDatos["filas"][number];
   elegida: boolean;
   puedeElegir: boolean;
   puedeGestionar: boolean;
   pendiente: boolean;
+  nombrePorClave: Map<string, string>;
   onElegir: () => void;
   onAlternar: (restriccionId: string, resuelta: boolean) => void;
   /// ID de la restriccion con la evidencia abierta, en toda la matriz.
@@ -873,7 +1044,26 @@ function TarjetaTarea({
                       className="size-5 shrink-0"
                       style={{ accentColor: "var(--color-exito)" }}
                     />
-                    <span className={c.resuelta ? "" : "opacity-80"}>{etiqueta}</span>
+                    <span className={c.resuelta ? "" : "opacity-80"}>
+                      {etiqueta}
+                      {/* Quien responde y para cuando, DEBAJO de la etiqueta.
+                          En el movil hay sitio para decirlo con palabras, que
+                          es mejor que el color de la matriz de escritorio. */}
+                      {!c.resuelta && c.promesa !== "liberada" && (
+                        <span
+                          className="block text-xs"
+                          style={{
+                            color:
+                              c.promesa === "vencida"
+                                ? "var(--color-peligro)"
+                                : "inherit",
+                            opacity: c.promesa === "vencida" ? 1 : 0.6,
+                          }}
+                        >
+                          {textoPromesa(c, nombrePorClave)}
+                        </span>
+                      )}
+                    </span>
                   </label>
                   {c.id !== null && (c.fotos.length > 0 || puedeGestionar) && (
                     <BotonEvidencia
