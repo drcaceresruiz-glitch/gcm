@@ -93,8 +93,19 @@ async function avisar(
     // En serie y no con `Promise.all`: los dos comparten el presupuesto de
     // correo y el tope de SMS, y en paralelo cada uno creeria que lo tiene
     // entero para si.
-    await avisarDeHechos(contexto, "ABRIR", motivos.abiertas);
-    await avisarDeHechos(contexto, "LISTA", motivos.listas);
+    const a = await avisarDeHechos(contexto, "ABRIR", motivos.abiertas);
+    const b = await avisarDeHechos(contexto, "LISTA", motivos.listas);
+
+    // La campanita se cuenta en el LAYOUT del panel, no en esta pagina, y
+    // `revalidatePath` sin tipo solo refresca la pagina. Sin esto el aviso se
+    // escribia bien y el numerito se quedaba viejo hasta recargar, que para
+    // quien lo mira es exactamente lo mismo que no haber avisado.
+    //
+    // Solo cuando de verdad se creo alguno: refrescar el layout en cada clic
+    // de la matriz seria pagar tres consultas por nada.
+    if (a.app + b.app > 0) {
+      revalidatePath(`/obras/${obraId}/lookahead`, "layout");
+    }
   } catch (e) {
     console.error("[avisos] No se pudo avisar del Lookahead:", e);
   }
