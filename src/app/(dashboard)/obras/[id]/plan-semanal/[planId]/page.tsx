@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { redirect, notFound } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
-import { obtenerPlanSemanal } from "@/services/plan-semanal.service";
+import {
+  obtenerPlanSemanal,
+  listarPlanesSemanales,
+} from "@/services/plan-semanal.service";
+import { ambicionDelPlan, type Ambicion } from "@/lib/capacidad";
 import { puede } from "@/lib/rbac";
 import { fechaLarga } from "@/utils/fechas";
 import { ETIQUETA_CNC } from "@/lib/plan-semanal";
@@ -14,6 +18,44 @@ import { CorregirCorte } from "@/components/plan-semanal/CorregirCorte";
 import { GaleriaEvidencia } from "@/components/evidencia/GaleriaEvidencia";
 
 export const metadata: Metadata = { title: "Plan Semanal" };
+
+/**
+ * El aviso de que se esta prometiendo mas de lo que esta obra suele cumplir.
+ *
+ * Sale AQUI y no en el panel a proposito: en el panel llegaria el lunes
+ * siguiente, cuando ya no se puede hacer nada. Aqui llega mientras se arma la
+ * semana, que es el unico momento en que la respuesta —comprometer menos—
+ * todavia es posible.
+ */
+function AvisoAmbicion({ a }: { a: Ambicion }) {
+  const grave = a.nivel === "sobrecarga";
+
+  return (
+    <div
+      className="rounded-xl border p-4 text-sm"
+      style={{
+        borderColor: grave ? "var(--color-peligro)" : "var(--borde)",
+        backgroundColor: "var(--superficie)",
+      }}
+    >
+      <p
+        className="font-semibold"
+        style={grave ? { color: "var(--color-peligro)" } : undefined}
+      >
+        {grave
+          ? `Estás prometiendo ${a.comprometidos} y sueles cumplir ${a.rendimiento} por semana`
+          : `Vas justo: ${a.comprometidos} prometidos sobre una media de ${a.rendimiento}`}
+      </p>
+      <p className="mt-1 opacity-80">
+        Es tu propia media de las últimas {a.semanas} semanas cerradas, no un
+        estándar de nadie.{" "}
+        {grave
+          ? "Comprometer más de lo que cabe es la causa de incumplimiento que no se arregla liberando restricciones: el trabajo ya estaba listo y aun así no se hizo."
+          : "Si la semana pasada fue floja, conviene mirarlo antes de guardar."}
+      </p>
+    </div>
+  );
+}
 
 function Seccion({ children }: { children: React.ReactNode }) {
   return (
@@ -71,6 +113,26 @@ export default async function DetallePlanSemanalPage({
           unidad: s.unidad,
           lookaheadTaskId: null,
         }));
+
+  /**
+   * Cuanto cabe, segun lo que esta obra viene cumpliendo.
+   *
+   * Solo se consulta con la semana ABIERTA: en una cerrada el aviso no serviria
+   * para nada y seria una consulta regalada. Las semanas cerradas ya traen sus
+   * conteos, asi que no hace falta pedir nada nuevo a la base.
+   */
+  const ambicion = abierto
+    ? ambicionDelPlan(
+        (await listarPlanesSemanales(sesion, id)).semanas
+          .filter((s) => s.estado === "CERRADO")
+          .map((s) => ({
+            numero: s.numero,
+            comprometidos: s.total,
+            cumplidos: s.cumplidos,
+          })),
+        plan.compromisos.length,
+      )
+    : null;
 
   return (
     <div className="space-y-6">
@@ -130,6 +192,8 @@ export default async function DetallePlanSemanalPage({
           />
         </Seccion>
       )}
+
+      {ambicion && ambicion.nivel !== "cabe" && <AvisoAmbicion a={ambicion} />}
 
       {abierto && puedeGestionar && plan.compromisos.length > 0 && (
         <Seccion>

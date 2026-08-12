@@ -1585,8 +1585,17 @@ prioridad:
     Fuera del plan, del mismo barrido: SinPermisoError estaba declarada tres
     veces con el mismo nombre y ahora es una sola (59e9b52).
 
-    Queda pendiente: P-1 (capacidad empirica, con su criterio de entrada) y
-    P-8 (la modalidad en el calculo, que pide diseno antes de codigo).   ENFOQUE                      ANTES   DESPUES
+    P-1 FASE A tambien se construyo, el mismo dia, POR PETICION EXPRESA y
+    SIN que se cumpliera el criterio de entrada que este plan fijaba: P-2
+    llevaba horas desplegado, asi que el aviso de sobrecarga no habia
+    aparecido aun en ninguna obra real. Queda dicho porque los umbrales
+    -3 semanas minimas, 1,0 y 1,3- se eligieron a ciegas y habra que
+    contrastarlos con lo que pase en obra.
+
+    P-8 se RETIRO tras su fase de diseno. Ver el anexo D.
+
+    Pendiente de verdad: solo P-1 FASE B (capacidad en horas-hombre), que
+    sigue necesitando dotacion y rendimientos que GCM no guarda.   ENFOQUE                      ANTES   DESPUES
        ---------------------------  -----   -------
        1  Estructura y estandares    4,0      4,0
        2  Informacion y sincroniz.   4,5      5,0     (+0,5)
