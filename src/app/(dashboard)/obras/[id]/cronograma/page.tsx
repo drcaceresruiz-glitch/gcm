@@ -42,10 +42,16 @@ import { TablaCronograma } from "@/components/cronograma/TablaCronograma";
 
 export const metadata: Metadata = { title: "Cronograma" };
 
-/// Nombre del dia de corte por indice ISO (1=lunes … 7=domingo).
+/**
+ * Nombre del dia de corte por indice ISO (1=lunes … 7=domingo), EN PLURAL.
+ *
+ * En plural porque la frase que lo usa es «Corte semanal los ___». De lunes a
+ * viernes el plural es invariable y por eso el fallo no se veia; el dia que se
+ * configuro sabado salio «Corte semanal los sábado».
+ */
 const DIAS_SEMANA: Record<number, string> = {
   1: "lunes", 2: "martes", 3: "miércoles", 4: "jueves",
-  5: "viernes", 6: "sábado", 7: "domingo",
+  5: "viernes", 6: "sábados", 7: "domingos",
 };
 
 export default async function CronogramaPage({
