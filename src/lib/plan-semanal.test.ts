@@ -12,6 +12,7 @@ import {
   mapaPreservablePorUid,
   validarCantidadPlan,
   uidsDuplicados,
+  avisoNumeracionSemana,
   type CompromisoEvaluado,
   type TareaProgramada,
   type EnlacePredecesora,
@@ -176,6 +177,45 @@ describe("proximoCorte", () => {
     const dia = hoy.getUTCDay() === 0 ? 7 : hoy.getUTCDay();
     const siguiente = dia === 7 ? 1 : dia + 1;
     expect(proximoCorte(siguiente, hoy)).toEqual(dc("2026-08-04"));
+  });
+});
+
+describe("avisoNumeracionSemana", () => {
+  // El caso real de la primera obra: la Semana 3 cierra el 14/08 y la Semana 2
+  // el 15/08, porque el correlativo es max(numero)+1 y no mira la fecha.
+  const existentes = [
+    { numero: 1, fechaCorte: dc("2026-08-07") },
+    { numero: 2, fechaCorte: dc("2026-08-15") },
+  ];
+
+  it("calla cuando la semana nueva va detras de todas", () => {
+    expect(avisoNumeracionSemana(dc("2026-08-22"), existentes)).toBeNull();
+  });
+
+  it("calla con la primera semana de la obra", () => {
+    expect(avisoNumeracionSemana(dc("2026-08-07"), [])).toBeNull();
+  });
+
+  it("avisa cuando la fecha es anterior a una que ya existe", () => {
+    const a = avisoNumeracionSemana(dc("2026-08-14"), existentes);
+    expect(a).not.toBeNull();
+    // Le tocara el 3 aunque cierre ANTES que la 2: eso es lo que hay que decir.
+    expect(a?.numero).toBe(3);
+    expect(a?.desordenadas.map((s) => s.numero)).toEqual([2]);
+  });
+
+  it("las lista de la mas proxima a la mas lejana", () => {
+    const a = avisoNumeracionSemana(dc("2026-08-01"), [
+      { numero: 1, fechaCorte: dc("2026-08-15") },
+      { numero: 2, fechaCorte: dc("2026-08-07") },
+    ]);
+    expect(a?.desordenadas.map((s) => s.numero)).toEqual([2, 1]);
+  });
+
+  it("misma fecha no es anterior", () => {
+    // El indice unico ya impide dos planes con el mismo corte; aqui solo se
+    // comprueba que no se avise de un empate.
+    expect(avisoNumeracionSemana(dc("2026-08-15"), existentes)).toBeNull();
   });
 });
 

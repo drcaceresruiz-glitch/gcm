@@ -251,6 +251,51 @@ export function proximoCorte(diaSemana: number, hoy: Date): Date {
   return new Date(hoy.getTime() + salto * DIA_MS);
 }
 
+export interface SemanaNumerada {
+  numero: number;
+  fechaCorte: Date;
+}
+
+export interface AvisoNumeracion {
+  /// Que numero le tocara: siempre el siguiente al mayor que exista.
+  numero: number;
+  /// Las que ya existen con fecha POSTERIOR y numero MENOR. Son las que
+  /// quedaran a contramano.
+  desordenadas: SemanaNumerada[];
+}
+
+/**
+ * Si crear una semana con esta fecha va a dejar el correlativo a contramano.
+ *
+ * El numero de una semana es `max(numero) + 1` y no mira la fecha, asi que
+ * crear una con corte anterior a otra ya existente produce lo que se vio en la
+ * primera obra: **la Semana 3 cerrando el 14/08 y la Semana 2 el 15/08**.
+ *
+ * Lo demas del sistema es coherente —las tarjetas y la tendencia se ordenan por
+ * fecha, y el tablero toma como «ultima» la de fecha mayor—: el unico que
+ * confunde es el rotulo. Por eso **se avisa y no se impide**, que es la misma
+ * regla que el resto de GCM: quien esta en obra a veces necesita recuperar una
+ * semana que se quedo sin registrar, y prohibirselo no le ayuda.
+ *
+ * Y por eso tampoco se RENUMERA: cambiar el numero de una semana ya cerrada
+ * romperia las actas y los correos donde se la cito por ese numero. Un rotulo
+ * incomodo es mejor que un rotulo que cambia solo.
+ *
+ * Devuelve null cuando no hay nada que avisar.
+ */
+export function avisoNumeracionSemana(
+  fechaCorte: Date,
+  existentes: readonly SemanaNumerada[],
+): AvisoNumeracion | null {
+  const numero = existentes.reduce((mx, s) => Math.max(mx, s.numero), 0) + 1;
+
+  const desordenadas = existentes
+    .filter((s) => s.fechaCorte.getTime() > fechaCorte.getTime())
+    .sort((a, b) => a.fechaCorte.getTime() - b.fechaCorte.getTime());
+
+  return desordenadas.length === 0 ? null : { numero, desordenadas };
+}
+
 export interface RangoSemana {
   inicio: Date;
   fin: Date;

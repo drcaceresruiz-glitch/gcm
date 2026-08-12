@@ -10,6 +10,7 @@ import {
   reabrirPlanSemanal,
   eliminarPlanSemanal,
   type ResultadoPlan,
+  type ResultadoCrearPlan,
   type DatosCompromiso,
   type Evaluacion,
 } from "@/services/plan-semanal.service";
@@ -23,11 +24,13 @@ import {
 export async function accionCrearPlanSemanal(
   obraId: string,
   fechaCorte: string,
-): Promise<ResultadoPlan> {
+  /// Segunda pasada: el residente ya vio el aviso de numeracion y sigue.
+  confirmado = false,
+): Promise<ResultadoCrearPlan> {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
-  const r = await crearPlanSemanal(sesion, obraId, { fechaCorte });
+  const r = await crearPlanSemanal(sesion, obraId, { fechaCorte, confirmado });
   if (r.ok) revalidatePath(`/obras/${obraId}/plan-semanal`);
   return r;
 }

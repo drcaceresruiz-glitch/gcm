@@ -17,7 +17,9 @@ import {
   mapaPreservablePorUid,
   validarCantidadPlan,
   uidsDuplicados,
+  avisoNumeracionSemana,
   CAUSAS_CNC,
+  type AvisoNumeracion,
   type FilaPareto,
   type PuntoPpc,
   type EnlacePredecesora,
@@ -428,14 +430,35 @@ export type ResultadoPlan =
   | { ok: false; error: string };
 
 /**
+ * Lo que puede devolver CREAR una semana, que es lo unico que ademas avisa.
+ *
+ * Va aparte de `ResultadoPlan` y no ensanchandolo: ese tipo lo comparten cerrar,
+ * reabrir, guardar y eliminar, y ninguna de esas puede pedir confirmacion.
+ * Meter el caso ahi obligaria a cuatro pantallas a tratar algo que jamas les
+ * llega —el compilador lo dijo en cuanto se intento—.
+ */
+export type ResultadoCrearPlan =
+  | ResultadoPlan
+  /**
+   * La fecha deja el correlativo a contramano. No es un error: es un aviso
+   * que hay que confirmar.
+   *
+   * Misma regla que `comprometerAlPts`: **se avisa, no se impide**. Quien esta
+   * en obra a veces necesita registrar una semana que se quedo sin meter, y
+   * prohibirselo no le ayuda. Renumerar tampoco vale: cambiaria el numero de
+   * semanas ya cerradas que estan citadas en actas y correos.
+   */
+  | { ok: false; requiereConfirmacion: true; aviso: string };
+
+/**
  * Crea la semana. El correlativo se calcula dentro de la transaccion; el indice
  * unico `(projectId, fechaCorte)` impide dos planes para la misma semana.
  */
 export async function crearPlanSemanal(
   sesion: SesionActiva,
   obraId: string,
-  datos: { fechaCorte: string },
-): Promise<ResultadoPlan> {
+  datos: { fechaCorte: string; confirmado?: boolean },
+): Promise<ResultadoCrearPlan> {
   if (!puede(sesion, "plan_semanal:gestionar")) {
     return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
   }
@@ -461,6 +484,25 @@ export async function crearPlanSemanal(
   });
   if (yaExiste) {
     return { ok: false, error: "Ya hay un plan para esa semana." };
+  }
+
+  // El numero es `max(numero) + 1` y no mira la fecha, asi que una semana con
+  // corte anterior a otra ya existente queda a contramano. Se dice ANTES de
+  // crearla, que es cuando todavia se puede cambiar la fecha.
+  if (!datos.confirmado) {
+    const semanas = await prisma.planSemanal.findMany({
+      where: { projectId: obraId },
+      select: { numero: true, fechaCorte: true },
+    });
+
+    const desorden = avisoNumeracionSemana(fechaCorte, semanas);
+    if (desorden) {
+      return {
+        ok: false,
+        requiereConfirmacion: true,
+        aviso: textoDesorden(desorden),
+      };
+    }
   }
 
   try {
@@ -503,6 +545,36 @@ export async function crearPlanSemanal(
       error: "No se pudo crear la semana. Vuelve a intentarlo en unos segundos.",
     };
   }
+}
+
+/**
+ * El aviso de numeracion, en una frase que se pueda leer en el formulario.
+ *
+ * Dice las tres cosas y en este orden: que numero le va a tocar, con cual va a
+ * quedar a contramano, y que eso es solo el rotulo. Lo ultimo importa: sin
+ * ello, quien lo lee cree que el PPC o la tendencia van a salir mal, y no es
+ * verdad —esos se ordenan por fecha—.
+ */
+function textoDesorden(a: AvisoNumeracion): string {
+  const primera = a.desordenadas[0]!;
+  const otras = a.desordenadas.length - 1;
+  const mas =
+    otras > 0
+      ? ` y otra${otras === 1 ? "" : "s"} ${otras} más`
+      : "";
+
+  return (
+    `Se creará como Semana ${a.numero}, pero cierra antes que la Semana ` +
+    `${primera.numero} (${diaYMes(primera.fechaCorte)})${mas}: el número no ` +
+    `seguirá al calendario. Los gráficos y el PPC sí van por fecha, así que ` +
+    `solo queda raro el rótulo. ¿La creas igual?`
+  );
+}
+
+function diaYMes(f: Date): string {
+  const dd = String(f.getUTCDate()).padStart(2, "0");
+  const mm = String(f.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}`;
 }
 
 export interface DatosCompromiso {
