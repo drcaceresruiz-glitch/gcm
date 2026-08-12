@@ -128,6 +128,7 @@ model Company {
   solicitudesPerfil SolicitudCambioPerfil[]
   emisoresSms       EmisorSms[]
   mensajesSms       MensajeSms[]
+  respaldosObra     RespaldoObra[]
 
   @@map("companies")
 }
@@ -475,6 +476,26 @@ model Project {
   /// Dia de la semana en que se espera el corte de avance (cadencia semanal,
   /// Last Planner). ISO: 1=lunes … 7=domingo. Viernes por defecto.
   diaCorteSemanal Int @default(5)
+
+  /// Con fecha = esta obra NO es una obra: es una COPIA restaurada de un
+  /// respaldo, cargada para revisarla. Nace y muere en modo auditoria y no
+  /// admite un solo cambio.
+  ///
+  /// Se guarda la fecha y no un booleano por el idioma de la casa
+  /// (`purgadaAt`, `aprobadaAt`, `cerradoAt`): un `true` dice que paso, una
+  /// fecha dice ademas cuando, y eso es justo lo que se pregunta de una copia
+  /// de auditoria.
+  ///
+  /// La restauracion la crea ademas en estado CERRADA, asi que la guarda de
+  /// escritura que ya existe la cubre desde el primer momento. Esta columna es
+  /// la segunda vuelta de llave: si algun dia se relajara la regla de CERRADA,
+  /// una copia de auditoria seguiria congelada.
+  archivadaEn DateTime?
+
+  /// De donde salio la copia: id original, correlativo, fecha del respaldo,
+  /// quien lo genero y version del formato. Es lo que se enseña en el cartel
+  /// de auditoria, y lo unico que ata la copia con la obra que ya no existe.
+  respaldoOrigen Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1460,6 +1481,52 @@ model AuditLog {
   @@index([projectId, createdAt])
   @@index([accion, createdAt])
   @@map("audit_logs")
+}
+
+/// Cada vez que alguien descarga el respaldo completo de una obra.
+///
+/// Existe por una razon concreta: borrar una obra cerrada EXIGE haberla
+/// respaldado antes, y "antes" hay que poder demostrarlo. Sin esta tabla la
+/// condicion seria una casilla de la pantalla, es decir, una promesa.
+///
+/// Igual que `audit_logs`, `projectId` va SIN clave foranea a proposito: la
+/// fila tiene que sobrevivir al borrado de la obra, que es justo el momento en
+/// que pasa a importar. Por eso tambien se copian aqui el nombre y el
+/// correlativo: cuando la obra ya no exista, esta fila tiene que seguir
+/// diciendo de cual hablaba.
+model RespaldoObra {
+  id        String  @id @default(cuid())
+  companyId String
+  projectId String
+  userId    String?
+
+  /// Copiados de la obra: cuando se borre, esto es lo unico que queda.
+  nombreObra  String  @db.VarChar(255)
+  correlativo String? @db.VarChar(20)
+
+  /// Version del formato del respaldo, para saber si un archivo viejo se
+  /// puede seguir restaurando.
+  formato Int
+
+  /// SHA-256 de `datos.json`. Es lo que ata esta fila con el archivo que
+  /// tiene el usuario en su disco: si no coincide, no es este respaldo.
+  hashDatos String @db.VarChar(64)
+
+  /// Tamaño del zip en bytes y conteo de filas por tabla, para poder decir
+  /// "el respaldo llevaba 348 partidas" sin abrirlo.
+  tamano   Int
+  conteos  Json
+  /// Si la evidencia viajo dentro del zip. Con obras de mucha foto puede
+  /// quedarse fuera, y entonces el respaldo NO sirve para borrar.
+  conFotos Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
+  @@index([projectId, createdAt])
+  @@map("respaldos_obra")
 }
 
 // ---------------------------------------------------------------------------

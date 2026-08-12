@@ -35,6 +35,7 @@ export const PERMISOS = [
   "obra:crear",
   "obra:editar",
   "obra:eliminar",
+  "obra:eliminar_cerrada",
   "obra:asignar_equipo",
 
   "partida:leer",
@@ -103,10 +104,18 @@ export type Permiso = (typeof PERMISOS)[number];
  * la empresa, y por esa cola viajan los codigos de acceso en claro. Quien
  * pueda vincular un emisor puede leer el segundo factor de cualquiera de sus
  * companeros. Es escalada de privilegios con otro nombre.
+ *
+ * `obra:eliminar_cerrada` borra una obra TERMINADA y todo lo que cuelga de
+ * ella: presupuesto, ordenes, cronograma, avances, fotos. Es el unico acto de
+ * la aplicacion del que no se vuelve ni con la auditoria —queda constancia de
+ * que se hizo, pero no lo que habia—, y por eso solo lo tiene el ADMIN. Notese
+ * que es DISTINTO de `obra:eliminar`, que sigue siendo delegable porque solo
+ * alcanza a obras en planificacion, donde no hay nada comprometido todavia.
  */
 export const INNEGOCIABLES: readonly Permiso[] = [
   "linea_base:aprobar",
   "movimiento:aprobar",
+  "obra:eliminar_cerrada",
   "permiso:leer",
   "permiso:editar",
   "configuracion:editar",

@@ -16,8 +16,7 @@ import {
   puedeTransicionarObra,
   requisitosParaEjecutar,
   puedeArrancar,
-  obraAdmiteCambios,
-  OBRA_CERRADA,
+  motivoNoAdmiteCambios,
   ETIQUETA_ESTADO_OBRA,
   type EstadoObra,
 } from "@/lib/obras";
@@ -865,13 +864,13 @@ export async function actualizarObra(
       fechaInicio: true,
       fechaFinProgramada: true,
       estado: true,
+      archivadaEn: true,
     },
   });
   if (!obra) return { ok: false, error: "No se encontro la obra." };
 
-  if (!obraAdmiteCambios(obra.estado)) {
-    return { ok: false, error: OBRA_CERRADA };
-  }
+  const noAdmite = motivoNoAdmiteCambios(obra);
+  if (noAdmite) return { ok: false, error: noAdmite };
 
   const validacion = validarObra(datos);
   if (!validacion.ok) return { ok: false, error: validacion.error };

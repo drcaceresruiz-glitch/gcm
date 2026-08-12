@@ -138,12 +138,21 @@ export async function pasadaDelReloj(): Promise<ResumenPasada> {
 
   try {
     // Solo obras que admiten cambios: una cerrada no tiene restricciones que
-    // liberar, y avisar de ella seria ruido sobre trabajo terminado.
+    // liberar, y avisar de ella seria ruido sobre trabajo terminado. Desde que
+    // existen las copias de auditoria esto importa mas: sin el filtro, cargar
+    // un respaldo pondria a la obra restaurada a mandar correos y SMS sobre
+    // restricciones que se resolvieron —o no— hace meses.
     const todas = await prisma.project.findMany({
       orderBy: { id: "asc" },
-      select: { id: true, companyId: true, nombreObra: true, estado: true },
+      select: {
+        id: true,
+        companyId: true,
+        nombreObra: true,
+        estado: true,
+        archivadaEn: true,
+      },
     });
-    const vivas = todas.filter((o) => obraAdmiteCambios(o.estado));
+    const vivas = todas.filter(obraAdmiteCambios);
 
     const { lote, siguiente } = siguienteLote(
       vivas,

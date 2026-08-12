@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { normalizarDecimal, multiplicar } from "@/lib/decimal";
 import { codigoPadre, calcularProfundidades } from "@/lib/jerarquia-partidas";
-import { obraAdmiteCambios, OBRA_CERRADA } from "@/lib/obras";
+import { motivoNoAdmiteCambios } from "@/lib/obras";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { AuditAction, ModalidadPartida } from "@/generated/prisma/enums";
 
@@ -38,7 +38,7 @@ async function contextoEditable(sesion: SesionActiva, partidaId: string) {
       parcial: true,
       tipo: true,
       modalidad: true,
-      project: { select: { estado: true } },
+      project: { select: { estado: true, archivadaEn: true } },
     },
   });
 
@@ -46,9 +46,8 @@ async function contextoEditable(sesion: SesionActiva, partidaId: string) {
 
   // Antes que el congelado: una obra cerrada no admite cambios aunque su
   // presupuesto nunca llegara a congelarse.
-  if (!obraAdmiteCambios(partida.project.estado)) {
-    return { ok: false as const, error: OBRA_CERRADA };
-  }
+  const noAdmite = motivoNoAdmiteCambios(partida.project);
+  if (noAdmite) return { ok: false as const, error: noAdmite };
 
   const congelada = await prisma.baseline.findFirst({
     where: { projectId: partida.projectId, aprobadaAt: { not: null } },
@@ -272,13 +271,12 @@ export async function crearPartida(
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
-    select: { id: true, estado: true },
+    select: { id: true, estado: true, archivadaEn: true },
   });
   if (!obra) return { ok: false, error: "Obra no encontrada." };
 
-  if (!obraAdmiteCambios(obra.estado)) {
-    return { ok: false, error: OBRA_CERRADA };
-  }
+  const noAdmite = motivoNoAdmiteCambios(obra);
+  if (noAdmite) return { ok: false, error: noAdmite };
 
   const congelada = await prisma.baseline.findFirst({
     where: { projectId: obraId, aprobadaAt: { not: null } },

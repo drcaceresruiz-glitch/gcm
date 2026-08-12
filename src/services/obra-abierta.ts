@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { obraAdmiteCambios, OBRA_CERRADA } from "@/lib/obras";
+import { motivoNoAdmiteCambios } from "@/lib/obras";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -37,7 +37,7 @@ export async function motivoSiObraCerrada(
     // existe, y responder "cerrada" o "abierta" sobre ella ya seria contar
     // algo que no le corresponde a quien pregunta.
     where: { id: obraId, companyId: sesion.companyId },
-    select: { estado: true },
+    select: { estado: true, archivadaEn: true },
   });
 
   // La obra inexistente NO se trata aqui: cada servicio ya comprueba que
@@ -45,5 +45,5 @@ export async function motivoSiObraCerrada(
   // solo confundiria sobre que fallo.
   if (!obra) return null;
 
-  return obraAdmiteCambios(obra.estado) ? null : OBRA_CERRADA;
+  return motivoNoAdmiteCambios(obra);
 }

@@ -8,7 +8,7 @@ import {
   type Medida,
 } from "@/lib/cronograma";
 import { normalizarDecimal, restar } from "@/lib/decimal";
-import { obraAdmiteCambios, OBRA_CERRADA } from "@/lib/obras";
+import { motivoNoAdmiteCambios } from "@/lib/obras";
 import {
   diasSinReportar,
   filasDelParte,
@@ -104,14 +104,13 @@ export async function importarCronograma(
   // cronograma en la obra de otro cliente manipulando el identificador.
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
-    select: { id: true, estado: true },
+    select: { id: true, estado: true, archivadaEn: true },
   });
 
   if (!obra) return { ok: false, error: "Obra no encontrada." };
 
-  if (!obraAdmiteCambios(obra.estado)) {
-    return { ok: false, error: OBRA_CERRADA };
-  }
+  const noAdmite = motivoNoAdmiteCambios(obra);
+  if (noAdmite) return { ok: false, error: noAdmite };
 
   const fechaCorte = fechaDeObra(analisis.fechaCorte);
 

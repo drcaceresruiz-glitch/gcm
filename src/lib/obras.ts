@@ -168,8 +168,38 @@ export function puedeArrancar(faltan: readonly RequisitoObra[]): boolean {
  * pantalla y en el servidor. La comprobacion que MANDA es la del servidor: la
  * de la pantalla solo evita ofrecer un boton que va a fallar.
  */
-export function obraAdmiteCambios(estado: string): boolean {
-  return estado !== "CERRADA";
+export function obraAdmiteCambios(obra: ObraParaEscribir): boolean {
+  return motivoNoAdmiteCambios(obra) === null;
+}
+
+/**
+ * Lo minimo que hay que saber de una obra para decidir si se puede escribir
+ * en ella. Es un tipo estructural a proposito: cada servicio ya trae la obra
+ * cargada con su propio `select`, y asi le vale el que tenga.
+ */
+export interface ObraParaEscribir {
+  estado: string;
+  /// Con fecha, es una copia restaurada para auditoria. Opcional para que un
+  /// `select` que no la pida siga compilando; ausente se lee como null.
+  archivadaEn?: Date | null;
+}
+
+/**
+ * Por que esta obra no admite cambios, o `null` si si los admite.
+ *
+ * Se devuelve el MOTIVO y no un booleano porque los dos casos se explican
+ * distinto y quien se topa con ellos necesita saber en cual esta: una obra
+ * cerrada podria en teoria reabrirse si el negocio lo decidiera; una copia de
+ * auditoria no es una obra, y no hay nada que reabrir.
+ *
+ * El orden importa: se mira primero `archivadaEn` porque una copia restaurada
+ * SIEMPRE viene ademas en estado CERRADA, y decir "esta cerrada" cuando lo que
+ * pasa es que estas mirando un respaldo confunde mas de lo que ayuda.
+ */
+export function motivoNoAdmiteCambios(obra: ObraParaEscribir): string | null {
+  if (obra.archivadaEn) return OBRA_ARCHIVADA;
+  if (obra.estado === "CERRADA") return OBRA_CERRADA;
+  return null;
 }
 
 /**
@@ -181,6 +211,17 @@ export function obraAdmiteCambios(estado: string): boolean {
 export const OBRA_CERRADA =
   "La obra esta cerrada y no admite cambios. El resultado de una obra " +
   "cerrada es historia: modificarlo falsearia lo que de verdad paso.";
+
+/**
+ * Lo mismo, para una copia restaurada de un respaldo.
+ *
+ * Se separa de `OBRA_CERRADA` porque no es el mismo hecho: aqui no se esta
+ * mirando la obra, se esta mirando una FOTO de la obra. Nada de lo que se
+ * escribiera encima significaria nada, porque el original ya no existe.
+ */
+export const OBRA_ARCHIVADA =
+  "Esto es una copia restaurada de un respaldo, abierta solo para revisarla. " +
+  "No admite cambios: lo que se escribiera aqui no le pasaria a ninguna obra.";
 
 /**
  * El verbo del boton que hace la transicion, no el nombre del estado destino.

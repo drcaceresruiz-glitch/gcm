@@ -10,25 +10,58 @@ import {
   requisitosParaEjecutar,
   puedeArrancar,
   obraAdmiteCambios,
+  motivoNoAdmiteCambios,
+  OBRA_CERRADA,
+  OBRA_ARCHIVADA,
 } from "@/lib/obras";
 
 describe("una obra cerrada no admite cambios", () => {
   it("solo CERRADA cierra la puerta", () => {
-    expect(obraAdmiteCambios("PLANIFICACION")).toBe(true);
-    expect(obraAdmiteCambios("EN_EJECUCION")).toBe(true);
-    expect(obraAdmiteCambios("PARALIZADA")).toBe(true);
-    expect(obraAdmiteCambios("CERRADA")).toBe(false);
+    expect(obraAdmiteCambios({ estado: "PLANIFICACION" })).toBe(true);
+    expect(obraAdmiteCambios({ estado: "EN_EJECUCION" })).toBe(true);
+    expect(obraAdmiteCambios({ estado: "PARALIZADA" })).toBe(true);
+    expect(obraAdmiteCambios({ estado: "CERRADA" })).toBe(false);
   });
 
   it("paralizada SI admite cambios: esta parada, no terminada", () => {
     // Una obra parada sigue teniendo papeleo pendiente que cerrar.
-    expect(obraAdmiteCambios("PARALIZADA")).toBe(true);
+    expect(obraAdmiteCambios({ estado: "PARALIZADA" })).toBe(true);
   });
 
   it("y de cerrada no se vuelve: no hay reabrir", () => {
     // Si algun dia se anade, hay que decidirlo a proposito. Esta prueba esta
     // aqui para que ese cambio no pase inadvertido.
     expect(transicionesDeObra("CERRADA")).toEqual([]);
+  });
+});
+
+describe("una copia restaurada de un respaldo tampoco admite cambios", () => {
+  const archivada = { estado: "CERRADA", archivadaEn: new Date("2026-08-12") };
+
+  it("la marca de archivada cierra la puerta por si sola", () => {
+    // Aunque el estado fuera uno que si admite cambios. Es la segunda vuelta
+    // de llave: si algun dia se relajara la regla de CERRADA, una copia de
+    // auditoria tiene que seguir congelada.
+    expect(
+      obraAdmiteCambios({
+        estado: "EN_EJECUCION",
+        archivadaEn: new Date("2026-08-12"),
+      }),
+    ).toBe(false);
+  });
+
+  it("y lo explica como copia, no como obra cerrada", () => {
+    // Los dos casos se leen distinto a proposito: quien esta mirando un
+    // respaldo tiene que saber que lo que ve no es la obra.
+    expect(motivoNoAdmiteCambios(archivada)).toBe(OBRA_ARCHIVADA);
+    expect(motivoNoAdmiteCambios({ estado: "CERRADA" })).toBe(OBRA_CERRADA);
+  });
+
+  it("sin marca y con estado vivo, no hay motivo", () => {
+    expect(motivoNoAdmiteCambios({ estado: "EN_EJECUCION" })).toBeNull();
+    expect(
+      motivoNoAdmiteCambios({ estado: "EN_EJECUCION", archivadaEn: null }),
+    ).toBeNull();
   });
 });
 
