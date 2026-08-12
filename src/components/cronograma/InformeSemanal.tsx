@@ -1,4 +1,4 @@
-import type { DatosCurva } from "@/services/cronograma.service";
+import type { DatosCurva, PeriodoInforme } from "@/services/cronograma.service";
 import type {
   AlertaAtraso,
   Capitulo,
@@ -54,6 +54,8 @@ export interface DatosInforme {
   real: string;
   planeado: string;
   desviacion: string;
+  /// Lo que se movio entre el corte anterior y este.
+  periodo: PeriodoInforme;
   curva: DatosCurva;
   capitulos: Capitulo[];
   alertas: AlertaAtraso[];
@@ -317,6 +319,8 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
         </section>
       </div>
 
+      <SeccionPeriodo periodo={datos.periodo} hasta={datos.fechaCorte} />
+
       {datos.lastPlanner && <SeccionLastPlanner lp={datos.lastPlanner} />}
 
       <footer
@@ -327,6 +331,121 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
         GCM &mdash; Gestión en Construcción Moderna
       </footer>
     </article>
+  );
+}
+
+/**
+ * Lo que se movio EN EL PERIODO.
+ *
+ * El informe daba solo acumulados —22.6% real sobre 13.06% planeado— y de un
+ * informe periodico lo primero que se espera es que diga que paso en ese
+ * periodo. Un acumulado no distingue una semana de mucho trabajo de una
+ * parada: las dos suben el numero, una mas que otra, y para saberlo habia que
+ * restar a mano contra el informe anterior.
+ *
+ * Se listan solo las tareas que SE MOVIERON. Una que sigue igual no es noticia
+ * del periodo, y con cien filas la lista dejaria de leerse.
+ */
+function SeccionPeriodo({
+  periodo,
+  hasta,
+}: {
+  periodo: PeriodoInforme;
+  hasta: Date;
+}) {
+  if (periodo.desde === null) {
+    return null; // Primer informe de la obra: no hay periodo, hay un principio.
+  }
+
+  const ganado = Number(periodo.ganado);
+
+  return (
+    <section className="mt-6 break-inside-avoid">
+      <Titulo>
+        Avance del periodo &mdash; {fechaCorta(periodo.desde)} a{" "}
+        {fechaCorta(hasta)}
+      </Titulo>
+
+      <div className="mt-3 grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
+        <div>
+          <p
+            className="text-4xl font-light tabular-nums"
+            style={{
+              color: ganado > 0 ? "var(--color-exito)" : "var(--texto)",
+            }}
+          >
+            {decimal(periodo.ganado, "")}
+          </p>
+          <p className="text-xs tracking-widest uppercase opacity-60">
+            puntos ganados
+          </p>
+          <p className="mt-1 text-xs opacity-70">
+            Del {decimal(periodo.realAnterior, "")}% al{" "}
+            {decimal(String(Number(periodo.realAnterior) + ganado), "")}% de obra
+            ejecutada.
+          </p>
+          {periodo.tareas.length === 0 && (
+            <p className="mt-2 text-xs" style={{ color: "var(--color-alerta)" }}>
+              Ninguna partida registró avance en el periodo.
+            </p>
+          )}
+        </div>
+
+        {periodo.tareas.length > 0 && (
+          <div>
+            <p className="mb-2 text-xs opacity-60">
+              {periodo.tareas.length}{" "}
+              {periodo.tareas.length === 1 ? "partida avanzó" : "partidas avanzaron"}
+            </p>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b" style={{ borderColor: "var(--borde)" }}>
+                  <th scope="col" className="pb-1 text-left font-normal opacity-60">
+                    Partida
+                  </th>
+                  <th scope="col" className="pb-1 text-right font-normal opacity-60">
+                    Antes
+                  </th>
+                  <th scope="col" className="pb-1 text-right font-normal opacity-60">
+                    Ahora
+                  </th>
+                  <th scope="col" className="pb-1 text-right font-normal opacity-60">
+                    Ganó
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {periodo.tareas.slice(0, 12).map((t) => (
+                  <tr key={t.uid} className="border-b" style={{ borderColor: "var(--borde)" }}>
+                    <td className="py-1">
+                      {t.codigo && <span className="opacity-50">{t.codigo} </span>}
+                      {t.nombre}
+                    </td>
+                    <td className="py-1 text-right tabular-nums opacity-60">
+                      {decimal(t.antes, "")}%
+                    </td>
+                    <td className="py-1 text-right tabular-nums">
+                      {decimal(t.ahora, "")}%
+                    </td>
+                    <td
+                      className="py-1 text-right font-semibold tabular-nums"
+                      style={{ color: "var(--color-exito)" }}
+                    >
+                      +{decimal(t.delta, "")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {periodo.tareas.length > 12 && (
+              <p className="mt-1 text-xs opacity-60">
+                y {periodo.tareas.length - 12} más.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

@@ -702,8 +702,42 @@ export interface CorteDisponible {
   esUltimo: boolean;
 }
 
+/// Una tarea que se movio en el periodo del informe.
+export interface AvanceDelPeriodo {
+  uid: number;
+  codigo: string | null;
+  nombre: string;
+  /// Como estaba al corte anterior y como esta a este.
+  antes: string;
+  ahora: string;
+  /// Cuanto gano, en puntos de la propia tarea.
+  delta: string;
+}
+
+export interface PeriodoInforme {
+  /// El corte anterior con el que se compara. Null en el primer informe de la
+  /// obra: no hay periodo, hay un principio.
+  desde: Date | null;
+  /// % real ponderado en ese corte anterior.
+  realAnterior: string;
+  /// Cuanto avanzo la obra ENTERA en el periodo, en puntos ponderados.
+  ganado: string;
+  /// Las tareas que se movieron, de la que mas gano a la que menos.
+  tareas: AvanceDelPeriodo[];
+}
+
 export interface InformeAlCorte {
   fechaCorte: Date;
+  /**
+   * Lo que paso ENTRE el corte anterior y este.
+   *
+   * El informe daba solo acumulados —22.6% real, 13.06% planeado— y de un
+   * informe SEMANAL lo primero que se espera es que diga que paso esa semana.
+   * Un acumulado no distingue una semana de mucho trabajo de una parada:
+   * las dos suben el numero, una mas que otra, y hay que restar a mano contra
+   * el informe anterior para saberlo.
+   */
+  periodo: PeriodoInforme;
   /// Las tareas MEDIDAS a esa fecha: el avance que se conocia ese dia.
   tareas: (TareaDelPlan & Medida)[];
   /// % real ponderado por duracion a la fecha del informe.
@@ -823,11 +857,41 @@ export async function informeAlCorte(
   );
   const ultimoIso = ordenadas[0]?.[0] ?? ahora.toISOString().slice(0, 10);
 
-  // La fecha pedida solo vale si es una de las ofrecidas: asi un `?corte=`
-  // manipulado no produce un informe de una fecha arbitraria.
-  const elegidoIso =
-    corteISO && porIso.has(corteISO) ? corteISO : ultimoIso;
-  const fechaCorte = porIso.get(elegidoIso)!;
+  /**
+   * La fecha del informe: la pedida si es utilizable, y si no la ultima.
+   *
+   * SE ADMITE CUALQUIER DIA, no solo los cortes ofrecidos. El informe nacio
+   * atado a las semanas, pero se pide a diario por motivos que no siguen el
+   * calendario del PTS —una visita del cliente, una valorizacion, un martes
+   * cualquiera—, y obligar a elegir entre tres botones convertia «informe al
+   * corte» en «informe de la semana».
+   *
+   * Los limites son los de la obra: ni antes de empezar —no habria nada que
+   * medir— ni en el futuro, que daria un documento de avance inventado. Fuera
+   * de rango se cae al ultimo corte en vez de fallar: quien manipule el
+   * parametro obtiene el informe de hoy, no un error.
+   */
+  const pedida =
+    corteISO && /^\d{4}-\d{2}-\d{2}$/.test(corteISO)
+      ? new Date(`${corteISO}T00:00:00Z`)
+      : null;
+
+  const utilizable =
+    pedida !== null &&
+    !Number.isNaN(pedida.getTime()) &&
+    pedida.getTime() >= inicioObra.getTime() &&
+    pedida.getTime() <= ahora.getTime();
+
+  const fechaCorte = utilizable ? pedida : porIso.get(ultimoIso)!;
+  const elegidoIso = fechaCorte.toISOString().slice(0, 10);
+
+  // Una fecha libre que no sea uno de los cortes conocidos se anade a la lista
+  // para que el selector la marque como elegida en vez de no senalar ninguna.
+  if (!porIso.has(elegidoIso)) {
+    porIso.set(elegidoIso, fechaCorte);
+    ordenadas.push([elegidoIso, fechaCorte]);
+    ordenadas.sort((a, b) => b[1].getTime() - a[1].getTime());
+  }
 
   const cortes: CorteDisponible[] = ordenadas.map(([iso, fecha]) => ({
     iso,
@@ -871,8 +935,75 @@ export async function informeAlCorte(
 
   const resumen = tareasBase.find((t) => t.nivel === 1);
 
+  /**
+   * Lo que se movio EN EL PERIODO: entre el corte anterior y este.
+   *
+   * Se mide dos veces con los mismos reportes que ya estan en memoria —una
+   * hasta el corte anterior y otra hasta este— y se restan. Sale gratis: la
+   * consulta ya se hizo, y `medirAvance` sobre cien tareas no cuesta nada.
+   *
+   * El corte anterior es el inmediatamente previo de la lista del selector, no
+   * «siete dias antes»: si el informe se pide un martes cualquiera, el periodo
+   * es desde el ultimo corte real y no una semana inventada hacia atras.
+   */
+  const anterior = ordenadas
+    .map(([, f]) => f)
+    .find((f) => f.getTime() < fechaCorte.getTime());
+
+  const periodo: PeriodoInforme = (() => {
+    if (!anterior) {
+      return { desde: null, realAnterior: "0.00", ganado: real, tareas: [] };
+    }
+
+    const medidoAntes = medirAvance(
+      tareasBase,
+      avances
+        .filter((a) => a.fecha.getTime() <= anterior.getTime())
+        .map((a) => ({ ...a, porcentaje: a.porcentaje.toString() })),
+    );
+
+    const realAnterior = ponderarPorDuracion(
+      medidoAntes.tareas.map((t) => ({
+        esResumen: t.esResumen,
+        duracionDias: t.duracionDias,
+        real: t.porcentajeReal,
+      })),
+      (t) => t.real,
+    );
+
+    const antesPorUid = new Map(
+      medidoAntes.tareas.map((t) => [t.uid, t.porcentajeReal]),
+    );
+
+    const tareas: AvanceDelPeriodo[] = medido.tareas
+      .filter((t) => !t.esResumen)
+      .map((t) => {
+        const antes = antesPorUid.get(t.uid) ?? "0.00";
+        return {
+          uid: t.uid,
+          codigo: t.codigo,
+          nombre: t.nombre,
+          antes,
+          ahora: t.porcentajeReal,
+          delta: restar(t.porcentajeReal, antes) ?? "0.00",
+        };
+      })
+      // Solo las que se movieron. Una tarea que sigue igual no es noticia del
+      // periodo, y con cien filas la lista dejaria de leerse.
+      .filter((t) => Number(t.delta) !== 0)
+      .sort((a, b) => Number(b.delta) - Number(a.delta));
+
+    return {
+      desde: anterior,
+      realAnterior,
+      ganado: restar(real, realAnterior) ?? "0.00",
+      tareas,
+    };
+  })();
+
   return {
     fechaCorte,
+    periodo,
     tareas: medido.tareas,
     real,
     planeado,

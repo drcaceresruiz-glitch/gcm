@@ -10,7 +10,7 @@ import {
   type CorteDisponible,
 } from "@/services/cronograma.service";
 import { lastPlannerAlCorte } from "@/services/plan-semanal.service";
-import { fechaCorta } from "@/utils/fechas";
+import { fechaCorta, hoy } from "@/utils/fechas";
 import {
   agruparPorCapitulo,
   alertasDeAtraso,
@@ -88,6 +88,7 @@ export default async function InformePage({
         obraId={id}
         cortes={informe.cortes}
         elegido={informe.fechaCorte}
+        hoyIso={hoy().toISOString().slice(0, 10)}
       />
 
       <InformeSemanal
@@ -103,6 +104,7 @@ export default async function InformePage({
           real: informe.real,
           planeado: informe.planeado,
           desviacion: informe.desviacion,
+          periodo: informe.periodo,
           curva,
           capitulos,
           alertas,
@@ -127,11 +129,14 @@ function SelectorDeCorte({
   obraId,
   cortes,
   elegido,
+  hoyIso,
 }: {
   obraId: string;
   cortes: CorteDisponible[];
   elegido: Date;
+  hoyIso: string;
 }) {
+  const elegidoIso = elegido.toISOString().slice(0, 10);
   if (cortes.length <= 1) return null;
 
   return (
@@ -140,7 +145,34 @@ function SelectorDeCorte({
       style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
     >
       <span className="opacity-70">Informe al corte de:</span>
-      {cortes.slice(0, 12).map((c) => {
+
+      {/* Cualquier dia, no solo los cortes. El informe se pide por motivos que
+          no siguen el calendario del PTS —una visita del cliente, una
+          valorizacion, un martes cualquiera— y con solo tres botones «informe
+          al corte» era en realidad «informe de la semana».
+          
+          Es un formulario GET y no un desplegable con JavaScript: esta pagina
+          no manda un solo byte al cliente salvo el boton de imprimir. */}
+      <form method="get" className="flex items-center gap-1.5">
+        <input
+          type="date"
+          name="corte"
+          defaultValue={elegidoIso}
+          max={hoyIso}
+          className="rounded-lg border px-2 py-1 text-xs"
+          style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+          aria-label="Fecha del informe"
+        />
+        <button
+          type="submit"
+          className="rounded-lg border px-2 py-1 text-xs font-medium"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          Ver
+        </button>
+      </form>
+
+      {cortes.slice(0, 8).map((c) => {
         const activo = c.fecha.getTime() === elegido.getTime();
         return (
           <Link
