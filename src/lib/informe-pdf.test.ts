@@ -33,7 +33,7 @@ describe("paginasDelInforme", () => {
     // fuera del papel.
     for (const pagina of paginas([tabla(300)])) {
       for (const e of pagina.elementos) {
-        const y = e.tipo === "linea" ? e.y1 : e.y;
+        const y = e.tipo === "linea" || e.tipo === "trazo" ? e.y1 : e.y;
         expect(y).toBeGreaterThanOrEqual(0);
       }
     }
@@ -153,5 +153,97 @@ describe("paginasDelInforme - que no se pisen las columnas", () => {
         }
       }
     }
+  });
+});
+
+describe("paginasDelInforme - el grafico de la curva", () => {
+  const dia = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
+  const conCurva = (
+    plan: { fecha: Date; valor: number }[],
+    real: { fecha: Date; valor: number }[],
+  ): SeccionInforme => ({
+    clase: "tabla",
+    titulo: "CURVA S",
+    cabeceras: ["Fecha", "Planeado", "Real"],
+    filas: real.map((p) => ["01/08/2026", "10.00", String(p.valor)]),
+    siNoHay: "Sin datos.",
+    grafico: [
+      { nombre: "Planeado", papel: "plan", puntos: plan },
+      { nombre: "Real", papel: "real", puntos: real },
+    ],
+  });
+
+  const trazos = (p: PaginaPdf[]) =>
+    p.flatMap((pag) => pag.elementos).filter((e) => e.tipo === "trazo");
+
+  it("dibuja un tramo por cada par de puntos consecutivos", () => {
+    const p = paginas([
+      conCurva(
+        [
+          { fecha: dia("2026-08-01"), valor: 10 },
+          { fecha: dia("2026-08-08"), valor: 20 },
+          { fecha: dia("2026-08-15"), valor: 30 },
+        ],
+        [
+          { fecha: dia("2026-08-01"), valor: 12 },
+          { fecha: dia("2026-08-08"), valor: 25 },
+        ],
+      ),
+    ]);
+    // 2 tramos del plan + 1 del real.
+    expect(trazos(p)).toHaveLength(3);
+    expect(trazos(p).filter((t) => t.papel === "real")).toHaveLength(1);
+  });
+
+  it("el eje va de 0 a 100 SIEMPRE, no del minimo al maximo", () => {
+    // Reescalar una curva de avance a su propio rango convierte una diferencia
+    // de dos puntos en un abismo visual. Dos series casi iguales tienen que
+    // salir casi juntas.
+    const p = paginas([
+      conCurva(
+        [
+          { fecha: dia("2026-08-01"), valor: 10 },
+          { fecha: dia("2026-08-08"), valor: 11 },
+        ],
+        [
+          { fecha: dia("2026-08-01"), valor: 12 },
+          { fecha: dia("2026-08-08"), valor: 13 },
+        ],
+      ),
+    ]);
+    const plan = trazos(p).find((t) => t.papel === "plan")!;
+    const real = trazos(p).find((t) => t.papel === "real")!;
+    // Dos puntos porcentuales sobre 150pt de alto son 3pt: nada.
+    expect(Math.abs(real.y1 - plan.y1)).toBeLessThan(6);
+  });
+
+  it("una serie vacia no rompe el grafico ni lo deja en blanco", () => {
+    const p = paginas([
+      conCurva([{ fecha: dia("2026-08-01"), valor: 10 }, { fecha: dia("2026-08-08"), valor: 20 }], []),
+    ]);
+    expect(trazos(p).length).toBeGreaterThan(0);
+  });
+
+  it("sin ningun punto no dibuja nada y sigue adelante", () => {
+    const p = paginas([conCurva([], [])]);
+    expect(trazos(p)).toHaveLength(0);
+    expect(p.length).toBeGreaterThan(0);
+  });
+
+  it("el grafico va ANTES de su tabla", () => {
+    const p = paginas([
+      conCurva(
+        [{ fecha: dia("2026-08-01"), valor: 10 }, { fecha: dia("2026-08-08"), valor: 20 }],
+        [{ fecha: dia("2026-08-01"), valor: 12 }, { fecha: dia("2026-08-08"), valor: 25 }],
+      ),
+    ]);
+    const elementos = p[0]!.elementos;
+    const primerTrazo = elementos.findIndex((e) => e.tipo === "trazo");
+    const cabeceraTabla = elementos.findIndex(
+      (e) => e.tipo === "texto" && e.texto === "Fecha",
+    );
+    expect(primerTrazo).toBeGreaterThanOrEqual(0);
+    expect(primerTrazo).toBeLessThan(cabeceraTabla);
   });
 });

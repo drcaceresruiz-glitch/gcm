@@ -115,6 +115,14 @@ const ROTULO_SEVERIDAD = { alta: "Alta", media: "Media", baja: "Baja" } as const
  *   casi siempre significa «esa semana no hubo».
  * - `nota`: una frase suelta, para cuando la seccion entera no aplica.
  */
+/// Una linea de un grafico: puntos en el tiempo con su valor 0..100.
+export interface SerieGrafico {
+  nombre: string;
+  /// "plan" se dibuja sobria; "real" es la que se mira.
+  papel: "plan" | "real";
+  puntos: readonly { fecha: Date; valor: number }[];
+}
+
 export type SeccionInforme =
   | {
       clase: "datos";
@@ -128,6 +136,15 @@ export type SeccionInforme =
       cabeceras: readonly string[];
       filas: readonly (readonly CeldaCsv[])[];
       siNoHay: string;
+      /**
+       * Los mismos datos, para quien sepa DIBUJARLOS.
+       *
+       * La hoja de calculo lo ignora —alli la tabla ya es el dato, y quien la
+       * abra hara su propio grafico— y el PDF pinta la curva encima de la
+       * tabla. Va aqui, junto a las filas de las que sale, para que no pueda
+       * dibujarse una cosa y tabularse otra.
+       */
+      grafico?: SerieGrafico[];
     }
   | { clase: "nota"; titulo: string; texto: string };
 
@@ -417,6 +434,12 @@ function curva(c: CurvaCsv): SeccionInforme {
     // cronograma cargado y sin avance reportado llega aqui con `plan` lleno y
     // `realSemanal` vacio, y decir «sin plan» mandaria a mirar donde no es.
     siNoHay: "Todavía no hay avance reportado: la curva no tiene puntos.",
+    // Para el grafico si vale la pena el plan ENTERO, dia a dia: es una linea
+    // continua y son puntos, no filas de una tabla que nadie leeria.
+    grafico: [
+      { nombre: "Planeado", papel: "plan", puntos: c.plan },
+      { nombre: "Real", papel: "real", puntos: c.realSemanal },
+    ],
   };
 }
 

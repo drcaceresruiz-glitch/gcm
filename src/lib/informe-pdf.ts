@@ -1,4 +1,4 @@
-import type { SeccionInforme } from "./informe-documento";
+import type { SeccionInforme, SerieGrafico } from "./informe-documento";
 import { aWinAnsi, partirEnLineas, repartirColumnas, type Medir } from "./pdf-texto";
 
 /**
@@ -50,7 +50,21 @@ export const A4_APAISADO: OpcionesPdf = {
 export type ElementoPdf =
   | { tipo: "texto"; x: number; y: number; texto: string; tam: number; negrita: boolean; gris: boolean }
   | { tipo: "linea"; x1: number; y1: number; x2: number; y2: number }
-  | { tipo: "fondo"; x: number; y: number; ancho: number; alto: number };
+  | { tipo: "fondo"; x: number; y: number; ancho: number; alto: number }
+  /// Un tramo de curva. Se emite uno por cada par de puntos consecutivos, para
+  /// que quien dibuje no tenga que saber nada de series ni de escalas.
+  | {
+      tipo: "trazo";
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      papel: "plan" | "real";
+    };
+
+/// Alto del area del grafico de la curva. Suficiente para leer la separacion
+/// entre las dos lineas sin comerse media pagina.
+const ALTO_GRAFICO = 150;
 
 export interface PaginaPdf {
   elementos: ElementoPdf[];
@@ -179,6 +193,14 @@ function dibujarSeccion(
     return;
   }
 
+  // El grafico va ANTES de su tabla: es lo que se mira, y la tabla esta
+  // debajo para quien quiera el numero exacto.
+  //
+  // Y va TAMBIEN cuando la tabla esta vacia. Es el caso de una obra recien
+  // arrancada: no hay avance reportado, la tabla de la curva no tiene ni una
+  // fila, pero el plan si existe y ver la forma prevista de la obra vale.
+  if (seccion.grafico) dibujarGrafico(lienzo, seccion.grafico, o, anchoUtil);
+
   if (seccion.filas.length === 0) {
     lienzo.texto(o.margen, seccion.siNoHay, o.tamTexto, { gris: true });
     lienzo.y -= o.tamTexto + 12;
@@ -297,4 +319,110 @@ function pintarFila(
   });
 
   lienzo.y = abajo;
+}
+
+/**
+ * La curva de avance, dibujada.
+ *
+ * Es el grafico del informe: dice de un vistazo si la obra va por encima o por
+ * debajo del plan, cosa que la tabla de la curva solo dice si te pones a
+ * comparar columna con columna.
+ *
+ * El eje Y va SIEMPRE de 0 a 100 y no de minimo a maximo: una curva de avance
+ * reescalada a su propio rango exagera cualquier diferencia y engana. El eje X
+ * abarca de la primera a la ultima fecha de todas las series juntas, para que
+ * las dos lineas compartan escala.
+ */
+function dibujarGrafico(
+  lienzo: Lienzo,
+  series: readonly SerieGrafico[],
+  o: OpcionesPdf,
+  anchoUtil: number,
+): void {
+  const conPuntos = series.filter((s) => s.puntos.length > 0);
+  if (conPuntos.length === 0) return;
+
+  const tiempos = conPuntos.flatMap((s) => s.puntos.map((p) => p.fecha.getTime()));
+  const desde = Math.min(...tiempos);
+  const hasta = Math.max(...tiempos);
+  const span = hasta - desde || 1;
+
+  lienzo.reservar(ALTO_GRAFICO + 24);
+
+  const arriba = lienzo.y;
+  const abajo = arriba - ALTO_GRAFICO;
+  // Sitio a la izquierda para los rotulos del eje.
+  const izquierda = o.margen + 24;
+  const derecha = o.margen + anchoUtil;
+
+  const aX = (t: number) => izquierda + ((t - desde) / span) * (derecha - izquierda);
+  const aY = (v: number) => abajo + (Math.min(100, Math.max(0, v)) / 100) * ALTO_GRAFICO;
+
+  // Rejilla horizontal cada 25%, con su rotulo.
+  for (const marca of [0, 25, 50, 75, 100]) {
+    const y = aY(marca);
+    lienzo.poner({ tipo: "linea", x1: izquierda, y1: y, x2: derecha, y2: y });
+    lienzo.poner({
+      tipo: "texto",
+      x: o.margen,
+      y: y - 2,
+      texto: `${marca}%`,
+      tam: 6,
+      negrita: false,
+      gris: true,
+    });
+  }
+
+  for (const serie of conPuntos) {
+    const puntos = [...serie.puntos].sort(
+      (a, b) => a.fecha.getTime() - b.fecha.getTime(),
+    );
+    for (let i = 1; i < puntos.length; i++) {
+      lienzo.poner({
+        tipo: "trazo",
+        x1: aX(puntos[i - 1]!.fecha.getTime()),
+        y1: aY(puntos[i - 1]!.valor),
+        x2: aX(puntos[i]!.fecha.getTime()),
+        y2: aY(puntos[i]!.valor),
+        papel: serie.papel,
+      });
+    }
+  }
+
+  lienzo.y = abajo - 4;
+
+  // Fechas de los extremos y leyenda, debajo del area.
+  lienzo.poner({
+    tipo: "texto",
+    x: izquierda,
+    y: lienzo.y - 6,
+    texto: fechaCorta(new Date(desde)),
+    tam: 6,
+    negrita: false,
+    gris: true,
+  });
+  lienzo.poner({
+    tipo: "texto",
+    x: derecha - 40,
+    y: lienzo.y - 6,
+    texto: fechaCorta(new Date(hasta)),
+    tam: 6,
+    negrita: false,
+    gris: true,
+  });
+  lienzo.texto(
+    izquierda + 90,
+    conPuntos.map((s) => s.nombre).join("   ·   "),
+    6,
+    { gris: true },
+  );
+
+  lienzo.y -= 16;
+}
+
+/// dd/mm/aa para los extremos del eje. En UTC, como el resto del informe.
+function fechaCorta(fecha: Date): string {
+  const d = String(fecha.getUTCDate()).padStart(2, "0");
+  const m = String(fecha.getUTCMonth() + 1).padStart(2, "0");
+  return `${d}/${m}/${String(fecha.getUTCFullYear()).slice(2)}`;
 }

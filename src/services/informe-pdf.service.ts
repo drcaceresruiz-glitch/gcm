@@ -28,6 +28,9 @@ const NEGRO = rgb(0.11, 0.15, 0.2);
 const GRIS = rgb(0.42, 0.48, 0.51);
 const RAYA = rgb(0.85, 0.89, 0.9);
 const FONDO_CABECERA = rgb(0.93, 0.96, 0.96);
+/// El mismo naranja #ea580c de la curva en pantalla, y el gris del plan.
+const REAL = rgb(0.918, 0.345, 0.047);
+const PLAN = rgb(0.45, 0.5, 0.54);
 
 export async function generarInformePdf(
   d: DatosCsvInforme,
@@ -75,6 +78,19 @@ export async function generarInformePdf(
           end: { x: e.x2, y: e.y2 },
           thickness: 0.5,
           color: RAYA,
+        });
+        continue;
+      }
+
+      if (e.tipo === "trazo") {
+        // El real en naranja y mas grueso: es el mismo naranja de alto
+        // contraste que usa la curva en pantalla, para que el papel y la
+        // aplicacion no parezcan dos sistemas distintos.
+        hoja.drawLine({
+          start: { x: e.x1, y: e.y1 },
+          end: { x: e.x2, y: e.y2 },
+          thickness: e.papel === "real" ? 1.6 : 0.9,
+          color: e.papel === "real" ? REAL : PLAN,
         });
         continue;
       }
