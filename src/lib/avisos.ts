@@ -85,6 +85,16 @@ export interface MotivoAviso {
   tipo: TipoRestriccion;
   /// Cuantos dias lleva abierta. 0 recien creada.
   diasAbierta: number;
+  /**
+   * Para cuando se prometio levantarla, si alguien lo prometio.
+   *
+   * Cambia el texto entero del aviso: no es lo mismo «te espera una
+   * restriccion» que «se paso la fecha que prometiste». Lo segundo es la
+   * conversacion que destraba la obra, y sin este dato no se puede decir.
+   */
+  fechaCompromiso?: Date | null;
+  /// Dias que quedan (o que se pasaron, en negativo) hasta esa fecha.
+  diasParaLaFecha?: number | null;
 }
 
 /// Un aviso ya repartido: a esta persona, por este canal, por esto.
@@ -705,7 +715,16 @@ export function textoAvisoSms(
   const cuenta = tareas === 1 ? "1 tarea espera" : `${tareas} tareas esperan`;
   const porQue = recortar(flujos.join(", "), 60);
 
-  const cola = `${cuenta} por ${porQue}. Entra a GCM.`;
+  // Si hay una promesa vencida, lo primero que se lee es eso. En 160
+  // caracteres solo cabe una idea, y "se paso la fecha" es la que hace actuar.
+  const vencidas = motivos.filter(
+    (m) => (m.diasParaLaFecha ?? null) !== null && m.diasParaLaFecha! < 0,
+  ).length;
+
+  const cola =
+    vencidas > 0
+      ? `se paso la fecha de ${vencidas === 1 ? "1 restriccion" : `${vencidas} restricciones`} (${porQue}). Entra a GCM.`
+      : `${cuenta} por ${porQue}. Entra a GCM.`;
   const sitio = LIMITE_SMS - cola.length - "GCM : ".length;
   const nombre = recortar(obra, Math.max(1, sitio));
 
@@ -740,6 +759,23 @@ export function textoAviso(
   }
 
   if (evento === "RECORDAR") {
+    // Si hay una promesa de por medio, ESA es la noticia. «Lleva cinco días
+    // abierta» es un dato; «se pasó la fecha que prometiste» es una promesa
+    // rota, y eso es lo que hace que alguien coja el teléfono.
+    const vencidos = motivos.filter(
+      (m) => (m.diasParaLaFecha ?? null) !== null && m.diasParaLaFecha! < 0,
+    );
+    if (vencidos.length > 0) {
+      const peor = Math.min(...vencidos.map((m) => m.diasParaLaFecha!));
+      const atraso = Math.abs(peor);
+      const cuantasV =
+        vencidos.length === 1 ? "1 restricción" : `${vencidos.length} restricciones`;
+      return {
+        titulo: `Se pasó la fecha en ${cuantasV}`,
+        cuerpo: `Se prometió tenerla${vencidos.length === 1 ? "" : "s"} y la más atrasada lleva ${atraso} ${atraso === 1 ? "día" : "días"} de retraso. Mientras nadie ponga fecha nueva, el trabajo sigue prometido para un día que ya no se sostiene.`,
+      };
+    }
+
     const dias = Math.max(...motivos.map((m) => m.diasAbierta));
     return {
       titulo: `${cuantas} sigue${tareas === 1 ? "" : "n"} esperando por ${lista}`,

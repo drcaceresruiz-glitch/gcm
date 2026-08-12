@@ -568,9 +568,57 @@ describe("los textos", () => {
     expect(textoAvisoSms(obra, muchos).length).toBeLessThanOrEqual(LIMITE_SMS);
   });
 
+  it("con una promesa vencida, el SMS habla de LA FECHA y no de la espera", () => {
+    // En 160 caracteres solo cabe una idea. "Lleva 5 dias abierta" es un dato;
+    // "se paso la fecha" es una promesa rota, y es la que hace coger el
+    // telefono.
+    const vencido: MotivoAviso = {
+      ...motivo(1, "MATERIALES", 9),
+      fechaCompromiso: d("2026-08-10"),
+      diasParaLaFecha: -3,
+    };
+    const texto = textoAvisoSms("CRIOCORD", [vencido]);
+    expect(texto).toContain("se paso la fecha");
+    expect(texto).not.toContain("1 tarea espera");
+    expect(texto.length).toBeLessThanOrEqual(LIMITE_SMS);
+  });
+
+  it("sigue cabiendo en 160 con la obra larga y muchas vencidas", () => {
+    const muchos = Array.from({ length: 40 }, (_, i) => ({
+      ...motivo(i, i % 2 === 0 ? "MATERIALES" : "INFORMACION"),
+      fechaCompromiso: d("2026-08-01"),
+      diasParaLaFecha: -12,
+    }));
+    expect(
+      textoAvisoSms("O".repeat(255), muchos).length,
+    ).toBeLessThanOrEqual(LIMITE_SMS);
+  });
+
   it("el SMS nunca lleva un enlace: las operadoras lo marcan como spam", () => {
     const texto = textoAvisoSms("CRIOCORD", [motivo(1, "MATERIALES")]);
     expect(texto).not.toMatch(/https?:|www\.|\.com|\.pe\//);
+  });
+
+  it("el recordatorio in-app dice la promesa rota, no los dias abiertos", () => {
+    const t = textoAviso("RECORDAR", [
+      {
+        ...motivo(1, "MATERIALES", 9),
+        fechaCompromiso: d("2026-08-10"),
+        diasParaLaFecha: -3,
+      },
+    ]);
+    expect(t.titulo).toContain("Se pasó la fecha");
+    expect(t.cuerpo).toContain("3 días de retraso");
+    // Y dice lo que se rompe si nadie hace nada, como el resto del sistema.
+    expect(t.cuerpo).toContain("fecha nueva");
+  });
+
+  it("sin promesa, el recordatorio sigue hablando de la antiguedad", () => {
+    // Lo de antes no se pierde: una restriccion que nadie prometio sigue
+    // necesitando que se diga cuanto lleva parada.
+    const t = textoAviso("RECORDAR", [motivo(1, "MATERIALES", 5)]);
+    expect(t.titulo).toContain("sigue esperando");
+    expect(t.cuerpo).toContain("5 días");
   });
 
   it("el SMS concuerda en singular y en plural", () => {

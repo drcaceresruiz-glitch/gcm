@@ -241,6 +241,9 @@ async function pasadaDeObra(
     select: {
       tipo: true,
       createdAt: true,
+      fechaCompromiso: true,
+      responsableUserId: true,
+      responsableContactoId: true,
       tarea: { select: { uid: true } },
     },
   });
@@ -256,14 +259,40 @@ async function pasadaDeObra(
     tarea: nombres.get(r.tarea.uid) ?? `Tarea ${r.tarea.uid}`,
     tipo: r.tipo,
     diasAbierta: diasEntre(r.createdAt, ahora),
+    fechaCompromiso: r.fechaCompromiso,
+    // Negativo = ya se paso. Es lo que decide si el texto habla de la espera o
+    // de la promesa rota.
+    diasParaLaFecha: r.fechaCompromiso
+      ? diasEntre(ahora, r.fechaCompromiso)
+      : null,
   }));
+
+  // PENDIENTE: avisar ademas al RESPONSABLE de cada restriccion, aunque no
+  // este suscrito a ese flujo.
+  //
+  // No se hace aqui todavia porque `repartirAvisos` reparte un lote COMUN de
+  // motivos entre todas las suscripciones: no sabe acotar unos motivos a una
+  // persona. Despacharlo en una segunda pasada tampoco vale —la clave de
+  // `EnvioAviso` lleva el conjunto de motivos dentro, asi que un subconjunto
+  // distinto es otra clave y quien ya recibio el aviso general recibiria un
+  // segundo—. Hacerlo bien pide que `repartirAvisos` acepte motivos por
+  // suscripcion, y eso es tocar la funcion que sostiene todo el reparto.
+  //
+  // Mientras tanto lo cubre la suscripcion por flujo, que es como funcionaba
+  // hasta ahora, y el texto ya dice la fecha prometida.
 
   let avisosApp = 0;
   let correos = 0;
   let sms = 0;
 
-  // Recordatorio: solo lo que hoy toca. Cada N dias, no todos los dias.
-  const paraRecordar = todos.filter((m) => tocaRecordar(m.diasAbierta, umbral));
+  // Recordatorio: lo que hoy toca por antiguedad, MAS lo que se prometio y ya
+  // vencio. Lo segundo no espera al ciclo de N dias: una fecha pasada es una
+  // conversacion pendiente hoy, no dentro de tres dias.
+  const paraRecordar = todos.filter(
+    (m) =>
+      tocaRecordar(m.diasAbierta, umbral) ||
+      (m.diasParaLaFecha !== null && m.diasParaLaFecha !== undefined && m.diasParaLaFecha < 0),
+  );
   if (paraRecordar.length > 0) {
     const r = await despachar(obra, "RECORDAR", paraRecordar, resueltas, {
       maxSmsDia: ajustes.maxSmsDia,
