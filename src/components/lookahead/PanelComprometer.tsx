@@ -25,10 +25,14 @@ export interface TareaSeleccionada {
   lista: boolean;
 }
 
+/// La forma la manda el servicio (`AvisoComprometer`): se copia aqui para no
+/// arrastrar `server-only` al cliente, asi que los dos tienen que ir a la par.
 interface Aviso {
   uid: number;
   nombre: string;
   semana?: number;
+  cerrada?: boolean;
+  cumplida?: boolean;
 }
 
 export function PanelComprometer({
@@ -202,15 +206,37 @@ export function PanelComprometer({
               </ul>
             </div>
           )}
-          {avisos.enOtraSemana.length > 0 && (
+          {/* Se separan porque son avisos OPUESTOS y antes decian lo mismo.
+              Que una tarea siga viva en una semana en marcha es un solape que
+              hay que resolver; que se cumpliera y se cerrara es volver a
+              prometer trabajo ya hecho, y eso hunde el PPC de la semana que
+              viene con un compromiso que nadie iba a ejecutar. */}
+          {avisos.enOtraSemana.some((a) => a.cerrada && a.cumplida) && (
+            <div>
+              <p className="opacity-80">Ya se cumplieron y su semana está cerrada:</p>
+              <ul className="ml-4 list-disc opacity-70">
+                {avisos.enOtraSemana
+                  .filter((a) => a.cerrada && a.cumplida)
+                  .map((a) => (
+                    <li key={a.uid}>
+                      {a.nombre} — cumplida en la Semana {a.semana}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+          {avisos.enOtraSemana.some((a) => !(a.cerrada && a.cumplida)) && (
             <div>
               <p className="opacity-80">Ya comprometidas en otra semana:</p>
               <ul className="ml-4 list-disc opacity-70">
-                {avisos.enOtraSemana.map((a) => (
-                  <li key={a.uid}>
-                    {a.nombre} (Semana {a.semana})
-                  </li>
-                ))}
+                {avisos.enOtraSemana
+                  .filter((a) => !(a.cerrada && a.cumplida))
+                  .map((a) => (
+                    <li key={a.uid}>
+                      {a.nombre} (Semana {a.semana}
+                      {a.cerrada ? ", cerrada sin cumplirse" : ""})
+                    </li>
+                  ))}
               </ul>
             </div>
           )}

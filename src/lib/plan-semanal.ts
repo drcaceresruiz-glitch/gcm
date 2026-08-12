@@ -478,22 +478,73 @@ export interface TareaProgramada {
  *
  * Es la base del autocargado del Plan Semanal: al abrir una semana sin
  * compromisos, se proponen estas tareas para que el residente solo confirme.
+ * Tambien es la ventana del Lookahead.
+ *
+ * **`terminadas` no es opcional por comodidad.** Sin ella, una partida al 100%
+ * seguia saliendo en la ventana del Lookahead con estado «Lista» y se podia
+ * volver a comprometer en la semana siguiente: fue lo que se vio en CRIOCORD
+ * el 11/08/2026, con cinco tareas cumplidas y cerradas en la Semana 2
+ * ofreciendose para la Semana 3. Y de paso inflaba la confiabilidad, que
+ * contaba como «listo para empezar» trabajo que ya estaba hecho.
+ *
+ * En una tarea terminada no hay nada que preparar ni nada que prometer, asi
+ * que no pertenece ni al make-ready ni al PTS. Sigue en el cronograma, en el
+ * parte y en la curva: solo desaparece de donde se planifica lo que falta.
  */
 export function tareasDeLaSemana(
   tareas: readonly TareaProgramada[],
   inicioSemana: Date,
   finSemana: Date,
+  terminadas: ReadonlySet<number> = new Set(),
 ): TareaProgramada[] {
   const ini = inicioSemana.getTime();
   const fin = finSemana.getTime();
   return tareas
-    .filter((t) => !t.esResumen && t.inicio.getTime() <= fin && t.fin.getTime() >= ini)
+    .filter(
+      (t) =>
+        !t.esResumen &&
+        !terminadas.has(t.uid) &&
+        t.inicio.getTime() <= fin &&
+        t.fin.getTime() >= ini,
+    )
     .slice()
     .sort(
       (a, b) =>
         a.inicio.getTime() - b.inicio.getTime() ||
         (a.codigo ?? "").localeCompare(b.codigo ?? ""),
     );
+}
+
+/// Lo minimo para saber si una tarea esta acabada.
+export interface TareaConAvance {
+  uid: number;
+  /// El `<PercentComplete>` del archivo. La siembra de la importacion.
+  porcentajeArchivo: string;
+}
+
+/**
+ * Que tareas estan al 100%.
+ *
+ * La regla de quien manda es la misma que en toda la aplicacion y no se puede
+ * decidir distinto aqui: **lo reportado desde obra gana**, y solo si nadie
+ * reporto nunca vale el porcentaje del archivo. Estaba escrita a mano en dos
+ * servicios; aqui esta una vez y con test.
+ *
+ * Se compara con `>= 100` y no con `=== 100`: los `Decimal` vuelven de la base
+ * como "100" o "100.00" segun la columna, y un texto que se compara por
+ * igualdad acabaria dejando fuera la mitad de los casos.
+ */
+export function tareasTerminadas(
+  tareas: readonly TareaConAvance[],
+  ultimoPorUid: ReadonlyMap<number, { porcentaje: string }>,
+): Set<number> {
+  const terminadas = new Set<number>();
+  for (const t of tareas) {
+    const reportado = ultimoPorUid.get(t.uid);
+    const vigente = Number(reportado?.porcentaje ?? t.porcentajeArchivo);
+    if (Number.isFinite(vigente) && vigente >= 100) terminadas.add(t.uid);
+  }
+  return terminadas;
 }
 
 export interface EnlacePredecesora {

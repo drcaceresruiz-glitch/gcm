@@ -14,6 +14,7 @@ import {
   uidsDuplicados,
   avisoNumeracionSemana,
   semanasAContramano,
+  tareasTerminadas,
   arrastreDeIncumplidos,
   type CompromisoPrevio,
   type CompromisoEvaluado,
@@ -219,6 +220,59 @@ describe("avisoNumeracionSemana", () => {
     // El indice unico ya impide dos planes con el mismo corte; aqui solo se
     // comprueba que no se avise de un empate.
     expect(avisoNumeracionSemana(dc("2026-08-15"), existentes)).toBeNull();
+  });
+});
+
+describe("tareasTerminadas y la ventana", () => {
+  const av = (porcentaje: string) => ({ porcentaje });
+
+  it("lo REPORTADO manda sobre el archivo, en los dos sentidos", () => {
+    const t = tareasTerminadas(
+      [
+        // El archivo la daba por hecha, pero obra reporto 80: no esta acabada.
+        { uid: 1, porcentajeArchivo: "100.00" },
+        // El archivo decia 0 y obra reporto 100: si lo esta.
+        { uid: 2, porcentajeArchivo: "0.00" },
+        // Nadie reporto nunca: vale el archivo.
+        { uid: 3, porcentajeArchivo: "100" },
+        { uid: 4, porcentajeArchivo: "45.00" },
+      ],
+      new Map([
+        [1, av("80.00")],
+        [2, av("100.00")],
+      ]),
+    );
+    expect([...t].sort()).toEqual([2, 3]);
+  });
+
+  it("UNA TAREA TERMINADA NO SE VUELVE A OFRECER", () => {
+    // El caso de CRIOCORD: cinco tareas cumplidas y cerradas en la Semana 2
+    // seguian saliendo en el Lookahead para comprometerlas en la Semana 3. En
+    // lo que ya esta hecho no hay nada que preparar ni nada que prometer.
+    const tareas = [
+      {
+        uid: 1, codigo: "4.5", nombre: "Curado de concreto",
+        inicio: dc("2026-08-10"), fin: dc("2026-08-14"), esResumen: false,
+      },
+      {
+        uid: 2, codigo: "5.1", nombre: "Transporte de estructuras",
+        inicio: dc("2026-08-10"), fin: dc("2026-08-14"), esResumen: false,
+      },
+    ];
+
+    // Sin el filtro salen las dos: es el comportamiento que fallaba.
+    expect(
+      tareasDeLaSemana(tareas, dc("2026-08-09"), dc("2026-08-15")).map((t) => t.uid),
+    ).toEqual([1, 2]);
+
+    expect(
+      tareasDeLaSemana(
+        tareas,
+        dc("2026-08-09"),
+        dc("2026-08-15"),
+        new Set([1]),
+      ).map((t) => t.uid),
+    ).toEqual([2]);
   });
 });
 

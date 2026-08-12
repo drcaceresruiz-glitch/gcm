@@ -3,7 +3,12 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { hoy } from "@/utils/fechas";
-import { tareasDeLaSemana, type TareaProgramada } from "@/lib/plan-semanal";
+import {
+  tareasDeLaSemana,
+  tareasTerminadas,
+  type TareaProgramada,
+} from "@/lib/plan-semanal";
+import { ultimoAvancePorTarea } from "@/lib/cronograma";
 import {
   ventanaLookahead,
   faseDeTarea,
@@ -248,13 +253,25 @@ async function cronogramaVigente(sesion: SesionActiva, obraId: string) {
           inicio: true,
           fin: true,
           esResumen: true,
+          // Para saber cuales estan acabadas: sin esto la ventana ofrecia
+          // preparar y comprometer trabajo ya hecho.
+          porcentajeArchivo: true,
         },
       },
     },
   });
 }
 
-/** Tareas del cronograma vigente que caen en la ventana del Lookahead. */
+/**
+ * Tareas del cronograma vigente que caen en la ventana del Lookahead.
+ *
+ * Las TERMINADAS se quedan fuera. El Lookahead es make-ready —preparar lo que
+ * viene—: en una partida al 100% no hay restricciones que levantar ni promesa
+ * que hacer. Mientras no se filtraron, la ventana ofrecia recomprometer en la
+ * Semana 3 cinco tareas ya cumplidas y cerradas en la Semana 2, y la
+ * confiabilidad salia al 100% contando trabajo hecho como «listo para
+ * empezar».
+ */
 async function tareasDeLaVentana(
   sesion: SesionActiva,
   obraId: string,
@@ -262,7 +279,25 @@ async function tareasDeLaVentana(
 ): Promise<{ desde: Date; hasta: Date; tareas: TareaProgramada[] }> {
   const { desde, hasta } = ventanaLookahead(hoy(), semanas);
   const cronograma = await cronogramaVigente(sesion, obraId);
-  const tareasCron: TareaProgramada[] = (cronograma?.tareas ?? []).map((t) => ({
+  const filas = cronograma?.tareas ?? [];
+
+  const avances = await prisma.avanceTarea.findMany({
+    where: { projectId: obraId },
+    orderBy: [{ fecha: "asc" }, { createdAt: "asc" }],
+    select: {
+      uid: true, porcentaje: true, fecha: true,
+      createdAt: true, reportadoPor: true, nota: true,
+    },
+  });
+  const ultimos = ultimoAvancePorTarea(
+    avances.map((a) => ({ ...a, porcentaje: a.porcentaje.toString() })),
+  );
+  const terminadas = tareasTerminadas(
+    filas.map((t) => ({ uid: t.uid, porcentajeArchivo: t.porcentajeArchivo.toString() })),
+    ultimos,
+  );
+
+  const tareasCron: TareaProgramada[] = filas.map((t) => ({
     uid: t.uid,
     codigo: t.codigo,
     nombre: t.nombre,
@@ -270,7 +305,11 @@ async function tareasDeLaVentana(
     fin: t.fin,
     esResumen: t.esResumen,
   }));
-  return { desde, hasta, tareas: tareasDeLaSemana(tareasCron, desde, hasta) };
+  return {
+    desde,
+    hasta,
+    tareas: tareasDeLaSemana(tareasCron, desde, hasta, terminadas),
+  };
 }
 
 /**

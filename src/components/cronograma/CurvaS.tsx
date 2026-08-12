@@ -162,7 +162,39 @@ export function CurvaS({
     ? [0, maximo / 4, maximo / 2, (maximo * 3) / 4, maximo]
     : [0, 25, 50, 75, 100];
 
-  const atrasado = Number(ultimoCorte.desfase) < 0;
+  /**
+   * La medida que leen los NUMEROS: el avance a hoy, no el ultimo cronograma
+   * importado.
+   *
+   * Hasta el 11/08/2026 esta cifra salia de `datos.cortes[ultimo]`, que es la
+   * ultima IMPORTACION de MS Project. Con el parte del dia y el cierre semanal
+   * escribiendo avance a diario, eso dejaba los indicadores clavados en la
+   * fecha del ultimo XML: en CRIOCORD, «real 11.27% al corte del 08/08»
+   * mientras el panel —que si lee el avance— decia 20.7%. Dos cifras del mismo
+   * avance en dos pantallas, y la que se enseña al cliente era la vieja.
+   *
+   * `puntoActual` ya viene del servicio con el ultimo real medido y su plan a
+   * esa misma fecha, que es exactamente lo que hace falta. La linea del grafico
+   * ya lo usaba; solo los rotulos se habian quedado atras.
+   */
+  const medida = datos.puntoActual
+    ? {
+        fecha: datos.puntoActual.fecha,
+        real: datos.puntoActual.real.toFixed(2),
+        planeado: datos.puntoActual.planeado.toFixed(2),
+        desfase: (datos.puntoActual.real - datos.puntoActual.planeado).toFixed(2),
+      }
+    : {
+        fecha: ultimoCorte.fecha,
+        real: decimal(ultimoCorte.real),
+        planeado: decimal(ultimoCorte.planeado),
+        desfase: decimal(ultimoCorte.desfase),
+      };
+  /// Si la medida cae en un corte importado se dice «al corte»; si no, es una
+  /// medida del dia y llamarla «corte» seria mentir sobre de donde sale.
+  const enCorte = medida.fecha.getTime() === ultimoCorte.fecha.getTime();
+
+  const atrasado = Number(medida.desfase) < 0;
   const ticks = calcularTicks(desde, hasta);
 
   // El cursor arranca en la fecha de corte, que es donde estaba la linea fija
@@ -484,12 +516,13 @@ export function CurvaS({
         </div>
 
         <p className="text-sm">
-          Al corte del <strong>{fechaCorta(ultimoCorte.fecha)}</strong>: real{" "}
-          <strong>{decimal(ultimoCorte.real)}%</strong> sobre un plan de{" "}
-          <strong>{decimal(ultimoCorte.planeado)}%</strong>,{" "}
+          {enCorte ? "Al corte del " : "Al "}
+          <strong>{fechaCorta(medida.fecha)}</strong>: real{" "}
+          <strong>{medida.real}%</strong> sobre un plan de{" "}
+          <strong>{medida.planeado}%</strong>,{" "}
           <strong style={{ color: atrasado ? "var(--color-peligro)" : "var(--color-exito)" }}>
-            {Number(ultimoCorte.desfase) > 0 ? "+" : ""}
-            {decimal(ultimoCorte.desfase)}%
+            {Number(medida.desfase) > 0 ? "+" : ""}
+            {medida.desfase}%
           </strong>{" "}
           respecto al plan. Ritmo actual:{" "}
           <strong>{textoRitmo(datos.factor)}%</strong> de lo previsto.{" "}
@@ -508,11 +541,11 @@ export function CurvaS({
         </p>
 
         <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          <Dato etiqueta="Avance real" valor={`${decimal(ultimoCorte.real)}%`} destacado />
-          <Dato etiqueta="Planeado" valor={`${decimal(ultimoCorte.planeado)}%`} />
+          <Dato etiqueta="Avance real" valor={`${medida.real}%`} destacado />
+          <Dato etiqueta="Planeado" valor={`${medida.planeado}%`} />
           <Dato
             etiqueta="Desfase"
-            valor={`${Number(ultimoCorte.desfase) > 0 ? "+" : ""}${decimal(ultimoCorte.desfase)}%`}
+            valor={`${Number(medida.desfase) > 0 ? "+" : ""}${medida.desfase}%`}
             color={atrasado ? "var(--color-peligro)" : "var(--color-exito)"}
           />
           <Dato etiqueta="Ritmo" valor={`${textoRitmo(datos.factor)}%`} />
@@ -550,10 +583,10 @@ export function CurvaS({
           grafico={svgRef}
           resumen={{
             obra: nombreObra,
-            corte: fechaCorta(ultimoCorte.fecha),
-            planeado: decimal(ultimoCorte.planeado),
-            real: decimal(ultimoCorte.real),
-            desfase: `${Number(ultimoCorte.desfase) > 0 ? "+" : ""}${decimal(ultimoCorte.desfase)}`,
+            corte: fechaCorta(medida.fecha),
+            planeado: medida.planeado,
+            real: medida.real,
+            desfase: `${Number(medida.desfase) > 0 ? "+" : ""}${medida.desfase}`,
             ritmo: `${textoRitmo(datos.factor)}%`,
             termino: datos.terminoProyectado
               ? fechaCorta(datos.terminoProyectado)

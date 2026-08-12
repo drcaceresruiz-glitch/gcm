@@ -18,6 +18,7 @@ import {
   validarCantidadPlan,
   uidsDuplicados,
   avisoNumeracionSemana,
+  tareasTerminadas,
   arrastreDeIncumplidos,
   CAUSAS_CNC,
   type AvisoNumeracion,
@@ -325,10 +326,20 @@ export async function obtenerPlanSemanal(
   const realDelPlanPorUid = new Map<number, string>();
   for (const a of avancesDelPlan) realDelPlanPorUid.set(a.uid, a.porcentaje.toString());
 
-  // Que tareas caen dentro de la semana del corte (para agrupar el desplegable).
+  // Que tareas caen dentro de la semana del corte (para agrupar el desplegable
+  // y para autocargar la semana vacia). Las TERMINADAS no se proponen: no se
+  // promete lo que ya esta hecho, y proponerlo era la otra cara del mismo
+  // agujero que dejaba el Lookahead ofrecer trabajo cumplido.
+  const terminadasUids = tareasTerminadas(
+    tareasCron.map((t) => ({
+      uid: t.uid,
+      porcentajeArchivo: t.porcentajeArchivo.toString(),
+    })),
+    ultimos,
+  );
   const { inicio: iniSemana, fin: finSemana } = rangoSemana(plan.fechaCorte);
   const enSemanaUids = new Set(
-    tareasDeLaSemana(tareasCron, iniSemana, finSemana).map((t) => t.uid),
+    tareasDeLaSemana(tareasCron, iniSemana, finSemana, terminadasUids).map((t) => t.uid),
   );
 
   // El analisis del Lookahead, para que el desplegable ponga primero lo LISTO
@@ -390,7 +401,12 @@ export async function obtenerPlanSemanal(
   // Sugerencias: las tareas cuyo trabajo cae en la semana del corte, menos las
   // ya cumplidas. La pantalla las usa para autocargar los compromisos cuando la
   // semana esta vacia; el residente confirma o ajusta.
-  const sugeridas = tareasDeLaSemana(tareasCron, iniSemana, finSemana)
+  //
+  // Los dos filtros hacen falta y no son el mismo: `uidsHechos` mira si alguien
+  // la dio por CUMPLIDA en otra semana; `terminadasUids`, si el avance
+  // reportado llego al 100%. Una tarea puede estar al 100% sin que ningun
+  // compromiso la declarara cumplida —se termino sin haberla prometido—.
+  const sugeridas = tareasDeLaSemana(tareasCron, iniSemana, finSemana, terminadasUids)
     .filter((t) => !uidsHechos.has(t.uid))
     .map((t) => ({
       uid: t.uid,
@@ -1220,6 +1236,16 @@ export interface AvisoComprometer {
   nombre: string;
   /// En que otra semana ya esta comprometida, si es el caso.
   semana?: number;
+  /**
+   * Si esa otra semana ya esta CERRADA y si alli se dio por cumplida.
+   *
+   * Sin esto, el dialogo decia lo mismo —«ya comprometida en la Semana 2»—
+   * tanto si la tarea sigue viva en una semana en marcha como si se cumplio y
+   * se cerro hace dias. Son avisos opuestos: el primero es un solape que hay
+   * que resolver; el segundo es volver a prometer trabajo hecho.
+   */
+  cerrada?: boolean;
+  cumplida?: boolean;
 }
 
 export type ResultadoComprometer =
@@ -1317,7 +1343,14 @@ export async function comprometerAlPts(
 
   const yaEnAlguna = await prisma.compromisoSemanal.findMany({
     where: { uid: { in: uids }, plan: { projectId: obraId } },
-    select: { uid: true, plan: { select: { id: true, numero: true } } },
+    select: {
+      uid: true,
+      cumplido: true,
+      plan: { select: { id: true, numero: true, estado: true } },
+    },
+    // Si una tarea aparece en varias semanas se avisa de la MAS RECIENTE, que
+    // es la que describe donde esta ahora.
+    orderBy: { plan: { fechaCorte: "desc" } },
   });
 
   const noListas: AvisoComprometer[] = [];
@@ -1335,7 +1368,13 @@ export async function comprometerAlPts(
     }
     const otra = yaEnAlguna.find((c) => c.uid === t.uid && c.plan.id !== planId);
     if (otra) {
-      enOtraSemana.push({ uid: t.uid, nombre: nombreDe(t), semana: otra.plan.numero });
+      enOtraSemana.push({
+        uid: t.uid,
+        nombre: nombreDe(t),
+        semana: otra.plan.numero,
+        cerrada: otra.plan.estado === "CERRADO",
+        cumplida: otra.cumplido === true,
+      });
     }
   }
 
