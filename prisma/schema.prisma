@@ -280,6 +280,10 @@ model User {
   codigosAcceso CodigoAcceso[]
   suscripcionesAviso SuscripcionAviso[]
   avisos             Aviso[]
+  /// Restricciones del Lookahead de las que se hizo cargo. Lleva nombre de
+  /// relacion porque el dia que haya un segundo vinculo entre las dos tablas
+  /// —quien la resolvio, por ejemplo— Prisma no sabria cual es cual.
+  restriccionesACargo Restriccion[] @relation("RestriccionesResponsable")
 
   @@unique([companyId, numDoc])
   @@index([companyId, estado])
@@ -1833,16 +1837,56 @@ model Restriccion {
   resueltaAt  DateTime?
   resueltaPor String?   @db.VarChar(150)
 
+  /// A QUIEN le toca levantarla. EXACTAMENTE UNO de los dos, o ninguno
+  /// mientras nadie lo haya decidido. Lo valida el servicio; la base no puede.
+  ///
+  /// Sin esto, el analisis de restricciones no es un analisis de restricciones:
+  /// el Last Planner pide una lista de restriccion -> responsable -> fecha en
+  /// que promete liberarla, y lo que habia era una casilla que alguien marca.
+  ///
+  /// El responsable casi nunca es el proveedor: es quien puede levantarla
+  /// DENTRO de la organizacion —el almacenero para MATERIALES, la oficina
+  /// tecnica para INFORMACION—. El proveedor es a quien esa persona persigue.
+  /// Ponerlo a el diluye la rendicion de cuentas, que es justo lo contrario de
+  /// lo que busca el sistema. Se permite igual porque a veces si lo es, pero la
+  /// pantalla ofrece primero a los de la obra.
+  responsableUserId     String?
+  responsableContactoId String?
+
+  /// Para cuando prometio tenerla levantada.
+  ///
+  /// `@db.Date` porque es un DIA, no un instante, igual que
+  /// `PlanSemanal.fechaCorte`: nadie promete un plano para las 14:32.
+  fechaCompromiso DateTime? @db.Date
+
+  /// Cuando se registro la promesa y quien la anoto.
+  ///
+  /// NO es lo mismo que quien promete. En obra la promesa llega por telefono y
+  /// la escribe el residente, y esa diferencia hay que poder verla: una promesa
+  /// que se hizo a si mismo el que la anota no vale lo mismo que una que hizo
+  /// el almacenero delante de todos.
+  comprometidoAt  DateTime?
+  comprometidoPor String?   @db.VarChar(150)
+
   createdAt DateTime @default(now())
 
-  tarea LookaheadTask @relation(fields: [lookaheadTaskId], references: [id], onDelete: Cascade)
-  fotos FotoEvidencia[]
+  tarea       LookaheadTask   @relation(fields: [lookaheadTaskId], references: [id], onDelete: Cascade)
+  fotos       FotoEvidencia[]
+  /// `SetNull` en los dos: dar de baja a alguien no puede borrar la traza de
+  /// que una restriccion estuvo a su nombre.
+  responsable User?           @relation("RestriccionesResponsable", fields: [responsableUserId], references: [id], onDelete: SetNull)
+  contacto    ContactoAviso?  @relation(fields: [responsableContactoId], references: [id], onDelete: SetNull)
 
   /// Un flujo no puede estar dos veces en la misma tarea. Cuando se sembraban
   /// las 7 de golpe no hacia falta; ahora se anaden y se quitan de una en una,
   /// y un duplicado seria invisible: la matriz indexa por tipo y ensenaria uno
   /// mientras el otro cuenta para el estado. Cubre tambien el indice de la FK.
   @@unique([lookaheadTaskId, tipo])
+  /// Para buscar las vencidas sin recorrer la tabla entera: el panel «Que
+  /// falta» pregunta por ellas en cada carga del tablero.
+  @@index([fechaCompromiso, resuelta])
+  @@index([responsableUserId, resuelta])
+  @@index([responsableContactoId])
   @@map("restricciones_tarea")
 }
 
@@ -2136,6 +2180,9 @@ model ContactoAviso {
 
   project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   suscripciones SuscripcionAviso[]
+  /// Restricciones de las que se hizo cargo. Alguien de fuera puede ser el
+  /// responsable de levantar una, aunque no sea lo habitual ni lo deseable.
+  restricciones Restriccion[]
 
   /// MySQL admite varios NULL en un indice unico, asi que esto no estorba a
   /// quien solo tiene correo o solo celular.

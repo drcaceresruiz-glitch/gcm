@@ -17,6 +17,11 @@ import {
   type ModoFlujos,
   type MotivoConservada,
 } from "@/lib/lookahead";
+import {
+  validarCompromisoRestriccion,
+  cumplimientoDeLiberacion,
+  type CumplimientoLiberacion,
+} from "@/lib/lookahead-compromiso";
 import { planesAbiertos, type SemanaAbierta } from "@/services/plan-semanal.service";
 import {
   fotosPorDestino,
@@ -526,6 +531,15 @@ export interface ConfiabilidadVentana extends Confiabilidad {
   semanas: number;
   /// Restricciones marcadas como resueltas en toda la ventana.
   restriccionesResueltas: number;
+  /**
+   * El cumplimiento de las PROMESAS de liberacion.
+   *
+   * La confiabilidad dice cuantas tareas estan listas; esto dice si quien se
+   * comprometio a dejarlas listas cumplio. Son preguntas distintas y las dos
+   * hacen falta: una obra puede tener confiabilidad baja porque nadie analiza,
+   * o porque se analiza y luego nadie levanta lo que prometio levantar.
+   */
+  liberacion: CumplimientoLiberacion;
 }
 
 /**
@@ -570,7 +584,16 @@ export async function confiabilidadDeVentana(
         select: {
           uid: true,
           analizadaAt: true,
-          restricciones: { select: { resuelta: true } },
+          restricciones: {
+            select: {
+              tipo: true,
+              resuelta: true,
+              resueltaAt: true,
+              fechaCompromiso: true,
+              responsableUserId: true,
+              responsableContactoId: true,
+            },
+          },
         },
       })
     : [];
@@ -591,13 +614,14 @@ export async function confiabilidadDeVentana(
     };
   });
 
+  const todasLasRestricciones = analizadas.flatMap((l) => l.restricciones);
+
   return {
     ...confiabilidad(filas),
     semanas,
-    restriccionesResueltas: analizadas.reduce(
-      (n, l) => n + l.restricciones.filter((r) => r.resuelta).length,
-      0,
-    ),
+    restriccionesResueltas: todasLasRestricciones.filter((r) => r.resuelta)
+      .length,
+    liberacion: cumplimientoDeLiberacion(todasLasRestricciones, hoy()),
   };
 }
 
@@ -1035,6 +1059,121 @@ export async function levantarTodasDeTareas(
     ids: pendientes.map((r) => r.id),
     resuelta: true,
   });
+}
+
+export interface ResultadoCompromiso {
+  ok: boolean;
+  /// Cuantas restricciones quedaron con la promesa puesta.
+  asignadas?: number;
+  error?: string;
+}
+
+/**
+ * Registra QUIEN levanta unas restricciones y PARA CUANDO.
+ *
+ * Es la pieza que le faltaba al analisis de restricciones para ser un analisis
+ * de restricciones: el Last Planner pide una lista de *restriccion ->
+ * responsable -> fecha*, y lo que habia era una casilla que alguien marca.
+ *
+ * VA EN LOTE porque asignar de una en una a treinta filas no lo hace nadie, y
+ * una funcion que no se usa no protege de nada. Es el mismo motivo por el que
+ * `levantarTodasDeTareas` existe.
+ *
+ * La promesa se registra VENGA POR DONDE VENGA. En obra llega por telefono y la
+ * escribe el residente, y por eso `comprometidoPor` guarda a quien la anota,
+ * que no es lo mismo que quien promete. Esa diferencia importa: una promesa que
+ * alguien se hizo a si mismo no vale lo que una que hizo el almacenero delante
+ * de todos.
+ */
+export async function comprometerRestricciones(
+  sesion: SesionActiva,
+  obraId: string,
+  datos: {
+    ids: readonly string[];
+    /// "u:<id>" | "c:<id>" | "" para dejarla sin responsable.
+    responsable: string;
+    /// "YYYY-MM-DD" | "" para quitar la fecha.
+    fecha: string;
+  },
+): Promise<ResultadoCompromiso> {
+  const error = await puertaDeEscritura(sesion, obraId);
+  if (error) return { ok: false, error };
+
+  const validacion = validarCompromisoRestriccion(
+    { responsable: datos.responsable, fecha: datos.fecha },
+    hoy(),
+  );
+  if (!validacion.ok) return { ok: false, error: validacion.error };
+
+  const ids = [...new Set(datos.ids)].slice(0, MAX_LOTE);
+  if (ids.length === 0) return { ok: true, asignadas: 0 };
+
+  // Los ids llegan del cliente: solo valen los que cuelgan de una tarea de ESTA
+  // obra y de esta empresa. Y solo las ABIERTAS: poner responsable a algo ya
+  // levantado seria escribir una promesa sobre trabajo terminado.
+  const suyas = await prisma.restriccion.findMany({
+    where: {
+      id: { in: ids },
+      resuelta: false,
+      tarea: { projectId: obraId, project: { companyId: sesion.companyId } },
+    },
+    select: { id: true },
+  });
+  if (suyas.length === 0) return { ok: true, asignadas: 0 };
+
+  const { responsable, fecha } = validacion.datos;
+
+  // El responsable tiene que ser de ESTA obra. Sin esto, un id copiado de otra
+  // obra dejaria una restriccion a nombre de alguien que no puede ni verla.
+  if (responsable) {
+    const existe =
+      responsable.tipo === "usuario"
+        ? await prisma.projectMembership.count({
+            where: { projectId: obraId, userId: responsable.id },
+          })
+        : await prisma.contactoAviso.count({
+            where: { id: responsable.id, projectId: obraId, activo: true },
+          });
+    if (existe === 0) {
+      return { ok: false, error: "Esa persona no está en esta obra." };
+    }
+  }
+
+  const ahora = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.restriccion.updateMany({
+      where: { id: { in: suyas.map((r) => r.id) } },
+      data: {
+        responsableUserId:
+          responsable?.tipo === "usuario" ? responsable.id : null,
+        responsableContactoId:
+          responsable?.tipo === "contacto" ? responsable.id : null,
+        fechaCompromiso: fecha,
+        comprometidoAt: ahora,
+        comprometidoPor: quien(sesion),
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "Restriccion",
+        entidadId: obraId,
+        accion: "UPDATE",
+        despues: {
+          evento: "comprometer",
+          restricciones: suyas.length,
+          responsable: datos.responsable || null,
+          fecha: datos.fecha || null,
+        },
+      },
+    });
+  });
+
+  return { ok: true, asignadas: suyas.length };
 }
 
 /**
