@@ -17,6 +17,8 @@ import {
 import { accionSubirEvidencia } from "@/app/(dashboard)/obras/[id]/evidencia/acciones";
 import type { FotoResumen } from "@/services/evidencia.service";
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
+import { cumplidoPorCantidad, cumplidoAlCerrar } from "@/lib/cierre-cantidad";
+import { esPositivo } from "@/lib/decimal";
 
 /**
  * Cerrar la semana: por cada compromiso, cumplido si/no; si no, su causa (CNC)
@@ -99,15 +101,29 @@ export function CierrePlanSemanal({
       const r = await accionCerrarPlanSemanal(
         obraId,
         planId,
-        filas.map((f) => ({
-          compromisoId: f.id,
-          cumplido: f.cumplido,
-          causa: f.cumplido ? null : f.causa,
-          nota: f.nota.trim() || null,
-          porcentajeReal:
-            f.uid !== null ? (f.porcentajeReal.trim() || null) : null,
-          cantidadEjec: f.cantidadEjec.trim() || null,
-        })),
+        filas.map((f) => {
+          /**
+           * La MISMA regla que la pantalla ensena y que el servicio aplica.
+           * Si aqui se mandara la casilla a secas, un «30 de 120 m2, cumplido»
+           * viajaria sin causa —el servidor la exige mirando lo ENVIADO, y
+           * deriva despues—, y la semana quedaria guardada con un no cumplido
+           * mudo, que es justo lo que el cierre existe para impedir.
+           */
+          const cumplido = cumplidoAlCerrar({
+            marcado: f.cumplido,
+            cantidadPlan: f.cantidadPlan,
+            cantidadEjec: f.cantidadEjec.trim() || null,
+          });
+          return {
+            compromisoId: f.id,
+            cumplido,
+            causa: cumplido ? null : f.causa,
+            nota: f.nota.trim() || null,
+            porcentajeReal:
+              f.uid !== null ? (f.porcentajeReal.trim() || null) : null,
+            cantidadEjec: f.cantidadEjec.trim() || null,
+          };
+        }),
         confirmado,
       );
       if (r.ok) return; // revalidatePath repinta la pagina ya cerrada.
@@ -128,6 +144,18 @@ export function CierrePlanSemanal({
       <ul className="space-y-2">
         {filas.map((f) => {
           const fotos = compromisos.find((c) => c.id === f.id)?.fotos ?? [];
+          /**
+           * Cuando hay cantidad comprometida, la casilla NO manda: lo decide lo
+           * ejecutado. Se ensena deshabilitada con el resultado ya puesto, en
+           * vez de dejar marcar algo que el servicio va a desmentir al guardar.
+           *
+           * `derivado` es null mientras no haya con que deducirlo —aun no se ha
+           * escrito la cantidad—, y entonces manda la persona, como siempre.
+           */
+          const derivado = cumplidoPorCantidad(f.cantidadPlan, f.cantidadEjec);
+          const cumplido = derivado ?? f.cumplido;
+          const mandaLaCantidad =
+            f.cantidadPlan !== null && esPositivo(f.cantidadPlan);
           return (
           <li
             key={f.id}
@@ -135,13 +163,23 @@ export function CierrePlanSemanal({
             style={{ borderColor: "var(--borde)" }}
           >
             <div className="flex flex-wrap items-center gap-3">
-              <label className="inline-flex items-center gap-1.5">
+              <label
+                className="inline-flex items-center gap-1.5"
+                title={
+                  derivado !== null
+                    ? `Lo decide la cantidad: ${f.cantidadEjec} de ${f.cantidadPlan} ${f.unidad ?? ""}`
+                    : undefined
+                }
+              >
                 <input
                   type="checkbox"
-                  checked={f.cumplido}
+                  checked={cumplido}
+                  disabled={derivado !== null}
                   onChange={(e) => set(f.id, { cumplido: e.target.checked })}
                 />
-                <span>Cumplido</span>
+                <span className={derivado !== null ? "opacity-60" : undefined}>
+                  Cumplido
+                </span>
               </label>
               <span className="flex-1">{f.descripcion}</span>
               {/* Solo si se comprometio por cantidad: preguntar "cuantos m2"
@@ -191,11 +229,21 @@ export function CierrePlanSemanal({
                 }
               />
             </div>
+            {/* Se dice en cuanto hay cantidad comprometida, no solo cuando ya
+                se dedujo: quien va a escribir «119» tiene que saber ANTES que
+                no le va a contar, y no descubrirlo al ver la casilla apagada. */}
+            {mandaLaCantidad && (
+              <p className="mt-1.5 text-xs opacity-70">
+                Lo decide la <strong>cantidad ejecutada</strong>: {f.cantidadPlan}{" "}
+                {f.unidad ?? ""} o más es cumplido. El corte es exacto — 119 de 120
+                no lo es.
+              </p>
+            )}
             {/* Cumplido y sin porcentaje: NO se registrara avance fisico. Se
                 dice, en vez de inventar un 100 como se hacia antes —que daba
                 por terminada una tarea de tres semanas por haber cumplido el
                 tramo de una, y falsificaba la curva S—. */}
-            {f.uid !== null && f.cumplido && !f.porcentajeReal.trim() && (
+            {f.uid !== null && cumplido && !f.porcentajeReal.trim() && (
               <p className="mt-1.5 text-xs" style={{ color: "var(--color-alerta)" }}>
                 Sin <strong>% alcanzado</strong> no se registrará avance físico de
                 esta tarea. Cuenta para el PPC igual. Escribe el acumulado si
@@ -203,7 +251,7 @@ export function CierrePlanSemanal({
               </p>
             )}
 
-            {!f.cumplido && (
+            {!cumplido && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <select
                   value={f.causa}
