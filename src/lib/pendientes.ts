@@ -128,12 +128,17 @@ export interface ConteoPendientes {
   coberturaMapeo: number | null;
 }
 
-/// Por debajo de esto, el PPC ya no es un mal dato suelto sino un patron.
-export const PPC_PREOCUPANTE = 70;
-
-/// Por debajo de esto SI es literalmente cierto que se cumple menos de la
-/// mitad de lo prometido. Existe para que el texto no lo diga cuando no lo es.
-export const PPC_MENOS_DE_LA_MITAD = 50;
+/**
+ * Los umbrales del PPC viven en `@/lib/plan-semanal`, que es de quien es el
+ * indicador. Se reexportan aqui porque este modulo los publicaba antes y hay
+ * codigo que los pide por esta puerta.
+ *
+ * Estaban definidos aqui y los usaba tambien el grafico. Con la definicion
+ * repartida, un grafico podia pintar en rojo lo que este panel llamaba
+ * aceptable.
+ */
+export { PPC_PREOCUPANTE, PPC_MENOS_DE_LA_MITAD } from "@/lib/plan-semanal";
+import { PPC_PREOCUPANTE, PPC_MENOS_DE_LA_MITAD } from "@/lib/plan-semanal";
 
 /// El EVM no puede ponderar por dinero con menos mapeo que esto.
 export const COBERTURA_MINIMA_MAPEO = 60;

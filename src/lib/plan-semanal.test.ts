@@ -15,6 +15,8 @@ import {
   avisoNumeracionSemana,
   semanasAContramano,
   causaQueMasFrena,
+  bandaDePpc,
+  filasDeParetoAcumulado,
   cumplidosSinAvance,
   tareasTerminadas,
   arrastreDeIncumplidos,
@@ -228,6 +230,56 @@ describe("avisoNumeracionSemana", () => {
     // El indice unico ya impide dos planes con el mismo corte; aqui solo se
     // comprueba que no se avise de un empate.
     expect(avisoNumeracionSemana(dc("2026-08-15"), existentes)).toBeNull();
+  });
+});
+
+describe("bandaDePpc", () => {
+  it("usa los mismos cortes con los que el panel decide alarmarse", () => {
+    // Si el grafico pintara en rojo lo que el panel llama aceptable, uno de
+    // los dos sobraria.
+    expect(bandaDePpc(100)).toBe("bueno");
+    expect(bandaDePpc(70)).toBe("bueno");
+    expect(bandaDePpc(69.9)).toBe("flojo");
+    expect(bandaDePpc(50)).toBe("flojo");
+    expect(bandaDePpc(49.9)).toBe("malo");
+    expect(bandaDePpc(0)).toBe("malo");
+  });
+});
+
+describe("filasDeParetoAcumulado", () => {
+  const f = (causa: CausaNoCumplimiento, conteo: number) => ({ causa, conteo });
+
+  it("acumula y marca las que suman el 80%", () => {
+    // 6 + 3 = 9 de 12 = 75%; hace falta la tercera para pasar del 80.
+    const r = filasDeParetoAcumulado([
+      f("PRERREQUISITO", 6),
+      f("MATERIALES", 3),
+      f("MANO_OBRA", 2),
+      f("CLIMA", 1),
+    ]);
+
+    expect(r.map((x) => x.acumulado)).toEqual([6, 9, 11, 12]);
+    expect(r.map((x) => Math.round(x.acumuladoPorcentaje))).toEqual([50, 75, 92, 100]);
+    expect(r.map((x) => x.dentroDel80)).toEqual([true, true, true, false]);
+  });
+
+  it("INCLUYE la causa que cruza el 80, no solo las de debajo", () => {
+    // Dejar fuera la que completa el 80 seria describir un Pareto que no
+    // llega al Pareto.
+    const r = filasDeParetoAcumulado([f("PRERREQUISITO", 8), f("MATERIALES", 2)]);
+    expect(r[0]?.dentroDel80).toBe(true);
+    expect(r[0]?.acumuladoPorcentaje).toBe(80);
+    expect(r[1]?.dentroDel80).toBe(false);
+  });
+
+  it("con una sola causa, esa lo es todo", () => {
+    const r = filasDeParetoAcumulado([f("PRERREQUISITO", 3)]);
+    expect(r[0]?.porcentaje).toBe(100);
+    expect(r[0]?.dentroDel80).toBe(true);
+  });
+
+  it("sin causas no hay filas", () => {
+    expect(filasDeParetoAcumulado([])).toEqual([]);
   });
 });
 

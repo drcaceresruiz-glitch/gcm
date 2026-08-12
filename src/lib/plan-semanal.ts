@@ -241,9 +241,96 @@ export function cumplidosSinAvance(
     .map((c) => ({ compromisoId: c.compromisoId, descripcion: c.descripcion }));
 }
 
+/**
+ * Los umbrales del PPC, en un solo sitio.
+ *
+ * Vivian en `@/lib/pendientes`, que es quien decide cuando alarmarse. Estan
+ * aqui porque el indicador es de este modulo y lo usan tres sitios —el panel,
+ * el color de las barras y el objetivo del grafico—: con la definicion
+ * repartida, un grafico podia pintar en rojo lo que el panel llamaba
+ * aceptable. `pendientes` los reexporta para no romper a quien ya los pedia
+ * alli.
+ *
+ * OBJETIVO 80: la referencia habitual de un Last Planner sano —la literatura
+ * situa lo saludable entre 75 y 85—. Es la raya del grafico, no un umbral de
+ * alarma: por debajo se avisa a partir de 70.
+ */
+export const PPC_OBJETIVO = 80;
+
+/// Por debajo de esto, el PPC ya no es un mal dato suelto sino un patron.
+export const PPC_PREOCUPANTE = 70;
+
+/// Por debajo de esto SI es literalmente cierto que se cumple menos de la
+/// mitad de lo prometido. Existe para que el texto no lo diga cuando no lo es.
+export const PPC_MENOS_DE_LA_MITAD = 50;
+
+export type BandaPpc = "bueno" | "flojo" | "malo";
+
+/// En que banda cae un PPC. Es lo que decide el color de su barra, con los
+/// mismos cortes que usa el panel para decidir el tono del aviso.
+export function bandaDePpc(ppc: number): BandaPpc {
+  if (ppc < PPC_MENOS_DE_LA_MITAD) return "malo";
+  if (ppc < PPC_PREOCUPANTE) return "flojo";
+  return "bueno";
+}
+
 export interface FilaPareto {
   causa: CausaNoCumplimiento;
   conteo: number;
+}
+
+export interface FilaParetoAcumulada extends FilaPareto {
+  /// Que parte del total se lleva esta causa (0..100).
+  porcentaje: number;
+  /// Cuantos fallos suman esta y todas las anteriores.
+  acumulado: number;
+  /// Ese acumulado en porcentaje (0..100).
+  acumuladoPorcentaje: number;
+  /**
+   * Si entra en el 80% que hay que atacar.
+   *
+   * Incluye a la que CRUZA el 80, no solo a las que se quedan por debajo: si
+   * tres causas suman el 78%, dejar fuera la cuarta —la que completa el 80—
+   * seria describir un Pareto que no llega al Pareto.
+   */
+  dentroDel80: boolean;
+}
+
+/// Que parte de los fallos hay que resolver para que el problema se note.
+export const CORTE_PARETO = 80;
+
+/**
+ * El Pareto con su acumulado.
+ *
+ * `paretoCausas` ya ordena de mayor a menor, y con eso solo se sabia cual
+ * falla mas. Lo que dice CUANTAS causas atacar es el acumulado: la regla 80/20
+ * separa las pocas que explican casi todo de la cola que no cambia nada.
+ * Sin curva ni corte, un Pareto es un grafico de barras ordenado.
+ */
+export function filasDeParetoAcumulado(
+  filas: readonly FilaPareto[],
+): FilaParetoAcumulada[] {
+  const total = filas.reduce((s, f) => s + f.conteo, 0);
+  if (total === 0) return [];
+
+  let acumulado = 0;
+  let cruzado = false;
+
+  return filas.map((f) => {
+    acumulado += f.conteo;
+    const acumuladoPorcentaje = (acumulado / total) * 100;
+    // La primera que llega al 80 entra; a partir de ahi, fuera.
+    const dentroDel80 = !cruzado;
+    if (acumuladoPorcentaje >= CORTE_PARETO) cruzado = true;
+
+    return {
+      ...f,
+      porcentaje: (f.conteo / total) * 100,
+      acumulado,
+      acumuladoPorcentaje,
+      dentroDel80,
+    };
+  });
 }
 
 /**
