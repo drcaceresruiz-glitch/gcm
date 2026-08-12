@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { CalendarDays, MapPin, Pencil } from "lucide-react";
+import { CalendarDays, Download, MapPin, Pencil } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, hitosDeObra, avisosDeSeccion } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
@@ -227,6 +227,31 @@ export default async function ObraLayout({
               comprometido nada. El servicio lo vuelve a comprobar. */}
           {obra.estado === "PLANIFICACION" && puede(sesion, "obra:eliminar") && (
             <EliminarObra obraId={obra.id} nombre={obra.nombreObra} />
+          )}
+
+          {/* El respaldo completo, solo con la obra ya cerrada: mientras siga
+              viva sus cifras cambian y el archivo saldria con las partidas de
+              un momento y las ordenes de otro.
+
+              Un enlace y no un boton con JavaScript: la descarga la resuelve
+              el navegador solo, igual que el informe en PDF. */}
+          {obra.estado === "CERRADA" && puede(sesion, "obra:eliminar_cerrada") && (
+            <div className="mt-4">
+              <a
+                href={`/obras/${obra.id}/respaldo`}
+                download
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs"
+                style={{ borderColor: "var(--borde)" }}
+              >
+                <Download className="size-3.5" aria-hidden="true" />
+                Descargar respaldo completo
+              </a>
+              <p className="mt-1.5 text-xs opacity-70">
+                Un .zip con la obra entera —presupuesto, ordenes, cronograma,
+                avances y fotos— y un resumen que se abre sin GCM. Contiene
+                datos personales: guardalo como el expediente en papel.
+              </p>
+            </div>
           )}
         </div>
       </div>
