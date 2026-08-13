@@ -79,6 +79,14 @@ if ! mkdir "$CANDADO" 2>/dev/null; then
 fi
 trap 'rm -rf "$CANDADO"' EXIT
 
+# Se deja constancia ANTES de hacer nada, y no solo al terminar.
+#
+# El 12 de agosto un despliegue se aplico sin que apareciera una sola linea en
+# esta bitacora, y eso hizo imposible saber si el script habia corrido, si habia
+# muerto a mitad o si el paquete lo habia aplicado otra cosa. Una linea al
+# empezar convierte esa pregunta en una respuesta.
+registrar "Paquete detectado; se empieza a aplicar."
+
 # Se renombra antes de tocarlo: si el proceso muere ahora, el siguiente pase no
 # reintenta sobre un archivo incompleto y el fallo queda visible.
 mv -f "$PAQUETE" "$EN_CURSO" || { registrar "ERROR: no se pudo reservar el paquete."; exit 1; }
