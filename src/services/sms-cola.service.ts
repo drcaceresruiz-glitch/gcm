@@ -1,7 +1,6 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { env } from "@/lib/env";
 import { hashToken } from "@/lib/tokens";
 import {
   GRACIA_PRESTAMO_SEGUNDOS,
@@ -9,7 +8,6 @@ import {
   MAXIMO_POR_ENTREGA,
   PRIORIDAD_CODIGO,
   caducidadDeMensaje,
-  tokenValido,
 } from "@/lib/sms-cola";
 import type { AlcanceCola } from "@/lib/emisor-sms";
 
@@ -48,9 +46,11 @@ export interface MensajePendiente {
  * falta comparar en tiempo constante como en `tokenValido`: el hash de 32
  * bytes no filtra el secreto por lo que tarde la consulta.
  *
- * El respaldo del token de entorno se comprueba DESPUES, y solo si ningun
- * emisor casa: mientras una empresa no tenga el suyo, su cola la sigue
- * sirviendo el telefono de siempre. Ver `AlcanceCola`.
+ * NO HAY RESPALDO. Hubo uno —un `SMS_COLA_TOKEN` de entorno que se probaba
+ * cuando ningun emisor casaba— y se quito el 12 de agosto de 2026: alcanzaba
+ * la cola de TODA empresa sin emisor propio, o sea varias a la vez, y por esta
+ * cola viajan los codigos en claro. Un emisor no reconocido es un emisor no
+ * reconocido. Ver `AlcanceCola`.
  */
 export async function resolverAlcance(
   token: string | null,
@@ -62,41 +62,34 @@ export async function resolverAlcance(
     select: { id: true, companyId: true },
   });
 
-  if (emisor) {
-    return { tipo: "empresa", companyId: emisor.companyId, emisorId: emisor.id };
-  }
+  if (!emisor) return null;
 
-  const global = env.SMS_COLA_TOKEN;
-  if (global && global.length >= 32 && tokenValido(token, global)) {
-    return { tipo: "respaldo" };
-  }
-
-  return null;
+  return { companyId: emisor.companyId, emisorId: emisor.id };
 }
 
 /**
- * Que mensajes alcanza este emisor.
+ * Que mensajes alcanza este emisor: los de SU empresa, y ninguno mas.
  *
- * El respaldo alcanza a las empresas que **todavia no tienen emisor propio**.
- * Es lo que hace que encender esto no deje a nadie sin SMS ni un minuto: el
- * telefono de siempre sigue sirviendo hasta que cada empresa registra el suyo,
- * y en ese momento deja de alcanzarla.
+ * Es una linea, y aun asi tiene funcion propia: obliga a que el filtro de
+ * empresa se escriba UNA vez y lo compartan la recogida y la confirmacion. Si
+ * cada una lo pusiera por su cuenta, bastaria olvidarlo en un sitio.
  */
 function filtroDelAlcance(alcance: AlcanceCola) {
-  return alcance.tipo === "empresa"
-    ? { companyId: alcance.companyId }
-    : { company: { emisoresSms: { none: { activo: true } } } };
+  return { companyId: alcance.companyId };
 }
 
-/** Si esta empresa tiene por donde sacar un SMS. */
+/**
+ * Si esta empresa tiene por donde sacar un SMS.
+ *
+ * Solo cuenta emisor PROPIO. Antes valia tambien el token global de entorno, y
+ * por eso esto devolvia `true` para empresas que no habian vinculado nada: sus
+ * SMS salian por el telefono de otro.
+ */
 export async function hayColaSms(companyId: string): Promise<boolean> {
   const propio = await prisma.emisorSms.count({
     where: { companyId, activo: true },
   });
-  if (propio > 0) return true;
-
-  const global = env.SMS_COLA_TOKEN;
-  return Boolean(global && global.length >= 32);
+  return propio > 0;
 }
 
 /**
@@ -198,8 +191,6 @@ export async function recogerPendientes(
  * avise; con esto, la pantalla del administrador lo dice.
  */
 async function anotarLatido(alcance: AlcanceCola, ahora: Date): Promise<void> {
-  if (alcance.tipo !== "empresa") return;
-
   await prisma.emisorSms
     .update({
       where: { id: alcance.emisorId },

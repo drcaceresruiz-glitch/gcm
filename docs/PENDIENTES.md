@@ -1141,10 +1141,14 @@ agruparlo-.
 4. **`configuracion:editar` es INNEGOCIABLE.** No por ser "ajustes": quien
    vincula un emisor puede leer los codigos de acceso de toda su empresa. Es
    de la misma familia que `permiso:editar`.
-5. **`SMS_COLA_TOKEN` sigue sirviendo, pero SOLO a las empresas sin emisor
-   propio.** Es la transicion, para que nadie se quedara sin SMS el dia del
-   cambio, y **esta pensada para borrarse**: mientras exista, un solo secreto
-   alcanza la cola de cualquier empresa que se quede sin emisor.
+5. **`SMS_COLA_TOKEN` YA NO EXISTE — borrado el 12 de agosto de 2026.** Era la
+   transicion para que nadie se quedara sin SMS el dia del cambio, y estaba
+   pensada para borrarse: mientras existiera, un solo secreto alcanzaba la cola
+   de cualquier empresa sin emisor propio —varias a la vez—, y por esa cola
+   viajan los codigos del pase y del segundo factor EN CLARO. Se comprobo en
+   produccion que la unica empresa ya tenia su emisor activo, asi que quitarlo
+   no dejo a nadie sin SMS. Una empresa sin emisor propio no tiene cola y sus
+   codigos salen por correo.
 
 **La ruta `/api/sms/cola` ya no responde 404** cuando no hay cola configurada:
 ahora existe siempre y quien decide es la credencial, asi que todo lo que no

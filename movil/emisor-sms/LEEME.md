@@ -32,7 +32,9 @@ aplicación que sea el gestor de SMS por defecto del teléfono.
 
 1. Abre la app y concede los permisos que pida (SMS y notificaciones).
 2. **Dirección de la cola**: `https://gcm.drcaceresruiz.com/api/sms/cola`
-3. **Token**: el mismo valor que pusiste en `SMS_COLA_TOKEN` en cPanel.
+3. **Token**: el que da GCM al vincular este telefono, en Empresa ->
+   Configuracion. Se ensena UNA vez y no se puede volver a ver; si se pierde,
+   se revoca y se crea otro. Es de esa empresa y solo alcanza su cola.
 4. Pulsa **Encender**.
 5. Pulsa **Quitar el ahorro de batería** y acepta.
 

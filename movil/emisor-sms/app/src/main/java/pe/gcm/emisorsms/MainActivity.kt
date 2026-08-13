@@ -86,7 +86,7 @@ class MainActivity : Activity() {
             setPadding(0, margen, 0, 0)
         })
         campoToken = EditText(this).apply {
-            hint = "el valor de SMS_COLA_TOKEN"
+            hint = "el token de Empresa -> Configuracion"
             setText(ajustes.token)
             // Se oculta al escribirlo: alguien puede estar mirando la pantalla
             // mientras se configura en la caseta.

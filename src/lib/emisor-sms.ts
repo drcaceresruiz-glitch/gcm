@@ -10,20 +10,27 @@
 /**
  * A quien sirve un emisor que acaba de presentar su credencial.
  *
- * `empresa` es lo normal: un token vinculado a una constructora, que solo ve
- * los mensajes de esa constructora.
+ * Siempre a UNA empresa, y por eso esto no es una union: un token vinculado a
+ * una constructora, que solo ve los mensajes de esa constructora.
  *
- * `respaldo` es la TRANSICION, y esta pensada para desaparecer. Hasta el 12
- * de agosto de 2026 habia un unico `SMS_COLA_TOKEN` para toda la plataforma;
- * si se hubiera apagado de golpe, el telefono ya configurado habria dejado de
- * mandar hasta que alguien lo reconfigurara. Con este alcance sigue sirviendo
- * —pero SOLO a las empresas que todavia no tienen emisor propio—, asi que en
- * cuanto cada una registra el suyo deja de alcanzarla. Cuando no quede
- * ninguna sin emisor, la variable de entorno se puede borrar.
+ * HUBO UN SEGUNDO ALCANCE, `respaldo`, y esta es la nota de su defuncion
+ * porque explica que no se debe reponer. Nacio como transicion: hasta el 12
+ * de agosto de 2026 habia un unico `SMS_COLA_TOKEN` para toda la plataforma, y
+ * apagarlo de golpe habria dejado mudo al telefono ya configurado. Servia «solo
+ * a las empresas que todavia no tienen emisor propio», que suena acotado y no
+ * lo es: son VARIAS empresas a la vez, y por esta cola viajan los codigos EN
+ * CLARO —incluidos los del segundo factor—. Un solo secreto leia los codigos de
+ * todo cliente que no hubiera registrado su telefono, antes que sus duenos.
+ *
+ * Con una constructora era deuda; con clientes de pago es un fallo de
+ * aislamiento entre inquilinos. Una empresa sin emisor propio ya no tiene cola:
+ * sus codigos salen por correo, que es un modo degradado honesto. Compartir un
+ * secreto entre inquilinos no lo era.
  */
-export type AlcanceCola =
-  | { tipo: "empresa"; companyId: string; emisorId: string }
-  | { tipo: "respaldo" };
+export interface AlcanceCola {
+  companyId: string;
+  emisorId: string;
+}
 
 /**
  * Cada cuanto pregunta un emisor sano.

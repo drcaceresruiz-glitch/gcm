@@ -11,10 +11,12 @@ import { encolarSms, hayColaSms } from "@/services/sms-cola.service";
  * SMS: `pase.service` llama a `enviarSms` y se acabo. Los canales, en orden
  * de preferencia:
  *
- * 1. **La cola propia** (`SMS_COLA_TOKEN`). GCM deja el mensaje en una cola y
- *    el telefono de la empresa lo recoge con MacroDroid o Tasker y lo manda
- *    con su SIM. Es lo que pidio el usuario para no depender de nadie. Ver
- *    `sms-cola.service` para el reparto y para el riesgo que trae.
+ * 1. **La cola propia de la empresa.** GCM deja el mensaje en una cola y el
+ *    telefono de esa constructora lo recoge con MacroDroid o Tasker y lo manda
+ *    con su SIM. Es lo que pidio el usuario para no depender de nadie. La
+ *    credencial es de cada empresa y vive hasheada en la base: ya no hay
+ *    ningun token de entorno que sirva a varias. Ver `sms-cola.service` para
+ *    el reparto y para el riesgo que trae.
  * 2. **json.pe** (`SMS_TOKEN`). La pasarela de antes, que TAMPOCO enviaba
  *    desde la nube: salia del movil Android del cliente con su app instalada.
  *    Se conserva como respaldo.

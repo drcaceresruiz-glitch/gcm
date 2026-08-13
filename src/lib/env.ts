@@ -83,31 +83,22 @@ const envSchema = z.object({
    */
   SMS_TOKEN: z.string().optional(),
 
-  /**
-   * Secreto de la COLA de SMS: la linea propia, sin intermediarios.
+  /*
+   * AQUI VIVIA `SMS_COLA_TOKEN`, y se quito el 12 de agosto de 2026. Queda la
+   * nota para que nadie lo reponga creyendo que arregla algo.
    *
-   * Con ella, GCM deja los mensajes en una cola y el telefono de la empresa
-   * los recoge (MacroDroid o Tasker) y los manda con su SIM. Tiene
-   * preferencia sobre `SMS_TOKEN`.
+   * Era el secreto unico de la cola de SMS, y servia a TODA empresa que no
+   * hubiera vinculado su propio telefono. No a una: a todas a la vez. Por esa
+   * cola viajan los codigos del pase y los del segundo factor EN CLARO, asi
+   * que quien tuviera esa cadena leia los codigos de cualquier cliente sin
+   * emisor propio antes que sus duenos. Con una constructora era deuda; con
+   * clientes de pago es un fallo de aislamiento entre inquilinos.
    *
-   * OPCIONAL, como el SMTP: sin ella la ruta de la cola responde 404 y el
-   * codigo del pase sale por correo o lo dicta el residente.
-   *
-   * Debe medir 32 caracteres o mas y ser aleatorio: es la unica credencial
-   * que protege la cola, y por esa cola viajan los codigos del pase EN CLARO
-   * hasta que salen. Generarlo con `openssl rand -base64 48` o equivalente,
-   * y no reutilizar ningun otro secreto.
-   *
-   * OJO A COMO SE VALIDA, que es deliberado: un token corto NO tumba la
-   * aplicacion, la deja sin cola. Antes esto era `.min(32)`, y eso convertia
-   * una funcion opcional en un punto unico de fallo de TODO el sistema:
-   * bastaba escribir un secreto de treinta caracteres en cPanel para que el
-   * proceso Node no arrancara y la obra entera se quedara sin GCM, con el
-   * agravante de que el fallo aparece al REINICIAR y no al guardar, asi que
-   * nadie relacionaria una cosa con la otra. La regla de la casa es que lo
-   * opcional degrada, como el SMTP; esto se habia saltado la regla.
+   * Cada empresa vincula ahora su telefono desde Empresa -> Configuracion, con
+   * su token hasheado en la base. La que no tenga ninguno no tiene cola, y sus
+   * codigos salen por correo: un modo degradado honesto, que es lo que un
+   * secreto compartido entre inquilinos nunca fue.
    */
-  SMS_COLA_TOKEN: z.string().optional(),
 
   /**
    * Secreto del RELOJ de avisos: lo unico de GCM que corre solo.
