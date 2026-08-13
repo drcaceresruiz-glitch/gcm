@@ -105,6 +105,33 @@ deja funcionando.
   FTPS explícito sobre el 21. Por eso el workflow usa `protocol: ftps`. Con
   `ftp` a secas la contraseña viajaría en claro.
 
+### El nombre por el que se conecta (12/08/2026)
+
+`FTP_SERVER` es **`server0808.cloudhostservers.com`**, no `ftp.drcaceresruiz.com`.
+Los dos resuelven a la misma IP `213.239.205.92` —es el mismo servidor— pero el
+certificado del FTPS está emitido a nombre del primero, y desde que el
+despliegue **verifica** el certificado, conectarse por el otro nombre falla con
+«certificate common name doesn't match requested host name».
+
+Y ProFTPD **no envía su certificado intermedio**, así que tampoco basta con
+acertar el nombre: sin ese eslabón no se llega a la raíz. El intermedio va en
+el secreto **`FTP_CA_PEM`**, y se saca de la extensión AIA del propio
+certificado del servidor:
+
+```bash
+openssl s_client -connect server0808.cloudhostservers.com:21 -starttls ftp </dev/null 2>/dev/null \
+  | openssl x509 -noout -text | grep "CA Issuers"
+```
+
+Eso da una URL (hoy `http://yr1.i.lencr.org/`); se descarga y se convierte con
+`openssl x509 -inform DER -in <archivo> -out intermedio.pem`, y ese texto es el
+secreto. Un certificado de CA es público: no es una credencial.
+
+**Cuando Let's Encrypt rote ese intermedio**, el despliegue fallará en rojo y el
+paso «Ver qué certificado presenta el FTPS» dirá el nombre del emisor nuevo.
+Se repite la receta de arriba y listo. Nunca la solución es volver a poner
+`ssl:verify-certificate no`: por ese canal viaja la contraseña del FTP.
+
 ### Qué se sube: UN archivo, no 1452
 
 `output: "standalone"` genera un servidor autocontenido. El workflow lo empaqueta
