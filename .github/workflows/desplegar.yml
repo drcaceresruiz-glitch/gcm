@@ -280,20 +280,37 @@ jobs:
       # seguir adelante sin verificar es exactamente el agujero que se cierra.
       # Si esto tumba el despliegue, la version viva sigue sirviendo.
       #
-      # SI ESTO FALLA, hay dos motivos y NO se arreglan igual. El paso de
-      # arriba imprime cual de los dos es, mirando `subject` y `Verify return
-      # code`:
+      # LO QUE PASO DE VERDAD AL ENCENDER ESTO, que no es lo que se esperaba y
+      # por eso queda escrito. lftp dijo:
       #
-      # 1. **Certificado autofirmado o de una CA que el runner no conoce.** La
-      #    salida no es volver a `no`: es copiar ESE certificado al secreto
-      #    `FTP_CA_PEM`. Se sigue verificando, contra un certificado concreto
-      #    en vez de contra una CA publica.
-      # 2. **Certificado bueno pero A NOMBRE DE OTRO** —lo normal en cPanel: se
-      #    conecta a `ftp.midominio.com` y el certificado es del servidor de la
-      #    casa, `servidorNN.hosting.com`—. Aqui anclarlo NO sirve: el nombre
-      #    se comprueba igual. Lo que hay que hacer es apuntar el secreto
-      #    `FTP_SERVER` al nombre QUE FIGURA EN EL CERTIFICADO, que es el mismo
-      #    servidor por su nombre real.
+      #     Certificate verification: The certificate is NOT trusted.
+      #     The certificate issuer is unknown.
+      #
+      # El certificado del servidor es BUENO —Let's Encrypt, en vigor, y a
+      # nombre del host al que se conecta—, pero ProFTPD **no manda su
+      # certificado intermedio**. Sin ese eslabon no se puede llegar desde la
+      # hoja hasta la raiz que el runner si tiene, y el diagnostico de arriba
+      # ya lo cantaba: `Verify return code: 21 (unable to verify the first
+      # certificate)`.
+      #
+      # ARREGLO: el intermedio va en el secreto `FTP_CA_PEM` y se anade al
+      # almacen. Se saca del sitio que indica el propio certificado, su
+      # extension AIA — «CA Issuers - URI: http://yr1.i.lencr.org/» —, se
+      # convierte con `openssl x509 -inform DER`, y ese texto es el secreto.
+      # Un certificado de CA es publico: no es una credencial.
+      #
+      # CUANDO CADUQUE O ROTE el intermedio, esto volvera a fallar en rojo y el
+      # paso de diagnostico dira el nombre del nuevo emisor. Es un minuto de
+      # trabajo cada varios meses, y a cambio la contrasena del FTP deja de
+      # viajar contra un extremo sin verificar.
+      #
+      # Y SI ALGUNA VEZ EL FALLO ES OTRO, hay un segundo motivo posible que se
+      # arregla distinto: un certificado a nombre de OTRO host —tipico en
+      # cPanel, conectarse a `ftp.midominio.com` cuando el certificado es de
+      # `servidorNN.hosting.com`—. Ahi anclarlo NO sirve, porque el nombre se
+      # comprueba igual: hay que apuntar `FTP_SERVER` al nombre que figura en
+      # el certificado. Se distinguen por el mensaje: «issuer is unknown» es
+      # cadena incompleta; uno que hable del nombre es lo otro.
       #
       # Lo que no es respuesta a ninguno de los dos es apagar la comprobacion.
       - name: Subir por FTPS
@@ -313,17 +330,19 @@ jobs:
             "$FTP_SERVER" "$FTP_USERNAME" "$LFTP_PASSWORD" > ~/.netrc
           chmod 600 ~/.netrc
 
-          # Contra QUE se verifica. Por defecto, el almacen de CA del runner.
-          # Con `FTP_CA_PEM` puesto, contra ese certificado y solo ese, que es
-          # lo que hace falta cuando el hosting usa uno autofirmado.
-          ANCLA=/etc/ssl/certs/ca-certificates.crt
+          # Contra QUE se verifica: el almacen de CA del runner, MAS lo que
+          # traiga `FTP_CA_PEM`. Se ANADE, no se sustituye: asi el certificado
+          # extra cubre el hueco concreto de este hosting sin dejar de confiar
+          # en las CA publicas, y el dia que el servidor se arregle esto sigue
+          # funcionando sin tocar nada.
+          ANCLA="$HOME/.ftp-anclas.pem"
+          cp /etc/ssl/certs/ca-certificates.crt "$ANCLA"
+
           if [ -n "${FTP_CA_PEM:-}" ]; then
-            printf '%s\n' "$FTP_CA_PEM" > "$HOME/.ftp-ca.pem"
-            chmod 600 "$HOME/.ftp-ca.pem"
-            ANCLA="$HOME/.ftp-ca.pem"
-            echo "Ancla de confianza: el certificado del secreto FTP_CA_PEM."
+            printf '%s\n' "$FTP_CA_PEM" >> "$ANCLA"
+            echo "Ancla de confianza: almacen del sistema + FTP_CA_PEM."
           else
-            echo "Ancla de confianza: el almacen de CA del sistema."
+            echo "Ancla de confianza: solo el almacen del sistema."
           fi
 
           lftp -c "
