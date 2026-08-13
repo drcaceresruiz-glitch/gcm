@@ -227,6 +227,23 @@ jobs:
       # lanza cada minuto y que actua en cuanto ve un `gcm.tar.gz`. De ahi las
       # dos reglas:
       #
+      # 0. **LOS SCRIPTS TAMBIEN se suben con otro nombre y se renombran.** Esto
+      #    faltaba, y costo un despliegue el 12 de agosto: `desplegar.sh` se
+      #    sobrescribia EN EL SITIO mientras un cron lo ejecuta cada minuto.
+      #    Bash lee el archivo por POSICION segun avanza, asi que si la subida
+      #    cae a mitad de una ejecucion, el proceso sigue leyendo desplazado
+      #    dentro de un archivo que ya no es el mismo: aplico el paquete con las
+      #    partes viejas y se salto entero el bloque de migraciones, sin dejar
+      #    una sola linea en la bitacora. Sintoma: version nueva sirviendo,
+      #    columna nueva inexistente y el panel en 500.
+      #
+      #    Renombrar lo arregla porque `mv` cambia la entrada del directorio:
+      #    quien ya estaba ejecutando conserva su archivo abierto y termina en
+      #    paz, y la siguiente pasada del cron coge el nuevo. Hay un instante en
+      #    que el archivo no existe —entre el `rm` y el `mv`— y no importa: esa
+      #    pasada del cron no encuentra el script, no hace nada, y a la
+      #    siguiente ya esta. Es la misma tecnica que el paquete usaba desde el
+      #    principio; simplemente no se le habia aplicado a los scripts.
       # 1. **El paquete se sube con otro nombre y se renombra al final.**
       #    Durante la subida de 20 MB el archivo YA EXISTE y esta a medias; si
       #    se subiera directamente como `gcm.tar.gz`, el cron lo cogeria a
@@ -357,9 +374,15 @@ jobs:
             open '$FTP_SERVER';
             cd '$FTP_SERVER_DIR';
             mkdir -f tmp;
-            put scripts/desplegar.sh -o desplegar.sh;
-            put scripts/avisos.sh -o avisos.sh;
-            put envio/app.js -o app.js;
+            put scripts/desplegar.sh -o desplegar.sh.subiendo;
+            rm -f desplegar.sh;
+            mv desplegar.sh.subiendo desplegar.sh;
+            put scripts/avisos.sh -o avisos.sh.subiendo;
+            rm -f avisos.sh;
+            mv avisos.sh.subiendo avisos.sh;
+            put envio/app.js -o app.js.subiendo;
+            rm -f app.js;
+            mv app.js.subiendo app.js;
             put envio/gcm.tar.gz -o gcm.tar.gz.subiendo;
             rm -f gcm.tar.gz;
             mv gcm.tar.gz.subiendo gcm.tar.gz;
