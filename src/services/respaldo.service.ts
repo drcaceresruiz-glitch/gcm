@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { env } from "@/lib/env";
 import { generarCsv } from "@/lib/csv";
-import { FORMATO_RESPALDO, TABLAS, type TablaRespaldo } from "@/lib/respaldo-esquema";
+import { FORMATO_RESPALDO, TABLAS, filtroPorObra } from "@/lib/respaldo-esquema";
 import { serializarFila, type FilaJson } from "@/lib/respaldo-serializacion";
 import {
   canonicalizar,
@@ -220,34 +220,28 @@ interface DelegadoLectura {
 /**
  * Lee la obra entera, tabla por tabla, en el orden del catalogo.
  *
- * Cada tabla se filtra por la obra directamente si tiene `projectId`, y si no,
- * por los ids que ya se recogieron de su tabla padre —que siempre se leyo
- * antes, porque el orden del catalogo lo garantiza y hay una prueba que lo
- * comprueba—. Asi el aislamiento por empresa se hereda de la primera consulta
- * y no hay que repetirlo treinta veces.
+ * El filtro sale de `filtroPorObra`, el MISMO que usa el borrado. No es un
+ * ahorro de codigo: es la garantia de que lo que el respaldo guarda y lo que
+ * el borrado se lleva son exactamente las mismas filas. Si cada uno tuviera su
+ * criterio, el dia que divergieran se borraria algo que el zip no tiene.
+ *
+ * El aislamiento por empresa se hereda de la consulta de la obra, que ya
+ * filtro por `companyId`: todo lo demas cuelga de ese `projectId`.
  */
 async function leerLaObra(obraId: string): Promise<LecturaObra> {
   const datos: EntradaDatos[] = [];
   const tablas: { tabla: string; filas: number }[] = [];
-  const idsPorTabla = new Map<string, string[]>();
   let fotos: FilaJson[] = [];
 
   for (const [indice, tabla] of TABLAS.entries()) {
-    const donde = filtroDeTabla(tabla, obraId, idsPorTabla);
+    const delegado = (prisma as unknown as Record<string, DelegadoLectura>)[
+      tabla.modelo
+    ]!;
+    const crudas = await delegado.findMany({
+      where: filtroPorObra(tabla.tabla, obraId),
+    });
 
-    const filas: FilaJson[] = [];
-    if (donde) {
-      const delegado = (prisma as unknown as Record<string, DelegadoLectura>)[
-        tabla.modelo
-      ]!;
-      const crudas = await delegado.findMany({ where: donde });
-      for (const cruda of crudas) filas.push(serializarFila(cruda, tabla));
-    }
-
-    const ids = filas
-      .map((f) => f.id)
-      .filter((id): id is string => typeof id === "string");
-    idsPorTabla.set(tabla.tabla, ids);
+    const filas = crudas.map((cruda) => serializarFila(cruda, tabla));
 
     if (tabla.tabla === "fotos_evidencia") fotos = filas;
 
@@ -274,33 +268,6 @@ async function leerLaObra(obraId: string): Promise<LecturaObra> {
     // `respaldos_obra` con el archivo que el usuario tiene en su disco.
     hashDatos: sha256Hex(datos.map((d) => d.sha256).join("")),
   };
-}
-
-/**
- * Como se acota una tabla a esta obra.
- *
- * Devuelve `null` cuando el padre no trajo ni una fila: preguntar por
- * `{ in: [] }` seria una consulta segura pero inutil, y ahorrarsela en una
- * obra sin ordenes ni encargos son varias consultas menos.
- */
-function filtroDeTabla(
-  tabla: TablaRespaldo,
-  obraId: string,
-  idsPorTabla: Map<string, string[]>,
-): Record<string, unknown> | null {
-  if (tabla.tabla === "projects") return { id: obraId };
-
-  if (tabla.refs.some((r) => r.a === "projects" && r.campo === "projectId")) {
-    return { projectId: obraId };
-  }
-
-  const padre = tabla.refs.find(
-    (r) => r.a !== tabla.tabla && idsPorTabla.has(r.a),
-  );
-  if (!padre) return null;
-
-  const ids = idsPorTabla.get(padre.a) ?? [];
-  return ids.length ? { [padre.campo]: { in: ids } } : null;
 }
 
 /**

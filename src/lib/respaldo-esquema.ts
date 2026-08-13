@@ -373,6 +373,53 @@ export const TABLAS: readonly TablaRespaldo[] = [
  */
 export const ORDEN_BORRADO: readonly TablaRespaldo[] = [...TABLAS].reverse();
 
+/**
+ * Como se llega a la obra desde una tabla que NO tiene `projectId`.
+ *
+ * El valor es el nombre de la RELACION en Prisma, que no siempre coincide con
+ * el de la columna: `orden_lineas.ordenId` se navega como `ordenCompra`, y
+ * `restricciones_tarea.lookaheadTaskId` como `tarea`.
+ *
+ * Sirve para acotar el borrado sin arrastrar listas de identificadores: se
+ * borra con `{ ordenCompra: { projectId } }`, que es una sola sentencia, en vez
+ * de con un `IN (...)` de decenas de miles de ids que ademas chocaria contra
+ * `max_allowed_packet`.
+ *
+ * Todas las tablas de aqui cuelgan de una que SI tiene `projectId`, asi que un
+ * solo nivel de anidamiento basta. La prueba lo comprueba.
+ */
+export const RELACION_A_LA_OBRA: Readonly<Record<string, string>> = {
+  baseline_items: "baseline",
+  movimiento_lineas: "movimiento",
+  proveedor_partidas: "partida",
+  orden_lineas: "ordenCompra",
+  orden_imputaciones: "ordenCompra",
+  tareas_cronograma: "cronograma",
+  dependencias_tarea: "cronograma",
+  encargo_partidas: "encargo",
+  valorizaciones_encargo: "encargo",
+  compromisos_semanales: "plan",
+  restricciones_tarea: "tarea",
+};
+
+/**
+ * El filtro que acota una tabla a UNA obra.
+ *
+ * Se usa igual para leer el respaldo y para borrar, que es justo lo que evita
+ * que el borrado alcance filas distintas de las que el respaldo guardo.
+ */
+export function filtroPorObra(
+  tabla: string,
+  obraId: string,
+): Record<string, unknown> {
+  if (tabla === "projects") return { id: obraId };
+
+  const relacion = RELACION_A_LA_OBRA[tabla];
+  if (relacion) return { [relacion]: { projectId: obraId } };
+
+  return { projectId: obraId };
+}
+
 /** Busca una tabla del catalogo por su nombre. */
 export function tablaDelRespaldo(nombre: string): TablaRespaldo | undefined {
   return TABLAS.find((t) => t.tabla === nombre);

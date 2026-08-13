@@ -7,6 +7,8 @@ import { fechaCorta } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
 import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 import { EliminarObra } from "@/components/obras/EliminarObra";
+import { EliminarObraCerrada } from "@/components/obras/EliminarObraCerrada";
+import { constaRespaldoReciente } from "@/services/obra-borrado.service";
 import { MenuObra, type FaseMenu } from "@/components/obras/MenuObra";
 import { EstadoObra } from "@/components/obras/EstadoObra";
 import type { EstadoObra as EstadoObraTipo } from "@/lib/obras";
@@ -251,6 +253,15 @@ export default async function ObraLayout({
                 avances y fotos— y un resumen que se abre sin GCM. Contiene
                 datos personales: guardalo como el expediente en papel.
               </p>
+
+              {/* El borrado definitivo va DEBAJO del respaldo y no en otro
+                  sitio: el orden de la pantalla es el orden correcto de hacer
+                  las cosas. El servicio no deja borrar sin respaldo reciente. */}
+              <EliminarObraCerrada
+                obraId={obra.id}
+                nombre={obra.nombreObra}
+                hayRespaldo={await constaRespaldoReciente(sesion, obra.id)}
+              />
             </div>
           )}
         </div>

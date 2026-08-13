@@ -6,6 +6,8 @@ import {
   TABLAS,
   ORDEN_BORRADO,
   EXCLUIDAS,
+  RELACION_A_LA_OBRA,
+  filtroPorObra,
   tablaDelRespaldo,
 } from "@/lib/respaldo-esquema";
 
@@ -170,5 +172,59 @@ describe("el orden de las tablas", () => {
   it("no hay tablas repetidas", () => {
     const nombres = TABLAS.map((t) => t.tabla);
     expect(new Set(nombres).size).toBe(nombres.length);
+  });
+});
+
+describe("como se acota cada tabla a una obra", () => {
+  it("toda tabla sabe llegar a la obra", () => {
+    // O tiene `projectId`, o declara por que relacion se llega. Una que no
+    // tuviera ninguna de las dos cosas se borraria ENTERA, de todas las obras
+    // de todas las empresas: es el peor fallo posible de esta funcionalidad.
+    for (const t of TABLAS) {
+      if (t.tabla === "projects") continue;
+      const directa = ESQUEMA.get(t.tabla)!.campos.includes("projectId");
+      const porRelacion = t.tabla in RELACION_A_LA_OBRA;
+      expect(
+        directa || porRelacion,
+        `${t.tabla} no sabe llegar a la obra`,
+      ).toBe(true);
+    }
+  });
+
+  it("y el filtro nunca sale vacio", () => {
+    // Un `where` vacio en un deleteMany borra la tabla entera.
+    for (const t of TABLAS) {
+      const filtro = filtroPorObra(t.tabla, "obra-1");
+      expect(Object.keys(filtro).length, `filtro de ${t.tabla}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("la relacion declarada existe en el esquema", () => {
+    for (const [tabla, relacion] of Object.entries(RELACION_A_LA_OBRA)) {
+      expect(ESQUEMA.get(tabla)?.campos, `${tabla}.${relacion}`).toContain(
+        relacion,
+      );
+    }
+  });
+
+  it("un solo nivel basta: el padre siempre tiene projectId", () => {
+    // Si algun dia dejara de ser cierto, el filtro anidado apuntaria a una
+    // columna que no existe y el borrado fallaria en produccion.
+    for (const tabla of Object.keys(RELACION_A_LA_OBRA)) {
+      const t = tablaDelRespaldo(tabla)!;
+      const padre = t.refs.find((r) => r.a !== tabla)!;
+      expect(
+        ESQUEMA.get(padre.a)!.campos,
+        `el padre de ${tabla} (${padre.a}) deberia tener projectId`,
+      ).toContain("projectId");
+    }
+  });
+
+  it("las tres formas de filtrar son las esperadas", () => {
+    expect(filtroPorObra("projects", "o1")).toEqual({ id: "o1" });
+    expect(filtroPorObra("wbs_items", "o1")).toEqual({ projectId: "o1" });
+    expect(filtroPorObra("orden_lineas", "o1")).toEqual({
+      ordenCompra: { projectId: "o1" },
+    });
   });
 });

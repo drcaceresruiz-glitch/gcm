@@ -11,6 +11,7 @@ import {
   type NuevaPartida,
 } from "@/services/partidas.service";
 import { eliminarObra, cambiarEstadoObra } from "@/services/obras.service";
+import { eliminarObraCerrada } from "@/services/obra-borrado.service";
 
 export interface RespuestaEdicion {
   ok: boolean;
@@ -74,6 +75,31 @@ export async function accionEliminarObra(
   if (!sesion) redirect("/login");
 
   const r = await eliminarObra(sesion, String(datos.get("id") ?? ""));
+  if (!r.ok) return { ok: false, error: r.error };
+
+  revalidatePath("/panel");
+  redirect("/panel");
+}
+
+/**
+ * Elimina DEFINITIVAMENTE una obra cerrada, con todo lo que cuelga de ella.
+ *
+ * La accion no decide nada: pasa lo tecleado al servicio, que comprueba el
+ * permiso, el estado, el nombre, la contrasena y que exista un respaldo
+ * reciente. Aqui solo se recoge el formulario y se vuelve al panel, porque la
+ * obra ya no existe y no hay ruta suya que revalidar.
+ */
+export async function accionEliminarObraCerrada(
+  _previo: RespuestaEdicion,
+  datos: FormData,
+): Promise<RespuestaEdicion> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await eliminarObraCerrada(sesion, String(datos.get("id") ?? ""), {
+    nombreEscrito: String(datos.get("nombre") ?? ""),
+    clave: String(datos.get("clave") ?? ""),
+  });
   if (!r.ok) return { ok: false, error: r.error };
 
   revalidatePath("/panel");
