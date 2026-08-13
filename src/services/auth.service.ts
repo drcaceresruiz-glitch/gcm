@@ -21,6 +21,48 @@ import type { AuditAction } from "@/generated/prisma/enums";
 const MAX_INTENTOS = 5;
 const BLOQUEO_MINUTOS = 15;
 
+/**
+ * Y el otro limite, el de la CONEXION, que hacia falta por dos motivos.
+ *
+ * El bloqueo de arriba es por cuenta, y una defensa que solo cuenta por cuenta
+ * deja dos agujeros:
+ *
+ *   1. **Rociado de credenciales.** Probar una clave comun contra mil cuentas
+ *      distintas no se acerca al umbral de ninguna. Cinco intentos por cuenta,
+ *      infinitas cuentas, cero friccion.
+ *   2. **Dejar fuera a un cliente a proposito.** El correo del ADMIN de una
+ *      constructora es adivinable; con fallar cinco veces cada cuarto de hora
+ *      se le mantiene fuera de su propio sistema indefinidamente. Contra un
+ *      cliente de pago eso no es una molestia, es un incidente.
+ *
+ * Se cuenta sobre `AuditLog`, que ya escribia la IP de cada `LOGIN_FAILED` y
+ * tiene indice por `(accion, createdAt)`. No hace falta tabla nueva.
+ *
+ * DOS COSAS QUE NO HACE, y conviene decirlas:
+ *
+ * - Los fallos contra un correo que NO EXISTE no se auditan (no hay empresa a
+ *   la que colgarlos) y por tanto no cuentan aqui. Da igual: quien prueba
+ *   correos inventados no obtiene nada. Lo que se quiere frenar es el rociado
+ *   contra cuentas REALES, y esas si quedan registradas.
+ * - Si la escritura de auditoria falla, este limite no ve nada y deja pasar.
+ *   Es el mismo trato que ya tenia la traza —nunca tumbar la operacion que
+ *   audita— y se prefiere a que un fallo de base cierre el acceso a todos.
+ *
+ * OJO AL NAT: una oficina entera sale por una sola IP. Veinte fallos en un
+ * cuarto de hora es mucho para gente que se equivoca de contrasena y poco para
+ * quien prueba listas.
+ *
+ * Y LO QUE ESTO NO ES: una defensa contra un atacante decidido. La IP sale de
+ * `x-forwarded-for`, que quien llama puede escribir; si Apache no la reescribe,
+ * cambiar esa cabecera en cada peticion esquiva el limite. Se acepta a
+ * sabiendas —sube el listado de "cualquiera con un script" a "alguien que sabe
+ * lo que hace", y el bloqueo POR CUENTA sigue debajo—, pero no conviene contar
+ * esto como una barrera solida. La barrera solida seria que el proxy fuera la
+ * unica fuente de esa cabecera.
+ */
+const MAX_FALLOS_POR_IP = 20;
+const VENTANA_IP_MINUTOS = 15;
+
 export type ResultadoLogin =
   | { ok: true; requiere2FA: true }
   | { ok: true; requiere2FA?: false; mustChangePassword: boolean }
@@ -64,6 +106,34 @@ export async function iniciarSesion(
   meta: MetadatosPeticion = {},
 ): Promise<ResultadoLogin> {
   const ERROR_GENERICO = "Correo o contrasena incorrectos.";
+
+  // El limite de la conexion va ANTES de mirar la cuenta, y por eso funciona
+  // contra el rociado: corta a quien prueba muchas cuentas, no a quien insiste
+  // en una. Sin IP no se puede atribuir nada y no se comprueba: mejor dejar
+  // pasar que cortarle el acceso a todo el mundo porque falte una cabecera.
+  if (meta.ip) {
+    const desde = new Date(Date.now() - VENTANA_IP_MINUTOS * 60000);
+    const fallosDeLaIp = await prisma.auditLog.count({
+      where: {
+        accion: "LOGIN_FAILED",
+        ip: meta.ip.slice(0, 45),
+        createdAt: { gt: desde },
+      },
+    });
+
+    if (fallosDeLaIp >= MAX_FALLOS_POR_IP) {
+      // Aqui SI se dice lo que pasa, al contrario que en el error generico.
+      // No delata ninguna cuenta —habla de la conexion, no del correo— y a
+      // quien de verdad se equivoco de contrasena le ahorra creer que su clave
+      // dejo de valer.
+      return {
+        ok: false,
+        error:
+          `Demasiados intentos fallidos desde esta conexion. ` +
+          `Espera ${VENTANA_IP_MINUTOS} minutos y vuelve a intentarlo.`,
+      };
+    }
+  }
 
   const usuario = await prisma.user.findUnique({
     where: { email: email.trim().toLowerCase() },
@@ -109,7 +179,21 @@ export async function iniciarSesion(
   const claveCorrecta = await verifyPassword(clave, usuario.passwordHash);
 
   if (!claveCorrecta) {
-    const intentos = usuario.failedLoginCount + 1;
+    // EL CASTIGO SE CUMPLE Y SE ACABA. El contador solo se ponia a cero al
+    // acertar, y de ahi salia el peor comportamiento de todo esto: una cuenta
+    // que llegara a cinco fallos quedaba a merced de cualquiera para siempre,
+    // porque a partir de ahi CADA fallo suelto volvia a bloquearla otro cuarto
+    // de hora. Cinco intentos una vez, y despues uno cada quince minutos, era
+    // suficiente para que el administrador de una constructora no volviera a
+    // entrar en su sistema.
+    //
+    // Si habia un bloqueo y ya vencio, se empieza de cero: quien quiera
+    // repetirlo tiene que volver a acertar cinco veces seguidas, no una.
+    const bloqueoVencido =
+      usuario.lockedUntil !== null && usuario.lockedUntil <= new Date();
+    const previos = bloqueoVencido ? 0 : usuario.failedLoginCount;
+    const intentos = previos + 1;
+
     await prisma.user.update({
       where: { id: usuario.id },
       data: {
