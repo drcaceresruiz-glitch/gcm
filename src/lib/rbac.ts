@@ -93,10 +93,19 @@ export type Permiso = (typeof PERMISOS)[number];
 /**
  * Permisos que NO se pueden reconfigurar por empresa.
  *
- * Los dos `*:aprobar` son actos contractuales irreversibles que mueven la
- * cifra contra la que se mide la obra. Si se volvieran configurables,
- * cualquier dia alguien se los concede a quien no debe y el sistema pierde
- * la garantia que lo hace fiable.
+ * `linea_base:aprobar` y `movimiento:aprobar` son actos contractuales
+ * irreversibles que mueven la cifra contra la que se mide la obra. Si se
+ * volvieran configurables, cualquier dia alguien se los concede a quien no
+ * debe y el sistema pierde la garantia que lo hace fiable.
+ *
+ * `meta:aprobar` esta aqui por un motivo DISTINTO, y conviene no confundirlo:
+ * no es contractual —la meta no se pacta con nadie de fuera— sino una
+ * separacion de funciones. Congelar la meta es lo que da sentido a la bolsa:
+ * con una meta editable bastaria rebajarla cuando el gasto se va, y todos los
+ * indicadores mentirian hacia atras sin dejar rastro. Quien EJECUTA contra la
+ * meta no puede ser quien la fija. Si fuera configurable, la primera empresa
+ * con prisa se lo concederia al residente y el control desapareceria sin que
+ * nadie tomara la decision de quitarlo.
  *
  * Los dos `permiso:*` reparten todos los demas. Si se pudieran conceder, un
  * ADMIN podria darselos a un CONSULTOR y ese repartirse a si mismo el resto:
@@ -119,6 +128,7 @@ export type Permiso = (typeof PERMISOS)[number];
 export const INNEGOCIABLES: readonly Permiso[] = [
   "linea_base:aprobar",
   "movimiento:aprobar",
+  "meta:aprobar",
   "obra:eliminar_cerrada",
   "permiso:leer",
   "permiso:editar",
@@ -188,6 +198,8 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// El presupuesto meta y su bolsa. El residente los VE y los ARMA, pero no
     /// los congela: aprobar la meta es lo que la vuelve inmutable, y quien
     /// ejecuta contra ella no deberia poder rebajarla cuando se le va el gasto.
+    /// Por eso `meta:aprobar` va en INNEGOCIABLES: no basta con no darselo por
+    /// defecto, tiene que no poder concederse.
     ///
     /// Que lo vea es una decision deliberada, no un descuido: la meta solo
     /// cambia conductas si la conoce quien produce. Esconderla deja al unico
