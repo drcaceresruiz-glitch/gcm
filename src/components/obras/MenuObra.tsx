@@ -52,6 +52,18 @@ export interface SeccionMenu {
   href: string;
   /// Prefijos de ruta que pertenecen a esta seccion, ademas de `href`.
   prefijos?: string[];
+  /**
+   * `href` solo casa por IGUALDAD, nunca por prefijo.
+   *
+   * Existe por una sola seccion: Presupuesto, cuyo `href` ES la raiz de la
+   * obra (`/obras/x`). Sin este freno, esa raiz es prefijo de CUALQUIER
+   * subruta de la obra, y una pantalla sin seccion propia —Evidencia,
+   * Editar— caia por accidente bajo «Presupuesto» en vez de bajo ninguna. No
+   * era un fallo de esas dos rutas: era que la regla general (prefijo por
+   * defecto) es incorrecta para la UNICA seccion cuyo href coincide con el
+   * tronco comun de todas las demas.
+   */
+  soloExacto?: boolean;
   /// Solo en las secciones que son un hito del ciclo.
   hecho?: boolean;
   /// Trabajo esperando. `critico` pinta en rojo; si no, en ambar.
@@ -70,16 +82,32 @@ export interface FaseMenu {
  *
  * Gana el prefijo MAS LARGO. Sin esa regla, `/obras/x/cronograma` capturaria
  * tambien `/obras/x/cronograma/informe` antes de que nadie mire si hay algo
- * mas especifico, y la raiz de la obra —que es el presupuesto— capturaria
- * todo lo demas.
+ * mas especifico.
+ *
+ * Una ruta sin seccion propia devuelve null, y NINGUNA seccion se resalta. Es
+ * preferible a que la raiz de la obra —el presupuesto— la reclame por ser
+ * prefijo de todo: eso paso de verdad (Evidencia y Editar encendian
+ * «Presupuesto») hasta que `soloExacto` lo corto de raiz.
  */
-function seccionActiva(ruta: string, fases: FaseMenu[]): string | null {
+export function seccionActiva(ruta: string, fases: FaseMenu[]): string | null {
   let ganadora: string | null = null;
   let largo = -1;
 
   for (const fase of fases) {
     for (const s of fase.secciones) {
-      for (const p of [s.href, ...(s.prefijos ?? [])]) {
+      // El propio href respeta `soloExacto`; los prefijos declarados a mano
+      // en `prefijos` SIEMPRE casan por debajo —para eso se declaran—.
+      const porIgualdadSolo = s.soloExacto ? [s.href] : [];
+      const porPrefijo = s.soloExacto ? [] : [s.href];
+
+      for (const p of porIgualdadSolo) {
+        if (ruta === p && p.length > largo) {
+          largo = p.length;
+          ganadora = s.clave;
+        }
+      }
+
+      for (const p of [...porPrefijo, ...(s.prefijos ?? [])]) {
         const coincide = ruta === p || ruta.startsWith(`${p}/`);
         if (coincide && p.length > largo) {
           largo = p.length;
