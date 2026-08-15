@@ -90,6 +90,7 @@ const proveedores = await import("@/services/proveedores.service");
 const usuarios = await import("@/services/usuarios.service");
 const causaRaiz = await import("@/services/causa-raiz.service");
 const meta = await import("@/services/meta.service");
+const tablero = await import("@/services/tablero-semanal.service");
 
 function sesion(companyId: string, permisos: Permiso[]): SesionActiva {
   return {
@@ -742,6 +743,28 @@ describe("presupuesto meta", () => {
     // quien ejecuta contra la meta no deberia poder rebajarla.
     await exigeNiTocarLaBase(() =>
       meta.aprobarMeta(sesion(MIA, [...leer, ...crear]), metaAjena),
+    );
+  });
+});
+
+
+describe("tablero semanal", () => {
+  const obraAjena = "OBRA-DE-EMPRESA-B";
+  const planAjeno = "PLAN-DE-EMPRESA-B";
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("el tablero de una semana ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      tablero.obtenerTablero(sesion(MIA, ["plan_semanal:leer"]), obraAjena, planAjeno),
+    );
+  });
+
+  it("sin permiso no toca la base", async () => {
+    await exigeNiTocarLaBase(() =>
+      tablero.obtenerTablero(sesion(MIA, []), obraAjena, planAjeno),
     );
   });
 });
