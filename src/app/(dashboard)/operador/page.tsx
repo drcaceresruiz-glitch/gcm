@@ -7,6 +7,7 @@ import { listarConstructoras } from "@/services/operador.service";
 import { fechaCorta } from "@/utils/fechas";
 import { Chip } from "@/components/ui/Chip";
 import { Mascota } from "@/components/ui/Mascota";
+import { Volver } from "@/components/ui/Volver";
 import { BotonSuspender } from "@/components/operador/BotonSuspender";
 
 export const metadata: Metadata = { title: "Constructoras" };
@@ -17,6 +18,10 @@ export const metadata: Metadata = { title: "Constructoras" };
  * Solo METADATOS: cuantos usuarios y cuantas obras tiene cada una, y si esta
  * activa. Ninguna celda enlaza a su contenido, y no hay pantalla de detalle:
  * quien opera GCM da de alta y suspende, no entra en los datos de nadie.
+ *
+ * SIN «Volver» hasta ahora, igual que Avisos y por el mismo motivo: se llega
+ * desde el boton «Constructoras» de la cabecera, que esta en cualquier
+ * pantalla, asi que no hay un origen que recordar. Al panel.
  */
 export default async function OperadorPage() {
   const sesion = await obtenerSesion();
@@ -29,6 +34,8 @@ export default async function OperadorPage() {
 
   return (
     <div className="space-y-6">
+      <Volver href="/panel">Volver al panel</Volver>
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">Constructoras</h2>

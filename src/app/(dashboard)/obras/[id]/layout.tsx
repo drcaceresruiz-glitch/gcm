@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { CalendarDays, Download, MapPin, Pencil } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, hitosDeObra, avisosDeSeccion } from "@/services/obras.service";
+import { planesAbiertos } from "@/services/plan-semanal.service";
 import { puede } from "@/lib/rbac";
 import { fechaCorta } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
@@ -43,9 +44,14 @@ export default async function ObraLayout({
   // Solo hace falta publicarlo para que la miga —montada arriba del todo,
   // en el layout raiz— lo pueda leer sin volver a consultar nada.
   const raiz = `/obras/${id}`;
-  const [hitos, avisos] = await Promise.all([
+  const [hitos, avisos, semanasAbiertas] = await Promise.all([
     hitosDeObra(sesion, id),
     avisosDeSeccion(sesion, id),
+    // Solo las ABIERTAS: es una consulta plana (id, numero, fechaCorte, sin
+    // compromisos) y corre en CADA navegacion dentro de la obra. Las semanas
+    // cerradas son historia, no trabajo por hacer, y ya se ven enteras desde
+    // dentro de `/plan-semanal`.
+    planesAbiertos(sesion, id),
   ]);
 
   /**
@@ -74,6 +80,11 @@ export default async function ObraLayout({
           // El importador de partidas es presupuesto aunque cuelgue aparte.
           prefijos: [`${raiz}/importar`],
           hecho: hitos.presupuesto,
+          // OBLIGATORIO: `href` es la raiz de la obra, y sin esto seria
+          // prefijo de CUALQUIER subruta —encendia «Presupuesto» al editar la
+          // ficha o al mirar las fotos del Lookahead—. Ver el comentario de
+          // `soloExacto` en MenuObra.tsx.
+          soloExacto: true,
         },
         puede(sesion, "cronograma:leer") && {
           clave: "cronograma",
@@ -121,6 +132,10 @@ export default async function ObraLayout({
           pregunta: "qué se prepara",
           href: `${raiz}/lookahead`,
           hecho: hitos.lookahead,
+          // La galeria de fotos que demuestran una restriccion liberada.
+          // Cuelga aparte (`/evidencia`, no `/lookahead/evidencia`) porque
+          // es donde aterriza el QR pegado en obra, pero es del Lookahead.
+          prefijos: [`${raiz}/evidencia`],
           pendientes:
             avisos.lookahead > 0
               ? { cuantos: avisos.lookahead, critico: true }
@@ -136,6 +151,13 @@ export default async function ObraLayout({
             avisos.planSemanal > 0
               ? { cuantos: avisos.planSemanal, critico: false }
               : null,
+          // Las semanas ABIERTAS, no todas: son las que se tocan hoy. El
+          // historial completo (cerradas incluidas) vive en la propia
+          // pantalla de Plan semanal, un clic mas alla.
+          ramas: semanasAbiertas.map((s) => ({
+            titulo: `Semana ${s.numero}`,
+            href: `${raiz}/plan-semanal/${s.id}`,
+          })),
         },
         puede(sesion, "lookahead:gestionar") && {
           clave: "personal",
