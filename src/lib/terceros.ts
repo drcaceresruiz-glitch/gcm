@@ -45,6 +45,7 @@ export type Licencia =
   | "MIT"
   | "Apache-2.0"
   | "EPL-2.0"
+  | "fuente-visible"
   | "CC-BY-NC-SA-4.0"
   | "GPL-2.0"
   | "GPL-3.0"
@@ -97,6 +98,16 @@ export const LICENCIAS: Record<Licencia, ReglaLicencia> = {
     resumen:
       "Deja vender, pero los archivos que vengan de ahi hay que publicarlos " +
       "con la misma licencia. Contagia por archivo, no por proyecto entero.",
+  },
+  "fuente-visible": {
+    permiteUsoComercial: false,
+    contagia: false,
+    exigeCita: true,
+    exigeDeclararCambios: false,
+    resumen:
+      "Source available: el codigo se puede LEER pero la licencia la escribio " +
+      "el autor y no es una de las conocidas. No se asume nada; hay que leerla " +
+      "entera y, si se quiere usar, pedirle permiso por escrito.",
   },
   "CC-BY-NC-SA-4.0": {
     permiteUsoComercial: false,
@@ -248,6 +259,61 @@ export const TERCEROS: Tercero[] = [
       "docs/COMUNIDADGIT/_ref/LastPlannerTool-main/.",
   },
   {
+    id: "pmis-v2",
+    nombre: "PMIS v2",
+    autor: "Copyright (c) 2026 AutoBotLog",
+    url: "https://github.com/AutoBotLog/pmis-v2",
+    licencia: "MIT",
+    estado: "candidato",
+    uso: "referencia",
+    queUsamos:
+      "Sistema de informacion de obra en Next.js + TypeScript + Tailwind + zod " +
+      "+ react-hook-form, practicamente nuestro mismo stack. Modulos de avance, " +
+      "QA, QC, seguridad, subcontratas y comparacion de progreso.",
+    ubicaciones: [],
+    avisoCopyright: "Copyright (c) 2026 AutoBotLog",
+    nota:
+      "El mas parecido a GCM de todo el lote, y con licencia limpia. Usa " +
+      "MongoDB donde nosotros usamos MariaDB con Prisma, asi que el modelo de " +
+      "datos hay que traducirlo. Extraido en docs/COMUNIDADGIT/_ref/pmis-v2-main/.",
+  },
+  {
+    id: "claude-code-construction",
+    nombre: "Construction Skills for Claude Code",
+    autor: "Copyright (c) 2026 dleerdefi",
+    url: "https://github.com/dleerdefi/claude-code-construction",
+    licencia: "MIT",
+    estado: "candidato",
+    uso: "referencia",
+    queUsamos:
+      "Trece skills de obra para Claude Code: tabulador de ofertas, redactor " +
+      "de RFI, extractor de cronogramas, troceador de planos y de " +
+      "especificaciones, generador de subcontratos.",
+    ubicaciones: [],
+    avisoCopyright: "Copyright (c) 2026 dleerdefi",
+    nota:
+      "Son herramientas de trabajo NUESTRAS, no codigo del producto: usarlas " +
+      "no mete nada de terceros dentro de GCM ni arrastra su licencia.",
+  },
+  {
+    id: "ddc-skills",
+    nombre: "DDC Skills for AI Agents in Construction",
+    autor: "Copyright (c) 2026 DataDrivenConstruction",
+    url: "https://github.com/datadrivenconstruction",
+    licencia: "MIT",
+    estado: "candidato",
+    uso: "referencia",
+    queUsamos:
+      "221 skills en markdown sobre datos de construccion: conversion " +
+      "Revit/IFC/DWG a tablas, mediciones (QTO) y validacion.",
+    ubicaciones: [],
+    avisoCopyright: "Copyright (c) 2026 DataDrivenConstruction",
+    nota:
+      "El ZIP original pesaba 334 MB porque incluia el mismo libro en PDF en " +
+      "31 idiomas. Se guardaron solo los skills (3,8 MB) en " +
+      "docs/COMUNIDADGIT/_ref/DDC_Skills_for_AI_Agents_in_Construction-main/.",
+  },
+  {
     id: "lps-laravel",
     nombre: "LPS (Last Planner System en Laravel)",
     autor: null,
@@ -336,6 +402,122 @@ export const TERCEROS: Tercero[] = [
     ubicaciones: [],
     avisoCopyright: null,
     nota: "Licencia propia con cesion de derechos. Mirar, no copiar.",
+  },
+  {
+    id: "madra-delay-attribution",
+    nombre: "MADRA (atribucion de retrasos)",
+    autor: "Copyright (c) 2026 Yishuai Tian",
+    url: "https://github.com/topics/delay-attribution",
+    licencia: "MIT",
+    estado: "candidato",
+    uso: "referencia",
+    queUsamos:
+      "Como repartir la responsabilidad de un retraso entre las partes con la " +
+      "evidencia delante. Encaja con nuestro analisis de causa raiz.",
+    ubicaciones: [],
+    avisoCopyright: "Copyright (c) 2026 Yishuai Tian",
+  },
+  {
+    id: "opentakeoff",
+    nombre: "OpenTakeoff",
+    autor: "OpenTakeoff / Kentucky AI",
+    url: "https://github.com/kentucky-ai/opentakeoff",
+    licencia: "Apache-2.0",
+    estado: "candidato",
+    uso: "referencia",
+    queUsamos:
+      "Mediciones sobre plano en el navegador, guardando la escala y como se " +
+      "midio cada cantidad.",
+    ubicaciones: [],
+    avisoCopyright: null,
+    nota:
+      "Apache permite copiar citando y DECLARANDO LOS CAMBIOS. Antes de " +
+      "adaptar nada hay que copiar el aviso exacto de su NOTICE.",
+  },
+  {
+    id: "mcp-construction",
+    nombre: "CMCP (Construction AI MCP Server)",
+    autor: null,
+    url: "https://cmcp.us",
+    licencia: "sin-licencia",
+    estado: "solo-lectura",
+    uso: "referencia",
+    queUsamos:
+      "Su catalogo de 62 herramientas de obra (RFI, ordenes de cambio, partes " +
+      "diarios, presupuestos) como mapa de alcance funcional.",
+    ubicaciones: [],
+    avisoCopyright: null,
+    nota:
+      "No trae LICENSE ni campo license en el package.json: todos los derechos " +
+      "reservados. Se mira el indice de funciones, no el codigo.",
+  },
+  {
+    id: "construction-drawing-analyzer",
+    nombre: "Drawing Analyzer (AutoConst)",
+    autor: "Copyright (c) 2026 Hamza Jabbar / AutoConst",
+    url: "https://hamzajabbar.online",
+    licencia: "fuente-visible",
+    estado: "solo-lectura",
+    uso: "referencia",
+    queUsamos:
+      "La idea de indexar los planos PDF una vez para no reprocesarlos en cada " +
+      "consulta.",
+    ubicaciones: [],
+    avisoCopyright: "Copyright (c) 2026 Hamza Jabbar / AutoConst",
+    nota:
+      "Licencia propia ('AutoConst Source Available'), no es una licencia " +
+      "conocida. Hay que leerla entera y pedir permiso por escrito antes de " +
+      "usar nada suyo.",
+  },
+  {
+    id: "openconstruction-erp",
+    nombre: "OpenConstructionERP",
+    autor: "Artem Boiko / DataDrivenConstruction.io",
+    url: "https://openconstructionerp.com",
+    licencia: "AGPL-3.0",
+    estado: "solo-lectura",
+    uso: "referencia",
+    queUsamos:
+      "El ERP de obra mas completo del lote: presupuesto por partidas (BOQ), " +
+      "mediciones sobre CAD y BIM, planificacion 4D, coste 5D y licitacion.",
+    ubicaciones: [],
+    avisoCopyright: null,
+    nota:
+      "AGPL: servir la aplicacion por web ya obliga a entregar el fuente, asi " +
+      "que copiar codigo suyo es incompatible con vender GCM. Ofrecen licencia " +
+      "comercial de pago si algun dia compensa. Su instalador hace " +
+      "'curl | sh': no ejecutarlo a ciegas.",
+  },
+  {
+    id: "massing",
+    nombre: "Massing",
+    autor: "Copyright (c) 2026 Matthew M. Emma",
+    url: "https://github.com/ibuilder/massing",
+    licencia: "MIT",
+    estado: "solo-lectura",
+    uso: "referencia",
+    queUsamos: "Autoria BIM nativa en IFC dentro del navegador.",
+    ubicaciones: [],
+    avisoCopyright: "Copyright (c) 2026 Matthew M. Emma",
+    nota:
+      "Su codigo es MIT, pero COMPONE piezas GPL (el editor de escritorio va " +
+      "como proceso aparte a proposito). Si algun dia se toca, leer antes su " +
+      "LICENSE-NOTES.md para no cruzar esa frontera.",
+  },
+  {
+    id: "osc-directory",
+    nombre: "AEC Open Source Directory",
+    autor: "Copyright (c) 2025 AEC Open Source Directory",
+    url: "https://directory.opensource.construction",
+    licencia: "MIT",
+    estado: "candidato",
+    uso: "referencia",
+    queUsamos:
+      "Catalogo de lo que ya existe libre en el sector, para no reinventar. " +
+      "Aqui se agrupan tambien open-material-data, material-crawler, el " +
+      "website de opensource.construction y la lista de gestion de proyectos.",
+    ubicaciones: [],
+    avisoCopyright: "Copyright (c) 2025 AEC Open Source Directory",
   },
   {
     id: "erpnext",
