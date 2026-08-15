@@ -27,6 +27,25 @@
 }
 
 /**
+ * La marca, a secas.
+ *
+ * Sus tres companeros de estado —exito, alerta y peligro— se llaman sin
+ * numero, asi que quien escribe un componente da por hecho que la marca
+ * tambien. No era verdad: la marca solo existia en pasos (500, 600, 700), y
+ * `var(--color-marca)` no resolvia a nada. Eso no avisa: el navegador
+ * descarta la declaracion en silencio, y un boton con texto blanco encima se
+ * queda INVISIBLE pero sigue ocupando su sitio. Asi desaparecio el boton de
+ * anadir partida, y con el la unica forma de teclear un presupuesto a mano.
+ *
+ * Se define como alias del 600, que es el que ya usaban todos los botones
+ * primarios. Al ser `var()`, se resuelve donde se usa y no aqui: cuando una
+ * paleta redefine `--color-marca-600`, este alias la sigue sola.
+ */
+:root {
+  --color-marca: var(--color-marca-600);
+}
+
+/**
  * Paletas de marca.
  *
  * Cada una redefine `--color-marca-*` y ademas TINE EL AMBIENTE: el fondo, el
