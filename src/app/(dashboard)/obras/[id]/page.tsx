@@ -85,6 +85,31 @@ export default async function ObraPage({
     .filter((n) => Number.isFinite(n));
   const siguienteCodigo = `${(raices.length ? Math.max(...raices) : 0) + 1}.0`;
 
+  /**
+   * Los capitulos que se pueden elegir como padre, con su sangria.
+   *
+   * Mismo criterio que el desplegable de los movimientos: el nivel de raiz se
+   * toma del MENOR que aparezca y no se da por supuesto un 0, porque un
+   * presupuesto importado puede empezar en cualquiera.
+   */
+  const nivelesCapitulo = filas
+    .filter((f) => f.tipo === "CAPITULO")
+    .map((f) => f.nivel);
+  const nivelRaiz = nivelesCapitulo.length > 0 ? Math.min(...nivelesCapitulo) : 0;
+
+  const capitulos = filas
+    .filter((f) => f.tipo === "CAPITULO")
+    .map((f) => ({
+      id: f.id,
+      codigo: f.codigoPartida,
+      etiqueta: `${f.codigoPartida} ${f.descripcion}`,
+      sangria: f.nivel - nivelRaiz,
+    }));
+
+  // Los codigos ya usados: con ellos la pantalla propone el siguiente hueco
+  // libre dentro del capitulo elegido, sin tener que preguntar al servidor.
+  const codigosUsados = filas.map((f) => f.codigoPartida);
+
   return (
     <div className="space-y-6">
       {puedeImportar && obra.lineaBaseVersion === null && (
@@ -173,7 +198,16 @@ export default async function ObraPage({
                 )}
                 {/* La segunda salida, que hasta ahora no existia: el servicio
                     de alta estaba escrito y no habia forma de llamarlo. */}
-                {puedeCrear && <NuevaFila obraId={id} codigoSugerido="1.0" />}
+                {/* Sin partidas todavia no hay capitulos que elegir: lo
+                    primero que se teclea es el 1.0. */}
+                {puedeCrear && (
+                  <NuevaFila
+                    obraId={id}
+                    codigoSugerido="1.0"
+                    capitulos={[]}
+                    codigosUsados={[]}
+                  />
+                )}
               </div>
             </div>
 
@@ -192,7 +226,12 @@ export default async function ObraPage({
             {/* Solo mientras se pueda editar: con el presupuesto congelado, lo
                 que procede es un movimiento, no una partida nueva suelta. */}
             {puedeCrear && obra.lineaBaseVersion === null && (
-              <NuevaFila obraId={id} codigoSugerido={siguienteCodigo} />
+              <NuevaFila
+                obraId={id}
+                codigoSugerido={siguienteCodigo}
+                capitulos={capitulos}
+                codigosUsados={codigosUsados}
+              />
             )}
           </div>
         )}

@@ -4,6 +4,14 @@ import { useState, useTransition } from "react";
 import { AlertCircle, LoaderCircle, Plus } from "lucide-react";
 
 import { accionCrearPartida } from "@/app/(dashboard)/obras/[id]/acciones";
+import { siguienteCodigoHijo } from "@/lib/jerarquia-partidas";
+
+export interface OpcionCapitulo {
+  id: string;
+  codigo: string;
+  etiqueta: string;
+  sangria: number;
+}
 
 /**
  * Anadir un capitulo o una partida a mano.
@@ -57,15 +65,43 @@ export function NuevaFila({
   /// Codigo que se propone al abrir. Sale de la ultima fila para no obligar a
   /// recordar por donde iba la numeracion.
   codigoSugerido,
+  capitulos,
+  codigosUsados,
 }: {
   obraId: string;
   codigoSugerido: string;
+  /// Los capitulos existentes, para elegir de cual cuelga la partida.
+  capitulos: OpcionCapitulo[];
+  /// Los codigos ya ocupados, para proponer el siguiente hueco libre.
+  codigosUsados: string[];
 }) {
   const [abierto, setAbierto] = useState(false);
   const [tipo, setTipo] = useState<Tipo>("PARTIDA");
   const [campos, setCampos] = useState({ ...VACIO, codigoPartida: codigoSugerido });
+  const [parentId, setParentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, guardar] = useTransition();
+
+  /**
+   * Al elegir capitulo, el codigo se propone solo.
+   *
+   * Es el nudo de todo esto: antes habia que SABER que "2.1" cuelga del
+   * capitulo 2.0, y quien acababa de crear el 4.0 tecleaba 2.1 sin darse
+   * cuenta de que la estaba metiendo en otro sitio. `siguienteCodigoHijo`
+   * conoce las tres convenciones —"4.0" tiene hijas "4.1", pero "7.02.00" las
+   * tiene en "7.02.01"— y se autocomprueba: si no encuentra un codigo que de
+   * verdad vuelva a ese capitulo, no propone nada y se teclea a mano.
+   */
+  function elegirCapitulo(id: string) {
+    setParentId(id);
+    setError(null);
+
+    const capitulo = capitulos.find((c) => c.id === id);
+    if (!capitulo) return;
+
+    const propuesto = siguienteCodigoHijo(capitulo.codigo, new Set(codigosUsados));
+    if (propuesto) setCampos((c) => ({ ...c, codigoPartida: propuesto }));
+  }
 
   function enviar() {
     setError(null);
@@ -75,6 +111,9 @@ export function NuevaFila({
         codigoPartida: campos.codigoPartida,
         descripcion: campos.descripcion,
         tipo,
+        // Un capitulo cuelga de la raiz o de otro capitulo por su codigo; el
+        // desplegable solo gobierna donde va una PARTIDA.
+        parentId: tipo === "PARTIDA" && parentId !== "" ? parentId : null,
         // Un capitulo no lleva cifras: se mandan en null aunque hubieran
         // quedado escritas de antes de cambiar el tipo.
         unidad: tipo === "CAPITULO" ? null : campos.unidad || null,
@@ -88,10 +127,22 @@ export function NuevaFila({
         return;
       }
 
-      // Se queda ABIERTO y con el tipo elegido: teclear un presupuesto son
-      // decenas de filas seguidas, y cerrar el formulario en cada una
-      // obligaria a volver a abrirlo y a volver a elegir.
-      setCampos({ ...VACIO });
+      /**
+       * Se queda ABIERTO, con el tipo y el capitulo elegidos: teclear un
+       * presupuesto son decenas de filas seguidas dentro del mismo capitulo.
+       *
+       * Y se propone YA el codigo siguiente, contando la que se acaba de
+       * crear. Antes se limpiaba a vacio y habia que acordarse de por donde
+       * iba la numeracion en cada fila, que es justo lo que hacia teclear un
+       * presupuesto una tarea de paciencia.
+       */
+      const capitulo = capitulos.find((c) => c.id === parentId);
+      const yaUsados = new Set([...codigosUsados, campos.codigoPartida]);
+      const siguiente = capitulo
+        ? (siguienteCodigoHijo(capitulo.codigo, yaUsados) ?? "")
+        : "";
+
+      setCampos({ ...VACIO, codigoPartida: siguiente });
       setError(null);
     });
   }
@@ -148,6 +199,37 @@ export function NuevaFila({
             ? "Un capítulo agrupa y no lleva cifras: su importe es la suma de las partidas que cuelgan de él. Códigos como 1.0, 2.0 o 01."
             : "Una partida sí lleva importe. Puedes dejar el metrado y el precio en blanco ahora y rellenarlos después pulsando su celda en la tabla."}
         </p>
+
+        {/* Solo para partidas: un capitulo cuelga de la raiz o de otro
+            capitulo, y eso lo dice su codigo. */}
+        {!esCapitulo && capitulos.length > 0 && (
+          <label className="mt-4 block text-xs">
+            <span className="mb-0.5 block font-medium opacity-70">
+              Capítulo donde cuelga
+            </span>
+            <select
+              value={parentId}
+              onChange={(e) => elegirCapitulo(e.target.value)}
+              className="w-full max-w-lg rounded border px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+            >
+              <option value="">Elige un capítulo</option>
+
+              {/* La sangria son espacios DUROS: el navegador colapsa los
+                  normales dentro de una opcion y todos los subcapitulos
+                  quedarian al mismo margen. */}
+              {capitulos.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {" ".repeat(c.sangria * 3)}
+                  {c.etiqueta}
+                </option>
+              ))}
+            </select>
+            <span className="mt-0.5 block opacity-60">
+              Al elegirlo, el código se propone solo.
+            </span>
+          </label>
+        )}
 
         <div className="mt-4 flex flex-wrap items-start gap-3">
           <Campo

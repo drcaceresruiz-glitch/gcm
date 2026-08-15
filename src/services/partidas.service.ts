@@ -308,6 +308,19 @@ export interface NuevaPartida {
   metrado?: string | null;
   precioUnitario?: string | null;
   /**
+   * El capitulo del que cuelga, ELEGIDO en una lista.
+   *
+   * Antes la jerarquia solo se podia teclear: se deducia del codigo, y quien
+   * escribia tenia que saber que "2.1" cuelga del capitulo 2.0 aunque acabara
+   * de crear el 4.0. Ahora se elige, y el codigo se propone desde el capitulo
+   * con `siguienteCodigoHijo`.
+   *
+   * Es opcional porque el importador y las partidas nacidas de un adicional
+   * siguen entrando sin el. Cuando viene, se EXIGE que coincida con el padre
+   * que dice el codigo: no manda uno sobre el otro, tienen que decir lo mismo.
+   */
+  parentId?: string | null;
+  /**
    * Si es capitulo o partida, DICHO, no deducido.
    *
    * Antes solo se deducia: sin cifras, capitulo. Y era una trampa cara. Al
@@ -368,7 +381,13 @@ export async function crearPartida(
 
   const existentes = await prisma.wbsItem.findMany({
     where: { projectId: obraId },
-    select: { id: true, codigoPartida: true, orden: true, parentId: true },
+    select: {
+      id: true,
+      codigoPartida: true,
+      orden: true,
+      parentId: true,
+      tipo: true,
+    },
   });
 
   if (existentes.some((e) => e.codigoPartida === codigo)) {
@@ -380,6 +399,42 @@ export async function crearPartida(
   const padre = codigoDelPadre
     ? (existentes.find((e) => e.codigoPartida === codigoDelPadre) ?? null)
     : null;
+
+  /**
+   * Si se dijo de que capitulo cuelga, tiene que coincidir con el que dice el
+   * codigo. No se elige uno de los dos: se exige que digan lo mismo.
+   *
+   * Aqui conviven tres representaciones del arbol —`parentId` da los
+   * subtotales de capitulo, el codigo da el total de la obra por `aportantes`,
+   * y `nivel` con `orden` dibujan la tabla—. Dejar que dos apunten a sitios
+   * distintos no da error: descuadra el presupuesto en una pantalla y no en
+   * la otra, que es la peor forma de estar mal. La pantalla propone el codigo
+   * con `siguienteCodigoHijo`, asi que llegar aqui con los dos en desacuerdo
+   * significa que alguien lo edito a mano.
+   */
+  if (nueva.parentId) {
+    const elegido = existentes.find((e) => e.id === nueva.parentId);
+
+    if (!elegido) {
+      return { ok: false, error: "El capitulo elegido no existe en esta obra." };
+    }
+    if (elegido.tipo !== "CAPITULO") {
+      return {
+        ok: false,
+        error:
+          `"${elegido.codigoPartida}" no es un capitulo. Colgar una partida de otra ` +
+          "partida con importe haria desaparecer el importe de esa partida del total.",
+      };
+    }
+    if (padre?.id !== elegido.id) {
+      return {
+        ok: false,
+        error:
+          `El codigo ${codigo} no cuelga de "${elegido.codigoPartida}", sino de ` +
+          `"${codigoDelPadre ?? "la raiz"}". Corrige el codigo o elige el otro capitulo.`,
+      };
+    }
+  }
 
   const metrado = nueva.metrado ? normalizarDecimal(nueva.metrado, 4) : null;
   const precioUnitario = nueva.precioUnitario

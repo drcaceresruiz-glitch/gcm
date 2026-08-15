@@ -174,3 +174,72 @@ describe("las hermanas salen en el orden en que se teclean", () => {
     expect(estado.creada?.["orden"]).toBe(21);
   });
 });
+
+/**
+ * El capitulo elegido y el que dice el codigo tienen que coincidir. No se
+ * escoge uno de los dos: en esta app los subtotales salen del `parentId` y el
+ * total de la obra del codigo, asi que dejarlos apuntando a sitios distintos
+ * descuadra el presupuesto en una pantalla y no en la otra.
+ */
+describe("elegir el capitulo del que cuelga", () => {
+  const capitulos: Fila[] = [
+    { id: "cap2", codigoPartida: "2.0", orden: 10, parentId: null },
+    { id: "cap4", codigoPartida: "4.0", orden: 20, parentId: null },
+  ];
+
+  function conTipos(filas: Fila[]) {
+    estado.existentes = filas.map((f) => ({
+      ...f,
+      tipo: f.codigoPartida.endsWith(".0") ? "CAPITULO" : "PARTIDA",
+    })) as unknown as Fila[];
+  }
+
+  it("acepta el codigo que de verdad cuelga del capitulo elegido", async () => {
+    conTipos(capitulos);
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "4.1",
+      descripcion: "Pintura",
+      tipo: "PARTIDA",
+      parentId: "cap4",
+      metrado: "1",
+      precioUnitario: "1",
+    });
+
+    expect(r.ok).toBe(true);
+    expect(estado.creada?.["parentId"]).toBe("cap4");
+  });
+
+  /** El caso de la captura: se crea el capitulo 4.0 y se teclea 2.1. */
+  it("rechaza el codigo que cuelga de otro capitulo", async () => {
+    conTipos(capitulos);
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "2.1",
+      descripcion: "Pintura",
+      tipo: "PARTIDA",
+      parentId: "cap4",
+      metrado: "1",
+      precioUnitario: "1",
+    });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("no cuelga de");
+  });
+
+  it("rechaza colgar de una partida, que borraria el importe de esa partida", async () => {
+    conTipos([...capitulos, { id: "p", codigoPartida: "4.1", orden: 21, parentId: "cap4" }]);
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "4.1.1",
+      descripcion: "Detalle",
+      tipo: "PARTIDA",
+      parentId: "p",
+      metrado: "1",
+      precioUnitario: "1",
+    });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("no es un capitulo");
+  });
+});
