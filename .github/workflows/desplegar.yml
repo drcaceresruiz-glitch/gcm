@@ -149,6 +149,19 @@ jobs:
           FIN
           node --check deploy/prisma.config.js
 
+          # El SHA viaja DENTRO del paquete, y no solo en `app.js`.
+          #
+          # `app.js` se sube aparte y el FTP lo deja en su sitio ANTES de que
+          # nadie aplique el `gcm.tar.gz`, asi que su SHA cambia aunque el
+          # paquete se quede sin aplicar. El 2026-08-15 eso hizo que
+          # `/api/health` cantara la version nueva mientras corria la vieja, y
+          # no habia forma de verlo con un curl.
+          #
+          # Este archivo llega al arbol vivo por el MISMO camino que el codigo:
+          # si el codigo esta, esto esta. `/api/health` lo publica como
+          # `version` y compara con el del arranque.
+          printf '%s' "${GITHUB_SHA}" > deploy/BUILD_SHA
+
           mkdir -p envio
           tar -czf envio/gcm.tar.gz -C deploy .
           ls -lh envio/gcm.tar.gz

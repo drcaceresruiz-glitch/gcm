@@ -221,7 +221,16 @@ rm -f "$EN_CURSO"
 
 # El reinicio, al final y solo si todo salio bien.
 date -u +%Y-%m-%dT%H:%M:%SZ > "$RAIZ/tmp/restart.txt"
-registrar "OK: aplicado ($cambiadas entradas). Reinicio pedido."
+
+# QUE version quedo viva, no solo cuantas entradas se movieron.
+#
+# El 15 de agosto hubo que reconstruir a mano que codigo estaba corriendo
+# porque la bitacora decia «aplicado (24 entradas)» y nada mas: 24 entradas son
+# 24 entradas en cualquier despliegue. Con el SHA, una linea del log responde
+# la pregunta que se hace siempre —«¿esto ya lleva mi cambio?»— sin cruzarla
+# con /api/health ni con fechas de archivos.
+SHA_APLICADO="$(cat "$RAIZ/BUILD_SHA" 2>/dev/null || echo "sin BUILD_SHA")"
+registrar "OK: aplicado ($cambiadas entradas), version $SHA_APLICADO. Reinicio pedido."
 
 # El arbol viejo se borra despues de pedir el reinicio: son cientos de megas y
 # no hay razon para que la obra espere a que termine.

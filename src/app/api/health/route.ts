@@ -9,6 +9,25 @@ import { verificarSalud } from "@/services/salud.service";
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * Si lo que corre es lo que se subio.
+ *
+ * `desfasado` es el estado que el 2026-08-15 nadie pudo ver: el FTP habia
+ * dejado `app.js` de la version nueva y el paquete seguia sin aplicarse, asi
+ * que `/api/health` cantaba la version nueva mientras corria la vieja.
+ *
+ * `desconocida` cuando el paquete no trae su SHA —uno anterior a esta
+ * comprobacion— porque no saberlo y estar al dia no son lo mismo, y decir
+ * "ok" sin poder comprobarlo es como se pierde la siguiente media hora.
+ */
+function coherenciaDelDespliegue(
+  paquete: string | null,
+  arranque: string | null,
+): "ok" | "desfasado" | "desconocida" {
+  if (paquete === null || arranque === null) return "desconocida";
+  return paquete === arranque ? "ok" : "desfasado";
+}
+
 export async function GET() {
   const salud = await verificarSalud();
 
@@ -24,7 +43,17 @@ export async function GET() {
       estado: "ok",
       baseDatos: "conectada",
       latenciaMs: salud.latenciaMs,
-      version: process.env["BUILD_SHA"] ?? "dev",
+      // `version` es el SHA del PAQUETE, o sea el codigo que de verdad corre.
+      // Antes salia de `app.js` y eso engano: `app.js` lo deja el FTP en su
+      // sitio ANTES de que nadie aplique el paquete, asi que decia la version
+      // nueva mientras corria la vieja. Si el paquete no lo trae —uno anterior
+      // a esta comprobacion— se cae al del arranque, que es lo unico que hay.
+      version: salud.shaPaquete ?? salud.shaArranque ?? "dev",
+      // El del punto de entrada, expuesto aparte para poder VER el hueco.
+      arranque: salud.shaArranque ?? "dev",
+      // La comparacion, ya hecha, porque nadie deberia tener que compararlas a
+      // ojo: "desfasado" = el FTP dejo una version que todavia no se aplico.
+      coherencia: coherenciaDelDespliegue(salud.shaPaquete, salud.shaArranque),
       // "pendiente" = hay un paquete subido que nadie aplico, o sea que esta
       // NO es la ultima version. Se dice aqui para poder saberlo con un curl,
       // sin entrar al servidor a mirar fechas de archivos.
