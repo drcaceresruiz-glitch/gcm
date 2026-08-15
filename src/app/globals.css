@@ -29,13 +29,26 @@
 /**
  * Paletas de marca.
  *
- * Solo redefinen `--color-marca-*`. Los semaforos —exito, alerta, peligro—
- * NO se tocan en ninguna: verde tiene que seguir significando bien y rojo
- * mal, se elija la paleta que se elija. Una paleta que cambiara el rojo del
- * sobrecosto convertiria una preferencia estetica en un error de lectura.
+ * Cada una redefine `--color-marca-*` y ademas TINE EL AMBIENTE: el fondo, el
+ * borde y las superficies del modo oscuro se corren al tono de la marca, con
+ * el mismo croma casi imperceptible que el teal por defecto usa en `:root`.
+ * Sin esa segunda parte, elegir «vino» pintaba los botones granate sobre un
+ * fondo que seguia siendo verdoso: media paleta. Los valores de luz y croma
+ * son LOS MISMOS en todas —solo cambia el tono—, para que ninguna eleccion
+ * sea mas clara ni mas sucia que otra.
  *
- * El valor por defecto (teal) vive en `@theme`, arriba, para que la
+ * Los semaforos —exito, alerta, peligro— NO se tocan en ninguna: verde tiene
+ * que seguir significando bien y rojo mal, se elija la paleta que se elija.
+ * Una paleta que cambiara el rojo del sobrecosto convertiria una preferencia
+ * estetica en un error de lectura.
+ *
+ * El valor por defecto (teal) vive en `@theme` y en `:root`, para que la
  * aplicacion tenga color aunque no haya ninguna eleccion guardada.
+ *
+ * Estos bloques tienen que ir ANTES que los de `data-tema`: a igual
+ * especificidad decide el orden, y en oscuro debe ganar `--fondo:
+ * var(--oscuro-fondo)` —que ya recoge el tinte, porque `--oscuro-*` si se
+ * redefine aqui—.
  */
 :root[data-paleta="azul"] {
   --color-marca-50: oklch(0.97 0.02 250);
@@ -44,6 +57,29 @@
   --color-marca-600: oklch(0.48 0.16 250);
   --color-marca-700: oklch(0.4 0.14 250);
   --color-marca-900: oklch(0.26 0.09 250);
+
+  --fondo: oklch(0.955 0.008 250);
+  --borde: oklch(0.86 0.012 255);
+  --oscuro-fondo: oklch(0.17 0.012 255);
+  --oscuro-superficie: oklch(0.22 0.016 255);
+  --oscuro-borde: oklch(0.32 0.014 255);
+}
+
+/* Marino. El azul de siempre de las ingenierias: se distingue del azul de al
+   lado por ser mucho mas oscuro y sobrio, no por el tono. */
+:root[data-paleta="marino"] {
+  --color-marca-50: oklch(0.96 0.015 260);
+  --color-marca-100: oklch(0.92 0.03 260);
+  --color-marca-500: oklch(0.38 0.1 260);
+  --color-marca-600: oklch(0.33 0.09 260);
+  --color-marca-700: oklch(0.28 0.08 260);
+  --color-marca-900: oklch(0.22 0.06 260);
+
+  --fondo: oklch(0.955 0.008 260);
+  --borde: oklch(0.86 0.012 260);
+  --oscuro-fondo: oklch(0.17 0.012 260);
+  --oscuro-superficie: oklch(0.22 0.016 260);
+  --oscuro-borde: oklch(0.32 0.014 260);
 }
 
 :root[data-paleta="indigo"] {
@@ -53,6 +89,46 @@
   --color-marca-600: oklch(0.47 0.19 285);
   --color-marca-700: oklch(0.4 0.17 285);
   --color-marca-900: oklch(0.27 0.11 285);
+
+  --fondo: oklch(0.955 0.008 285);
+  --borde: oklch(0.86 0.012 285);
+  --oscuro-fondo: oklch(0.17 0.012 285);
+  --oscuro-superficie: oklch(0.22 0.016 285);
+  --oscuro-borde: oklch(0.32 0.014 285);
+}
+
+:root[data-paleta="violeta"] {
+  --color-marca-50: oklch(0.96 0.02 320);
+  --color-marca-100: oklch(0.92 0.05 320);
+  --color-marca-500: oklch(0.55 0.17 320);
+  --color-marca-600: oklch(0.48 0.17 320);
+  --color-marca-700: oklch(0.41 0.15 320);
+  --color-marca-900: oklch(0.27 0.1 320);
+
+  --fondo: oklch(0.955 0.008 320);
+  --borde: oklch(0.86 0.012 320);
+  --oscuro-fondo: oklch(0.17 0.012 320);
+  --oscuro-superficie: oklch(0.22 0.016 320);
+  --oscuro-borde: oklch(0.32 0.014 320);
+}
+
+/* Vino. Vive al lado del rojo de `--color-peligro`, asi que se separa con el
+   mismo truco que el ambar del aviso: mas oscuro y menos saturado (0.45/0.11
+   frente a 0.58/0.19) y el tono corrido hacia el granate (10 frente a 25).
+   Un boton de marca granate no debe leerse como un error. */
+:root[data-paleta="vino"] {
+  --color-marca-50: oklch(0.96 0.015 10);
+  --color-marca-100: oklch(0.91 0.04 10);
+  --color-marca-500: oklch(0.45 0.11 10);
+  --color-marca-600: oklch(0.39 0.1 10);
+  --color-marca-700: oklch(0.33 0.09 10);
+  --color-marca-900: oklch(0.24 0.06 10);
+
+  --fondo: oklch(0.955 0.008 10);
+  --borde: oklch(0.86 0.012 10);
+  --oscuro-fondo: oklch(0.17 0.012 10);
+  --oscuro-superficie: oklch(0.22 0.016 10);
+  --oscuro-borde: oklch(0.32 0.014 10);
 }
 
 /* Ambar. Es el color de obra por excelencia, pero queda MUY cerca de
@@ -65,8 +141,16 @@
   --color-marca-600: oklch(0.52 0.14 55);
   --color-marca-700: oklch(0.44 0.12 55);
   --color-marca-900: oklch(0.3 0.08 55);
+
+  --fondo: oklch(0.955 0.008 70);
+  --borde: oklch(0.86 0.012 70);
+  --oscuro-fondo: oklch(0.17 0.012 70);
+  --oscuro-superficie: oklch(0.22 0.016 70);
+  --oscuro-borde: oklch(0.32 0.014 70);
 }
 
+/* Grafito no tine nada: su gracia es justo la ausencia de color, asi que su
+   ambiente NEUTRALIZA el tinte verdoso que `:root` trae de serie. */
 :root[data-paleta="grafito"] {
   --color-marca-50: oklch(0.96 0.004 240);
   --color-marca-100: oklch(0.92 0.006 240);
@@ -74,6 +158,12 @@
   --color-marca-600: oklch(0.4 0.02 240);
   --color-marca-700: oklch(0.33 0.018 240);
   --color-marca-900: oklch(0.24 0.014 240);
+
+  --fondo: oklch(0.955 0.002 240);
+  --borde: oklch(0.86 0.004 240);
+  --oscuro-fondo: oklch(0.17 0.004 240);
+  --oscuro-superficie: oklch(0.22 0.005 240);
+  --oscuro-borde: oklch(0.32 0.005 240);
 }
 
 /* Tema claro por defecto. Antes se seguia `prefers-color-scheme`, asi que la

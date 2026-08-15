@@ -27,6 +27,8 @@ describe("paletaValida", () => {
   it("acepta las paletas declaradas", () => {
     expect(paletaValida("ambar")).toBe("ambar");
     expect(paletaValida("grafito")).toBe("grafito");
+    expect(paletaValida("vino")).toBe("vino");
+    expect(paletaValida("marino")).toBe("marino");
   });
 
   it("cae en teal ante cualquier otra cosa", () => {
@@ -50,8 +52,17 @@ describe("temaEfectivo", () => {
 
 describe("muestras del selector", () => {
   /**
-   * Si faltara una, su boton saldria transparente y parecerian cuatro
-   * paletas en vez de cinco.
+   * No es una cifra tecnica: es la promesa hecha al producto de que cada
+   * empresa encuentra una identidad propia entre las opciones. Quitar una
+   * paleta por limpieza tiene que romper algo.
+   */
+  it("hay al menos siete paletas para elegir", () => {
+    expect(PALETAS.length).toBeGreaterThanOrEqual(7);
+  });
+
+  /**
+   * Si faltara una muestra, su boton saldria transparente y la fila
+   * aparentaria menos paletas de las que hay.
    */
   it("cada paleta tiene su color de muestra", () => {
     for (const p of PALETAS) {

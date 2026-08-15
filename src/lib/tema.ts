@@ -10,7 +10,23 @@
 export const TEMAS = ["auto", "claro", "oscuro"] as const;
 export type Tema = (typeof TEMAS)[number];
 
-export const PALETAS = ["teal", "azul", "indigo", "ambar", "grafito"] as const;
+/**
+ * En orden de rueda de color, no de llegada: el selector las pinta en fila y
+ * asi la fila se lee como un degradado en vez de como un cajon desordenado.
+ *
+ * SIEMPRE al menos siete. No es una cifra tecnica: es la promesa de que cada
+ * empresa encuentra una identidad propia, y hay una prueba que la vigila.
+ */
+export const PALETAS = [
+  "teal",
+  "azul",
+  "marino",
+  "indigo",
+  "violeta",
+  "vino",
+  "ambar",
+  "grafito",
+] as const;
 export type Paleta = (typeof PALETAS)[number];
 
 export const ETIQUETA_TEMA: Record<Tema, string> = {
@@ -22,7 +38,10 @@ export const ETIQUETA_TEMA: Record<Tema, string> = {
 export const ETIQUETA_PALETA: Record<Paleta, string> = {
   teal: "Teal",
   azul: "Azul",
+  marino: "Marino",
   indigo: "Indigo",
+  violeta: "Violeta",
+  vino: "Vino",
   ambar: "Ambar",
   grafito: "Grafito",
 };
@@ -33,12 +52,15 @@ export const ETIQUETA_PALETA: Record<Paleta, string> = {
  * Se repiten aqui los valores de `globals.css` a proposito: la muestra tiene
  * que ensenar el color de una paleta que TODAVIA no esta aplicada, asi que no
  * puede leerlo de `var(--color-marca-500)`, que siempre devolveria el de la
- * paleta activa y pintaria las cinco muestras iguales.
+ * paleta activa y pintaria todas las muestras iguales.
  */
 export const MUESTRA_PALETA: Record<Paleta, string> = {
   teal: "oklch(0.62 0.11 195)",
   azul: "oklch(0.55 0.16 250)",
+  marino: "oklch(0.38 0.1 260)",
   indigo: "oklch(0.54 0.18 285)",
+  violeta: "oklch(0.55 0.17 320)",
+  vino: "oklch(0.45 0.11 10)",
   ambar: "oklch(0.6 0.15 55)",
   grafito: "oklch(0.48 0.02 240)",
 };

@@ -33,6 +33,7 @@ import { Chip } from "@/components/ui/Chip";
 import { Mascota } from "@/components/ui/Mascota";
 import { Paginacion } from "@/components/ui/Paginacion";
 import { AcentoTitulo, Regla } from "@/components/ui/Regla";
+import { Bienvenida } from "@/components/obras/Bienvenida";
 import { FiltrosObras } from "@/components/obras/FiltrosObras";
 import { FranjaObra, type AlertaObra } from "@/components/obras/FranjaObra";
 import { ResumenEmpresaPanel } from "@/components/obras/ResumenEmpresaPanel";
@@ -119,27 +120,16 @@ export default async function PanelPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <AcentoTitulo>
-          <h1 className="text-2xl font-semibold tracking-tight">Obras</h1>
-          <p className="mt-1 text-sm opacity-70">
-            {vacioDeVerdad
-              ? "Aún no hay obras registradas."
-              : `${obras.total} obra(s)${hayFiltro ? " coinciden" : " en tu empresa"}.`}
-          </p>
-        </AcentoTitulo>
-
-        {puedeCrear && !vacioDeVerdad && (
-          <Link
-            href="/obras/nueva"
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-            style={{ backgroundColor: "var(--color-marca-600)" }}
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            Nueva obra
-          </Link>
-        )}
-      </div>
+      {/* El saludo con el «siguiente paso» encabeza el panel: contesta «qué
+          tengo que mirar hoy» antes de ensenar nada mas. El titulo «Obras»
+          baja a encabezar su propia lista, mas abajo. */}
+      <Bienvenida
+        nombres={sesion.nombres}
+        resumen={resumen}
+        alertas={alertasEmpresa}
+        vacia={vacioDeVerdad}
+        puedeCrear={puedeCrear}
+      />
 
       {/* El tablero encabeza todo: es la obra que se supervisa, con sus
           indicadores juntos. Debajo van las cifras de la empresa entera y la
@@ -160,9 +150,21 @@ export default async function PanelPage({
         <ResumenEmpresaPanel resumen={resumen} alertas={alertasEmpresa} />
       )}
 
-      {/* El buscador no se pinta con la empresa vacia: no hay nada que
-          filtrar y solo estorbaria al unico paso que toca, crear la obra. */}
-      {!vacioDeVerdad && <FiltrosObras />}
+      {/* El titulo que antes encabezaba la pagina entera, ahora al frente de
+          lo suyo: la lista. El buscador no se pinta con la empresa vacia; no
+          hay nada que filtrar y solo estorbaria al unico paso que toca,
+          crear la obra. */}
+      {!vacioDeVerdad && (
+        <>
+          <AcentoTitulo>
+            <h2 className="text-xl font-semibold tracking-tight">Obras</h2>
+            <p className="mt-1 text-sm opacity-70">
+              {obras.total} obra(s){hayFiltro ? " coinciden" : " en tu empresa"}.
+            </p>
+          </AcentoTitulo>
+          <FiltrosObras />
+        </>
+      )}
 
       {vacioDeVerdad ? (
         <div
@@ -330,9 +332,9 @@ export default async function PanelPage({
                   </Chip>
                 </div>
 
-                <h2 className="mt-2 text-sm font-semibold text-balance">
+                <h3 className="mt-2 text-sm font-semibold text-balance">
                   {obra.nombreObra}
-                </h2>
+                </h3>
 
                 {obra.ubicacion && (
                   <p className="mt-2 flex items-start gap-1.5 text-xs opacity-70">
