@@ -328,3 +328,42 @@ export function siguienteCodigoHijo(
 
   return null;
 }
+
+/**
+ * Quien se ha quedado la numeracion de un capitulo, si no es el.
+ *
+ * `siguienteCodigoHijo` devuelve `null` en dos situaciones que se parecen y no
+ * lo son: que no quepa ningun codigo, y que los codigos que le tocarian a este
+ * capitulo cuelguen YA de otro. La segunda es corriente en presupuestos
+ * importados a los que despues se les anadieron capitulos: conviven "4"
+ * —importado, con hijas "4.01"— y "4.0" —anadido despues—, y desde entonces
+ * cualquier "4.x" cuelga de "4.0" porque asi lo dice `codigoPadre`.
+ *
+ * Sin esto, la pantalla se limitaba a dejar la casilla del codigo en blanco, y
+ * cualquier codigo que se tecleara lo rechazaba el servicio por no colgar del
+ * capitulo elegido. Un callejon sin salida sin una sola explicacion.
+ *
+ * Devuelve el codigo del capitulo rival, o `null` si no hay tal rival (y
+ * entonces el problema es otro).
+ */
+export function quienSeQuedaLaNumeracion(
+  capitulo: string,
+  existentes: ReadonlySet<string>,
+): string | null {
+  const segmentos = capitulo.split(".");
+  const ultimo = segmentos.at(-1) ?? "";
+  const esCabecera = segmentos.length > 1 && Number(ultimo) === 0;
+  const base = esCabecera ? segmentos.slice(0, -1) : segmentos;
+
+  for (let n = 1; n <= 999; n++) {
+    const candidato = [...base, String(n).padStart(ultimo.length, "0")].join(".");
+    if (existentes.has(candidato)) continue;
+
+    // El primer hueco libre basta: si ese ya se lo lleva otro, todos los
+    // demas del mismo patron se lo llevan tambien.
+    const rival = codigoPadre(candidato, new Set([...existentes, candidato]));
+    return rival === capitulo ? null : rival;
+  }
+
+  return null;
+}
