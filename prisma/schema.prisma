@@ -1817,6 +1817,29 @@ model CompromisoSemanal {
   /// Protocolo de calidad subido al completar (gate de calidad, Fase 4).
   protocoloCalidad Boolean @default(false)
 
+  // --- Dia dentro de la semana (tablero de planificacion semanal) ----------
+  //
+  // El PTS comprometia POR SEMANA y el tablero de Last Planner se lee POR DIA:
+  // filas por contratista, columnas por dia habil. Sin esto no hay donde
+  // colocar la tarjeta.
+  //
+  // ISO 1-7 (lunes=1), la MISMA convencion que `Project.diaCorteSemanal` y
+  // `WorkCalendar.diaSemana`. Se guarda el dia y no una fecha porque la semana
+  // ya la fija `PlanSemanal.fechaCorte`: con una fecha suelta cabria escribir
+  // un dia de otra semana y nada lo impediria.
+  //
+  // SON DOS Y NO UNO a proposito. La referencia del tablero habla de «que
+  // actividad se completara cada dia», pero en obra un compromiso de tres dias
+  // es lo normal, y meterlo en una sola columna haria que el tablero mintiera
+  // sobre cuando ocupa el frente. Con inicio y fin la tarjeta se estira, como
+  // el post-it estirado de la pizarra. Iguales = un solo dia.
+  //
+  // Nullable los dos: un compromiso sin dia sigue siendo valido —se pacto la
+  // semana y aun no el dia— y el tablero lo enseña en su banda «sin dia» en
+  // vez de esconderlo.
+  diaInicio Int?
+  diaFin    Int?
+
   plan      PlanSemanal @relation(fields: [planSemanalId], references: [id], onDelete: Cascade)
   proveedor Proveedor?  @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
   fotos     FotoEvidencia[]
