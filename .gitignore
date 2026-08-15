@@ -99,6 +99,10 @@ next-env.d.ts
 # Documentos de referencia (binarios pesados; se guardan en local)
 /docs/referencias/
 
+# Repositorios de terceros descargados para estudio (1,8 GB de ZIPs).
+# Son material de consulta local: NUNCA deben entrar al repositorio.
+/docs/COMUNIDADGIT/
+
 # Archivos de bloqueo de Word/Office (aparecen al tener un .doc abierto)
 **/~$*
 
