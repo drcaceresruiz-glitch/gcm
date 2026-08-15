@@ -161,8 +161,27 @@ else
     [ -n "${DATABASE_URL:-}" ] || { echo "sin DATABASE_URL en el archivo"; exit 1; }
 
     if [ -n "${NODEVENV_ACTIVATE:-}" ]; then
+      # `set +u` ALREDEDOR DEL SOURCE, Y NO ES UN CAPRICHO.
+      #
+      # El `activate` de CloudLinux es un enlace a
+      # /usr/share/l.v.e-manager/utils/activate, y en su linea 78 lee
+      # `CL_VIRTUAL_ENV` sin valor por defecto. Con el `set -u` de la cabecera,
+      # leer una variable sin definir mata el subshell AHI MISMO: el
+      # `migrate deploy` no llegaba a ejecutarse nunca y el despliegue abortaba
+      # entero. Fue exactamente lo que paso el 2026-08-15 y dejo todas las
+      # paginas de obra en 500 hasta aplicar la migracion a mano.
+      #
+      # La auditoria del 12/08 no lo cazo porque lo comprobo con
+      # `bash -c '. "$NODEVENV_ACTIVATE"; npx prisma migrate status'`, que NO
+      # lleva `set -u`. El archivo funcionaba; lo que fallaba era cargarlo bajo
+      # nounset.
+      #
+      # Se apaga solo para el source y se vuelve a encender inmediatamente: el
+      # resto del bloque sigue protegido.
+      set +u
       # shellcheck disable=SC1090
-      . "$NODEVENV_ACTIVATE" || { echo "no se pudo activar $NODEVENV_ACTIVATE"; exit 1; }
+      . "$NODEVENV_ACTIVATE" || { set -u; echo "no se pudo activar $NODEVENV_ACTIVATE"; exit 1; }
+      set -u
     fi
 
     command -v npx >/dev/null 2>&1 || { echo "npx no esta en el PATH"; exit 1; }
