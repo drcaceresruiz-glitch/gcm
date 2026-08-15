@@ -11,6 +11,7 @@ import {
 import { puede } from "@/lib/rbac";
 import { fechaCorta } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
+import { PublicarEtiqueta } from "@/components/navegacion/PublicarEtiqueta";
 import { Tarjeta } from "@/components/ui/Tarjeta";
 import { FormularioEncargo } from "@/components/proveedores/FormularioEncargo";
 
@@ -52,6 +53,10 @@ export default async function EditarEncargoPage({
 
   return (
     <div className="space-y-4">
+      <PublicarEtiqueta
+        clave="encargo"
+        valor={`E-${String(encargo.numero).padStart(3, "0")}`}
+      />
       <Volver href={`/obras/${id}/proveedores`}>Volver a proveedores</Volver>
 
       <div>

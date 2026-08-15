@@ -10,6 +10,7 @@ import { EliminarObra } from "@/components/obras/EliminarObra";
 import { EliminarObraCerrada } from "@/components/obras/EliminarObraCerrada";
 import { constaRespaldoReciente } from "@/services/obra-borrado.service";
 import { MenuObra, type FaseMenu } from "@/components/obras/MenuObra";
+import { PublicarEtiqueta } from "@/components/navegacion/PublicarEtiqueta";
 import { EstadoObra } from "@/components/obras/EstadoObra";
 import type { EstadoObra as EstadoObraTipo } from "@/lib/obras";
 
@@ -38,6 +39,9 @@ export default async function ObraLayout({
   const obra = await obtenerObra(sesion, id);
   if (!obra) notFound();
 
+  // El nombre de la obra sale gratis: ya se pidio para pintar el h1 de abajo.
+  // Solo hace falta publicarlo para que la miga —montada arriba del todo,
+  // en el layout raiz— lo pueda leer sin volver a consultar nada.
   const raiz = `/obras/${id}`;
   const [hitos, avisos] = await Promise.all([
     hitosDeObra(sesion, id),
@@ -177,6 +181,7 @@ export default async function ObraLayout({
     // `print:block` deshace la rejilla al imprimir: el riel va oculto y su
     // columna vacia correria el documento de la orden hacia la derecha.
     <div className="space-y-4 lg:grid lg:grid-cols-[210px_minmax(0,1fr)] lg:gap-8 lg:space-y-0 print:block">
+      <PublicarEtiqueta clave="obra" valor={obra.nombreObra} />
       <MenuObra fases={fases} />
 
       <div className="space-y-6">

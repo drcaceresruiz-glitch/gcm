@@ -12,6 +12,7 @@ import { ETIQUETA_CNC } from "@/lib/plan-semanal";
 import { LayoutGrid } from "lucide-react";
 import { Volver } from "@/components/ui/Volver";
 import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
+import { PublicarEtiqueta } from "@/components/navegacion/PublicarEtiqueta";
 import { FormularioPlanSemanal } from "@/components/plan-semanal/FormularioPlanSemanal";
 import { CierrePlanSemanal } from "@/components/plan-semanal/CierrePlanSemanal";
 import { BotonReabrir } from "@/components/plan-semanal/BotonReabrir";
@@ -138,6 +139,7 @@ export default async function DetallePlanSemanalPage({
 
   return (
     <div className="space-y-6">
+      <PublicarEtiqueta clave="plan" valor={`Semana ${plan.numero}`} />
       <div>
         <Volver href={`/obras/${id}/plan-semanal`}>Volver al plan semanal</Volver>
         <h2 className="mt-3 text-xl font-semibold">Semana {plan.numero}</h2>

@@ -7,6 +7,7 @@ import { obtenerTablero } from "@/services/tablero-semanal.service";
 import { puede } from "@/lib/rbac";
 import { fechaLarga, hoy } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
+import { PublicarEtiqueta } from "@/components/navegacion/PublicarEtiqueta";
 import { Rejilla } from "@/components/tablero-semanal/Rejilla";
 import {
   ColocarTarjetas,
@@ -44,6 +45,7 @@ export default async function TableroSemanalPage({
 
   return (
     <div className="space-y-6">
+      <PublicarEtiqueta clave="plan" valor={`Semana ${datos.numero}`} />
       <div>
         <Volver href={`/obras/${id}/plan-semanal/${planId}`}>
           Volver a la semana {datos.numero}

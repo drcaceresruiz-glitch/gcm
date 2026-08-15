@@ -13,6 +13,8 @@ import {
   type EnlaceEmpresa,
 } from "@/components/navegacion/Navegacion";
 import { RelojPeru } from "@/components/ui/RelojPeru";
+import { ProveedorEtiquetas } from "@/components/navegacion/EtiquetasContexto";
+import { Migas } from "@/components/navegacion/Migas";
 import { FraseRotativa } from "@/components/portada/FraseRotativa";
 import { CierrePorInactividad } from "@/components/navegacion/CierrePorInactividad";
 import { PieDePagina } from "@/components/navegacion/PieDePagina";
@@ -98,9 +100,16 @@ export default async function DashboardLayout({
   ].filter(Boolean) as EnlaceEmpresa[];
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      {/* Cierra la sesion sola tras un rato sin actividad. No pinta nada. */}
-      <CierrePorInactividad />
+    // Envuelve TODO, `children` incluido: es la unica forma de que un layout
+    // o una pagina de mas abajo —que son componentes de SERVIDOR— puedan
+    // publicar una etiqueta con `<PublicarEtiqueta>` (cliente) y que la miga,
+    // montada aqui arriba, la vea. React permite este anidamiento —un
+    // componente cliente recibiendo hijos de servidor por `children`— aunque
+    // el import vaya al reves.
+    <ProveedorEtiquetas>
+      <div className="flex min-h-dvh flex-col">
+        {/* Cierra la sesion sola tras un rato sin actividad. No pinta nada. */}
+        <CierrePorInactividad />
 
       {/* `print:hidden` es lo que permite que las pantallas que son
           documentos —la orden que se le manda al proveedor— salgan por la
@@ -162,11 +171,14 @@ export default async function DashboardLayout({
         </div>
       </header>
 
+      <Migas />
+
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 print:max-w-none print:p-0">
         {children}
       </main>
 
-      <PieDePagina />
-    </div>
+        <PieDePagina />
+      </div>
+    </ProveedorEtiquetas>
   );
 }
