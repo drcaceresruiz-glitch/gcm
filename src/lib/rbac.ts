@@ -59,6 +59,10 @@ export const PERMISOS = [
   "linea_base:crear",
   "linea_base:aprobar",
 
+  "meta:leer",
+  "meta:crear",
+  "meta:aprobar",
+
   "movimiento:leer",
   "movimiento:crear",
   "movimiento:aprobar",
@@ -130,7 +134,15 @@ export function esInnegociable(permiso: string): boolean {
   return INNEGOCIABLES.includes(permiso as Permiso);
 }
 
-/** Solo lectura: base comun de todos los roles no administrativos. */
+/**
+ * Solo lectura: base comun de todos los roles no administrativos.
+ *
+ * `meta:leer` NO esta aqui, y es a proposito. De esta lista bebe CONSULTOR,
+ * que es el perfil del cliente y de la supervision: `linea_base:leer` les
+ * ensena el presupuesto de VENTA, que es suyo y lo han firmado, pero la meta
+ * es el COSTO al que la empresa cree que puede hacerlo, y su diferencia es el
+ * margen. Eso no se ensena a la otra parte de la mesa.
+ */
 const SOLO_LECTURA: Permiso[] = [
   "empresa:leer",
   "obra:leer",
@@ -173,6 +185,15 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// como la del presupuesto, asi que no va en INNEGOCIABLES.
     "cronograma:linea_base",
     "linea_base:crear",
+    /// El presupuesto meta y su bolsa. El residente los VE y los ARMA, pero no
+    /// los congela: aprobar la meta es lo que la vuelve inmutable, y quien
+    /// ejecuta contra ella no deberia poder rebajarla cuando se le va el gasto.
+    ///
+    /// Que lo vea es una decision deliberada, no un descuido: la meta solo
+    /// cambia conductas si la conoce quien produce. Esconderla deja al unico
+    /// que puede mover la aguja trabajando a ciegas sobre ella.
+    "meta:leer",
+    "meta:crear",
     "movimiento:crear",
     /// Ve a quien se le compra y cuanto se ha comprometido contra SU
     /// presupuesto, pero no pide ni aprueba: eso es administracion.
@@ -208,6 +229,11 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "proveedor:editar",
     "orden:leer",
     "orden:crear",
+    /// Ve la meta y la bolsa —es el perfil economico de la obra y el margen es
+    /// su materia— pero no la arma: eso sale de oficina tecnica, con el
+    /// residente. Si una empresa lo organiza al reves, `meta:crear` se concede
+    /// desde la matriz de permisos sin tocar codigo.
+    "meta:leer",
     /// Reparte la obra entre proveedores: crea encargos, les asigna el frente
     /// y su monto, y tambien valoriza. Es el trabajo economico-administrativo
     /// previo a emitir las ordenes.

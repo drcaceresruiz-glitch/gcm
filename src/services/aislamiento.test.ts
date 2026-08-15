@@ -89,6 +89,7 @@ const encargos = await import("@/services/encargos.service");
 const proveedores = await import("@/services/proveedores.service");
 const usuarios = await import("@/services/usuarios.service");
 const causaRaiz = await import("@/services/causa-raiz.service");
+const meta = await import("@/services/meta.service");
 
 function sesion(companyId: string, permisos: Permiso[]): SesionActiva {
   return {
@@ -639,6 +640,94 @@ describe("analisis de causa raiz", () => {
     );
     await exigeNiTocarLaBase(() =>
       causaRaiz.cerrarAnalisis(sesion(MIA, []), analisisAjeno),
+    );
+  });
+});
+
+
+/**
+ * El presupuesto meta expone el MARGEN de la obra, que es el dato mas
+ * sensible que guarda la aplicacion: no solo hay que aislarlo por empresa,
+ * es que ensenarselo a quien no toca es peor que ensenarle el presupuesto.
+ */
+describe("presupuesto meta", () => {
+  const obraAjena = "OBRA-DE-EMPRESA-B";
+  const metaAjena = "META-DE-EMPRESA-B";
+
+  const leer: Permiso[] = ["meta:leer"];
+  const crear: Permiso[] = ["meta:crear"];
+  const aprobar: Permiso[] = ["meta:aprobar"];
+
+  /// Una meta minima pero VALIDA: con items vacios la funcion se iria por el
+  /// error de validacion antes de tocar la base y no demostraria nada.
+  const datos = {
+    modo: "PARTIDA" as const,
+    fechaMeta: "2026-08-15",
+    mesesPlazo: "8",
+    items: [
+      {
+        codigoRef: "1.1",
+        descripcion: "Concreto",
+        tipo: "PARTIDA" as const,
+        parcial: "45000.00",
+      },
+    ],
+    gastosGenerales: [],
+  };
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("listar las metas de una obra ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      meta.listarMetas(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("comparar contra el contractual en una obra ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      meta.compararConContractual(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("crear una meta en una obra ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      meta.crearMeta(sesion(MIA, crear), obraAjena, datos),
+    );
+  });
+
+  it("aprobar una meta ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      meta.aprobarMeta(sesion(MIA, aprobar), metaAjena),
+    );
+  });
+
+  it("eliminar un borrador ajeno va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      meta.eliminarBorrador(sesion(MIA, crear), metaAjena),
+    );
+  });
+
+  it("sin permiso no se toca la base", async () => {
+    await exigeNiTocarLaBase(() => meta.listarMetas(sesion(MIA, []), obraAjena));
+    await exigeNiTocarLaBase(() =>
+      meta.compararConContractual(sesion(MIA, []), obraAjena),
+    );
+    await exigeNiTocarLaBase(() =>
+      meta.crearMeta(sesion(MIA, []), obraAjena, datos),
+    );
+    await exigeNiTocarLaBase(() => meta.aprobarMeta(sesion(MIA, []), metaAjena));
+    await exigeNiTocarLaBase(() =>
+      meta.eliminarBorrador(sesion(MIA, []), metaAjena),
+    );
+  });
+
+  it("leer la meta no basta para crearla ni para aprobarla", async () => {
+    // El residente ve la bolsa y arma la meta, pero congelarla es otro acto:
+    // quien ejecuta contra la meta no deberia poder rebajarla.
+    await exigeNiTocarLaBase(() =>
+      meta.aprobarMeta(sesion(MIA, [...leer, ...crear]), metaAjena),
     );
   });
 });
