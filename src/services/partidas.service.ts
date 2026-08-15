@@ -321,6 +321,22 @@ export interface NuevaPartida {
    */
   parentId?: string | null;
   /**
+   * Como esta contratada, DICHA al crearla.
+   *
+   * Faltaba: toda partida nacia a precios unitarios y para dejarla a suma
+   * alzada habia que crearla y cambiarla despues en la tabla. Y no era solo
+   * un paso de mas: al crearla se calculaba el importe como metrado x precio,
+   * que es exactamente lo que una suma alzada NO hace.
+   */
+  modalidad?: ModalidadPartida;
+  /**
+   * El importe cerrado, para las de suma alzada.
+   *
+   * En precios unitarios no se manda: sale de multiplicar. Aqui es el precio
+   * pactado por todo el alcance, y el metrado que lo acompane es referencial.
+   */
+  parcial?: string | null;
+  /**
    * Si es capitulo o partida, DICHO, no deducido.
    *
    * Antes solo se deducia: sin cifras, capitulo. Y era una trampa cara. Al
@@ -448,8 +464,30 @@ export async function crearPartida(
     return { ok: false, error: "El precio unitario no es un numero valido." };
   }
 
+  /**
+   * El importe depende de COMO este contratada, no solo de las cifras.
+   *
+   * En precios unitarios sale de multiplicar. En suma alzada es un precio
+   * cerrado que se teclea, y multiplicar ahi seria inventarse un importe que
+   * nadie pacto. Y una fila de alcance no lleva importe: el suyo vive en su
+   * partida padre, y ponerselo la haria CUBRIR a ese padre en `aportantes`,
+   * borrando su precio del costo directo.
+   */
+  const modalidadPedida = nueva.modalidad;
+  const importeCerrado = nueva.parcial ? normalizarDecimal(nueva.parcial, 2) : null;
+
+  if (nueva.parcial && importeCerrado === null) {
+    return { ok: false, error: "El importe no es un numero valido." };
+  }
+
   const parcial =
-    metrado && precioUnitario ? multiplicar(metrado, precioUnitario, 2) : null;
+    modalidadPedida === "ALCANCE"
+      ? null
+      : modalidadPedida === "SUMA_ALZADA"
+        ? importeCerrado
+        : metrado && precioUnitario
+          ? multiplicar(metrado, precioUnitario, 2)
+          : null;
 
   // Lo que diga quien la crea; si no dice nada, se deduce como siempre: sin
   // cifras es un capitulo que agrupa, con cifras es una partida.
@@ -464,12 +502,28 @@ export async function crearPartida(
   // Aceptar cifras aqui crearia un capitulo con importe propio, y `aportantes`
   // decidiria entonces que el capitulo cuenta y sus hijas no, borrando el
   // importe de estas sin un solo error.
-  if (tipo === "CAPITULO" && (metrado || precioUnitario)) {
+  if (tipo === "CAPITULO" && (metrado || precioUnitario || importeCerrado)) {
     return {
       ok: false,
       error:
         "Un capitulo no lleva metrado ni precio: su importe es la suma de las " +
         "partidas que cuelgan de el.",
+    };
+  }
+
+  if (tipo === "CAPITULO" && modalidadPedida) {
+    return {
+      ok: false,
+      error: "Un capitulo no tiene modalidad: su importe es la suma de sus partidas.",
+    };
+  }
+
+  if (modalidadPedida === "SUMA_ALZADA" && importeCerrado === null) {
+    return {
+      ok: false,
+      error:
+        "Una partida a suma alzada necesita su importe cerrado: es el precio " +
+        "pactado por todo el alcance, y no sale de multiplicar el metrado.",
     };
   }
 
@@ -510,6 +564,7 @@ export async function crearPartida(
         parentId: padre?.id ?? null,
         codigoPartida: codigo,
         tipo,
+        ...(modalidadPedida ? { modalidad: modalidadPedida } : {}),
         descripcion: descripcion.slice(0, 500),
         nivel: profundidades.get(codigo) ?? 0,
         orden,

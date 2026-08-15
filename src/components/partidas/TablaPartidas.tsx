@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   LoaderCircle,
+  Plus,
   SearchX,
   Trash2,
 } from "lucide-react";
@@ -30,6 +31,9 @@ interface Props {
   filas: PartidaFila[];
   /// false cuando el presupuesto esta congelado o el rol no permite editar.
   editable: boolean;
+  /// Pulsar el «+» de un capitulo. Lo recoge el panel, que abre el alta ya
+  /// apuntando ahi. Sin el, la tabla no pinta ese boton.
+  onAnadirEn?: (capituloId: string) => void;
 }
 
 const ETIQUETA_MODALIDAD: Record<PartidaFila["modalidad"], string> = {
@@ -45,7 +49,7 @@ const UMBRAL_CONTRAER = 60;
  *  presupuesto, asi que la clave no lleva la obra. */
 const CLAVE_COLUMNAS = "gcm:columnas-partidas";
 
-export function TablaPartidas({ obraId, filas, editable }: Props) {
+export function TablaPartidas({ obraId, filas, editable, onAnadirEn }: Props) {
   const router = useRouter();
   const [pendiente, iniciarTransicion] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -439,7 +443,23 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
                     </td>
 
                     {editable && (
-                      <td className="px-2 py-2">
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {/* Anadir DENTRO de este capitulo, sin tener que
+                            buscarlo despues en un desplegable ni acordarse de
+                            que numero le toca: se pulsa donde se esta
+                            mirando. */}
+                        {esCapitulo && onAnadirEn && (
+                          <button
+                            type="button"
+                            onClick={() => onAnadirEn(f.id)}
+                            aria-label={`Anadir una partida en ${f.codigoPartida}`}
+                            title={`Anadir una partida en ${f.codigoPartida}`}
+                            className="rounded p-1 opacity-50 hover:opacity-100"
+                            style={{ color: "var(--color-marca-600)" }}
+                          >
+                            <Plus className="size-4" aria-hidden="true" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => eliminar(f)}

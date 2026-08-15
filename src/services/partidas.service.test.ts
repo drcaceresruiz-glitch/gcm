@@ -243,3 +243,77 @@ describe("elegir el capitulo del que cuelga", () => {
     expect(r.ok === false && r.error).toContain("no es un capitulo");
   });
 });
+
+/**
+ * La modalidad al CREAR, no despues.
+ *
+ * Faltaba entera: toda partida nacia a precios unitarios y habia que
+ * corregirla en la tabla. Y no era solo un paso de mas: al crearla el importe
+ * salia de metrado x precio, asi que una suma alzada nacia con una cifra que
+ * nadie habia pactado.
+ */
+describe("crear una partida a suma alzada", () => {
+  it("toma el importe cerrado y NO lo multiplica", async () => {
+    estado.existentes = [];
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "3.1",
+      descripcion: "Puesta a tierra",
+      tipo: "PARTIDA",
+      modalidad: "SUMA_ALZADA",
+      unidad: "glb",
+      // El metrado es referencial: si se multiplicara saldrian 5000.
+      metrado: "2",
+      parcial: "2500.00",
+    });
+
+    expect(r.ok).toBe(true);
+    expect(estado.creada?.["modalidad"]).toBe("SUMA_ALZADA");
+    expect(estado.creada?.["parcial"]).toBe("2500.00");
+    expect(estado.creada?.["metrado"]).toBe("2.0000");
+  });
+
+  it("exige el importe: sin el, la partida no vale nada y nadie avisaria", async () => {
+    estado.existentes = [];
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "3.1",
+      descripcion: "Puesta a tierra",
+      tipo: "PARTIDA",
+      modalidad: "SUMA_ALZADA",
+      metrado: "1",
+    });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("importe cerrado");
+  });
+
+  it("a precios unitarios sigue saliendo de multiplicar", async () => {
+    estado.existentes = [];
+
+    await crearPartida(sesion, "obra", {
+      codigoPartida: "3.1",
+      descripcion: "Concreto",
+      tipo: "PARTIDA",
+      modalidad: "PRECIOS_UNITARIOS",
+      metrado: "12.5",
+      precioUnitario: "385",
+    });
+
+    expect(estado.creada?.["parcial"]).toBe("4812.50");
+  });
+
+  it("un capitulo sigue sin admitir modalidad ni importe", async () => {
+    estado.existentes = [];
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "5.0",
+      descripcion: "ACABADOS",
+      tipo: "CAPITULO",
+      modalidad: "SUMA_ALZADA",
+      parcial: "100",
+    });
+
+    expect(r.ok).toBe(false);
+  });
+});

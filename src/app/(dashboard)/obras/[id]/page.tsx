@@ -8,8 +8,8 @@ import { puede } from "@/lib/rbac";
 import { soles } from "@/utils/formato";
 import { Explicacion } from "@/components/ui/Explicacion";
 import { CONGELAR_PRESUPUESTO, MODALIDAD_PARTIDA } from "@/lib/explicaciones";
-import { TablaPartidas } from "@/components/partidas/TablaPartidas";
 import { NuevaFila } from "@/components/partidas/NuevaFila";
+import { PanelPresupuesto } from "@/components/partidas/PanelPresupuesto";
 import { Mascota } from "@/components/ui/Mascota";
 import { PanelAyuda, type PuntoAyuda } from "@/components/ui/PanelAyuda";
 
@@ -214,26 +214,18 @@ export default async function ObraPage({
             <PanelAyuda puntos={PRIMEROS_PASOS} />
           </div>
         ) : (
-          <div className="space-y-4">
-            <TablaPartidas
-              obraId={id}
-              filas={filas}
-              // Un presupuesto congelado no se edita: los indicadores se
-              // calculan contra el y cambiarlo los invalidaria hacia atras.
-              editable={puede(sesion, "partida:editar") && obra.lineaBaseVersion === null}
-            />
-
-            {/* Solo mientras se pueda editar: con el presupuesto congelado, lo
-                que procede es un movimiento, no una partida nueva suelta. */}
-            {puedeCrear && obra.lineaBaseVersion === null && (
-              <NuevaFila
-                obraId={id}
-                codigoSugerido={siguienteCodigo}
-                capitulos={capitulos}
-                codigosUsados={codigosUsados}
-              />
-            )}
-          </div>
+          <PanelPresupuesto
+            obraId={id}
+            filas={filas}
+            // Un presupuesto congelado no se edita: los indicadores se
+            // calculan contra el y cambiarlo los invalidaria hacia atras. Y
+            // entonces lo que procede es un movimiento, no una partida suelta.
+            editable={puede(sesion, "partida:editar") && obra.lineaBaseVersion === null}
+            puedeCrear={puedeCrear && obra.lineaBaseVersion === null}
+            codigoSugerido={siguienteCodigo}
+            capitulos={capitulos}
+            codigosUsados={codigosUsados}
+          />
         )}
 
         {/* Estaba escrita en `explicaciones.ts` desde hace tiempo y no la
