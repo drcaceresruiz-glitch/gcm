@@ -5,7 +5,11 @@ import { normalizarDecimal, multiplicar } from "@/lib/decimal";
 import { codigoPadre, calcularProfundidades } from "@/lib/jerarquia-partidas";
 import { motivoNoAdmiteCambios } from "@/lib/obras";
 import type { SesionActiva } from "@/services/sesion.service";
-import type { AuditAction, ModalidadPartida } from "@/generated/prisma/enums";
+import type {
+  AuditAction,
+  ModalidadPartida,
+  WbsType,
+} from "@/generated/prisma/enums";
 
 /**
  * Edicion de partidas.
@@ -258,6 +262,21 @@ export interface NuevaPartida {
   unidad?: string | null;
   metrado?: string | null;
   precioUnitario?: string | null;
+  /**
+   * Si es capitulo o partida, DICHO, no deducido.
+   *
+   * Antes solo se deducia: sin cifras, capitulo. Y era una trampa cara. Al
+   * construir un presupuesto a mano lo natural es teclear primero la lista de
+   * partidas y poner los precios despues —o pedirlos al proveedor—, y cada una
+   * de esas filas nacia CAPITULO para siempre: `actualizarPartida` no toca
+   * `tipo`, asi que sus celdas de unidad, metrado y precio quedaban vacias y
+   * NO editables, sin ninguna via en la interfaz para arreglarlo. Habia que
+   * borrar la fila y rehacerla, y nadie avisaba.
+   *
+   * Se deja opcional para no romper a quien ya llamaba sin decirlo: si no
+   * viene, se deduce como siempre.
+   */
+  tipo?: WbsType;
 }
 
 export async function crearPartida(
@@ -332,8 +351,27 @@ export async function crearPartida(
   const parcial =
     metrado && precioUnitario ? multiplicar(metrado, precioUnitario, 2) : null;
 
-  // Sin cifras es un capitulo que agrupa; con cifras es una partida.
-  const tipo = metrado || precioUnitario ? "PARTIDA" : "CAPITULO";
+  // Lo que diga quien la crea; si no dice nada, se deduce como siempre: sin
+  // cifras es un capitulo que agrupa, con cifras es una partida.
+  //
+  // La deduccion sola no basta porque al teclear un presupuesto se escriben
+  // primero las filas y despues los precios, y asi todas nacerian capitulo
+  // sin vuelta atras.
+  const tipo: WbsType =
+    nueva.tipo ?? (metrado || precioUnitario ? "PARTIDA" : "CAPITULO");
+
+  // Un capitulo es un titulo: su importe lo calcula la suma de lo que cuelga.
+  // Aceptar cifras aqui crearia un capitulo con importe propio, y `aportantes`
+  // decidiria entonces que el capitulo cuenta y sus hijas no, borrando el
+  // importe de estas sin un solo error.
+  if (tipo === "CAPITULO" && (metrado || precioUnitario)) {
+    return {
+      ok: false,
+      error:
+        "Un capitulo no lleva metrado ni precio: su importe es la suma de las " +
+        "partidas que cuelgan de el.",
+    };
+  }
 
   const profundidades = calcularProfundidades([...codigos]);
 

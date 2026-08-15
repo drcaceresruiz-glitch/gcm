@@ -7,11 +7,44 @@ import { obtenerObra, listarPartidas } from "@/services/obras.service";
 import { puede } from "@/lib/rbac";
 import { soles } from "@/utils/formato";
 import { Explicacion } from "@/components/ui/Explicacion";
-import { CONGELAR_PRESUPUESTO } from "@/lib/explicaciones";
+import { CONGELAR_PRESUPUESTO, MODALIDAD_PARTIDA } from "@/lib/explicaciones";
 import { TablaPartidas } from "@/components/partidas/TablaPartidas";
+import { NuevaFila } from "@/components/partidas/NuevaFila";
 import { Mascota } from "@/components/ui/Mascota";
+import { PanelAyuda, type PuntoAyuda } from "@/components/ui/PanelAyuda";
 
-export const metadata: Metadata = { title: "Obra" };
+export const metadata: Metadata = { title: "Presupuesto de la obra" };
+
+/**
+ * Lo que hay que saber ANTES de teclear la primera fila.
+ *
+ * El texto no se inventa aqui: es el mismo que explica la plantilla de Excel
+ * (`lib/plantilla-presupuesto.ts`), resumido. Si un dia divergen, el usuario
+ * que empezo por Excel y el que empezo tecleando habran aprendido dos reglas
+ * distintas para la misma cosa.
+ */
+const PRIMEROS_PASOS: PuntoAyuda[] = [
+  {
+    titulo: "Primero los capítulos, luego lo que cuelga",
+    texto:
+      "Un código terminado en .0 —1.0, 2.0— o sin punto agrupa y no lleva cifras. Los demás (1.1, 2.3, 01.02.01) son partidas y sí llevan importe.",
+  },
+  {
+    titulo: "El importe del capítulo no se escribe",
+    texto:
+      "Lo calcula el sistema sumando sus partidas. Si le pusieras importe propio, el suyo taparía el de sus hijas y el presupuesto perdería dinero sin avisar.",
+  },
+  {
+    titulo: "Puedes dejar los precios para después",
+    texto:
+      "Teclea las descripciones ahora y pulsa luego cualquier celda para rellenar metrado y precio. Elige «Partida» aunque no tengas las cifras todavía: lo que decide es lo que marcas, no lo que dejas en blanco.",
+  },
+  {
+    titulo: "Nada de esto es definitivo",
+    texto:
+      "El presupuesto se edita libremente hasta que lo congelas en Revisiones. A partir de ahí, los cambios entran como adicionales.",
+  },
+];
 
 /**
  * La portada de la obra: su presupuesto por partidas.
@@ -36,6 +69,21 @@ export default async function ObraPage({
   const { filas, totalPartidas, montoTotal } = await listarPartidas(sesion, id);
   const { importadas } = await searchParams;
   const puedeImportar = puede(sesion, "partida:importar");
+  const puedeCrear = puede(sesion, "partida:crear");
+
+  /**
+   * Que codigo proponer para la fila siguiente.
+   *
+   * Se propone el capitulo raiz que toca —si la ultima raiz es la 3.0, se
+   * ofrece 4.0—, que es lo que se teclea al arrancar. No se intenta adivinar
+   * la subpartida siguiente: acertar exigiria saber si quien escribe va a
+   * seguir dentro del capitulo o a abrir otro, y una propuesta equivocada
+   * cuesta mas de corregir que un campo vacio.
+   */
+  const raices = filas
+    .map((f) => Number.parseInt(f.codigoPartida.split(".")[0] ?? "", 10))
+    .filter((n) => Number.isFinite(n));
+  const siguienteCodigo = `${(raices.length ? Math.max(...raices) : 0) + 1}.0`;
 
   return (
     <div className="space-y-6">
@@ -100,34 +148,58 @@ export default async function ObraPage({
         <h2 className="mb-3 text-lg font-semibold">Presupuesto por partidas</h2>
 
         {filas.length === 0 ? (
-          <div
-            className="rounded-xl border border-dashed p-10 text-center"
-            style={{ borderColor: "var(--borde)" }}
-          >
-            <div className="flex justify-center">
-              <Mascota pose="trabajando" alto={170} flotar />
+          <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+            <div
+              className="rounded-xl border border-dashed p-10 text-center"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <div className="flex justify-center">
+                <Mascota pose="trabajando" alto={170} flotar />
+              </div>
+              <p className="mt-3 text-sm opacity-70">
+                Esta obra aún no tiene partidas. Hay dos caminos, y ninguno
+                excluye al otro: cargar el Excel que ya tengas, o empezar a
+                teclearlo aquí.
+              </p>
+
+              <div className="mt-5 flex flex-col items-center gap-3">
+                {puedeImportar && (
+                  <Link
+                    href={`/obras/${id}/importar`}
+                    className="inline-flex items-center gap-2 text-sm font-medium underline"
+                  >
+                    Cargar el presupuesto desde Excel
+                  </Link>
+                )}
+                {/* La segunda salida, que hasta ahora no existia: el servicio
+                    de alta estaba escrito y no habia forma de llamarlo. */}
+                {puedeCrear && <NuevaFila obraId={id} codigoSugerido="1.0" />}
+              </div>
             </div>
-            <p className="mt-3 text-sm opacity-70">
-              Esta obra aún no tiene partidas.
-            </p>
-            {puedeImportar && (
-              <Link
-                href={`/obras/${id}/importar`}
-                className="mt-4 inline-flex items-center gap-2 text-sm font-medium underline"
-              >
-                Cargar el presupuesto desde Excel
-              </Link>
-            )}
+
+            <PanelAyuda puntos={PRIMEROS_PASOS} />
           </div>
         ) : (
-          <TablaPartidas
-            obraId={id}
-            filas={filas}
-            // Un presupuesto congelado no se edita: los indicadores se
-            // calculan contra el y cambiarlo los invalidaria hacia atras.
-            editable={puede(sesion, "partida:editar") && obra.lineaBaseVersion === null}
-          />
+          <div className="space-y-4">
+            <TablaPartidas
+              obraId={id}
+              filas={filas}
+              // Un presupuesto congelado no se edita: los indicadores se
+              // calculan contra el y cambiarlo los invalidaria hacia atras.
+              editable={puede(sesion, "partida:editar") && obra.lineaBaseVersion === null}
+            />
+
+            {/* Solo mientras se pueda editar: con el presupuesto congelado, lo
+                que procede es un movimiento, no una partida nueva suelta. */}
+            {puedeCrear && obra.lineaBaseVersion === null && (
+              <NuevaFila obraId={id} codigoSugerido={siguienteCodigo} />
+            )}
+          </div>
         )}
+
+        {/* Estaba escrita en `explicaciones.ts` desde hace tiempo y no la
+            renderizaba nadie. Va aqui porque es donde se elige modalidad. */}
+        {filas.length > 0 && <Explicacion texto={MODALIDAD_PARTIDA} />}
       </section>
     </div>
   );
