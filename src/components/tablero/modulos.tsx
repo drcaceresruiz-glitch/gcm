@@ -18,8 +18,9 @@ import {
   Info,
   CircleCheck,
   ArrowRight,
+  Maximize2,
 } from "lucide-react";
-import type { DefinicionModulo } from "@/lib/tablero";
+import type { DefinicionModulo, ModuloTablero } from "@/lib/tablero";
 import { resumirPendientes } from "@/lib/pendientes";
 import {
   COLOR_SEMAFORO,
@@ -101,18 +102,28 @@ export function moduloConDatos(
   }
 }
 
-/** El contenido de un modulo, elegido por su clave. */
+/**
+ * El contenido de un modulo, elegido por su clave.
+ *
+ * `ampliado` cambia dos cosas: la caja pierde la altura fija —en el modal
+ * tiene todo el sitio que quiera— y no repite la cabecera, que el modal ya
+ * pinta con su boton de cerrar.
+ */
 export function ModuloContenido({
   modulo,
   datos,
+  ampliado = false,
 }: {
   modulo: DefinicionModulo;
   datos: DatosTablero;
+  ampliado?: boolean;
 }) {
   const obraId = datos.obra.id;
+  const acento = acentoDeModulo(modulo.clave, datos);
 
   return (
-    <Caja ancho={modulo.ancho}>
+    <Caja ancho={modulo.ancho} acento={acento} ampliada={ampliado}>
+      {!ampliado && <CabeceraModulo modulo={modulo} acento={acento} />}
       {modulo.clave === "avance" && datos.cronograma && (
         <Avance crono={datos.cronograma} obraId={obraId} />
       )}
@@ -158,25 +169,38 @@ export function ModuloContenido({
 }
 
 /**
- * La caja comun. `elevacion-1` y borde para que cada modulo se despegue del
- * fondo de la tarjeta ancha que los contiene, y `flex` en columna para que el
- * enlace del pie quede siempre abajo por muy distinto que sea el cuerpo.
+ * La caja comun, con ALTURA FIJA en la rejilla.
+ *
+ * Antes cada modulo media lo suyo y `auto-rows-fr` estiraba la fila entera a
+ * la altura del mas largo: «Que falta», con cuatro avisos explicados, dejaba
+ * al lado un «Avance fisico» que era un tercio de cifra y dos tercios de
+ * aire. Con todas las cajas iguales la rejilla se lee como un tablero; lo que
+ * no cabe (solo la lista de pendientes, en la practica) se desplaza dentro de
+ * su caja, y el modal de ampliar sigue enseñandolo entero.
+ *
+ * El acento tiñe borde y lavado de fondo, con el mismo degradado diagonal que
+ * las tarjetas de cifras del panel: un solo lenguaje visual.
  */
 function Caja({
   ancho,
+  acento,
+  ampliada,
   children,
 }: {
   ancho: 1 | 2;
+  acento: string;
+  ampliada: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div
-      className={`elevacion-1 flex h-full flex-col rounded-xl border p-3 ${
-        ancho === 2 ? "sm:col-span-2 lg:col-span-2" : ""
-      }`}
+      className={`elevacion-1 flex flex-col rounded-xl border p-3 ${
+        ampliada ? "" : "h-[19rem] overflow-hidden"
+      } ${ancho === 2 ? "sm:col-span-2 lg:col-span-2" : ""}`}
       style={{
-        borderColor: "var(--borde)",
+        borderColor: `color-mix(in oklab, ${acento} 30%, var(--borde))`,
         backgroundColor: "var(--superficie)",
+        backgroundImage: `linear-gradient(135deg, color-mix(in oklab, ${acento} 14%, var(--superficie)) 0%, var(--superficie) 60%)`,
       }}
     >
       {children}
@@ -184,23 +208,154 @@ function Caja({
   );
 }
 
-function Titulo({
-  icono: Icono,
-  children,
+/// El icono de cada modulo, en un solo sitio: lo usa la cabecera comun.
+/// `satisfies` y no una anotacion: exige la entrada de CADA modulo del
+/// catalogo y a la vez deja que la busqueda devuelva el icono sin `undefined`.
+const ICONOS = {
+  pendientes: ListChecks,
+  avance: TrendingUp,
+  curva: TrendingUp,
+  plazo: CalendarClock,
+  presupuesto: Wallet,
+  valorGanado: Gauge,
+  ppc: ClipboardCheck,
+  confiabilidad: Telescope,
+  liberacion: CalendarClock,
+  causas: Ban,
+  atrasos: AlertTriangle,
+  criticas: Link2,
+  capitulos: Layers,
+  ordenes: FileText,
+} satisfies Record<ModuloTablero, typeof Wallet>;
+
+/**
+ * La cabecera comun: icono, titulo, LA NOTA y la seña de que se amplia.
+ *
+ * La nota —que pregunta contesta el modulo— vivia solo en el modal y en el
+ * configurador, o sea, donde ya no hace falta. Un tablero con catorce cifras
+ * sin explicar se aprende o se ignora; con la explicacion debajo de cada
+ * titulo, se lee. Y el icono de ampliar existe porque la caja SIEMPRE fue
+ * pulsable y nada lo decia: una interaccion que no se anuncia no existe.
+ */
+function CabeceraModulo({
+  modulo,
+  acento,
 }: {
-  icono: typeof Wallet;
-  children: React.ReactNode;
+  modulo: DefinicionModulo;
+  acento: string;
 }) {
+  // La firma dice `string` (el contrato de `DefinicionModulo`), pero todo
+  // modulo sale del catalogo, cuyo `satisfies` garantiza su entrada aqui.
+  const Icono = ICONOS[modulo.clave as ModuloTablero];
+
   return (
-    <h3 className="flex items-center gap-1.5 text-xs font-medium opacity-70">
-      <Icono
-        className="size-3.5 shrink-0"
-        style={{ color: "var(--color-marca-500)" }}
+    <header className="mb-1 flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <h3 className="flex items-center gap-1.5 text-xs font-semibold">
+          <Icono
+            className="size-3.5 shrink-0"
+            style={{ color: acento }}
+            aria-hidden="true"
+          />
+          {modulo.etiqueta}
+        </h3>
+        <p className="mt-0.5 text-xs opacity-55">{modulo.nota}</p>
+      </div>
+      <Maximize2
+        className="size-3.5 shrink-0 opacity-35"
         aria-hidden="true"
       />
-      {children}
-    </h3>
+    </header>
   );
+}
+
+/// Umbrales del PPC y de la ventana lista, compartidos entre el cuerpo del
+/// modulo y su acento: dos copias de un umbral terminan discrepando.
+function semaforoPpc(ppc: number): Semaforo {
+  return ppc >= 80 ? "verde" : ppc >= 60 ? "ambar" : "rojo";
+}
+
+function semaforoVentana(porcentaje: number): Semaforo {
+  return porcentaje >= 70 ? "verde" : porcentaje >= 40 ? "ambar" : "rojo";
+}
+
+/**
+ * El color que gobierna un modulo entero: borde, lavado de fondo e icono.
+ *
+ * Donde el dato ya trae un juicio —un semaforo, un sobregiro, un plazo
+ * vencido— el modulo se viste con el: la rejilla se convierte en un mapa de
+ * calor y lo que va mal se encuentra sin leer una sola cifra. Donde no hay
+ * juicio que hacer (la curva, las ordenes), marca neutral: pintar de rojo lo
+ * que no esta mal enseña a ignorar el rojo.
+ */
+function acentoDeModulo(
+  clave: DefinicionModulo["clave"],
+  datos: DatosTablero,
+): string {
+  const MARCA = "var(--color-marca-500)";
+
+  switch (clave) {
+    case "pendientes": {
+      const { criticas, total } = resumirPendientes(datos.pendientes);
+      if (criticas > 0) return COLOR_SEMAFORO.rojo;
+      if (total > 0) return COLOR_SEMAFORO.ambar;
+      return COLOR_SEMAFORO.verde;
+    }
+    case "avance":
+      return datos.cronograma
+        ? COLOR_SEMAFORO[
+            semaforoDesfase(redondearA(datos.cronograma.desfase, 1))
+          ]
+        : MARCA;
+    case "plazo":
+      return datos.plazo.restantes < 0 ? COLOR_SEMAFORO.rojo : MARCA;
+    case "presupuesto":
+      return datos.presupuesto.porcentaje > 100 ||
+        datos.presupuesto.sobregiradas > 0
+        ? COLOR_SEMAFORO.rojo
+        : COLOR_SEMAFORO.verde;
+    case "valorGanado": {
+      const m = datos.valorGanado?.metricas;
+      if (!m) return MARCA;
+      // Manda el peor de los dos indices: un SPI holgado no compensa un CPI
+      // en rojo, y al reves tampoco.
+      const semaforos = [semaforoIndice(m.spi), semaforoIndice(m.cpi)].filter(
+        (s): s is Semaforo => s !== null,
+      );
+      if (semaforos.includes("rojo")) return COLOR_SEMAFORO.rojo;
+      if (semaforos.includes("ambar")) return COLOR_SEMAFORO.ambar;
+      return semaforos.length > 0 ? COLOR_SEMAFORO.verde : MARCA;
+    }
+    case "ppc": {
+      const ultima = datos.planSemanal?.ultima;
+      return ultima
+        ? COLOR_SEMAFORO[semaforoPpc(redondearA(ultima.ppc, 0))]
+        : MARCA;
+    }
+    case "confiabilidad": {
+      const lk = datos.lookahead;
+      // Sin ventana o sin analisis no hay juicio todavia; el cuerpo ya lo
+      // explica en neutro y el color no debe contradecirlo.
+      if (!lk || lk.total === 0 || lk.sinAnalizar === lk.total) return MARCA;
+      return COLOR_SEMAFORO[semaforoVentana(lk.porcentaje)];
+    }
+    case "atrasos": {
+      const a = datos.cronograma?.atrasos;
+      if (!a || a.total === 0) return COLOR_SEMAFORO.verde;
+      return a.alta > 0 ? COLOR_SEMAFORO.rojo : COLOR_SEMAFORO.ambar;
+    }
+    case "criticas": {
+      const c = datos.cronograma?.criticas;
+      if (!c) return MARCA;
+      return c.atrasados > 0 ? COLOR_SEMAFORO.rojo : COLOR_SEMAFORO.verde;
+    }
+    case "causas":
+      // Ambar y no rojo: señala donde mirar, no una emergencia. El Pareto
+      // siempre tiene un primer puesto; eso solo no es una crisis.
+      return datos.planSemanal?.causaTop ? COLOR_SEMAFORO.ambar : MARCA;
+    default:
+      return MARCA;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -222,8 +377,6 @@ function Avance({
 
   return (
     <>
-      <Titulo icono={TrendingUp}>Avance físico</Titulo>
-
       <div className="mt-2">
         <p
           className="text-2xl font-semibold tabular-nums"
@@ -302,8 +455,6 @@ function Curva({
 
   return (
     <>
-      <Titulo icono={TrendingUp}>Curva de avance</Titulo>
-
       <MiniCurva curva={crono.curva} />
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs opacity-70">
@@ -499,8 +650,6 @@ function Plazo({ datos, obraId }: { datos: DatosTablero; obraId: string }) {
 
   return (
     <>
-      <Titulo icono={CalendarClock}>Plazo</Titulo>
-
       <div className="mt-2">
         <p className="text-2xl font-semibold tabular-nums">
           {vencido ? (
@@ -585,8 +734,6 @@ function Presupuesto({
 
   return (
     <>
-      <Titulo icono={Wallet}>Presupuesto</Titulo>
-
       <div className="mt-2">
         <p className="text-lg font-semibold tabular-nums">
           {soles(presupuesto.saldo)}
@@ -653,8 +800,6 @@ function ValorGanado({
 
   return (
     <>
-      <Titulo icono={Gauge}>Valor ganado (EVM)</Titulo>
-
       <div className="mt-2 grid grid-cols-2 gap-2">
         <Indice etiqueta="SPI" nota="plazo" valor={m.spi} />
         <Indice etiqueta="CPI" nota="costo" valor={m.cpi} />
@@ -748,7 +893,6 @@ function Ppc({
   if (!plan.ultima) {
     return (
       <>
-        <Titulo icono={ClipboardCheck}>PPC</Titulo>
         <p className="mt-2 text-sm opacity-60">
           {plan.abiertas > 0
             ? `${plan.abiertas === 1 ? "Una semana abierta" : `${plan.abiertas} semanas abiertas`} sin cerrar todavía.`
@@ -763,13 +907,11 @@ function Ppc({
   }
 
   const ppc = redondearA(plan.ultima.ppc, 0);
-  const semaforo: Semaforo = ppc >= 80 ? "verde" : ppc >= 60 ? "ambar" : "rojo";
+  const semaforo = semaforoPpc(ppc);
   const delta = plan.anterior === null ? null : redondearA(ppc - plan.anterior, 0);
 
   return (
     <>
-      <Titulo icono={ClipboardCheck}>PPC</Titulo>
-
       <div className="mt-2">
         <p
           className="text-2xl font-semibold tabular-nums"
@@ -886,7 +1028,6 @@ function Confiabilidad({
   if (lk.total === 0) {
     return (
       <>
-        <Titulo icono={Telescope}>Lookahead</Titulo>
         <p className="mt-2 text-sm opacity-60">
           No hay tareas del cronograma en las próximas {lk.semanas} semanas.
         </p>
@@ -906,7 +1047,6 @@ function Confiabilidad({
   if (lk.sinAnalizar === lk.total) {
     return (
       <>
-        <Titulo icono={Telescope}>Lookahead</Titulo>
         <p className="mt-2 text-sm opacity-60">
           Aún sin análisis de restricciones.
         </p>
@@ -920,13 +1060,10 @@ function Confiabilidad({
     );
   }
 
-  const semaforo: Semaforo =
-    lk.porcentaje >= 70 ? "verde" : lk.porcentaje >= 40 ? "ambar" : "rojo";
+  const semaforo = semaforoVentana(lk.porcentaje);
 
   return (
     <>
-      <Titulo icono={Telescope}>Lookahead</Titulo>
-
       <div className="mt-2">
         <p
           className="text-2xl font-semibold tabular-nums"
@@ -987,7 +1124,6 @@ function Causas({
   if (!plan.causaTop) {
     return (
       <>
-        <Titulo icono={Ban}>Causa que más frena</Titulo>
         {/* Tres estados distintos y tres mensajes distintos. El tercero es el
             que faltaba: con pocos incumplimientos —o con todos de la misma
             causa— el «primer puesto» del Pareto no es un hallazgo, es el azar
@@ -1016,8 +1152,6 @@ function Causas({
 
   return (
     <>
-      <Titulo icono={Ban}>Causa que más frena</Titulo>
-
       <div className="mt-2">
         <p className="text-base font-semibold">{ETIQUETA_CNC[causa]}</p>
         <p className="text-xs opacity-60">
@@ -1068,8 +1202,6 @@ function Atrasos({
 
   return (
     <>
-      <Titulo icono={AlertTriangle}>Partidas atrasadas</Titulo>
-
       <div className="mt-2 flex items-end gap-1">
         <p className="text-2xl font-semibold tabular-nums">{atrasos.total}</p>
         <p className="pb-1 text-xs opacity-60">por detrás del plan</p>
@@ -1135,8 +1267,6 @@ function Criticas({
 
   return (
     <>
-      <Titulo icono={Link2}>Cadena crítica</Titulo>
-
       <div className="mt-2 flex items-end gap-1">
         <p
           className="text-2xl font-semibold tabular-nums"
@@ -1196,8 +1326,6 @@ function Capitulos({
 
   return (
     <>
-      <Titulo icono={Layers}>Capítulos</Titulo>
-
       {crono.capitulos.length === 0 ? (
         <p className="mt-2 text-xs opacity-60">
           Ningún capítulo medible por ahora.
@@ -1303,7 +1431,6 @@ function Pendientes({
   if (total === 0) {
     return (
       <>
-        <Titulo icono={ListChecks}>Qué falta</Titulo>
         <p
           className="mt-2 flex items-center gap-1.5 text-sm"
           style={{ color: "var(--color-exito)" }}
@@ -1321,20 +1448,20 @@ function Pendientes({
 
   return (
     <>
-      <div className="flex items-baseline justify-between gap-2">
-        <Titulo icono={ListChecks}>Qué falta</Titulo>
-        <span className="text-xs tabular-nums opacity-70">
-          {criticas > 0 && (
-            <strong style={{ color: "var(--color-peligro)" }}>
-              {criticas} urgente{criticas === 1 ? "" : "s"}
-            </strong>
-          )}
-          {criticas > 0 && total > criticas && " · "}
-          {total > criticas && `${total - criticas} por mirar`}
-        </span>
-      </div>
+      <p className="text-xs tabular-nums opacity-70">
+        {criticas > 0 && (
+          <strong style={{ color: "var(--color-peligro)" }}>
+            {criticas} urgente{criticas === 1 ? "" : "s"}
+          </strong>
+        )}
+        {criticas > 0 && total > criticas && " · "}
+        {total > criticas && `${total - criticas} por mirar`}
+      </p>
 
-      <ul className="mt-2 space-y-2">
+      {/* La lista se desplaza DENTRO de la caja, que ahora mide lo mismo que
+          las demas: era este modulo el que estiraba la fila entera hacia
+          abajo. El modal de ampliar la sigue enseñando completa. */}
+      <ul className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto">
         {lista.map((p) => (
           <li key={p.clave} className="flex items-start gap-2">
             {p.gravedad === "critica" ? (
@@ -1399,7 +1526,6 @@ function Ordenes({
   if (ordenes.aprobadas === 0 && ordenes.borradores === 0) {
     return (
       <>
-        <Titulo icono={FileText}>Órdenes de compra</Titulo>
         <p className="mt-2 text-sm opacity-60">
           {ordenes.anuladas === 0
             ? "Aún no se ha emitido ninguna orden."
@@ -1417,8 +1543,6 @@ function Ordenes({
 
   return (
     <>
-      <Titulo icono={FileText}>Órdenes de compra</Titulo>
-
       <div className="mt-2 flex items-end gap-1">
         <p className="text-2xl font-semibold tabular-nums">{ordenes.total}</p>
         <p className="pb-1 text-xs opacity-60">en total</p>
@@ -1473,8 +1597,6 @@ function Demora({
 
   return (
     <>
-      <Titulo icono={CalendarClock}>Demora por flujo</Titulo>
-
       {peor && (
         <p className="mt-1 text-2xl font-semibold tabular-nums">
           {peor.dias} <span className="text-base font-normal">días</span>

@@ -306,8 +306,12 @@ export function Tablero({
               cuáles ver.
             </p>
           ) : (
+            // Sin `auto-rows-fr`: las cajas ya miden TODAS lo mismo (la
+            // altura fija vive en la Caja), asi que estirar filas solo
+            // serviria para que un modulo largo desalineara el resto, que es
+            // justo lo que pasaba con «Que falta».
             <div
-              className={`mt-4 grid auto-rows-fr gap-3 sm:grid-cols-2 lg:grid-cols-4 ${
+              className={`mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 ${
                 pendiente ? "opacity-50 transition-opacity" : ""
               }`}
             >
@@ -428,7 +432,9 @@ function ModuloAmpliado({
         </header>
 
         <div className="overflow-y-auto p-4">
-          <ModuloContenido modulo={modulo} datos={datos} />
+          {/* `ampliado`: sin altura fija ni cabecera repetida, que este marco
+              ya pone el titulo y la nota arriba. */}
+          <ModuloContenido modulo={modulo} datos={datos} ampliado />
         </div>
       </div>
     </div>
