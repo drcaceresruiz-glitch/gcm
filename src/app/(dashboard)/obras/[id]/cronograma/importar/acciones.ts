@@ -8,6 +8,7 @@ import {
   analizarProjectXml,
   type ResultadoAnalisisCronograma,
 } from "@/lib/msproject-xml";
+import { analizarCronogramaExcel } from "@/lib/excel-cronograma";
 import { importarCronograma } from "@/services/cronograma.service";
 import { convertirMppAXml, puedeConvertirMpp } from "@/services/mpp.service";
 
@@ -30,7 +31,20 @@ import { convertirMppAXml, puedeConvertirMpp } from "@/services/mpp.service";
  */
 const TAMANO_MAXIMO = 20 * 1024 * 1024;
 
-const EXTENSIONES = [".xml", ".mpp"];
+/**
+ * El Excel se limita mas bajo, como el del presupuesto: un cronograma de mil
+ * filas no llega a un mega, y aceptar mas solo abre la puerta a que alguien
+ * suba otra cosa con extension cambiada.
+ */
+const TAMANO_MAXIMO_EXCEL = 8 * 1024 * 1024;
+
+const EXTENSIONES_PROJECT = [".xml", ".mpp"];
+const EXTENSIONES_EXCEL = [".xlsx", ".xlsm"];
+const EXTENSIONES = [...EXTENSIONES_PROJECT, ...EXTENSIONES_EXCEL];
+
+function esExcel(nombre: string): boolean {
+  return EXTENSIONES_EXCEL.some((e) => nombre.toLowerCase().endsWith(e));
+}
 
 /**
  * Deja el contenido en XML, convirtiendo antes si hace falta.
@@ -55,6 +69,45 @@ async function comoXml(
     : { ok: false, error: convertido.error };
 }
 
+/**
+ * Analiza el archivo, venga de donde venga.
+ *
+ * Es el unico sitio que sabe que hay dos formatos. Los dos lectores devuelven
+ * el MISMO `ResultadoAnalisisCronograma`, asi que a partir de aqui —vista
+ * previa, servicio, base de datos— nadie se entera de por donde entro el plan.
+ *
+ * El try/catch no filtra nada: un archivo corrupto no debe revelar detalles
+ * de la libreria ni del servidor.
+ */
+async function analizarArchivo(
+  archivo: File,
+): Promise<{ ok: true; analisis: ResultadoAnalisisCronograma } | { ok: false; error: string }> {
+  if (esExcel(archivo.name)) {
+    try {
+      return { ok: true, analisis: await analizarCronogramaExcel(await archivo.arrayBuffer()) };
+    } catch {
+      return {
+        ok: false,
+        error:
+          "No se pudo leer el Excel. Comprueba que sea un archivo valido y que no este protegido con contrasena.",
+      };
+    }
+  }
+
+  const contenido = await comoXml(archivo);
+  if (!contenido.ok) return { ok: false, error: contenido.error };
+
+  try {
+    return { ok: true, analisis: await analizarProjectXml(contenido.xml) };
+  } catch {
+    return {
+      ok: false,
+      error:
+        "No se pudo leer el archivo. Comprueba que sea el XML que exporta MS Project.",
+    };
+  }
+}
+
 export interface EstadoAnalisisCronograma {
   analisis?: ResultadoAnalisisCronograma;
   nombreArchivo?: string;
@@ -65,7 +118,7 @@ type Validacion = { ok: true; archivo: File } | { ok: false; error: string };
 
 function validarArchivo(archivo: unknown): Validacion {
   if (!(archivo instanceof File) || archivo.size === 0) {
-    return { ok: false, error: "Selecciona el cronograma de MS Project." };
+    return { ok: false, error: "Selecciona el cronograma." };
   }
 
   const nombre = archivo.name.toLowerCase();
@@ -73,7 +126,9 @@ function validarArchivo(archivo: unknown): Validacion {
   if (!EXTENSIONES.some((e) => nombre.endsWith(e))) {
     return {
       ok: false,
-      error: "Formato no admitido. Sube el .mpp de MS Project o su exportacion a .xml.",
+      error:
+        "Formato no admitido. Sube el .mpp de MS Project, su exportacion a .xml, " +
+        "o el Excel de la plantilla (.xlsx).",
     };
   }
 
@@ -88,9 +143,11 @@ function validarArchivo(archivo: unknown): Validacion {
     };
   }
 
-  if (archivo.size > TAMANO_MAXIMO) {
+  const tope = esExcel(nombre) ? TAMANO_MAXIMO_EXCEL : TAMANO_MAXIMO;
+  if (archivo.size > tope) {
     const mb = (archivo.size / 1024 / 1024).toFixed(1);
-    return { ok: false, error: `El archivo pesa ${mb} MB y el limite son 20 MB.` };
+    const topeMb = Math.round(tope / 1024 / 1024);
+    return { ok: false, error: `El archivo pesa ${mb} MB y el limite son ${topeMb} MB.` };
   }
 
   return { ok: true, archivo };
@@ -114,20 +171,10 @@ export async function accionAnalizar(
   const validacion = validarArchivo(datos.get("archivo"));
   if (!validacion.ok) return { error: validacion.error };
 
-  const contenido = await comoXml(validacion.archivo);
-  if (!contenido.ok) return { error: contenido.error };
+  const leido = await analizarArchivo(validacion.archivo);
+  if (!leido.ok) return { error: leido.error };
 
-  try {
-    const analisis = await analizarProjectXml(contenido.xml);
-    return { analisis, nombreArchivo: validacion.archivo.name };
-  } catch {
-    // No se expone el error interno: un archivo corrupto no debe revelar
-    // detalles de la libreria ni del servidor.
-    return {
-      error:
-        "No se pudo leer el archivo. Comprueba que sea el XML que exporta MS Project.",
-    };
-  }
+  return { analisis: leido.analisis, nombreArchivo: validacion.archivo.name };
 }
 
 export interface EstadoImportacionCronograma {
@@ -153,23 +200,16 @@ export async function accionImportar(
   const validacion = validarArchivo(datos.get("archivo"));
   if (!validacion.ok) return { error: validacion.error };
 
-  // Se vuelve a convertir y a analizar en el servidor: la vista previa del
-  // navegador es solo para mirar, y estas son las tareas que se guardan.
-  const contenido = await comoXml(validacion.archivo);
-  if (!contenido.ok) return { error: contenido.error };
-
-  let analisis: ResultadoAnalisisCronograma;
-  try {
-    analisis = await analizarProjectXml(contenido.xml);
-  } catch {
-    return { error: "No se pudo leer el archivo." };
-  }
+  // Se vuelve a analizar en el servidor: la vista previa del navegador es
+  // solo para mirar, y estas son las tareas que se guardan.
+  const leido = await analizarArchivo(validacion.archivo);
+  if (!leido.ok) return { error: leido.error };
 
   // El servicio vuelve a comprobar el permiso y el aislamiento por empresa.
   const resultado = await importarCronograma(
     sesion,
     obraId,
-    analisis,
+    leido.analisis,
     validacion.archivo.name,
   );
 

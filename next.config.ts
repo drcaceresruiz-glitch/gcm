@@ -21,9 +21,15 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       // El limite por defecto es 1 MB: un presupuesto de obra con cientos
-      // de partidas lo supera. El importador rechaza por encima de 8 MB con
-      // un mensaje claro, asi que este techo nunca se alcanza en silencio.
-      bodySizeLimit: "10mb",
+      // de partidas lo supera. Los importadores rechazan antes, con un
+      // mensaje claro, asi que este techo nunca se alcanza en silencio.
+      //
+      // Va por ENCIMA del mayor de esos limites, que son 8 MB en los Excel y
+      // 20 MB en el .mpp del cronograma. Estuvo en 10 MB, por debajo de los
+      // 20: un .mpp de 15 MB pasaba la validacion de la app y moria despues
+      // contra el framework, con un error opaco en vez del mensaje que el
+      // importador tenia preparado. Justo lo que este comentario decia evitar.
+      bodySizeLimit: "24mb",
     },
   },
 
