@@ -78,7 +78,7 @@ la empresa. Legalmente basta con que sea accesible desde la aplicacion.
 
 Ninguno de los proyectos evaluados esta dentro del producto. Todos son
 `candidato` (nos interesan), `solo-lectura` (su licencia impide copiar) o
-`descartado`. Los dos casos que merecen atencion antes de tocarlos:
+`descartado`. Los casos que merecen atencion antes de tocarlos:
 
 - **LastPlannerTool** y **Taskcafe** declaran MIT pero su LICENSE no nombra al
   titular (el de Taskcafe es la plantilla sin rellenar, `[year] [fullname]`).
@@ -86,3 +86,19 @@ Ninguno de los proyectos evaluados esta dentro del producto. Todos son
   autor por GitHub que lo complete.
 - **Architecture Decision Record** y **Snazzy Gallery** son CC BY-NC-SA: el NC
   prohibe el uso comercial. Se sigue el formato, no se copian los archivos.
+- **CMCP** no trae licencia de ninguna clase: todos los derechos reservados.
+- **Drawing Analyzer** usa una licencia escrita por su autor ("AutoConst Source
+  Available"). No se presume nada: hay que leerla entera y pedir permiso.
+- **OpenConstructionERP** es AGPL y es, a la vez, el mas completo del lote.
+  Servir la aplicacion ya obliga a entregar el fuente, asi que su codigo no
+  entra. Venden licencia comercial si algun dia compensa.
+- **Massing** es MIT pero compone piezas GPL a proposito, con el editor de
+  escritorio como proceso aparte. Leer su `LICENSE-NOTES.md` antes de tocarlo.
+
+Lo extraido para trabajar esta en `docs/COMUNIDADGIT/_ref/`:
+**LastPlannerTool** (Last Planner), **pmis-v2** (nuestro mismo stack) y los
+skills de **DDC** (sin los 375 MB de PDF del ZIP original).
+
+Aparte del codigo, dos cosas se pueden usar hoy sin tocar la licencia de GCM,
+porque son herramientas nuestras y no viajan dentro del producto: los skills de
+**Construction Skills for Claude Code** y los de **DDC**.

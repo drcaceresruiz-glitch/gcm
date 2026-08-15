@@ -133,6 +133,15 @@ describe("LICENCIAS", () => {
     expect(LICENCIAS["sin-licencia"].permiteUsoComercial).toBe(false);
   });
 
+  /**
+   * Una licencia escrita por el autor no se presume permisiva por parecerlo.
+   * Hasta que alguien la lea entera y pida permiso, se trata como cerrada.
+   */
+  it("no presume nada de una licencia propia del autor", () => {
+    expect(LICENCIAS["fuente-visible"].permiteUsoComercial).toBe(false);
+    expect(LICENCIAS["propia-restrictiva"].permiteUsoComercial).toBe(false);
+  });
+
   it("marca como copyleft toda la familia GPL", () => {
     expect(LICENCIAS["GPL-2.0"].contagia).toBe(true);
     expect(LICENCIAS["GPL-3.0"].contagia).toBe(true);
