@@ -4,6 +4,10 @@ import {
   ventanaRecomendada,
   type DemoraFlujo,
 } from "@/lib/liberacion";
+import {
+  tasaDeLiberacion,
+  type TasaLiberacion,
+} from "@/lib/indicadores-lps";
 
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
@@ -1498,4 +1502,35 @@ export async function demoraDeLiberacion(
   );
 
   return { flujos, ventana: ventanaRecomendada(flujos) };
+}
+
+
+/**
+ * La tasa de liberacion de restricciones de TODA la obra.
+ *
+ * De toda la obra y no de la ventana a proposito: la ventana es lo que hay que
+ * mirar AHORA, pero la fiabilidad de las promesas es un habito y se mide sobre
+ * el historial. Restringirla a tres semanas la haria saltar de un 100 % a un
+ * 40 % segun el dia, y un indicador que oscila asi no se usa.
+ *
+ * Trae TODAS las restricciones, tambien las que no tienen fecha prometida:
+ * `tasaDeLiberacion` las cuenta aparte, y ese contador es lo que impide leer
+ * un 100 % sobre cuatro promesas como si fuera un 100 % de verdad.
+ */
+export async function tasaDeLiberacionDeObra(
+  sesion: SesionActiva,
+  obraId: string,
+  /// `hoy()` y no `new Date()`: la fecha prometida es un DIA de calendario,
+  /// y compararla contra el instante del servidor corre el dia en la madrugada
+  /// de Peru. El resto del sistema ya usa esta misma funcion.
+  ahora: Date = hoy(),
+): Promise<TasaLiberacion | null> {
+  if (!puede(sesion, "lookahead:leer")) return null;
+
+  const filas = await prisma.restriccion.findMany({
+    where: { tarea: { projectId: obraId, project: { companyId: sesion.companyId } } },
+    select: { fechaCompromiso: true, resuelta: true, resueltaAt: true },
+  });
+
+  return tasaDeLiberacion(filas, ahora);
 }

@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
-import { obtenerLookahead } from "@/services/lookahead.service";
+import {
+  obtenerLookahead,
+  tasaDeLiberacionDeObra,
+} from "@/services/lookahead.service";
+import { inventarioEjecutable } from "@/lib/indicadores-lps";
+import { PanelIndicadores } from "@/components/lookahead/PanelIndicadores";
 import { puede } from "@/lib/rbac";
 import { fechaCorta, hoy } from "@/utils/fechas";
 import { proximoCorte } from "@/lib/plan-semanal";
@@ -45,7 +50,16 @@ export default async function LookaheadPage({
   if (!obra) redirect("/panel");
   if (!puede(sesion, "lookahead:leer")) redirect(`/obras/${id}`);
 
-  const datos = await obtenerLookahead(sesion, id, semanas);
+  // En paralelo: la tasa recorre las restricciones de TODA la obra y no
+  // depende de la ventana, asi que no tiene por que esperar a la matriz.
+  const [datos, tasa] = await Promise.all([
+    obtenerLookahead(sesion, id, semanas),
+    tasaDeLiberacionDeObra(sesion, id),
+  ]);
+
+  // El inventario sale de las filas que la matriz ya trajo: ni una consulta
+  // mas para saber cuanto trabajo hay listo sin comprometer.
+  const inventario = datos ? inventarioEjecutable(datos.filas) : null;
 
   return (
     <div className="space-y-6">
@@ -66,6 +80,12 @@ export default async function LookaheadPage({
           )}
         </p>
       </div>
+
+      {/* Antes de la matriz: son las dos cifras que se miran para decidir si
+          se puede comprometer, no un resumen de lo que ya se hizo. */}
+      {inventario && inventario.total > 0 && (
+        <PanelIndicadores inventario={inventario} tasa={tasa} />
+      )}
 
       {datos && datos.puedeGestionar && datos.filas.length > 0 && (
         <EnlaceBoton

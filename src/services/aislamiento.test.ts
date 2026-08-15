@@ -313,6 +313,20 @@ describe("lookahead", () => {
     );
   });
 
+  it("la tasa de liberacion va acotada", async () => {
+    // Recorre TODAS las restricciones de la obra, no solo las de la ventana:
+    // si el filtro se olvidara, contaria las promesas de otra empresa.
+    await exigeFiltroDeEmpresa(() =>
+      lookahead.tasaDeLiberacionDeObra(sesion(MIA, ["lookahead:leer"]), obraAjena),
+    );
+  });
+
+  it("sin permiso, la tasa no toca la base", async () => {
+    await exigeNiTocarLaBase(() =>
+      lookahead.tasaDeLiberacionDeObra(sesion(MIA, []), obraAjena),
+    );
+  });
+
   it("sincronizar la ventana va acotado", async () => {
     await exigeFiltroDeEmpresa(() =>
       lookahead.sincronizarLookahead(
