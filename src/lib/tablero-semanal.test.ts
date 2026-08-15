@@ -175,3 +175,29 @@ describe("los dias no laborables", () => {
     expect(t.dias).toHaveLength(7);
   });
 });
+
+describe("el contraste del texto sobre el post-it", () => {
+  it("el amarillo pide letra oscura", async () => {
+    const { textoSobre, PALETA_TABLERO } = await import("@/lib/tablero-semanal");
+    const amarillo = PALETA_TABLERO.find((c) => c.hex === "#eab308")!;
+
+    // Con letra blanca este color queda ilegible en la pantalla de la sala,
+    // que es justo donde hay que leerlo de lejos.
+    expect(textoSobre(amarillo.hex)).toBe("oscuro");
+  });
+
+  it("el azul y el rojo piden letra clara", async () => {
+    const { textoSobre } = await import("@/lib/tablero-semanal");
+
+    expect(textoSobre("#2563eb")).toBe("claro");
+    expect(textoSobre("#dc2626")).toBe("claro");
+  });
+
+  it("sin color, o con basura, se cae a letra oscura", async () => {
+    const { textoSobre } = await import("@/lib/tablero-semanal");
+
+    expect(textoSobre(null)).toBe("oscuro");
+    expect(textoSobre("azul")).toBe("oscuro");
+    expect(textoSobre("#zzz")).toBe("oscuro");
+  });
+});

@@ -201,3 +201,39 @@ export function construirTablero(
 
   return { dias, filas, colocadas, sinDia };
 }
+
+/**
+ * El codigo de colores del post-it, como SUGERENCIA.
+ *
+ * Es la convencion mas extendida en obra —azul/verde estructuras, amarillo
+ * instalaciones, rosa acabados, rojo alerta— pero es una convencion, no una
+ * norma: cada empresa tiene la suya y algunas pintan por zona en vez de por
+ * especialidad. Por eso viaja con su significado escrito al lado y el campo
+ * sigue siendo un hex libre: quien quiera otra cosa la escribe.
+ */
+export const PALETA_TABLERO: ReadonlyArray<{ hex: string; etiqueta: string }> = [
+  { hex: "#2563eb", etiqueta: "Estructuras / concreto" },
+  { hex: "#16a34a", etiqueta: "Ingenierías principales" },
+  { hex: "#eab308", etiqueta: "Instalaciones (eléctricas / mecánicas)" },
+  { hex: "#f97316", etiqueta: "Acabados / tabiquería" },
+  { hex: "#ec4899", etiqueta: "Detalles arquitectónicos" },
+  { hex: "#dc2626", etiqueta: "Crítico / alerta temprana" },
+];
+
+/**
+ * Que color de texto se lee encima de un fondo.
+ *
+ * Sin esto, el amarillo de instalaciones con letra blanca queda ilegible en la
+ * pantalla de la sala, que es donde justamente hay que leerlo de lejos. Es la
+ * luminancia percibida (ITU-R BT.601), no el promedio de los canales: el verde
+ * pesa mucho mas que el azul para el ojo.
+ */
+export function textoSobre(hex: string | null): "claro" | "oscuro" {
+  if (!hex || !/^#[0-9a-f]{6}$/i.test(hex)) return "oscuro";
+
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+
+  return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? "oscuro" : "claro";
+}

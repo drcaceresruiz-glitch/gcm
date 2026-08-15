@@ -9,7 +9,9 @@ import { ambicionDelPlan, type Ambicion } from "@/lib/capacidad";
 import { puede } from "@/lib/rbac";
 import { fechaLarga } from "@/utils/fechas";
 import { ETIQUETA_CNC } from "@/lib/plan-semanal";
+import { LayoutGrid } from "lucide-react";
 import { Volver } from "@/components/ui/Volver";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 import { FormularioPlanSemanal } from "@/components/plan-semanal/FormularioPlanSemanal";
 import { CierrePlanSemanal } from "@/components/plan-semanal/CierrePlanSemanal";
 import { BotonReabrir } from "@/components/plan-semanal/BotonReabrir";
@@ -147,6 +149,19 @@ export default async function DetallePlanSemanalPage({
           · {plan.cumplidos}/{plan.total} cumplidos
           {plan.ppc !== null ? ` · PPC ${plan.ppc.toFixed(0)}%` : ""}
         </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {/* El tablero lo ve cualquiera que pueda leer el plan: es la vista de
+            la reunion, y en la reunion hay mas gente que la que edita. */}
+        <EnlaceBoton
+          href={`/obras/${id}/plan-semanal/${planId}/tablero`}
+          icono={LayoutGrid}
+          posicionIcono="izquierda"
+          tamano="sm"
+        >
+          Ver el tablero de la semana
+        </EnlaceBoton>
       </div>
 
       {puedeGestionar && (

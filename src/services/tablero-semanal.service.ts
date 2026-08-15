@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { construirTablero, type CompromisoEnTablero, type Tablero } from "@/lib/tablero-semanal";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { EstadoPlanSemanal } from "@/generated/prisma/enums";
 
@@ -104,4 +105,102 @@ export async function obtenerTablero(
     puedeGestionar: puede(sesion, "plan_semanal:gestionar"),
     contratistas: contratistas.map((p) => ({ id: p.id, nombre: p.razonSocial })),
   };
+}
+
+
+export interface ColocacionTarjeta {
+  compromisoId: string;
+  /// ISO 1-7, o null para devolverla a la banda «sin dia».
+  diaInicio: number | null;
+  diaFin: number | null;
+  proveedorId: string | null;
+  /// Hex `#rrggbb`, o null para dejarla neutra.
+  color: string | null;
+}
+
+export type ResultadoColocacion =
+  | { ok: true; colocadas: number }
+  | { ok: false; error: string };
+
+/**
+ * Coloca las tarjetas del tablero, todas de una vez.
+ *
+ * De una vez y no una a una porque asi se usa: la reunion decide la semana
+ * entera mirando la pizarra y despues alguien la pasa. Guardar tarjeta a
+ * tarjeta serian veinte peticiones y veinte oportunidades de dejar el tablero
+ * a medias.
+ *
+ * NO se toca `descripcion`, `cantidadPlan` ni nada del compromiso en si: el
+ * tablero coloca, no replanifica. Comprometer trabajo sigue siendo del PTS, y
+ * mezclarlo aqui permitiria cambiar lo prometido desde una pantalla que se usa
+ * con la semana ya en marcha.
+ */
+export async function colocarTarjetas(
+  sesion: SesionActiva,
+  obraId: string,
+  planId: string,
+  tarjetas: readonly ColocacionTarjeta[],
+): Promise<ResultadoColocacion> {
+  if (!puede(sesion, "plan_semanal:gestionar")) {
+    return { ok: false, error: "No tienes permiso para mover el tablero." };
+  }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
+  const plan = await prisma.planSemanal.findFirst({
+    where: { id: planId, projectId: obraId, project: { companyId: sesion.companyId } },
+    select: { id: true, estado: true, compromisos: { select: { id: true } } },
+  });
+  if (!plan) return { ok: false, error: "Semana no encontrada." };
+
+  // Una semana cerrada ya dio su PPC y se leyo. Mover sus tarjetas cambiaria
+  // el reparto por dia de un resultado que ya se firmo.
+  if (plan.estado !== "ABIERTO") {
+    return { ok: false, error: "La semana esta cerrada: su tablero ya no se mueve." };
+  }
+
+  // Solo se aceptan compromisos DE ESTA semana. Sin esto, un id de otra semana
+  // —o de otra obra— colado en el formulario se escribiria igual: la peticion
+  // la arma el navegador y no se le cree nada.
+  const deLaSemana = new Set(plan.compromisos.map((c) => c.id));
+  const validas = tarjetas.filter((t) => deLaSemana.has(t.compromisoId));
+
+  const proveedoresPedidos = validas
+    .map((t) => t.proveedorId)
+    .filter((p): p is string => p !== null);
+
+  // Y los proveedores, de ESTA empresa. Un id ajeno dejaria una fila del
+  // tablero con el nombre de un contratista de otro cliente.
+  const propios = new Set(
+    (
+      await prisma.proveedor.findMany({
+        where: { id: { in: proveedoresPedidos }, companyId: sesion.companyId },
+        select: { id: true },
+      })
+    ).map((p) => p.id),
+  );
+
+  await prisma.$transaction(
+    validas.map((t) =>
+      prisma.compromisoSemanal.update({
+        where: { id: t.compromisoId },
+        data: {
+          // Fuera del rango ISO se guarda null: es «sin dia», que es lo que de
+          // hecho significa un valor que ninguna columna puede representar.
+          diaInicio: enRangoIso(t.diaInicio),
+          diaFin: enRangoIso(t.diaFin),
+          proveedorId: t.proveedorId && propios.has(t.proveedorId) ? t.proveedorId : null,
+          color: /^#[0-9a-f]{6}$/i.test(t.color ?? "") ? t.color : null,
+        },
+      }),
+    ),
+  );
+
+  return { ok: true, colocadas: validas.length };
+}
+
+/** ISO 1-7, o null. Cualquier otra cosa es «sin dia». */
+function enRangoIso(dia: number | null): number | null {
+  return dia !== null && Number.isInteger(dia) && dia >= 1 && dia <= 7 ? dia : null;
 }
