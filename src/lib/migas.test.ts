@@ -1,0 +1,59 @@
+import { describe, expect, it } from "vitest";
+
+import { migasDeRuta } from "@/lib/migas";
+
+describe("la cadena de migas", () => {
+  it("arma los cuatro niveles del tablero de una semana", () => {
+    const m = migasDeRuta("/obras/abc/plan-semanal/xyz/tablero", {
+      obra: "CRIOCORD",
+      plan: "Semana 3",
+    });
+
+    expect(m.map((x) => x.texto)).toEqual([
+      "Obras",
+      "CRIOCORD",
+      "Plan semanal",
+      "Semana 3",
+      "Tablero",
+    ]);
+  });
+
+  it("la ultima nunca lleva enlace: es donde estas", () => {
+    const m = migasDeRuta("/obras/abc/cronograma/gantt", { obra: "CRIOCORD" });
+
+    expect(m[m.length - 1]).toEqual({ texto: "Diagrama de Gantt", href: null });
+    expect(m[0]!.href).toBe("/obras");
+  });
+
+  it("sin etiqueta, el id no se pinta en crudo", () => {
+    // Una miga que dijera «cmsu8thog» orienta menos que una que dice «Obra».
+    const m = migasDeRuta("/obras/cmsu8thog000476ecjhkl6802/meta");
+
+    expect(m.map((x) => x.texto)).toEqual(["Obras", "Obra", "Presupuesto meta"]);
+  });
+
+  it("un tramo sin pantalla se pinta como texto, no como enlace roto", () => {
+    const m = migasDeRuta("/empresa/usuarios");
+
+    expect(m[0]).toEqual({ texto: "Empresa", href: null });
+    expect(m[1]!.texto).toBe("Usuarios");
+  });
+
+  it("los prefijos sin entrada se saltan en vez de inventarse", () => {
+    // `.../ordenes/:orden` no tiene pantalla propia: se salta y la cadena
+    // sigue con «Imprimir».
+    const m = migasDeRuta("/obras/abc/ordenes/o1/imprimir", { obra: "CRIOCORD" });
+
+    expect(m.map((x) => x.texto)).toEqual([
+      "Obras",
+      "CRIOCORD",
+      "Órdenes",
+      "Imprimir",
+    ]);
+  });
+
+  it("una ruta desconocida no revienta ni inventa", () => {
+    expect(migasDeRuta("/no/existe/esto")).toEqual([]);
+    expect(migasDeRuta("/")).toEqual([]);
+  });
+});
