@@ -1,5 +1,7 @@
 import { HardHat, Ruler, Tag } from "lucide-react";
 
+import { SelloMetodologia } from "@/components/ui/SelloMetodologia";
+
 /**
  * Pie de pagina del area privada: marca, ano, creditos y version.
  *
@@ -53,6 +55,10 @@ export function PieDePagina() {
             v{VERSION}
           </span>
         </div>
+
+        {/* Sobre que esta construido. Va debajo de los creditos y no encima:
+            primero quien lo hizo, despues con que metodo. */}
+        <SelloMetodologia compacto className="mt-1" />
       </div>
     </footer>
   );

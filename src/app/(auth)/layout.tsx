@@ -1,5 +1,6 @@
 import { Mascota } from "@/components/ui/Mascota";
 import { HeroPortada } from "@/components/portada/HeroPortada";
+import { SelloMetodologia } from "@/components/ui/SelloMetodologia";
 
 /**
  * El marco de las pantallas de acceso (login, recuperar clave, etc.).
@@ -33,6 +34,11 @@ export default function AuthLayout({
             <p className="mt-1 text-sm opacity-70">
               Gestión en Construcción Moderna
             </p>
+
+            {/* Aqui el sello SI lleva su detalle: es lo primero que ve quien
+                no conoce GCM, y decir sobre que esta construido explica mas
+                que cualquier eslogan. */}
+            <SelloMetodologia className="mt-4" />
           </header>
 
           <div
