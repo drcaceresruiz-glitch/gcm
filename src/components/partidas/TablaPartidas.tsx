@@ -288,6 +288,11 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
                 // cerrado: recalcularlo alteraria un precio ya pactado.
                 const parcialCalculado = f.modalidad === "PRECIOS_UNITARIOS";
 
+                // Una fila de alcance no lleva dinero propio: el suyo vive en
+                // su partida padre. Dejar la celda abierta permitia escribir
+                // un importe que BORRABA del costo directo el de ese padre.
+                const sinImportePropio = f.modalidad === "ALCANCE";
+
                 return (
                   <tr
                     key={f.id}
@@ -426,7 +431,7 @@ export function TablaPartidas({ obraId, filas, editable }: Props) {
                           // En precios unitarios el importe es el resultado de
                           // metrado x precio: se edita cambiando esos dos, no
                           // el resultado, o quedaria incoherente con ellos.
-                          editable={editable && !parcialCalculado}
+                          editable={editable && !parcialCalculado && !sinImportePropio}
                           alineadoDerecha
                           onGuardar={(v) => guardar(f.id, { parcial: v })}
                         />

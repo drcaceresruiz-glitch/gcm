@@ -117,6 +117,41 @@ export async function actualizarPartida(
   if (!ctx.ok) return ctx;
   const { partida } = ctx;
 
+  const modalidadFinal = campos.modalidad ?? partida.modalidad;
+
+  /**
+   * Una fila de alcance NO puede llevar cifras propias.
+   *
+   * No es una cuestion de orden: `aportantes` hace que cualquier importe
+   * positivo CUBRA a sus ancestros, asi que un alcance con importe no suma
+   * de mas, sino que BORRA del costo directo el precio cerrado de su partida
+   * padre, y con el el BAC y los subtotales. La pantalla dejaba esa celda
+   * editable y el servicio no lo comprobaba: era el punto 7 de PENDIENTES.
+   */
+  if (modalidadFinal === "ALCANCE") {
+    for (const campo of ["parcial", "metrado", "precioUnitario"] as const) {
+      const valor = campos[campo];
+      if (valor !== undefined && valor !== null && valor.trim() !== "") {
+        return {
+          ok: false,
+          error:
+            `"${partida.codigoPartida}" solo detalla el alcance de otra partida ` +
+            "y no lleva cifras propias: el dinero esta en su partida padre.",
+        };
+      }
+    }
+  }
+
+  // La modalidad de un capitulo es basura ignorada por el calculo —su importe
+  // es la suma de lo que cuelga—, asi que aceptarla solo sirve para que
+  // alguien crea que significa algo.
+  if (campos.modalidad !== undefined && partida.tipo === "CAPITULO") {
+    return {
+      ok: false,
+      error: "Un capitulo no tiene modalidad: su importe es la suma de sus partidas.",
+    };
+  }
+
   const datos: Record<string, unknown> = {};
 
   if (campos.descripcion !== undefined) {
@@ -178,8 +213,18 @@ export async function actualizarPartida(
   if (campos.modalidad !== undefined) {
     datos["modalidad"] = campos.modalidad;
 
-    // Al pasar a alcance, el importe deja de ser propio: lo lleva el padre.
-    if (campos.modalidad === "ALCANCE") datos["parcial"] = null;
+    /**
+     * Al pasar a alcance se limpian LAS TRES cifras, no solo el importe.
+     *
+     * Antes solo se anulaba `parcial`, y el metrado y el precio quedaban
+     * dentro. Bastaba volver a precios unitarios para que el recalculo los
+     * multiplicara y resucitara un importe que la fila no debe tener.
+     */
+    if (campos.modalidad === "ALCANCE") {
+      datos["parcial"] = null;
+      datos["metrado"] = null;
+      datos["precioUnitario"] = null;
+    }
   }
 
   if (Object.keys(datos).length === 0) return { ok: true };
@@ -323,7 +368,7 @@ export async function crearPartida(
 
   const existentes = await prisma.wbsItem.findMany({
     where: { projectId: obraId },
-    select: { id: true, codigoPartida: true, orden: true },
+    select: { id: true, codigoPartida: true, orden: true, parentId: true },
   });
 
   if (existentes.some((e) => e.codigoPartida === codigo)) {
@@ -375,10 +420,26 @@ export async function crearPartida(
 
   const profundidades = calcularProfundidades([...codigos]);
 
-  // Se coloca justo detras de su padre, o al final si cuelga de la raiz.
-  const orden = padre
-    ? padre.orden + 1
-    : Math.max(0, ...existentes.map((e) => e.orden)) + 1;
+  /**
+   * Se coloca detras de la ULTIMA de sus hermanas, no detras de su padre.
+   *
+   * Con `padre.orden + 1` cada fila nueva se metia la primera del capitulo, y
+   * teclear 2.1, 2.2 y 2.3 seguidas las dejaba al reves. Nadie escribe un
+   * presupuesto de abajo arriba.
+   *
+   * Las hermanas se buscan por `parentId` y no por el prefijo del codigo,
+   * porque el codigo admite convenciones donde "7.02.01" es hija de
+   * "7.02.00" pese a tener los mismos segmentos.
+   */
+  const hermanas = padre
+    ? existentes.filter((e) => e.parentId === padre.id)
+    : existentes.filter((e) => e.parentId === null);
+
+  const ultima = hermanas.length
+    ? Math.max(...hermanas.map((h) => h.orden))
+    : (padre?.orden ?? Math.max(0, ...existentes.map((e) => e.orden)));
+
+  const orden = ultima + 1;
 
   const creada = await prisma.$transaction(async (tx) => {
     // Se abre hueco en la numeracion para no dejar dos partidas con el
