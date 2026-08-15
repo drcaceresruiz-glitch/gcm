@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sumar } from "@/lib/decimal";
 import { sumarHojas, type NodoImporte } from "@/lib/jerarquia-partidas";
+import type { ProjectState } from "@/generated/prisma/enums";
 
 /**
  * El costo directo de una obra, contado UNA sola vez.
@@ -172,15 +173,22 @@ export async function bacDeObra(obraId: string): Promise<BacObra> {
 }
 
 /**
- * El costo directo de TODAS las obras de una empresa, sumado.
+ * El costo directo de las obras de una empresa, sumado.
  *
  * Se resuelve obra por obra y luego se suma, porque la regla de hojas es
  * por arbol: mezclar los codigos de dos obras haria que la "4.1" de una
  * pareciera hija de la "4" de la otra.
+ *
+ * `estado` acota la suma a las obras en ese estado; sin el, entran todas.
+ * Existe porque el panel ensena solo lo EN EJECUCION —la exposicion de
+ * hoy—, mientras que la cartera completa es cifra de presentacion.
  */
-export async function totalDeEmpresa(companyId: string): Promise<string> {
+export async function totalDeEmpresa(
+  companyId: string,
+  estado?: ProjectState,
+): Promise<string> {
   const obras = await prisma.project.findMany({
-    where: { companyId },
+    where: { companyId, ...(estado ? { estado } : {}) },
     select: { id: true },
   });
 

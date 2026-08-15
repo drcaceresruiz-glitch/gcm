@@ -70,28 +70,38 @@ export interface ObraResumen {
 export interface ResumenEmpresa {
   obras: number;
   obrasEnEjecucion: number;
-  /// Suma de las partidas de TODAS las obras de la empresa.
+  /**
+   * Suma de las partidas SOLO de las obras en ejecucion, no de la cartera
+   * entera. Mezclar planificacion, ejecucion y cerradas daba un numero
+   * contra el que nadie decide nada: la exposicion de hoy es lo que esta
+   * vivo. La cartera completa es cifra de presentacion, no de operacion.
+   */
   presupuestoTotal: string;
-  /// Comprometido con proveedores, solo de ordenes aprobadas. Es el importe
-  /// imputable de cada una: neto con IGV, total con retencion o sin impuesto.
+  /// Comprometido con proveedores de las obras en ejecucion, solo ordenes
+  /// aprobadas. Es el importe imputable de cada una: neto con IGV, total con
+  /// retencion o sin impuesto.
   comprometido: string;
-  /// Presupuesto menos comprometido. Puede salir negativo, y entonces hay que
-  /// verlo: significa que se ha pedido mas de lo que hay presupuestado.
+  /// Presupuesto menos comprometido, ambos ya acotados a ejecucion. Puede
+  /// salir negativo, y entonces hay que verlo: se ha pedido mas de lo que
+  /// hay presupuestado.
   saldo: string;
   partidasSobregiradas: number;
   obrasConPlazoVencido: number;
 }
 
 /**
- * Las cifras de la empresa entera, para encabezar el panel.
+ * Las cifras de la empresa para encabezar el panel: el conteo de obras es de
+ * todas; el dinero, SOLO de las que estan en ejecucion.
  *
- * Hasta ahora estos totales **no existian en ninguna pantalla**: el
- * comprometido y el presupuesto solo se veian obra por obra, asi que nadie
- * podia responder «cuanto tengo comprometido en total» sin sumar a mano.
+ * Primero no existian en ninguna pantalla; despues sumaban la cartera
+ * completa, y ese numero mezclaba obras en planificacion, en ejecucion y
+ * cerradas: contra el no se decide nada. Lo que el panel debe contestar a
+ * primera vista es la exposicion de HOY —cuanto hay presupuestado y
+ * comprometido en lo que esta vivo—.
  *
- * Va aparte de `listarObras` a proposito: aquella devuelve UNA PAGINA y estas
- * cifras son de todas las obras. Calcularlas desde la pagina daria un total
- * distinto en cada pagina, que es justo la clase de cifra que no puede
+ * Va aparte de `listarObras` a proposito: aquella devuelve UNA PAGINA y
+ * estas cifras no dependen de la pagina. Calcularlas desde ella daria un
+ * total distinto en cada pagina, que es justo la clase de cifra que no puede
  * aparecer en un panel de control.
  */
 export async function obtenerResumenEmpresa(
@@ -115,11 +125,19 @@ export async function obtenerResumenEmpresa(
 
       // Con la regla de hojas y no con un `SUM` plano: filtrar por `tipo` no
       // protege del doble conteo, porque un grupo a suma alzada con hijas
-      // costeadas tambien es PARTIDA.
-      totalDeEmpresa(sesion.companyId),
+      // costeadas tambien es PARTIDA. Acotado a EN_EJECUCION igual que el
+      // comprometido de abajo: las dos cifras se restan para dar el saldo, y
+      // restar ambitos distintos daria un numero que no es de nadie.
+      totalDeEmpresa(sesion.companyId, "EN_EJECUCION"),
 
       prisma.ordenImputacion.aggregate({
-        where: { ordenCompra: { ...deLaEmpresa, estado: "APROBADA" } },
+        where: {
+          ordenCompra: {
+            ...deLaEmpresa,
+            estado: "APROBADA",
+            project: { estado: "EN_EJECUCION" },
+          },
+        },
         _sum: { importe: true },
       }),
 

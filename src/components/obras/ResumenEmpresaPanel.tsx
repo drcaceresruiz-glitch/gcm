@@ -5,11 +5,13 @@ import { CifraAnimada } from "@/components/obras/CifraAnimada";
 import { AlertasEmpresa } from "@/components/obras/AlertasEmpresa";
 
 /**
- * Las cifras de la empresa entera, encabezando el panel.
+ * Las cifras de la empresa encabezando el panel: obras contadas todas, el
+ * dinero SOLO de las que estan en ejecucion.
  *
- * Antes no existian en ninguna pantalla: el presupuesto y el comprometido
- * solo se veian obra por obra, asi que «cuanto tengo comprometido en total»
- * no se podia responder sin sumar a mano.
+ * Sumar la cartera completa mezclaba planificacion, ejecucion y cerradas en
+ * un numero contra el que nadie decide nada; lo que se necesita a primera
+ * vista es la exposicion de hoy. Cada etiqueta dice su ambito, porque una
+ * cifra acotada que no declara el corte parece simplemente equivocada.
  *
  * El presupuesto va SIN IGV, que es la cifra de control. El comprometido va
  * por el importe IMPUTABLE de cada orden —neto con IGV, total con retencion—,
@@ -54,7 +56,7 @@ export function ResumenEmpresaPanel({
         numero={Number(resumen.presupuestoTotal)}
         moneda
         acento="var(--color-exito)"
-        detalle="Suma de partidas, sin IGV"
+        detalle="Obras en ejecución, sin IGV"
       />
 
       <Cifra
@@ -64,7 +66,7 @@ export function ResumenEmpresaPanel({
         numero={Number(resumen.comprometido)}
         moneda
         acento="var(--color-alerta)"
-        detalle="Solo órdenes aprobadas"
+        detalle="En ejecución, órdenes aprobadas"
       />
 
       <Cifra
