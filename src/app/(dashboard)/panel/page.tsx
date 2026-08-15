@@ -158,8 +158,13 @@ export default async function PanelPage({
         <>
           <AcentoTitulo>
             <h2 className="text-xl font-semibold tracking-tight">Obras</h2>
+            {/* La segunda frase es la guia de lectura de las tarjetas: las
+                barras y los globos no se explican en ningun otro sitio, y una
+                cifra sin leyenda se ignora o se malinterpreta. */}
             <p className="mt-1 text-sm opacity-70">
               {obras.total} obra(s){hayFiltro ? " coinciden" : " en tu empresa"}.
+              {" "}Cada tarjeta lleva sus barras —calendario, comprometido y
+              avance físico— y sus avisos en los globos de color.
             </p>
           </AcentoTitulo>
           <FiltrosObras />

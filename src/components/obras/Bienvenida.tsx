@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Compass, Plus } from "lucide-react";
 import { Mascota } from "@/components/ui/Mascota";
+import { PaletasHero } from "@/components/obras/PaletasHero";
 import type { AlertaEmpresa, ResumenEmpresa } from "@/services/obras.service";
 
 /**
@@ -180,6 +181,12 @@ export function Bienvenida({
             Nueva obra
           </Link>
         )}
+      </div>
+
+      {/* Las paletas, en el sitio mas visto de la aplicacion: una
+          preferencia que nadie descubre no es una preferencia. */}
+      <div className="mt-3 flex justify-end">
+        <PaletasHero />
       </div>
     </section>
   );
