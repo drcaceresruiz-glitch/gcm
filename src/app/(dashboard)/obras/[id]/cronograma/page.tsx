@@ -207,8 +207,10 @@ export default async function CronogramaPage({
           </dl>
 
           <p className="text-xs opacity-60">
-            {cronograma.archivo} · cargado por {cronograma.importadoPor}{" "}
-            {haceCuanto(cronograma.importadoAt)}
+            {/* Sin archivo el cronograma se tecleo aqui: decirlo es mas util
+                que dejar el hueco, que ademas colgaria un « · » suelto. */}
+            {cronograma.archivo ?? "Escrito en GCM"} · cargado por{" "}
+            {cronograma.importadoPor} {haceCuanto(cronograma.importadoAt)}
           </p>
 
           {/* El plazo del cronograma puede no coincidir con las fechas que
@@ -383,7 +385,8 @@ export default async function CronogramaPage({
                     </Chip>
                     <span>{fechaLarga(c.fechaCorte)}</span>
                     <span className="opacity-60">
-                      {c.tareas} tareas · {c.archivo} · {c.importadoPor}
+                      {c.tareas} tareas · {c.archivo ?? "Escrito en GCM"} ·{" "}
+                      {c.importadoPor}
                     </span>
                     <BotonLineaBase
                       obraId={id}

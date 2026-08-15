@@ -117,6 +117,41 @@ export async function actualizarPartida(
   if (!ctx.ok) return ctx;
   const { partida } = ctx;
 
+  const modalidadFinal = campos.modalidad ?? partida.modalidad;
+
+  /**
+   * Una fila de alcance NO puede llevar cifras propias.
+   *
+   * No es una cuestion de orden: `aportantes` hace que cualquier importe
+   * positivo CUBRA a sus ancestros, asi que un alcance con importe no suma
+   * de mas, sino que BORRA del costo directo el precio cerrado de su partida
+   * padre, y con el el BAC y los subtotales. La pantalla dejaba esa celda
+   * editable y el servicio no lo comprobaba: era el punto 7 de PENDIENTES.
+   */
+  if (modalidadFinal === "ALCANCE") {
+    for (const campo of ["parcial", "metrado", "precioUnitario"] as const) {
+      const valor = campos[campo];
+      if (valor !== undefined && valor !== null && valor.trim() !== "") {
+        return {
+          ok: false,
+          error:
+            `"${partida.codigoPartida}" solo detalla el alcance de otra partida ` +
+            "y no lleva cifras propias: el dinero esta en su partida padre.",
+        };
+      }
+    }
+  }
+
+  // La modalidad de un capitulo es basura ignorada por el calculo —su importe
+  // es la suma de lo que cuelga—, asi que aceptarla solo sirve para que
+  // alguien crea que significa algo.
+  if (campos.modalidad !== undefined && partida.tipo === "CAPITULO") {
+    return {
+      ok: false,
+      error: "Un capitulo no tiene modalidad: su importe es la suma de sus partidas.",
+    };
+  }
+
   const datos: Record<string, unknown> = {};
 
   if (campos.descripcion !== undefined) {
@@ -178,8 +213,18 @@ export async function actualizarPartida(
   if (campos.modalidad !== undefined) {
     datos["modalidad"] = campos.modalidad;
 
-    // Al pasar a alcance, el importe deja de ser propio: lo lleva el padre.
-    if (campos.modalidad === "ALCANCE") datos["parcial"] = null;
+    /**
+     * Al pasar a alcance se limpian LAS TRES cifras, no solo el importe.
+     *
+     * Antes solo se anulaba `parcial`, y el metrado y el precio quedaban
+     * dentro. Bastaba volver a precios unitarios para que el recalculo los
+     * multiplicara y resucitara un importe que la fila no debe tener.
+     */
+    if (campos.modalidad === "ALCANCE") {
+      datos["parcial"] = null;
+      datos["metrado"] = null;
+      datos["precioUnitario"] = null;
+    }
   }
 
   if (Object.keys(datos).length === 0) return { ok: true };
@@ -263,6 +308,35 @@ export interface NuevaPartida {
   metrado?: string | null;
   precioUnitario?: string | null;
   /**
+   * El capitulo del que cuelga, ELEGIDO en una lista.
+   *
+   * Antes la jerarquia solo se podia teclear: se deducia del codigo, y quien
+   * escribia tenia que saber que "2.1" cuelga del capitulo 2.0 aunque acabara
+   * de crear el 4.0. Ahora se elige, y el codigo se propone desde el capitulo
+   * con `siguienteCodigoHijo`.
+   *
+   * Es opcional porque el importador y las partidas nacidas de un adicional
+   * siguen entrando sin el. Cuando viene, se EXIGE que coincida con el padre
+   * que dice el codigo: no manda uno sobre el otro, tienen que decir lo mismo.
+   */
+  parentId?: string | null;
+  /**
+   * Como esta contratada, DICHA al crearla.
+   *
+   * Faltaba: toda partida nacia a precios unitarios y para dejarla a suma
+   * alzada habia que crearla y cambiarla despues en la tabla. Y no era solo
+   * un paso de mas: al crearla se calculaba el importe como metrado x precio,
+   * que es exactamente lo que una suma alzada NO hace.
+   */
+  modalidad?: ModalidadPartida;
+  /**
+   * El importe cerrado, para las de suma alzada.
+   *
+   * En precios unitarios no se manda: sale de multiplicar. Aqui es el precio
+   * pactado por todo el alcance, y el metrado que lo acompane es referencial.
+   */
+  parcial?: string | null;
+  /**
    * Si es capitulo o partida, DICHO, no deducido.
    *
    * Antes solo se deducia: sin cifras, capitulo. Y era una trampa cara. Al
@@ -323,7 +397,13 @@ export async function crearPartida(
 
   const existentes = await prisma.wbsItem.findMany({
     where: { projectId: obraId },
-    select: { id: true, codigoPartida: true, orden: true },
+    select: {
+      id: true,
+      codigoPartida: true,
+      orden: true,
+      parentId: true,
+      tipo: true,
+    },
   });
 
   if (existentes.some((e) => e.codigoPartida === codigo)) {
@@ -335,6 +415,42 @@ export async function crearPartida(
   const padre = codigoDelPadre
     ? (existentes.find((e) => e.codigoPartida === codigoDelPadre) ?? null)
     : null;
+
+  /**
+   * Si se dijo de que capitulo cuelga, tiene que coincidir con el que dice el
+   * codigo. No se elige uno de los dos: se exige que digan lo mismo.
+   *
+   * Aqui conviven tres representaciones del arbol —`parentId` da los
+   * subtotales de capitulo, el codigo da el total de la obra por `aportantes`,
+   * y `nivel` con `orden` dibujan la tabla—. Dejar que dos apunten a sitios
+   * distintos no da error: descuadra el presupuesto en una pantalla y no en
+   * la otra, que es la peor forma de estar mal. La pantalla propone el codigo
+   * con `siguienteCodigoHijo`, asi que llegar aqui con los dos en desacuerdo
+   * significa que alguien lo edito a mano.
+   */
+  if (nueva.parentId) {
+    const elegido = existentes.find((e) => e.id === nueva.parentId);
+
+    if (!elegido) {
+      return { ok: false, error: "El capitulo elegido no existe en esta obra." };
+    }
+    if (elegido.tipo !== "CAPITULO") {
+      return {
+        ok: false,
+        error:
+          `"${elegido.codigoPartida}" no es un capitulo. Colgar una partida de otra ` +
+          "partida con importe haria desaparecer el importe de esa partida del total.",
+      };
+    }
+    if (padre?.id !== elegido.id) {
+      return {
+        ok: false,
+        error:
+          `El codigo ${codigo} no cuelga de "${elegido.codigoPartida}", sino de ` +
+          `"${codigoDelPadre ?? "la raiz"}". Corrige el codigo o elige el otro capitulo.`,
+      };
+    }
+  }
 
   const metrado = nueva.metrado ? normalizarDecimal(nueva.metrado, 4) : null;
   const precioUnitario = nueva.precioUnitario
@@ -348,8 +464,30 @@ export async function crearPartida(
     return { ok: false, error: "El precio unitario no es un numero valido." };
   }
 
+  /**
+   * El importe depende de COMO este contratada, no solo de las cifras.
+   *
+   * En precios unitarios sale de multiplicar. En suma alzada es un precio
+   * cerrado que se teclea, y multiplicar ahi seria inventarse un importe que
+   * nadie pacto. Y una fila de alcance no lleva importe: el suyo vive en su
+   * partida padre, y ponerselo la haria CUBRIR a ese padre en `aportantes`,
+   * borrando su precio del costo directo.
+   */
+  const modalidadPedida = nueva.modalidad;
+  const importeCerrado = nueva.parcial ? normalizarDecimal(nueva.parcial, 2) : null;
+
+  if (nueva.parcial && importeCerrado === null) {
+    return { ok: false, error: "El importe no es un numero valido." };
+  }
+
   const parcial =
-    metrado && precioUnitario ? multiplicar(metrado, precioUnitario, 2) : null;
+    modalidadPedida === "ALCANCE"
+      ? null
+      : modalidadPedida === "SUMA_ALZADA"
+        ? importeCerrado
+        : metrado && precioUnitario
+          ? multiplicar(metrado, precioUnitario, 2)
+          : null;
 
   // Lo que diga quien la crea; si no dice nada, se deduce como siempre: sin
   // cifras es un capitulo que agrupa, con cifras es una partida.
@@ -364,7 +502,7 @@ export async function crearPartida(
   // Aceptar cifras aqui crearia un capitulo con importe propio, y `aportantes`
   // decidiria entonces que el capitulo cuenta y sus hijas no, borrando el
   // importe de estas sin un solo error.
-  if (tipo === "CAPITULO" && (metrado || precioUnitario)) {
+  if (tipo === "CAPITULO" && (metrado || precioUnitario || importeCerrado)) {
     return {
       ok: false,
       error:
@@ -373,12 +511,44 @@ export async function crearPartida(
     };
   }
 
+  if (tipo === "CAPITULO" && modalidadPedida) {
+    return {
+      ok: false,
+      error: "Un capitulo no tiene modalidad: su importe es la suma de sus partidas.",
+    };
+  }
+
+  if (modalidadPedida === "SUMA_ALZADA" && importeCerrado === null) {
+    return {
+      ok: false,
+      error:
+        "Una partida a suma alzada necesita su importe cerrado: es el precio " +
+        "pactado por todo el alcance, y no sale de multiplicar el metrado.",
+    };
+  }
+
   const profundidades = calcularProfundidades([...codigos]);
 
-  // Se coloca justo detras de su padre, o al final si cuelga de la raiz.
-  const orden = padre
-    ? padre.orden + 1
-    : Math.max(0, ...existentes.map((e) => e.orden)) + 1;
+  /**
+   * Se coloca detras de la ULTIMA de sus hermanas, no detras de su padre.
+   *
+   * Con `padre.orden + 1` cada fila nueva se metia la primera del capitulo, y
+   * teclear 2.1, 2.2 y 2.3 seguidas las dejaba al reves. Nadie escribe un
+   * presupuesto de abajo arriba.
+   *
+   * Las hermanas se buscan por `parentId` y no por el prefijo del codigo,
+   * porque el codigo admite convenciones donde "7.02.01" es hija de
+   * "7.02.00" pese a tener los mismos segmentos.
+   */
+  const hermanas = padre
+    ? existentes.filter((e) => e.parentId === padre.id)
+    : existentes.filter((e) => e.parentId === null);
+
+  const ultima = hermanas.length
+    ? Math.max(...hermanas.map((h) => h.orden))
+    : (padre?.orden ?? Math.max(0, ...existentes.map((e) => e.orden)));
+
+  const orden = ultima + 1;
 
   const creada = await prisma.$transaction(async (tx) => {
     // Se abre hueco en la numeracion para no dejar dos partidas con el
@@ -394,6 +564,7 @@ export async function crearPartida(
         parentId: padre?.id ?? null,
         codigoPartida: codigo,
         tipo,
+        ...(modalidadPedida ? { modalidad: modalidadPedida } : {}),
         descripcion: descripcion.slice(0, 500),
         nivel: profundidades.get(codigo) ?? 0,
         orden,

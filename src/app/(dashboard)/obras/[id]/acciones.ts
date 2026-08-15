@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
   actualizarPartida,
@@ -18,6 +19,16 @@ export interface RespuestaEdicion {
   error?: string;
 }
 
+/**
+ * Las tres modalidades que existen.
+ *
+ * La modalidad llega del `value` de un desplegable, que es texto crudo del
+ * navegador: sin esta puerta, cualquiera podia guardar una modalidad
+ * inventada y dejar la partida fuera de todas las reglas de calculo. La ruta
+ * de movimientos ya validaba asi y esta no.
+ */
+const MODALIDAD = z.enum(["PRECIOS_UNITARIOS", "SUMA_ALZADA", "ALCANCE"]);
+
 export async function accionEditarPartida(
   obraId: string,
   partidaId: string,
@@ -25,6 +36,10 @@ export async function accionEditarPartida(
 ): Promise<RespuestaEdicion> {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
+
+  if (campos.modalidad !== undefined && !MODALIDAD.safeParse(campos.modalidad).success) {
+    return { ok: false, error: "Esa modalidad no existe." };
+  }
 
   const r = await actualizarPartida(sesion, partidaId, campos);
   if (!r.ok) return { ok: false, error: r.error };

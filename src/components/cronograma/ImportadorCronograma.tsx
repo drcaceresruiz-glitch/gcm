@@ -96,6 +96,10 @@ export function ImportadorCronograma({
               XML). Este servidor no puede convertir archivos .mpp.
             </>
           )}{" "}
+          También se acepta el <strong>Excel de la plantilla</strong>, para las
+          obras que no llevan el plan en MS Project. Ese camino no trae la ruta
+          crítica: sin la red completa de precedencias no se conoce, y GCM
+          prefiere decir que no se sabe antes que dibujar una que no existe.{" "}
           Se lee el plan tal como está en el archivo: tareas, fechas,
           duraciones, predecesoras y el <strong>% Planeado</strong>, que no se
           calcula sino que se toma del campo personalizado, para que las cifras
@@ -116,7 +120,7 @@ export function ImportadorCronograma({
             id="archivo"
             name="archivo"
             type="file"
-            accept={admiteMpp ? ".mpp,.xml" : ".xml"}
+            accept={admiteMpp ? ".mpp,.xml,.xlsx,.xlsm" : ".xml,.xlsx,.xlsm"}
             onChange={alElegirArchivo}
             className="sr-only"
           />

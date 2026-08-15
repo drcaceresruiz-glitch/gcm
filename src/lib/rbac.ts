@@ -46,6 +46,12 @@ export const PERMISOS = [
 
   "cronograma:leer",
   "cronograma:importar",
+  // Escribir el plan a mano y quitar tareas. Van aparte de `importar` porque
+  // no son lo mismo: importar anade una version y no destruye nada, mientras
+  // que estos dos cambian y borran lo que ya hay. Colgarlos de `importar`
+  // habria regalado el borrado a quien solo tenia que poder subir un archivo.
+  "cronograma:editar",
+  "cronograma:eliminar",
   "avance:registrar",
   "cronograma:linea_base",
 
@@ -190,6 +196,12 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// obra. Es quien lo sabe —esta ahi— y encaja con que ya importe el
     /// presupuesto. ADMIN_OBRA y CONSULTOR solo lo leen.
     "cronograma:importar",
+    /// Y lo teclea y lo corrige, por lo mismo: no todas las obras tienen MS
+    /// Project, y quien conoce el plan es quien esta en la obra. Va con el
+    /// mismo perfil que ya podia sustituir el cronograma entero subiendo otro
+    /// archivo, asi que no ensancha lo que este rol puede romper.
+    "cronograma:editar",
+    "cronograma:eliminar",
     "avance:registrar",
     /// El last planner de la obra: arma el plan semanal, compromete tareas y
     /// cierra la semana midiendo PPC/CNC. Es trabajo de campo, va con el residente.

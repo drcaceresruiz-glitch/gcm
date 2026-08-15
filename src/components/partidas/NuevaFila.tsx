@@ -4,6 +4,14 @@ import { useState, useTransition } from "react";
 import { AlertCircle, LoaderCircle, Plus } from "lucide-react";
 
 import { accionCrearPartida } from "@/app/(dashboard)/obras/[id]/acciones";
+import { siguienteCodigoHijo } from "@/lib/jerarquia-partidas";
+
+export interface OpcionCapitulo {
+  id: string;
+  codigo: string;
+  etiqueta: string;
+  sangria: number;
+}
 
 /**
  * Anadir un capitulo o una partida a mano.
@@ -20,6 +28,7 @@ import { accionCrearPartida } from "@/app/(dashboard)/obras/[id]/acciones";
  */
 
 type Tipo = "CAPITULO" | "PARTIDA";
+type Modalidad = "PRECIOS_UNITARIOS" | "SUMA_ALZADA";
 
 const VACIO = {
   codigoPartida: "",
@@ -27,6 +36,7 @@ const VACIO = {
   unidad: "",
   metrado: "",
   precioUnitario: "",
+  parcial: "",
 };
 
 function Campo({
@@ -57,15 +67,76 @@ export function NuevaFila({
   /// Codigo que se propone al abrir. Sale de la ultima fila para no obligar a
   /// recordar por donde iba la numeracion.
   codigoSugerido,
+  capitulos,
+  codigosUsados,
+  pedido,
 }: {
   obraId: string;
   codigoSugerido: string;
+  /// Los capitulos existentes, para elegir de cual cuelga la partida.
+  capitulos: OpcionCapitulo[];
+  /// Los codigos ya ocupados, para proponer el siguiente hueco libre.
+  codigosUsados: string[];
+  /**
+   * Alta pedida desde la tabla, con el «+» de un capitulo.
+   *
+   * Lleva un `sello` que cambia en cada pulsacion: sin el, pulsar dos veces
+   * el mismo capitulo no haria nada la segunda, porque el id seria igual y
+   * no habria cambio que detectar.
+   */
+  pedido?: { capituloId: string; sello: number };
 }) {
   const [abierto, setAbierto] = useState(false);
   const [tipo, setTipo] = useState<Tipo>("PARTIDA");
   const [campos, setCampos] = useState({ ...VACIO, codigoPartida: codigoSugerido });
+  const [parentId, setParentId] = useState("");
+  const [modalidad, setModalidad] = useState<Modalidad>("PRECIOS_UNITARIOS");
   const [error, setError] = useState<string | null>(null);
   const [guardando, guardar] = useTransition();
+
+  /**
+   * Se atiende la peticion DURANTE el renderizado, no en un efecto.
+   *
+   * Es el mismo patron que `CeldaEditable` usa para sincronizarse con su
+   * prop: un efecto pintaria primero el formulario con el capitulo anterior y
+   * lo corregiria despues, y ese parpadeo se ve.
+   */
+  const [selloAtendido, setSelloAtendido] = useState(0);
+
+  if (pedido && pedido.sello !== selloAtendido) {
+    setSelloAtendido(pedido.sello);
+    setAbierto(true);
+    setTipo("PARTIDA");
+    setError(null);
+    setParentId(pedido.capituloId);
+
+    const capitulo = capitulos.find((c) => c.id === pedido.capituloId);
+    const propuesto = capitulo
+      ? siguienteCodigoHijo(capitulo.codigo, new Set(codigosUsados))
+      : null;
+    setCampos({ ...VACIO, codigoPartida: propuesto ?? "" });
+  }
+
+  /**
+   * Al elegir capitulo, el codigo se propone solo.
+   *
+   * Es el nudo de todo esto: antes habia que SABER que "2.1" cuelga del
+   * capitulo 2.0, y quien acababa de crear el 4.0 tecleaba 2.1 sin darse
+   * cuenta de que la estaba metiendo en otro sitio. `siguienteCodigoHijo`
+   * conoce las tres convenciones —"4.0" tiene hijas "4.1", pero "7.02.00" las
+   * tiene en "7.02.01"— y se autocomprueba: si no encuentra un codigo que de
+   * verdad vuelva a ese capitulo, no propone nada y se teclea a mano.
+   */
+  function elegirCapitulo(id: string) {
+    setParentId(id);
+    setError(null);
+
+    const capitulo = capitulos.find((c) => c.id === id);
+    if (!capitulo) return;
+
+    const propuesto = siguienteCodigoHijo(capitulo.codigo, new Set(codigosUsados));
+    if (propuesto) setCampos((c) => ({ ...c, codigoPartida: propuesto }));
+  }
 
   function enviar() {
     setError(null);
@@ -75,12 +146,24 @@ export function NuevaFila({
         codigoPartida: campos.codigoPartida,
         descripcion: campos.descripcion,
         tipo,
+        // Un capitulo cuelga de la raiz o de otro capitulo por su codigo; el
+        // desplegable solo gobierna donde va una PARTIDA.
+        parentId: tipo === "PARTIDA" && parentId !== "" ? parentId : null,
+        modalidad: tipo === "CAPITULO" ? undefined : modalidad,
         // Un capitulo no lleva cifras: se mandan en null aunque hubieran
         // quedado escritas de antes de cambiar el tipo.
         unidad: tipo === "CAPITULO" ? null : campos.unidad || null,
         metrado: tipo === "CAPITULO" ? null : campos.metrado || null,
+        // En suma alzada el precio unitario no participa: el importe esta
+        // cerrado y multiplicarlo inventaria una cifra que nadie pacto.
         precioUnitario:
-          tipo === "CAPITULO" ? null : campos.precioUnitario || null,
+          tipo === "CAPITULO" || modalidad === "SUMA_ALZADA"
+            ? null
+            : campos.precioUnitario || null,
+        parcial:
+          tipo !== "CAPITULO" && modalidad === "SUMA_ALZADA"
+            ? campos.parcial || null
+            : null,
       });
 
       if (!r.ok) {
@@ -88,10 +171,22 @@ export function NuevaFila({
         return;
       }
 
-      // Se queda ABIERTO y con el tipo elegido: teclear un presupuesto son
-      // decenas de filas seguidas, y cerrar el formulario en cada una
-      // obligaria a volver a abrirlo y a volver a elegir.
-      setCampos({ ...VACIO });
+      /**
+       * Se queda ABIERTO, con el tipo y el capitulo elegidos: teclear un
+       * presupuesto son decenas de filas seguidas dentro del mismo capitulo.
+       *
+       * Y se propone YA el codigo siguiente, contando la que se acaba de
+       * crear. Antes se limpiaba a vacio y habia que acordarse de por donde
+       * iba la numeracion en cada fila, que es justo lo que hacia teclear un
+       * presupuesto una tarea de paciencia.
+       */
+      const capitulo = capitulos.find((c) => c.id === parentId);
+      const yaUsados = new Set([...codigosUsados, campos.codigoPartida]);
+      const siguiente = capitulo
+        ? (siguienteCodigoHijo(capitulo.codigo, yaUsados) ?? "")
+        : "";
+
+      setCampos({ ...VACIO, codigoPartida: siguiente });
       setError(null);
     });
   }
@@ -111,6 +206,7 @@ export function NuevaFila({
   }
 
   const esCapitulo = tipo === "CAPITULO";
+  const esAlzada = modalidad === "SUMA_ALZADA";
 
   return (
     <div
@@ -149,6 +245,74 @@ export function NuevaFila({
             : "Una partida sí lleva importe. Puedes dejar el metrado y el precio en blanco ahora y rellenarlos después pulsando su celda en la tabla."}
         </p>
 
+        {/* Solo para partidas: un capitulo cuelga de la raiz o de otro
+            capitulo, y eso lo dice su codigo. */}
+        {!esCapitulo && capitulos.length > 0 && (
+          <label className="mt-4 block text-xs">
+            <span className="mb-0.5 block font-medium opacity-70">
+              Capítulo donde cuelga
+            </span>
+            <select
+              value={parentId}
+              onChange={(e) => elegirCapitulo(e.target.value)}
+              className="w-full max-w-lg rounded border px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+            >
+              <option value="">Elige un capítulo</option>
+
+              {/* La sangria son espacios DUROS: el navegador colapsa los
+                  normales dentro de una opcion y todos los subcapitulos
+                  quedarian al mismo margen. */}
+              {capitulos.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {" ".repeat(c.sangria * 3)}
+                  {c.etiqueta}
+                </option>
+              ))}
+            </select>
+            <span className="mt-0.5 block opacity-60">
+              Al elegirlo, el código se propone solo.
+            </span>
+          </label>
+        )}
+
+        {/* La modalidad, al crear y no despues. Antes toda partida nacia a
+            precios unitarios y habia que corregirla en la tabla; y como al
+            crearla el importe salia de metrado x precio, una suma alzada
+            nacia con una cifra que nadie habia pactado. */}
+        {!esCapitulo && (
+          <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Cómo está contratada">
+            {(["PRECIOS_UNITARIOS", "SUMA_ALZADA"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={modalidad === m}
+                onClick={() => setModalidad(m)}
+                className="rounded-lg border px-3 py-1.5 text-sm"
+                style={{
+                  borderColor: modalidad === m ? "var(--color-marca-600)" : "var(--borde)",
+                  backgroundColor:
+                    modalidad === m
+                      ? "color-mix(in oklab, var(--color-marca-600) 12%, transparent)"
+                      : undefined,
+                  fontWeight: modalidad === m ? 600 : 400,
+                }}
+              >
+                {m === "PRECIOS_UNITARIOS" ? "Precios unitarios" : "Suma alzada"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!esCapitulo && (
+          <p className="mt-2 text-xs text-pretty opacity-70">
+            {esAlzada
+              ? "El precio está cerrado por todo el alcance: el metrado es referencial y aunque se ejecute más, el importe pactado no cambia. El riesgo es del contratista."
+              : "El importe sale de metrado × precio. Si en obra sale más cantidad, el importe sube y se valoriza: el riesgo es del cliente."}
+          </p>
+        )}
+
         <div className="mt-4 flex flex-wrap items-start gap-3">
           <Campo
             etiqueta="Código"
@@ -176,7 +340,7 @@ export function NuevaFila({
                 ancho="w-24"
                 value={campos.unidad}
                 onChange={(e) => setCampos({ ...campos, unidad: e.target.value })}
-                placeholder="m3"
+                placeholder={esAlzada ? "glb" : "m3"}
               />
               <Campo
                 etiqueta="Metrado"
@@ -185,17 +349,34 @@ export function NuevaFila({
                 value={campos.metrado}
                 onChange={(e) => setCampos({ ...campos, metrado: e.target.value })}
                 placeholder="12.5"
+                ayuda={esAlzada ? "Referencial" : undefined}
               />
-              <Campo
-                etiqueta="Precio unitario"
-                ancho="w-32"
-                inputMode="decimal"
-                value={campos.precioUnitario}
-                onChange={(e) =>
-                  setCampos({ ...campos, precioUnitario: e.target.value })
-                }
-                placeholder="385.00"
-              />
+
+              {/* En suma alzada no hay precio unitario que multiplicar: se
+                  pide el importe cerrado y punto. Ensenar los dos campos
+                  invitaria a rellenarlos y a esperar que cuadren. */}
+              {esAlzada ? (
+                <Campo
+                  etiqueta="Importe cerrado"
+                  ancho="w-36"
+                  inputMode="decimal"
+                  value={campos.parcial}
+                  onChange={(e) => setCampos({ ...campos, parcial: e.target.value })}
+                  placeholder="2500.00"
+                  ayuda="El precio pactado"
+                />
+              ) : (
+                <Campo
+                  etiqueta="Precio unitario"
+                  ancho="w-32"
+                  inputMode="decimal"
+                  value={campos.precioUnitario}
+                  onChange={(e) =>
+                    setCampos({ ...campos, precioUnitario: e.target.value })
+                  }
+                  placeholder="385.00"
+                />
+              )}
             </>
           )}
         </div>

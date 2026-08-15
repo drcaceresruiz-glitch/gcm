@@ -1256,9 +1256,20 @@ model Cronograma {
   /// las cifras viejas incomparables con las nuevas y sin rastro del porque.
   minutosPorDia Int @default(480)
 
-  archivo      String   @db.VarChar(255)
+  /// El nombre del archivo del que salio. NULL cuando la version no salio de
+  /// ningun archivo, sino de tareas tecleadas en GCM.
+  archivo      String?  @db.VarChar(255)
   importadoAt  DateTime @default(now())
   importadoPor String   @db.VarChar(150)
+
+  /// De donde salio esta version: `IMPORTADO` si la creo un archivo,
+  /// `MANUAL` si nacio de teclear la primera tarea.
+  ///
+  /// Importa para la fecha de corte: un archivo trae su `<StatusDate>` y sin
+  /// el se rechaza la importacion, porque inventar la fecha a la que estan
+  /// referidos unos avances es mentir sobre ellos. Un cronograma tecleado no
+  /// tiene esa fecha que respetar, y toma la del dia en que se empezo.
+  origen OrigenRegistro @default(IMPORTADO)
 
   /// Linea base: con fecha, esta version es el plan CONGELADO contra el que se
   /// mide el EVM (PV/SPI). null = no es la base. Solo una version por obra la
@@ -1333,6 +1344,19 @@ model TareaCronograma {
   /// "no informado" al auditar.
   holguraDias     Decimal @db.Decimal(8, 2) @default(0)
   holguraInferida Boolean @default(false)
+
+  /// De donde salio esta fila. `IMPORTADO` es lo que trajo un archivo;
+  /// `MANUAL`, lo que se tecleo en GCM.
+  ///
+  /// Es lo que permite que reimportar NO se lleve por delante el trabajo a
+  /// mano, igual que en el presupuesto: el archivo manda sobre lo que el
+  /// archivo trajo, y no opina sobre lo demas.
+  ///
+  /// Las tareas MANUAL no traen predecesoras, asi que su ruta critica y su
+  /// holgura no se conocen: nacen con `esCritico` en falso y
+  /// `holguraInferida` en cierto. No se deducen, por la misma razon por la
+  /// que `esCritico` tampoco se deduce de la holgura en las importadas.
+  origen OrigenRegistro @default(IMPORTADO)
 
   cronograma Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
 

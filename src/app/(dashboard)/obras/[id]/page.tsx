@@ -8,8 +8,8 @@ import { puede } from "@/lib/rbac";
 import { soles } from "@/utils/formato";
 import { Explicacion } from "@/components/ui/Explicacion";
 import { CONGELAR_PRESUPUESTO, MODALIDAD_PARTIDA } from "@/lib/explicaciones";
-import { TablaPartidas } from "@/components/partidas/TablaPartidas";
 import { NuevaFila } from "@/components/partidas/NuevaFila";
+import { PanelPresupuesto } from "@/components/partidas/PanelPresupuesto";
 import { Mascota } from "@/components/ui/Mascota";
 import { PanelAyuda, type PuntoAyuda } from "@/components/ui/PanelAyuda";
 
@@ -84,6 +84,31 @@ export default async function ObraPage({
     .map((f) => Number.parseInt(f.codigoPartida.split(".")[0] ?? "", 10))
     .filter((n) => Number.isFinite(n));
   const siguienteCodigo = `${(raices.length ? Math.max(...raices) : 0) + 1}.0`;
+
+  /**
+   * Los capitulos que se pueden elegir como padre, con su sangria.
+   *
+   * Mismo criterio que el desplegable de los movimientos: el nivel de raiz se
+   * toma del MENOR que aparezca y no se da por supuesto un 0, porque un
+   * presupuesto importado puede empezar en cualquiera.
+   */
+  const nivelesCapitulo = filas
+    .filter((f) => f.tipo === "CAPITULO")
+    .map((f) => f.nivel);
+  const nivelRaiz = nivelesCapitulo.length > 0 ? Math.min(...nivelesCapitulo) : 0;
+
+  const capitulos = filas
+    .filter((f) => f.tipo === "CAPITULO")
+    .map((f) => ({
+      id: f.id,
+      codigo: f.codigoPartida,
+      etiqueta: `${f.codigoPartida} ${f.descripcion}`,
+      sangria: f.nivel - nivelRaiz,
+    }));
+
+  // Los codigos ya usados: con ellos la pantalla propone el siguiente hueco
+  // libre dentro del capitulo elegido, sin tener que preguntar al servidor.
+  const codigosUsados = filas.map((f) => f.codigoPartida);
 
   return (
     <div className="space-y-6">
@@ -173,28 +198,34 @@ export default async function ObraPage({
                 )}
                 {/* La segunda salida, que hasta ahora no existia: el servicio
                     de alta estaba escrito y no habia forma de llamarlo. */}
-                {puedeCrear && <NuevaFila obraId={id} codigoSugerido="1.0" />}
+                {/* Sin partidas todavia no hay capitulos que elegir: lo
+                    primero que se teclea es el 1.0. */}
+                {puedeCrear && (
+                  <NuevaFila
+                    obraId={id}
+                    codigoSugerido="1.0"
+                    capitulos={[]}
+                    codigosUsados={[]}
+                  />
+                )}
               </div>
             </div>
 
             <PanelAyuda puntos={PRIMEROS_PASOS} />
           </div>
         ) : (
-          <div className="space-y-4">
-            <TablaPartidas
-              obraId={id}
-              filas={filas}
-              // Un presupuesto congelado no se edita: los indicadores se
-              // calculan contra el y cambiarlo los invalidaria hacia atras.
-              editable={puede(sesion, "partida:editar") && obra.lineaBaseVersion === null}
-            />
-
-            {/* Solo mientras se pueda editar: con el presupuesto congelado, lo
-                que procede es un movimiento, no una partida nueva suelta. */}
-            {puedeCrear && obra.lineaBaseVersion === null && (
-              <NuevaFila obraId={id} codigoSugerido={siguienteCodigo} />
-            )}
-          </div>
+          <PanelPresupuesto
+            obraId={id}
+            filas={filas}
+            // Un presupuesto congelado no se edita: los indicadores se
+            // calculan contra el y cambiarlo los invalidaria hacia atras. Y
+            // entonces lo que procede es un movimiento, no una partida suelta.
+            editable={puede(sesion, "partida:editar") && obra.lineaBaseVersion === null}
+            puedeCrear={puedeCrear && obra.lineaBaseVersion === null}
+            codigoSugerido={siguienteCodigo}
+            capitulos={capitulos}
+            codigosUsados={codigosUsados}
+          />
         )}
 
         {/* Estaba escrita en `explicaciones.ts` desde hace tiempo y no la

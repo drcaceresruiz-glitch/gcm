@@ -285,3 +285,46 @@ export function calcularProfundidades(
   for (const codigo of codigos) resolver(codigo, new Set());
   return profundidad;
 }
+
+/**
+ * El siguiente codigo libre para una partida que cuelgue de `capitulo`.
+ *
+ * Es la inversa de `codigoPadre`, y por eso se COMPRUEBA en vez de confiarse:
+ * las convenciones de este archivo son sutiles —"4.0" tiene hijas "4.1", pero
+ * "7.02.00" las tiene en "7.02.01", con los mismos segmentos— y una inversa
+ * que se equivoque produciria una partida cuyo `parentId` dice una cosa y cuyo
+ * codigo dice otra. Los subtotales salen del `parentId` y el total de la obra
+ * del codigo, asi que esa discrepancia descuadra el presupuesto sin dar error.
+ *
+ * Devuelve `null` si no encuentra un codigo que de verdad vuelva al capitulo.
+ * Quien llama debe entonces PEDIRLO, no inventarlo.
+ */
+export function siguienteCodigoHijo(
+  capitulo: string,
+  existentes: ReadonlySet<string>,
+): string | null {
+  const segmentos = capitulo.split(".");
+  const ultimo = segmentos.at(-1) ?? "";
+
+  // Una cabecera de grupo ("4.0", "7.02.00") tiene a sus hijas a su MISMA
+  // profundidad; un capitulo que no lo es ("01.02") las tiene un nivel dentro.
+  const esCabecera = segmentos.length > 1 && Number(ultimo) === 0;
+  const base = esCabecera ? segmentos.slice(0, -1) : segmentos;
+  const ancho = ultimo.length;
+
+  for (let n = 1; n <= 999; n++) {
+    const candidato = [...base, String(n).padStart(ancho, "0")].join(".");
+    if (existentes.has(candidato)) continue;
+
+    // La comprobacion: con el candidato dentro del conjunto, su padre tiene
+    // que ser exactamente el capitulo del que se pidio colgar.
+    const conCandidato = new Set([...existentes, candidato]);
+    if (codigoPadre(candidato, conCandidato) === capitulo) return candidato;
+
+    // Si no vuelve, este numero no sirve; probar el siguiente no arregla el
+    // desajuste, que es de forma y no de numero.
+    return null;
+  }
+
+  return null;
+}
