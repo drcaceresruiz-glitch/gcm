@@ -90,6 +90,15 @@ export default async function ObraLayout({
           href: `${raiz}/revisiones`,
           hecho: hitos.lineaBase,
         },
+        /// Va DESPUES de Revisiones y no antes: la meta se fija contra una
+        /// linea base aprobada, asi que el orden del menu es el del trabajo.
+        puede(sesion, "meta:leer") && {
+          clave: "meta",
+          titulo: "Meta",
+          pregunta: "cuánto queremos gastar",
+          href: `${raiz}/meta`,
+          hecho: hitos.meta,
+        },
       ].filter(Boolean),
     },
     {

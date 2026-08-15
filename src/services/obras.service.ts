@@ -572,7 +572,7 @@ export const obtenerObra = cache(async function obtenerObra(
 /**
  * Que pasos del ciclo de la obra tienen ya algo cargado.
  *
- * Alimenta la ruta de la obra (el riel de ubicacion del layout): cinco
+ * Alimenta la ruta de la obra (el riel de ubicacion del layout): seis
  * `findFirst` que solo piden el id, en paralelo. No cuenta nada —no importa
  * CUANTO hay, solo si el paso se dio—.
  *
@@ -590,6 +590,9 @@ export interface HitosObra {
   lookahead: boolean;
   /// Existe al menos una semana del PTS.
   planSemanal: boolean;
+  /// Hay un presupuesto meta APROBADO. El borrador no cuenta: hasta que se
+  /// congela no gobierna ninguna bolsa, igual que en `metaQueManda`.
+  meta: boolean;
 }
 
 export const hitosDeObra = cache(async function hitosDeObra(
@@ -604,7 +607,7 @@ export const hitosDeObra = cache(async function hitosDeObra(
     project: { companyId: sesion.companyId },
   };
 
-  const [partida, cronograma, base, lookahead, plan] = await Promise.all([
+  const [partida, cronograma, base, lookahead, plan, meta] = await Promise.all([
     prisma.wbsItem.findFirst({ where: deLaObra, select: { id: true } }),
     prisma.cronograma.findFirst({ where: deLaObra, select: { id: true } }),
     prisma.baseline.findFirst({
@@ -616,6 +619,10 @@ export const hitosDeObra = cache(async function hitosDeObra(
       select: { id: true },
     }),
     prisma.planSemanal.findFirst({ where: deLaObra, select: { id: true } }),
+    prisma.presupuestoMeta.findFirst({
+      where: { ...deLaObra, aprobadaAt: { not: null } },
+      select: { id: true },
+    }),
   ]);
 
   return {
@@ -624,6 +631,7 @@ export const hitosDeObra = cache(async function hitosDeObra(
     lineaBase: base !== null,
     lookahead: lookahead !== null,
     planSemanal: plan !== null,
+    meta: meta !== null,
   };
 });
 
