@@ -268,7 +268,8 @@ export interface CronogramaVigente {
   version: number;
   fechaCorte: Date;
   nombreProyecto: string;
-  archivo: string;
+  /// NULL cuando la version no salio de un archivo, sino de teclear.
+  archivo: string | null;
   importadoAt: Date;
   importadoPor: string;
   tareas: (TareaDelPlan & Medida)[];
@@ -368,7 +369,8 @@ export interface CorteImportado {
   id: string;
   version: number;
   fechaCorte: Date;
-  archivo: string;
+  /// NULL cuando la version no salio de un archivo, sino de teclear.
+  archivo: string | null;
   importadoAt: Date;
   importadoPor: string;
   tareas: number;

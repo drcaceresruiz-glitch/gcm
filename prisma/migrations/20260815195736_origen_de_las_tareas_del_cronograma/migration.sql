@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE `cronogramas` ADD COLUMN `origen` ENUM('MANUAL', 'IMPORTADO') NOT NULL DEFAULT 'IMPORTADO',
+    MODIFY `archivo` VARCHAR(255) NULL;
+
+-- AlterTable
+ALTER TABLE `tareas_cronograma` ADD COLUMN `origen` ENUM('MANUAL', 'IMPORTADO') NOT NULL DEFAULT 'IMPORTADO';
