@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   aportantes,
   codigoPadre,
+  siguienteCodigoHijo,
+  quienSeQuedaLaNumeracion,
   sumarHojas,
   subtotalesPorRama,
   type NodoImporte,
@@ -223,5 +225,37 @@ describe("subtotalesPorRama", () => {
     );
 
     expect(suma.toFixed(2)).toBe(sumarHojas(nodos));
+  });
+});
+
+
+/**
+ * El capitulo que se quedo sin numeracion.
+ *
+ * Sale de CRIOCORD: el Excel trajo el capitulo "4" con hijas "4.01", y
+ * despues se anadio un capitulo "4.0" con hijas "4.1". Desde ese momento
+ * `codigoPadre` manda que todo "4.x" cuelgue de "4.0", asi que el "4" no
+ * puede numerar ni una hija mas. La pantalla dejaba la casilla del codigo en
+ * blanco y el servicio rechazaba despues lo que se tecleara.
+ */
+describe("quienSeQuedaLaNumeracion", () => {
+  const CRIOCORD = new Set([
+    "4", "4.01", "4.01.01",
+    "4.0", "4.1", "4.2", "4.3",
+  ]);
+
+  it("nombra al capitulo que se quedo con los codigos", () => {
+    expect(siguienteCodigoHijo("4", CRIOCORD)).toBeNull();
+    expect(quienSeQuedaLaNumeracion("4", CRIOCORD)).toBe("4.0");
+  });
+
+  it("calla cuando el capitulo si puede numerar", () => {
+    expect(siguienteCodigoHijo("4.0", CRIOCORD)).toBe("4.4");
+    expect(quienSeQuedaLaNumeracion("4.0", CRIOCORD)).toBeNull();
+  });
+
+  it("no inventa un rival cuando no lo hay", () => {
+    const sueltas = new Set(["1.0", "1.1"]);
+    expect(quienSeQuedaLaNumeracion("1.0", sueltas)).toBeNull();
   });
 });

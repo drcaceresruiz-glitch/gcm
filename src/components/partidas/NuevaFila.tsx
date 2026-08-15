@@ -4,7 +4,10 @@ import { useState, useTransition } from "react";
 import { AlertCircle, LoaderCircle, Plus } from "lucide-react";
 
 import { accionCrearPartida } from "@/app/(dashboard)/obras/[id]/acciones";
-import { siguienteCodigoHijo } from "@/lib/jerarquia-partidas";
+import {
+  siguienteCodigoHijo,
+  quienSeQuedaLaNumeracion,
+} from "@/lib/jerarquia-partidas";
 
 export interface OpcionCapitulo {
   id: string;
@@ -92,7 +95,38 @@ export function NuevaFila({
   const [parentId, setParentId] = useState("");
   const [modalidad, setModalidad] = useState<Modalidad>("PRECIOS_UNITARIOS");
   const [error, setError] = useState<string | null>(null);
+  /// Por que no se pudo proponer un codigo. Distinto de `error`: aqui no ha
+  /// fallado nada todavia, se esta avisando antes de teclear.
+  const [avisoCodigo, setAvisoCodigo] = useState<string | null>(null);
   const [guardando, guardar] = useTransition();
+
+  /**
+   * El codigo que le toca a una partida dentro de `capitulo`, y si no le toca
+   * ninguno, POR QUE.
+   *
+   * El «por que» importa tanto como el codigo: en un presupuesto importado al
+   * que despues se le anadieron capitulos conviven "4" y "4.0", y desde
+   * entonces todo "4.x" cuelga de "4.0". Pulsar el «+» del "4" dejaba la
+   * casilla vacia y el servicio rechazaba despues cualquier cosa que se
+   * tecleara, sin que nada dijera que el problema no era lo tecleado.
+   */
+  function proponer(capitulo: OpcionCapitulo | undefined) {
+    if (!capitulo) return { codigo: "", aviso: null };
+
+    const usados = new Set(codigosUsados);
+    const propuesto = siguienteCodigoHijo(capitulo.codigo, usados);
+    if (propuesto) return { codigo: propuesto, aviso: null };
+
+    const rival = quienSeQuedaLaNumeracion(capitulo.codigo, usados);
+    return {
+      codigo: "",
+      aviso: rival
+        ? `Los códigos que le tocarían a «${capitulo.codigo}» ya cuelgan de ` +
+          `«${rival}». Elige «${rival}» en la lista, o escribe un código a mano.`
+        : `No hay ningún código libre que cuelgue de «${capitulo.codigo}». ` +
+          `Escríbelo a mano.`,
+    };
+  }
 
   /**
    * Se atiende la peticion DURANTE el renderizado, no en un efecto.
@@ -110,11 +144,11 @@ export function NuevaFila({
     setError(null);
     setParentId(pedido.capituloId);
 
-    const capitulo = capitulos.find((c) => c.id === pedido.capituloId);
-    const propuesto = capitulo
-      ? siguienteCodigoHijo(capitulo.codigo, new Set(codigosUsados))
-      : null;
-    setCampos({ ...VACIO, codigoPartida: propuesto ?? "" });
+    const { codigo, aviso } = proponer(
+      capitulos.find((c) => c.id === pedido.capituloId),
+    );
+    setCampos({ ...VACIO, codigoPartida: codigo });
+    setAvisoCodigo(aviso);
   }
 
   /**
@@ -132,10 +166,16 @@ export function NuevaFila({
     setError(null);
 
     const capitulo = capitulos.find((c) => c.id === id);
-    if (!capitulo) return;
+    if (!capitulo) {
+      setAvisoCodigo(null);
+      return;
+    }
 
-    const propuesto = siguienteCodigoHijo(capitulo.codigo, new Set(codigosUsados));
-    if (propuesto) setCampos((c) => ({ ...c, codigoPartida: propuesto }));
+    const { codigo, aviso } = proponer(capitulo);
+    setAvisoCodigo(aviso);
+    // Si no hay codigo que proponer se DEJA el que hubiera: borrarlo perderia
+    // lo que la persona ya estuviera escribiendo.
+    if (codigo) setCampos((c) => ({ ...c, codigoPartida: codigo }));
   }
 
   function enviar() {
@@ -274,6 +314,24 @@ export function NuevaFila({
               Al elegirlo, el código se propone solo.
             </span>
           </label>
+        )}
+
+        {/* No es un error —todavia no ha fallado nada—, es el aviso de que
+            este capitulo no puede numerar hijas porque otro se quedo con su
+            numeracion. Sin el, la casilla del codigo se quedaba vacia y el
+            servicio rechazaba despues cualquier cosa que se escribiera. */}
+        {!esCapitulo && avisoCodigo && (
+          <p
+            role="status"
+            className="mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-xs text-pretty"
+            style={{
+              backgroundColor:
+                "color-mix(in oklab, var(--color-alerta) 15%, transparent)",
+            }}
+          >
+            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            {avisoCodigo}
+          </p>
         )}
 
         {/* La modalidad, al crear y no despues. Antes toda partida nacia a
