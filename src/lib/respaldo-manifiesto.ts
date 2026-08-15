@@ -47,6 +47,10 @@ export interface Manifiesto {
     /// Si la evidencia viaja dentro. Un respaldo sin fotos sigue siendo una
     /// auditoria completa de las cifras, pero NO sirve para borrar la obra.
     evidencia: "incluida" | "omitida";
+    /// Y lo mismo con las fotos de la galeria (el escaparate). Opcional
+    /// porque los respaldos anteriores a la galeria no traen la clave, y el
+    /// manifiesto tiene que poder leerlos igual.
+    galeria?: "incluida" | "omitida";
   };
   tablas: { tabla: string; filas: number }[];
   entradas: EntradaZip[];

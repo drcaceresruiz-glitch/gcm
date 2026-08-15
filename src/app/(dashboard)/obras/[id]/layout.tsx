@@ -159,6 +159,15 @@ export default async function ObraLayout({
             href: `${raiz}/plan-semanal/${s.id}`,
           })),
         },
+        /// El escaparate: las fotos de avance que se curan y, si gerencia
+        /// quiere, se ensenan al cliente. Va tras el Plan semanal porque la
+        /// foto se sube cuando el trabajo ya se hizo.
+        puede(sesion, "galeria:leer") && {
+          clave: "galeria",
+          titulo: "Galería",
+          pregunta: "cómo se ve la obra",
+          href: `${raiz}/galeria`,
+        },
         puede(sesion, "lookahead:gestionar") && {
           clave: "personal",
           titulo: "Personal",

@@ -40,6 +40,15 @@ const RUTAS_PUBLICAS = [
   // seguridad (ver la cabecera): quitar una ruta de aqui no protege nada, y
   // ponerla no desprotege nada.
   "/api/evidencia",
+  // GALERIA DEL CLIENTE: el dueño de la obra mira su avance con un enlace,
+  // sin cuenta de GCM, asi que jamas tendra `gcm_sesion`. La pagina no abre
+  // nada por si misma: `galeriaPublica()` exige un slug ACTIVO y solo
+  // devuelve fotos publicadas una a una por gerencia.
+  "/galeria",
+  // Y la ruta que sirve sus fotos, por lo mismo que `/api/evidencia`: cada
+  // `<img>` de la pagina publica la pide sin cookie. El route handler exige
+  // sesion o slug activo antes de leer un byte.
+  "/api/galeria",
   // La cola de SMS: la consulta un telefono con MacroDroid o Tasker, que
   // jamas va a tener cookie de sesion. Se identifica con su propio token en
   // la cabecera `Authorization`, que comprueba el route handler.

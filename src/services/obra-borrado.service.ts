@@ -105,10 +105,16 @@ export async function eliminarObraCerrada(
 
   // Se leen ANTES de borrar: despues, las filas ya no estan para decir donde
   // vivian los archivos.
-  const fotos = await prisma.fotoEvidencia.findMany({
-    where: { projectId: obraId },
-    select: { ruta: true },
-  });
+  const [fotos, fotosGaleria] = await Promise.all([
+    prisma.fotoEvidencia.findMany({
+      where: { projectId: obraId },
+      select: { ruta: true },
+    }),
+    prisma.fotoGaleria.findMany({
+      where: { projectId: obraId },
+      select: { ruta: true },
+    }),
+  ]);
 
   const borradas = await borrarLaObra(sesion, obra, respaldo);
 
@@ -117,6 +123,12 @@ export async function eliminarObraCerrada(
   // archivo que ya no esta, no. Si esto falla, la obra ya no existe igual.
   if (fotos.length > 0) {
     await rm(join(env.STORAGE_ROOT, "evidencia", obraId), {
+      recursive: true,
+      force: true,
+    }).catch(() => {});
+  }
+  if (fotosGaleria.length > 0) {
+    await rm(join(env.STORAGE_ROOT, "galeria", obraId), {
       recursive: true,
       force: true,
     }).catch(() => {});
@@ -156,11 +168,16 @@ async function respaldoUtilizable(obraId: string) {
 
   // Un respaldo SIN las fotos no autoriza a borrar una obra QUE TIENE fotos:
   // seria borrar del disco unos archivos que no estan en ningun otro sitio.
+  // Cuentan las de evidencia Y las de galeria: `conFotos` dice que las fotos
+  // de la obra viajaron en el zip, vengan de donde vengan.
   if (!respaldo.conFotos) {
-    const fotos = await prisma.fotoEvidencia.count({
-      where: { projectId: obraId, purgadaAt: null },
-    });
-    if (fotos > 0) return null;
+    const [evidencia, galeria] = await Promise.all([
+      prisma.fotoEvidencia.count({
+        where: { projectId: obraId, purgadaAt: null },
+      }),
+      prisma.fotoGaleria.count({ where: { projectId: obraId } }),
+    ]);
+    if (evidencia > 0 || galeria > 0) return null;
   }
 
   return respaldo;

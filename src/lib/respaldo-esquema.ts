@@ -315,6 +315,23 @@ export const TABLAS: readonly TablaRespaldo[] = [
       { campo: "paseId", a: "pases_obra" },
     ],
   },
+  // La galeria (el escaparate) va aparte de la evidencia a proposito, igual
+  // que en el resto del sistema. `fotos_galeria` ANTES que `galerias_obra`:
+  // la portada de la configuracion apunta a una foto, y el catalogo exige
+  // que toda referencia mire hacia atras.
+  {
+    tabla: "fotos_galeria",
+    modelo: "fotoGaleria",
+    refs: [{ campo: "projectId", a: "projects" }],
+  },
+  {
+    tabla: "galerias_obra",
+    modelo: "galeriaObra",
+    refs: [
+      { campo: "projectId", a: "projects" },
+      { campo: "portadaId", a: "fotos_galeria" },
+    ],
+  },
   {
     tabla: "encargos_proveedor",
     modelo: "encargoProveedor",

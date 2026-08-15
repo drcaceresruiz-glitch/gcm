@@ -53,6 +53,9 @@ interface LecturaObra {
   datos: EntradaDatos[];
   tablas: { tabla: string; filas: number }[];
   fotos: FilaJson[];
+  /// Las de la galeria van aparte de las de evidencia: viajan en su propia
+  /// carpeta del zip y el manifiesto las declara por separado.
+  fotosGaleria: FilaJson[];
   hashDatos: string;
 }
 
@@ -162,8 +165,21 @@ export async function generarRespaldoDeObra(
     name: "informe/resumen.csv",
   });
 
-  const conFotos = await adjuntarFotos(zip, lectura.fotos, manifiesto.entradas);
+  const conFotos = await adjuntarFotos(
+    zip,
+    lectura.fotos,
+    manifiesto.entradas,
+    "evidencia",
+  );
   manifiesto.contenido.evidencia = conFotos > 0 ? "incluida" : "omitida";
+
+  const conGaleria = await adjuntarFotos(
+    zip,
+    lectura.fotosGaleria,
+    manifiesto.entradas,
+    "galeria",
+  );
+  manifiesto.contenido.galeria = conGaleria > 0 ? "incluida" : "omitida";
 
   const manifiestoJson = canonicalizar(manifiesto);
   const firma = firmar(
@@ -191,7 +207,10 @@ export async function generarRespaldoDeObra(
           conteos: Object.fromEntries(
             lectura.tablas.map((t) => [t.tabla, t.filas]),
           ),
-          conFotos: conFotos > 0,
+          // "Las fotos de la obra viajaron", vengan de la evidencia o de la
+          // galeria: es la condicion que el borrado comprueba antes de
+          // llevarse los archivos del disco.
+          conFotos: conFotos > 0 || conGaleria > 0,
         },
       })
       .catch(() => {
@@ -232,6 +251,7 @@ async function leerLaObra(obraId: string): Promise<LecturaObra> {
   const datos: EntradaDatos[] = [];
   const tablas: { tabla: string; filas: number }[] = [];
   let fotos: FilaJson[] = [];
+  let fotosGaleria: FilaJson[] = [];
 
   for (const [indice, tabla] of TABLAS.entries()) {
     const delegado = (prisma as unknown as Record<string, DelegadoLectura>)[
@@ -244,6 +264,7 @@ async function leerLaObra(obraId: string): Promise<LecturaObra> {
     const filas = crudas.map((cruda) => serializarFila(cruda, tabla));
 
     if (tabla.tabla === "fotos_evidencia") fotos = filas;
+    if (tabla.tabla === "fotos_galeria") fotosGaleria = filas;
 
     // NDJSON: una fila por linea. Permite leer un respaldo grande sin meter
     // todo el archivo en memoria, y que un `diff` senale la fila que cambio.
@@ -264,6 +285,7 @@ async function leerLaObra(obraId: string): Promise<LecturaObra> {
     datos,
     tablas,
     fotos,
+    fotosGaleria,
     // Una sola huella de TODOS los datos: es la que ata el apunte de
     // `respaldos_obra` con el archivo que el usuario tiene en su disco.
     hashDatos: sha256Hex(datos.map((d) => d.sha256).join("")),
@@ -273,9 +295,14 @@ async function leerLaObra(obraId: string): Promise<LecturaObra> {
 /**
  * Mete las fotos en el zip, transmitidas desde disco.
  *
- * No se vuelve a calcular su huella: `fotos_evidencia.hash` ya guarda el
- * SHA-256 del contenido desde que se subio. Reusarlo ahorra leer cada archivo
- * dos veces y, sobre todo, hace que la comprobacion al restaurar sea contra la
+ * Sirve a la evidencia y a la galeria (por eso `carpeta`): ambas guardan
+ * `ruta`, `hash` y `tamano` con el mismo contrato, y el zip las separa en
+ * su propia carpeta para que abrir el respaldo cuente la misma historia que
+ * la aplicacion —lo probatorio y el escaparate no se mezclan—.
+ *
+ * No se vuelve a calcular su huella: la columna `hash` ya guarda el SHA-256
+ * del contenido desde que se subio. Reusarlo ahorra leer cada archivo dos
+ * veces y, sobre todo, hace que la comprobacion al restaurar sea contra la
  * MISMA huella que se calculo el dia que se tomo la foto.
  *
  * Una foto que falta no aborta nada: se anota su ausencia por omision y la
@@ -285,6 +312,7 @@ async function adjuntarFotos(
   zip: Archiver,
   fotos: FilaJson[],
   entradas: EntradaZip[],
+  carpeta: "evidencia" | "galeria",
 ): Promise<number> {
   let puestas = 0;
 
@@ -294,8 +322,9 @@ async function adjuntarFotos(
     const hash = typeof foto.hash === "string" ? foto.hash : "";
     const tamano = typeof foto.tamano === "number" ? foto.tamano : 0;
     // Con `purgadaAt` el archivo ya no existe por decision propia: la fila se
-    // conserva a proposito, sin el binario.
-    if (!ruta || !id || foto.purgadaAt !== null) continue;
+    // conserva a proposito, sin el binario. Las filas de galeria no traen la
+    // columna, de ahi el `?? null`: `undefined !== null` las saltaria TODAS.
+    if (!ruta || !id || (foto.purgadaAt ?? null) !== null) continue;
 
     const absoluta = join(env.STORAGE_ROOT, ruta);
     try {
@@ -304,7 +333,7 @@ async function adjuntarFotos(
       continue;
     }
 
-    const nombre = `evidencia/${ruta.split("/").pop() ?? id}`;
+    const nombre = `${carpeta}/${ruta.split("/").pop() ?? id}`;
     zip.append(createReadStream(absoluta), { name: nombre });
     entradas.push({ nombre, bytes: tamano, sha256: hash });
     puestas += 1;
@@ -345,7 +374,8 @@ function leeme(nombreObra: string): string {
     "--------------",
     "  datos/       una entrada por tabla, en formato NDJSON (una fila por",
     "               linea). El numero del nombre es el orden en que se montan.",
-    "  evidencia/   las fotos, tal cual se subieron.",
+    "  evidencia/   las fotos de evidencia, tal cual se subieron.",
+    "  galeria/     las fotos de la galeria de avance, tal cual se subieron.",
     "  informe/     un resumen en CSV que se abre con cualquier hoja de calculo.",
     "  manifiesto.json / .sig   que lleva el archivo, y su firma.",
     "",

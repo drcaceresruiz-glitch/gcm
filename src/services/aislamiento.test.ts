@@ -91,6 +91,7 @@ const usuarios = await import("@/services/usuarios.service");
 const causaRaiz = await import("@/services/causa-raiz.service");
 const meta = await import("@/services/meta.service");
 const tablero = await import("@/services/tablero-semanal.service");
+const galeria = await import("@/services/galeria.service");
 
 function sesion(companyId: string, permisos: Permiso[]): SesionActiva {
   return {
@@ -765,6 +766,44 @@ describe("tablero semanal", () => {
   it("sin permiso no toca la base", async () => {
     await exigeNiTocarLaBase(() =>
       tablero.obtenerTablero(sesion(MIA, []), obraAjena, planAjeno),
+    );
+  });
+});
+
+
+describe("galeria", () => {
+  const obraAjena = "OBRA-DE-EMPRESA-B";
+  const fotoAjena = "FOTO-DE-EMPRESA-B";
+
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  it("la galeria de una obra ajena va acotada", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      galeria.listarGaleria(sesion(MIA, ["galeria:leer"]), obraAjena),
+    );
+  });
+
+  it("el archivo de una foto ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      galeria.archivoGaleria(sesion(MIA, ["galeria:leer"]), fotoAjena),
+    );
+  });
+
+  it("marcar visible una foto ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      galeria.marcarVisibleCliente(
+        sesion(MIA, ["galeria:publicar"]),
+        fotoAjena,
+        true,
+      ),
+    );
+  });
+
+  it("sin permiso no toca la base", async () => {
+    await exigeNiTocarLaBase(() =>
+      galeria.listarGaleria(sesion(MIA, []), obraAjena),
     );
   });
 });

@@ -55,6 +55,13 @@ export const PERMISOS = [
   "lookahead:leer",
   "lookahead:gestionar",
 
+  // La galeria de la obra: el escaparate, no la evidencia probatoria.
+  // `publicar` va aparte de `gestionar` a proposito: subir y describir fotos
+  // es trabajo de campo; decidir cuales ve EL CLIENTE es un acto de gerencia.
+  "galeria:leer",
+  "galeria:gestionar",
+  "galeria:publicar",
+
   "linea_base:leer",
   "linea_base:crear",
   "linea_base:aprobar",
@@ -190,6 +197,13 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// El Lookahead (mediano plazo): analiza restricciones y prepara lo que se
     /// podra comprometer en el PTS. Es trabajo de campo, va con el residente.
     "lookahead:gestionar",
+    /// La galeria: sube y describe las fotos de avance —esta en obra, las toma
+    /// el—. PUBLICAR al cliente no: eso es de gerencia. Y `galeria:leer` no
+    /// esta en SOLO_LECTURA a proposito: la galeria interna ensena TODO, y de
+    /// esa lista bebe CONSULTOR, que es el perfil del cliente; el cliente solo
+    /// entra por su enlace, que ensena lo curado.
+    "galeria:leer",
+    "galeria:gestionar",
     /// Fija la linea base del cronograma (la version congelada contra la que se
     /// mide el EVM). Re-fijable con confirmacion; se audita. No es contractual
     /// como la del presupuesto, asi que no va en INNEGOCIABLES.
@@ -254,6 +268,11 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "encargo:valorizar",
     "plan_semanal:gestionar",
     "lookahead:gestionar",
+    /// La galeria completa, y la decision de que ve el cliente: publicar una
+    /// foto y encender o rotar el enlace son actos de gerencia de obra.
+    "galeria:leer",
+    "galeria:gestionar",
+    "galeria:publicar",
   ],
 
   /// Almacen: necesita ver las partidas para imputar movimientos de

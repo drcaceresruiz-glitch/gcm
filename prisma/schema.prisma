@@ -514,6 +514,8 @@ model Project {
   calendariosLaborales WorkCalendar[]
   lookaheadTareas      LookaheadTask[]
   fotosEvidencia       FotoEvidencia[]
+  fotosGaleria         FotoGaleria[]
+  galeriaObra          GaleriaObra?
   pasesObra            PaseObra[]
   analisisCausa        AnalisisCausa[]
   contactosAviso       ContactoAviso[]
@@ -2094,6 +2096,105 @@ model FotoEvidencia {
   @@index([compromisoId])
   @@index([paseId])
   @@map("fotos_evidencia")
+}
+
+// ---------------------------------------------------------------------------
+// Galeria de la obra: fotos PARA ENSENAR, no para probar
+//
+// Es deliberadamente un mundo APARTE de `FotoEvidencia`. Aquella es registro
+// probatorio: inmutable, adosada a una restriccion o a una causa, y jamas se
+// borra. Esta es la cara de la obra —lo que el gerente repasa y lo que el
+// cliente puede llegar a ver—, y por eso SE CURA: se describe, se destaca,
+// se publica y, si una foto salio mal, se borra. Mezclarlas habria obligado
+// a que curar el escaparate tocara el archivo probatorio.
+// ---------------------------------------------------------------------------
+
+/// Como se agrupa la galeria al ensenarla: por semana de calendario o por
+/// mes. Semana DE CALENDARIO (lunes a domingo), no la del corte de la obra:
+/// la galeria es para gente de fuera del Last Planner, y "la semana del 10"
+/// se entiende sin explicar nada.
+enum AgrupacionGaleria {
+  SEMANA
+  MES
+}
+
+model FotoGaleria {
+  id        String @id @default(cuid())
+  projectId String
+
+  /// Ruta RELATIVA dentro de STORAGE_ROOT ("galeria/<obra>/<id>.jpg").
+  /// Misma disciplina que la evidencia: fuera del arbol de la app, para que
+  /// el despliegue no pueda llevarse las fotos por delante.
+  ruta String @db.VarChar(255)
+
+  nombreOriginal String @db.VarChar(255)
+  mimeType       String @db.VarChar(100)
+  /// Bytes del archivo tal como se guardo.
+  tamano         Int
+  /// SHA-256 del contenido. Ademas de integridad, es lo que permite que el
+  /// respaldo de la obra adjunte el archivo sin recalcular nada.
+  hash           String @db.VarChar(64)
+
+  titulo      String? @db.VarChar(150)
+  descripcion String? @db.VarChar(500)
+
+  /// UID de la tarea del cronograma que retrata, hitos incluidos (un hito ES
+  /// una tarea con `esHito`). Ancla (projectId, uid) y JAMAS clave foranea a
+  /// `TareaCronograma`, por lo mismo que `AvanceTarea`: las versiones del
+  /// cronograma se sustituyen enteras y la foto debe sobrevivirlas.
+  uid Int?
+
+  /// Si el enlace del cliente la ensena. APAGADA por defecto: publicar una
+  /// foto de obra —que retrata personas y errores— es una decision, nunca
+  /// un descuido.
+  visibleCliente Boolean @default(false)
+
+  subidaPor String   @db.VarChar(150)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  portadaDe GaleriaObra[]
+
+  @@index([projectId, createdAt])
+  @@index([projectId, uid])
+  @@index([projectId, visibleCliente])
+  @@map("fotos_galeria")
+}
+
+/// La configuracion de la galeria de UNA obra, incluido el enlace publico
+/// del cliente. Nace solo cuando alguien configura algo: la galeria funciona
+/// sin esta fila, con sus valores por defecto.
+model GaleriaObra {
+  id        String @id @default(cuid())
+  projectId String @unique
+
+  /// La parte impredecible de la URL publica (`/galeria/<slug>`).
+  ///
+  /// Se guarda EN CLARO, al contrario que todos los demas tokens de la casa,
+  /// y es deliberado: no es una credencial de entrada a GCM —abre solo las
+  /// fotos que gerencia decidio publicar de UNA obra— y el gerente tiene que
+  /// poder volver a copiar el enlace cuando quiera. Guardar el hash
+  /// obligaria a rotar el enlace en cada copia, que es como se dejan de
+  /// compartir las cosas. Revocar sigue siendo un clic: apagar o rotar.
+  slug String @unique @db.VarChar(64)
+
+  /// El enlace nace APAGADO: crear la configuracion no publica nada.
+  activo Boolean @default(false)
+
+  agrupacion AgrupacionGaleria @default(SEMANA)
+
+  /// La foto que encabeza la galeria publica. SetNull: borrar la foto no
+  /// puede tumbar la configuracion entera.
+  portadaId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  portada FotoGaleria? @relation(fields: [portadaId], references: [id], onDelete: SetNull)
+
+  @@map("galerias_obra")
 }
 
 // ---------------------------------------------------------------------------
