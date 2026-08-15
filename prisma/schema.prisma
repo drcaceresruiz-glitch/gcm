@@ -520,6 +520,7 @@ model Project {
   suscripcionesAviso   SuscripcionAviso[]
   avisos               Aviso[]
   ajustesAvisos        AjustesAvisosObra?
+  presupuestosMeta     PresupuestoMeta[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -617,6 +618,7 @@ model WbsItem {
   imputaciones     OrdenImputacion[]
   proveedores      ProveedorPartida[]
   encargos         EncargoPartida[]
+  repartosMeta     MetaItemPartida[]
 
   @@unique([projectId, codigoPartida])
   @@index([projectId, parentId])
@@ -2530,4 +2532,245 @@ model RelojTarea {
   error         String? @db.VarChar(300)
 
   @@map("reloj_tareas")
+}
+
+// ---------------------------------------------------------------------------
+// Presupuesto meta y bolsa operativa
+//
+// `Baseline` es el presupuesto CONTRACTUAL: lo que el cliente paga, con su
+// cascada de gastos generales y utilidad en porcentaje. El presupuesto META es
+// el otro: lo que la empresa se compromete a GASTAR. La diferencia entre los
+// dos es la BOLSA OPERATIVA de la obra, y sin ella nadie sabe si se esta
+// ganando o perdiendo hasta la liquidacion.
+//
+// Vive en tablas propias, y NO como un `tipo` dentro de `Baseline`, por dos
+// motivos. El primero es de riesgo: hay nueve `baseline.findFirst` repartidos
+// por seis servicios, sin punto unico, y un discriminador los volveria
+// ambiguos a todos de golpe; olvidar uno no da error, da una cifra creible.
+// El segundo es de forma: la meta no tiene utilidad, y sus gastos generales no
+// son un porcentaje. Compartir tabla obligaria a arrastrar dos columnas con la
+// regla no escrita "en la meta van en cero", que es una invariante que nada
+// hace cumplir.
+// ---------------------------------------------------------------------------
+
+/// Con que detalle se compara la meta contra el contractual.
+///
+/// Se elige por obra al crear la meta y queda FIJO para esa version: cambiarlo
+/// con datos dentro obliga a decidir que se hace con lo ya cargado, y la
+/// respuesta honesta suele ser que se pierde. Para cambiar de modo se crea una
+/// version nueva de la meta.
+enum ModoPresupuestoMeta {
+  /// Espeja el arbol contractual linea a linea. La bolsa sale por partida.
+  PARTIDA
+  /// Solo cabeceras de capitulo. La bolsa sale por capitulo.
+  CAPITULO
+  /// Estructura propia por frentes de produccion, con reparto a partidas.
+  FRENTE
+}
+
+/// Las dos clases de gasto general, que se comportan al reves ante un atraso.
+enum TipoGastoGeneral {
+  /// No depende del plazo: cartas fianza, licencias, polizas, gastos de
+  /// licitacion. Un mes mas de obra no los mueve.
+  FIJO
+  /// Por mes: staff, oficina, camioneta, servicios. Son los que sangran
+  /// cuando la obra se estira, y por eso se guardan con su monto mensual y
+  /// sus meses en vez de con un total ciego.
+  VARIABLE
+}
+
+/// El presupuesto meta de una obra: lo que la empresa se compromete a gastar.
+///
+/// Versionado y congelable como `Baseline`, y por el mismo motivo: si la meta
+/// se pudiera editar despues, la bolsa seria teatro —bastaria bajarla cuando
+/// te pasas de gasto— y todos los indicadores mentirian hacia atras.
+model PresupuestoMeta {
+  id        String @id @default(cuid())
+  projectId String
+
+  version Int
+
+  modo ModoPresupuestoMeta
+
+  /// Fecha a la que se fija la meta. Como en `Baseline.fechaRevision`, no
+  /// coincide con `createdAt`: una meta del 03/06 puede cargarse despues.
+  fechaMeta DateTime @db.Date
+
+  notas String? @db.Text
+
+  // --- Las tres cifras de la meta ----------------------------------------
+  //
+  // AQUI NO HAY UTILIDAD, Y ES A PROPOSITO. La utilidad no es un costo que se
+  // pueda gastar: es el resultado. Metida en la meta se vuelve gastable, el
+  // equipo de obra se la come sin darse cuenta y nadie lo nota hasta la
+  // liquidacion. La utilidad contractual vive en `Baseline.porcentajeUtilidad`
+  // y se ensena aparte, etiquetada como lo que es. Si alguien viene a anadirla
+  // aqui "por completitud", esto es lo que tiene que leer antes.
+  //
+  // Tampoco hay un porcentaje de gastos generales: en la meta son una lista
+  // con plazo (`GastoGeneralMeta`), porque escalan con los MESES y no con la
+  // produccion. Un porcentaje sobre el costo directo esconde justo el modo de
+  // falla mas caro: la obra que se estira con todas sus partidas en meta.
+
+  /// Suma de los items de la meta.
+  costoDirecto Decimal @db.Decimal(14, 2)
+
+  /// Suma de `GastoGeneralMeta`. Derivada, se persiste para no recalcular la
+  /// lista en cada consulta de tablero.
+  gastosGenerales Decimal @db.Decimal(14, 2)
+
+  /// costoDirecto + gastosGenerales. El COSTO al que se compromete la obra,
+  /// que es la cifra que se compara con el presupuesto de venta.
+  costoTotal Decimal @db.Decimal(14, 2)
+
+  /// Plazo en meses con el que se presupuestaron los gastos generales
+  /// variables.
+  ///
+  /// Se GUARDA, no se deriva de `Project.fechaFinProgramada`. Si se derivara,
+  /// atrasar la obra reescribiria la meta hacia atras: los gastos generales
+  /// meta subirian solos para encajar con la fecha nueva y siempre cuadrarian,
+  /// con lo que la desviacion de plazo —el sobrecosto mas caro que tiene una
+  /// obra— desapareceria de la pantalla. Congelado, el atraso se ve.
+  ///
+  /// Se propone desde las fechas de la obra al crear la meta, y desde ahi es
+  /// suyo.
+  mesesPlazo Decimal @db.Decimal(5, 2)
+
+  // --- Contra que se fijo -------------------------------------------------
+  //
+  // La bolsa se calcula contra el presupuesto VIGENTE (base + movimientos
+  // aprobados), no contra la base: si no, un adicional aprobado no contaria.
+  // Pero eso abre un agujero: el contractual sube por el adicional y la meta
+  // no incluye lo que cuesta construirlo, asi que la bolsa se infla sola.
+  // Estos dos campos son lo que permite detectarlo y decir CUANTO.
+
+  /// Version de la linea base contra la que se fijo esta meta.
+  baselineVersion Int
+
+  /// Cuantos movimientos aprobados habia en la obra al fijarla. Si despues hay
+  /// mas, la meta esta desfasada y la bolsa exagera: ver `desfaseDeMeta`.
+  movimientosAlFijar Int @default(0)
+
+  /// null = borrador editable. Con fecha = CONGELADA e inmutable.
+  aprobadaAt  DateTime?
+  aprobadaPor String?   @db.VarChar(150)
+
+  creadaPor String   @db.VarChar(150)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project              Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items                PresupuestoMetaItem[]
+  gastosGeneralesLista GastoGeneralMeta[]
+
+  @@unique([projectId, version])
+  @@index([projectId])
+  @@map("presupuestos_meta")
+}
+
+/// Una linea del presupuesto meta.
+///
+/// Copia por valor, sin FK al arbol vivo, por el mismo motivo que
+/// `BaselineItem`: la meta debe sobrevivir intacta aunque despues se renombren
+/// o eliminen partidas del presupuesto.
+model PresupuestoMetaItem {
+  id                String @id @default(cuid())
+  presupuestoMetaId String
+
+  /// Codigo de la partida o capitulo contractual que espeja esta linea.
+  ///
+  /// Este unico campo nullable es lo que hace que los modos PARTIDA y CAPITULO
+  /// salgan de la MISMA tabla a distinta profundidad, sin ramas en el modelo:
+  /// en PARTIDA apunta a codigos de partida, en CAPITULO a codigos de
+  /// capitulo, y el calculo de la bolsa solo cambia por donde une.
+  ///
+  /// null = LINEA PROPIA DE LA META: un costo real que el contractual no
+  /// desglosa —andamio alquilado, cuadrilla de apoyo, encofrado metalico— y
+  /// que por tanto no tiene contra que compararse linea a linea, pero si
+  /// cuenta en el total del capitulo y de la obra.
+  ///
+  /// En modo FRENTE va siempre en null: ahi la correspondencia con el
+  /// presupuesto no es un codigo sino un reparto, y vive en `MetaItemPartida`.
+  codigoRef String? @db.VarChar(32)
+
+  descripcion String  @db.VarChar(500)
+  tipo        WbsType
+  nivel       Int     @default(0)
+  orden       Int     @default(0)
+
+  unidad         String?  @db.VarChar(20)
+  metrado        Decimal? @db.Decimal(14, 4)
+  precioUnitario Decimal? @db.Decimal(14, 4)
+  parcial        Decimal? @db.Decimal(14, 2)
+
+  meta    PresupuestoMeta   @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
+  reparto MetaItemPartida[]
+
+  @@index([presupuestoMetaId, orden])
+  @@index([presupuestoMetaId, codigoRef])
+  @@map("presupuesto_meta_items")
+}
+
+/// Reparto de una linea de meta entre las partidas del contractual. SOLO en
+/// modo FRENTE.
+///
+/// Un frente de produccion ("Estructura ZONA 1") no coincide con una partida
+/// del contrato: toca varias, y a veces solo una parte de cada una. Sin este
+/// reparto no hay forma de comparar la meta con el presupuesto, porque no
+/// hablan el mismo idioma.
+///
+/// Es la MISMA forma que `EncargoPartida`, a proposito: la logica de reparto
+/// por fraccion ya esta escrita y probada en `lib/encargos.ts` y se reutiliza
+/// en vez de escribir una segunda que se comporte distinto en los bordes.
+model MetaItemPartida {
+  id         String @id @default(cuid())
+  metaItemId String
+  wbsItemId  String
+
+  /// 0..100. Porcentaje del parcial de la partida que cubre ESTA linea de la
+  /// meta. Entre todas las lineas no deben pasar del 100 % de la partida.
+  fraccion Decimal @default(100) @db.Decimal(6, 3)
+
+  item    PresupuestoMetaItem @relation(fields: [metaItemId], references: [id], onDelete: Cascade)
+  /// Restrict, como en `EncargoPartida`: una partida repartida en una meta no
+  /// se borra a la ligera; primero se quita del reparto.
+  partida WbsItem             @relation(fields: [wbsItemId], references: [id], onDelete: Restrict)
+
+  @@unique([metaItemId, wbsItemId])
+  @@index([wbsItemId])
+  @@map("meta_item_partidas")
+}
+
+/// Un gasto general de la meta.
+///
+/// No es un porcentaje: es una linea con su plazo. Los VARIABLE llevan monto
+/// mensual y meses, y de ahi sale su total; los FIJO llevan el total directo y
+/// dejan los otros dos en null. Que un VARIABLE si los lleve lo valida el
+/// servicio: la base no puede expresar esa condicion.
+///
+/// Guardar el mensual y los meses por separado —en vez de un total ciego— es
+/// lo que permite decir cuanto cuesta CADA MES de atraso, que es la pregunta
+/// que se hace en obra cuando el plazo se va.
+model GastoGeneralMeta {
+  id                String @id @default(cuid())
+  presupuestoMetaId String
+
+  concepto String           @db.VarChar(200)
+  tipo     TipoGastoGeneral
+
+  /// Solo en VARIABLE. En FIJO van en null.
+  montoMensual Decimal? @db.Decimal(14, 2)
+  meses        Decimal? @db.Decimal(5, 2)
+
+  /// En VARIABLE, montoMensual * meses. En FIJO, el importe tal cual. Se
+  /// persiste para no tener que multiplicar en cada suma y para que un FIJO y
+  /// un VARIABLE se puedan sumar sin preguntar de que tipo son.
+  montoTotal Decimal @db.Decimal(14, 2)
+
+  orden Int @default(0)
+
+  meta PresupuestoMeta @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
+
+  @@index([presupuestoMetaId, orden])
+  @@map("gastos_generales_meta")
 }

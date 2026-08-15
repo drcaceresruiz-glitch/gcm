@@ -169,6 +169,47 @@ export const TABLAS: readonly TablaRespaldo[] = [
     decimales: { importe: 2, nuevoMetrado: 4, nuevoPrecio: 4 },
   },
   {
+    /// Van despues de `wbs_items` porque el reparto de mas abajo apunta a las
+    /// partidas con `Restrict`: al borrar, que es esta lista al reves, el
+    /// reparto tiene que irse ANTES que ellas.
+    tabla: "presupuestos_meta",
+    modelo: "presupuestoMeta",
+    refs: [{ campo: "projectId", a: "projects" }],
+    decimales: {
+      costoDirecto: 2,
+      gastosGenerales: 2,
+      costoTotal: 2,
+      mesesPlazo: 2,
+    },
+    fechas: ["fechaMeta"],
+  },
+  {
+    tabla: "presupuesto_meta_items",
+    modelo: "presupuestoMetaItem",
+    refs: [{ campo: "presupuestoMetaId", a: "presupuestos_meta" }],
+    decimales: { metrado: 4, precioUnitario: 4, parcial: 2 },
+  },
+  {
+    /// El ORDEN de estas dos referencias importa, y no es capricho: se llega a
+    /// la obra por la PARTIDA, no por el item de la meta. El item cuelga de
+    /// `presupuestos_meta`, que si tiene `projectId`, pero eso serian dos
+    /// saltos y el filtro del respaldo solo hace uno. La partida lo tiene
+    /// directo, asi que va primera.
+    tabla: "meta_item_partidas",
+    modelo: "metaItemPartida",
+    refs: [
+      { campo: "wbsItemId", a: "wbs_items" },
+      { campo: "metaItemId", a: "presupuesto_meta_items" },
+    ],
+    decimales: { fraccion: 3 },
+  },
+  {
+    tabla: "gastos_generales_meta",
+    modelo: "gastoGeneralMeta",
+    refs: [{ campo: "presupuestoMetaId", a: "presupuestos_meta" }],
+    decimales: { montoMensual: 2, meses: 2, montoTotal: 2 },
+  },
+  {
     tabla: "proveedor_partidas",
     modelo: "proveedorPartida",
     refs: [{ campo: "wbsItemId", a: "wbs_items" }],
@@ -398,6 +439,11 @@ export const RELACION_A_LA_OBRA: Readonly<Record<string, string>> = {
   dependencias_tarea: "cronograma",
   encargo_partidas: "encargo",
   valorizaciones_encargo: "encargo",
+  presupuesto_meta_items: "meta",
+  gastos_generales_meta: "meta",
+  /// Por la PARTIDA y no por el item: ver el comentario de la tabla. Es la
+  /// unica de las tres que no llega por su padre natural.
+  meta_item_partidas: "partida",
   compromisos_semanales: "plan",
   restricciones_tarea: "tarea",
 };
