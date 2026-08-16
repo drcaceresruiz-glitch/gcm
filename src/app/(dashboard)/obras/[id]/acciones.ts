@@ -9,6 +9,8 @@ import {
   crearPartida,
   eliminarPartida,
   renumerarPartidas,
+  agruparEnSumaAlzada,
+  type Agrupacion,
   type CamposPartida,
   type NuevaPartida,
 } from "@/services/partidas.service";
@@ -158,6 +160,34 @@ export async function accionRenumerarPartidas(
 
   revalidatePath(`/obras/${obraId}`);
   return { ok: true, cambiadas };
+}
+
+/**
+ * Agrupa varias partidas en una sola a suma alzada.
+ *
+ * Devuelve la suma de las agrupadas junto al importe guardado: si no
+ * coinciden, la pantalla puede decir cuanto entro o salio del presupuesto,
+ * que es lo unico que no debe pasar en silencio.
+ */
+export async function accionAgruparPartidas(
+  obraId: string,
+  datos: Agrupacion,
+): Promise<RespuestaEdicion & { codigo?: string; importe?: string; suma?: string }> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  let salida: { codigo: string; importe: string; suma: string } | null = null;
+
+  const r = await intentar(async () => {
+    const hecho = await agruparEnSumaAlzada(sesion, obraId, datos);
+    if (hecho.ok) salida = hecho.datos;
+    return hecho;
+  });
+
+  if (!r.ok) return r;
+
+  revalidatePath(`/obras/${obraId}`);
+  return { ok: true, ...(salida ?? {}) };
 }
 
 /**

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SesionActiva } from "@/services/sesion.service";
+import { sumarHojas } from "@/lib/jerarquia-partidas";
 
 /**
  * Las dos reglas del presupuesto que, al fallar, no dan error: descuadran.
@@ -18,6 +19,9 @@ interface Fila {
   parentId: string | null;
   tipo?: "CAPITULO" | "PARTIDA";
   parcial?: string | null;
+  modalidad?: "PRECIOS_UNITARIOS" | "SUMA_ALZADA" | "ALCANCE";
+  nivel?: number;
+  descripcion?: string;
 }
 
 const estado: {
@@ -33,8 +37,11 @@ const estado: {
   escritos: string[];
   /// Las filas del mapeo tarea-partida de la obra.
   mapeos: { id: string; codigoPartida: string }[];
+  /// Lo que la agrupacion escribio sobre las partidas elegidas.
+  vaciadas: Record<string, unknown>[];
 } = {
   mapeos: [],
+  vaciadas: [],
   partida: null,
   existentes: [],
   creada: null,
@@ -53,7 +60,10 @@ vi.mock("@/lib/prisma", () => {
       if (typeof codigo === "string") estado.escritos.push(codigo);
       return Promise.resolve({});
     },
-    updateMany: () => Promise.resolve({ count: 0 }),
+    updateMany: (args: { data: Record<string, unknown> }) => {
+      estado.vaciadas.push(args.data);
+      return Promise.resolve({ count: 0 });
+    },
     create: (args: { data: Record<string, unknown> }) => {
       estado.creada = args.data;
       return Promise.resolve({ id: "nueva" });
@@ -79,12 +89,14 @@ vi.mock("@/lib/prisma", () => {
       encargoPartida: sujecion("encargo"),
       movimientoLinea: sujecion("movimiento"),
       metaItemPartida: sujecion("meta"),
+      proveedorPartida: sujecion("proveedor"),
       // Sin revision, el presupuesto esta abierto. Las pruebas de renumeracion
       // la encienden para comprobar que entonces se niega.
       baseline: { findFirst: () => Promise.resolve(estado.revision) },
       mapeoTareaPartida: {
         findMany: () => Promise.resolve(estado.mapeos),
         update: () => Promise.resolve({}),
+        count: () => Promise.resolve(estado.sujeciones["mapeo"] ?? 0),
       },
       project: { findFirst: () => Promise.resolve({ id: "obra", estado: "PLANIFICACION", archivadaEn: null }) },
       auditLog: { create: () => Promise.resolve({}) },
@@ -99,8 +111,13 @@ vi.mock("@/lib/prisma", () => {
   };
 });
 
-const { actualizarPartida, crearPartida, eliminarPartida, renumerarPartidas } =
-  await import("@/services/partidas.service");
+const {
+  actualizarPartida,
+  crearPartida,
+  eliminarPartida,
+  renumerarPartidas,
+  agruparEnSumaAlzada,
+} = await import("@/services/partidas.service");
 
 const sesion = {
   userId: "u1",
@@ -118,6 +135,7 @@ beforeEach(() => {
   estado.revision = null;
   estado.escritos = [];
   estado.mapeos = [];
+  estado.vaciadas = [];
 });
 
 function partidaAlcance() {
@@ -652,5 +670,297 @@ describe("lo que la renumeracion tiene que negarse a hacer", () => {
     const r = await renumerarPartidas(sesion, "obra");
 
     expect(r.ok).toBe(true);
+  });
+});
+
+
+/**
+ * Agrupar varias partidas en un solo precio cerrado.
+ *
+ * El dinero pasa de N filas a una: las elegidas quedan como ALCANCE, sin
+ * cifras propias. Lo unico que no puede pasar es que ese dinero se cuente dos
+ * veces, o que deje colgado un compromiso que apuntaba a una de ellas.
+ */
+describe("agrupar a suma alzada", () => {
+  function capituloConDos() {
+    estado.existentes = [
+      {
+        id: "cap",
+        codigoPartida: "3.0",
+        orden: 10,
+        parentId: null,
+        tipo: "CAPITULO",
+        nivel: 0,
+        descripcion: "INSTALACIONES",
+      },
+      {
+        id: "a",
+        codigoPartida: "3.1",
+        orden: 11,
+        parentId: "cap",
+        tipo: "PARTIDA",
+        modalidad: "PRECIOS_UNITARIOS",
+        nivel: 1,
+        descripcion: "Tuberia",
+        parcial: "1200.00",
+      },
+      {
+        id: "b",
+        codigoPartida: "3.2",
+        orden: 12,
+        parentId: "cap",
+        tipo: "PARTIDA",
+        modalidad: "PRECIOS_UNITARIOS",
+        nivel: 1,
+        descripcion: "Accesorios",
+        parcial: "800.50",
+      },
+    ];
+  }
+
+  const grupo = { partidaIds: ["a", "b"], descripcion: "Instalacion completa" };
+
+  it("crea la partida con la suma y vacia las agrupadas", async () => {
+    capituloConDos();
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", grupo);
+
+    expect(r.ok).toBe(true);
+    expect(r.ok === true && r.datos.suma).toBe("2000.50");
+    expect(r.ok === true && r.datos.importe).toBe("2000.50");
+    // Nace dentro del mismo capitulo, con el siguiente codigo libre.
+    expect(estado.creada?.["codigoPartida"]).toBe("3.3");
+    expect(estado.creada?.["modalidad"]).toBe("SUMA_ALZADA");
+    expect(estado.creada?.["parcial"]).toBe("2000.50");
+
+    // Y las elegidas se quedan SIN cifras: es lo que impide contarlas dos
+    // veces, porque `aportantes` solo cuenta a quien tiene importe.
+    const vaciado = estado.vaciadas.find((d) => "modalidad" in d);
+    expect(vaciado).toMatchObject({
+      modalidad: "ALCANCE",
+      parcial: null,
+      metrado: null,
+      precioUnitario: null,
+    });
+  });
+
+  it("acepta un importe pactado distinto de la suma, y lo distingue", async () => {
+    capituloConDos();
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", {
+      ...grupo,
+      importe: "1900",
+    });
+
+    expect(r.ok).toBe(true);
+    expect(r.ok === true && r.datos.importe).toBe("1900.00");
+    // La suma se devuelve aparte para que la pantalla pueda decir cuanto
+    // entro o salio del presupuesto.
+    expect(r.ok === true && r.datos.suma).toBe("2000.50");
+  });
+
+  it("se niega con partidas de capitulos distintos", async () => {
+    capituloConDos();
+    estado.existentes.push({
+      id: "otra",
+      codigoPartida: "4.1",
+      orden: 20,
+      parentId: "cap2",
+      tipo: "PARTIDA",
+      modalidad: "PRECIOS_UNITARIOS",
+      nivel: 1,
+      descripcion: "De otro capitulo",
+      parcial: "50.00",
+    });
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", {
+      ...grupo,
+      partidaIds: ["a", "otra"],
+    });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("otro capitulo");
+    expect(estado.creada).toBeNull();
+  });
+
+  /**
+   * La unica via por la que agrupar podria INFLAR el presupuesto: si una
+   * elegida tiene hijas costeadas, vaciarla no vacia su dinero —lo siguen
+   * aportando ellas— y la partida nueva lo sumaria otra vez.
+   */
+  it("se niega si alguna elegida tiene partidas dentro", async () => {
+    capituloConDos();
+    estado.existentes.push({
+      id: "hija",
+      codigoPartida: "3.1.1",
+      orden: 13,
+      parentId: "a",
+      tipo: "PARTIDA",
+      modalidad: "PRECIOS_UNITARIOS",
+      nivel: 2,
+      descripcion: "Dentro de la 3.1",
+      parcial: "300.00",
+    });
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", grupo);
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("tiene partidas dentro");
+    expect(estado.creada).toBeNull();
+  });
+
+  it("se niega si alguna esta enlazada con el cronograma", async () => {
+    capituloConDos();
+    estado.sujeciones = { mapeo: 1 };
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", grupo);
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("cronograma");
+    expect(estado.creada).toBeNull();
+  });
+
+  it("se niega si alguna tiene una orden de compra imputada", async () => {
+    capituloConDos();
+    estado.sujeciones = { orden: 1 };
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", grupo);
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("orden de compra");
+  });
+
+  it("se niega con una revision viva", async () => {
+    capituloConDos();
+    estado.revision = { version: 1, aprobadaAt: new Date() };
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", grupo);
+
+    expect(r.ok).toBe(false);
+    expect(estado.creada).toBeNull();
+  });
+
+  it("se niega con menos de dos partidas", async () => {
+    capituloConDos();
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", {
+      ...grupo,
+      partidaIds: ["a"],
+    });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("al menos dos");
+  });
+
+  it("se niega si alguna ya es alcance de otra", async () => {
+    capituloConDos();
+    estado.existentes[1]!.modalidad = "ALCANCE";
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", grupo);
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("ya es alcance");
+  });
+});
+
+
+/**
+ * El agujero que destapo la revision adversaria, y que tumbo la premisa.
+ *
+ * La funcion razonaba: «no se toca ni un codigo, luego el reparto no cambia».
+ * Falso: no se MODIFICA ninguno, pero se CREA uno, y crear un codigo cambia de
+ * quien cuelgan las filas que ya estaban.
+ */
+describe("agrupar no puede hacer desaparecer el importe que acaba de cerrar", () => {
+  /**
+   * Un capitulo "3.0" con "3.1", "3.2" y una huerfana "3.3.1".
+   *
+   * La huerfana no es rebuscada: es lo que deja el importador cuando el Excel
+   * trae las hijas sin su cabecera —"en CRIOCORD estan 11.11.02 a 11.11.19
+   * pero no la cabecera 11.11", dice `jerarquia-partidas`—. Su `parentId`
+   * apunta al capitulo porque `codigoPadre` sube hasta encontrarlo, asi que
+   * los dos arboles COINCIDEN: el dato esta perfectamente sano.
+   */
+  function conHuerfana() {
+    estado.existentes = [
+      { id: "cap", codigoPartida: "3.0", orden: 10, parentId: null, tipo: "CAPITULO", nivel: 0, descripcion: "INSTALACIONES" },
+      { id: "a", codigoPartida: "3.1", orden: 11, parentId: "cap", tipo: "PARTIDA", modalidad: "PRECIOS_UNITARIOS", nivel: 1, descripcion: "Tuberia", parcial: "1200.00" },
+      { id: "b", codigoPartida: "3.2", orden: 12, parentId: "cap", tipo: "PARTIDA", modalidad: "PRECIOS_UNITARIOS", nivel: 1, descripcion: "Accesorios", parcial: "800.50" },
+      { id: "h", codigoPartida: "3.3.1", orden: 13, parentId: "cap", tipo: "PARTIDA", modalidad: "PRECIOS_UNITARIOS", nivel: 2, descripcion: "Sin cabecera 3.3", parcial: "500.00" },
+    ];
+  }
+
+  it("se niega cuando el codigo nuevo quedaria por encima de una costeada", async () => {
+    conHuerfana();
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", {
+      partidaIds: ["a", "b"],
+      descripcion: "Instalacion completa",
+    });
+
+    // A la nueva le tocaria "3.3", que dejaria a "3.3.1" por debajo: la nueva
+    // quedaria CUBIERTA y sus 2.000,50 saldrian del costo directo.
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("3.3.1");
+    expect(estado.creada).toBeNull();
+  });
+
+  /**
+   * Y la comprobacion que de verdad protege, hecha con las funciones puras:
+   * asi se ve el dinero evaporandose, sin depender de los mensajes.
+   */
+  it("la aritmetica que lo demuestra", () => {
+    const antes = sumarHojas([
+      { codigo: "3.0", parcial: null },
+      { codigo: "3.1", parcial: "1200.00" },
+      { codigo: "3.2", parcial: "800.50" },
+      { codigo: "3.3.1", parcial: "500.00" },
+    ]);
+
+    const despuesSiSeHubieraHecho = sumarHojas([
+      { codigo: "3.0", parcial: null },
+      { codigo: "3.1", parcial: null },
+      { codigo: "3.2", parcial: null },
+      { codigo: "3.3", parcial: "2000.50" },
+      { codigo: "3.3.1", parcial: "500.00" },
+    ]);
+
+    expect(antes).toBe("2500.50");
+    // 2.000,50 desaparecidos: "3.3" queda cubierta por "3.3.1".
+    expect(despuesSiSeHubieraHecho).toBe("500.00");
+  });
+
+  it("se niega si el capitulo elegido no es un capitulo", async () => {
+    estado.existentes = [
+      { id: "cap", codigoPartida: "3.1", orden: 10, parentId: null, tipo: "PARTIDA", modalidad: "SUMA_ALZADA", nivel: 0, descripcion: "Partida con importe", parcial: "9000.00" },
+      { id: "a", codigoPartida: "3.1.1", orden: 11, parentId: "cap", tipo: "PARTIDA", modalidad: "PRECIOS_UNITARIOS", nivel: 1, descripcion: "Dentro", parcial: "100.00" },
+      { id: "b", codigoPartida: "3.1.2", orden: 12, parentId: "cap", tipo: "PARTIDA", modalidad: "PRECIOS_UNITARIOS", nivel: 1, descripcion: "Dentro tambien", parcial: "200.00" },
+    ];
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", {
+      partidaIds: ["a", "b"],
+      descripcion: "Agrupadas bajo una partida",
+    });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("no es un ");
+    expect(estado.creada).toBeNull();
+  });
+
+  it("se niega si alguna esta asignada a un proveedor", async () => {
+    estado.existentes = [
+      { id: "cap", codigoPartida: "3.0", orden: 10, parentId: null, tipo: "CAPITULO", nivel: 0, descripcion: "INSTALACIONES" },
+      { id: "a", codigoPartida: "3.1", orden: 11, parentId: "cap", tipo: "PARTIDA", modalidad: "PRECIOS_UNITARIOS", nivel: 1, descripcion: "Tuberia", parcial: "1200.00" },
+      { id: "b", codigoPartida: "3.2", orden: 12, parentId: "cap", tipo: "PARTIDA", modalidad: "PRECIOS_UNITARIOS", nivel: 1, descripcion: "Accesorios", parcial: "800.50" },
+    ];
+    estado.sujeciones = { proveedor: 1 };
+
+    const r = await agruparEnSumaAlzada(sesion, "obra", {
+      partidaIds: ["a", "b"],
+      descripcion: "Instalacion completa",
+    });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("proveedor");
   });
 });

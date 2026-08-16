@@ -1,12 +1,13 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { normalizarDecimal, multiplicar } from "@/lib/decimal";
+import { normalizarDecimal, multiplicar, sumar, restar } from "@/lib/decimal";
 import {
   codigoPadre,
   calcularProfundidades,
   sumarHojas,
   aportantes,
+  siguienteCodigoHijo,
   LARGO_MAXIMO_CODIGO,
 } from "@/lib/jerarquia-partidas";
 import { calcularRenumeracion } from "@/lib/renumerar-partidas";
@@ -1083,4 +1084,412 @@ export async function renumerarPartidas(
   });
 
   return { ok: true, datos: { cambiadas: cambios.size } };
+}
+
+
+export interface Agrupacion {
+  /// Las partidas que se meten en el mismo precio cerrado.
+  partidaIds: string[];
+  /// Como se llama la partida que nace.
+  descripcion: string;
+  /// El precio pactado. Si no viene, se toma la suma de las elegidas.
+  importe?: string | null;
+  unidad?: string | null;
+}
+
+/**
+ * Agrupa varias partidas de un capitulo en una sola a suma alzada.
+ *
+ * Nace una partida nueva con el precio cerrado del conjunto, y las elegidas
+ * pasan a ALCANCE: siguen describiendo lo que entra, pero ya no llevan cifras
+ * propias. Su dinero vive desde ese momento en la partida nueva.
+ *
+ * NO SE TOCA NI UN CODIGO, a proposito. Podrian anidarse las elegidas bajo la
+ * nueva, pero eso obliga a renumerarlas, y renumerar cambia quien cubre a
+ * quien en el reparto del costo directo. La agrupacion no necesita ese riesgo:
+ * una fila de ALCANCE no aporta al costo —`aportantes` solo cuenta las que
+ * tienen importe—, asi que basta con vaciarlas y crear la que lo lleva.
+ */
+export async function agruparEnSumaAlzada(
+  sesion: SesionActiva,
+  obraId: string,
+  datos: Agrupacion,
+): Promise<Resultado<{ codigo: string; importe: string; suma: string }>> {
+  if (!puede(sesion, "partida:editar")) {
+    return { ok: false, error: "No tienes permiso para editar partidas." };
+  }
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { id: true, estado: true, archivadaEn: true },
+  });
+  if (!obra) return { ok: false, error: "Obra no encontrada." };
+
+  const noAdmite = motivoNoAdmiteCambios(obra);
+  if (noAdmite) return { ok: false, error: noAdmite };
+
+  // Misma puerta que la renumeracion: con una revision viva —congelada o en
+  // borrador— los importes de estas partidas ya estan citados en otro sitio.
+  const revision = await prisma.baseline.findFirst({
+    where: { projectId: obraId },
+    select: { version: true, aprobadaAt: true },
+    orderBy: { version: "desc" },
+  });
+
+  if (revision) {
+    return {
+      ok: false,
+      error:
+        revision.aprobadaAt === null
+          ? `Hay una revision v${revision.version} en borrador. Agrupar ahora la dejaria con importes que no corresponden.`
+          : `El presupuesto esta congelado (linea base v${revision.version}).`,
+    };
+  }
+
+  const elegidas = [...new Set(datos.partidaIds)];
+
+  if (elegidas.length < 2) {
+    return { ok: false, error: "Elige al menos dos partidas para agrupar." };
+  }
+
+  const descripcion = datos.descripcion.trim();
+  if (descripcion === "") {
+    return { ok: false, error: "La partida agrupada necesita una descripcion." };
+  }
+
+  const todas = await prisma.wbsItem.findMany({
+    where: { projectId: obraId },
+    select: {
+      id: true,
+      codigoPartida: true,
+      parentId: true,
+      orden: true,
+      nivel: true,
+      tipo: true,
+      modalidad: true,
+      descripcion: true,
+      parcial: true,
+    },
+  });
+
+  const porId = new Map(todas.map((p) => [p.id, p]));
+  const filas = elegidas.map((id) => porId.get(id));
+
+  if (filas.some((f) => f === undefined)) {
+    return { ok: false, error: "Alguna de las partidas elegidas no es de esta obra." };
+  }
+
+  const grupo = filas as NonNullable<(typeof filas)[number]>[];
+
+  const noPartida = grupo.find((f) => f.tipo !== "PARTIDA");
+  if (noPartida) {
+    return {
+      ok: false,
+      error: `"${noPartida.codigoPartida}" es un capitulo, no una partida. Un capitulo ya agrupa por si mismo.`,
+    };
+  }
+
+  const yaAlcance = grupo.find((f) => f.modalidad === "ALCANCE");
+  if (yaAlcance) {
+    return {
+      ok: false,
+      error: `"${yaAlcance.codigoPartida}" ya es alcance de otra partida: no lleva importe propio que agrupar.`,
+    };
+  }
+
+  /**
+   * Todas del MISMO capitulo, y de un capitulo de verdad.
+   *
+   * Agrupar partidas de capitulos distintos moveria dinero de un capitulo a
+   * otro: el total de la obra no cambiaria, pero los subtotales si, y esos son
+   * los que se miran para decidir.
+   */
+  const padreId = grupo[0]!.parentId;
+
+  if (padreId === null) {
+    return {
+      ok: false,
+      error: "Solo se agrupan partidas que cuelguen de un capitulo.",
+    };
+  }
+
+  const deOtro = grupo.find((f) => f.parentId !== padreId);
+  if (deOtro) {
+    return {
+      ok: false,
+      error: `"${deOtro.codigoPartida}" es de otro capitulo. Solo se agrupan partidas del mismo.`,
+    };
+  }
+
+  /**
+   * El padre tiene que ser un CAPITULO, no solo existir.
+   *
+   * Se comprobaba solo que existiera. Colgando el grupo de una PARTIDA con
+   * importe propio, la partida nueva pasa a cubrirla y ese importe deja de
+   * contar en el costo directo: dinero que desaparece sin tocarlo nadie.
+   */
+  const capitulo = porId.get(padreId);
+
+  if (capitulo && capitulo.tipo !== "CAPITULO") {
+    return {
+      ok: false,
+      error:
+        `Esas partidas cuelgan de "${capitulo.codigoPartida}", que no es un ` +
+        `capitulo sino una partida con importe propio. Agrupar ahi haria ` +
+        `desaparecer ese importe del costo directo.`,
+    };
+  }
+  if (!capitulo) {
+    return { ok: false, error: "No se encuentra el capitulo de esas partidas." };
+  }
+
+  /**
+   * Ninguna puede tener descendientes con importe.
+   *
+   * Si una elegida tiene hijas costeadas, vaciarla no vacia el dinero: las
+   * hijas lo siguen aportando, y la partida nueva lo sumaria OTRA VEZ. Es la
+   * unica via por la que agrupar podria inflar el presupuesto.
+   */
+  const conHijas = grupo.find((f) => todas.some((o) => o.parentId === f.id));
+  if (conHijas) {
+    return {
+      ok: false,
+      error: `"${conHijas.codigoPartida}" tiene partidas dentro. Agrupa esas, o agrupa el capitulo entero.`,
+    };
+  }
+
+  /**
+   * Ni compromisos, ni enlace con el cronograma.
+   *
+   * Vaciar el importe de una partida a la que apunta una orden, un encargo o
+   * una tarea del cronograma deja ese compromiso senalando a una fila sin
+   * cifra: el avance de esa tarea dejaria de valorizar, y la curva S y el SPI
+   * cambiarian hacia atras sin que nadie tocara el avance.
+   */
+  const codigos = grupo.map((f) => f.codigoPartida);
+
+  const sujeciones: [string, number][] = [
+    [
+      "está enlazada con una tarea del cronograma",
+      await prisma.mapeoTareaPartida.count({
+        where: { projectId: obraId, codigoPartida: { in: codigos } },
+      }),
+    ],
+    [
+      "está imputada en una orden de compra",
+      await prisma.ordenImputacion.count({ where: { wbsItemId: { in: elegidas } } }),
+    ],
+    [
+      "está incluida en un encargo a un proveedor",
+      await prisma.encargoPartida.count({ where: { wbsItemId: { in: elegidas } } }),
+    ],
+    [
+      "está repartida en un presupuesto meta",
+      await prisma.metaItemPartida.count({ where: { wbsItemId: { in: elegidas } } }),
+    ],
+    [
+      // El proveedor no sujeta por clave ajena —`ProveedorPartida` es Cascade,
+      // no Restrict—, asi que la base no protesta: el frente asignado se queda
+      // sin importe, su avance deja de valorizar y nadie se entera.
+      "está asignada a un proveedor",
+      await prisma.proveedorPartida.count({ where: { wbsItemId: { in: elegidas } } }),
+    ],
+  ];
+
+  const sujeta = sujeciones.filter(([, n]) => n > 0);
+
+  if (sujeta.length > 0) {
+    return {
+      ok: false,
+      error:
+        "No se pueden agrupar: alguna de las elegidas " +
+        sujeta.map(([motivo]) => motivo).join(", y ") +
+        ". Quítala de ahí primero, o deja esa fuera del grupo.",
+    };
+  }
+
+  const suma = sumar(grupo.map((f) => f.parcial?.toString() ?? "0"));
+
+  const importe = datos.importe?.trim()
+    ? normalizarDecimal(datos.importe, 2)
+    : suma;
+
+  if (importe === null) {
+    return { ok: false, error: "El importe cerrado no es un numero valido." };
+  }
+  if (noCabe(importe, ENTEROS_IMPORTE)) {
+    return {
+      ok: false,
+      error: `El importe no puede pasar de ${ENTEROS_IMPORTE} digitos enteros.`,
+    };
+  }
+
+  const existentes = new Set(todas.map((p) => p.codigoPartida));
+  const codigoNuevo = siguienteCodigoHijo(capitulo.codigoPartida, existentes);
+
+  if (codigoNuevo === null) {
+    return {
+      ok: false,
+      error:
+        `No hay ningun codigo libre que cuelgue de "${capitulo.codigoPartida}". ` +
+        "Cierra antes los huecos de la numeracion.",
+    };
+  }
+
+  /**
+   * La red, y la leccion que costo un agujero: NO se razona sobre el dinero,
+   * se COMPRUEBA.
+   *
+   * Esta funcion decia «no se toca ni un codigo, luego el reparto no cambia».
+   * Es falso: no se MODIFICA ninguno, pero se CREA uno, y crear un codigo
+   * cambia de quien cuelgan las filas que ya estaban. Con un capitulo "3.0"
+   * que tiene "3.1", "3.2" y una huerfana "3.3.1" —la forma que deja el
+   * importador cuando falta la cabecera "3.3"—, agrupar 3.1 y 3.2 daba a la
+   * nueva el codigo "3.3", que pasaba a tener a "3.3.1" POR DEBAJO. Y una
+   * fila cubierta por una descendiente costeada no aporta: los 2.000,50 que
+   * se acababan de cerrar desaparecian del costo directo.
+   *
+   * Lo unico que agrupar puede mover es lo que se corrija a mano el importe.
+   */
+  const antes = todas.map((p) => ({
+    codigo: p.codigoPartida,
+    // Capitulos anulados, como en todo el resto del sistema.
+    parcial: p.tipo === "PARTIDA" ? (p.parcial?.toString() ?? null) : null,
+  }));
+
+  const enGrupo = new Set(elegidas);
+
+  const despues = [
+    ...todas.map((p) => ({
+      codigo: p.codigoPartida,
+      parcial:
+        enGrupo.has(p.id) || p.tipo !== "PARTIDA"
+          ? null
+          : (p.parcial?.toString() ?? null),
+    })),
+    { codigo: codigoNuevo, parcial: importe },
+  ];
+
+  const costoAntes = sumarHojas(antes);
+  const costoDespues = sumarHojas(despues);
+  const sinElGrupo = restar(costoAntes, suma);
+  const esperado = sinElGrupo === null ? null : sumar([sinElGrupo, importe]);
+
+  if (esperado === null || costoDespues !== esperado) {
+    // Se dice el porque cuando se sabe, que casi siempre es este.
+    const conNuevo = new Set([...existentes, codigoNuevo]);
+    const debajo = [...existentes].filter(
+      (c) => codigoPadre(c, conNuevo) === codigoNuevo,
+    );
+
+    return {
+      ok: false,
+      error:
+        debajo.length > 0
+          ? `No se puede agrupar aqui: a la partida nueva le tocaria el codigo ` +
+            `"${codigoNuevo}", que quedaria POR ENCIMA de ${debajo.slice(0, 3).join(", ")}. ` +
+            `Su importe dejaria de contar. Cierra antes los huecos de la numeracion.`
+          : `No se puede agrupar: el costo directo pasaria de ${costoAntes} a ` +
+            `${costoDespues}, cuando deberia quedar en ${esperado}.`,
+    };
+  }
+
+  const hermanas = todas.filter((p) => p.parentId === padreId);
+  const orden = Math.max(...hermanas.map((h) => h.orden)) + 1;
+
+  const creada = await prisma.$transaction(async (tx) => {
+    /**
+     * La foto se leyo fuera de la transaccion.
+     *
+     * Si alguien creo, borro o cambio el importe de una partida mientras
+     * tanto, la comprobacion del costo directo se hizo sobre otra obra. Se
+     * releen las filas implicadas y se aborta si no son las mismas.
+     */
+    const ahora = await tx.wbsItem.findMany({
+      where: { projectId: obraId },
+      select: { id: true, codigoPartida: true, parcial: true },
+    });
+
+    const parcialPorId = new Map(
+      todas.map((p) => [p.id, p.parcial?.toString() ?? null]),
+    );
+
+    const cambio =
+      ahora.length !== todas.length ||
+      ahora.some(
+        (f) =>
+          !parcialPorId.has(f.id) ||
+          parcialPorId.get(f.id) !== (f.parcial?.toString() ?? null),
+      ) ||
+      ahora.some((f) => f.codigoPartida === codigoNuevo);
+
+    if (cambio) {
+      throw new Error(
+        "AVISO: el presupuesto cambio mientras se agrupaba. No se ha tocado " +
+          "nada; vuelve a intentarlo.",
+      );
+    }
+
+    // Hueco en la numeracion, como hace `crearPartida`: sin esto la fila nueva
+    // comparte `orden` con la siguiente y se muestran en orden impredecible.
+    await tx.wbsItem.updateMany({
+      where: { projectId: obraId, orden: { gte: orden } },
+      data: { orden: { increment: 1 } },
+    });
+
+    const nueva = await tx.wbsItem.create({
+      data: {
+        projectId: obraId,
+        parentId: padreId,
+        codigoPartida: codigoNuevo,
+        tipo: "PARTIDA",
+        modalidad: "SUMA_ALZADA",
+        descripcion: descripcion.slice(0, 500),
+        nivel: (grupo[0]?.nivel ?? capitulo.nivel + 1),
+        orden,
+        unidad: datos.unidad?.trim() ? datos.unidad.trim().slice(0, 20) : "glb",
+        metrado: null,
+        precioUnitario: null,
+        parcial: importe,
+        origen: "MANUAL",
+        editadaAMano: true,
+      },
+      select: { id: true },
+    });
+
+    // Las elegidas se quedan SIN cifras. Es lo que hace que no cuenten dos
+    // veces: `aportantes` solo mira quien tiene importe.
+    await tx.wbsItem.updateMany({
+      where: { id: { in: elegidas } },
+      data: {
+        modalidad: "ALCANCE",
+        parcial: null,
+        metrado: null,
+        precioUnitario: null,
+        editadaAMano: true,
+      },
+    });
+
+    return nueva;
+  });
+
+  await auditar({
+    sesion,
+    projectId: obraId,
+    entidadId: creada.id,
+    accion: "CREATE",
+    antes: {
+      agrupadas: grupo.map((f) => ({
+        codigo: f.codigoPartida,
+        descripcion: f.descripcion,
+        parcial: f.parcial?.toString() ?? null,
+      })),
+      suma,
+    },
+    // Si el importe pactado no es la suma, queda escrito: eso es dinero
+    // entrando o saliendo del presupuesto, y no puede pasar sin rastro.
+    despues: { codigo: codigoNuevo, descripcion, importe, coincideConLaSuma: importe === suma },
+  });
+
+  return { ok: true, datos: { codigo: codigoNuevo, importe, suma } };
 }
