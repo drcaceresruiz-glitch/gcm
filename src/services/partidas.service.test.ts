@@ -25,13 +25,29 @@ const estado: {
   /// Cuantas filas sujetan a la partida por cada relacion `Restrict`.
   sujeciones: Record<string, number>;
   borrada: string | null;
-} = { partida: null, existentes: [], creada: null, sujeciones: {}, borrada: null };
+  /// La revision del presupuesto, si la hay: congelada o en borrador.
+  revision: { version: number; aprobadaAt: Date | null } | null;
+  /// Codigos escritos por la renumeracion, en orden.
+  escritos: string[];
+} = {
+  partida: null,
+  existentes: [],
+  creada: null,
+  sujeciones: {},
+  borrada: null,
+  revision: null,
+  escritos: [],
+};
 
 vi.mock("@/lib/prisma", () => {
   const wbsItem = {
     findFirst: () => Promise.resolve(estado.partida),
     findMany: () => Promise.resolve(estado.existentes),
-    update: () => Promise.resolve({}),
+    update: (args: { data: Record<string, unknown> }) => {
+      const codigo = args.data["codigoPartida"];
+      if (typeof codigo === "string") estado.escritos.push(codigo);
+      return Promise.resolve({});
+    },
     updateMany: () => Promise.resolve({ count: 0 }),
     create: (args: { data: Record<string, unknown> }) => {
       estado.creada = args.data;
@@ -58,18 +74,28 @@ vi.mock("@/lib/prisma", () => {
       encargoPartida: sujecion("encargo"),
       movimientoLinea: sujecion("movimiento"),
       metaItemPartida: sujecion("meta"),
-      // Sin linea base aprobada: el presupuesto esta abierto.
-      baseline: { findFirst: () => Promise.resolve(null) },
+      // Sin revision, el presupuesto esta abierto. Las pruebas de renumeracion
+      // la encienden para comprobar que entonces se niega.
+      baseline: { findFirst: () => Promise.resolve(estado.revision) },
+      mapeoTareaPartida: {
+        findMany: () => Promise.resolve([]),
+        update: () => Promise.resolve({}),
+      },
       project: { findFirst: () => Promise.resolve({ id: "obra", estado: "PLANIFICACION", archivadaEn: null }) },
       auditLog: { create: () => Promise.resolve({}) },
-      $transaction: (fn: (tx: unknown) => unknown) => Promise.resolve(fn({ wbsItem })),
+      $transaction: (fn: (tx: unknown) => unknown) =>
+        Promise.resolve(
+          fn({
+            wbsItem,
+            mapeoTareaPartida: { update: () => Promise.resolve({}) },
+          }),
+        ),
     },
   };
 });
 
-const { actualizarPartida, crearPartida, eliminarPartida } = await import(
-  "@/services/partidas.service"
-);
+const { actualizarPartida, crearPartida, eliminarPartida, renumerarPartidas } =
+  await import("@/services/partidas.service");
 
 const sesion = {
   userId: "u1",
@@ -84,6 +110,8 @@ beforeEach(() => {
   estado.creada = null;
   estado.sujeciones = {};
   estado.borrada = null;
+  estado.revision = null;
+  estado.escritos = [];
 });
 
 function partidaAlcance() {
@@ -453,5 +481,90 @@ describe("borrar una partida sujeta por otra cosa", () => {
     // Lo que importa: NO se intento borrar. Antes se intentaba, chocaba contra
     // la clave ajena y la pantalla se caia sin decir por que.
     expect(estado.borrada).toBeNull();
+  });
+});
+
+
+/**
+ * Renumerar es lo mas delicado del presupuesto.
+ *
+ * El codigo es la llave con la que el cronograma y las revisiones senalan a
+ * cada partida, y ademas de el sale la jerarquia que reparte el costo directo.
+ * Lo que se fija aqui son las dos guardas que no se pueden perder: que no se
+ * renumera con una revision viva, y que se escribe en DOS FASES.
+ */
+describe("cerrar los huecos de la numeracion", () => {
+  function conHueco() {
+    estado.existentes = [
+      { id: "c2", codigoPartida: "2.0", orden: 10, parentId: null },
+      { id: "p1", codigoPartida: "2.1", orden: 11, parentId: "c2" },
+      { id: "c3", codigoPartida: "3.0", orden: 20, parentId: null },
+    ];
+  }
+
+  it("renumera y deja la numeracion seguida", async () => {
+    conHueco();
+
+    const r = await renumerarPartidas(sesion, "obra");
+
+    expect(r.ok).toBe(true);
+    expect(r.ok === true && r.datos.cambiadas).toBe(3);
+  });
+
+  /**
+   * Dos fases, porque MariaDB no tiene restricciones diferidas: al cerrar el
+   * hueco, el 3.0 pasa a 2.0 mientras el 2.0 todavia existe, y el indice unico
+   * revienta a mitad de camino. Primero se escribe a un codigo imposible.
+   */
+  it("escribe primero codigos imposibles y despues los definitivos", async () => {
+    conHueco();
+
+    await renumerarPartidas(sesion, "obra");
+
+    const temporales = estado.escritos.filter((c) => c.startsWith("#"));
+    const definitivos = estado.escritos.filter((c) => !c.startsWith("#"));
+
+    expect(temporales).toHaveLength(3);
+    expect(definitivos).toEqual(["1.0", "1.1", "2.0"]);
+    // Y en ese orden: ningun definitivo antes de que salgan todos los viejos.
+    expect(estado.escritos.slice(0, 3).every((c) => c.startsWith("#"))).toBe(true);
+  });
+
+  it("se niega con el presupuesto congelado", async () => {
+    conHueco();
+    estado.revision = { version: 2, aprobadaAt: new Date() };
+
+    const r = await renumerarPartidas(sesion, "obra");
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("congelado");
+    expect(estado.escritos).toEqual([]);
+  });
+
+  /**
+   * El borrador es el fallo silencioso mas caro: si se aprobara despues, cada
+   * partida quedaria con base 0,00 y el presupuesto vigente mentiria entero.
+   */
+  it("se niega tambien con una revision en borrador", async () => {
+    conHueco();
+    estado.revision = { version: 3, aprobadaAt: null };
+
+    const r = await renumerarPartidas(sesion, "obra");
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("borrador");
+    expect(estado.escritos).toEqual([]);
+  });
+
+  it("no toca nada cuando no hay huecos", async () => {
+    estado.existentes = [
+      { id: "c1", codigoPartida: "1.0", orden: 0, parentId: null },
+      { id: "p1", codigoPartida: "1.1", orden: 1, parentId: "c1" },
+    ];
+
+    const r = await renumerarPartidas(sesion, "obra");
+
+    expect(r.ok === true && r.datos.cambiadas).toBe(0);
+    expect(estado.escritos).toEqual([]);
   });
 });
