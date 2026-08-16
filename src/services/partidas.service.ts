@@ -2,7 +2,11 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { normalizarDecimal, multiplicar } from "@/lib/decimal";
-import { codigoPadre, calcularProfundidades } from "@/lib/jerarquia-partidas";
+import {
+  codigoPadre,
+  calcularProfundidades,
+  LARGO_MAXIMO_CODIGO,
+} from "@/lib/jerarquia-partidas";
 import { motivoNoAdmiteCambios } from "@/lib/obras";
 import type { SesionActiva } from "@/services/sesion.service";
 import type {
@@ -170,10 +174,10 @@ export async function actualizarPartida(
   // Los numericos se normalizan con la misma precision que la base. Un
   // texto no numerico se rechaza en vez de guardarse como nulo: perder un
   // metrado en silencio es peor que un mensaje de error.
-  for (const [campo, decimales] of [
-    ["metrado", 4],
-    ["precioUnitario", 4],
-    ["parcial", 2],
+  for (const [campo, decimales, enteros] of [
+    ["metrado", 4, ENTEROS_METRADO],
+    ["precioUnitario", 4, ENTEROS_PRECIO],
+    ["parcial", 2, ENTEROS_IMPORTE],
   ] as const) {
     const valor = campos[campo];
     if (valor === undefined) continue;
@@ -186,6 +190,15 @@ export async function actualizarPartida(
     const normalizado = normalizarDecimal(valor, decimales);
     if (normalizado === null) {
       return { ok: false, error: `El valor de ${campo} no es un numero valido.` };
+    }
+    // La magnitud, que `normalizarDecimal` no mira: ajusta los decimales y
+    // deja pasar cualquier parte entera. Once digitos en un metrado pasaban
+    // hasta chocar contra la base, y eso no sale como aviso.
+    if (noCabe(normalizado, enteros)) {
+      return {
+        ok: false,
+        error: `El valor de ${campo} no puede pasar de ${enteros} digitos enteros.`,
+      };
     }
     datos[campo] = normalizado;
   }
@@ -201,12 +214,48 @@ export async function actualizarPartida(
   const modalidad = campos.modalidad ?? partida.modalidad;
 
   if (campos.parcial === undefined && modalidad === "PRECIOS_UNITARIOS") {
-    const metrado = (datos["metrado"] ?? partida.metrado?.toString()) as string | null;
-    const precio = (datos["precioUnitario"] ??
-      partida.precioUnitario?.toString()) as string | null;
+    /**
+     * Lo tocado manda; lo no tocado se lee de la base.
+     *
+     * El `??` de antes no distinguia «no lo has tocado» de «lo has borrado»:
+     * al vaciar el metrado, `datos["metrado"]` quedaba en null y el `??`
+     * recaia en el metrado VIEJO, asi que la fila se guardaba sin metrado y
+     * con el importe intacto, calculado sobre una cifra que ya no estaba.
+     */
+    const tocado = (campo: "metrado" | "precioUnitario") =>
+      campos[campo] !== undefined;
 
-    if (metrado && precio) {
-      datos["parcial"] = multiplicar(metrado, precio, 2);
+    const metrado = (
+      tocado("metrado") ? datos["metrado"] : (partida.metrado?.toString() ?? null)
+    ) as string | null;
+    const precio = (
+      tocado("precioUnitario")
+        ? datos["precioUnitario"]
+        : (partida.precioUnitario?.toString() ?? null)
+    ) as string | null;
+
+    // Si en ESTA edicion se ha borrado uno de los dos operandos, el importe se
+    // va con el: un importe sin las cifras que lo justifican no se puede
+    // defender delante de nadie.
+    const borroOperando =
+      (tocado("metrado") && datos["metrado"] === null) ||
+      (tocado("precioUnitario") && datos["precioUnitario"] === null);
+
+    if (borroOperando) {
+      datos["parcial"] = null;
+    } else if (metrado && precio) {
+      const calculado = multiplicar(metrado, precio, 2);
+
+      // El producto puede no caber aunque quepan sus dos operandos.
+      if (calculado !== null && noCabe(calculado, ENTEROS_IMPORTE)) {
+        return {
+          ok: false,
+          error:
+            `El importe saldria ${calculado}, que pasa de ${ENTEROS_IMPORTE} ` +
+            `digitos enteros y no cabe. Revisa el metrado y el precio.`,
+        };
+      }
+      datos["parcial"] = calculado;
     }
   }
 
@@ -284,6 +333,50 @@ export async function eliminarPartida(
     };
   }
 
+  /**
+   * Lo demas que sujeta a una partida, y que no eran las hijas.
+   *
+   * En el esquema hay CINCO relaciones `Restrict` hacia `WbsItem` y aqui solo
+   * se comprobaba la primera. Las otras cuatro no daban un mensaje: daban un
+   * choque contra la clave ajena que nadie recogia, y una Server Action que
+   * revienta se ve como «This page couldn't load», sin traza y sin decir que
+   * la partida tenia dinero comprometido.
+   *
+   * No se borra en cascada a proposito: son compromisos con terceros —una
+   * orden a un proveedor, un adicional aprobado— y quitarlos es una decision
+   * de quien los firmo, no un efecto secundario de limpiar el presupuesto.
+   */
+  const sujeciones: [string, number][] = [
+    [
+      "está imputada en una orden de compra",
+      await prisma.ordenImputacion.count({ where: { wbsItemId: partidaId } }),
+    ],
+    [
+      "está incluida en un encargo a un proveedor",
+      await prisma.encargoPartida.count({ where: { wbsItemId: partidaId } }),
+    ],
+    [
+      "figura en una línea de un movimiento presupuestal",
+      await prisma.movimientoLinea.count({ where: { wbsItemId: partidaId } }),
+    ],
+    [
+      "está repartida en un presupuesto meta",
+      await prisma.metaItemPartida.count({ where: { wbsItemId: partidaId } }),
+    ],
+  ];
+
+  const sujeta = sujeciones.filter(([, n]) => n > 0);
+
+  if (sujeta.length > 0) {
+    return {
+      ok: false,
+      error:
+        `"${partida.codigoPartida}" no se puede eliminar porque ` +
+        sujeta.map(([motivo]) => motivo).join(", y ") +
+        ". Quítala de ahí primero.",
+    };
+  }
+
   await prisma.wbsItem.delete({ where: { id: partidaId } });
 
   await auditar({
@@ -353,6 +446,26 @@ export interface NuevaPartida {
   tipo?: WbsType;
 }
 
+/**
+ * Si un decimal NO cabe en su columna.
+ *
+ * `normalizarDecimal` ajusta los DECIMALES y nunca la parte entera, asi que
+ * un metrado de once digitos pasaba todas las validaciones y reventaba contra
+ * la base. Y lo peor no es el valor tecleado sino el CALCULADO: metrado y
+ * precio pueden caber cada uno y su producto no.
+ *
+ * Los topes salen del esquema: metrado y precioUnitario son Decimal(14,4)
+ * —diez enteros—; parcial es Decimal(14,2) —doce—.
+ */
+function noCabe(valor: string, enteros: number): boolean {
+  const entera = (valor.replace("-", "").split(".")[0] ?? "").replace(/^0+/, "");
+  return entera.length > enteros;
+}
+
+const ENTEROS_METRADO = 10;
+const ENTEROS_PRECIO = 10;
+const ENTEROS_IMPORTE = 12;
+
 export async function crearPartida(
   sesion: SesionActiva,
   obraId: string,
@@ -387,6 +500,18 @@ export async function crearPartida(
     return {
       ok: false,
       error: "El codigo debe ser numeros separados por punto, como 4.3 o 01.02.01.",
+    };
+  }
+
+  // La descripcion y la unidad se recortan al guardar; el codigo era el unico
+  // que iba crudo contra su VarChar(32). Recortarlo NO vale: el codigo decide
+  // de quien cuelga la partida, y un codigo a medias colgaria de otro sitio.
+  if (codigo.length > LARGO_MAXIMO_CODIGO) {
+    return {
+      ok: false,
+      error:
+        `El codigo no puede pasar de ${LARGO_MAXIMO_CODIGO} caracteres, y "${codigo}" ` +
+        `tiene ${codigo.length}.`,
     };
   }
 
@@ -463,6 +588,18 @@ export async function crearPartida(
   if (nueva.precioUnitario && precioUnitario === null) {
     return { ok: false, error: "El precio unitario no es un numero valido." };
   }
+  if (metrado && noCabe(metrado, ENTEROS_METRADO)) {
+    return {
+      ok: false,
+      error: `El metrado no puede pasar de ${ENTEROS_METRADO} digitos enteros.`,
+    };
+  }
+  if (precioUnitario && noCabe(precioUnitario, ENTEROS_PRECIO)) {
+    return {
+      ok: false,
+      error: `El precio unitario no puede pasar de ${ENTEROS_PRECIO} digitos enteros.`,
+    };
+  }
 
   /**
    * El importe depende de COMO este contratada, no solo de las cifras.
@@ -488,6 +625,23 @@ export async function crearPartida(
         : metrado && precioUnitario
           ? multiplicar(metrado, precioUnitario, 2)
           : null;
+
+  /**
+   * El importe puede no caber aunque quepan sus dos operandos.
+   *
+   * Es el caso que ninguna validacion por campo detecta: un metrado de diez
+   * digitos y un precio de cinco caben cada uno en su columna, y su producto
+   * de quince no cabe en la del importe. La cifra imposible la fabrica el
+   * servidor, no quien teclea.
+   */
+  if (parcial && noCabe(parcial, ENTEROS_IMPORTE)) {
+    return {
+      ok: false,
+      error:
+        `El importe sale de ${parcial}, que pasa de ${ENTEROS_IMPORTE} digitos ` +
+        `enteros y no cabe. Revisa el metrado y el precio.`,
+    };
+  }
 
   // Lo que diga quien la crea; si no dice nada, se deduce como siempre: sin
   // cifras es un capitulo que agrupa, con cifras es una partida.

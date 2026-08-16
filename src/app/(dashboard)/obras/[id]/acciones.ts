@@ -29,6 +29,56 @@ export interface RespuestaEdicion {
  */
 const MODALIDAD = z.enum(["PRECIOS_UNITARIOS", "SUMA_ALZADA", "ALCANCE"]);
 
+/**
+ * Lo que decir cuando la base rechaza algo que nadie previo.
+ *
+ * Los servicios validan lo que saben validar, pero la base tiene la ultima
+ * palabra —anchuras, magnitudes, claves ajenas, indices unicos— y cada una de
+ * esas negativas llegaba aqui como una excepcion suelta.
+ */
+function mensajeDeFallo(e: unknown): string {
+  const codigo = (e as { code?: unknown } | null)?.code;
+
+  switch (codigo) {
+    case "P2000":
+      return "Algún valor es más largo de lo que admite esa columna. Acórtalo.";
+    case "P2002":
+      return "Ya existe una partida con ese código en esta obra.";
+    case "P2003":
+      return "Esa partida está enlazada con algo más (una orden, un encargo, un movimiento o una meta). Quítala de ahí primero.";
+    case "P2020":
+      return "Alguna cifra es demasiado grande para su columna. Revísala.";
+    case "P2025":
+      return "Esa partida ya no existe: puede que la haya borrado otra persona. Recarga la página.";
+    default:
+      return "No se pudo guardar el cambio. Si vuelve a pasar, avisa indicando qué partida estabas tocando.";
+  }
+}
+
+/**
+ * Ejecuta una operacion del servicio sin que un fallo tumbe la pantalla.
+ *
+ * Una Server Action que lanza NO se ve como un error: React sube el rechazo,
+ * y sin `error.tsx` en el arbol sale la pantalla generica de Next —«This page
+ * couldn't load»—, sin traza y sin decir que paso. Un presupuesto con cientos
+ * de filas se queda entonces inservible por un metrado con un cero de mas.
+ *
+ * Aqui se convierte en lo que siempre debio ser: un mensaje al lado del campo,
+ * con la pagina intacta. El error se registra en el servidor, que es donde
+ * sirve para arreglarlo.
+ */
+async function intentar(
+  operacion: () => Promise<{ ok: boolean; error?: string }>,
+): Promise<RespuestaEdicion> {
+  try {
+    const r = await operacion();
+    return r.ok ? { ok: true } : { ok: false, error: r.error };
+  } catch (e) {
+    console.error("[partidas] fallo no previsto", e);
+    return { ok: false, error: mensajeDeFallo(e) };
+  }
+}
+
 export async function accionEditarPartida(
   obraId: string,
   partidaId: string,
@@ -41,8 +91,8 @@ export async function accionEditarPartida(
     return { ok: false, error: "Esa modalidad no existe." };
   }
 
-  const r = await actualizarPartida(sesion, partidaId, campos);
-  if (!r.ok) return { ok: false, error: r.error };
+  const r = await intentar(() => actualizarPartida(sesion, partidaId, campos));
+  if (!r.ok) return r;
 
   revalidatePath(`/obras/${obraId}`);
   return { ok: true };
@@ -55,8 +105,8 @@ export async function accionCrearPartida(
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
-  const r = await crearPartida(sesion, obraId, nueva);
-  if (!r.ok) return { ok: false, error: r.error };
+  const r = await intentar(() => crearPartida(sesion, obraId, nueva));
+  if (!r.ok) return r;
 
   revalidatePath(`/obras/${obraId}`);
   return { ok: true };
@@ -69,8 +119,8 @@ export async function accionEliminarPartida(
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
-  const r = await eliminarPartida(sesion, partidaId);
-  if (!r.ok) return { ok: false, error: r.error };
+  const r = await intentar(() => eliminarPartida(sesion, partidaId));
+  if (!r.ok) return r;
 
   revalidatePath(`/obras/${obraId}`);
   return { ok: true };
