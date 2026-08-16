@@ -16,6 +16,8 @@ interface Fila {
   codigoPartida: string;
   orden: number;
   parentId: string | null;
+  tipo?: "CAPITULO" | "PARTIDA";
+  parcial?: string | null;
 }
 
 const estado: {
@@ -29,7 +31,10 @@ const estado: {
   revision: { version: number; aprobadaAt: Date | null } | null;
   /// Codigos escritos por la renumeracion, en orden.
   escritos: string[];
+  /// Las filas del mapeo tarea-partida de la obra.
+  mapeos: { id: string; codigoPartida: string }[];
 } = {
+  mapeos: [],
   partida: null,
   existentes: [],
   creada: null,
@@ -78,7 +83,7 @@ vi.mock("@/lib/prisma", () => {
       // la encienden para comprobar que entonces se niega.
       baseline: { findFirst: () => Promise.resolve(estado.revision) },
       mapeoTareaPartida: {
-        findMany: () => Promise.resolve([]),
+        findMany: () => Promise.resolve(estado.mapeos),
         update: () => Promise.resolve({}),
       },
       project: { findFirst: () => Promise.resolve({ id: "obra", estado: "PLANIFICACION", archivadaEn: null }) },
@@ -112,6 +117,7 @@ beforeEach(() => {
   estado.borrada = null;
   estado.revision = null;
   estado.escritos = [];
+  estado.mapeos = [];
 });
 
 function partidaAlcance() {
@@ -566,5 +572,85 @@ describe("cerrar los huecos de la numeracion", () => {
 
     expect(r.ok === true && r.datos.cambiadas).toBe(0);
     expect(estado.escritos).toEqual([]);
+  });
+});
+
+
+/**
+ * Las guardas que salieron de la revision adversaria.
+ *
+ * Las tres tapan agujeros que MUEVEN DINERO sin dar ningun error, y las tres
+ * se descubrieron atacando la primera version de la renumeracion. Sin estas
+ * pruebas, el siguiente que toque el fichero las vuelve a abrir.
+ */
+describe("lo que la renumeracion tiene que negarse a hacer", () => {
+  /**
+   * El caso que cegaba la red entera.
+   *
+   * Se teclea "3.02" antes de que exista "3": `codigoPadre` devuelve null y la
+   * fila nace en la raiz. Al crear "3" despues, el codigo dice que "3.02"
+   * cuelga de el, pero su `parentId` sigue en null. Los dos arboles discrepan
+   * sin que nadie los haya editado, y renumerar con esa discrepancia movia el
+   * costo directo de 400 a 1400 con la red dando el visto bueno.
+   */
+  it("se niega cuando el arbol que se ve y el que dice el codigo discrepan", async () => {
+    estado.existentes = [
+      { id: "a", codigoPartida: "3.02", orden: 1, parentId: null, tipo: "PARTIDA", parcial: "400.00" },
+      { id: "b", codigoPartida: "3", orden: 2, parentId: null, tipo: "PARTIDA", parcial: "1000.00" },
+      { id: "c", codigoPartida: "3.01", orden: 3, parentId: "b", tipo: "CAPITULO", parcial: "7.00" },
+    ];
+
+    const r = await renumerarPartidas(sesion, "obra");
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("3.02");
+    expect(estado.escritos).toEqual([]);
+  });
+
+  /**
+   * Un capitulo con importe propio no puede contar: la aplicacion lo anula en
+   * las seis llamadas que reparten el costo directo. Si la red no lo anulara,
+   * sumaria un arbol distinto del que se lee en pantalla.
+   */
+  it("renumera igual con un capitulo que lleva importe, sin contarlo", async () => {
+    estado.existentes = [
+      { id: "c2", codigoPartida: "2.0", orden: 10, parentId: null, tipo: "CAPITULO", parcial: "999.00" },
+      { id: "p1", codigoPartida: "2.1", orden: 11, parentId: "c2", tipo: "PARTIDA", parcial: "400.00" },
+    ];
+
+    const r = await renumerarPartidas(sesion, "obra");
+
+    expect(r.ok).toBe(true);
+    expect(estado.escritos.filter((c) => !c.startsWith("#"))).toEqual(["1.0", "1.1"]);
+  });
+
+  /**
+   * Un mapeo que apunta a una partida borrada se resucitaria sobre otra: el
+   * avance de esa tarea empezaria a valorizar contra dinero que nunca cubrio.
+   */
+  it("se niega si el cronograma sigue enlazado a una partida que ya no existe", async () => {
+    estado.existentes = [
+      { id: "c2", codigoPartida: "2.0", orden: 10, parentId: null, tipo: "CAPITULO" },
+      { id: "p1", codigoPartida: "2.1", orden: 11, parentId: "c2", tipo: "PARTIDA", parcial: "400.00" },
+    ];
+    estado.mapeos = [{ id: "m1", codigoPartida: "9.9" }];
+
+    const r = await renumerarPartidas(sesion, "obra");
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("9.9");
+    expect(estado.escritos).toEqual([]);
+  });
+
+  it("arrastra el mapeo cuando esta sano", async () => {
+    estado.existentes = [
+      { id: "c2", codigoPartida: "2.0", orden: 10, parentId: null, tipo: "CAPITULO" },
+      { id: "p1", codigoPartida: "2.1", orden: 11, parentId: "c2", tipo: "PARTIDA", parcial: "400.00" },
+    ];
+    estado.mapeos = [{ id: "m1", codigoPartida: "2.1" }];
+
+    const r = await renumerarPartidas(sesion, "obra");
+
+    expect(r.ok).toBe(true);
   });
 });

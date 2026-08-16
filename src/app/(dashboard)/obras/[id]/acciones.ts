@@ -38,6 +38,12 @@ const MODALIDAD = z.enum(["PRECIOS_UNITARIOS", "SUMA_ALZADA", "ALCANCE"]);
  * esas negativas llegaba aqui como una excepcion suelta.
  */
 function mensajeDeFallo(e: unknown): string {
+  // Los avisos que se lanza el propio sistema van con marca, para poder
+  // distinguirlos de una excepcion cualquiera y contarlos tal cual.
+  if (e instanceof Error && e.message.startsWith("AVISO: ")) {
+    return e.message.slice("AVISO: ".length);
+  }
+
   const codigo = (e as { code?: unknown } | null)?.code;
 
   switch (codigo) {

@@ -6,6 +6,7 @@ import {
   codigoPadre,
   calcularProfundidades,
   sumarHojas,
+  aportantes,
   LARGO_MAXIMO_CODIGO,
 } from "@/lib/jerarquia-partidas";
 import { calcularRenumeracion } from "@/lib/renumerar-partidas";
@@ -816,8 +817,56 @@ export async function renumerarPartidas(
     orderBy: { orden: "asc" },
   });
 
+  /**
+   * El tipo de cada fila, que decide si su importe cuenta.
+   *
+   * La aplicacion ANULA el importe de los capitulos antes de repartir el costo
+   * directo (`listarPartidas`, `presupuesto-obra`, revisiones y movimientos lo
+   * hacen los seis igual). Una red que sumara las filas tal cual estaria
+   * sumando un arbol distinto del que se lee en pantalla, y un capitulo con
+   * importe propio la cegaba entera.
+   */
+  const tipos = new Map(
+    (
+      await prisma.wbsItem.findMany({
+        where: { projectId: obraId },
+        select: { id: true, tipo: true },
+      })
+    ).map((p) => [p.id, p.tipo]),
+  );
+
   if (partidas.length === 0) {
     return { ok: false, error: "Esta obra no tiene partidas que renumerar." };
+  }
+
+  /**
+   * Los dos arboles tienen que decir lo mismo ANTES de tocar nada.
+   *
+   * Se renumera siguiendo `parentId` —el que se ve en la tabla— pero el dinero
+   * lo reparte el CODIGO. Mientras coincidan, renumerar es presentacion pura.
+   * Cuando discrepan —pasa en presupuestos importados a los que despues se les
+   * anadieron capitulos, o al teclear "3.02" antes de que exista "3"— cualquier
+   * renumeracion es una apuesta. Se niega y se dice QUE fila no cuadra, en vez
+   * de arreglarla por cuenta propia.
+   */
+  const codigosActuales = new Set(partidas.map((p) => p.codigoPartida));
+  const idPorCodigo = new Map(partidas.map((p) => [p.codigoPartida, p.id]));
+
+  for (const p of partidas) {
+    const porCodigo = codigoPadre(p.codigoPartida, codigosActuales);
+    const esperado = porCodigo === null ? null : (idPorCodigo.get(porCodigo) ?? null);
+
+    if (esperado !== p.parentId) {
+      const dondeEsta = partidas.find((o) => o.id === p.parentId)?.codigoPartida;
+      return {
+        ok: false,
+        error:
+          `No se puede renumerar: "${p.codigoPartida}" figura dentro de ` +
+          `"${dondeEsta ?? "la raiz"}", pero su codigo dice que cuelga de ` +
+          `"${porCodigo ?? "la raiz"}". Corrige esa partida primero: ` +
+          `renumerar con esa discrepancia moveria dinero de sitio.`,
+      };
+    }
   }
 
   const { cambios, problema } = calcularRenumeracion(
@@ -845,8 +894,42 @@ export async function renumerarPartidas(
   const importes = partidas.map((p) => ({
     id: p.id,
     codigo: p.codigoPartida,
-    parcial: p.parcial?.toString() ?? null,
+    // Capitulos anulados, el mismo criterio que aplican las otras seis
+    // llamadas del sistema. Sin esto la red suma otro arbol.
+    parcial:
+      tipos.get(p.id) === "PARTIDA" ? (p.parcial?.toString() ?? null) : null,
   }));
+
+  /**
+   * Lo que no puede cambiar no es el total: es QUIEN CUENTA.
+   *
+   * Comparar un escalar deja pasar dos cambios de cobertura que se compensen
+   * —una partida que empieza a contar y otra que deja de hacerlo por el mismo
+   * importe—, y tambien deja pasar que el dinero cambie de capitulo mientras
+   * la obra suma igual. `aportantes` devuelve las filas que de verdad entran
+   * en el costo directo; si ese conjunto cambia, no es una renumeracion.
+   */
+  const renumerado = importes.map((n) => ({
+    ...n,
+    codigo: cambios.get(n.id) ?? n.codigo,
+  }));
+
+  const cuentanAntes = new Set(aportantes(importes).map((n) => n.id));
+  const cuentanDespues = new Set(aportantes(renumerado).map((n) => n.id));
+
+  const mismosQueCuentan =
+    cuentanAntes.size === cuentanDespues.size &&
+    [...cuentanAntes].every((id) => cuentanDespues.has(id));
+
+  if (!mismosQueCuentan) {
+    return {
+      ok: false,
+      error:
+        "No se puede renumerar: cambiaria que partidas cuentan en el costo " +
+        "directo. Renumerar solo puede cambiar los numeros, nunca quien " +
+        "aporta el dinero.",
+    };
+  }
 
   const totalAntes = sumarHojas(importes);
   const totalDespues = sumarHojas(
@@ -877,7 +960,34 @@ export async function renumerarPartidas(
     if (nuevo) nuevoPorCodigo.set(p.codigoPartida, nuevo);
   }
 
-  const mapeosAMover = mapeos.filter((m) => nuevoPorCodigo.has(m.codigoPartida));
+  /**
+   * Un mapeo colgado no se puede arrastrar: se resucitaria sobre otra partida.
+   *
+   * Si una fila del mapeo apunta a un codigo que ya no existe —porque esa
+   * partida se borro— y la renumeracion le da ESE codigo a otra distinta, el
+   * avance de la tarea empezaria a valorizar contra una partida que nunca
+   * cubrio, sin que nada avise. Es un problema previo a la renumeracion, y se
+   * dice en vez de heredarlo.
+   */
+  const colgados = mapeos.filter((m) => !codigosActuales.has(m.codigoPartida));
+
+  if (colgados.length > 0) {
+    const cuales = [...new Set(colgados.map((m) => m.codigoPartida))].slice(0, 3);
+    return {
+      ok: false,
+      error:
+        `No se puede renumerar: el cronograma sigue enlazado a ${colgados.length} ` +
+        `partida(s) que ya no existen (${cuales.join(", ")}). Renumerar les daria ` +
+        `esos codigos a otras partidas y el avance valorizaria donde no debe.`,
+    };
+  }
+
+  /**
+   * Se pasan TODAS las filas del mapeo por las dos fases, no solo las que
+   * cambian: `@@unique([projectId, uid, codigoPartida])` tambien choca contra
+   * una fila que NO se mueve y que ya ocupa el codigo de destino.
+   */
+  const mapeosAMover = mapeos;
 
   await prisma.$transaction(
     async (tx) => {
@@ -889,6 +999,30 @@ export async function renumerarPartidas(
        * escribe primero a un codigo imposible —lleva "#", que el formato de
        * codigo no admite— y despues al definitivo.
        */
+      /**
+       * La foto se leyo FUERA de la transaccion.
+       *
+       * Si mientras tanto alguien creo, borro o renombro una partida, el plan
+       * calculado ya no describe esta obra: aplicarlo dejaria filas fuera del
+       * arbol o le daria a una el codigo de otra. Se comprueba aqui dentro,
+       * antes de la primera escritura, y se aborta entero.
+       */
+      const ahora = await tx.wbsItem.findMany({
+        where: { projectId: obraId },
+        select: { id: true, codigoPartida: true },
+      });
+
+      const movida =
+        ahora.length !== partidas.length ||
+        ahora.some((f) => idPorCodigo.get(f.codigoPartida) !== f.id);
+
+      if (movida) {
+        throw new Error(
+          "AVISO: el presupuesto cambio mientras se renumeraba. No se ha " +
+            "tocado nada; vuelve a intentarlo.",
+        );
+      }
+
       let n = 0;
       for (const id of cambios.keys()) {
         await tx.wbsItem.update({
@@ -919,7 +1053,12 @@ export async function renumerarPartidas(
       for (const mapeo of mapeosAMover) {
         await tx.mapeoTareaPartida.update({
           where: { id: mapeo.id },
-          data: { codigoPartida: nuevoPorCodigo.get(mapeo.codigoPartida)! },
+          data: {
+            // Las que no cambian vuelven a su mismo codigo: han pasado por la
+            // fase temporal solo para no chocar con las que si cambian.
+            codigoPartida:
+              nuevoPorCodigo.get(mapeo.codigoPartida) ?? mapeo.codigoPartida,
+          },
         });
       }
     },
