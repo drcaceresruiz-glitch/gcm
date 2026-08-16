@@ -22,7 +22,10 @@ const estado: {
   partida: Record<string, unknown> | null;
   existentes: Fila[];
   creada: Record<string, unknown> | null;
-} = { partida: null, existentes: [], creada: null };
+  /// Cuantas filas sujetan a la partida por cada relacion `Restrict`.
+  sujeciones: Record<string, number>;
+  borrada: string | null;
+} = { partida: null, existentes: [], creada: null, sujeciones: {}, borrada: null };
 
 vi.mock("@/lib/prisma", () => {
   const wbsItem = {
@@ -34,11 +37,27 @@ vi.mock("@/lib/prisma", () => {
       estado.creada = args.data;
       return Promise.resolve({ id: "nueva" });
     },
+    count: () => Promise.resolve(estado.sujeciones["hijas"] ?? 0),
+    delete: (args: { where: { id: string } }) => {
+      estado.borrada = args.where.id;
+      return Promise.resolve({});
+    },
   };
+
+  // Las cuatro relaciones `Restrict` que tambien sujetan a una partida. Sin
+  // ellas en el doble, la prueba del borrado no podria distinguir el mensaje
+  // del choque contra la clave ajena.
+  const sujecion = (clave: string) => ({
+    count: () => Promise.resolve(estado.sujeciones[clave] ?? 0),
+  });
 
   return {
     prisma: {
       wbsItem,
+      ordenImputacion: sujecion("orden"),
+      encargoPartida: sujecion("encargo"),
+      movimientoLinea: sujecion("movimiento"),
+      metaItemPartida: sujecion("meta"),
       // Sin linea base aprobada: el presupuesto esta abierto.
       baseline: { findFirst: () => Promise.resolve(null) },
       project: { findFirst: () => Promise.resolve({ id: "obra", estado: "PLANIFICACION", archivadaEn: null }) },
@@ -48,19 +67,23 @@ vi.mock("@/lib/prisma", () => {
   };
 });
 
-const { actualizarPartida, crearPartida } = await import("@/services/partidas.service");
+const { actualizarPartida, crearPartida, eliminarPartida } = await import(
+  "@/services/partidas.service"
+);
 
 const sesion = {
   userId: "u1",
   companyId: "c1",
   role: "RESIDENTE",
-  permisos: ["partida:editar", "partida:crear"],
+  permisos: ["partida:editar", "partida:crear", "partida:eliminar"],
 } as unknown as SesionActiva;
 
 beforeEach(() => {
   estado.partida = null;
   estado.existentes = [];
   estado.creada = null;
+  estado.sujeciones = {};
+  estado.borrada = null;
 });
 
 function partidaAlcance() {
@@ -315,5 +338,120 @@ describe("crear una partida a suma alzada", () => {
     });
 
     expect(r.ok).toBe(false);
+  });
+});
+
+
+/**
+ * Lo que la base rechaza y el servicio dejaba pasar.
+ *
+ * Las tres roturas de esta tanda comparten desenlace: la excepcion subia sin
+ * que nadie la recogiera, la Server Action se rechazaba y salia la pantalla
+ * generica de Next. Un presupuesto de cientos de filas quedaba inservible por
+ * un cero de mas. Lo que se fija aqui es que el servicio se NIEGUE antes, con
+ * un motivo que se pueda leer.
+ */
+describe("los limites de las columnas", () => {
+  const nueva = {
+    codigoPartida: "1.1",
+    descripcion: "Concreto",
+    tipo: "PARTIDA" as const,
+    modalidad: "PRECIOS_UNITARIOS" as const,
+  };
+
+  it("rechaza un codigo mas largo que su columna, en vez de recortarlo", async () => {
+    // 35 caracteres, y pasa el regex de forma sin problema.
+    const largo = "01.02.03.04.05.06.07.08.09.10.11.12";
+    expect(largo).toMatch(/^\d+(\.\d+)*$/);
+
+    const r = await crearPartida(sesion, "obra", { ...nueva, codigoPartida: largo });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("32");
+    // Recortarlo seria peor que rechazarlo: el codigo decide de quien cuelga.
+    expect(estado.creada).toBeNull();
+  });
+
+  it("rechaza un metrado con mas digitos enteros de los que caben", async () => {
+    const r = await crearPartida(sesion, "obra", {
+      ...nueva,
+      metrado: "99999999999",
+      precioUnitario: "10",
+    });
+
+    expect(r.ok).toBe(false);
+    expect(estado.creada).toBeNull();
+  });
+
+  /**
+   * El caso que ninguna validacion por campo detecta: los dos operandos caben
+   * y su producto no. La cifra imposible la fabrica el servidor.
+   */
+  it("rechaza el importe cuando no cabe, aunque metrado y precio si quepan", async () => {
+    const r = await crearPartida(sesion, "obra", {
+      ...nueva,
+      metrado: "9999999999",
+      precioUnitario: "1000",
+    });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("importe");
+    expect(estado.creada).toBeNull();
+  });
+
+  it("deja pasar las cifras normales", async () => {
+    const r = await crearPartida(sesion, "obra", {
+      ...nueva,
+      metrado: "120",
+      precioUnitario: "8.50",
+    });
+
+    expect(r.ok).toBe(true);
+    expect(estado.creada?.["parcial"]).toBe("1020.00");
+  });
+});
+
+describe("borrar una partida sujeta por otra cosa", () => {
+  function partidaSuelta() {
+    estado.partida = {
+      id: "p1",
+      projectId: "obra",
+      codigoPartida: "4.1",
+      descripcion: "Excavacion",
+      tipo: "PARTIDA",
+      modalidad: "PRECIOS_UNITARIOS",
+      unidad: "m3",
+      metrado: null,
+      precioUnitario: null,
+      parcial: null,
+      project: { id: "obra", estado: "PLANIFICACION", archivadaEn: null },
+    };
+  }
+
+  it("borra la que no sujeta nadie", async () => {
+    partidaSuelta();
+
+    const r = await eliminarPartida(sesion, "p1");
+
+    expect(r.ok).toBe(true);
+    expect(estado.borrada).toBe("p1");
+  });
+
+  it.each([
+    ["orden", "orden de compra"],
+    ["encargo", "encargo"],
+    ["movimiento", "movimiento"],
+    ["meta", "meta"],
+  ])("se niega y explica cuando la sujeta %s", async (clave, texto) => {
+    partidaSuelta();
+    estado.sujeciones = { [clave]: 1 };
+
+    const r = await eliminarPartida(sesion, "p1");
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain(texto);
+    // Lo que importa: NO se intento borrar. Antes se intentaba, chocaba contra
+    // la clave ajena y la pantalla se caia sin decir por que.
+    expect(estado.borrada).toBeNull();
   });
 });

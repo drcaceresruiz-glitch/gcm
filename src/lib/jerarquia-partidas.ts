@@ -1,6 +1,16 @@
 import { sumar, esPositivo, esNegativo } from "@/lib/decimal";
 
 /**
+ * Lo que cabe en la columna del codigo: `codigoPartida VarChar(32)`.
+ *
+ * Vive aqui porque quien FABRICA codigos es este modulo, y proponer uno que
+ * no quepa no da un aviso: da un error de la base al guardar, que sale como
+ * una pantalla rota. Anadir una hija ANADE un segmento, asi que un capitulo
+ * ya largo puede quedarse sin hijas que quepan.
+ */
+export const LARGO_MAXIMO_CODIGO = 32;
+
+/**
  * Jerarquia de codigos de partida.
  *
  * Conviven varias convenciones en los presupuestos reales:
@@ -319,7 +329,11 @@ export function siguienteCodigoHijo(
     // La comprobacion: con el candidato dentro del conjunto, su padre tiene
     // que ser exactamente el capitulo del que se pidio colgar.
     const conCandidato = new Set([...existentes, candidato]);
-    if (codigoPadre(candidato, conCandidato) === capitulo) return candidato;
+    if (codigoPadre(candidato, conCandidato) === capitulo) {
+      // Y que quepa. Un codigo mas largo que su columna no se rechaza con un
+      // aviso: revienta contra la base al guardar, y eso es una pantalla rota.
+      return candidato.length <= LARGO_MAXIMO_CODIGO ? candidato : null;
+    }
 
     // Si no vuelve, este numero no sirve; probar el siguiente no arregla el
     // desajuste, que es de forma y no de numero.

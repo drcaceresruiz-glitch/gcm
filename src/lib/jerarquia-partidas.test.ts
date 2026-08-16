@@ -4,6 +4,7 @@ import {
   codigoPadre,
   siguienteCodigoHijo,
   quienSeQuedaLaNumeracion,
+  LARGO_MAXIMO_CODIGO,
   sumarHojas,
   subtotalesPorRama,
   type NodoImporte,
@@ -257,5 +258,32 @@ describe("quienSeQuedaLaNumeracion", () => {
   it("no inventa un rival cuando no lo hay", () => {
     const sueltas = new Set(["1.0", "1.1"]);
     expect(quienSeQuedaLaNumeracion("1.0", sueltas)).toBeNull();
+  });
+});
+
+
+/**
+ * Anadir una hija ANADE un segmento, asi que un capitulo ya largo puede
+ * quedarse sin hijas que quepan en `VarChar(32)`. Proponer una que no cabe no
+ * da un aviso: da un error de la base al guardar, y eso sale como una pantalla
+ * rota. El importador admite codigos de hasta 32, asi que el caso llega solo.
+ */
+describe("siguienteCodigoHijo y la anchura de la columna", () => {
+  it("no propone un codigo que no quepa", () => {
+    const capitulo = "01.01.01.01.01.01.01.01.01.01.1"; // 31 caracteres
+    expect(capitulo.length).toBe(31);
+
+    const propuesto = siguienteCodigoHijo(capitulo, new Set([capitulo]));
+
+    // Cabria "01.01.01.01.01.01.01.01.01.01.1.1" (33), y por eso se calla.
+    expect(propuesto).toBeNull();
+  });
+
+  it("sigue proponiendo cuando el resultado si cabe", () => {
+    const capitulo = "01.01.01.01.01"; // 14 caracteres
+    const propuesto = siguienteCodigoHijo(capitulo, new Set([capitulo]));
+
+    expect(propuesto).not.toBeNull();
+    expect(propuesto!.length).toBeLessThanOrEqual(LARGO_MAXIMO_CODIGO);
   });
 });
