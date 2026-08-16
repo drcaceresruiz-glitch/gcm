@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { PartidaFila } from "@/services/obras.service";
 import { TablaPartidas } from "@/components/partidas/TablaPartidas";
 import { NuevaFila, type OpcionCapitulo } from "@/components/partidas/NuevaFila";
+import { CerrarHuecos } from "@/components/partidas/CerrarHuecos";
 
 /**
  * La tabla y el alta, juntas, porque tienen que hablarse.
@@ -62,6 +63,10 @@ export function PanelPresupuesto({
           pedido={pedido}
         />
       )}
+
+      {/* Debajo del alta y no arriba: se teclea mucho mas de lo que se
+          renumera, y renumerar es una operacion de limpieza. */}
+      {editable && <CerrarHuecos obraId={obraId} />}
     </div>
   );
 }

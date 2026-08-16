@@ -8,6 +8,7 @@ import {
   actualizarPartida,
   crearPartida,
   eliminarPartida,
+  renumerarPartidas,
   type CamposPartida,
   type NuevaPartida,
 } from "@/services/partidas.service";
@@ -37,6 +38,12 @@ const MODALIDAD = z.enum(["PRECIOS_UNITARIOS", "SUMA_ALZADA", "ALCANCE"]);
  * esas negativas llegaba aqui como una excepcion suelta.
  */
 function mensajeDeFallo(e: unknown): string {
+  // Los avisos que se lanza el propio sistema van con marca, para poder
+  // distinguirlos de una excepcion cualquiera y contarlos tal cual.
+  if (e instanceof Error && e.message.startsWith("AVISO: ")) {
+    return e.message.slice("AVISO: ".length);
+  }
+
   const codigo = (e as { code?: unknown } | null)?.code;
 
   switch (codigo) {
@@ -124,6 +131,33 @@ export async function accionEliminarPartida(
 
   revalidatePath(`/obras/${obraId}`);
   return { ok: true };
+}
+
+/**
+ * Cierra los huecos de la numeracion.
+ *
+ * Devuelve cuantas cambiaron para poder decirlo: «se renumeraron 14» y «ya
+ * estaban seguidas» son respuestas distintas, y sin el numero la pantalla no
+ * podria distinguirlas.
+ */
+export async function accionRenumerarPartidas(
+  obraId: string,
+): Promise<RespuestaEdicion & { cambiadas?: number }> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  let cambiadas = 0;
+
+  const r = await intentar(async () => {
+    const salida = await renumerarPartidas(sesion, obraId);
+    if (salida.ok) cambiadas = salida.datos.cambiadas;
+    return salida;
+  });
+
+  if (!r.ok) return r;
+
+  revalidatePath(`/obras/${obraId}`);
+  return { ok: true, cambiadas };
 }
 
 /**
