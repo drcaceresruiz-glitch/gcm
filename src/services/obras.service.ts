@@ -1145,6 +1145,10 @@ export async function cambiarEstadoObra(
 
 export interface PartidaFila {
   id: string;
+  /// De que capitulo cuelga. Lo necesita la pantalla para poder ofrecer
+  /// agrupar SOLO partidas del mismo capitulo, que es la condicion que impone
+  /// el servicio: agrupar entre capitulos moveria dinero de uno a otro.
+  parentId: string | null;
   codigoPartida: string;
   tipo: "CAPITULO" | "PARTIDA";
   /// Gobierna si el importe se recalcula al cambiar el metrado.
@@ -1208,6 +1212,7 @@ export async function listarPartidas(
 
   const filas: PartidaFila[] = items.map((i) => ({
     id: i.id,
+    parentId: i.parentId,
     codigoPartida: i.codigoPartida,
     tipo: i.tipo,
     modalidad: i.modalidad,

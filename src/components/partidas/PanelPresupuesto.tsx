@@ -6,6 +6,7 @@ import type { PartidaFila } from "@/services/obras.service";
 import { TablaPartidas } from "@/components/partidas/TablaPartidas";
 import { NuevaFila, type OpcionCapitulo } from "@/components/partidas/NuevaFila";
 import { CerrarHuecos } from "@/components/partidas/CerrarHuecos";
+import { AgruparPartidas } from "@/components/partidas/AgruparPartidas";
 
 /**
  * La tabla y el alta, juntas, porque tienen que hablarse.
@@ -66,6 +67,8 @@ export function PanelPresupuesto({
 
       {/* Debajo del alta y no arriba: se teclea mucho mas de lo que se
           renumera, y renumerar es una operacion de limpieza. */}
+      {editable && <AgruparPartidas obraId={obraId} filas={filas} />}
+
       {editable && <CerrarHuecos obraId={obraId} />}
     </div>
   );
