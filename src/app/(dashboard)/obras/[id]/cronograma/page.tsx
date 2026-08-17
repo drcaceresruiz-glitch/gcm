@@ -44,11 +44,13 @@ import { TareasAMano } from "@/components/cronograma/TareasAMano";
 import { GenerarEdt } from "@/components/cronograma/GenerarEdt";
 import { SincronizarEdt } from "@/components/cronograma/SincronizarEdt";
 import { MarcarHitos } from "@/components/cronograma/MarcarHitos";
+import { HitosPropuestos } from "@/components/cronograma/HitosPropuestos";
 import {
   listarHitos,
   partidasParaAnclar,
   personasParaResponsable,
 } from "@/services/hitos.service";
+import { hitosPropuestos } from "@/services/hitos-predictivos.service";
 import { listarTareasManuales } from "@/services/cronograma-manual.service";
 
 export const metadata: Metadata = { title: "Cronograma" };
@@ -102,10 +104,12 @@ export default async function CronogramaPage({
 
   // Los hitos que ya estan marcados, y las partidas a las que se puede anclar
   // uno nuevo. Los capitulos entran: «fin de estructuras» cuelga del capitulo.
-  const [hitosMarcados, anclasPosibles, personasPosibles] = await Promise.all([
+  const [hitosMarcados, anclasPosibles, personasPosibles, prediccion] = await Promise.all([
     listarHitos(sesion, id),
     partidasParaAnclar(sesion, id),
     personasParaResponsable(sesion, id),
+    // Solo LEE: deduce propuestas del estado de hoy y no escribe nada.
+    hitosPropuestos(sesion, id),
   ]);
   const puedeLineaBase = puede(sesion, "cronograma:linea_base");
 
@@ -395,6 +399,20 @@ export default async function CronogramaPage({
               personas={personasPosibles}
               puedeEditar={puedeEditarTareas}
               puedeEliminar={puedeEliminarTareas}
+            />
+          </Tarjeta>
+
+          <Tarjeta>
+            <h3 className="text-base font-semibold">Hitos que propone GCM</h3>
+            <p className="mt-0.5 mb-4 text-sm opacity-70">
+              Deducidos del estado de la obra. <strong>Nada se marca solo</strong>:
+              hasta que aceptas una, no existe en el cronograma.
+            </p>
+
+            <HitosPropuestos
+              obraId={id}
+              prediccion={prediccion}
+              puedeAceptar={puedeEditarTareas}
             />
           </Tarjeta>
 
