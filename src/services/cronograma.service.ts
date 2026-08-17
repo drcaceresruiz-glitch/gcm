@@ -33,6 +33,11 @@ import {
   type PuntoDiario,
 } from "@/lib/curva-s";
 import type { ResultadoAnalisisCronograma } from "@/lib/msproject-xml";
+import {
+  formaCanonicaDeArchivo,
+  formaCanonicaDeGuardado,
+  resumenesDelArchivo,
+} from "@/lib/cronograma-huella";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -44,14 +49,49 @@ import type { SesionActiva } from "@/services/sesion.service";
  * datos ni servidor. Aqui solo queda lo que toca datos, que es donde importan
  * los permisos y el aislamiento por empresa.
  *
- * A diferencia del presupuesto NO hay "reemplazar": cada corte es una version
- * nueva y no se destruye nada, asi que tampoco hace falta el equivalente a
- * `analizarRiesgoDeReemplazo`.
+ * Cada corte NUEVO es una version nueva y no destruye nada. Lo unico que se
+ * reemplaza es un corte contra SI MISMO: volver a cargar el mismo
+ * `<StatusDate>` con un plan distinto reescribe esa version en su sitio, en
+ * vez de crear un segundo punto sobre el mismo dia de la curva S. Eso si
+ * destruye, asi que pasa por confirmacion y por el equivalente a
+ * `analizarRiesgoDeReemplazo` del presupuesto.
  */
+
+/**
+ * Lo que un reemplazo de corte se lleva por delante y ningun archivo devuelve.
+ *
+ * Sin esto la confirmacion solo puede decir "se reescriben 107 tareas", que se
+ * lee como rutina y esconde lo unico que no vuelve.
+ */
+export interface EnRiesgoPorReemplazoCronograma {
+  version: number;
+  fechaCorte: string;
+  /// Se reescriben, pero el archivo las trae otra vez: no es perdida.
+  tareasImportadas: number;
+  /// Tecleadas en GCM. Se CONSERVAN; se cuentan para poder decirlo.
+  tareasManuales: number;
+  /// Las que trae el archivo y hoy no estan.
+  tareasNuevas: number;
+  /**
+   * UID que el archivo nuevo ya no trae. Su avance y su mapeo NO se borran
+   * —viven anclados a `(projectId, uid)`, sin clave foranea— pero se quedan
+   * sin fila de tarea, que es lo que el aviso de huerfanos senala despues.
+   */
+  uidsQueDesaparecen: {
+    uid: number;
+    nombre: string;
+    avances: number;
+    mapeos: number;
+  }[];
+  avancesHuerfanos: number;
+  /// Lo mas caro de la lista: cada mapeo lo confirmo una persona a mano.
+  mapeosHuerfanos: number;
+}
 
 export type ResultadoImportacionCronograma =
   | { ok: true; version: number; tareas: number; dependencias: number; yaEstaba?: false }
   | { ok: true; version: number; tareas: number; dependencias: number; yaEstaba: true }
+  | { ok: true; requiereConfirmacion: true; riesgo: EnRiesgoPorReemplazoCronograma }
   | { ok: false; error: string };
 
 /**
@@ -64,6 +104,178 @@ export type ResultadoImportacionCronograma =
  */
 function fechaDeObra(texto: string): Date {
   return new Date(`${texto}T00:00:00Z`);
+}
+
+/**
+ * El cliente que entrega `$transaction`: el mismo de siempre sin las funciones
+ * de conexion. Igual que en `edt.service.ts`, y por lo mismo: se toma del
+ * propio `prisma` para que un cambio de version del cliente lo arrastre solo.
+ */
+type ClienteTransaccion = Omit<
+  typeof prisma,
+  "$connect" | "$disconnect" | "$on" | "$use" | "$extends"
+>;
+
+/** Lo justo de una fila para pesarla en la huella. Ver `@/lib/cronograma-huella`. */
+const CAMPOS_DE_LA_HUELLA = {
+  uid: true,
+  fila: true,
+  codigo: true,
+  nombre: true,
+  nivel: true,
+  esHito: true,
+  esCritico: true,
+  inicio: true,
+  fin: true,
+  duracionDias: true,
+  porcentajePlaneado: true,
+  porcentajeArchivo: true,
+  holguraDias: true,
+  holguraInferida: true,
+} as const;
+
+/**
+ * ¿El archivo trae un plan distinto del que ya esta guardado en ese corte?
+ *
+ * Solo entran las filas `IMPORTADO`: las tecleadas en GCM no salieron de
+ * ningun archivo y no deben hacer que el archivo parezca distinto.
+ */
+async function elArchivoTraeOtroPlan(
+  corte: { id: string; minutosPorDia: number },
+  analisis: ResultadoAnalisisCronograma,
+): Promise<boolean> {
+  const [tareas, dependencias] = await Promise.all([
+    prisma.tareaCronograma.findMany({
+      where: { cronogramaId: corte.id, origen: "IMPORTADO" },
+      select: CAMPOS_DE_LA_HUELLA,
+    }),
+    prisma.dependenciaTarea.findMany({
+      where: { cronogramaId: corte.id },
+      select: { tareaUid: true, predecesoraUid: true, tipo: true, desfaseDias: true },
+    }),
+  ]);
+
+  return (
+    formaCanonicaDeArchivo(analisis) !==
+    formaCanonicaDeGuardado(
+      tareas,
+      dependencias,
+      corte.minutosPorDia,
+      resumenesDelArchivo(analisis.tareas),
+    )
+  );
+}
+
+/**
+ * Por que NO se puede reemplazar ese corte, o null si se puede.
+ *
+ * Las dos razones son las mismas que ya aplica el resto del modulo, con la
+ * misma redaccion: con la linea base fijada el cronograma no se toca
+ * (`cronograma-manual.service.ts`, `hitos.service.ts`, `edt-sincronizar.ts`),
+ * y solo se reescribe el ultimo corte.
+ */
+async function motivoQueImpideReemplazar(
+  // Se recibe el cliente porque esto se comprueba dos veces: antes de ofrecer
+  // el reemplazo y otra vez DENTRO de la transaccion que lo aplica. Alli tiene
+  // que leer la transaccion, no la conexion de al lado.
+  cliente: ClienteTransaccion,
+  obraId: string,
+  corte: { version: number; lineaBaseAt: Date | null },
+): Promise<string | null> {
+  if (corte.lineaBaseAt) {
+    return (
+      `El cronograma v${corte.version} esta fijado como linea base ` +
+      `(${corte.lineaBaseAt.toISOString().slice(0, 10)}). Los indicadores se ` +
+      `calculan contra el, asi que no admite cambios.`
+    );
+  }
+
+  const ultima = await cliente.cronograma.findFirst({
+    where: { projectId: obraId },
+    orderBy: { version: "desc" },
+    select: { version: true },
+  });
+
+  if (ultima && ultima.version !== corte.version) {
+    return (
+      `Ese corte es la version ${corte.version} y la vigente es la ` +
+      `${ultima.version}. Solo se vuelve a cargar el ultimo corte: reescribir ` +
+      `uno anterior cambiaria hacia atras cifras que ya se informaron.`
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Que se lleva por delante reemplazar ese corte con este archivo.
+ *
+ * Espejo de `analizarRiesgoDeReemplazo` del presupuesto
+ * (`importacion.service.ts`) y por el mismo motivo escrito alli: un numero
+ * redondo de tareas se lee como rutina.
+ */
+async function analizarRiesgoDeReemplazoCronograma(
+  obraId: string,
+  corte: { id: string; version: number },
+  analisis: ResultadoAnalisisCronograma,
+  fechaCorte: string,
+): Promise<EnRiesgoPorReemplazoCronograma> {
+  const guardadas = await prisma.tareaCronograma.findMany({
+    where: { cronogramaId: corte.id },
+    select: { uid: true, nombre: true, origen: true },
+  });
+
+  const importadas = guardadas.filter((t) => t.origen === "IMPORTADO");
+  const traeElArchivo = new Set(analisis.tareas.map((t) => t.uid));
+  const yaEstaban = new Set(guardadas.map((t) => t.uid));
+
+  // Solo pierden su fila las IMPORTADO: las MANUAL no las toca el reemplazo.
+  const desaparecen = importadas.filter((t) => !traeElArchivo.has(t.uid));
+  const uids = desaparecen.map((t) => t.uid);
+
+  const [avances, mapeos] = await Promise.all([
+    uids.length > 0
+      ? prisma.avanceTarea.groupBy({
+          by: ["uid"],
+          where: { projectId: obraId, uid: { in: uids } },
+          _count: true,
+        })
+      : [],
+    uids.length > 0
+      ? prisma.mapeoTareaPartida.groupBy({
+          by: ["uid"],
+          where: { projectId: obraId, uid: { in: uids } },
+          _count: true,
+        })
+      : [],
+  ]);
+
+  const cuenta = (filas: { uid: number; _count: number }[]) =>
+    new Map(filas.map((f) => [f.uid, f._count]));
+
+  const porAvance = cuenta(avances);
+  const porMapeo = cuenta(mapeos);
+
+  const uidsQueDesaparecen = desaparecen
+    .map((t) => ({
+      uid: t.uid,
+      nombre: t.nombre,
+      avances: porAvance.get(t.uid) ?? 0,
+      mapeos: porMapeo.get(t.uid) ?? 0,
+    }))
+    // Primero las que duelen: las que llevan trabajo humano encima.
+    .sort((a, b) => b.avances + b.mapeos - (a.avances + a.mapeos) || a.uid - b.uid);
+
+  return {
+    version: corte.version,
+    fechaCorte,
+    tareasImportadas: importadas.length,
+    tareasManuales: guardadas.length - importadas.length,
+    tareasNuevas: analisis.tareas.filter((t) => !yaEstaban.has(t.uid)).length,
+    uidsQueDesaparecen,
+    avancesHuerfanos: uidsQueDesaparecen.reduce((s, u) => s + u.avances, 0),
+    mapeosHuerfanos: uidsQueDesaparecen.reduce((s, u) => s + u.mapeos, 0),
+  };
 }
 
 export async function importarCronograma(
@@ -115,13 +327,20 @@ export async function importarCronograma(
   const fechaCorte = fechaDeObra(analisis.fechaCorte);
 
   /**
-   * Un corte ya cargado no se vuelve a cargar.
+   * Un corte ya cargado no se DUPLICA. Pero puede reemplazarse.
    *
-   * La comparacion es por `<StatusDate>` y no por el contenido del archivo.
-   * De la misma semana hay dos exports distintos —uno de ellos guardado con
-   * otra configuracion, con campos que cambian sin que el plan cambie—, y
+   * La busqueda es por `<StatusDate>` y no por el contenido del archivo. De la
+   * misma semana hay dos exports distintos —uno de ellos guardado con otra
+   * configuracion, con campos que cambian sin que el plan cambie—, y
    * compararlos byte a byte los daria por cortes diferentes: la curva S
    * acabaria con dos puntos sobre el mismo dia.
+   *
+   * Encontrarlo NO basta para saber que hacer. Antes esto devolvia
+   * `yaEstaba: true` sin mas, y era demasiado grueso: trataba igual "mismo
+   * corte, mismo plan" —saltar, correcto— y "mismo corte, plan distinto"
+   * —saltar, y ahi el archivo se perdia en silencio—. Eso dejaba sin salida
+   * el caso de volver a cargar un corte para corregirlo, que es el unico
+   * camino que hay: no existe borrar una version importada.
    */
   const mismoCorte = await prisma.cronograma.findFirst({
     // Solo cuenta como «ya cargado» una version que salio de un ARCHIVO. Una
@@ -129,16 +348,43 @@ export async function importarCronograma(
     // y sin este filtro bloqueaba la importacion devolviendo `yaEstaba: true`
     // sin haber escrito nada: el archivo se perdia en silencio.
     where: { projectId: obraId, fechaCorte, origen: "IMPORTADO" },
-    select: { version: true, _count: { select: { tareas: true, dependencias: true } } },
+    select: {
+      id: true,
+      version: true,
+      minutosPorDia: true,
+      lineaBaseAt: true,
+      _count: { select: { tareas: true, dependencias: true } },
+    },
   });
 
   if (mismoCorte) {
+    // Mismo corte y mismo plan: no hay nada que hacer y no se molesta a nadie.
+    // Se comprueba ANTES que los impedimentos a proposito: un archivo
+    // identico sobre una linea base fijada no es un error, es un no-op.
+    if (!(await elArchivoTraeOtroPlan(mismoCorte, analisis))) {
+      return {
+        ok: true,
+        yaEstaba: true,
+        version: mismoCorte.version,
+        tareas: mismoCorte._count.tareas,
+        dependencias: mismoCorte._count.dependencias,
+      };
+    }
+
+    const impedimento = await motivoQueImpideReemplazar(prisma, obraId, mismoCorte);
+    if (impedimento) return { ok: false, error: impedimento };
+
+    // Se pide confirmacion y NO se escribe nada. Reemplazar destruye, y quien
+    // lo autoriza tiene que ver antes que se lleva por delante.
     return {
       ok: true,
-      yaEstaba: true,
-      version: mismoCorte.version,
-      tareas: mismoCorte._count.tareas,
-      dependencias: mismoCorte._count.dependencias,
+      requiereConfirmacion: true,
+      riesgo: await analizarRiesgoDeReemplazoCronograma(
+        obraId,
+        mismoCorte,
+        analisis,
+        analisis.fechaCorte,
+      ),
     };
   }
 
@@ -238,6 +484,207 @@ export async function importarCronograma(
     return {
       ok: false,
       error: "No se pudo guardar el cronograma. Vuelve a intentarlo en unos segundos.",
+    };
+  }
+}
+
+export type ResultadoReemplazoCronograma =
+  | {
+      ok: true;
+      version: number;
+      tareas: number;
+      dependencias: number;
+      /// Tareas MANUAL que sobrevivieron al reemplazo.
+      conservadas: number;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Vuelve a cargar un corte que ya estaba, reescribiendo lo que trajo el archivo.
+ *
+ * Se llama SOLO despues de que `importarCronograma` devuelva
+ * `requiereConfirmacion` y una persona lo acepte con el riesgo delante.
+ *
+ * Reescribe la version EN SU SITIO: ni `version` ni `fechaCorte` cambian. Es
+ * lo que mantiene un punto por corte en la curva S, que era el motivo del
+ * guardia desde el principio.
+ *
+ * Lo que NO toca, y es deliberado: `AvanceTarea`, `MapeoTareaPartida`,
+ * `HitoObra` y los planes semanales. Ninguno cuelga de `TareaCronograma` por
+ * clave foranea —se anclan a `(projectId, uid)`— precisamente para sobrevivir
+ * a esto, como dice el esquema.
+ */
+export async function reemplazarCronograma(
+  sesion: SesionActiva,
+  obraId: string,
+  analisis: ResultadoAnalisisCronograma,
+  archivo: string,
+): Promise<ResultadoReemplazoCronograma> {
+  if (!puede(sesion, "cronograma:importar")) {
+    return { ok: false, error: "No tienes permiso para importar el cronograma." };
+  }
+
+  if (analisis.tareas.length === 0) {
+    return { ok: false, error: "El archivo no trae ninguna tarea que importar." };
+  }
+
+  if (!analisis.fechaCorte) {
+    return {
+      ok: false,
+      error:
+        "El archivo no trae fecha de estado (<StatusDate>). Fijala en MS Project " +
+        "y vuelve a exportarlo: es la fecha a la que estan referidos los avances.",
+    };
+  }
+
+  /**
+   * El espacio de UID negativos es de las tareas tecleadas en GCM, y el lector
+   * de MSPDI los admite (`entero()` usa `/^-?\d+$/`). Un archivo con UID
+   * negativo chocaria contra `@@unique([cronogramaId, uid])` a mitad de
+   * escritura, o peor: se llevaria el avance de una tarea manual a otra fila.
+   * Se corta aqui, con palabras, en vez de dejar que reviente.
+   */
+  const negativos = analisis.tareas.filter((t) => t.uid < 0).map((t) => t.uid);
+  if (negativos.length > 0) {
+    return {
+      ok: false,
+      error:
+        `El archivo trae UID negativos (${negativos.slice(0, 5).join(", ")}), que en ` +
+        `GCM son de las tareas escritas a mano. Renumeralos en MS Project antes de cargarlo.`,
+    };
+  }
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { id: true, estado: true, archivadaEn: true },
+  });
+
+  if (!obra) return { ok: false, error: "Obra no encontrada." };
+
+  const noAdmite = motivoNoAdmiteCambios(obra);
+  if (noAdmite) return { ok: false, error: noAdmite };
+
+  const fechaCorte = fechaDeObra(analisis.fechaCorte);
+
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        /**
+         * Se vuelve a comprobar TODO aqui dentro.
+         *
+         * Entre la pantalla de confirmacion y este momento pudo fijarse la
+         * linea base o entrar otro corte. Es el mismo patron que usa
+         * `edt-sincronizar`, y sin el la confirmacion autorizaria un estado
+         * que ya no existe.
+         */
+        const corte = await tx.cronograma.findFirst({
+          where: { projectId: obraId, fechaCorte, origen: "IMPORTADO" },
+          select: { id: true, version: true, lineaBaseAt: true },
+        });
+
+        if (!corte) {
+          return {
+            ok: false as const,
+            error: "Ese corte ya no esta cargado. Vuelve a subir el archivo.",
+          };
+        }
+
+        const impedimento = await motivoQueImpideReemplazar(tx, obraId, corte);
+        if (impedimento) return { ok: false as const, error: impedimento };
+
+        const conservadas = await tx.tareaCronograma.count({
+          where: { cronogramaId: corte.id, origen: "MANUAL" },
+        });
+
+        // El archivo manda sobre lo que el archivo trajo, y no opina sobre lo
+        // demas: las MANUAL se quedan donde estan.
+        await tx.tareaCronograma.deleteMany({
+          where: { cronogramaId: corte.id, origen: "IMPORTADO" },
+        });
+        await tx.dependenciaTarea.deleteMany({ where: { cronogramaId: corte.id } });
+
+        await tx.tareaCronograma.createMany({
+          data: analisis.tareas.map((t) => ({
+            cronogramaId: corte.id,
+            uid: t.uid,
+            fila: t.fila,
+            codigo: t.codigo,
+            nombre: t.nombre,
+            nivel: t.nivel,
+            esResumen: t.esResumen,
+            esHito: t.esHito,
+            esCritico: t.esCritico,
+            inicio: fechaDeObra(t.inicio),
+            fin: fechaDeObra(t.fin),
+            duracionDias: t.duracionDias,
+            porcentajePlaneado: t.porcentajePlaneado,
+            porcentajeArchivo: t.porcentajeArchivo,
+            holguraDias: t.holguraDias,
+            holguraInferida: t.holguraInferida,
+          })),
+        });
+
+        if (analisis.dependencias.length > 0) {
+          await tx.dependenciaTarea.createMany({
+            data: analisis.dependencias.map((d) => ({
+              cronogramaId: corte.id,
+              tareaUid: d.tareaUid,
+              predecesoraUid: d.predecesoraUid,
+              tipo: d.tipo,
+              desfaseDias: d.desfaseDias,
+            })),
+          });
+        }
+
+        // `version` y `fechaCorte` NO se tocan. Lo demas describe de donde
+        // salio lo que ahora hay dentro.
+        await tx.cronograma.update({
+          where: { id: corte.id },
+          data: {
+            nombreProyecto: analisis.nombreProyecto || "Cronograma",
+            minutosPorDia: analisis.minutosPorDia,
+            archivo: archivo.slice(0, 255),
+            importadoAt: new Date(),
+            importadoPor: `${sesion.nombres} ${sesion.apellidos}`.trim().slice(0, 150),
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            companyId: sesion.companyId,
+            userId: sesion.userId,
+            projectId: obraId,
+            entidad: "Cronograma",
+            entidadId: corte.id,
+            accion: "UPDATE",
+            despues: {
+              origen: "reemplazo-de-corte",
+              version: corte.version,
+              archivo: archivo.slice(0, 255),
+              fechaCorte: analisis.fechaCorte,
+              tareas: analisis.tareas.length,
+              dependencias: analisis.dependencias.length,
+              tareasManualesConservadas: conservadas,
+            },
+          },
+        });
+
+        return {
+          ok: true as const,
+          version: corte.version,
+          tareas: analisis.tareas.length,
+          dependencias: analisis.dependencias.length,
+          conservadas,
+        };
+      },
+      // Borra y reescribe el corte entero: se le da mas margen que al
+      // arranque por defecto, como hizo C-5 con la importacion de presupuesto.
+      { timeout: 20_000 },
+    );
+  } catch {
+    return {
+      ok: false,
+      error: "No se pudo reemplazar el cronograma. Vuelve a intentarlo en unos segundos.",
     };
   }
 }

@@ -9,7 +9,11 @@ import {
   type ResultadoAnalisisCronograma,
 } from "@/lib/msproject-xml";
 import { analizarCronogramaExcel } from "@/lib/excel-cronograma";
-import { importarCronograma } from "@/services/cronograma.service";
+import {
+  importarCronograma,
+  reemplazarCronograma,
+  type EnRiesgoPorReemplazoCronograma,
+} from "@/services/cronograma.service";
 import { convertirMppAXml, puedeConvertirMpp } from "@/services/mpp.service";
 
 /**
@@ -179,6 +183,11 @@ export async function accionAnalizar(
 
 export interface EstadoImportacionCronograma {
   error?: string;
+  /**
+   * El corte ya estaba y el archivo trae OTRO plan. No se ha escrito nada:
+   * hace falta que alguien vea lo que se lleva por delante y lo acepte.
+   */
+  riesgo?: EnRiesgoPorReemplazoCronograma;
 }
 
 export async function accionImportar(
@@ -215,10 +224,66 @@ export async function accionImportar(
 
   if (!resultado.ok) return { error: resultado.error };
 
+  /**
+   * Mismo corte, plan distinto: NO se ha escrito nada todavia.
+   *
+   * Se devuelve el riesgo a la pantalla en vez de redirigir, porque lo que
+   * viene despues destruye y quien lo autorice tiene que verlo antes.
+   */
+  if ("requiereConfirmacion" in resultado) {
+    return { riesgo: resultado.riesgo };
+  }
+
   revalidatePath(`/obras/${obraId}/cronograma`);
 
-  // Si el corte ya estaba cargado no se creo nada, y la pantalla lo dice en
-  // vez de fingir una importacion que no ha ocurrido.
+  // Si el corte ya estaba cargado CON EL MISMO PLAN no se creo nada, y la
+  // pantalla lo dice en vez de fingir una importacion que no ha ocurrido.
   const estado = resultado.yaEstaba ? "repetido" : "cargado";
   redirect(`/obras/${obraId}/cronograma?${estado}=${resultado.version}`);
+}
+
+/**
+ * Segundo paso del reemplazo: aplicar lo que la pantalla ya enseño.
+ *
+ * Va aparte de `accionImportar` a proposito. Que reemplazar tenga su propia
+ * accion —y su propia casilla de confirmacion— impide que un reintento del
+ * primer envio acabe reescribiendo un corte sin que nadie lo pidiera.
+ */
+export async function accionReemplazar(
+  _previo: EstadoImportacionCronograma,
+  datos: FormData,
+): Promise<EstadoImportacionCronograma> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  if (!puede(sesion, "cronograma:importar")) {
+    return { error: "No tienes permiso para importar el cronograma." };
+  }
+
+  const obraId = String(datos.get("obraId") ?? "");
+  if (!obraId) return { error: "Falta la obra de destino." };
+
+  if (datos.get("confirmado") !== "si") {
+    return { error: "Marca la casilla para confirmar que quieres reemplazar el corte." };
+  }
+
+  const validacion = validarArchivo(datos.get("archivo"));
+  if (!validacion.ok) return { error: validacion.error };
+
+  // Se reanaliza en el servidor, igual que al importar: lo que se guarda sale
+  // de aqui y no de lo que el navegador diga haber visto.
+  const leido = await analizarArchivo(validacion.archivo);
+  if (!leido.ok) return { error: leido.error };
+
+  const resultado = await reemplazarCronograma(
+    sesion,
+    obraId,
+    leido.analisis,
+    validacion.archivo.name,
+  );
+
+  if (!resultado.ok) return { error: resultado.error };
+
+  revalidatePath(`/obras/${obraId}/cronograma`);
+  redirect(`/obras/${obraId}/cronograma?reemplazado=${resultado.version}`);
 }

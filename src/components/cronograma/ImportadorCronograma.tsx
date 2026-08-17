@@ -6,7 +6,9 @@ import type { ResultadoAnalisisCronograma } from "@/lib/msproject-xml";
 import {
   accionAnalizar,
   accionImportar,
+  accionReemplazar,
 } from "@/app/(dashboard)/obras/[id]/cronograma/importar/acciones";
+import type { EnRiesgoPorReemplazoCronograma } from "@/services/cronograma.service";
 import { VistaPreviaCronograma } from "@/components/cronograma/VistaPreviaCronograma";
 import { fechaLarga } from "@/utils/fechas";
 
@@ -28,6 +30,13 @@ export function ImportadorCronograma({
   const [archivo, setArchivo] = useState<File | null>(null);
   const [analisis, setAnalisis] = useState<ResultadoAnalisisCronograma | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * El corte ya estaba y el archivo trae otro plan. Mientras esto tenga valor,
+   * NADA se ha escrito: es la pantalla de «esto es lo que te llevas por
+   * delante» y el unico camino hacia `accionReemplazar`.
+   */
+  const [riesgo, setRiesgo] = useState<EnRiesgoPorReemplazoCronograma | null>(null);
+  const [confirmado, setConfirmado] = useState(false);
   const [pendiente, iniciarTransicion] = useTransition();
   const entradaArchivo = useRef<HTMLInputElement>(null);
 
@@ -35,6 +44,8 @@ export function ImportadorCronograma({
     setArchivo(null);
     setAnalisis(null);
     setError(null);
+    setRiesgo(null);
+    setConfirmado(false);
     if (entradaArchivo.current) entradaArchivo.current.value = "";
   }
 
@@ -43,6 +54,8 @@ export function ImportadorCronograma({
     setArchivo(elegido);
     setAnalisis(null);
     setError(null);
+    setRiesgo(null);
+    setConfirmado(false);
     if (!elegido) return;
 
     // Se analiza al instante: obligar a pulsar un boton extra solo para ver
@@ -68,6 +81,23 @@ export function ImportadorCronograma({
       // Si todo va bien la accion redirige y este componente se desmonta.
       const resultado = await accionImportar({}, datos);
       if (resultado?.error) setError(resultado.error);
+      // El corte ya estaba con OTRO plan: no se escribio nada y hay que
+      // ensenar lo que un reemplazo se llevaria por delante.
+      else if (resultado?.riesgo) setRiesgo(resultado.riesgo);
+    });
+  }
+
+  function reemplazar() {
+    if (!archivo) return;
+
+    const datos = new FormData();
+    datos.append("archivo", archivo);
+    datos.append("obraId", obraId);
+    datos.append("confirmado", "si");
+
+    iniciarTransicion(async () => {
+      const resultado = await accionReemplazar({}, datos);
+      if (resultado?.error) setError(resultado.error);
     });
   }
 
@@ -77,8 +107,16 @@ export function ImportadorCronograma({
     analisis?.fechaCorte !== null &&
     cortesCargados.includes(analisis.fechaCorte);
 
-  const puedeImportar =
-    hayTareas && !!analisis?.fechaCorte && !corteRepetido && !pendiente;
+  /**
+   * Un corte repetido YA NO bloquea el boton.
+   *
+   * Bloquearlo aqui dejaba sin salida el unico camino que hay para corregir un
+   * corte ya cargado —no existe borrar una version importada—, y encima
+   * escondia el caso bueno: si el archivo trae el mismo plan, el servidor
+   * responde «ya estaba» y no escribe nada. Quien decide es el servidor, que
+   * compara el plan; la pantalla solo avisa de lo que va a pasar.
+   */
+  const puedeImportar = hayTareas && !!analisis?.fechaCorte && !pendiente;
 
   return (
     <div className="space-y-6">
@@ -197,8 +235,11 @@ export function ImportadorCronograma({
               <span>
                 El corte del{" "}
                 <strong>{fechaLarga(new Date(`${analisis.fechaCorte}T00:00:00Z`))}</strong>{" "}
-                ya está cargado. Para registrar uno nuevo, fija otra fecha de
-                estado en MS Project y vuelve a exportar.
+                ya está cargado. Si el archivo trae el mismo plan no se
+                guardará nada; si trae cambios, GCM te enseñará qué se
+                reescribe antes de tocar nada. Para registrar un corte{" "}
+                <em>nuevo</em>, fija otra fecha de estado en MS Project y
+                vuelve a exportar.
               </span>
             </div>
           )}
@@ -215,8 +256,18 @@ export function ImportadorCronograma({
             )}
             {pendiente
               ? "Cargando..."
-              : `Cargar ${analisis?.totalTareas ?? 0} tareas`}
+              : corteRepetido
+                ? "Comprobar si el archivo trae cambios"
+                : `Cargar ${analisis?.totalTareas ?? 0} tareas`}
           </button>
+
+          {riesgo && <PanelDeReemplazo
+            riesgo={riesgo}
+            confirmado={confirmado}
+            alConfirmar={setConfirmado}
+            alReemplazar={reemplazar}
+            pendiente={pendiente}
+          />}
 
           {analisis && analisis.errores.length > 0 && (
             <p className="mt-2 text-xs opacity-70">
@@ -246,5 +297,133 @@ function Seccion({
       <h2 className="text-sm font-semibold">{titulo}</h2>
       {children}
     </section>
+  );
+}
+
+/**
+ * Lo que un reemplazo se lleva por delante, antes de autorizarlo.
+ *
+ * El orden de la lista no es decorativo: primero lo que NO vuelve —el avance
+ * y los mapeos que se quedan sin tarea—, y solo despues los conteos. Un
+ * «se reescriben 107 tareas» a secas se lee como rutina, que es justo lo que
+ * este panel existe para evitar.
+ */
+function PanelDeReemplazo({
+  riesgo,
+  confirmado,
+  alConfirmar,
+  alReemplazar,
+  pendiente,
+}: {
+  riesgo: EnRiesgoPorReemplazoCronograma;
+  confirmado: boolean;
+  alConfirmar: (v: boolean) => void;
+  alReemplazar: () => void;
+  pendiente: boolean;
+}) {
+  const huerfanos = riesgo.uidsQueDesaparecen.filter(
+    (u) => u.avances > 0 || u.mapeos > 0,
+  );
+
+  return (
+    <div
+      className="mt-4 rounded-lg border p-4"
+      style={{ borderColor: "var(--color-alerta)" }}
+    >
+      <h3 className="text-sm font-semibold">
+        Ese corte ya está cargado y el archivo trae otro plan
+      </h3>
+
+      <p className="mt-1 text-sm opacity-70">
+        Todavía no se ha guardado nada. Reemplazar reescribe la versión{" "}
+        <strong>v{riesgo.version}</strong> en su sitio: mantiene su fecha de
+        corte y su número, así que la curva S sigue con un solo punto ese día.
+      </p>
+
+      <ul className="mt-3 space-y-1 text-sm">
+        <li>
+          Se reescriben <strong>{riesgo.tareasImportadas}</strong> tareas que
+          vinieron de un archivo; el tuyo las trae otra vez.
+        </li>
+        {riesgo.tareasNuevas > 0 && (
+          <li>
+            Entran <strong>{riesgo.tareasNuevas}</strong> tareas nuevas.
+          </li>
+        )}
+        {riesgo.tareasManuales > 0 && (
+          <li>
+            Se <strong>conservan</strong> las {riesgo.tareasManuales} tareas
+            escritas a mano en GCM: el archivo no opina sobre ellas.
+          </li>
+        )}
+      </ul>
+
+      {huerfanos.length > 0 && (
+        <div className="mt-3">
+          <p className="text-sm font-medium">
+            Esto es lo que no vuelve solo:
+          </p>
+          <p className="mt-1 text-sm opacity-70">
+            {riesgo.avancesHuerfanos > 0 && (
+              <>
+                <strong>{riesgo.avancesHuerfanos}</strong> reportes de avance
+              </>
+            )}
+            {riesgo.avancesHuerfanos > 0 && riesgo.mapeosHuerfanos > 0 && " y "}
+            {riesgo.mapeosHuerfanos > 0 && (
+              <>
+                <strong>{riesgo.mapeosHuerfanos}</strong> mapeos con el
+                presupuesto, que confirmó una persona uno a uno
+              </>
+            )}{" "}
+            quedan sin tarea, porque el archivo nuevo ya no trae su UID. No se
+            borran —siguen guardados—, pero dejan de aparecer hasta que un
+            corte vuelva a traer esos UID.
+          </p>
+
+          <ul className="mt-2 space-y-1 text-xs opacity-80">
+            {huerfanos.slice(0, 8).map((u) => (
+              <li key={u.uid}>
+                <strong>{u.uid}</strong> · {u.nombre}
+                {u.avances > 0 && ` · ${u.avances} avances`}
+                {u.mapeos > 0 && ` · ${u.mapeos} mapeos`}
+              </li>
+            ))}
+          </ul>
+
+          {huerfanos.length > 8 && (
+            <p className="mt-1 text-xs opacity-70">
+              …y {huerfanos.length - 8} más.
+            </p>
+          )}
+        </div>
+      )}
+
+      <label className="mt-4 flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={confirmado}
+          onChange={(e) => alConfirmar(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          Entiendo que se reescribe la versión v{riesgo.version} del{" "}
+          {riesgo.fechaCorte} con lo que trae este archivo.
+        </span>
+      </label>
+
+      <button
+        type="button"
+        onClick={alReemplazar}
+        disabled={!confirmado || pendiente}
+        className="mt-3 flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+        style={{ backgroundColor: "var(--color-peligro)" }}
+      >
+        {pendiente && (
+          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+        )}
+        {pendiente ? "Reemplazando..." : "Reemplazar el corte"}
+      </button>
+    </div>
   );
 }

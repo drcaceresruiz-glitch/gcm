@@ -70,13 +70,13 @@ export default async function CronogramaPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ cargado?: string; repetido?: string }>;
+  searchParams: Promise<{ cargado?: string; repetido?: string; reemplazado?: string }>;
 }) {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
   const { id } = await params;
-  const { cargado, repetido } = await searchParams;
+  const { cargado, repetido, reemplazado } = await searchParams;
 
   const obra = await obtenerObra(sesion, id);
   if (!obra) notFound();
@@ -186,9 +186,17 @@ export default async function CronogramaPage({
 
       {repetido && (
         <Mensaje tono="alerta" icono={<Info className="size-4 shrink-0" />}>
-          Ese corte ya estaba cargado (versión {repetido}), así que no se ha
-          creado ninguna versión nueva. Para registrar un corte nuevo, fija otra
-          fecha de estado en MS Project y vuelve a exportar.
+          Ese corte ya estaba cargado (versión {repetido}) y el archivo traía el
+          mismo plan, así que no se ha cambiado nada. Para registrar un corte
+          nuevo, fija otra fecha de estado en MS Project y vuelve a exportar.
+        </Mensaje>
+      )}
+
+      {reemplazado && (
+        <Mensaje tono="exito" icono={<CheckCircle2 className="size-4 shrink-0" />}>
+          Corte reemplazado: la versión {reemplazado} se ha reescrito con el
+          archivo nuevo, conservando su fecha de corte y las tareas que
+          escribiste a mano.
         </Mensaje>
       )}
 
