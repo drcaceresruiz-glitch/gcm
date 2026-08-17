@@ -90,6 +90,7 @@ vi.mock("@/lib/prisma", () => {
       movimientoLinea: sujecion("movimiento"),
       metaItemPartida: sujecion("meta"),
       proveedorPartida: sujecion("proveedor"),
+      avanceTarea: sujecion("avance"),
       // Sin revision, el presupuesto esta abierto. Las pruebas de renumeracion
       // la encienden para comprobar que entonces se niega.
       baseline: { findFirst: () => Promise.resolve(estado.revision) },
@@ -1137,5 +1138,88 @@ describe("crear un capitulo puede descubrir dinero que estaba cubierto", () => {
 
     expect(r.ok).toBe(true);
     expect(r.ok === true && r.datos.aviso).toBeUndefined();
+  });
+});
+
+
+/**
+ * Una partida iniciada NO SE BORRA. Nunca.
+ *
+ * Es la unica puerta del presupuesto sin segundo paso. Las demas dejan
+ * confirmar porque lo que se pierde es una referencia; aqui lo que se perderia
+ * es historia: alguien fue a obra, lo hizo y lo reporto. Borrar la partida no
+ * borra ese hecho, borra su unica constancia, y con ella la curva S y el valor
+ * ganado se mueven hacia atras sin que nadie haya deshecho nada de verdad.
+ *
+ * La base no lo impedia: el avance no cuelga de la partida por clave ajena, se
+ * ancla al `uid` de la tarea y lo que los une es el mapeo POR CODIGO.
+ */
+describe("borrar una partida que ya se empezo", () => {
+  function partidaEnEjecucion() {
+    estado.partida = {
+      id: "p1",
+      projectId: "obra",
+      codigoPartida: "4.1",
+      descripcion: "Concreto en zapatas",
+      tipo: "PARTIDA",
+      modalidad: "PRECIOS_UNITARIOS",
+      unidad: "m3",
+      metrado: null,
+      precioUnitario: null,
+      parcial: null,
+      project: { id: "obra", estado: "EN_EJECUCION", archivadaEn: null },
+    };
+    estado.mapeos = [{ id: "m1", codigoPartida: "4.1" }];
+  }
+
+  it("se niega SIEMPRE si hay avance reportado", async () => {
+    partidaEnEjecucion();
+    estado.sujeciones = { avance: 2 };
+
+    const r = await eliminarPartida(sesion, "p1");
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("2 reporte");
+    expect(estado.borrada).toBeNull();
+  });
+
+  /**
+   * Y no hay confirmacion que lo salte. `eliminarPartida` no admite un
+   * segundo argumento para forzarlo, a proposito: si existiera, alguien lo
+   * usaria un viernes por la tarde.
+   */
+  it("no hay forma de forzarlo", async () => {
+    partidaEnEjecucion();
+    estado.sujeciones = { avance: 1 };
+
+    // Se llama con todo lo que se pueda pasar; da igual.
+    const r = await (eliminarPartida as unknown as (
+      s: unknown, id: string, forzar?: boolean,
+    ) => Promise<{ ok: boolean }>)(sesion, "p1", true);
+
+    expect(r.ok).toBe(false);
+    expect(estado.borrada).toBeNull();
+  });
+
+  it("enlazada al cronograma pero sin avance, lo dice y tampoco borra", async () => {
+    partidaEnEjecucion();
+    estado.sujeciones = { avance: 0 };
+
+    const r = await eliminarPartida(sesion, "p1");
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("cronograma");
+    expect(estado.borrada).toBeNull();
+  });
+
+  it("sin mapeo ni avance, se borra como siempre", async () => {
+    partidaEnEjecucion();
+    estado.mapeos = [];
+    estado.sujeciones = {};
+
+    const r = await eliminarPartida(sesion, "p1");
+
+    expect(r.ok).toBe(true);
+    expect(estado.borrada).toBe("p1");
   });
 });

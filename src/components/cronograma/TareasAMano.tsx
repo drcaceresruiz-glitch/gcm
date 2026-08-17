@@ -19,6 +19,8 @@ export interface TareaManual {
   duracionDias: string;
   porcentajePlaneado: string;
   esHito: boolean;
+  nivel: number;
+  esResumen: boolean;
 }
 
 /**
@@ -40,6 +42,7 @@ const VACIA = {
   duracionDias: "",
   porcentajePlaneado: "",
   esHito: false,
+  padreUid: "",
 };
 
 function Campo({
@@ -106,6 +109,9 @@ export function TareasAMano({
         duracionDias: campos.duracionDias,
         porcentajePlaneado: campos.porcentajePlaneado || null,
         esHito: campos.esHito,
+        // Solo al CREAR: mover una tarea de sitio arrastra a las suyas y eso
+        // es otra operacion, no un campo mas de este formulario.
+        padreUid: campos.padreUid === "" ? null : Number(campos.padreUid),
       };
 
       const r =
@@ -135,6 +141,7 @@ export function TareasAMano({
       duracionDias: t.duracionDias,
       porcentajePlaneado: t.porcentajePlaneado,
       esHito: t.esHito,
+      padreUid: "",
     });
   }
 
@@ -181,8 +188,15 @@ export function TareasAMano({
               {tareas.map((t) => (
                 <tr key={t.uid} className="border-t" style={{ borderColor: "var(--borde)" }}>
                   <td className="px-3 py-2 tabular-nums opacity-70">{t.codigo ?? "—"}</td>
-                  <td className="px-3 py-2">
-                    {t.nombre}
+                  {/* La sangria ES la jerarquia: en un cronograma el nivel mas
+                      el orden es lo unico que dice quien cuelga de quien. */}
+                  <td
+                    className="px-3 py-2"
+                    style={{ paddingLeft: `${0.75 + (t.nivel - 1) * 1.25}rem` }}
+                  >
+                    <span className={t.esResumen ? "font-medium" : undefined}>
+                      {t.nombre}
+                    </span>
                     {t.esHito && <span className="ml-2 text-xs opacity-60">(hito)</span>}
                   </td>
                   <td className="px-3 py-2 tabular-nums">{t.inicio}</td>
@@ -282,6 +296,34 @@ export function TareasAMano({
                 tareas nacen sin ella y con la holgura marcada como no conocida.
                 No se inventa lo que el archivo sabría y aquí no se sabe.
               </p>
+
+              {/* Solo al crear. Mover una tarea ya escrita arrastra a todas
+                  las suyas, y eso es otra operacion distinta de editarla. */}
+              {editando === null && tareas.length > 0 && (
+                <label className="mt-4 block text-xs">
+                  <span className="mb-0.5 block font-medium opacity-70">
+                    Cuelga de
+                  </span>
+                  <select
+                    value={campos.padreUid}
+                    onChange={(e) => setCampos({ ...campos, padreUid: e.target.value })}
+                    className="w-full max-w-lg rounded border px-2 py-1.5 text-sm"
+                    style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+                  >
+                    <option value="">Nada: va al primer nivel</option>
+                    {tareas.map((t) => (
+                      <option key={t.uid} value={t.uid}>
+                        {" ".repeat((t.nivel - 1) * 3)}
+                        {t.codigo ? `${t.codigo} ` : ""}
+                        {t.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="mt-0.5 block opacity-60">
+                    Entra justo detrás de lo que ya cuelgue de ella.
+                  </span>
+                </label>
+              )}
 
               <div className="mt-4 flex flex-wrap items-start gap-3">
                 <Campo
