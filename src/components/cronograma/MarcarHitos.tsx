@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, Diamond, LoaderCircle, Trash2 } from "lucide-react";
 
 import {
+  accionAsignarResponsable,
   accionCrearHito,
   accionEliminarHito,
 } from "@/app/(dashboard)/obras/[id]/cronograma/acciones-hitos";
@@ -15,6 +16,9 @@ export interface HitoMarcado {
   fecha: string;
   anclaCodigo: string | null;
   diasAviso: number;
+  responsableClave: string | null;
+  /// Nulo con clave puesta = se hizo cargo y despues causo baja.
+  responsableNombre: string | null;
 }
 
 /// Una partida o capitulo al que anclar el hito.
@@ -22,6 +26,13 @@ export interface AnclaPosible {
   codigo: string;
   nombre: string;
   nivel: number;
+}
+
+/// Quien puede responder de un hito: de la obra, o de fuera.
+export interface PersonaPosible {
+  clave: string;
+  nombre: string;
+  externo: boolean;
 }
 
 const VACIO = { nombre: "", fecha: "", anclaCodigo: "", diasAviso: "7" };
@@ -41,12 +52,14 @@ export function MarcarHitos({
   obraId,
   hitos,
   anclas,
+  personas,
   puedeEditar,
   puedeEliminar,
 }: {
   obraId: string;
   hitos: HitoMarcado[];
   anclas: AnclaPosible[];
+  personas: PersonaPosible[];
   puedeEditar: boolean;
   puedeEliminar: boolean;
 }) {
@@ -80,6 +93,18 @@ export function MarcarHitos({
       setCampos({ ...VACIO });
       setAbierto(false);
       if (r.aviso) setAviso(r.aviso);
+      router.refresh();
+    });
+  }
+
+  function asignar(uid: number, clave: string) {
+    setError(null);
+    ir(async () => {
+      const r = await accionAsignarResponsable(obraId, uid, clave || null);
+      if (!r.ok) {
+        setError(r.error ?? "No se pudo asignar el responsable.");
+        return;
+      }
       router.refresh();
     });
   }
@@ -118,6 +143,39 @@ export function MarcarHitos({
               </span>
               <span className="tabular-nums opacity-70">{h.fecha}</span>
               <span className="text-xs opacity-50">avisa {h.diasAviso} d antes</span>
+
+              {puedeEditar ? (
+                <label className="flex items-center gap-1 text-xs">
+                  <span className="sr-only">Responsable de {h.nombre}</span>
+                  <select
+                    value={h.responsableClave ?? ""}
+                    disabled={yendo}
+                    onChange={(e) => asignar(h.uid, e.target.value)}
+                    className="rounded border px-1.5 py-1 text-xs"
+                    style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+                  >
+                    <option value="">— sin responsable —</option>
+                    {personas.map((p) => (
+                      <option key={p.clave} value={p.clave}>
+                        {p.nombre}
+                        {p.externo ? " (externo)" : ""}
+                      </option>
+                    ))}
+                    {/* Quien se hizo cargo y despues causo baja: sigue en la
+                        fila, pero ya no esta en la lista de elegibles. */}
+                    {h.responsableClave &&
+                      !personas.some((p) => p.clave === h.responsableClave) && (
+                        <option value={h.responsableClave}>
+                          {h.responsableNombre ?? "— ya no está en la obra —"}
+                        </option>
+                      )}
+                  </select>
+                </label>
+              ) : (
+                <span className="text-xs opacity-60">
+                  {h.responsableNombre ?? (h.responsableClave ? "ya no está" : "sin responsable")}
+                </span>
+              )}
               {puedeEliminar && (
                 <button
                   type="button"

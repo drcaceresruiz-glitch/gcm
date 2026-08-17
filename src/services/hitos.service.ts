@@ -298,6 +298,156 @@ export interface HitoListado {
   fecha: string;
   anclaCodigo: string | null;
   diasAviso: number;
+  /// La clave del responsable, para el desplegable. Nulo si no tiene.
+  responsableClave: string | null;
+  /**
+   * Su nombre, o nulo si ya no se puede resolver.
+   *
+   * Con clave pero sin nombre significa que esa persona causo baja despues de
+   * hacerse cargo: la traza se conserva —`SET NULL` solo actua al BORRAR la
+   * fila, y aqui se da de baja, que no es lo mismo— pero ya no hay a quien
+   * escribir. La pantalla lo dice en vez de callarlo.
+   */
+  responsableNombre: string | null;
+}
+
+export interface PersonaPosible {
+  /// "u:" mas el id para alguien de GCM; "c:" mas el id para alguien de fuera.
+  clave: string;
+  nombre: string;
+  externo: boolean;
+}
+
+/**
+ * Quien puede responder de un hito.
+ *
+ * Los de la obra primero, y despues los contactos externos. El orden no es
+ * cosmetico: el responsable es quien responde DENTRO de la organizacion —el
+ * residente, el jefe de campo—, no el proveedor al que se persigue. Se permite
+ * elegir a alguien de fuera —la supervision, el cliente— porque a veces la
+ * fecha depende de ellos, pero no es lo que se ofrece primero.
+ *
+ * Solo gente viva: un usuario dado de baja o un contacto desactivado no puede
+ * hacerse cargo de nada.
+ */
+export async function personasParaResponsable(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<PersonaPosible[]> {
+  if (!puede(sesion, "cronograma:leer")) return [];
+
+  const [miembros, contactos] = await Promise.all([
+    prisma.projectMembership.findMany({
+      where: {
+        projectId: obraId,
+        project: { companyId: sesion.companyId },
+        user: { estado: "ACTIVO" },
+      },
+      select: { user: { select: { id: true, nombres: true, apellidos: true } } },
+    }),
+    prisma.contactoAviso.findMany({
+      where: { projectId: obraId, activo: true },
+      select: { id: true, nombre: true },
+    }),
+  ]);
+
+  const dentro = miembros
+    .map((m) => ({
+      clave: `u:${m.user.id}`,
+      nombre: `${m.user.nombres} ${m.user.apellidos}`.trim(),
+      externo: false,
+    }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  const fuera = contactos
+    .map((c) => ({ clave: `c:${c.id}`, nombre: c.nombre, externo: true }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  return [...dentro, ...fuera];
+}
+
+/**
+ * Pone —o quita— el nombre de alguien encima de un hito.
+ *
+ * UNO DE LOS DOS, NUNCA AMBOS. La base no puede exigirlo con dos claves
+ * ajenas opcionales, asi que se comprueba aqui: `clave` trae "u:" o "c:", y de
+ * ahi sale cual de las dos columnas se llena. `null` lo deja sin responsable.
+ *
+ * Y se comprueba que esa persona sea DE ESTA OBRA. Sin esto, alterando el
+ * identificador se podria poner de responsable a alguien de otra empresa, que
+ * es una fuga de nombres entre clientes.
+ */
+export async function asignarResponsable(
+  sesion: SesionActiva,
+  obraId: string,
+  uid: number,
+  clave: string | null,
+): Promise<Resultado> {
+  if (!puede(sesion, "cronograma:editar")) {
+    return { ok: false, error: "No tienes permiso para editar el cronograma." };
+  }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
+  const hito = await prisma.hitoObra.findFirst({
+    where: { projectId: obraId, uid, project: { companyId: sesion.companyId } },
+    select: { id: true },
+  });
+  if (!hito) return { ok: false, error: "Ese hito no existe en esta obra." };
+
+  let responsableUserId: string | null = null;
+  let responsableContactoId: string | null = null;
+
+  if (clave) {
+    const id = clave.slice(2);
+
+    if (clave.startsWith("u:")) {
+      const miembro = await prisma.projectMembership.findFirst({
+        where: {
+          projectId: obraId,
+          userId: id,
+          project: { companyId: sesion.companyId },
+          user: { estado: "ACTIVO" },
+        },
+        select: { id: true },
+      });
+      if (!miembro) {
+        return { ok: false, error: "Esa persona no esta en la obra." };
+      }
+      responsableUserId = id;
+    } else if (clave.startsWith("c:")) {
+      const contacto = await prisma.contactoAviso.findFirst({
+        where: { id, projectId: obraId, activo: true },
+        select: { id: true },
+      });
+      if (!contacto) {
+        return { ok: false, error: "Ese contacto no esta en la obra." };
+      }
+      responsableContactoId = id;
+    } else {
+      return { ok: false, error: "No se reconoce a esa persona." };
+    }
+  }
+
+  await prisma.hitoObra.update({
+    where: { id: hito.id },
+    data: { responsableUserId, responsableContactoId },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      companyId: sesion.companyId,
+      userId: sesion.userId,
+      projectId: obraId,
+      entidad: "Cronograma",
+      entidadId: hito.id,
+      accion: "UPDATE",
+      despues: { evento: "hito_responsable", uid, clave },
+    },
+  });
+
+  return { ok: true };
 }
 
 export interface AnclaPosible {
@@ -348,7 +498,17 @@ export async function listarHitos(
 
   const hitos = await prisma.hitoObra.findMany({
     where: { projectId: obraId },
-    select: { uid: true, anclaCodigo: true, diasAviso: true },
+    select: {
+      uid: true,
+      anclaCodigo: true,
+      diasAviso: true,
+      responsableUserId: true,
+      responsableContactoId: true,
+      // Se traen los nombres por la relacion, no con otra consulta: asi el
+      // que ya no se puede resolver llega como `null` y se distingue solo.
+      responsable: { select: { nombres: true, apellidos: true, estado: true } },
+      contacto: { select: { nombre: true, activo: true } },
+    },
   });
   if (hitos.length === 0) return [];
 
@@ -360,11 +520,33 @@ export async function listarHitos(
 
   const porUid = new Map(hitos.map((h) => [h.uid, h]));
 
-  return tareas.map((t) => ({
-    uid: t.uid,
-    nombre: t.nombre,
-    fecha: t.fin.toISOString().slice(0, 10),
-    anclaCodigo: porUid.get(t.uid)?.anclaCodigo ?? null,
-    diasAviso: porUid.get(t.uid)?.diasAviso ?? 7,
-  }));
+  return tareas.map((t) => {
+    const h = porUid.get(t.uid);
+
+    const clave = h?.responsableUserId
+      ? `u:${h.responsableUserId}`
+      : h?.responsableContactoId
+        ? `c:${h.responsableContactoId}`
+        : null;
+
+    // Dado de baja no es lo mismo que borrado: la fila sigue apuntando a el,
+    // pero ya no hay a quien escribir. Se devuelve sin nombre para poder
+    // decirlo en pantalla.
+    const nombre =
+      h?.responsable && h.responsable.estado === "ACTIVO"
+        ? `${h.responsable.nombres} ${h.responsable.apellidos}`.trim()
+        : h?.contacto && h.contacto.activo
+          ? h.contacto.nombre
+          : null;
+
+    return {
+      uid: t.uid,
+      nombre: t.nombre,
+      fecha: t.fin.toISOString().slice(0, 10),
+      anclaCodigo: h?.anclaCodigo ?? null,
+      diasAviso: h?.diasAviso ?? 7,
+      responsableClave: clave,
+      responsableNombre: nombre,
+    };
+  });
 }

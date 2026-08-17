@@ -44,7 +44,11 @@ import { TareasAMano } from "@/components/cronograma/TareasAMano";
 import { GenerarEdt } from "@/components/cronograma/GenerarEdt";
 import { SincronizarEdt } from "@/components/cronograma/SincronizarEdt";
 import { MarcarHitos } from "@/components/cronograma/MarcarHitos";
-import { listarHitos, partidasParaAnclar } from "@/services/hitos.service";
+import {
+  listarHitos,
+  partidasParaAnclar,
+  personasParaResponsable,
+} from "@/services/hitos.service";
 import { listarTareasManuales } from "@/services/cronograma-manual.service";
 
 export const metadata: Metadata = { title: "Cronograma" };
@@ -98,9 +102,10 @@ export default async function CronogramaPage({
 
   // Los hitos que ya estan marcados, y las partidas a las que se puede anclar
   // uno nuevo. Los capitulos entran: «fin de estructuras» cuelga del capitulo.
-  const [hitosMarcados, anclasPosibles] = await Promise.all([
+  const [hitosMarcados, anclasPosibles, personasPosibles] = await Promise.all([
     listarHitos(sesion, id),
     partidasParaAnclar(sesion, id),
+    personasParaResponsable(sesion, id),
   ]);
   const puedeLineaBase = puede(sesion, "cronograma:linea_base");
 
@@ -379,6 +384,7 @@ export default async function CronogramaPage({
               obraId={id}
               hitos={hitosMarcados}
               anclas={anclasPosibles}
+              personas={personasPosibles}
               puedeEditar={puedeEditarTareas}
               puedeEliminar={puedeEliminarTareas}
             />

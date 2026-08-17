@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
-import { crearHito, eliminarHito, type NuevoHito } from "@/services/hitos.service";
+import {
+  asignarResponsable,
+  crearHito,
+  eliminarHito,
+  type NuevoHito,
+} from "@/services/hitos.service";
 
 /**
  * Marcar y quitar hitos sobre la EDT.
@@ -43,6 +48,32 @@ export async function accionCrearHito(
     return { ok: true, uid: r.datos.uid, aviso: r.datos.aviso };
   } catch (e) {
     console.error("[hitos] fallo al crear", e);
+    return { ok: false, error: mensaje(e) };
+  }
+}
+
+/**
+ * Pone el nombre de alguien encima de un hito, o se lo quita.
+ *
+ * `clave` vacia = sin responsable. Un hito sin nombre no es un plan: cuando
+ * llegue el aviso, no habra a quien escribirle.
+ */
+export async function accionAsignarResponsable(
+  obraId: string,
+  uid: number,
+  clave: string | null,
+): Promise<RespuestaHito> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  try {
+    const r = await asignarResponsable(sesion, obraId, uid, clave || null);
+    if (!r.ok) return { ok: false, error: r.error };
+
+    revalidatePath(`/obras/${obraId}`, "layout");
+    return { ok: true };
+  } catch (e) {
+    console.error("[hitos] fallo al asignar responsable", e);
     return { ok: false, error: mensaje(e) };
   }
 }
