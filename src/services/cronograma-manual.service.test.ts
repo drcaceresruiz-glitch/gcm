@@ -34,7 +34,12 @@ const estado: {
   avances: number;
   mapeos: number;
   borrados: string[];
+  /// Las tareas del cronograma, en orden de fila. Es de donde sale la EDT.
+  orden: { uid: number; fila: number; nivel: number }[];
+  corrimientos: Record<string, unknown>[];
 } = {
+  orden: [],
+  corrimientos: [],
   obra: { id: "obra", ultimoUidManual: 0 },
   vigente: { id: "cro", version: 1, lineaBaseAt: null },
   tarea: null,
@@ -49,10 +54,22 @@ const estado: {
 
 vi.mock("@/lib/prisma", () => {
   const tareaCronograma = {
-    findFirst: (args: { orderBy?: unknown }) =>
-      // La misma funcion sirve para buscar la tarea y para pedir la ultima
-      // fila; se distinguen por el `orderBy`.
-      Promise.resolve(args.orderBy ? { fila: 7 } : estado.tarea),
+    // Buscar POR UID es la comprobacion del padre; sin uid, es la tarea que se
+    // esta editando o borrando.
+    // Dos consultas distintas con la misma forma: la del padre pide solo el
+    // `uid`; la de la tarea que se edita o borra pide `id` y `origen`. Se
+    // distinguen por lo que SELECCIONAN, no por el filtro.
+    findFirst: (args: { where?: { uid?: number }; select?: { id?: boolean } }) =>
+      Promise.resolve(
+        args.select?.id
+          ? estado.tarea
+          : (estado.orden.find((t) => t.uid === args.where?.uid) ?? null),
+      ),
+    findMany: () => Promise.resolve(estado.orden),
+    updateMany: (args: { data: Record<string, unknown> }) => {
+      estado.corrimientos.push(args.data);
+      return Promise.resolve({ count: 0 });
+    },
     create: (args: { data: Record<string, unknown> }) => {
       estado.creada = args.data;
       return Promise.resolve({ id: "t-nueva" });
@@ -150,6 +167,8 @@ beforeEach(() => {
   estado.avances = 0;
   estado.mapeos = 0;
   estado.borrados = [];
+  estado.orden = [];
+  estado.corrimientos = [];
 });
 
 describe("crear una tarea a mano", () => {
@@ -293,5 +312,113 @@ describe("borrar avisa antes de destruir", () => {
 
     expect(r.ok).toBe(true);
     expect(estado.borradaId).toBe("t1");
+  });
+});
+
+
+/**
+ * La EDT: capitulos, subcapitulos y paquetes de trabajo.
+ *
+ * En el cronograma la jerarquia NO sale de un `parentId` —no existe—: sale del
+ * campo `nivel` MAS el orden del documento, que es como la exporta MS Project.
+ * Una tarea pertenece a la ultima anterior de nivel menor. Por eso elegir
+ * padre se traduce en dos cosas a la vez, y las dos tienen que cuadrar.
+ */
+describe("la jerarquia de una EDT tecleada", () => {
+  it("sin padre, la tarea va al primer nivel y al final", async () => {
+    estado.orden = [
+      { uid: -1, fila: 1, nivel: 1 },
+      { uid: -2, fila: 2, nivel: 2 },
+    ];
+
+    await crearTareaManual(sesion, "obra", tarea);
+
+    expect(estado.creada?.["nivel"]).toBe(1);
+    expect(estado.creada?.["fila"]).toBe(3);
+  });
+
+  it("con padre, hereda su nivel mas uno", async () => {
+    estado.orden = [{ uid: -1, fila: 1, nivel: 1 }];
+
+    await crearTareaManual(sesion, "obra", { ...tarea, padreUid: -1 });
+
+    expect(estado.creada?.["nivel"]).toBe(2);
+    expect(estado.creada?.["fila"]).toBe(2);
+  });
+
+  /**
+   * Lo que de verdad hace que la EDT se sostenga: la fila nueva entra DETRAS
+   * de todo lo que ya cuelga del padre. Ponerla al final la sacaria del grupo
+   * aunque su nivel dijera otra cosa, porque la pertenencia la da el orden.
+   */
+  it("entra detras de la ultima descendiente del padre, no al final", async () => {
+    estado.orden = [
+      { uid: -1, fila: 1, nivel: 1 }, // CAPITULO I      <- el padre
+      { uid: -2, fila: 2, nivel: 2 }, //   tarea suya
+      { uid: -3, fila: 3, nivel: 3 }, //     subtarea suya
+      { uid: -4, fila: 4, nivel: 1 }, // CAPITULO II     <- ya es otra rama
+    ];
+
+    await crearTareaManual(sesion, "obra", { ...tarea, padreUid: -1 });
+
+    // Detras de la fila 3, que es la ultima del capitulo I.
+    expect(estado.creada?.["fila"]).toBe(4);
+    expect(estado.creada?.["nivel"]).toBe(2);
+    // Y lo que venia detras se corre para hacerle sitio.
+    expect(estado.corrimientos).toContainEqual({ fila: { increment: 1 } });
+  });
+
+  it("marca al padre como tarea resumen", async () => {
+    estado.orden = [{ uid: -1, fila: 1, nivel: 1 }];
+
+    await crearTareaManual(sesion, "obra", { ...tarea, padreUid: -1 });
+
+    expect(estado.corrimientos).toContainEqual({ esResumen: true });
+  });
+
+  it("se niega si el padre elegido no existe", async () => {
+    estado.orden = [{ uid: -1, fila: 1, nivel: 1 }];
+
+    const r = await crearTareaManual(sesion, "obra", { ...tarea, padreUid: -99 });
+
+    expect(r.ok).toBe(false);
+    expect(estado.creada).toBeNull();
+  });
+});
+
+describe("borrar una tarea que agrupa a otras", () => {
+  /**
+   * Al desaparecer la madre, sus hijas conservan su nivel y pasan a colgar de
+   * lo que quede delante. No da ningun error: reorganiza la EDT sola.
+   */
+  it("se niega mientras tenga tareas dentro", async () => {
+    estado.tarea = { id: "t1", uid: -1, origen: "MANUAL", nombre: "CAPITULO I" };
+    estado.orden = [
+      { uid: -1, fila: 1, nivel: 1 },
+      { uid: -2, fila: 2, nivel: 2 },
+      { uid: -3, fila: 3, nivel: 3 },
+      { uid: -4, fila: 4, nivel: 1 },
+    ];
+
+    const r = await eliminarTareaManual(sesion, "obra", -1, true);
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("2 tarea");
+    expect(estado.borradaId).toBeNull();
+  });
+
+  it("borra la hoja, que no agrupa a nadie", async () => {
+    estado.tarea = { id: "t3", uid: -3, origen: "MANUAL", nombre: "Paquete" };
+    estado.orden = [
+      { uid: -1, fila: 1, nivel: 1 },
+      { uid: -2, fila: 2, nivel: 2 },
+      { uid: -3, fila: 3, nivel: 3 },
+      { uid: -4, fila: 4, nivel: 1 },
+    ];
+
+    const r = await eliminarTareaManual(sesion, "obra", -3);
+
+    expect(r.ok).toBe(true);
+    expect(estado.borradaId).toBe("t3");
   });
 });

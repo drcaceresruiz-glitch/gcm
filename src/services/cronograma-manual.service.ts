@@ -36,6 +36,17 @@ export interface TareaAMano {
   /// El "% planeado" que leera el informe. Cero si no se dice.
   porcentajePlaneado?: string | null;
   esHito?: boolean;
+  /**
+   * De que tarea cuelga, si cuelga de alguna. Es lo que hace que una EDT sea
+   * una EDT y no una lista.
+   *
+   * OJO: el cronograma no tiene `parentId`. La jerarquia sale del `nivel` mas
+   * el ORDEN del documento —una tarea pertenece a la ultima anterior de nivel
+   * menor—, que es como lo exporta MS Project. Asi que elegir padre aqui se
+   * traduce en dos cosas: el nivel del padre mas uno, y la posicion justo
+   * detras de su ultima descendiente.
+   */
+  padreUid?: number | null;
 }
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -119,6 +130,28 @@ export async function crearTareaManual(
     return { ok: false, error: "El % planeado tiene que estar entre 0 y 100." };
   }
 
+  /**
+   * El padre se comprueba ANTES de abrir la transaccion.
+   *
+   * Dentro tambien se vuelve a mirar —por si desaparece entre medias— pero
+   * alli solo cabe lanzar, y una excepcion es un mensaje generico. Aqui se
+   * puede decir lo que pasa.
+   */
+  if (tarea.padreUid !== null && tarea.padreUid !== undefined) {
+    if (!ctx.vigente) {
+      return { ok: false, error: "Esta obra no tiene cronograma del que colgar la tarea." };
+    }
+
+    const padre = await prisma.tareaCronograma.findFirst({
+      where: { cronogramaId: ctx.vigente.id, uid: tarea.padreUid },
+      select: { uid: true },
+    });
+
+    if (!padre) {
+      return { ok: false, error: "La tarea de la que quieres colgar esta ya no existe." };
+    }
+  }
+
   const quien = `${sesion.nombres} ${sesion.apellidos} (${sesion.email})`.trim().slice(0, 150);
 
   const salida = await prisma.$transaction(async (tx) => {
@@ -161,20 +194,64 @@ export async function crearTareaManual(
       cronogramaId = nuevo.id;
     }
 
-    const ultima = await tx.tareaCronograma.findFirst({
+    /**
+     * Donde entra la fila, y con que nivel.
+     *
+     * Sin padre, al final y a nivel 1. Con padre, JUSTO DETRAS de su ultima
+     * descendiente: en un cronograma la pertenencia la da el orden, asi que
+     * ponerla al final la sacaria del grupo aunque el nivel dijera lo
+     * contrario. Todo lo que venga despues se corre una fila.
+     */
+    const hermanas = await tx.tareaCronograma.findMany({
       where: { cronogramaId },
-      orderBy: { fila: "desc" },
-      select: { fila: true },
+      orderBy: { fila: "asc" },
+      select: { uid: true, fila: true, nivel: true },
     });
+
+    let nivel = 1;
+    let fila = (hermanas.at(-1)?.fila ?? 0) + 1;
+
+    if (tarea.padreUid !== null && tarea.padreUid !== undefined) {
+      const indice = hermanas.findIndex((t) => t.uid === tarea.padreUid);
+      const padre = hermanas[indice];
+
+      if (!padre) {
+        throw new Error("AVISO: la tarea de la que quieres colgar esta no existe.");
+      }
+
+      nivel = padre.nivel + 1;
+
+      // La ultima descendiente es la ultima seguida con nivel MAYOR que el
+      // padre; la primera de nivel igual o menor ya es de otra rama.
+      let ultima = indice;
+      for (let i = indice + 1; i < hermanas.length; i++) {
+        if ((hermanas[i]?.nivel ?? 0) <= padre.nivel) break;
+        ultima = i;
+      }
+
+      fila = (hermanas[ultima]?.fila ?? padre.fila) + 1;
+
+      await tx.tareaCronograma.updateMany({
+        where: { cronogramaId, fila: { gte: fila } },
+        data: { fila: { increment: 1 } },
+      });
+
+      // Quien tiene descendientes es una tarea RESUMEN: su duracion y su
+      // avance son los de lo que agrupa, no los suyos propios.
+      await tx.tareaCronograma.updateMany({
+        where: { cronogramaId, uid: padre.uid },
+        data: { esResumen: true },
+      });
+    }
 
     await tx.tareaCronograma.create({
       data: {
         cronogramaId,
         uid,
-        fila: (ultima?.fila ?? 0) + 1,
+        fila,
         codigo: tarea.codigo?.trim() ? tarea.codigo.trim().slice(0, 40) : null,
         nombre: tarea.nombre.trim().slice(0, 500),
-        nivel: 1,
+        nivel,
         esResumen: false,
         esHito: tarea.esHito ?? false,
         // Sin red de precedencias no hay ruta critica: no se inventa.
@@ -329,6 +406,39 @@ export async function eliminarTareaManual(
     };
   }
 
+  /**
+   * Una tarea con otras dentro no se borra sin mas.
+   *
+   * La pertenencia la da el ORDEN mas el nivel: al desaparecer la madre, sus
+   * hijas conservan su nivel y pasan a colgar de lo que quede delante, que
+   * puede ser cualquier cosa. No da error, reorganiza la EDT sola. Se exige
+   * vaciarla primero, igual que un capitulo del presupuesto.
+   */
+  const orden = await prisma.tareaCronograma.findMany({
+    where: { cronogramaId: ctx.vigente.id },
+    orderBy: { fila: "asc" },
+    select: { uid: true, nivel: true },
+  });
+
+  const indice = orden.findIndex((t) => t.uid === uid);
+  const nivelPropio = orden[indice]?.nivel ?? 1;
+  let dentro = 0;
+
+  for (let i = indice + 1; i < orden.length; i++) {
+    if ((orden[i]?.nivel ?? 0) <= nivelPropio) break;
+    dentro++;
+  }
+
+  if (dentro > 0) {
+    return {
+      ok: false,
+      error:
+        `"${fila.nombre}" tiene ${dentro} tarea(s) dentro. Borralas antes, o la ` +
+        `EDT se reorganizaria sola: sus hijas pasarian a colgar de la tarea que ` +
+        `quede delante.`,
+    };
+  }
+
   const [avances, mapeos] = await Promise.all([
     prisma.avanceTarea.count({ where: { projectId: obraId, uid } }),
     prisma.mapeoTareaPartida.count({ where: { projectId: obraId, uid } }),
@@ -388,6 +498,10 @@ export interface TareaManualListada {
   duracionDias: string;
   porcentajePlaneado: string;
   esHito: boolean;
+  /// Profundidad en la EDT. 1 es raiz. La pantalla lo pinta como sangria y lo
+  /// usa para ofrecer padres.
+  nivel: number;
+  esResumen: boolean;
 }
 
 /**
@@ -423,6 +537,8 @@ export async function listarTareasManuales(
       duracionDias: true,
       porcentajePlaneado: true,
       esHito: true,
+      nivel: true,
+      esResumen: true,
     },
   });
 
