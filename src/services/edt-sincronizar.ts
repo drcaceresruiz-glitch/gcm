@@ -357,9 +357,26 @@ export async function sincronizarEdtConPresupuesto(
         });
       }
 
-      // Mover filas cambia quien cuelga de quien, y con ello las fechas que
-      // hereda cada paquete.
-      await recalcularResumenes(tx, vigente.id);
+      /**
+       * Mover filas cambia quien cuelga de quien, y con ello las fechas que
+       * hereda cada paquete.
+       *
+       * Los SOBRANTES se quedan fuera del recalculo. Acaban de ser
+       * desterrados al final del documento, y alli la regla del orden —«es
+       * resumen quien tiene a la siguiente mas adentro»— dice algo distinto
+       * de lo que decia en su sitio: al ultimo no le cuelga nadie. Aplicarsela
+       * convierte en TRABAJO EJECUTABLE a una fila que solo agrupaba, y eso no
+       * se queda en lo cosmetico —entra en el denominador del avance
+       * ponderado, se ofrece en el Lookahead y se puede comprometer en el
+       * Plan Semanal—.
+       *
+       * Un sobrante no se recalcula: se queda como estaba y se informa.
+       */
+      await recalcularResumenes(
+        tx,
+        vigente.id,
+        new Set(plan.sobrantes.map((s) => s.uid)),
+      );
 
       const resumen = {
         version: vigente.version,

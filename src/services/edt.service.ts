@@ -57,6 +57,28 @@ export interface EdtGenerada {
 export async function recalcularResumenes(
   tx: ClienteTransaccion,
   cronogramaId: string,
+  /**
+   * Filas que NO se recalculan: se quedan exactamente como estaban.
+   *
+   * Son los SOBRANTES de la sincronizacion —lo que ya no sale del
+   * presupuesto—, y existen porque la regla del orden deja de significar lo
+   * que dice cuando una fila se destierra al final del documento.
+   *
+   * El caso que lo destapo: un cronograma importado con la plantilla oficial
+   * trae la obra como fila raiz de nivel 1. La sincronizacion la manda al
+   * final —no es ninguna partida— y alli, sin nada colgando por debajo, la
+   * regla la convierte en HOJA. Una cabecera pasaba a ser trabajo ejecutable:
+   * salia ofrecida en el Lookahead, se podia comprometer en el Plan Semanal y
+   * **entraba en el denominador del avance ponderado**, que es de donde sale
+   * la curva.
+   *
+   * OJO AL ALCANCE: esto protege el camino de la SINCRONIZACION, que es quien
+   * mueve la fila. Cualquier otra escritura que recalcule sin esta lista
+   * —editar una tarea a mano, por ejemplo— vuelve a aplicarle la regla y la
+   * degrada otra vez. La cura de verdad es que la EDT respete la cabecera en
+   * vez de desterrarla, y esa es otra obra.
+   */
+  intocables: ReadonlySet<number> = new Set(),
 ): Promise<void> {
   const tareas = await tx.tareaCronograma.findMany({
     where: { cronogramaId },
@@ -125,6 +147,11 @@ export async function recalcularResumenes(
   for (let i = 0; i < despues.length; i++) {
     const t = despues[i]!;
     const vieja = tareas[i]!;
+
+    // Los sobrantes participan en el orden —para no alterar lo que se deduce
+    // de las demas— pero no se les escribe nada.
+    if (intocables.has(vieja.uid)) continue;
+
     const cambios: Record<string, unknown> = {};
 
     if (vieja.esResumen !== t.esResumen) cambios["esResumen"] = t.esResumen;
