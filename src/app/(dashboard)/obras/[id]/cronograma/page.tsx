@@ -43,6 +43,8 @@ import { TablaCronograma } from "@/components/cronograma/TablaCronograma";
 import { TareasAMano } from "@/components/cronograma/TareasAMano";
 import { GenerarEdt } from "@/components/cronograma/GenerarEdt";
 import { SincronizarEdt } from "@/components/cronograma/SincronizarEdt";
+import { MarcarHitos } from "@/components/cronograma/MarcarHitos";
+import { listarHitos, partidasParaAnclar } from "@/services/hitos.service";
 import { listarTareasManuales } from "@/services/cronograma-manual.service";
 
 export const metadata: Metadata = { title: "Cronograma" };
@@ -93,6 +95,13 @@ export default async function CronogramaPage({
   // El regimen laboral de la obra: con el, el formulario calcula la duracion
   // de una tarea en dias de TRABAJO en cuanto se teclean sus dos fechas.
   const calendarioObra = await obtenerCalendario(sesion, id);
+
+  // Los hitos que ya estan marcados, y las partidas a las que se puede anclar
+  // uno nuevo. Los capitulos entran: «fin de estructuras» cuelga del capitulo.
+  const [hitosMarcados, anclasPosibles] = await Promise.all([
+    listarHitos(sesion, id),
+    partidasParaAnclar(sesion, id),
+  ]);
   const puedeLineaBase = puede(sesion, "cronograma:linea_base");
 
   // La fecha por defecto del reporte se alinea al ultimo dia de corte semanal.
@@ -362,6 +371,17 @@ export default async function CronogramaPage({
             </p>
 
             <Hitos filas={filasDeHitos} hayBase={baseCron !== null} />
+
+            {/* Los hitos los pone el planificador sobre la EDT ya generada: el
+                presupuesto dice que se construye y cuanto cuesta, no que fechas
+                son clave. */}
+            <MarcarHitos
+              obraId={id}
+              hitos={hitosMarcados}
+              anclas={anclasPosibles}
+              puedeEditar={puedeEditarTareas}
+              puedeEliminar={puedeEliminarTareas}
+            />
           </Tarjeta>
 
           <Tarjeta>

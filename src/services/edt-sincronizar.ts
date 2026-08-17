@@ -157,7 +157,19 @@ export async function sincronizarEdtConPresupuesto(
     select: { uid: true, codigo: true, nombre: true, nivel: true, fila: true, esResumen: true },
   });
 
-  const plan = planSincronizacion(edt, tareas);
+  /**
+   * Los hitos y la partida tras la que va cada uno.
+   *
+   * Sin esto la sincronizacion los mandaria al final del documento —son filas
+   * que no salen del presupuesto— y «fin de estructuras» acabaria en un cajon
+   * al fondo en vez de junto a las estructuras.
+   */
+  const hitos = await prisma.hitoObra.findMany({
+    where: { projectId: obraId },
+    select: { uid: true, anclaCodigo: true },
+  });
+
+  const plan = planSincronizacion(edt, tareas, hitos);
 
   /**
    * LO QUE YA SE ESTA EJECUTANDO NO SE QUEDA SIN RESPALDO.
