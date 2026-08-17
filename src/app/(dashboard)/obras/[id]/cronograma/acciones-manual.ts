@@ -9,6 +9,39 @@ import {
   eliminarTareaManual,
   type TareaAMano,
 } from "@/services/cronograma-manual.service";
+import { generarEdtDesdePresupuesto } from "@/services/edt.service";
+
+export interface RespuestaEdt {
+  ok: boolean;
+  error?: string;
+  tareas?: number;
+  enlazadas?: number;
+}
+
+/**
+ * Genera el cronograma desde el presupuesto.
+ *
+ * El presupuesto YA es la EDT; esto la copia al cronograma y deja puesto el
+ * enlace con el dinero, que es lo que hoy hay que casar a mano en
+ * `/cronograma/mapeo`.
+ */
+export async function accionGenerarEdt(obraId: string): Promise<RespuestaEdt> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  let datos: { tareas: number; enlazadas: number } | null = null;
+
+  const r = await intentar(async () => {
+    const hecho = await generarEdtDesdePresupuesto(sesion, obraId);
+    if (hecho.ok) datos = { tareas: hecho.datos.tareas, enlazadas: hecho.datos.enlazadas };
+    return hecho;
+  });
+
+  if (!r.ok) return r;
+
+  revalidatePath(`/obras/${obraId}/cronograma`);
+  return { ok: true, ...(datos ?? {}) };
+}
 
 export interface RespuestaTarea {
   ok: boolean;

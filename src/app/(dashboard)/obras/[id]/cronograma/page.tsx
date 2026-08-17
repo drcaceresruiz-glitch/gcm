@@ -40,6 +40,7 @@ import { Chip } from "@/components/ui/Chip";
 import { Tarjeta } from "@/components/ui/Tarjeta";
 import { TablaCronograma } from "@/components/cronograma/TablaCronograma";
 import { TareasAMano } from "@/components/cronograma/TareasAMano";
+import { GenerarEdt } from "@/components/cronograma/GenerarEdt";
 import { listarTareasManuales } from "@/services/cronograma-manual.service";
 
 export const metadata: Metadata = { title: "Cronograma" };
@@ -196,7 +197,21 @@ export default async function CronogramaPage({
             </Link>
           )}
 
-          {/* La tercera via: teclearlo. Una obra pequena no tiene planificador
+          {/* El camino corto, y el que mejor cuadra: el presupuesto YA es la
+              EDT. Va el primero porque teclear las tareas a mano teniendo el
+              presupuesto es escribir dos veces la misma estructura. */}
+          {puedeEditarTareas && (
+            <div className="mt-6 flex flex-col items-center gap-2">
+              <GenerarEdt obraId={id} />
+              <p className="max-w-md text-xs text-pretty opacity-60">
+                El capítulo es la rama, la partida es el paquete de trabajo y
+                sus subpartidas son las tareas. Solo tendrás que poner las
+                fechas en las tareas: los paquetes las heredan.
+              </p>
+            </div>
+          )}
+
+          {/* La otra via: teclearlo. Una obra pequena no tiene planificador
               ni licencia de Project, y sin cronograma no hay curva S, ni valor
               ganado, ni informe semanal. La primera tarea crea la version. */}
           <div className="mt-6 flex flex-col items-center gap-3">

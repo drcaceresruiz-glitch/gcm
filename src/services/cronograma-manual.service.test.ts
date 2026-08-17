@@ -65,7 +65,17 @@ vi.mock("@/lib/prisma", () => {
           ? estado.tarea
           : (estado.orden.find((t) => t.uid === args.where?.uid) ?? null),
       ),
-    findMany: () => Promise.resolve(estado.orden),
+    // El recalculo de resumenes pide tambien fechas y `esResumen`; las pruebas
+    // de jerarquia solo declaran uid/fila/nivel, asi que se completan aqui.
+    findMany: () =>
+      Promise.resolve(
+        estado.orden.map((t) => ({
+          esResumen: false,
+          inicio: new Date("2026-08-17T00:00:00.000Z"),
+          fin: new Date("2026-08-17T00:00:00.000Z"),
+          ...t,
+        })),
+      ),
     updateMany: (args: { data: Record<string, unknown> }) => {
       estado.corrimientos.push(args.data);
       return Promise.resolve({ count: 0 });
