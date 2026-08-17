@@ -356,7 +356,55 @@ export async function eliminarPartida(
    * orden a un proveedor, un adicional aprobado— y quitarlos es una decision
    * de quien los firmo, no un efecto secundario de limpiar el presupuesto.
    */
+  /**
+   * Una partida con avance reportado NO SE BORRA. Nunca, y sin confirmacion
+   * que valga.
+   *
+   * Es trabajo ya ejecutado en obra: alguien fue, lo hizo y lo reporto. Borrar
+   * la partida no borra ese hecho, borra la unica constancia de el —y con ella
+   * el avance de la obra, la curva S y el valor ganado se mueven hacia atras
+   * sin que nadie haya deshecho nada en el mundo real—.
+   *
+   * Es la unica puerta de todo el presupuesto sin segundo paso: las demas
+   * dejan confirmar porque lo que se pierde es una referencia; aqui lo que se
+   * perderia es historia.
+   *
+   * El avance no cuelga de la partida por clave ajena: se ancla al `uid` de la
+   * tarea del cronograma, y lo que las une es `MapeoTareaPartida` POR CODIGO.
+   * Por eso hay que preguntarlo en dos saltos, y por eso la base no lo impedia.
+   */
+  const mapeos = await prisma.mapeoTareaPartida.findMany({
+    where: { projectId: partida.projectId, codigoPartida: partida.codigoPartida },
+    select: { uid: true },
+  });
+
+  if (mapeos.length > 0) {
+    const avances = await prisma.avanceTarea.count({
+      where: {
+        projectId: partida.projectId,
+        uid: { in: mapeos.map((m) => m.uid) },
+      },
+    });
+
+    if (avances > 0) {
+      return {
+        ok: false,
+        error:
+          `"${partida.codigoPartida}" tiene ${avances} reporte(s) de avance: ya se ` +
+          `empezó a ejecutar en obra. Una partida iniciada no se borra —se ` +
+          `perdería el trabajo reportado—. Si dejó de hacerse, registra el cambio ` +
+          `como un movimiento presupuestal.`,
+      };
+    }
+  }
+
   const sujeciones: [string, number][] = [
+    [
+      // Sin avance todavia, pero enlazada: borrarla dejaria el mapeo colgando,
+      // y ese hueco es el que despues impide renumerar.
+      "está enlazada con una tarea del cronograma",
+      mapeos.length,
+    ],
     [
       "está imputada en una orden de compra",
       await prisma.ordenImputacion.count({ where: { wbsItemId: partidaId } }),
