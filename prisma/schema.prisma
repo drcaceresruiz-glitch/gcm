@@ -2620,6 +2620,12 @@ enum EventoAviso {
   LISTA
   /// El repaso del dia, agrupado.
   RESUMEN
+
+  /// Una fecha clave se acerca y sigue sin cumplirse. Suena UNA VEZ, al entrar
+  /// en la ventana de antelacion del hito.
+  HITO_CERCA
+  /// Una fecha clave paso sin cumplirse. Insiste cada `diasRecordatorio`.
+  HITO_VENCIDO
 }
 
 /// El aviso dentro de GCM.
