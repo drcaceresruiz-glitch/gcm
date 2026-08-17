@@ -8,6 +8,7 @@ import {
   olvidarDesafioPase,
   cerrarPase,
 } from "@/services/pase.service";
+import { ipDeLaPeticion } from "@/lib/ip-peticion";
 
 /**
  * Acciones de la puerta del pase de obra.
@@ -49,9 +50,9 @@ export async function accionVerificarCodigo(
   const cabeceras = await headers();
 
   const r = await verificarCodigoPase(obraId, codigo, {
-    // Detras de un proxy la IP real viaja en la cabecera; se toma la primera
-    // de la lista, que es la del cliente.
-    ip: cabeceras.get("x-forwarded-for")?.split(",")[0]?.trim(),
+    // Detras de un proxy la IP real viaja en la cabecera; cual de las entradas
+    // es la fiable —y por que NO es la primera— lo explica `ipDeLaPeticion`.
+    ip: ipDeLaPeticion(cabeceras),
     userAgent: cabeceras.get("user-agent") ?? undefined,
   });
 

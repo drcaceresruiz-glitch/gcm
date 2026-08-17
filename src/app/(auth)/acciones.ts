@@ -11,6 +11,7 @@ import {
 import { obtenerSesion, cerrarSesion } from "@/services/sesion.service";
 import { verificarCodigo, olvidarDesafio } from "@/services/dosFactores.service";
 import { codigoBienFormado, LONGITUD_CODIGO } from "@/lib/dosFactores";
+import { ipDeLaPeticion } from "@/lib/ip-peticion";
 
 /**
  * Acciones de servidor del flujo de acceso.
@@ -32,11 +33,9 @@ const esquemaLogin = z.object({
 async function metadatosPeticion() {
   const h = await headers();
   return {
-    // El servidor esta detras de Apache: la IP real viaja en la cabecera.
-    ip:
-      h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      h.get("x-real-ip") ??
-      undefined,
+    // El servidor esta detras de un proxy: la IP real viaja en la cabecera, y
+    // cual de las entradas es la fiable lo decide `ipDeLaPeticion`.
+    ip: ipDeLaPeticion(h),
     userAgent: h.get("user-agent") ?? undefined,
   };
 }

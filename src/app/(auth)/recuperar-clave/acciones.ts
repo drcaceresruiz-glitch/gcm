@@ -8,6 +8,7 @@ import {
   restablecerConToken,
 } from "@/services/recuperacion.service";
 import { LONGITUD_MINIMA_CLAVE } from "@/lib/claves";
+import { ipDeLaPeticion } from "@/lib/ip-peticion";
 
 /**
  * Acciones del flujo publico de recuperacion. No exigen sesion —quien las usa
@@ -27,10 +28,7 @@ export interface EstadoNuevaClave {
 async function metadatosPeticion() {
   const h = await headers();
   return {
-    ip:
-      h.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      h.get("x-real-ip") ??
-      undefined,
+    ip: ipDeLaPeticion(h),
     userAgent: h.get("user-agent") ?? undefined,
   };
 }

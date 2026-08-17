@@ -52,13 +52,17 @@ const BLOQUEO_MINUTOS = 15;
  * cuarto de hora es mucho para gente que se equivoca de contrasena y poco para
  * quien prueba listas.
  *
- * Y LO QUE ESTO NO ES: una defensa contra un atacante decidido. La IP sale de
- * `x-forwarded-for`, que quien llama puede escribir; si Apache no la reescribe,
- * cambiar esa cabecera en cada peticion esquiva el limite. Se acepta a
- * sabiendas —sube el listado de "cualquiera con un script" a "alguien que sabe
- * lo que hace", y el bloqueo POR CUENTA sigue debajo—, pero no conviene contar
- * esto como una barrera solida. La barrera solida seria que el proxy fuera la
- * unica fuente de esa cabecera.
+ * DE DONDE SALE LA IP, que es lo que decide si este limite sirve de algo. Hasta
+ * el 17/08 se leia la PRIMERA entrada de `x-forwarded-for`, que es justo la que
+ * escribe quien llama: bastaba cambiarla en cada peticion para que este contador
+ * no llegara nunca a veinte. Ahora la elige `lib/ip-peticion`, que toma la que
+ * puso nuestro proxy. Si se pone un CDN delante hay que tocar `SALTOS_DE_PROXY`
+ * o todo el mundo caera en el mismo cubo.
+ *
+ * Y LO QUE ESTO SIGUE SIN SER: una defensa contra un atacante decidido. Queda
+ * un supuesto sin comprobar —que el proxy escriba esa cabecera en vez de dejar
+ * pasar la del cliente—, y eso no se arregla desde la aplicacion sino en la
+ * configuracion del servidor. Debajo sigue el bloqueo POR CUENTA.
  */
 const MAX_FALLOS_POR_IP = 20;
 const VENTANA_IP_MINUTOS = 15;
