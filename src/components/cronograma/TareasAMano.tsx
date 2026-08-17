@@ -229,7 +229,30 @@ export function TareasAMano({
                     <span className={t.esResumen ? "font-medium" : undefined}>
                       {t.nombre}
                     </span>
-                    {t.esHito && <span className="ml-2 text-xs opacity-60">(hito)</span>}
+                    {/*
+                      Un hito CON CODIGO se marca aparte y en rojo. La etiqueta
+                      gris «(hito)» era la unica senal, y no distingue el hito
+                      legitimo —«fin de estructuras», sin codigo— de una partida
+                      que dejo de contar en el avance sin dar ningun error. Esto
+                      es lo que permite encontrarla sin repasar la lista a ojo.
+                    */}
+                    {t.esHito && (
+                      <span
+                        className="ml-2 text-xs"
+                        style={
+                          t.codigo
+                            ? { color: "var(--color-peligro)", fontWeight: 500 }
+                            : { opacity: 0.6 }
+                        }
+                        title={
+                          t.codigo
+                            ? "Marcada como hito: no cuenta en el avance ponderado ni se puede enlazar con el presupuesto."
+                            : undefined
+                        }
+                      >
+                        (hito{t.codigo ? ", no cuenta en el avance" : ""})
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2 tabular-nums">{t.inicio}</td>
                   <td className="px-3 py-2 tabular-nums">{t.fin}</td>
@@ -420,6 +443,47 @@ export function TareasAMano({
                 />
                 Es un hito
               </label>
+
+              {/*
+                Marcar «es un hito» NO es cosmetico, y la casilla sola no lo
+                decia: `esHito` saca la fila del avance ponderado, del enlace
+                con el presupuesto, del parte del dia y del tablero, todo a la
+                vez y sin dar ningun error. Asi es como una partida acabo de
+                rombo en el Gantt y dejo de contar.
+
+                El aviso sube de tono cuando ademas hay CODIGO, porque un
+                codigo es lo que distingue una partida del presupuesto de un
+                acontecimiento como «fin de estructuras». Se avisa, no se
+                impide: hay hitos legitimos y quien planifica manda.
+              */}
+              {campos.esHito && (
+                <p
+                  className="mt-2 rounded-lg border px-3 py-2 text-xs"
+                  style={{
+                    borderColor: campos.codigo.trim()
+                      ? "var(--color-peligro)"
+                      : "var(--borde)",
+                    backgroundColor: campos.codigo.trim()
+                      ? "color-mix(in srgb, var(--color-peligro) 8%, transparent)"
+                      : undefined,
+                  }}
+                >
+                  Un hito dura cero días: en el Gantt sale como un rombo, sin
+                  barra, y <strong>no cuenta en el avance ponderado ni se puede
+                  enlazar con una partida del presupuesto</strong>.
+                  {campos.codigo.trim() && (
+                    <>
+                      {" "}
+                      Y esta lleva el código{" "}
+                      <span className="font-mono">{campos.codigo.trim()}</span>:
+                      si es una partida con dinero, marcarla como hito la saca
+                      de la valorización <strong>sin dar ningún error</strong>.
+                      Para una fecha clave, deja la partida como está y márcala
+                      con «Marcar hito», que crea una fila aparte.
+                    </>
+                  )}
+                </p>
+              )}
 
               <div className="mt-4 flex items-center gap-3">
                 <button
