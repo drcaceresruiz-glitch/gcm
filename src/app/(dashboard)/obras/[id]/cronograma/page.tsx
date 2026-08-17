@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
+import { obtenerCalendario } from "@/services/calendario.service";
 import {
   obtenerCronograma,
   historialCronogramas,
@@ -90,12 +91,7 @@ export default async function CronogramaPage({
   const tareasAMano = await listarTareasManuales(sesion, id);
   // El regimen laboral de la obra: con el, el formulario calcula la duracion
   // de una tarea en dias de TRABAJO en cuanto se teclean sus dos fechas.
-  const calendarioObra = (
-    await prisma.workCalendar.findMany({
-      where: { projectId: id },
-      select: { diaSemana: true, laborable: true, horas: true },
-    })
-  ).map((d) => ({ ...d, horas: d.horas.toString() }));
+  const calendarioObra = await obtenerCalendario(sesion, id);
   const puedeLineaBase = puede(sesion, "cronograma:linea_base");
 
   // La fecha por defecto del reporte se alinea al ultimo dia de corte semanal.
