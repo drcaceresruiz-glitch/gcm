@@ -42,6 +42,7 @@ import { Tarjeta } from "@/components/ui/Tarjeta";
 import { TablaCronograma } from "@/components/cronograma/TablaCronograma";
 import { TareasAMano } from "@/components/cronograma/TareasAMano";
 import { GenerarEdt } from "@/components/cronograma/GenerarEdt";
+import { SincronizarEdt } from "@/components/cronograma/SincronizarEdt";
 import { listarTareasManuales } from "@/services/cronograma-manual.service";
 
 export const metadata: Metadata = { title: "Cronograma" };
@@ -405,6 +406,11 @@ export default async function CronogramaPage({
             puedeRegistrar={puede(sesion, "avance:registrar")}
             fechaReporteDefecto={fechaReporteDefecto}
           />
+
+          {/* El presupuesto sigue vivo despues de generar la EDT: partidas
+              nuevas, nombres corregidos, agrupaciones a suma alzada. Esto
+              reconcilia las dos sin borrar nada. */}
+          {puedeEditarTareas && <SincronizarEdt obraId={id} />}
 
           {/* Solo las escritas aqui. Las que vinieron de un archivo no se
               editan: el siguiente corte las devolveria como estaban. */}

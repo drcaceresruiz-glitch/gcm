@@ -10,6 +10,7 @@ import {
   type TareaAMano,
 } from "@/services/cronograma-manual.service";
 import { generarEdtDesdePresupuesto } from "@/services/edt.service";
+import { sincronizarEdtConPresupuesto } from "@/services/edt-sincronizar";
 
 export interface RespuestaEdt {
   ok: boolean;
@@ -34,6 +35,52 @@ export async function accionGenerarEdt(obraId: string): Promise<RespuestaEdt> {
   const r = await intentar(async () => {
     const hecho = await generarEdtDesdePresupuesto(sesion, obraId);
     if (hecho.ok) datos = { tareas: hecho.datos.tareas, enlazadas: hecho.datos.enlazadas };
+    return hecho;
+  });
+
+  if (!r.ok) return r;
+
+  revalidatePath(`/obras/${obraId}/cronograma`);
+  return { ok: true, ...(datos ?? {}) };
+}
+
+export interface RespuestaSincronizar {
+  ok: boolean;
+  error?: string;
+  altas?: number;
+  cambios?: number;
+  enlacesCreados?: number;
+  enlacesRetirados?: number;
+  sobrantes?: string[];
+}
+
+/**
+ * Pone la EDT al dia con el presupuesto.
+ *
+ * El presupuesto sigue vivo despues de generar la EDT: se anaden partidas, se
+ * corrigen importes, se agrupa a suma alzada. Esto reconcilia las dos sin
+ * borrar nada y sin tocar las fechas, que son lo unico que no sale del
+ * presupuesto.
+ */
+export async function accionSincronizarEdt(
+  obraId: string,
+): Promise<RespuestaSincronizar> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  let datos: Omit<RespuestaSincronizar, "ok" | "error"> | null = null;
+
+  const r = await intentar(async () => {
+    const hecho = await sincronizarEdtConPresupuesto(sesion, obraId);
+    if (hecho.ok) {
+      datos = {
+        altas: hecho.datos.altas,
+        cambios: hecho.datos.cambios,
+        enlacesCreados: hecho.datos.enlacesCreados,
+        enlacesRetirados: hecho.datos.enlacesRetirados,
+        sobrantes: hecho.datos.sobrantes,
+      };
+    }
     return hecho;
   });
 
