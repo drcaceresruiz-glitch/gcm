@@ -26,6 +26,11 @@ export interface TareaControlada {
   duracionDias: string;
   inicio: Date;
   fin: Date;
+  /**
+   * Sus fechas no son un plan todavia. Opcional a proposito: quien no lo pase
+   * —el lector de MS Project, que SIEMPRE trae fechas— se comporta como antes.
+   */
+  sinProgramar?: boolean;
   porcentajePlaneado: string;
   porcentajeReal: string;
   desfase: string;
@@ -257,6 +262,16 @@ export function alertasDeAtraso(
 
   for (const t of tareas) {
     if (t.esResumen) continue;
+    /**
+     * Una tarea sin programar no puede estar atrasada.
+     *
+     * Sus fechas no son un plan: son el relleno que exige la columna, porque
+     * la EDT sale del presupuesto y el presupuesto no trae fechas. Sin esta
+     * linea, generar la EDT de una obra ya empezada publicaba de golpe una
+     * alerta roja por cada partida —y el titular del tablero senalaba como
+     * cuello de botella algo que nadie habia programado todavia—.
+     */
+    if (t.sinProgramar) continue;
 
     const desfase = Number(t.desfase);
     const real = Number(t.porcentajeReal) || 0;

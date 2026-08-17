@@ -4,6 +4,7 @@ import { puede } from "@/lib/rbac";
 import { normalizarDecimal } from "@/lib/decimal";
 import { hoy as hoyCalendario } from "@/utils/fechas";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
+import { recalcularResumenes } from "@/services/edt.service";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -267,6 +268,10 @@ export async function crearTareaManual(
       },
     });
 
+    // Las fechas de los paquetes y capitulos son la envoltura de sus hojas: en
+    // cuanto entra o cambia una hoja, hay que volver a subirlas.
+    await recalcularResumenes(tx, cronogramaId);
+
     await tx.auditLog.create({
       data: {
         companyId: sesion.companyId,
@@ -354,6 +359,10 @@ export async function editarTareaManual(
         porcentajePlaneado: planeado,
       },
     });
+
+    // Cambiar la fecha de una hoja mueve la envoltura de todo lo que la
+    // contiene, hasta el capitulo.
+    await recalcularResumenes(tx, ctx.vigente!.id);
 
     await tx.auditLog.create({
       data: {
@@ -468,6 +477,9 @@ export async function eliminarTareaManual(
       },
     });
     await tx.tareaCronograma.delete({ where: { id: fila.id } });
+
+    // Al irse una hoja, su paquete puede empezar mas tarde o acabar antes.
+    await recalcularResumenes(tx, ctx.vigente!.id);
 
     await tx.auditLog.create({
       data: {

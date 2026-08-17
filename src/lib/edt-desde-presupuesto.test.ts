@@ -24,17 +24,18 @@ function fila(
   descripcion: string,
   parentId: string | null,
   orden: number,
+  parcial: string | null = null,
 ): FilaPresupuesto {
-  return { id, codigoPartida, descripcion, parentId, orden };
+  return { id, codigoPartida, descripcion, parentId, orden, parcial };
 }
 
 const PRESUPUESTO = [
   fila("c4", "4.0", "CAPITULO IV", null, 1),
   fila("p1", "4.1", "Concreto en zapatas", "c4", 2),
-  fila("t1", "4.1.1", "Encofrado", "p1", 3),
-  fila("t2", "4.1.2", "Acero", "p1", 4),
-  fila("t3", "4.1.3", "Vaciado", "p1", 5),
-  fila("p2", "4.2", "Solado", "c4", 6),
+  fila("t1", "4.1.1", "Encofrado", "p1", 3, "100.00"),
+  fila("t2", "4.1.2", "Acero", "p1", 4, "200.00"),
+  fila("t3", "4.1.3", "Vaciado", "p1", 5, "300.00"),
+  fila("p2", "4.2", "Solado", "c4", 6, "400.00"),
 ];
 
 describe("edtDesdePresupuesto", () => {
