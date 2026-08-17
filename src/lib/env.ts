@@ -44,6 +44,22 @@ const envSchema = z.object({
   DECOLECTA_TOKEN: z.string().optional(),
 
   /**
+   * Token de json.pe para consultar el RUC en SUNAT.
+   *
+   * OTRO proveedor de lo mismo que `DECOLECTA_TOKEN`, no un producto distinto.
+   * Si esta puesto, se usa este; si no, decolecta. Los dos siguen siendo
+   * OPCIONALES: sin ninguno, el alta de proveedores funciona igual y la razon
+   * social se escribe a mano.
+   *
+   * Su plan gratuito tiene tope MENSUAL. Al agotarse responde 429 y GCM lo
+   * trata como lo que es —una comodidad que hoy no esta— sin tumbar nada.
+   *
+   * OJO: es el token de la API CONSULTA. El de su API SMS es otro producto,
+   * con otra URL base y otro token, y ese es `SMS_TOKEN`.
+   */
+  JSONPE_TOKEN: z.string().optional(),
+
+  /**
    * Conversion de archivos .mpp de MS Project a XML, con MPXJ.
    *
    * Las dos son OPCIONALES a proposito, igual que el SMTP. Sin ellas el

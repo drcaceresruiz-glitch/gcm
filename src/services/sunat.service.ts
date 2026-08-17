@@ -1,5 +1,6 @@
 import "server-only";
 import { env } from "@/lib/env";
+import { leerRazonSocial, leerTexto } from "@/lib/sunat";
 
 /**
  * Consulta de RUC contra SUNAT, a traves de apis.net.pe.
@@ -34,28 +35,51 @@ export type ConsultaRuc =
   | { ok: true; razonSocial: string; direccion?: string; estado?: string }
   | { ok: false; motivo: "sin_token" | "no_encontrado" | "fallo"; detalle: string };
 
-/**
- * Decolecta devuelve `razon_social`, en snake_case. Se aceptan tambien los
- * nombres que usaban las versiones anteriores de apis.net.pe: el servicio ya
- * cambio una vez de dominio y de formato, y no hay motivo para pensar que no
- * vuelva a hacerlo.
- */
-function leerRazonSocial(datos: unknown): string | null {
-  if (typeof datos !== "object" || datos === null) return null;
-  const registro = datos as Record<string, unknown>;
+/** POST con `{ruc}`, y la respuesta envuelta en `data`. */
+const URL_JSONPE = "https://api.json.pe/api/ruc";
 
-  for (const campo of ["razon_social", "razonSocial", "nombre"]) {
-    const valor = registro[campo];
-    if (typeof valor === "string" && valor.trim()) return valor.trim();
+/**
+ * A quien se le pregunta, y como.
+ *
+ * Manda el token que haya: **json.pe primero si esta configurado**, y si no,
+ * decolecta. No se apaga ninguno al añadir el otro —es la misma regla que rige
+ * los canales de SMS— para que cambiar de proveedor no exija tocar codigo ni
+ * deje el formulario mudo mientras tanto.
+ *
+ * Los dos piden `Bearer`, pero no se parecen en nada mas: uno es GET con el
+ * numero en la URL y el otro POST con el numero en el cuerpo.
+ */
+function aQuienSePregunta(
+  ruc: string,
+): { url: string; init: RequestInit } | null {
+  if (env.JSONPE_TOKEN) {
+    return {
+      url: URL_JSONPE,
+      init: {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.JSONPE_TOKEN}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ ruc }),
+      },
+    };
+  }
+
+  if (env.DECOLECTA_TOKEN) {
+    return {
+      url: `${URL_BASE}?numero=${ruc}`,
+      init: {
+        headers: {
+          Authorization: `Bearer ${env.DECOLECTA_TOKEN}`,
+          Accept: "application/json",
+        },
+      },
+    };
   }
 
   return null;
-}
-
-function leerTexto(datos: unknown, campo: string): string | undefined {
-  if (typeof datos !== "object" || datos === null) return undefined;
-  const valor = (datos as Record<string, unknown>)[campo];
-  return typeof valor === "string" && valor.trim() ? valor.trim() : undefined;
 }
 
 export async function consultarRuc(ruc: string): Promise<ConsultaRuc> {
@@ -65,7 +89,9 @@ export async function consultarRuc(ruc: string): Promise<ConsultaRuc> {
     return { ok: false, motivo: "fallo", detalle: "El RUC son 11 digitos." };
   }
 
-  if (!env.DECOLECTA_TOKEN) {
+  const destino = aQuienSePregunta(limpio);
+
+  if (!destino) {
     return {
       ok: false,
       motivo: "sin_token",
@@ -77,11 +103,8 @@ export async function consultarRuc(ruc: string): Promise<ConsultaRuc> {
   try {
     // Se aborta a los cinco segundos: sin esto, una peticion colgada dejaria
     // el formulario esperando indefinidamente por un dato que es opcional.
-    const respuesta = await fetch(`${URL_BASE}?numero=${limpio}`, {
-      headers: {
-        Authorization: `Bearer ${env.DECOLECTA_TOKEN}`,
-        Accept: "application/json",
-      },
+    const respuesta = await fetch(destino.url, {
+      ...destino.init,
       signal: AbortSignal.timeout(TIEMPO_LIMITE_MS),
       // No se cachea: un RUC puede cambiar de razon social, y el dato lo
       // valida una persona antes de guardarlo.
@@ -111,8 +134,10 @@ export async function consultarRuc(ruc: string): Promise<ConsultaRuc> {
       return {
         ok: false,
         motivo: "fallo",
+        // Sin decir «por hoy»: el plan gratuito de json.pe tiene tope MENSUAL,
+        // y prometer que manana vuelve a funcionar seria mentir.
         detalle:
-          "Se agoto la cuota de consultas a SUNAT por hoy. Escribe la razon social a mano.",
+          "Se agoto la cuota de consultas a SUNAT. Escribe la razon social a mano.",
       };
     }
 
