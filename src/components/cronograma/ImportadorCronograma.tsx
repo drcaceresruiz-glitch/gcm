@@ -325,6 +325,11 @@ function PanelDeReemplazo({
     (u) => u.avances > 0 || u.mapeos > 0,
   );
 
+  // Este panel existe para que alguien se pare a leerlo. Un «1 tareas» lo
+  // convierte en ruido de sistema, que es justo lo contrario.
+  const plural = (n: number, uno: string, varios: string) =>
+    `${n} ${n === 1 ? uno : varios}`;
+
   return (
     <div
       className="mt-4 rounded-lg border p-4"
@@ -342,18 +347,26 @@ function PanelDeReemplazo({
 
       <ul className="mt-3 space-y-1 text-sm">
         <li>
-          Se reescriben <strong>{riesgo.tareasImportadas}</strong> tareas que
-          vinieron de un archivo; el tuyo las trae otra vez.
+          Se {riesgo.tareasImportadas === 1 ? "reescribe" : "reescriben"}{" "}
+          <strong>{plural(riesgo.tareasImportadas, "tarea", "tareas")}</strong>{" "}
+          que {riesgo.tareasImportadas === 1 ? "vino" : "vinieron"} de un
+          archivo; el tuyo {riesgo.tareasImportadas === 1 ? "la" : "las"} trae
+          otra vez.
         </li>
         {riesgo.tareasNuevas > 0 && (
           <li>
-            Entran <strong>{riesgo.tareasNuevas}</strong> tareas nuevas.
+            {riesgo.tareasNuevas === 1 ? "Entra" : "Entran"}{" "}
+            <strong>{plural(riesgo.tareasNuevas, "tarea nueva", "tareas nuevas")}</strong>.
           </li>
         )}
         {riesgo.tareasManuales > 0 && (
           <li>
-            Se <strong>conservan</strong> las {riesgo.tareasManuales} tareas
-            escritas a mano en GCM: el archivo no opina sobre ellas.
+            Se <strong>conserva{riesgo.tareasManuales === 1 ? "" : "n"}</strong>{" "}
+            {riesgo.tareasManuales === 1
+              ? "la tarea escrita"
+              : `las ${riesgo.tareasManuales} tareas escritas`}{" "}
+            a mano en GCM: el archivo no opina sobre{" "}
+            {riesgo.tareasManuales === 1 ? "ella" : "ellas"}.
           </li>
         )}
       </ul>
@@ -366,27 +379,32 @@ function PanelDeReemplazo({
           <p className="mt-1 text-sm opacity-70">
             {riesgo.avancesHuerfanos > 0 && (
               <>
-                <strong>{riesgo.avancesHuerfanos}</strong> reportes de avance
+                <strong>
+                  {plural(riesgo.avancesHuerfanos, "reporte de avance", "reportes de avance")}
+                </strong>
               </>
             )}
             {riesgo.avancesHuerfanos > 0 && riesgo.mapeosHuerfanos > 0 && " y "}
             {riesgo.mapeosHuerfanos > 0 && (
               <>
-                <strong>{riesgo.mapeosHuerfanos}</strong> mapeos con el
-                presupuesto, que confirmó una persona uno a uno
+                <strong>{plural(riesgo.mapeosHuerfanos, "mapeo", "mapeos")}</strong> con
+                el presupuesto, que confirmó una persona uno a uno
               </>
             )}{" "}
-            quedan sin tarea, porque el archivo nuevo ya no trae su UID. No se
-            borran —siguen guardados—, pero dejan de aparecer hasta que un
-            corte vuelva a traer esos UID.
+            {riesgo.avancesHuerfanos + riesgo.mapeosHuerfanos === 1
+              ? "queda"
+              : "quedan"}{" "}
+            sin tarea, porque el archivo nuevo ya no trae su UID. No se borran
+            —siguen guardados—, pero dejan de aparecer hasta que un corte vuelva
+            a traer esos UID.
           </p>
 
           <ul className="mt-2 space-y-1 text-xs opacity-80">
             {huerfanos.slice(0, 8).map((u) => (
               <li key={u.uid}>
                 <strong>{u.uid}</strong> · {u.nombre}
-                {u.avances > 0 && ` · ${u.avances} avances`}
-                {u.mapeos > 0 && ` · ${u.mapeos} mapeos`}
+                {u.avances > 0 && ` · ${plural(u.avances, "avance", "avances")}`}
+                {u.mapeos > 0 && ` · ${plural(u.mapeos, "mapeo", "mapeos")}`}
               </li>
             ))}
           </ul>
