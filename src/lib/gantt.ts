@@ -226,3 +226,215 @@ export function resumenesPlegables(
 
   return plegables;
 }
+
+/** Lo minimo de una tarea de la LINEA BASE para dibujar su barra gris. */
+export interface TareaBase {
+  uid: number;
+  inicio: Date;
+  fin: Date;
+}
+
+/**
+ * Donde estaba la tarea segun el plan congelado, o null si no estaba.
+ *
+ * Null y una barra de ancho cero NO son lo mismo: una tarea que nacio despues
+ * de fijar la base no tiene con que compararse, y pintarle una barra gris en
+ * el origen diria que se movio desde el dia uno. Ausencia no es «no se movio».
+ */
+export function barraLineaBase(
+  base: TareaBase | undefined,
+  rango: RangoGantt,
+): Pick<Barra, "x" | "ancho"> | null {
+  if (!base) return null;
+
+  return {
+    x: dias(rango.inicio, base.inicio),
+    ancho: Math.max(1, dias(base.inicio, base.fin)),
+  };
+}
+
+export type TipoEnlace = "FC" | "CC" | "FF" | "CF";
+
+export interface DependenciaGantt {
+  tareaUid: number;
+  predecesoraUid: number;
+  /// FC, CC, FF o CF. Cualquier otra cosa se descarta.
+  tipo: string;
+  desfaseDias: string;
+}
+
+export interface EnlaceGantt {
+  tareaUid: number;
+  predecesoraUid: number;
+  tipo: TipoEnlace;
+  /// Ambos extremos son criticos: es la cadena que manda sobre el plazo.
+  critica: boolean;
+  /// La polilinea, en DIAS (x) y FILAS (y). El componente multiplica.
+  puntos: { x: number; y: number }[];
+}
+
+/** Cuanto sobresale el codo antes de girar, en dias de eje. */
+const SALIENTE = 0.6;
+
+/**
+ * Por que borde sale el enlace y por cual entra.
+ *
+ * Es la mitad del significado de una dependencia, y equivocarla dibuja una
+ * atadura que no existe —peor que no dibujar nada—. FC (fin-comienzo) es la
+ * comun: la siguiente empieza cuando la anterior acaba. CC arrancan juntas,
+ * FF acaban juntas, CF la siguiente ACABA cuando la anterior empieza.
+ */
+const BORDES: Record<TipoEnlace, { sale: "fin" | "inicio"; entra: "inicio" | "fin" }> = {
+  FC: { sale: "fin", entra: "inicio" },
+  CC: { sale: "inicio", entra: "inicio" },
+  FF: { sale: "fin", entra: "fin" },
+  CF: { sale: "inicio", entra: "fin" },
+};
+
+function esTipo(t: string): t is TipoEnlace {
+  return t === "FC" || t === "CC" || t === "FF" || t === "CF";
+}
+
+/**
+ * Las flechas dibujables entre las filas VISIBLES.
+ *
+ * Se descarta el enlace cuyo origen o destino esta escondido bajo un capitulo
+ * plegado: no hay donde anclarlo sin inventar. Reanclarlo al resumen dibujaria
+ * una dependencia entre capitulos que en los datos no existe, y eso se lee
+ * como una restriccion real. El filtro vive AQUI, en logica pura, para poder
+ * probarlo sin montar el DOM.
+ *
+ * Las coordenadas salen en dias y filas —nunca en pixeles—, que es la regla
+ * de todo este modulo: asi la geometria se prueba sin ancho de pantalla.
+ */
+export function flechasDeDependencia(
+  dependencias: readonly DependenciaGantt[],
+  visibles: readonly TareaGantt[],
+  rango: RangoGantt,
+): EnlaceGantt[] {
+  const fila = new Map<number, number>();
+  visibles.forEach((t, i) => fila.set(t.uid, i));
+  const porUid = new Map(visibles.map((t) => [t.uid, t]));
+
+  const flechas: EnlaceGantt[] = [];
+
+  for (const d of dependencias) {
+    if (!esTipo(d.tipo)) continue;
+
+    const desde = porUid.get(d.predecesoraUid);
+    const hasta = porUid.get(d.tareaUid);
+    // Uno de los dos esta plegado: no se dibuja.
+    if (!desde || !hasta) continue;
+
+    const filaDesde = fila.get(d.predecesoraUid)!;
+    const filaHasta = fila.get(d.tareaUid)!;
+
+    const bordes = BORDES[d.tipo];
+    const desfase = Number(d.desfaseDias) || 0;
+
+    // El desfase corre el punto de SALIDA: un «24FC+3 dias» arranca tres dias
+    // despues del fin de la predecesora, no en el fin.
+    const xSale =
+      dias(rango.inicio, bordes.sale === "fin" ? desde.fin : desde.inicio) + desfase;
+    const xEntra = dias(
+      rango.inicio,
+      bordes.entra === "fin" ? hasta.fin : hasta.inicio,
+    );
+
+    // El centro vertical de cada fila. La fila 0 tiene su centro en 0,5.
+    const ySale = filaDesde + 0.5;
+    const yEntra = filaHasta + 0.5;
+
+    flechas.push({
+      tareaUid: d.tareaUid,
+      predecesoraUid: d.predecesoraUid,
+      tipo: d.tipo,
+      critica: desde.esCritico && hasta.esCritico,
+      puntos: ruta(xSale, ySale, xEntra, yEntra, bordes.sale, bordes.entra),
+    });
+  }
+
+  return flechas;
+}
+
+/** Quita puntos consecutivos repetidos: dejan tramos de longitud cero. */
+function sinRepetidos(
+  puntos: { x: number; y: number }[],
+): { x: number; y: number }[] {
+  return puntos.filter(
+    (p, i) => i === 0 || p.x !== puntos[i - 1]!.x || p.y !== puntos[i - 1]!.y,
+  );
+}
+
+/**
+ * La polilinea ORTOGONAL entre dos bordes de barra.
+ *
+ * Cada tramo cambia solo en x o solo en y. Una diagonal se lee como «va de
+ * aqui a alla» sin decir por donde, y con veinte enlaces encima el diagrama
+ * se vuelve un ovillo.
+ *
+ * Dos formas segun donde caiga el destino:
+ *
+ *  - **Directo** (el caso comun, FC hacia adelante): se sale del borde, se
+ *    corre hasta la vertical del destino, se baja y se entra. Cuatro puntos.
+ *  - **Rodeo**: cuando el destino queda DETRAS en el sentido de salida —pasa
+ *    con desfases negativos, con CC entre tareas solapadas y con CF—, ir en
+ *    linea recta obligaria a atravesar la propia barra hacia atras. Se sale,
+ *    se baja al pasillo entre las dos filas, se recorre por ahi y se sube.
+ *
+ * En la MISMA fila el pasillo baja un poco: quedarse a la altura de la fila
+ * significaria cruzar la barra por encima.
+ */
+function ruta(
+  xSale: number,
+  ySale: number,
+  xEntra: number,
+  yEntra: number,
+  sale: "inicio" | "fin",
+  entra: "inicio" | "fin",
+): { x: number; y: number }[] {
+  const dirSale = sale === "fin" ? 1 : -1;
+  const dirEntra = entra === "inicio" ? -1 : 1;
+
+  const xCodoSale = xSale + SALIENTE * dirSale;
+  const xCodoEntra = xEntra + SALIENTE * dirEntra;
+
+  const mismaFila = ySale === yEntra;
+  const yPasillo = mismaFila ? ySale + 0.45 : (ySale + yEntra) / 2;
+
+  // ¿El destino queda POR DELANTE en el sentido en que se sale? Si no, hay
+  // que rodear: ir en recta significaria volver atras sobre la propia barra.
+  const adelante = dirSale > 0 ? xEntra >= xSale : xEntra <= xSale;
+
+  /**
+   * Por donde baja el tramo vertical.
+   *
+   * Normalmente por el codo de entrada. Pero con dos tareas PEGADAS —una
+   * acaba el 7 y la siguiente empieza el 8, que es el caso mas comun de
+   * todos— los dos codos de 0,6 dias suman mas que el hueco de 1 dia y se
+   * cruzan: el trazo salia con un zigzag de seis puntos donde tocaba un
+   * escalon. Cuando se solapan se baja por el PUNTO MEDIO, que da el escalon
+   * limpio de siempre.
+   */
+  const solapan =
+    dirSale > 0 ? xCodoEntra < xCodoSale : xCodoEntra > xCodoSale;
+  const xVertical = solapan ? (xSale + xEntra) / 2 : xCodoEntra;
+
+  return sinRepetidos(
+    adelante
+      ? [
+          { x: xSale, y: ySale },
+          { x: xVertical, y: ySale },
+          { x: xVertical, y: yEntra },
+          { x: xEntra, y: yEntra },
+        ]
+      : [
+          { x: xSale, y: ySale },
+          { x: xCodoSale, y: ySale },
+          { x: xCodoSale, y: yPasillo },
+          { x: xCodoEntra, y: yPasillo },
+          { x: xCodoEntra, y: yEntra },
+          { x: xEntra, y: yEntra },
+        ],
+  );
+}

@@ -372,20 +372,33 @@ describe("analizarProjectXml: duraciones, fechas y holgura", () => {
 });
 
 describe("analizarProjectXml: dependencias", () => {
+  /**
+   * MSPDI numera los enlaces por el orden INGLES y las siglas de GCM son
+   * castellanas, asi que no se corresponden posicionalmente:
+   *
+   *     0 = FF (Finish-Finish)  -> FF
+   *     1 = FS (Finish-Start)   -> FC
+   *     2 = SS (Start-Start)    -> CC
+   *     3 = SF (Start-Finish)   -> CF
+   *
+   * El 2 y el 3 estuvieron cambiados hasta el 17 de agosto de 2026, **y esta
+   * prueba fijaba el error**: nombraba «Comienzo-fin» al 2 y afirmaba
+   * `[FF, FC, CF, CC]`. Codigo y prueba coincidian, y los dos estaban mal.
+   * Por eso el nombre de cada tarea dice ahora el codigo MSPDI y su sigla: si
+   * alguien vuelve a cambiarlos, la prueba se lee sola.
+   */
   it("traduce los cuatro tipos de enlace de MSPDI", async () => {
-    // Hoy el archivo solo trae FC y un CC, pero el mapeo va completo: un
-    // enlace mal tipado desplaza fechas sin dar ningun sintoma.
     const r = await analizarProjectXml(
       construirXml([
         { uid: 1, nombre: "1.1 Origen" },
-        { uid: 2, nombre: "1.2 Fin-fin", predecesoras: [{ uid: 1, tipo: "0" }] },
-        { uid: 3, nombre: "1.3 Fin-comienzo", predecesoras: [{ uid: 1, tipo: "1" }] },
-        { uid: 4, nombre: "1.4 Comienzo-fin", predecesoras: [{ uid: 1, tipo: "2" }] },
-        { uid: 5, nombre: "1.5 Comienzo-comienzo", predecesoras: [{ uid: 1, tipo: "3" }] },
+        { uid: 2, nombre: "1.2 Tipo 0 = FF fin-fin", predecesoras: [{ uid: 1, tipo: "0" }] },
+        { uid: 3, nombre: "1.3 Tipo 1 = FC fin-comienzo", predecesoras: [{ uid: 1, tipo: "1" }] },
+        { uid: 4, nombre: "1.4 Tipo 2 = CC comienzo-comienzo", predecesoras: [{ uid: 1, tipo: "2" }] },
+        { uid: 5, nombre: "1.5 Tipo 3 = CF comienzo-fin", predecesoras: [{ uid: 1, tipo: "3" }] },
       ]),
     );
 
-    expect(r.dependencias.map((d) => d.tipo)).toEqual(["FF", "FC", "CF", "CC"]);
+    expect(r.dependencias.map((d) => d.tipo)).toEqual(["FF", "FC", "CC", "CF"]);
   });
 
   it("convierte el desfase de decimas de minuto a dias, con su signo", async () => {

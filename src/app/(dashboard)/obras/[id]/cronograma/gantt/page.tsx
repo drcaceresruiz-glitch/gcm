@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
-import { obtenerCronograma } from "@/services/cronograma.service";
+import {
+  obtenerCronograma,
+  lineaBaseCronograma,
+} from "@/services/cronograma.service";
 import { puede } from "@/lib/rbac";
 import { fechaLarga } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
@@ -25,7 +28,12 @@ export default async function GanttPage({
 
   if (!puede(sesion, "cronograma:leer")) redirect(`/obras/${id}`);
 
-  const cronograma = await obtenerCronograma(sesion, id);
+  const [cronograma, base] = await Promise.all([
+    obtenerCronograma(sesion, id),
+    // La version congelada, para pintar debajo de cada barra donde estaba la
+    // tarea antes. null mientras la obra no haya fijado ninguna.
+    lineaBaseCronograma(sesion, id),
+  ]);
   if (!cronograma) redirect(`/obras/${id}/cronograma`);
 
   // Del cronograma medido a la forma minima que dibuja el Gantt. Las fechas
@@ -59,7 +67,16 @@ export default async function GanttPage({
         </p>
       </div>
 
-      <Gantt tareas={tareas} fechaCorte={cronograma.fechaCorte} />
+      <Gantt
+        tareas={tareas}
+        fechaCorte={cronograma.fechaCorte}
+        dependencias={cronograma.dependencias}
+        lineaBase={(base?.tareas ?? []).map((t) => ({
+          uid: t.uid,
+          inicio: t.inicio,
+          fin: t.fin,
+        }))}
+      />
     </div>
   );
 }

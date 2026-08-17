@@ -8,7 +8,12 @@ import {
   posicionDia,
   filasVisibles,
   resumenesPlegables,
+  flechasDeDependencia,
+  barraLineaBase,
+  type DependenciaGantt,
+  type EnlaceGantt,
   type RangoGantt,
+  type TareaBase,
   type TareaGantt,
 } from "@/lib/gantt";
 import { fechaCorta } from "@/utils/fechas";
@@ -138,11 +143,28 @@ function calcularTicks(rango: RangoGantt, porMeses: boolean): Tick[] {
 export function Gantt({
   tareas,
   fechaCorte,
+  dependencias = [],
+  lineaBase = [],
 }: {
   tareas: TareaGantt[];
   fechaCorte: Date;
+  /// Los enlaces del cronograma. Vacio en una obra sin red de precedencias
+  /// —un plan venido de Excel no la trae— y entonces no se dibuja ninguno.
+  dependencias?: DependenciaGantt[];
+  /// Las tareas de la version fijada como linea base. Vacio si no hay.
+  lineaBase?: TareaBase[];
 }) {
   const [colapsados, setColapsados] = useState<Set<number>>(new Set());
+
+  /**
+   * La fila señalada con el raton o el teclado, por uid.
+   *
+   * Es lo que hace legible el diagrama: por defecto solo se pintan los enlaces
+   * de la ruta critica —los que explican la fecha final—, y los demas se piden
+   * fila a fila. Con 76 enlaces sobre 106 tareas, pintarlos todos a la vez es
+   * una maraña que nadie mira.
+   */
+  const [señalada, setSeñalada] = useState<number | null>(null);
 
   const rango = useMemo(() => rangoGantt(tareas), [tareas]);
   const plegables = useMemo(() => resumenesPlegables(tareas), [tareas]);
@@ -164,6 +186,16 @@ export function Gantt({
   const ticks = useMemo(
     () => (rango ? calcularTicks(rango, porMeses) : []),
     [rango, porMeses],
+  );
+
+  const flechas = useMemo(
+    () => (rango ? flechasDeDependencia(dependencias, visibles, rango) : []),
+    [dependencias, visibles, rango],
+  );
+
+  const basePorUid = useMemo(
+    () => new Map(lineaBase.map((t) => [t.uid, t])),
+    [lineaBase],
   );
 
   if (!rango) {
@@ -302,8 +334,24 @@ export function Gantt({
                 plegable={plegables.has(t.uid)}
                 colapsado={colapsados.has(t.uid)}
                 onAlternar={() => alternar(t.uid)}
+                base={barraLineaBase(basePorUid.get(t.uid), rango)}
+                onSeñalar={() => setSeñalada(t.uid)}
+                onSoltar={() => setSeñalada((s) => (s === t.uid ? null : s))}
               />
             ))}
+
+            {/* Las flechas, por encima de las barras y sin robar el raton: el
+                clic del plegado tiene que seguir llegando a la fila. */}
+            {flechas.length > 0 && (
+              <Flechas
+                flechas={flechas}
+                señalada={señalada}
+                pxDia={pxDia}
+                izquierda={ANCHO_NOMBRES}
+                ancho={anchoTiempo}
+                alto={altoCuerpo}
+              />
+            )}
 
             {/* Linea de corte, sobre las barras. */}
             {xCorte >= 0 && xCorte <= anchoTiempo && (
@@ -340,6 +388,9 @@ function Fila({
   plegable,
   colapsado,
   onAlternar,
+  base,
+  onSeñalar,
+  onSoltar,
 }: {
   tarea: TareaGantt;
   indice: number;
@@ -350,6 +401,10 @@ function Fila({
   plegable: boolean;
   colapsado: boolean;
   onAlternar: () => void;
+  /// Donde estaba la tarea en la linea base, o null si no estaba en ella.
+  base: { x: number; ancho: number } | null;
+  onSeñalar: () => void;
+  onSoltar: () => void;
 }) {
   const b = geometriaBarra(tarea, rango);
   const izquierda = b.x * pxDia;
@@ -368,7 +423,16 @@ function Fila({
   const tooltip = `${tarea.codigo ? tarea.codigo + " " : ""}${tarea.nombre}\n${fechaCorta(tarea.inicio)} – ${fechaCorta(tarea.fin)}\nReal ${real.toFixed(0)}% · Plan ${plan.toFixed(0)}%${tarea.esCritico ? "\nRuta crítica" : ""}`;
 
   return (
-    <div className="relative z-10 flex" style={{ height: ALTO_FILA }}>
+    <div
+      className="relative z-10 flex"
+      style={{ height: ALTO_FILA }}
+      onMouseEnter={onSeñalar}
+      onMouseLeave={onSoltar}
+      // Con el teclado tambien: recorrer el Gantt tabulando tiene que enseñar
+      // las mismas ataduras que pasar el raton.
+      onFocus={onSeñalar}
+      onBlur={onSoltar}
+    >
       {/* Nombre */}
       <div
         className="sticky left-0 z-10 flex shrink-0 items-center gap-1 border-r border-b"
@@ -419,6 +483,23 @@ function Fila({
         }}
         title={tooltip}
       >
+        {/* La linea base, DEBAJO de la barra viva y mas fina: se lee de un
+            vistazo cuanto se ha corrido la tarea desde que se congelo el
+            plan. Va primero para que la barra viva quede por encima. */}
+        {base && !tarea.esHito && (
+          <div
+            className="absolute rounded-sm"
+            style={{
+              left: base.x * pxDia,
+              width: base.ancho * pxDia,
+              top: ALTO_FILA / 2 + 9,
+              height: 4,
+              backgroundColor: "color-mix(in oklab, var(--texto) 35%, transparent)",
+            }}
+            title={`Línea base: ${base.ancho} día(s)`}
+          />
+        )}
+
         {tarea.esHito ? (
           <Rombo left={izquierda} color={color} />
         ) : tarea.esResumen ? (
@@ -568,5 +649,83 @@ function Muestra({ color, etiqueta }: { color: string; etiqueta: string }) {
       />
       {etiqueta}
     </span>
+  );
+}
+
+/**
+ * Las flechas de dependencia, en una capa SVG sobre las barras.
+ *
+ * SVG y no divs: son polilineas con punta, y componerlas con cajas
+ * posicionadas seria un tramo por segmento y una rotacion por punta.
+ *
+ * `pointer-events: none` es obligatorio, no cosmetico: sin el, la capa tapa
+ * toda el area de tiempo y el clic del plegado deja de llegar a la fila.
+ *
+ * Lo que se ve por defecto son solo las CRITICAS, tenues. Al señalar una fila
+ * se resaltan las suyas —de quien depende y a quien arrastra—, que es la
+ * pregunta que se le hace a un Gantt cuando algo se mueve.
+ */
+function Flechas({
+  flechas,
+  señalada,
+  pxDia,
+  izquierda,
+  ancho,
+  alto,
+}: {
+  flechas: EnlaceGantt[];
+  señalada: number | null;
+  pxDia: number;
+  izquierda: number;
+  ancho: number;
+  alto: number;
+}) {
+  const visibles = flechas.filter(
+    (f) =>
+      f.critica || f.tareaUid === señalada || f.predecesoraUid === señalada,
+  );
+
+  return (
+    <svg
+      className="pointer-events-none absolute top-0 z-20"
+      style={{ left: izquierda, width: ancho, height: alto }}
+      width={ancho}
+      height={alto}
+      aria-hidden="true"
+    >
+      <defs>
+        <marker
+          id="gantt-punta"
+          viewBox="0 0 6 6"
+          refX="5"
+          refY="3"
+          markerWidth="5"
+          markerHeight="5"
+          orient="auto-start-reverse"
+        >
+          <path d="M0,0 L6,3 L0,6 z" fill="context-stroke" />
+        </marker>
+      </defs>
+
+      {visibles.map((f) => {
+        const resaltada =
+          f.tareaUid === señalada || f.predecesoraUid === señalada;
+        const color = f.critica ? "var(--color-peligro)" : "var(--texto)";
+
+        return (
+          <polyline
+            key={`${f.predecesoraUid}-${f.tareaUid}-${f.tipo}`}
+            points={f.puntos
+              .map((p) => `${p.x * pxDia},${p.y * ALTO_FILA}`)
+              .join(" ")}
+            fill="none"
+            stroke={color}
+            strokeWidth={resaltada ? 1.6 : 1}
+            strokeOpacity={resaltada ? 0.9 : 0.35}
+            markerEnd="url(#gantt-punta)"
+          />
+        );
+      })}
+    </svg>
   );
 }

@@ -115,12 +115,27 @@ const CAMPO_PORCENTAJE_PLANEADO = "188743731";
  *
  * El mapeo va completo aunque hoy el archivo solo traiga FC y un CC: un
  * enlace mal tipado desplaza fechas sin dar ningun sintoma.
+ *
+ * MSPDI los numera por el orden ingles —FF, FS, SS, SF— y las siglas de aqui
+ * son las castellanas, asi que **no se corresponden posicionalmente**:
+ *
+ *     0 = FF (Finish-Finish)  -> FF, fin-fin
+ *     1 = FS (Finish-Start)   -> FC, fin-comienzo
+ *     2 = SS (Start-Start)    -> CC, comienzo-comienzo
+ *     3 = SF (Start-Finish)   -> CF, comienzo-fin
+ *
+ * El 2 y el 3 estuvieron CAMBIADOS hasta el 17 de agosto de 2026: un SS se
+ * guardaba como CF y un SF como CC. Es exactamente el fallo del que avisa el
+ * parrafo de arriba, y no dio la cara en un año porque hasta que el Gantt no
+ * dibujo las flechas nada leia el tipo: se guardaba y se olvidaba. Los
+ * cronogramas ya importados conservan el tipo cambiado; se corrige
+ * reimportando.
  */
 const TIPOS_DEPENDENCIA: Record<string, TipoDependencia> = {
   "0": "FF",
   "1": "FC",
-  "2": "CF",
-  "3": "CC",
+  "2": "CC",
+  "3": "CF",
 };
 
 /**
