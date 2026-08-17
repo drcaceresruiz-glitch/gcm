@@ -388,6 +388,16 @@ const LARGO_CLAVE = 120;
  * Lleva el dia dentro SOLO cuando el aviso se repite —recordatorio, resumen—.
  * Los de una sola vez (se abrio, quedo lista) no lo llevan: si lo llevaran, el
  * mismo aviso volveria a salir cada dia.
+ *
+ * Los dos hitos caen uno a cada lado, y ahi esta todo su comportamiento:
+ *
+ * - `HITO_CERCA` **sin dia**: suena UNA vez, al entrar en la ventana. Con el
+ *   dia dentro sonaria cada dia de la semana previa.
+ * - `HITO_VENCIDO` **con dia**: `avisosDeHitos` ya decide que solo toca cada
+ *   N dias; lo que la clave tiene que impedir es que suene doce veces EL DIA
+ *   que toca —el cron pasa cada cinco minutos—. Sin el dia sonaria una sola
+ *   vez en la vida del hito y nunca mas, que es justo lo contrario de
+ *   «insistir mientras siga sin cumplirse».
  */
 export function claveDeAviso(
   evento: EventoAviso,
@@ -395,7 +405,8 @@ export function claveDeAviso(
   personaClave: string,
   dia?: string,
 ): string {
-  const repetible = evento === "RECORDAR" || evento === "RESUMEN";
+  const repetible =
+    evento === "RECORDAR" || evento === "RESUMEN" || evento === "HITO_VENCIDO";
   const partes = [evento, ancla, personaClave];
   if (repetible) partes.push(dia ?? "");
   return partes.join("|").slice(0, LARGO_CLAVE);

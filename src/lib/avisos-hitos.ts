@@ -1,4 +1,4 @@
-import { tocaRecordar } from "@/lib/avisos";
+import { recortar, tocaRecordar, LIMITE_SMS } from "@/lib/avisos";
 
 /**
  * Cuando avisar de un hito, y de que.
@@ -144,6 +144,41 @@ export function textoDeHito(aviso: AvisoDeHito): { titulo: string; cuerpo: strin
       `${aviso.nombre} venció el ${aviso.fecha}, hace ${dias} día(s), y sigue ` +
       `sin cumplirse. Todo lo que dependía de esta fecha va con ese retraso.`,
   };
+}
+
+/**
+ * El mismo aviso en un SMS.
+ *
+ * Menos de 160 caracteres, CERO enlaces y sin tildes, como todos los SMS de
+ * GCM: las operadoras marcan como spam lo que lleva URL, y una tilde saca al
+ * mensaje del alfabeto GSM-7 y lo deja en 70 caracteres —o sea, en dos SMS
+ * que se cobran como dos—.
+ *
+ * Lo que se recorta primero es el nombre de la OBRA, no el del hito. Es al
+ * reves que en los avisos de restricciones y a proposito: alli lo que hay que
+ * saber es que flujo falta, aqui lo unico que hay que saber es QUE fecha se
+ * viene encima. Quien recibe esto casi siempre trabaja en una sola obra.
+ */
+export function textoSmsDeHito(obra: string, aviso: AvisoDeHito): string {
+  const dias = Math.abs(aviso.diasParaLaFecha);
+  const cual = recortar(aviso.nombre, 60);
+
+  const cuando =
+    aviso.diasParaLaFecha === 0
+      ? "es HOY"
+      : aviso.diasParaLaFecha === 1
+        ? "es manana"
+        : `es en ${dias} dias`;
+
+  const cola =
+    aviso.evento === "HITO_CERCA"
+      ? `hito "${cual}" ${cuando} y sigue sin cumplirse. Entra a GCM.`
+      : `hito "${cual}" vencio hace ${dias} d y sigue sin cumplirse. Entra a GCM.`;
+
+  const sitio = LIMITE_SMS - cola.length - "GCM : ".length;
+  const nombre = recortar(obra, Math.max(1, sitio));
+
+  return recortar(`GCM ${nombre}: ${cola}`, LIMITE_SMS);
 }
 
 /**

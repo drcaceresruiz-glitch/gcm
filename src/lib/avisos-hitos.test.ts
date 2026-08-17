@@ -5,6 +5,8 @@ import {
   avisosDeHitos,
   diasHasta,
   textoDeHito,
+  textoSmsDeHito,
+  type AvisoDeHito,
   type HitoParaAviso,
 } from "./avisos-hitos";
 import { quiereEvento, seFiltraPorFlujo } from "./avisos";
@@ -154,6 +156,65 @@ describe("los textos", () => {
     expect(v.titulo).toContain("vencido");
     expect(v.cuerpo).toContain("6 día(s)");
     expect(v.cuerpo).toContain("dependía");
+  });
+});
+
+describe("el SMS", () => {
+  const cerca = (p: Partial<AvisoDeHito> = {}): AvisoDeHito => ({
+    uid: -1,
+    nombre: "Fin de estructuras",
+    fecha: "2026-10-15",
+    evento: "HITO_CERCA",
+    diasParaLaFecha: 3,
+    responsableClave: null,
+    ...p,
+  });
+
+  it("cabe en un SMS y no lleva enlaces", () => {
+    // Pasarse de 160 lo parte en dos, que se cobran como dos y llegan
+    // desordenados; y una URL hace que la operadora lo marque como spam.
+    const largo = textoSmsDeHito("x".repeat(200), cerca({ nombre: "y".repeat(200) }));
+    expect(largo.length).toBeLessThanOrEqual(160);
+    expect(largo).not.toMatch(/https?:|www\.|\.com/);
+  });
+
+  /**
+   * Una tilde saca al mensaje del alfabeto GSM-7 y lo deja en 70 caracteres:
+   * el mismo texto pasa a costar y a llegar como dos SMS.
+   */
+  it("no lleva tildes", () => {
+    const textos = [
+      textoSmsDeHito("Obra", cerca({ diasParaLaFecha: 1 })),
+      textoSmsDeHito("Obra", cerca({ diasParaLaFecha: 0 })),
+      textoSmsDeHito("Obra", cerca({ diasParaLaFecha: 5 })),
+      textoSmsDeHito("Obra", cerca({ evento: "HITO_VENCIDO", diasParaLaFecha: -4 })),
+    ];
+    for (const t of textos) expect(t).not.toMatch(/[áéíóúÁÉÍÓÚñ]/);
+  });
+
+  it("dice cual es el hito, que es lo unico que hay que saber", () => {
+    const t = textoSmsDeHito("EDIFICIO LOS ROBLES", cerca());
+    expect(t).toContain("Fin de estructuras");
+    expect(t).toContain("3 dias");
+  });
+
+  /**
+   * Es al reves que en los avisos de restricciones, y a proposito: alli lo
+   * que hay que saber es que flujo falta; aqui, QUE fecha se viene encima.
+   */
+  it("cuando no cabe todo, lo que se recorta es la obra, no el hito", () => {
+    const t = textoSmsDeHito("EDIFICIO MULTIFAMILIAR ".repeat(9), cerca());
+
+    expect(t.length).toBeLessThanOrEqual(160);
+    // El hito llega entero; la obra es la que se queda a medias.
+    expect(t).toContain("Fin de estructuras");
+    expect(t).toContain("es en 3 dias");
+    expect(t).toMatch(/EDIFICIO MULTIFAMILIAR.*…/);
+  });
+
+  it("el vencido dice cuanto lleva", () => {
+    const t = textoSmsDeHito("Obra", cerca({ evento: "HITO_VENCIDO", diasParaLaFecha: -4 }));
+    expect(t).toContain("vencio hace 4 d");
   });
 });
 

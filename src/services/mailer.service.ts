@@ -358,6 +358,67 @@ export function correoRestricciones(datos: {
 }
 
 /**
+ * Correo de un hito de obra.
+ *
+ * Tiene plantilla propia y no reusa la de restricciones por una diferencia que
+ * se ve a simple vista: aquella es una TABLA de tareas con su flujo y sus dias
+ * —lo que se lee de un vistazo cuando hay ocho cosas pendientes— y un hito es
+ * UNA fecha. Metido en esa tabla, lo importante —el dia— quedaria en una
+ * columna estrecha a la derecha, y el boton diria «Ver el Lookahead», que es
+ * el sitio donde el hito no esta.
+ *
+ * Se manda uno a uno, como todos los correos de obra: la lista puede incluir
+ * al cliente y al proveedor a la vez, y ninguno tiene por que ver al otro.
+ */
+export function correoHito(datos: {
+  nombre: string;
+  obra: string;
+  titulo: string;
+  cuerpo: string;
+  /// El nombre del hito y el dia en que toca, ya en formato de calendario.
+  hito: string;
+  fecha: string;
+  /// Si la fecha ya paso. Cambia el color, que es lo unico que se lee antes
+  /// que el texto.
+  vencido: boolean;
+  /// A donde se va a verlo. Vacio si no hay direccion publica.
+  enlace: string | null;
+}): Omit<Correo, "para"> {
+  const texto = [
+    `Hola ${datos.nombre},`,
+    ``,
+    `${datos.obra}: ${datos.titulo}`,
+    ``,
+    datos.cuerpo,
+    ``,
+    `- ${datos.hito} — ${datos.fecha}`,
+    ...(datos.enlace ? [``, datos.enlace] : []),
+  ].join("\n");
+
+  const color = datos.vencido ? "#b42318" : "#0f7186";
+
+  const html = plantilla(
+    esc(datos.titulo),
+    `<p>Hola <strong>${esc(datos.nombre)}</strong>,</p>
+     <p style="color:#6b7a82;">${esc(datos.obra)}</p>
+     <div style="border-left:4px solid ${color};padding:10px 14px;margin:16px 0;background:#f7fafb;">
+       <div style="font-weight:bold;font-size:16px;">${esc(datos.hito)}</div>
+       <div style="color:${color};font-size:14px;">${esc(datos.fecha)}</div>
+     </div>
+     <p>${esc(datos.cuerpo)}</p>
+     ${
+       datos.enlace
+         ? `<p style="margin:20px 0;">
+              <a href="${esc(datos.enlace)}" style="background:#0f7186;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:bold;">Ver el cronograma</a>
+            </p>`
+         : ""
+     }`,
+  );
+
+  return { asunto: `${datos.obra}: ${datos.titulo}`, texto, html };
+}
+
+/**
  * Correo con la curva de avance de una obra.
  *
  * La imagen va como ADJUNTO y no incrustada en el HTML: casi todos los

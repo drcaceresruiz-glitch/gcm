@@ -425,6 +425,28 @@ describe("claveDeAviso", () => {
     );
   });
 
+  /**
+   * Los dos hitos caen uno a cada lado, y de eso depende TODO su
+   * comportamiento: «se acerca» suena una vez en la vida del hito, «vencido»
+   * insiste cada N dias. Si se equivoca el lado, o suena cada dia de la
+   * ventana previa, o suena una sola vez y no vuelve a insistir jamas.
+   */
+  it("el hito que se acerca no lleva dia; el vencido si", () => {
+    const hoy = diaDeClave(d("2026-08-11"));
+    const manana = diaDeClave(d("2026-08-12"));
+    const ancla = "hito:-7:HITO_CERCA";
+
+    expect(claveDeAviso("HITO_CERCA", ancla, "u:u1", hoy)).toBe(
+      claveDeAviso("HITO_CERCA", ancla, "u:u1", manana),
+    );
+
+    // Sin el dia, el cron —que pasa cada cinco minutos— reservaria una sola
+    // vez y el hito vencido no volveria a sonar nunca mas.
+    expect(claveDeAviso("HITO_VENCIDO", "hito:-7:HITO_VENCIDO", "u:u1", hoy)).not.toBe(
+      claveDeAviso("HITO_VENCIDO", "hito:-7:HITO_VENCIDO", "u:u1", manana),
+    );
+  });
+
   it("nunca pasa de lo que cabe en la columna", () => {
     const larga = "x".repeat(200);
     expect(claveDeAviso("RESUMEN", larga, larga, "2026-08-11").length).toBeLessThanOrEqual(120);

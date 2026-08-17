@@ -19,9 +19,18 @@ import {
   type Persona,
   type SuscripcionResuelta,
 } from "@/lib/avisos";
+import {
+  textoDeHito,
+  textoSmsDeHito,
+  type AvisoDeHito,
+} from "@/lib/avisos-hitos";
 import { PRIORIDAD_AVISO } from "@/lib/sms-cola";
 import { enviarSms } from "@/services/sms.service";
-import { enviarCorreo, correoRestricciones } from "@/services/mailer.service";
+import {
+  enviarCorreo,
+  correoHito,
+  correoRestricciones,
+} from "@/services/mailer.service";
 import type {
   CanalAviso,
   EventoAviso,
@@ -125,6 +134,16 @@ export async function despacharLotes(args: {
   dia: string;
   /// Tope de entregas de esta tanda. Sin el, el de `MAX_POR_TANDA`.
   tope?: number;
+  /**
+   * El ancla de la clave, cuando los motivos no sirven para identificarla.
+   *
+   * Por defecto se compone con `uid:tipo` de cada motivo, y ese `tipo` es un
+   * flujo de restriccion. Un hito no tiene flujo: su ancla es `hito:uid:evento`
+   * y la pone quien despacha. Sin esto, dos hitos de la misma tarea —el que se
+   * acerca y el que vencio— compartirian clave, o peor: la compartiria un hito
+   * con la restriccion que colgara del mismo uid.
+   */
+  ancla?: string;
   /// Que hacer con cada destinatario. Devuelve si de verdad salio.
   entregar: (persona: Persona, motivos: MotivoAviso[]) => Promise<boolean>;
 }): Promise<number> {
@@ -139,7 +158,7 @@ export async function despacharLotes(args: {
   for (const lote of lotes) {
     const clave = claveDeAviso(
       evento,
-      anclaDe(lote.motivos),
+      args.ancla ?? anclaDe(lote.motivos),
       lote.persona.clave,
       dia,
     );
@@ -356,6 +375,87 @@ export async function entregarCorreo(
         dias: m.diasAbierta,
       })),
       masCuantas: Math.max(0, motivos.length - MAX_LINEAS_CORREO),
+      enlace,
+    }),
+  });
+  return enviado;
+}
+
+/**
+ * Las tres entregas de un hito.
+ *
+ * Van aparte de las de restricciones y no como un parametro de aquellas por lo
+ * que cuentan: un aviso de restriccion habla de tareas que esperan por un
+ * flujo, y un hito habla de una fecha comprometida. Con el texto de aquellas,
+ * un hito llegaria diciendo «1 tarea espera por…», que ni describe lo que
+ * pasa ni dice que se rompe.
+ *
+ * El aviso in-app lleva a `/cronograma`, no al Lookahead: el hito se marca,
+ * se mira y se cumple ahi.
+ */
+export async function avisoDeHitoEnBandeja(
+  contexto: ContextoAviso,
+  aviso: AvisoDeHito,
+  persona: Persona,
+): Promise<boolean> {
+  const userId = idDeUsuario(persona);
+  // Solo los usuarios de GCM tienen bandeja. `canalesEfectivos` ya lo filtra;
+  // esto es la red por si algun dia deja de hacerlo.
+  if (userId === null) return false;
+
+  const texto = textoDeHito(aviso);
+  await prisma.aviso.create({
+    data: {
+      companyId: contexto.companyId,
+      projectId: contexto.projectId,
+      userId,
+      evento: aviso.evento,
+      titulo: texto.titulo.slice(0, 200),
+      cuerpo: texto.cuerpo.slice(0, 400),
+      camino: "/cronograma",
+    },
+  });
+  return true;
+}
+
+export async function entregarSmsDeHito(
+  contexto: ContextoAviso,
+  nombreObra: string,
+  aviso: AvisoDeHito,
+  persona: Persona,
+): Promise<boolean> {
+  if (!persona.celular) return false;
+
+  const { enviado } = await enviarSms(
+    contexto.companyId,
+    persona.celular,
+    textoSmsDeHito(nombreObra, aviso),
+    { projectId: contexto.projectId, prioridad: PRIORIDAD_AVISO },
+  );
+  return enviado;
+}
+
+export async function entregarCorreoDeHito(
+  contexto: ContextoAviso,
+  nombreObra: string,
+  aviso: AvisoDeHito,
+  persona: Persona,
+): Promise<boolean> {
+  if (!persona.email) return false;
+
+  const texto = textoDeHito(aviso);
+  const enlace = `${env.APP_URL.replace(/\/$/, "")}/obras/${contexto.projectId}/cronograma`;
+
+  const { enviado } = await enviarCorreo({
+    para: persona.email,
+    ...correoHito({
+      nombre: persona.nombre,
+      obra: nombreObra,
+      titulo: texto.titulo,
+      cuerpo: texto.cuerpo,
+      hito: aviso.nombre,
+      fecha: aviso.fecha,
+      vencido: aviso.evento === "HITO_VENCIDO",
       enlace,
     }),
   });

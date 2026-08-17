@@ -15,16 +15,26 @@ import {
   type EncargoDirecto,
   type EstadoReloj,
   type MotivoAviso,
+  type Persona,
 } from "@/lib/avisos";
 import {
+  anclaDeHito,
+  avisosDeHitos,
+  type AvisoDeHito,
+  type HitoParaAviso,
+} from "@/lib/avisos-hitos";
+import {
+  avisoDeHitoEnBandeja,
   despacharLotes,
   entregarCorreo,
+  entregarCorreoDeHito,
   entregarSms,
+  entregarSmsDeHito,
   personasPorClave,
   repartoDeAviso,
   suscripcionesResueltas,
 } from "@/services/avisos-envio";
-import type { EventoAviso } from "@/generated/prisma/enums";
+import type { EventoAviso, TipoRestriccion } from "@/generated/prisma/enums";
 
 /**
  * El reloj de los avisos: lo unico de GCM que corre solo.
@@ -245,20 +255,51 @@ async function pasadaDeObra(
   if (esEstreno(ajustes.createdAt, ahora, umbral)) return nada;
 
   const resueltas = await suscripcionesResueltas(obra.id);
-  if (resueltas.length === 0) return nada;
 
-  const abiertas = await prisma.restriccion.findMany({
-    where: { resuelta: false, tarea: { projectId: obra.id } },
-    select: {
-      tipo: true,
-      createdAt: true,
-      fechaCompromiso: true,
-      responsableUserId: true,
-      responsableContactoId: true,
-      tarea: { select: { uid: true } },
-    },
+  /**
+   * Los hitos se miran AUNQUE la obra no tenga ni una suscripcion viva.
+   *
+   * Es la unica diferencia de fondo con las restricciones, y la justifica el
+   * dato: un hito lleva el nombre de su responsable escrito encima, asi que
+   * hay a quien escribir sin depender de que alguien acertara a configurar
+   * una suscripcion. Callar la fecha comprometida de la obra porque nadie
+   * configuro los avisos seria perder lo unico que hace util a un hito.
+   */
+  const hitos = await hitosQueTocanHoy(obra.id, ahora, umbral);
+
+  const abiertas =
+    resueltas.length === 0
+      ? []
+      : await prisma.restriccion.findMany({
+          where: { resuelta: false, tarea: { projectId: obra.id } },
+          select: {
+            tipo: true,
+            createdAt: true,
+            fechaCompromiso: true,
+            responsableUserId: true,
+            responsableContactoId: true,
+            tarea: { select: { uid: true } },
+          },
+        });
+
+  if (hitos.length === 0 && abiertas.length === 0) return nada;
+
+  const personas = await personasPorClave(obra.id);
+
+  // Los hitos van POR DELANTE en el reparto del presupuesto de correos de la
+  // pasada. Son pocos —dos o tres en una obra entera— y hablan de una fecha
+  // que no vuelve; el recordatorio y el resumen de restricciones vuelven
+  // manana. Si algo se queda fuera por tope, que sea lo que se repite.
+  const porHitos = await despacharHitos(obra, hitos, resueltas, personas, {
+    maxSmsDia: ajustes.maxSmsDia,
+    correosDisponibles,
   });
-  if (abiertas.length === 0) return nada;
+
+  let avisosApp = porHitos.avisosApp;
+  let correos = porHitos.correos;
+  let sms = porHitos.sms;
+
+  if (abiertas.length === 0) return { avisosApp, correos, sms };
 
   const nombres = await nombresDeTareas(
     obra.id,
@@ -284,7 +325,6 @@ async function pasadaDeObra(
   // configurara bien; esto es una restriccion con el nombre de una persona
   // escrito encima. `repartirAvisos` funde las dos vias antes de armar los
   // lotes, asi que quien llegue por ambas recibe UN aviso con la union.
-  const personas = await personasPorClave(obra.id);
   const suyas = new Map<string, MotivoAviso[]>();
 
   abiertas.forEach((r, i) => {
@@ -317,10 +357,6 @@ async function pasadaDeObra(
       ];
     });
   };
-
-  let avisosApp = 0;
-  let correos = 0;
-  let sms = 0;
 
   // Recordatorio: lo que hoy toca por antiguedad, MAS lo que se prometio y ya
   // vencio. Lo segundo no espera al ciclo de N dias: una fecha pasada es una
@@ -420,6 +456,202 @@ async function despachar(
             entregarCorreo(contexto, obra.nombreObra, evento, persona, suyos),
         })
       : 0;
+
+  return { avisosApp, correos, sms };
+}
+
+/**
+ * Los hitos de la obra que HOY merecen un aviso.
+ *
+ * El nombre y la fecha no estan en `HitoObra` —solo el ancla y el
+ * responsable—: viven en la fila del cronograma vigente, que es la que se
+ * mueve cuando se replanifica. Por eso se leen de alli en cada pasada y no se
+ * copian: un hito que se corrio tres dias tiene que avisar con la fecha nueva.
+ *
+ * Un hito cuya fila ya no esta en el cronograma vigente NO avisa. Pasa al
+ * importar un corte nuevo, que sustituye las tareas enteras: sin fila no hay
+ * ni nombre ni fecha, y avisar de una fecha inventada es peor que callar. El
+ * `HitoObra` sigue ahi para cuando la fila vuelva.
+ */
+async function hitosQueTocanHoy(
+  projectId: string,
+  ahora: Date,
+  umbral: number,
+): Promise<AvisoDeHito[]> {
+  const hitos = await prisma.hitoObra.findMany({
+    where: { projectId },
+    select: {
+      uid: true,
+      diasAviso: true,
+      responsableUserId: true,
+      responsableContactoId: true,
+    },
+  });
+  if (hitos.length === 0) return [];
+
+  const uids = hitos.map((h) => h.uid);
+
+  const [vigente, avances] = await Promise.all([
+    prisma.cronograma.findFirst({
+      where: { projectId },
+      orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
+      select: {
+        tareas: {
+          where: { uid: { in: uids } },
+          select: { uid: true, nombre: true, fin: true },
+        },
+      },
+    }),
+    prisma.avanceTarea.findMany({
+      where: { projectId, uid: { in: uids } },
+      select: { uid: true, porcentaje: true },
+    }),
+  ]);
+
+  const filas = new Map((vigente?.tareas ?? []).map((t) => [t.uid, t]));
+
+  // Un hito se da por cumplido al llegar al 100%: no tiene otra forma de
+  // cerrarse —no lleva dinero ni duracion— y `avanceTarea` es donde se
+  // reporta, sea a mano o al cerrar un Plan Semanal.
+  const cumplidos = new Set(
+    avances.filter((a) => Number(a.porcentaje) >= 100).map((a) => a.uid),
+  );
+
+  const paraDecidir: HitoParaAviso[] = hitos.flatMap((h) => {
+    const fila = filas.get(h.uid);
+    if (!fila) return [];
+
+    return [
+      {
+        uid: h.uid,
+        nombre: fila.nombre,
+        // La fila se guardo a medianoche UTC, asi que esto devuelve el mismo
+        // dia de calendario que se escribio.
+        fecha: fila.fin.toISOString().slice(0, 10),
+        diasAviso: h.diasAviso,
+        cumplido: cumplidos.has(h.uid),
+        responsableClave: h.responsableUserId
+          ? `u:${h.responsableUserId}`
+          : h.responsableContactoId
+            ? `c:${h.responsableContactoId}`
+            : null,
+      },
+    ];
+  });
+
+  return avisosDeHitos(paraDecidir, diaDeClave(ahora), umbral);
+}
+
+/**
+ * Despacha los avisos de hito, UNO POR HITO.
+ *
+ * No se agrupan varios hitos en un mensaje, al reves que las restricciones, y
+ * es por la clave que impide repetir: su ancla es `hito:uid:evento`, de un
+ * solo hito. Agrupando dos en un aviso habria que inventar un ancla conjunta,
+ * y entonces cumplir uno de los dos cambiaria la clave del otro y volveria a
+ * sonar. Ademas un hito se lee de un vistazo —un nombre y una fecha— y dos
+ * juntos ya no.
+ *
+ * El coste de no agrupar lo absorben los topes que ya estaban: el cuarto SMS
+ * del dia de una persona **degrada a correo**, no se descarta.
+ */
+async function despacharHitos(
+  obra: ObraDelReloj,
+  avisos: readonly AvisoDeHito[],
+  resueltas: Awaited<ReturnType<typeof suscripcionesResueltas>>,
+  personas: ReadonlyMap<string, Persona>,
+  limites: { maxSmsDia: number; correosDisponibles: number },
+): Promise<{ avisosApp: number; correos: number; sms: number }> {
+  let avisosApp = 0;
+  let correos = 0;
+  let sms = 0;
+
+  if (avisos.length === 0) return { avisosApp, correos, sms };
+
+  const dia = diaDeClave(new Date());
+  const contexto = { companyId: obra.companyId, projectId: obra.id };
+
+  for (const aviso of avisos) {
+    /**
+     * `MotivoAviso` exige un flujo y un hito no tiene ninguno. Da igual cual
+     * se ponga —igual que en `motivosDeHechos` para las tareas que quedan
+     * listas—: `seFiltraPorFlujo` no filtra los eventos de hito, el ancla de
+     * la clave la pone `anclaDeHito`, y los textos de hito no lo miran.
+     */
+    const motivos: MotivoAviso[] = [
+      {
+        uid: aviso.uid,
+        tarea: aviso.nombre,
+        tipo: "INFORMACION" as TipoRestriccion,
+        diasAbierta: Math.max(0, -aviso.diasParaLaFecha),
+        diasParaLaFecha: aviso.diasParaLaFecha,
+      },
+    ];
+
+    // Quien se hizo cargo, si sigue siendo alcanzable. Con clave y sin
+    // persona significa que se dio de baja despues: la fila conserva la traza
+    // —lo dice la pantalla— pero ya no hay a quien escribir, y lo recogen las
+    // suscripciones de la obra.
+    const responsable = aviso.responsableClave
+      ? (personas.get(aviso.responsableClave) ?? null)
+      : null;
+
+    const todos = await repartoDeAviso({
+      projectId: obra.id,
+      evento: aviso.evento,
+      motivos,
+      resueltas,
+      maxSmsDia: limites.maxSmsDia,
+      dia,
+      // El SMS nace apagado tambien aqui: detras hay una SIM que se paga, y
+      // nadie pidio gastarla en su nombre. Quien quiera el hito por SMS lo
+      // enciende en su suscripcion.
+      directos: responsable
+        ? [
+            {
+              persona: responsable,
+              motivos,
+              canales: { app: true, correo: true, sms: false },
+            },
+          ]
+        : [],
+    });
+    if (todos.length === 0) continue;
+
+    const comun = {
+      contexto,
+      evento: aviso.evento,
+      todos,
+      dia,
+      ancla: anclaDeHito(aviso.uid, aviso.evento),
+    };
+
+    avisosApp += await despacharLotes({
+      ...comun,
+      canal: "APP",
+      entregar: (persona) => avisoDeHitoEnBandeja(contexto, aviso, persona),
+    });
+
+    sms += await despacharLotes({
+      ...comun,
+      canal: "SMS",
+      entregar: (persona) =>
+        entregarSmsDeHito(contexto, obra.nombreObra, aviso, persona),
+    });
+
+    // El correo va el ULTIMO y con lo que quede del presupuesto de la pasada,
+    // por lo mismo que en las restricciones: es el unico canal lento.
+    const quedan = limites.correosDisponibles - correos;
+    if (quedan > 0) {
+      correos += await despacharLotes({
+        ...comun,
+        canal: "CORREO",
+        tope: quedan,
+        entregar: (persona) =>
+          entregarCorreoDeHito(contexto, obra.nombreObra, aviso, persona),
+      });
+    }
+  }
 
   return { avisosApp, correos, sms };
 }
