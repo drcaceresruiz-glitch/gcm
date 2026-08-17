@@ -251,6 +251,14 @@ export const TABLAS: readonly TablaRespaldo[] = [
     refs: [{ campo: "projectId", a: "projects" }],
   },
   {
+    // El responsable y el contacto NO se listan como referencias a proposito:
+    // son `SET NULL` y pueden apuntar a alguien que ya no esta. Restaurar un
+    // respaldo no debe fallar porque un responsable causara baja entre medias.
+    tabla: "hitos_obra",
+    modelo: "hitoObra",
+    refs: [{ campo: "projectId", a: "projects" }],
+  },
+  {
     tabla: "contactos_aviso",
     modelo: "contactoAviso",
     refs: [{ campo: "projectId", a: "projects" }],

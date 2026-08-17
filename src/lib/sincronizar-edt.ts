@@ -75,9 +75,39 @@ export interface PlanSincronizacion {
  * orden del documento, asi que una fila nueva insertada en mitad sin recolocar
  * al resto cambia de quien cuelgan las siguientes.
  */
+/**
+ * Donde va cada hito: detras de TODA la rama de la partida que lo ancla.
+ *
+ * No basta con ponerlo en la fila siguiente. La jerarquia del cronograma sale
+ * del nivel MAS el orden del documento, asi que un hito colado justo detras de
+ * un capitulo le robaria las partidas —pasarian a colgar del hito— y el
+ * capitulo dejaria de ser resumen. Va despues de su ultima descendiente, y al
+ * MISMO nivel que su ancla: asi es hermano de lo que cierra, que es lo que un
+ * hito significa —«fin de estructuras» va con las estructuras, no dentro de
+ * una de ellas—.
+ *
+ * Y nunca a un nivel mas profundo que el ancla: eso convertiria en resumen a
+ * la fila de delante, y si esa fila lleva dinero se caeria de la valorizacion.
+ */
+function posicionDelHito(
+  edt: readonly FilaEdt[],
+  anclaCodigo: string,
+): { indice: number; nivel: number } | null {
+  const i = edt.findIndex((f) => f.codigo === anclaCodigo);
+  if (i < 0) return null;
+
+  const nivel = edt[i]!.nivel;
+  let fin = i + 1;
+  while (fin < edt.length && edt[fin]!.nivel > nivel) fin++;
+
+  return { indice: fin, nivel };
+}
+
 export function planSincronizacion(
   edt: readonly FilaEdt[],
   tareas: readonly TareaExistente[],
+  /// Los hitos de la obra y la partida tras la que va cada uno.
+  hitos: readonly { uid: number; anclaCodigo: string | null }[] = [],
 ): PlanSincronizacion {
   const porCodigo = new Map<string, TareaExistente>();
   for (const t of tareas) {
@@ -90,9 +120,52 @@ export function planSincronizacion(
 
   const altas: FilaEdt[] = [];
   const cambios: CambioEdt[] = [];
+  const porUid = new Map(tareas.map((t) => [t.uid, t]));
 
-  edt.forEach((f, i) => {
+  // Los hitos que encuentran su ancla se intercalan; los que no, caen al final
+  // como cualquier otra suelta —y ahi se ven, que es la idea—.
+  const hitosEn = new Map<number, { uid: number; nivel: number }[]>();
+  const anclados = new Set<number>();
+
+  for (const h of hitos) {
+    if (!h.anclaCodigo) continue;
+    const pos = posicionDelHito(edt, h.anclaCodigo);
+    if (!pos) continue;
+    hitosEn.set(pos.indice, [
+      ...(hitosEn.get(pos.indice) ?? []),
+      { uid: h.uid, nivel: pos.nivel },
+    ]);
+    anclados.add(h.uid);
+  }
+
+  type Entrada =
+    | { tipo: "edt"; fila: FilaEdt }
+    | { tipo: "hito"; uid: number; nivel: number };
+
+  const documento: Entrada[] = [];
+  for (let i = 0; i <= edt.length; i++) {
+    // Van ANTES de la fila `i` porque su posicion es «detras de la rama», y esa
+    // rama termina justo donde empieza la fila `i`.
+    for (const h of hitosEn.get(i) ?? []) documento.push({ tipo: "hito", ...h });
+    if (i < edt.length) documento.push({ tipo: "edt", fila: edt[i]! });
+  }
+
+  documento.forEach((entrada, i) => {
     const fila = i + 1;
+
+    if (entrada.tipo === "hito") {
+      const t = porUid.get(entrada.uid);
+      if (!t) return;
+      const cambio: CambioEdt = { uid: t.uid };
+      if (t.fila !== fila) cambio.fila = fila;
+      if (t.nivel !== entrada.nivel) cambio.nivel = entrada.nivel;
+      // Un hito no agrupa nada: si venia marcado como resumen, se corrige.
+      if (t.esResumen) cambio.esResumen = false;
+      if (Object.keys(cambio).length > 1) cambios.push(cambio);
+      return;
+    }
+
+    const f = entrada.fila;
     const existente = porCodigo.get(f.codigo);
 
     if (!existente) {
@@ -118,6 +191,7 @@ export function planSincronizacion(
    * calculo; por eso `sobrantes` solo lista, y el servicio decide que contar.
    */
   const sueltas = tareas
+    .filter((t) => !anclados.has(t.uid))
     .filter((t) => t.codigo === null || !deLaEdt.has(t.codigo))
     .sort((a, b) => a.fila - b.fila);
 
@@ -144,7 +218,8 @@ export function planSincronizacion(
   const salto = sueltas.length > 0 ? 1 - nivelMinimo : 0;
 
   sueltas.forEach((t, i) => {
-    const fila = edt.length + i + 1;
+    // Detras de TODO el documento, que ya incluye los hitos intercalados.
+    const fila = documento.length + i + 1;
     const nivel = t.nivel + salto;
     const cambio: CambioEdt = { uid: t.uid };
     if (t.fila !== fila) cambio.fila = fila;

@@ -271,3 +271,157 @@ describe("el bloque de sobrantes no se traga la ultima fila de la EDT", () => {
     expect(planSincronizacion(objetivo, hay).cambios).toEqual([]);
   });
 });
+
+/**
+ * LOS HITOS ANCLADOS.
+ *
+ * Un hito es un acontecimiento —«fin de estructuras»—, no trabajo. Se ancla a
+ * una partida para no irse al final del documento cada vez que el presupuesto
+ * cambia, y su sitio es DETRAS DE TODA la rama de esa partida: colarlo en la
+ * fila siguiente le robaria las hijas al capitulo, porque en un cronograma la
+ * jerarquia sale del nivel mas el orden del documento.
+ */
+describe("los hitos anclados a una partida", () => {
+  const OBRA = edt(
+    ["1.0", "ESTRUCTURAS", 1, true],
+    ["1.1", "Zapatas", 2, false],
+    ["1.2", "Columnas", 2, false],
+    ["2.0", "INSTALACIONES", 1, true],
+    ["2.1", "Pozo a tierra", 2, false],
+  );
+
+  it("anclado a un capitulo, va DETRAS de toda su rama y a su mismo nivel", () => {
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-2, "1.1", "Zapatas", 2, 2),
+      tarea(-3, "1.2", "Columnas", 2, 3),
+      tarea(-4, "2.0", "INSTALACIONES", 1, 4, true),
+      tarea(-5, "2.1", "Pozo a tierra", 2, 5),
+      tarea(-90, null, "Fin de estructuras", 1, 6),
+    ];
+
+    const plan = planSincronizacion(OBRA, hay, [{ uid: -90, anclaCodigo: "1.0" }]);
+
+    // Detras de 1.2, que es la ultima de la rama de 1.0. El nivel ya era 1
+    // —el del capitulo— y por eso no aparece: el plan solo trae lo que cambia.
+    expect(plan.cambios).toContainEqual({ uid: -90, fila: 4 });
+
+    // Y las de detras se corren para dejarle sitio.
+    expect(plan.cambios).toContainEqual({ uid: -4, fila: 5 });
+    expect(plan.cambios).toContainEqual({ uid: -5, fila: 6 });
+
+    // No es una sobrante: tiene su sitio en el documento.
+    expect(plan.sobrantes.map((s) => s.uid)).not.toContain(-90);
+  });
+
+  /**
+   * La comprobacion que de verdad importa: el capitulo NO puede dejar de ser
+   * resumen. Si el hito se colara justo detras de «1.0» al mismo nivel, sus
+   * partidas pasarian a colgar del hito.
+   */
+  it("el capitulo conserva sus partidas dentro", () => {
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-2, "1.1", "Zapatas", 2, 2),
+      tarea(-3, "1.2", "Columnas", 2, 3),
+      tarea(-4, "2.0", "INSTALACIONES", 1, 4, true),
+      tarea(-5, "2.1", "Pozo a tierra", 2, 5),
+      tarea(-90, null, "Fin de estructuras", 1, 6),
+    ];
+
+    const plan = planSincronizacion(OBRA, hay, [{ uid: -90, anclaCodigo: "1.0" }]);
+    const filaFinal = new Map<number, number>();
+    const nivelFinal = new Map<number, number>();
+    for (const t of hay) {
+      filaFinal.set(t.uid, t.fila);
+      nivelFinal.set(t.uid, t.nivel);
+    }
+    for (const c of plan.cambios) {
+      if (c.fila !== undefined) filaFinal.set(c.uid, c.fila);
+      if (c.nivel !== undefined) nivelFinal.set(c.uid, c.nivel);
+    }
+
+    const orden = [...filaFinal.entries()]
+      .sort((a, b) => a[1] - b[1])
+      .map(([uid]) => ({ uid, nivel: nivelFinal.get(uid)! }));
+
+    // 1.0 sigue teniendo a 1.1 y 1.2 colgando: la siguiente cuelga mas adentro.
+    expect(orden.map((o) => o.uid)).toEqual([-1, -2, -3, -90, -4, -5]);
+    expect(orden[1]!.nivel).toBeGreaterThan(orden[0]!.nivel);
+    // Y el hito no se lleva nada dentro: el que le sigue no cuelga de el.
+    expect(orden[4]!.nivel).toBeLessThanOrEqual(orden[3]!.nivel);
+  });
+
+  it("anclado a una partida hoja, va justo detras y como hermana", () => {
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-2, "1.1", "Zapatas", 2, 2),
+      tarea(-3, "1.2", "Columnas", 2, 3),
+      tarea(-4, "2.0", "INSTALACIONES", 1, 4, true),
+      tarea(-5, "2.1", "Pozo a tierra", 2, 5),
+      tarea(-91, null, "Zapatas recibidas", 2, 6),
+    ];
+
+    const plan = planSincronizacion(OBRA, hay, [{ uid: -91, anclaCodigo: "1.1" }]);
+
+    // Detras de 1.1 y a su mismo nivel: hermana, no hija. Si fuera nivel 3,
+    // convertiria a 1.1 en resumen y esa partida lleva dinero. El nivel 2 ya
+    // lo tenia, asi que solo cambia la fila.
+    expect(plan.cambios).toContainEqual({ uid: -91, fila: 3 });
+  });
+
+  it("si su ancla desaparece del presupuesto, el hito cae al final", () => {
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-2, "1.1", "Zapatas", 2, 2),
+      tarea(-3, "1.2", "Columnas", 2, 3),
+      tarea(-4, "2.0", "INSTALACIONES", 1, 4, true),
+      tarea(-5, "2.1", "Pozo a tierra", 2, 5),
+      tarea(-92, null, "Hito huerfano", 2, 6),
+    ];
+
+    const plan = planSincronizacion(OBRA, hay, [{ uid: -92, anclaCodigo: "9.9" }]);
+
+    expect(plan.sobrantes.map((s) => s.uid)).toContain(-92);
+    // Ya estaba en la fila 6, la ultima; solo sube a raiz para no tragarse la
+    // fila de delante.
+    expect(plan.cambios).toContainEqual({ uid: -92, nivel: 1 });
+  });
+
+  it("un hito sin ancla vive al final, sin estorbar", () => {
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-2, "1.1", "Zapatas", 2, 2),
+      tarea(-3, "1.2", "Columnas", 2, 3),
+      tarea(-4, "2.0", "INSTALACIONES", 1, 4, true),
+      tarea(-5, "2.1", "Pozo a tierra", 2, 5),
+      tarea(-93, null, "Entrega del terreno", 1, 6),
+    ];
+
+    const plan = planSincronizacion(OBRA, hay, [{ uid: -93, anclaCodigo: null }]);
+
+    expect(plan.sobrantes.map((s) => s.uid)).toContain(-93);
+    // Ya estaba en su sitio y a raiz: no se toca.
+    expect(plan.cambios).toEqual([]);
+  });
+
+  it("dos hitos en el mismo ancla conservan su orden", () => {
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-2, "1.1", "Zapatas", 2, 2),
+      tarea(-3, "1.2", "Columnas", 2, 3),
+      tarea(-4, "2.0", "INSTALACIONES", 1, 4, true),
+      tarea(-5, "2.1", "Pozo a tierra", 2, 5),
+      tarea(-94, null, "Vaciado terminado", 1, 6),
+      tarea(-95, null, "Acta firmada", 1, 7),
+    ];
+
+    const plan = planSincronizacion(OBRA, hay, [
+      { uid: -94, anclaCodigo: "1.0" },
+      { uid: -95, anclaCodigo: "1.0" },
+    ]);
+
+    expect(plan.cambios).toContainEqual({ uid: -94, fila: 4 });
+    expect(plan.cambios).toContainEqual({ uid: -95, fila: 5 });
+  });
+});
