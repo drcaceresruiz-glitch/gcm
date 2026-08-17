@@ -39,9 +39,22 @@ concurrency:
 jobs:
   desplegar:
     runs-on: ubuntu-latest
-    # Un despliegue sano tarda un par de minutos. Sin este limite, un cuelgue
-    # de FTP consume las 6 horas por defecto antes de que nadie se entere:
-    # ya paso una vez.
+    # RED DE SEGURIDAD, NO EL FRENO PRINCIPAL. Sin este limite, un cuelgue de
+    # FTP consume las 6 horas por defecto antes de que nadie se entere.
+    #
+    # No se sube, y esto va medido, no supuesto. Un despliegue sano tarda
+    # 1,8 min y el reparto es: pruebas 0,2 (las 1507 enteras), compilar 0,7,
+    # subir 0,4. Lo demas es ruido. El run #324 (2026-08-17) murio a los
+    # 20m14s y NO fue por crecimiento: fue el paso de FTP colgado 18m52s sin
+    # imprimir una sola linea. Subir este numero no habria desplegado nada;
+    # solo habria alargado el cuelgue.
+    #
+    # Por eso el freno de verdad esta EN CADA PASO que puede colgarse (ver
+    # "Subir por FTPS"). Este de aqui solo cubre lo que no tenga tope propio.
+    #
+    # Cuando toque subirlo sera por las pruebas, y se vera venir: a 12
+    # segundos las 1507, harian falta unas cincuenta veces mas para que
+    # asomen por aqui.
     timeout-minutes: 20
 
     steps:
@@ -343,7 +356,17 @@ jobs:
       # cadena incompleta; uno que hable del nombre es lo otro.
       #
       # Lo que no es respuesta a ninguno de los dos es apagar la comprobacion.
+      #
+      # EL TOPE DE ESTE PASO ES EL QUE IMPORTA. Subir tarda 0,4 min, y el
+      # 2026-08-17 este paso se colgo 18m52s EN SILENCIO —ni un reintento ni
+      # un error en la bitacora— hasta que el reloj del job lo mato. Con un
+      # solo commit en vuelo eso deja el codigo sin desplegar sin que nadie se
+      # entere, porque el listado de runs solo enseña un icono gris.
+      #
+      # Ocho minutos son veinte veces lo que tarda: si se pasa de ahi no es
+      # lentitud, es un cuelgue. Que muera aqui y en rojo.
       - name: Subir por FTPS
+        timeout-minutes: 8
         env:
           FTP_SERVER: ${{ secrets.FTP_SERVER }}
           FTP_CA_PEM: ${{ secrets.FTP_CA_PEM }}
@@ -351,14 +374,30 @@ jobs:
           LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
           FTP_SERVER_DIR: ${{ secrets.FTP_SERVER_DIR }}
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq lftp
+          # DOS TOPES DE DENTRO, mas cortos que el del paso (8 min) a
+          # proposito: si salta el de GitHub, el mensaje es «The operation was
+          # canceled» y hay que adivinar QUE se colgo —el 17/08 se perdio un
+          # rato justamente en eso—. Saltando estos primero, la bitacora dice
+          # el nombre. 3 + 4 = 7 min, holgado por debajo del tope del paso.
+          sudo timeout 180 apt-get update -qq
+          sudo timeout 180 apt-get install -y -qq lftp
 
           # Credenciales por ~/.netrc: no aparecen en la lista de procesos.
           umask 077
           printf 'machine %s\nlogin %s\npassword %s\n' \
             "$FTP_SERVER" "$FTP_USERNAME" "$LFTP_PASSWORD" > ~/.netrc
           chmod 600 ~/.netrc
+
+          # El borrado va en un `trap` y no al final del script porque ahora
+          # hay caminos que NO llegan al final: el tope de lftp sale por su
+          # cuenta. Entre comillas simples para que `$ANCLA` se resuelva al
+          # salir, no aqui, que todavia no existe.
+          #
+          # (De paso: la linea de borrado decia `.ftp-ca.pem` y el archivo se
+          # llama `.ftp-anclas.pem`, asi que el ancla nunca se borraba. No era
+          # grave —un certificado de CA es publico, y el runner se destruye—
+          # pero el borrado que no borra es de las cosas que se creen hechas.)
+          trap 'rm -f ~/.netrc "$ANCLA"' EXIT
 
           # Contra QUE se verifica: el almacen de CA del runner, MAS lo que
           # traiga `FTP_CA_PEM`. Se ANADE, no se sustituye: asi el certificado
@@ -375,7 +414,15 @@ jobs:
             echo "Ancla de confianza: solo el almacen del sistema."
           fi
 
-          lftp -c "
+          # `set +e` para poder MIRAR el codigo de salida: con `-e` el script
+          # se iria sin decir si fue un fallo de FTP o un cuelgue, que se
+          # arreglan distinto.
+          #
+          # INT primero y KILL veinte segundos despues: a lftp se le pide que
+          # cierre en paz —para que no deje una sesion a medias en el
+          # servidor— y si no atiende, se le mata.
+          set +e
+          timeout --signal=INT --kill-after=20s 240 lftp -c "
             set cmd:fail-exit true;
             set ftp:ssl-force true;
             set ftp:ssl-protect-data false;
@@ -401,6 +448,29 @@ jobs:
             mv gcm.tar.gz.subiendo gcm.tar.gz;
             bye
           "
+          codigo=$?
+          set -e
 
-          rm -f ~/.netrc "$HOME/.ftp-ca.pem"
+          # 124 es lo que devuelve `timeout` cuando corta. Se distingue a
+          # proposito del resto: un fallo de lftp trae su mensaje encima y se
+          # lee; un cuelgue no deja NADA escrito —es lo que hizo perder el
+          # despliegue del 17/08— asi que el mensaje lo ponemos aqui.
+          if [ "$codigo" = 124 ] || [ "$codigo" = 137 ]; then
+            echo "El FTP se colgo: 4 minutos sin terminar, cuando sube en 25" \
+                 "segundos. El paquete NO se aplica a medias —viaja con nombre" \
+                 "provisional y se renombra al final, y el cron solo mira el" \
+                 "nombre definitivo—, asi que casi seguro sigue viva la version" \
+                 "anterior. COMPROBARLO igualmente con /api/health antes de" \
+                 "relanzar: cada archivo se sube con ese mismo baile de rm+mv," \
+                 "y si el corte cayo justo en el hueco de app.js —milisegundos—" \
+                 "el sitio se queda sin punto de entrada y no responde. Si es" \
+                 "asi, relanzar el workflow lo repone."
+            exit 1
+          fi
+
+          if [ "$codigo" != 0 ]; then
+            echo "lftp fallo con codigo $codigo (mirar su mensaje aqui arriba)."
+            exit "$codigo"
+          fi
+
           echo "Subido. El cron del servidor aplicara el paquete en menos de un minuto."
