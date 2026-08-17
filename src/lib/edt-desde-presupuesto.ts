@@ -1,3 +1,5 @@
+import { aportantes } from "@/lib/jerarquia-partidas";
+
 /**
  * La EDT del cronograma sale del PRESUPUESTO, no se teclea aparte.
  *
@@ -11,6 +13,25 @@
  * hojas: un paquete toma el inicio de su primera tarea y el fin de la ultima,
  * y un capitulo lo mismo respecto a sus paquetes. Asi cada fecha vive en un
  * solo sitio y no puede discrepar consigo misma.
+ *
+ * QUIEN ES HOJA LO DECIDE EL DINERO, NO LA FORMA DEL ARBOL. Una revision
+ * adversaria tumbo la primera version, que llamaba hoja a "la que no tiene
+ * subpartidas colgando". No es lo mismo, y el presupuesto real da los dos
+ * casos en que difieren:
+ *
+ *   - Un capitulo a suma alzada lleva el importe y sus subpartidas son el
+ *     ALCANCE, sin cifra. La forma decia que las hojas eran las subpartidas
+ *     vacias; el dinero dice que la hoja es el capitulo.
+ *   - Una partida costeada con un descuento comercial colgando: el descuento
+ *     es negativo y NO cubre a su madre, asi que las dos aportan.
+ *
+ * Y la diferencia no es cosmetica: `esResumen` excluye a una fila de la
+ * valorizacion en nueve sitios del sistema —el mapeo, el tablero, el plan
+ * semanal, la curva—, asi que una partida costeada marcada como resumen es
+ * dinero que sale del control de avance SIN dar ningun error.
+ *
+ * De ahi las dos reglas de abajo: aporta ⟺ es hoja, y una hoja jamas tiene
+ * hijas en la EDT.
  */
 
 export interface FilaPresupuesto {
@@ -19,6 +40,8 @@ export interface FilaPresupuesto {
   descripcion: string;
   parentId: string | null;
   orden: number;
+  /// El importe de la fila. Es lo que decide si es hoja: sin el no se puede.
+  parcial: string | null;
 }
 
 export interface FilaEdt {
@@ -30,8 +53,10 @@ export interface FilaEdt {
   /// Posicion en el documento. La pertenencia sale del nivel MAS este orden.
   fila: number;
   /**
-   * Agrupa a otras. En el cronograma una tarea resumen no lleva fechas
-   * propias: las hereda de lo que contiene.
+   * Agrupa a otras. En el cronograma una tarea resumen no lleva fechas propias
+   * —las hereda de lo que contiene— y NO valoriza.
+   *
+   * Aqui es exactamente lo contrario de "aporta al costo directo".
    */
   esResumen: boolean;
 }
@@ -43,12 +68,30 @@ export interface FilaEdt {
  * la tabla: en un presupuesto importado las filas pueden venir en cualquier
  * orden dentro de la lista, y lo que define la EDT es de quien cuelga cada una.
  *
- * Una partida sin subpartidas es a la vez el paquete y su unica tarea: una
- * sola fila, no dos identicas.
+ * Dos reglas gobiernan que sale y que no:
+ *
+ *   1. Solo sobrevive la fila que APORTA al costo directo o que tiene alguna
+ *      descendiente que aporta. Una subpartida de alcance —sin cifra, bajo una
+ *      partida a suma alzada que si la tiene— describe lo que entra en el
+ *      precio, no una tarea que ejecutar, y no baja a la EDT.
+ *
+ *   2. Una fila que aporta NUNCA lleva hijas en la EDT: si alguna descendiente
+ *      suya tambien aporta, sube a hermana. Es lo que impide que una partida
+ *      costeada acabe marcada como resumen y se caiga de la valorizacion.
+ *
+ * Juntas garantizan la invariante que de verdad importa: el conjunto de filas
+ * NO resumen es exactamente el que devuelve `aportantes`, cuya suma es el costo
+ * directo. Ni un sol sin tarea que lo cubra, ni un sol contado dos veces.
  */
 export function edtDesdePresupuesto(
   filas: readonly FilaPresupuesto[],
 ): FilaEdt[] {
+  const aporta = new Set(
+    aportantes(
+      filas.map((f) => ({ codigo: f.codigoPartida, parcial: f.parcial })),
+    ).map((n) => n.codigo),
+  );
+
   const hijasDe = new Map<string | null, FilaPresupuesto[]>();
 
   for (const fila of filas) {
@@ -63,31 +106,74 @@ export function edtDesdePresupuesto(
     );
   }
 
+  // Regla 1: se queda la que aporta, y la que tiene descendencia que aporta.
+  const seQueda = new Set<string>();
+  const enCurso = new Set<string>();
+
+  const sirve = (fila: FilaPresupuesto): boolean => {
+    if (seQueda.has(fila.id)) return true;
+    // Proteccion ante un ciclo por datos corruptos: mejor una EDT a medias que
+    // un proceso colgado.
+    if (enCurso.has(fila.id)) return false;
+    enCurso.add(fila.id);
+
+    let util = aporta.has(fila.codigoPartida);
+    for (const hija of hijasDe.get(fila.id) ?? []) {
+      if (sirve(hija)) util = true;
+    }
+
+    enCurso.delete(fila.id);
+    if (util) seQueda.add(fila.id);
+    return util;
+  };
+
+  for (const fila of filas) sirve(fila);
+
+  /**
+   * Las filas que cuelgan de este nivel en la EDT.
+   *
+   * Salta las que no sirven —bajando a buscar debajo— y aplica la regla 2:
+   * tras una fila que aporta van, como hermanas suyas, sus descendientes que
+   * tambien aportan.
+   */
+  const delNivel = (hijas: readonly FilaPresupuesto[]): FilaPresupuesto[] => {
+    const salida: FilaPresupuesto[] = [];
+    for (const hija of hijas) {
+      const dentro = hijasDe.get(hija.id) ?? [];
+      if (!seQueda.has(hija.id)) {
+        salida.push(...delNivel(dentro));
+        continue;
+      }
+      salida.push(hija);
+      if (aporta.has(hija.codigoPartida)) salida.push(...delNivel(dentro));
+    }
+    return salida;
+  };
+
   const salida: FilaEdt[] = [];
   const visitados = new Set<string>();
 
-  const recorrer = (padreId: string | null, nivel: number) => {
-    for (const fila of hijasDe.get(padreId) ?? []) {
-      // Proteccion ante un ciclo por datos corruptos: mejor una EDT a medias
-      // que un proceso colgado.
+  const recorrer = (hijas: readonly FilaPresupuesto[], nivel: number) => {
+    for (const fila of delNivel(hijas)) {
       if (visitados.has(fila.id)) continue;
       visitados.add(fila.id);
 
-      const hijas = hijasDe.get(fila.id) ?? [];
+      const esHoja = aporta.has(fila.codigoPartida);
 
       salida.push({
         codigo: fila.codigoPartida,
         nombre: fila.descripcion,
         nivel,
         fila: salida.length + 1,
-        esResumen: hijas.length > 0,
+        esResumen: !esHoja,
       });
 
-      recorrer(fila.id, nivel + 1);
+      // Una hoja no se abre: sus descendientes ya subieron a hermanas.
+      if (!esHoja) recorrer(hijasDe.get(fila.id) ?? [], nivel + 1);
     }
   };
 
-  recorrer(null, 1);
+  recorrer(hijasDe.get(null) ?? [], 1);
 
   return salida;
 }
@@ -141,4 +227,24 @@ export function subirFechas<T extends Programada>(filas: readonly T[]): T[] {
   }
 
   return salida;
+}
+
+/**
+ * Quien es resumen segun el ORDEN DEL DOCUMENTO: lo es quien tiene a la
+ * siguiente colgando mas adentro.
+ *
+ * Es la misma regla que aplica el lector de MS Project, y existe aqui porque
+ * `esResumen` se guarda en la base y se quedaba PEGADO: al borrar la ultima
+ * hija de un paquete, nadie le devolvia la marca a `false`. Esa fila quedaba
+ * inservible para siempre —no valoriza, no se puede enlazar con su partida y
+ * no hay forma de arreglarla desde la pantalla—, arrastrando ademas las fechas
+ * de las tareas ya muertas.
+ */
+export function resumenesPorOrden<T extends { nivel: number }>(
+  filas: readonly T[],
+): boolean[] {
+  return filas.map((f, i) => {
+    const siguiente = filas[i + 1];
+    return siguiente !== undefined && siguiente.nivel > f.nivel;
+  });
 }

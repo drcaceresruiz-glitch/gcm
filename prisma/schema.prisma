@@ -1339,6 +1339,17 @@ model TareaCronograma {
   inicio DateTime @db.Date
   fin    DateTime @db.Date
 
+  /// La fila existe pero AUN NO SE HA PROGRAMADO: `inicio` y `fin` no son un
+  /// plan, son solo el relleno que exige la columna.
+  ///
+  /// Nace asi la EDT generada desde el presupuesto, que trae la estructura y
+  /// el dinero pero ninguna fecha. Sin esta marca el sistema no puede
+  /// distinguir "sin programar" de "programada para el primer dia y con
+  /// duracion cero", y esto ultimo significa VENCIDA: generar la EDT publicaba
+  /// al instante cientos de alertas rojas falsas en el tablero y en el informe
+  /// que se emite al cliente.
+  sinProgramar Boolean @default(false)
+
   /// Sale de `<Duration>`, nunca de restar las fechas: una partida de un dia
   /// puede abarcar tres dias naturales por el calendario. Admite fraccion —en
   /// el archivo real hay una de 8,8 dias y el informe la imprime asi—.

@@ -5,6 +5,7 @@ import { hoy as hoyCalendario } from "@/utils/fechas";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import {
   edtDesdePresupuesto,
+  resumenesPorOrden,
   subirFechas,
   type Programada,
 } from "@/lib/edt-desde-presupuesto";
@@ -59,43 +60,88 @@ export async function recalcularResumenes(
   const tareas = await tx.tareaCronograma.findMany({
     where: { cronogramaId },
     orderBy: { fila: "asc" },
-    select: { uid: true, fila: true, nivel: true, esResumen: true, inicio: true, fin: true },
+    select: {
+      uid: true, fila: true, nivel: true, esResumen: true,
+      inicio: true, fin: true, sinProgramar: true,
+    },
   });
 
   const dia = (f: Date) => f.toISOString().slice(0, 10);
 
-  const antes: (Programada & { uid: number })[] = tareas.map((t) => ({
-    uid: t.uid,
-    nivel: t.nivel,
-    fila: t.fila,
-    esResumen: t.esResumen,
-    inicio: dia(t.inicio),
-    fin: dia(t.fin),
-  }));
+  /**
+   * Quien es resumen se RECALCULA, no se hereda.
+   *
+   * `esResumen` se guarda en la base y se quedaba pegado: al borrar la ultima
+   * hija de un paquete nadie le devolvia la marca a `false`, y esa fila
+   * quedaba inservible para siempre —no valoriza, no aparece en la pantalla de
+   * mapeo y el sistema rechaza enlazarla con su partida—, sin ninguna forma de
+   * arreglarla salvo borrarla tambien.
+   *
+   * La regla es la del orden del documento —es resumen quien tiene a la
+   * siguiente colgando mas adentro—, la misma que aplica el lector de MS
+   * Project, para que las tres vias de entrada coincidan.
+   */
+  const resumen = resumenesPorOrden(tareas);
+
+  const antes: (Programada & { uid: number })[] = tareas.map((t, i) => {
+    // Deja de aportar fecha la que no esta programada, y tambien la que acaba
+    // de dejar de ser resumen: las que tenia venian de hijas que ya no estan.
+    const sinPlan = t.sinProgramar || (t.esResumen && !resumen[i]!);
+    return {
+      uid: t.uid,
+      nivel: t.nivel,
+      fila: t.fila,
+      esResumen: resumen[i]!,
+      inicio: sinPlan ? null : dia(t.inicio),
+      fin: sinPlan ? null : dia(t.fin),
+    };
+  });
 
   const despues = subirFechas(antes);
-  const previas = new Map(antes.map((t) => [t.uid, t]));
 
-  for (const t of despues) {
-    if (!t.esResumen) continue;
+  for (let i = 0; i < despues.length; i++) {
+    const t = despues[i]!;
+    const vieja = tareas[i]!;
+    const cambios: Record<string, unknown> = {};
 
-    const vieja = previas.get(t.uid);
-    // Sin una sola hoja programada no se toca: inventarle fechas al resumen
-    // seria decir que hay un plan donde no lo hay.
-    if (t.inicio === null || t.fin === null) continue;
-    if (vieja?.inicio === t.inicio && vieja.fin === t.fin) continue;
+    if (vieja.esResumen !== t.esResumen) cambios["esResumen"] = t.esResumen;
 
-    await tx.tareaCronograma.updateMany({
-      where: { cronogramaId, uid: t.uid },
-      data: {
-        inicio: new Date(`${t.inicio}T00:00:00.000Z`),
-        fin: new Date(`${t.fin}T00:00:00.000Z`),
+    if (!t.esResumen && vieja.esResumen && !vieja.sinProgramar) {
+      // Se quedo sin hijas: las fechas que arrastra son las de las tareas
+      // muertas. Vuelve a estar sin programar en vez de mentir en el Gantt.
+      cambios["sinProgramar"] = true;
+      cambios["duracionDias"] = "0.00";
+    }
+
+    if (t.esResumen) {
+      if (t.inicio === null || t.fin === null) {
+        // Ninguna hoja suya esta programada: inventarle fechas seria decir que
+        // hay un plan donde no lo hay, y conservar las viejas es peor todavia.
+        if (!vieja.sinProgramar) {
+          cambios["sinProgramar"] = true;
+          cambios["duracionDias"] = "0.00";
+        }
+      } else if (
+        vieja.sinProgramar ||
+        dia(vieja.inicio) !== t.inicio ||
+        dia(vieja.fin) !== t.fin
+      ) {
+        cambios["inicio"] = new Date(`${t.inicio}T00:00:00.000Z`);
+        cambios["fin"] = new Date(`${t.fin}T00:00:00.000Z`);
         // La duracion de un resumen es su envoltura, en dias de calendario. No
         // hay otra fuente: las hojas la traen del teclado y el resumen no se
         // teclea. Se documenta aqui porque el resto del sistema toma la
         // duracion del archivo y NUNCA de restar fechas.
-        duracionDias: diasEntre(t.inicio, t.fin),
-      },
+        cambios["duracionDias"] = diasEntre(t.inicio, t.fin);
+        cambios["sinProgramar"] = false;
+      }
+    }
+
+    if (Object.keys(cambios).length === 0) continue;
+
+    await tx.tareaCronograma.updateMany({
+      where: { cronogramaId, uid: vieja.uid },
+      data: cambios,
     });
   }
 }
@@ -132,6 +178,8 @@ export async function generarEdtDesdePresupuesto(
       descripcion: true,
       parentId: true,
       orden: true,
+      // Sin el importe no se puede saber quien es hoja: lo decide el dinero.
+      parcial: true,
     },
   });
 
@@ -185,7 +233,18 @@ export async function generarEdtDesdePresupuesto(
     };
   }
 
-  const edt = edtDesdePresupuesto(partidas);
+  const edt = edtDesdePresupuesto(
+    partidas.map((p) => ({ ...p, parcial: p.parcial?.toString() ?? null })),
+  );
+
+  if (edt.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Ninguna partida del presupuesto tiene importe todavia, asi que no hay " +
+        "nada que programar. Costea el presupuesto y vuelve.",
+    };
+  }
 
   const quien = `${sesion.nombres} ${sesion.apellidos} (${sesion.email})`.trim().slice(0, 150);
   const confirmadoPor = quien.slice(0, 150);
@@ -194,6 +253,39 @@ export async function generarEdtDesdePresupuesto(
     async (tx) => {
       let cronogramaId = vigente?.id ?? null;
       let version = vigente?.version ?? 0;
+
+      /**
+       * La comprobacion de "esta vacio" se repite AQUI DENTRO.
+       *
+       * Hacerla solo antes deja una ventana: dos pestañas, dos usuarios, o uno
+       * solo que reintenta tras un cuelgue, y las dos peticiones ven el
+       * cronograma vacio, las dos pasan, y quedan 736 tareas donde debia haber
+       * 368 —cada partida enlazada a dos tareas gemelas, cargando su importe
+       * dos veces—. El avance ponderado saldria a la mitad del real y la
+       * cobertura del mapeo seguiria marcando 100%, asi que la cifra parece
+       * mas seria y miente. Las dos peticiones responderian "Listo".
+       *
+       * El `update` del contador de uid mas abajo bloquea la fila de la obra,
+       * pero llega tarde: para entonces ya se decidio generar. Se relee antes.
+       */
+      if (cronogramaId !== null) {
+        const ahora = await tx.cronograma.findUnique({
+          where: { id: cronogramaId },
+          select: { lineaBaseAt: true, _count: { select: { tareas: true } } },
+        });
+        if (!ahora) throw new Error("AVISO: el cronograma dejo de existir. Recarga la pantalla.");
+        if (ahora.lineaBaseAt) {
+          throw new Error(
+            "AVISO: el cronograma acaba de fijarse como linea base. Recarga la pantalla.",
+          );
+        }
+        if (ahora._count.tareas > 0) {
+          throw new Error(
+            `AVISO: otra generacion se adelanto y el cronograma ya tiene ` +
+              `${ahora._count.tareas} tarea(s). Recarga la pantalla.`,
+          );
+        }
+      }
 
       if (cronogramaId === null) {
         version = 1;
@@ -244,8 +336,18 @@ export async function generarEdtDesdePresupuesto(
           esCritico: false,
           holguraDias: "0.00",
           holguraInferida: true,
-          // Nacen SIN programar. El presupuesto no tiene fechas y no se las
-          // inventa: se ponen en las hojas y suben solas.
+          /**
+           * Nacen SIN PROGRAMAR, y hay que decirlo con una marca.
+           *
+           * El presupuesto no tiene fechas y no se las inventa. Pero las
+           * columnas no admiten nulo, asi que se rellenan con el inicio de
+           * obra —y eso, sin la marca, el sistema lo lee como "programada para
+           * el primer dia y ya vencida": generar la EDT publicaba al instante
+           * cientos de alertas rojas en el tablero y en el informe al cliente,
+           * senalando como cuello de botella una partida que nadie habia
+           * programado todavia.
+           */
+          sinProgramar: true,
           inicio: obra.fechaInicio,
           fin: obra.fechaInicio,
           duracionDias: "0.00",
@@ -256,12 +358,15 @@ export async function generarEdtDesdePresupuesto(
       });
 
       /**
-       * El enlace con el dinero, solo en las HOJAS.
+       * El enlace con el dinero, en las HOJAS.
        *
-       * Una partida con subpartidas no lleva importe propio: sus hijas lo
-       * cubren, que es lo que decide `aportantes` en el presupuesto. Enlazar
-       * tambien el paquete haria que su avance y el de sus tareas contaran dos
-       * veces el mismo dinero.
+       * Aqui "hoja" ya no significa "sin subpartidas" sino APORTANTE al costo
+       * directo: `edtDesdePresupuesto` construye la EDT de modo que las filas
+       * no resumen sean exactamente las que devuelve `aportantes`. Por eso la
+       * suma de lo enlazado es el costo directo entero —ni un sol sin tarea
+       * que lo cubra, ni un sol contado dos veces—, y por eso ninguna partida
+       * costeada puede quedar marcada como resumen, que es lo que la excluiria
+       * de la valorizacion.
        */
       const hojas = conUid.filter((f) => !f.esResumen);
 
