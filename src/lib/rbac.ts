@@ -36,6 +36,8 @@ export const PERMISOS = [
   "obra:editar",
   "obra:eliminar",
   "obra:eliminar_cerrada",
+  /// Recargar el respaldo de una obra borrada, como copia de solo lectura.
+  "obra:restaurar",
   "obra:asignar_equipo",
 
   "partida:leer",
@@ -143,6 +145,9 @@ export const INNEGOCIABLES: readonly Permiso[] = [
   "movimiento:aprobar",
   "meta:aprobar",
   "obra:eliminar_cerrada",
+  /// Del ADMIN por el mismo motivo que el borrado: quien pueda recargar un
+  /// respaldo puede meter en la empresa una obra entera venida de un archivo.
+  "obra:restaurar",
   "permiso:leer",
   "permiso:editar",
   "configuracion:editar",
