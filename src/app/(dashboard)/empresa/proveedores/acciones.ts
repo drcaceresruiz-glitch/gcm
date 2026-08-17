@@ -40,6 +40,8 @@ function leerDatos(datos: FormData): DatosProveedor {
     tipoImpuesto: texto("tipoImpuesto"),
     cuentaBancaria: texto("cuentaBancaria"),
     cci: texto("cci"),
+    cuentaDetraccion: texto("cuentaDetraccion"),
+    rol: texto("rol"),
   };
 }
 

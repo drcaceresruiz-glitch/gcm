@@ -2,8 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Building2, Pencil, Plus, Users } from "lucide-react";
+import { Building2, Pencil, Phone, Plus, Users } from "lucide-react";
 import type { ProveedorResumen } from "@/services/proveedores.service";
+import {
+  ROTULO_CONTRATO,
+  type EstadoContrato,
+} from "@/lib/semaforo-contratista";
 import { FormularioProveedor } from "@/components/proveedores/FormularioProveedor";
 import { BotonEstadoProveedor } from "@/components/proveedores/BotonEstadoProveedor";
 
@@ -26,6 +30,9 @@ interface Props {
   verTodos: boolean;
   puedeCrear: boolean;
   puedeEditar: boolean;
+  /// Estado de contrato por id de proveedor, en la obra elegida. `null` cuando
+  /// no se eligio ninguna: entonces la columna no se pinta.
+  semaforo: Record<string, EstadoContrato> | null;
 }
 
 export function ListaProveedores({
@@ -34,6 +41,7 @@ export function ListaProveedores({
   verTodos,
   puedeCrear,
   puedeEditar,
+  semaforo,
 }: Props) {
   /// null = cerrado; "nuevo" = alta; un id = editando ese proveedor.
   const [abierto, setAbierto] = useState<string | null>(null);
@@ -107,6 +115,7 @@ export function ListaProveedores({
                 puedeEditar={puedeEditar}
                 editando={abierto === p.id}
                 onEditar={() => setAbierto(p.id)}
+                contrato={semaforo?.[p.id] ?? null}
               />
             </li>
           ))}
@@ -121,12 +130,18 @@ function Fila({
   puedeEditar,
   editando,
   onEditar,
+  contrato,
 }: {
   proveedor: ProveedorResumen;
   puedeEditar: boolean;
   editando: boolean;
   onEditar: () => void;
+  /// null cuando no se eligio obra: entonces no se pinta nada, que es distinto
+  /// de pintar «sin contrato».
+  contrato: EstadoContrato | null;
 }) {
+  const rotulo = contrato ? ROTULO_CONTRATO[contrato] : null;
+
   return (
     <div
       className="flex flex-wrap items-start justify-between gap-3 rounded-xl border p-4"
@@ -151,6 +166,27 @@ function Fila({
               desactivado
             </span>
           )}
+
+          {/* El color NUNCA va solo: lleva su palabra al lado. Un punto verde
+              sin texto no se puede leer en blanco y negro ni con un lector de
+              pantalla, y aqui decide si alguien esta contratado. */}
+          {rotulo && (
+            <span
+              title={rotulo.ayuda}
+              className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium"
+              style={{
+                color: rotulo.color,
+                backgroundColor: `color-mix(in oklab, ${rotulo.color} 15%, transparent)`,
+              }}
+            >
+              <span
+                aria-hidden="true"
+                className="size-1.5 rounded-full"
+                style={{ backgroundColor: rotulo.color }}
+              />
+              {rotulo.texto}
+            </span>
+          )}
         </p>
 
         <p className="mt-0.5 text-xs opacity-60">
@@ -159,8 +195,23 @@ function Fila({
               cambia como se les factura y como se les paga. */}
           {p.ruc.startsWith("10") && " · persona natural"}
           {p.contactoNombre && ` · ${p.contactoNombre}`}
-          {p.contactoTelefono && ` · ${p.contactoTelefono}`}
         </p>
+
+        {/* El telefono, como ENLACE. En el movil abre el marcador de una
+            pulsacion; en un ordenador no hace nada y no estorba, asi que no
+            hace falta detectar el dispositivo. */}
+        {p.contactoTelefono && (
+          <p className="mt-0.5 text-xs">
+            <a
+              href={`tel:${p.contactoTelefono.replace(/\s/g, "")}`}
+              className="inline-flex items-center gap-1.5 underline underline-offset-2"
+              style={{ color: "var(--color-marca-600)" }}
+            >
+              <Phone className="size-3" aria-hidden="true" />
+              {p.contactoTelefono}
+            </a>
+          </p>
+        )}
 
         {(p.cuentaBancaria || p.banco) && (
           <p className="mt-0.5 text-xs opacity-60">

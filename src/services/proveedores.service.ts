@@ -12,9 +12,14 @@ import type { SesionActiva } from "@/services/sesion.service";
 import type {
   MonedaCuenta,
   OrigenRegistro,
+  RolProveedor,
   TipoCuenta,
   TipoImpuesto,
 } from "@/generated/prisma/enums";
+import {
+  estadoDelContrato,
+  type EstadoContrato,
+} from "@/lib/semaforo-contratista";
 
 /**
  * Catalogo de proveedores de la empresa.
@@ -43,6 +48,11 @@ export interface ProveedorResumen {
   monedaCuenta: MonedaCuenta | null;
   cuentaBancaria: string | null;
   cci: string | null;
+  /// La del Banco de la Nacion, aparte de la corriente: no es la misma cuenta
+  /// ni sirve para lo mismo.
+  cuentaDetraccion: string | null;
+  /// Vende, ejecuta, o las dos cosas.
+  rol: RolProveedor;
   /// Que impuesto lleva lo que emite. De aqui lo hereda cada orden suya.
   tipoImpuesto: TipoImpuesto;
   activo: boolean;
@@ -74,6 +84,8 @@ const CAMPOS_RESUMEN = {
   monedaCuenta: true,
   cuentaBancaria: true,
   cci: true,
+  cuentaDetraccion: true,
+  rol: true,
   tipoImpuesto: true,
   activo: true,
   origen: true,
@@ -85,6 +97,40 @@ function filtroDe(sesion: SesionActiva, incluirInactivos: boolean) {
     companyId: sesion.companyId,
     ...(incluirInactivos ? {} : { activo: true }),
   };
+}
+
+/**
+ * Lo que se escribe en el buscador, convertido en condicion.
+ *
+ * Busca en razon social, RUC y telefono, que es lo que la gente tiene a mano
+ * cuando busca a alguien: el nombre a medias, el RUC de una factura, o el
+ * numero desde el que le acaban de llamar.
+ *
+ * El telefono se compara SIN separadores: en la base hay «987 654 321» y
+ * «987-654-321» conviviendo, y quien busca teclea nueve digitos seguidos. Sin
+ * esto, el buscador falla justo con el dato mas facil de teclear. MariaDB no
+ * tiene un `replace` encadenable comodo en Prisma, asi que se prueban las dos
+ * formas: tal cual y con los separadores mas comunes.
+ */
+function filtroDeBusqueda(busqueda?: string) {
+  const texto = busqueda?.trim();
+  if (!texto) return {};
+
+  const soloDigitos = texto.replace(/\D/g, "");
+
+  const condiciones: object[] = [
+    { razonSocial: { contains: texto } },
+    { ruc: { contains: texto } },
+    { contactoTelefono: { contains: texto } },
+    { contactoNombre: { contains: texto } },
+  ];
+
+  if (soloDigitos.length >= 3) {
+    condiciones.push({ ruc: { contains: soloDigitos } });
+    condiciones.push({ contactoTelefono: { contains: soloDigitos } });
+  }
+
+  return { OR: condiciones };
 }
 
 /**
@@ -124,6 +170,10 @@ export async function listarProveedoresPagina(
     incluirInactivos?: boolean;
     pagina?: string;
     porPagina?: number;
+    /// Nombre, RUC o telefono, a medias. Vacio no filtra nada.
+    busqueda?: string;
+    /// Solo los que ejecutan, solo los que venden, o todos si no se dice.
+    rol?: RolProveedor;
   } = {},
 ): Promise<Pagina<ProveedorResumen>> {
   const porPagina = opciones.porPagina ?? POR_PAGINA;
@@ -132,7 +182,19 @@ export async function listarProveedoresPagina(
     return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
   }
 
-  const where = filtroDe(sesion, opciones.incluirInactivos ?? false);
+  // AMBOS entra siempre que se filtre por uno de los dos: quien hace las dos
+  // cosas es contratista cuando se buscan contratistas. Filtrar por igualdad
+  // exacta lo dejaria fuera de las dos listas, que es el peor resultado.
+  const porRol =
+    opciones.rol && opciones.rol !== "AMBOS"
+      ? { rol: { in: [opciones.rol, "AMBOS"] as RolProveedor[] } }
+      : {};
+
+  const where = {
+    ...filtroDe(sesion, opciones.incluirInactivos ?? false),
+    ...porRol,
+    ...filtroDeBusqueda(opciones.busqueda),
+  };
 
   const total = await prisma.proveedor.count({ where });
   const totalPaginas = contarPaginas(total, porPagina);
@@ -169,6 +231,11 @@ export interface DatosProveedor {
   monedaCuenta?: string;
   cuentaBancaria?: string;
   cci?: string;
+  /// La del Banco de la Nacion. Cadena vacia = sin indicar.
+  cuentaDetraccion?: string;
+  /// "PROVEEDOR" | "CONTRATISTA" | "AMBOS". Si no llega, se queda en PROVEEDOR,
+  /// que es lo que era todo el catalogo hasta ahora.
+  rol?: string;
   /// "IGV" | "RENTA" | "NINGUNO". Si no llega, se queda en IGV.
   tipoImpuesto?: string;
 }
@@ -212,6 +279,15 @@ function saneado(datos: DatosProveedor) {
     monedaCuenta: enumerado<MonedaCuenta>(datos.monedaCuenta, ["PEN", "USD"]),
     cuentaBancaria: opcional(datos.cuentaBancaria, 40),
     cci: opcional(datos.cci, 40),
+    cuentaDetraccion: opcional(datos.cuentaDetraccion, 40),
+    // Como el impuesto, tampoco admite null. Ante un valor raro se queda en
+    // PROVEEDOR, que es lo que era todo el catalogo antes de existir el campo.
+    rol:
+      enumerado<RolProveedor>(datos.rol, [
+        "PROVEEDOR",
+        "CONTRATISTA",
+        "AMBOS",
+      ]) ?? "PROVEEDOR",
     // Este no admite null: toda orden lleva un tratamiento u otro. Ante un
     // valor raro se queda en IGV, que es el caso corriente y el que menos
     // sorprende si alguien no toco el desplegable.
@@ -394,4 +470,72 @@ export async function cambiarEstadoProveedor(
   });
 
   return { ok: true, id: proveedorId };
+}
+
+/**
+ * El semaforo de contrato de varios proveedores a la vez, para UNA obra.
+ *
+ * EN DOS CONSULTAS PARA TODA LA PAGINA, no una por fila: veinte proveedores
+ * serian cuarenta viajes a la base para pintar veinte puntos de color. Aqui se
+ * traen los encargos de esos veinte y las ordenes de esos veinte, y el color lo
+ * decide `lib/semaforo-contratista`, que es puro y esta probado.
+ *
+ * Devuelve un mapa por id. Quien no aparezca no tiene nada en esa obra, y la
+ * pantalla lo pinta como `ninguno` sin volver a preguntar.
+ *
+ * Acotado por empresa aunque los ids vengan de una lista ya filtrada: esta
+ * funcion es publica y no puede fiarse de quien la llame.
+ */
+export async function semaforoDeContratos(
+  sesion: SesionActiva,
+  obraId: string,
+  proveedorIds: readonly string[],
+  hoy = new Date(),
+): Promise<Map<string, EstadoContrato>> {
+  const salida = new Map<string, EstadoContrato>();
+  if (proveedorIds.length === 0) return salida;
+  if (!puede(sesion, "proveedor:leer")) return salida;
+
+  // Que la obra sea de la empresa se comprueba aqui: sin esto, un id de obra
+  // ajena devolveria los encargos de otra constructora.
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { id: true },
+  });
+  if (!obra) return salida;
+
+  const [encargos, ordenes] = await Promise.all([
+    prisma.encargoProveedor.findMany({
+      where: { projectId: obraId, proveedorId: { in: [...proveedorIds] } },
+      select: {
+        proveedorId: true,
+        estado: true,
+        fechaInicio: true,
+        fechaFin: true,
+      },
+    }),
+    prisma.ordenCompra.findMany({
+      where: { projectId: obraId, proveedorId: { in: [...proveedorIds] } },
+      select: { proveedorId: true },
+      distinct: ["proveedorId"],
+    }),
+  ]);
+
+  const porProveedor = new Map<string, typeof encargos>();
+  for (const e of encargos) {
+    const suyos = porProveedor.get(e.proveedorId) ?? [];
+    suyos.push(e);
+    porProveedor.set(e.proveedorId, suyos);
+  }
+
+  const conOrdenes = new Set(ordenes.map((o) => o.proveedorId));
+
+  for (const id of proveedorIds) {
+    salida.set(
+      id,
+      estadoDelContrato(porProveedor.get(id) ?? [], conOrdenes.has(id), hoy),
+    );
+  }
+
+  return salida;
 }

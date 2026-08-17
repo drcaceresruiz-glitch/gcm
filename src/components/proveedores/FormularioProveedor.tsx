@@ -177,6 +177,32 @@ export function FormularioProveedor({ proveedor, onCerrar }: Props) {
         />
       </div>
 
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        {/* El rol no cambia la ficha ni lo que se le puede hacer: solo permite
+            separarlos al mirar la lista. Por eso nace en PROVEEDOR, que es lo
+            que era todo el catalogo hasta ahora. */}
+        <CampoSelect
+          id="rol"
+          name="rol"
+          etiqueta="Qué hace para la empresa"
+          defaultValue={proveedor?.rol ?? "PROVEEDOR"}
+          ayuda="Solo sirve para poder filtrar la lista."
+        >
+          <option value="PROVEEDOR">Vende materiales o alquila equipos</option>
+          <option value="CONTRATISTA">Ejecuta trabajo en obra</option>
+          <option value="AMBOS">Las dos cosas</option>
+        </CampoSelect>
+        <CampoTexto
+          id="cuentaDetraccion"
+          name="cuentaDetraccion"
+          type="text"
+          inputMode="numeric"
+          etiqueta="Cuenta de detracción"
+          defaultValue={proveedor?.cuentaDetraccion ?? ""}
+          ayuda="La del Banco de la Nación. No es la cuenta corriente."
+        />
+      </div>
+
       {/* Se pregunta UNA vez, aqui, y no en cada orden: quien factura factura
           siempre. De aqui lo hereda cada pedido suyo. */}
       <div className="mt-4">

@@ -35,6 +35,27 @@ enum UserState {
   INACTIVO
 }
 
+/**
+ * Que hace para la empresa quien esta en el catalogo.
+ *
+ * NO son dos tablas, y esa es la decision: quien ejecuta una partida y quien
+ * vende el cemento tienen la misma identidad —un RUC—, la misma cuenta y la
+ * misma consulta a SUNAT. Ademas, en GCM el que se compromete en el plan
+ * semanal y el que carga tareas del Lookahead YA es el proveedor: separarlos
+ * habria partido en dos el catalogo del que dependen esas pantallas.
+ *
+ * Lo que si hacia falta era poder DISTINGUIRLOS al mirar la lista, que es lo
+ * unico que este campo resuelve.
+ */
+enum RolProveedor {
+  /// Vende materiales o alquila equipos. Lo que habia hasta ahora.
+  PROVEEDOR
+  /// Ejecuta trabajo en obra: se le dan frentes y se le valoriza.
+  CONTRATISTA
+  /// Las dos cosas. Es mas comun de lo que parece.
+  AMBOS
+}
+
 /// Estado de una solicitud de cambio de datos de perfil.
 enum EstadoSolicitud {
   PENDIENTE
@@ -990,6 +1011,21 @@ model Proveedor {
   /// digitos. Es la que sirve para transferir desde otra entidad.
   cci String? @db.VarChar(40)
 
+  /**
+   * La cuenta de detraccion del Banco de la Nacion.
+   *
+   * Va con las demas cuentas por el mismo motivo que ellas: es del proveedor y
+   * no del pedido. Y va APARTE de `cuentaBancaria` porque no es la misma
+   * cuenta ni sirve para lo mismo: a esta se deposita el porcentaje detraido, y
+   * pagar el total a la cuenta corriente cuando habia detraccion es un problema
+   * tributario, no un descuido de tesoreria.
+   */
+  cuentaDetraccion String? @db.VarChar(40)
+
+  /// Vende, ejecuta, o las dos cosas. Solo sirve para poder distinguirlos en la
+  /// lista: la ficha, el RUC y las cuentas son las mismas.
+  rol RolProveedor @default(PROVEEDOR)
+
   /// Que impuesto lleva lo que emite este proveedor.
   ///
   /// Va aqui y no en cada orden porque es una propiedad SUYA y no del pedido:
@@ -1022,6 +1058,7 @@ model Proveedor {
   @@index([companyId])
   @@index([companyId, razonSocial])
   @@index([companyId, activo])
+  @@index([companyId, rol])
   @@map("proveedores")
 }
 
