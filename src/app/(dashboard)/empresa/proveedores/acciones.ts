@@ -10,6 +10,7 @@ import {
   type DatosProveedor,
 } from "@/services/proveedores.service";
 import { consultarRuc, type ConsultaRuc } from "@/services/sunat.service";
+import { importarProveedores } from "@/services/proveedores-excel.service";
 import { puede } from "@/lib/rbac";
 
 /**
@@ -110,4 +111,40 @@ export async function accionConsultarRuc(ruc: string): Promise<ConsultaRuc> {
   }
 
   return consultarRuc(ruc);
+}
+
+export interface EstadoImportacion {
+  error?: string;
+  resumen?: {
+    creados: number;
+    completados: number;
+    sinCambios: number;
+    rechazos: { fila: number; motivo: string }[];
+  };
+}
+
+/**
+ * Sube el Excel del catalogo.
+ *
+ * La accion no decide nada: comprueba que llego un archivo y pasa el resto al
+ * servicio, que es donde viven el permiso, la lectura y —lo que importa— la
+ * regla de rellenar huecos sin pisar nada.
+ */
+export async function accionImportarProveedores(
+  _previo: EstadoImportacion,
+  datos: FormData,
+): Promise<EstadoImportacion> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const archivo = datos.get("archivo");
+  if (!(archivo instanceof File) || archivo.size === 0) {
+    return { error: "No llegó ningún archivo." };
+  }
+
+  const r = await importarProveedores(sesion, archivo);
+  if (!r.ok) return { error: r.error };
+
+  revalidatePath("/empresa/proveedores");
+  return { resumen: r.resumen };
 }

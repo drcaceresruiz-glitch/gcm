@@ -9,6 +9,7 @@ import {
 import { listarObras } from "@/services/obras.service";
 import type { RolProveedor } from "@/generated/prisma/enums";
 import { FiltroProveedores } from "@/components/proveedores/FiltroProveedores";
+import { ImportarProveedores } from "@/components/proveedores/ImportarProveedores";
 import { puede } from "@/lib/rbac";
 import { Volver } from "@/components/ui/Volver";
 import { Paginacion } from "@/components/ui/Paginacion";
@@ -106,6 +107,8 @@ export default async function ProveedoresPage({
           {guardado ? `${guardado} guardado.` : `Proveedor ${estado}.`}
         </p>
       )}
+
+      {puede(sesion, "proveedor:crear") && <ImportarProveedores />}
 
       <FiltroProveedores
         obras={obras?.filas.map((o) => ({ id: o.id, nombre: o.nombreObra })) ?? []}
