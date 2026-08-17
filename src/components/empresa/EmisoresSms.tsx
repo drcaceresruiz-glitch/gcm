@@ -16,7 +16,11 @@ import {
   Download,
   Send,
 } from "lucide-react";
-import { mensajeDeVinculo, pasosDeVinculo } from "@/lib/vinculo-emisor";
+import {
+  mensajeDeVinculo,
+  mensajeDelToken,
+  pasosDeVinculo,
+} from "@/lib/vinculo-emisor";
 import { enlaceWhatsApp } from "@/lib/whatsapp";
 import {
   accionVincularEmisor,
@@ -401,7 +405,6 @@ function TokenNuevo({
   direccionCola: string;
 }) {
   const datosDelVinculo = {
-    token,
     direccionCola,
     urlInstalador: URL_INSTALADOR,
   };
@@ -430,16 +433,41 @@ function TokenNuevo({
           justo lo que se esta creando— y un SMS con enlaces lo marcan como
           spam las operadoras. Lo manda quien administra desde su WhatsApp. */}
       {numero ? (
-        <a
-          href={enlaceWhatsApp(mensajeDeVinculo(datosDelVinculo), numero)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-white"
-          style={{ backgroundColor: "var(--color-marca-600)" }}
-        >
-          <Send className="size-3.5" aria-hidden="true" />
-          Enviar los pasos y el token al {numero}
-        </a>
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={enlaceWhatsApp(mensajeDeVinculo(datosDelVinculo), numero)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-white"
+              style={{ backgroundColor: "var(--color-marca-600)" }}
+            >
+              <Send className="size-3.5" aria-hidden="true" />
+              1. Enviar los pasos al {numero}
+            </a>
+            <a
+              href={enlaceWhatsApp(mensajeDelToken(token), numero)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium"
+              style={{
+                borderColor: "var(--color-marca-600)",
+                color: "var(--color-marca-600)",
+              }}
+            >
+              <Send className="size-3.5" aria-hidden="true" />
+              2. Enviar solo el token
+            </a>
+          </div>
+          {/* Son dos y hay que decir por que, o el segundo boton parece un
+              error. WhatsApp copia el mensaje ENTERO: con el token dentro de
+              los pasos, no hay forma de llevarse solo el token. */}
+          <p className="text-xs opacity-60">
+            Van en dos mensajes a propósito: en WhatsApp se copia el mensaje
+            entero, así que el token viaja solo para poder copiarlo de un toque
+            y pegarlo en la aplicación.
+          </p>
+        </div>
       ) : (
         <p className="text-xs opacity-60">
           No pusiste el celular de ese teléfono, así que no hay a dónde mandar
