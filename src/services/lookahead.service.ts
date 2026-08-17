@@ -1098,12 +1098,27 @@ async function analizar(
   const uids = [...new Set(datos.uids)].slice(0, MAX_LOTE);
   if (uids.length === 0) return NADA;
 
-  // Los uid llegan del cliente: solo valen los que existen en el cronograma
-  // vigente de ESTA obra. Sin esto se podrian crear filas de Lookahead para
-  // tareas inventadas, que luego no se veria en ninguna pantalla.
+  /**
+   * Los uid llegan del cliente: solo valen los que existen en el cronograma
+   * vigente de ESTA obra. Sin esto se podrian crear filas de Lookahead para
+   * tareas inventadas, que luego no se veria en ninguna pantalla.
+   *
+   * Y **los resumenes no cuentan como trabajo**. La ventana ya los excluye
+   * —`tareasDeLaSemana` filtra `!esResumen`— pero eso es el filtro de lo que
+   * se OFRECE, y aqui llega lo que el navegador PIDE. Un agrupador metido en
+   * la matriz no se queda quieto: infla el denominador de la confiabilidad
+   * («3/4 listas» cuando solo hay 3 tareas de verdad) y se puede comprometer
+   * al Plan Semanal, con lo que el PPC acabaria midiendo el cumplimiento de
+   * una fila que no ejecuta nadie.
+   *
+   * Se filtra en el servidor y no en la pantalla porque esta es la frontera:
+   * la pantalla ya lo hacia y aun asi aparecio uno.
+   */
   const cronograma = await cronogramaVigente(sesion, obraId);
-  const delCronograma = new Set((cronograma?.tareas ?? []).map((t) => t.uid));
-  const validos = uids.filter((u) => delCronograma.has(u));
+  const ejecutables = new Set(
+    (cronograma?.tareas ?? []).filter((t) => !t.esResumen).map((t) => t.uid),
+  );
+  const validos = uids.filter((u) => ejecutables.has(u));
   if (validos.length === 0) return NADA;
 
   const ahora = new Date();
