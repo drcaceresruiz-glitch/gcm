@@ -28,6 +28,8 @@ export interface EstadoConfiguracion {
   /// El token recien creado, en claro. Viaja UNA vez hasta la pantalla y no
   /// se guarda en ningun sitio: en la base solo esta su hash.
   token?: string;
+  /// El celular de ese emisor, ya normalizado, para poder mandarle los pasos.
+  numero?: string | null;
 }
 
 export async function accionVincularEmisor(
@@ -47,6 +49,7 @@ export async function accionVincularEmisor(
   return {
     ok: "Teléfono vinculado. Copia el token ahora: no se puede volver a ver.",
     token: r.token,
+    numero: r.numero,
   };
 }
 

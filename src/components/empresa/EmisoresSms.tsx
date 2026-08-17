@@ -14,7 +14,10 @@ import {
   Ban,
   Trash2,
   Download,
+  Send,
 } from "lucide-react";
+import { mensajeDeVinculo, pasosDeVinculo } from "@/lib/vinculo-emisor";
+import { enlaceWhatsApp } from "@/lib/whatsapp";
 import {
   accionVincularEmisor,
   accionCambiarEstadoEmisor,
@@ -232,7 +235,13 @@ export function EmisoresSms({
 
         <Avisos estado={vinculo} />
 
-        {vinculo.token && <TokenNuevo token={vinculo.token} />}
+        {vinculo.token && (
+          <TokenNuevo
+            token={vinculo.token}
+            numero={vinculo.numero ?? null}
+            direccionCola={direccionCola}
+          />
+        )}
 
         {/* El enlace, no «pidesela a quien administra GCM». Quien instala esto
             lo hace DESDE EL TELEFONO: se abre esta pantalla en el movil, o se
@@ -382,7 +391,21 @@ function Fila({
  * de revocar y volver a vincular antes que un secreto que se puede consultar
  * cuando se quiera —y que acabaria copiado en un correo—.
  */
-function TokenNuevo({ token }: { token: string }) {
+function TokenNuevo({
+  token,
+  numero,
+  direccionCola,
+}: {
+  token: string;
+  numero: string | null;
+  direccionCola: string;
+}) {
+  const datosDelVinculo = {
+    token,
+    direccionCola,
+    urlInstalador: URL_INSTALADOR,
+  };
+
   return (
     <div
       className="space-y-2 rounded-xl border-2 p-3"
@@ -401,6 +424,41 @@ function TokenNuevo({ token }: { token: string }) {
         No se puede volver a ver. Si lo pierdes, revoca ese teléfono y vincula
         otro.
       </p>
+
+      {/* Mandarselo AL TELEFONO, que es donde hace falta. Por WhatsApp y no por
+          SMS por dos razones: para el primer telefono no hay canal de SMS —es
+          justo lo que se esta creando— y un SMS con enlaces lo marcan como
+          spam las operadoras. Lo manda quien administra desde su WhatsApp. */}
+      {numero ? (
+        <a
+          href={enlaceWhatsApp(mensajeDeVinculo(datosDelVinculo), numero)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-white"
+          style={{ backgroundColor: "var(--color-marca-600)" }}
+        >
+          <Send className="size-3.5" aria-hidden="true" />
+          Enviar los pasos y el token al {numero}
+        </a>
+      ) : (
+        <p className="text-xs opacity-60">
+          Si hubieras puesto el número de la SIM, GCM te prepararía el WhatsApp
+          con estos pasos ya escritos para ese teléfono.
+        </p>
+      )}
+
+      <details className="text-xs">
+        <summary className="cursor-pointer opacity-70">
+          Ver los pasos en ese teléfono, uno a uno
+        </summary>
+        <ol className="mt-2 list-decimal space-y-1.5 pl-4">
+          {pasosDeVinculo(datosDelVinculo).map((paso) => (
+            <li key={paso} className="break-words">
+              {paso}
+            </li>
+          ))}
+        </ol>
+      </details>
     </div>
   );
 }

@@ -28,7 +28,7 @@ export type ResultadoEmisor = { ok: true } | { ok: false; error: string };
 
 /// Lo que devuelve vincular: el token en claro, que solo se ve UNA vez.
 export type ResultadoVinculo =
-  | { ok: true; token: string }
+  | { ok: true; token: string; numero: string | null }
   | { ok: false; error: string };
 
 export interface EmisorLista {
@@ -135,7 +135,10 @@ export async function vincularEmisor(
     },
   });
 
-  return { ok: true, token };
+  // El numero vuelve para poder mandarle a ESE telefono las instrucciones y el
+  // token por WhatsApp. Es el mismo que se acaba de normalizar, no el que
+  // escribio el usuario: asi el enlace no se arma con un texto libre.
+  return { ok: true, token, numero };
 }
 
 /**

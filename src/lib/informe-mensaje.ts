@@ -169,16 +169,12 @@ export function textoWhatsApp(d: DatosCsvInforme): string {
 }
 
 /**
- * El enlace que abre WhatsApp con el mensaje ya escrito.
+ * El enlace para compartir el informe, SIN destinatario: el chat se elige en
+ * el propio WhatsApp. Exigir el celular obligaria a tener registrado el de
+ * cada cliente para algo que se resuelve en dos toques.
  *
- * SIN numero a proposito: `wa.me/?text=` deja elegir el chat en el propio
- * WhatsApp. Exigir el celular obligaria a tener registrado el de cada cliente
- * para algo que la persona resuelve en dos toques.
- *
- * El texto lo compone el SERVIDOR y llega hecho: si lo armara el navegador,
- * un mensaje con el membrete de GCM podria decir cifras que GCM no ha medido.
- * Es la misma regla que ya sigue el envio por correo.
+ * El texto lo compone el SERVIDOR y llega hecho: si lo armara el navegador, un
+ * mensaje con el membrete de GCM podria decir cifras que GCM no ha medido. Es
+ * la misma regla que ya sigue el envio por correo.
  */
-export function enlaceWhatsApp(texto: string): string {
-  return `https://wa.me/?text=${encodeURIComponent(texto)}`;
-}
+export { enlaceWhatsApp } from "./whatsapp";
