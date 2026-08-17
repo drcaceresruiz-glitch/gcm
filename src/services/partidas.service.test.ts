@@ -1065,3 +1065,77 @@ describe("crear un codigo que cambia el reparto", () => {
     expect(r.ok).toBe(true);
   });
 });
+
+
+/**
+ * El agujero que la revision adversaria encontro EN LA RED, no en el codigo
+ * viejo.
+ *
+ * La primera version miraba solo quien DEJA de contar. El caso contrario se
+ * colaba entero: crear un capitulo terminado en ceros —sin una sola cifra—
+ * desvia la cadena de padres, porque `codigoPadre` prefiere la
+ * hermana-cabecera al recorte del ultimo segmento. Una partida que estaba
+ * cubierta se descubre y VUELVE a contar.
+ */
+describe("crear un capitulo puede descubrir dinero que estaba cubierto", () => {
+  it("avisa cuando una partida cubierta vuelve a contar", async () => {
+    estado.existentes = [
+      { id: "cap", codigoPartida: "1", orden: 1, parentId: null, tipo: "CAPITULO" },
+      { id: "a", codigoPartida: "1.3", orden: 2, parentId: "cap", tipo: "PARTIDA", parcial: "10496.50" },
+      { id: "b", codigoPartida: "1.3.1", orden: 3, parentId: "a", tipo: "PARTIDA", parcial: "6000.00" },
+    ];
+
+    // Un capitulo SIN cifras: la rama de rechazo ni se evaluaba, porque exige
+    // un importe positivo en la fila nueva.
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "1.3.0",
+      descripcion: "CABECERA DEL GRUPO",
+      tipo: "CAPITULO",
+    });
+
+    expect(r.ok).toBe(true);
+    // Antes contaba solo 1.3.1 (6000). Ahora 1.3 se descubre: 16496.50.
+    expect(r.ok === true && r.datos.aviso).toContain("1.3");
+    expect(r.ok === true && r.datos.aviso).toContain("6000.00");
+    expect(r.ok === true && r.datos.aviso).toContain("16496.50");
+  });
+
+  /**
+   * El mismo mecanismo por la otra convencion: la que documenta
+   * `quienSeQuedaLaNumeracion`, con "4" y "4.0" peleandose la numeracion.
+   */
+  it("avisa tambien en la forma 4 / 4.0 de los presupuestos importados", async () => {
+    estado.existentes = [
+      { id: "a", codigoPartida: "4", orden: 1, parentId: null, tipo: "PARTIDA", parcial: "20000.00" },
+      { id: "b", codigoPartida: "4.01", orden: 2, parentId: "a", tipo: "PARTIDA", parcial: "5000.00" },
+    ];
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "4.0",
+      descripcion: "CAPITULO IV",
+      tipo: "CAPITULO",
+    });
+
+    expect(r.ok).toBe(true);
+    expect(r.ok === true && r.datos.aviso).toContain("25000.00");
+  });
+
+  it("sigue sin avisar cuando el costo directo solo sube lo que aporta la nueva", async () => {
+    estado.existentes = [
+      { id: "cap", codigoPartida: "2.0", orden: 1, parentId: null, tipo: "CAPITULO" },
+      { id: "p", codigoPartida: "2.1", orden: 2, parentId: "cap", tipo: "PARTIDA", parcial: "100.00" },
+    ];
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "2.2",
+      descripcion: "Otra normal",
+      tipo: "PARTIDA",
+      modalidad: "PRECIOS_UNITARIOS",
+      metrado: "2",
+      precioUnitario: "50",
+    });
+
+    expect(r.ok).toBe(true);
+    expect(r.ok === true && r.datos.aviso).toBeUndefined();
+  });
+});

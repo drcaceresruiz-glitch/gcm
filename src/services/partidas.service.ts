@@ -743,8 +743,32 @@ export async function crearPartida(
     };
   }
 
-  // Las que dejan de contar porque la nueva las detalla. Se dira al terminar.
+  /**
+   * En los DOS sentidos, que es lo que faltaba.
+   *
+   * Mirar solo quien DEJA de contar dejaba pasar el caso contrario: crear un
+   * capitulo "1.3.0" —sin una sola cifra— desvia la cadena de padres, porque
+   * `codigoPadre` prefiere la hermana-cabecera al recorte del ultimo segmento.
+   * Con eso una partida que estaba CUBIERTA se descubre y vuelve a contar: el
+   * costo directo subia 10.496,50 sin rechazo y sin aviso.
+   */
   const cedenALaNueva = [...cuentanAntes].filter((c) => !cuentanDespues.has(c));
+  const vuelvenAContar = [...cuentanDespues].filter(
+    (c) => c !== codigo && !cuentanAntes.has(c),
+  );
+
+  /**
+   * Y la comprobacion que lo caza sea cual sea el mecanismo: el costo directo
+   * solo puede moverse en lo que aporte la fila nueva. Ni un sol mas.
+   */
+  const costoAntes = sumarHojas(importesAntes);
+  const costoDespues = sumarHojas(importesDespues);
+  const aportaLaNueva = cuentanDespues.has(codigo);
+
+  const esperado =
+    aportaLaNueva && parcialNuevo !== null
+      ? sumar([costoAntes, parcialNuevo])
+      : costoAntes;
 
   const profundidades = calcularProfundidades([...codigos]);
 
@@ -816,14 +840,33 @@ export async function crearPartida(
    * forma que nadie espera al teclear una fila, y callarlo lo convierte en un
    * descuadre que se descubre semanas despues.
    */
-  const aviso =
-    cedenALaNueva.length > 0
-      ? `Ojo: ${cedenALaNueva.slice(0, 3).join(", ")}` +
+  const partes: string[] = [];
+
+  if (cedenALaNueva.length > 0) {
+    partes.push(
+      `${cedenALaNueva.slice(0, 3).join(", ")}` +
         `${cedenALaNueva.length > 3 ? ` y ${cedenALaNueva.length - 3} mas` : ""} ` +
-        `${cedenALaNueva.length === 1 ? "ha dejado" : "han dejado"} de contar en ` +
-        `el costo directo, porque ahora ${cedenALaNueva.length === 1 ? "la" : "las"} detalla ` +
-        `${codigo}. El costo directo pasa de ${sumarHojas(importesAntes)} a ` +
-        `${sumarHojas(importesDespues)}.`
+        `${cedenALaNueva.length === 1 ? "ha dejado" : "han dejado"} de contar, ` +
+        `porque ahora ${cedenALaNueva.length === 1 ? "la" : "las"} detalla ${codigo}`,
+    );
+  }
+
+  if (vuelvenAContar.length > 0) {
+    partes.push(
+      `${vuelvenAContar.slice(0, 3).join(", ")}` +
+        `${vuelvenAContar.length > 3 ? ` y ${vuelvenAContar.length - 3} mas` : ""} ` +
+        `${vuelvenAContar.length === 1 ? "vuelve" : "vuelven"} a contar, porque ` +
+        `${codigo} ha cambiado de quien cuelgan`,
+    );
+  }
+
+  // El aviso sale si el costo directo se movio MAS de lo que aporta la fila
+  // nueva, venga el desvio de donde venga: los dos conjuntos son la
+  // explicacion, no la condicion.
+  const aviso =
+    costoDespues !== esperado || partes.length > 0
+      ? `Ojo: ${partes.join("; ")}${partes.length > 0 ? ". " : ""}` +
+        `El costo directo pasa de ${costoAntes} a ${costoDespues}.`
       : undefined;
 
   return { ok: true, datos: { id: creada.id, aviso } };
