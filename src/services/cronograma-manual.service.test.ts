@@ -37,9 +37,12 @@ const estado: {
   /// Las tareas del cronograma, en orden de fila. Es de donde sale la EDT.
   orden: { uid: number; fila: number; nivel: number }[];
   corrimientos: Record<string, unknown>[];
+  /// Regimen laboral de la obra. Vacio = se trabaja los siete dias.
+  calendario: { diaSemana: number; laborable: boolean; horas: string }[];
 } = {
   orden: [],
   corrimientos: [],
+  calendario: [],
   obra: { id: "obra", ultimoUidManual: 0 },
   vigente: { id: "cro", version: 1, lineaBaseAt: null },
   tarea: null,
@@ -95,6 +98,11 @@ vi.mock("@/lib/prisma", () => {
   };
 
   const cliente = {
+    // El calendario laboral de la obra: la duracion sale de las fechas
+    // contando solo los dias que se trabaja. Vacio = todos laborables.
+    workCalendar: {
+      findMany: () => Promise.resolve(estado.calendario),
+    },
     project: {
       findFirst: () => Promise.resolve(estado.obra),
       update: (args: { data: { ultimoUidManual: { decrement: number } } }) => {
@@ -179,6 +187,7 @@ beforeEach(() => {
   estado.borrados = [];
   estado.orden = [];
   estado.corrimientos = [];
+  estado.calendario = [];
 });
 
 describe("crear una tarea a mano", () => {
@@ -430,5 +439,63 @@ describe("borrar una tarea que agrupa a otras", () => {
 
     expect(r.ok).toBe(true);
     expect(estado.borradaId).toBe("t3");
+  });
+});
+
+/**
+ * La duracion no se teclea: sale de las fechas.
+ *
+ * Pedirla aparte obligaba a calcular a mano algo que las dos fechas ya dicen, y
+ * a mantenerlo al dia cada vez que se corre una fecha —que es justo lo que
+ * nadie hace—. Y se cuenta en dias de TRABAJO, que es lo que significa la
+ * duracion en un cronograma.
+ */
+describe("la duracion sale de las fechas", () => {
+  it("la calcula aunque se teclee otra cosa", async () => {
+    // Del 17 al 19, ambos incluidos, son tres dias. Se teclea "2" a proposito.
+    await crearTareaManual(sesion, "obra", { ...tarea, duracionDias: "2" });
+
+    expect(estado.creada?.["duracionDias"]).toBe("3.00");
+  });
+
+  it("no cuenta los dias que no se trabaja", async () => {
+    // Domingo de descanso. Siete dias seguidos contienen exactamente un
+    // domingo, sea cual sea el dia de la semana en que empiecen: seis de
+    // trabajo. Asi la prueba no depende de en que dia cae el 17 de agosto.
+    estado.calendario = [{ diaSemana: 7, laborable: false, horas: "0" }];
+
+    await crearTareaManual(sesion, "obra", {
+      ...tarea,
+      inicio: "2026-08-17",
+      fin: "2026-08-23",
+    });
+
+    expect(estado.creada?.["duracionDias"]).toBe("6.00");
+  });
+
+  it("un solo dia dura un dia, no cero", async () => {
+    await crearTareaManual(sesion, "obra", {
+      ...tarea,
+      inicio: "2026-08-17",
+      fin: "2026-08-17",
+    });
+
+    expect(estado.creada?.["duracionDias"]).toBe("1.00");
+  });
+
+  /**
+   * La fila que nace de la EDT generada viene SIN programar, y por eso no
+   * cuenta para los atrasos. Teclearle las fechas es exactamente lo que le
+   * faltaba: si la marca no se levantara, esa tarea quedaria invisible para el
+   * control de avance para siempre.
+   */
+  it("al editar, la tarea deja de estar sin programar", async () => {
+    estado.tarea = { id: "t1", uid: -1, origen: "MANUAL", nombre: "Vaciado" };
+
+    const r = await editarTareaManual(sesion, "obra", -1, tarea);
+
+    expect(r.ok).toBe(true);
+    expect(estado.actualizada?.["sinProgramar"]).toBe(false);
+    expect(estado.actualizada?.["duracionDias"]).toBe("3.00");
   });
 });

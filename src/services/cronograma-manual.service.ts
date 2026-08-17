@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { normalizarDecimal } from "@/lib/decimal";
+import { diasLaborablesEntre } from "@/lib/calendario";
 import { hoy as hoyCalendario } from "@/utils/fechas";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { recalcularResumenes } from "@/services/edt.service";
@@ -23,17 +24,65 @@ export type Resultado<T = void> =
   | ({ ok: true } & (T extends void ? object : { datos: T }))
   | { ok: false; error: string };
 
+/**
+ * Una fecha de calendario "YYYY-MM-DD" en el dia LOCAL que nombra.
+ *
+ * `new Date("2026-08-17T00:00:00.000Z")` no vale: en Peru —UTC-5— es el 16 a
+ * las 19:00, y `getDay()` diria domingo en vez de lunes. Contando dias
+ * laborables eso corre la cuenta un dia entero.
+ */
+function diaLocal(iso: string): Date {
+  const [anio, mes, dia] = iso.split("-").map(Number);
+  return new Date(anio!, mes! - 1, dia!);
+}
+
+/**
+ * La duracion SALE de las fechas, en dias de trabajo.
+ *
+ * Una tarea importada trae su `<Duration>` del archivo y ahi no se toca: una
+ * partida de un dia puede abarcar tres dias naturales, y deducirla haria que
+ * las manuales y las importadas midieran cosas distintas con el mismo nombre.
+ * Pero una tarea TECLEADA no tiene archivo del que sacarla, y pedirla aparte
+ * obligaba a calcular a mano algo que las dos fechas ya dicen —y a mantenerlo
+ * al dia cada vez que se corre una fecha, que es justo lo que nadie hace—.
+ *
+ * Se cuenta con el calendario de la obra, no en dias naturales, porque eso es
+ * lo que significa la duracion en un cronograma: del viernes al lunes hay dos
+ * dias de trabajo si no se trabaja el domingo, no cuatro. El regimen es por
+ * obra —el sabado de 5 horas de CRIOCORD no aplica a otra— y sin filas se
+ * asume laborable, que es preferible a esconder trabajo ya programado.
+ */
+async function duracionDeLasFechas(
+  projectId: string,
+  inicio: string,
+  fin: string,
+): Promise<string> {
+  const calendario = await prisma.workCalendar.findMany({
+    where: { projectId },
+    select: { diaSemana: true, laborable: true, horas: true },
+  });
+
+  const dias = diasLaborablesEntre(
+    diaLocal(inicio),
+    diaLocal(fin),
+    calendario.map((d) => ({ ...d, horas: d.horas.toString() })),
+  );
+
+  return `${dias}.00`;
+}
+
 export interface TareaAMano {
   codigo?: string | null;
   nombre: string;
   /// Fechas de CALENDARIO, "YYYY-MM-DD". Nunca un `Date` local.
   inicio: string;
   fin: string;
-  /// En dias, con decimales. Se TECLEA, no se deduce de las fechas: una
-  /// partida de un dia puede abarcar tres dias naturales por el calendario, y
-  /// deducirla haria que las manuales y las importadas midieran cosas
-  /// distintas con el mismo nombre.
-  duracionDias: string;
+  /**
+   * Ya NO se teclea: sale de las fechas, en dias de trabajo del calendario de
+   * la obra. Se acepta por compatibilidad y se ignora —ver
+   * `duracionDeLasFechas`—.
+   */
+  duracionDias?: string;
   /// El "% planeado" que leera el informe. Cero si no se dice.
   porcentajePlaneado?: string | null;
   esHito?: boolean;
@@ -121,12 +170,9 @@ export async function crearTareaManual(
   const problema = revisarCampos(tarea);
   if (problema) return { ok: false, error: problema };
 
-  const duracion = normalizarDecimal(tarea.duracionDias, 2);
+  const duracion = await duracionDeLasFechas(obraId, tarea.inicio, tarea.fin);
   const planeado = normalizarDecimal(tarea.porcentajePlaneado || "0", 2);
 
-  if (duracion === null) {
-    return { ok: false, error: "La duracion no es un numero valido." };
-  }
   if (planeado === null || Number(planeado) < 0 || Number(planeado) > 100) {
     return { ok: false, error: "El % planeado tiene que estar entre 0 y 100." };
   }
@@ -321,10 +367,9 @@ export async function editarTareaManual(
   const problema = revisarCampos(tarea);
   if (problema) return { ok: false, error: problema };
 
-  const duracion = normalizarDecimal(tarea.duracionDias, 2);
+  const duracion = await duracionDeLasFechas(obraId, tarea.inicio, tarea.fin);
   const planeado = normalizarDecimal(tarea.porcentajePlaneado || "0", 2);
 
-  if (duracion === null) return { ok: false, error: "La duracion no es un numero valido." };
   if (planeado === null || Number(planeado) < 0 || Number(planeado) > 100) {
     return { ok: false, error: "El % planeado tiene que estar entre 0 y 100." };
   }
@@ -357,6 +402,10 @@ export async function editarTareaManual(
         fin: new Date(`${tarea.fin}T00:00:00.000Z`),
         duracionDias: duracion,
         porcentajePlaneado: planeado,
+        // Teclear sus fechas es JUSTO lo que le faltaba a una fila nacida de la
+        // EDT generada: deja de estar sin programar y vuelve a contar para los
+        // atrasos. Sin esto se quedaria invisible al control para siempre.
+        sinProgramar: false,
       },
     });
 

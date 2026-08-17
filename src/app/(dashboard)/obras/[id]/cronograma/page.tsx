@@ -88,6 +88,14 @@ export default async function CronogramaPage({
   const puedeEliminarTareas = puede(sesion, "cronograma:eliminar");
   // Las escritas a mano se leen aparte: solo esta pantalla las distingue.
   const tareasAMano = await listarTareasManuales(sesion, id);
+  // El regimen laboral de la obra: con el, el formulario calcula la duracion
+  // de una tarea en dias de TRABAJO en cuanto se teclean sus dos fechas.
+  const calendarioObra = (
+    await prisma.workCalendar.findMany({
+      where: { projectId: id },
+      select: { diaSemana: true, laborable: true, horas: true },
+    })
+  ).map((d) => ({ ...d, horas: d.horas.toString() }));
   const puedeLineaBase = puede(sesion, "cronograma:linea_base");
 
   // La fecha por defecto del reporte se alinea al ultimo dia de corte semanal.
@@ -220,6 +228,7 @@ export default async function CronogramaPage({
               tareas={tareasAMano}
               puedeEditar={puedeEditarTareas}
               puedeEliminar={puedeEliminarTareas}
+              calendario={calendarioObra}
             />
           </div>
         </div>
@@ -408,6 +417,7 @@ export default async function CronogramaPage({
             tareas={tareasAMano}
             puedeEditar={puedeEditarTareas}
             puedeEliminar={puedeEliminarTareas}
+            calendario={calendarioObra}
           />
 
           <p className="text-xs opacity-60">

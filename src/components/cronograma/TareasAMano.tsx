@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+
+import { diasLaborablesEntre, type DiaLaboral } from "@/lib/calendario";
 import { AlertCircle, CalendarPlus, LoaderCircle, Pencil, Trash2 } from "lucide-react";
 
 import {
@@ -60,7 +62,7 @@ function Campo({
       <span className="mb-0.5 block font-medium opacity-70">{etiqueta}</span>
       <input
         {...props}
-        className="w-full rounded border px-2 py-1.5 text-sm"
+        className={`w-full rounded border px-2 py-1.5 text-sm ${props.className ?? ""}`}
         style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
       />
       {ayuda && <span className="mt-0.5 block opacity-60">{ayuda}</span>}
@@ -73,12 +75,15 @@ export function TareasAMano({
   tareas,
   puedeEditar,
   puedeEliminar,
+  calendario = [],
 }: {
   obraId: string;
   /// Solo las de origen MANUAL. Las importadas no se pintan aqui.
   tareas: TareaManual[];
   puedeEditar: boolean;
   puedeEliminar: boolean;
+  /// Regimen laboral de la obra. Vacio = se cuentan los siete dias.
+  calendario?: DiaLaboral[];
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
@@ -87,6 +92,33 @@ export function TareasAMano({
   const [error, setError] = useState<string | null>(null);
   const [porConfirmar, setPorConfirmar] = useState<{ uid: number; texto: string } | null>(null);
   const [guardando, guardar] = useTransition();
+
+  /**
+   * La duracion no se teclea: la dicen las dos fechas.
+   *
+   * Se cuenta en dias de TRABAJO segun el calendario de la obra —del viernes
+   * al lunes hay dos, no cuatro, si no se trabaja el domingo—. Esto es solo lo
+   * que se ve mientras se escribe; la cifra que se guarda la vuelve a calcular
+   * el servidor, para que no dependa del reloj del navegador.
+   *
+   * Las fechas se parten a mano en vez de pasarlas por `new Date(iso)`: eso
+   * las interpreta en UTC, y en Peru —UTC-5— el dia sale corrido uno atras.
+   */
+  const duracionCalculada = useMemo(() => {
+    if (!campos.inicio || !campos.fin) return "";
+
+    const dia = (iso: string) => {
+      const [anio, mes, d] = iso.split("-").map(Number);
+      if (!anio || !mes || !d) return null;
+      return new Date(anio, mes - 1, d);
+    };
+
+    const desde = dia(campos.inicio);
+    const hasta = dia(campos.fin);
+    if (!desde || !hasta || hasta.getTime() < desde.getTime()) return "";
+
+    return String(diasLaborablesEntre(desde, hasta, calendario));
+  }, [campos.inicio, campos.fin, calendario]);
 
   if (!puedeEditar && tareas.length === 0) return null;
 
@@ -357,11 +389,16 @@ export function TareasAMano({
                 <Campo
                   etiqueta="Duración"
                   ancho="w-28"
-                  inputMode="decimal"
-                  value={campos.duracionDias}
-                  onChange={(e) => setCampos({ ...campos, duracionDias: e.target.value })}
-                  placeholder="3"
-                  ayuda="Días de trabajo"
+                  readOnly
+                  tabIndex={-1}
+                  value={duracionCalculada}
+                  placeholder="—"
+                  ayuda={
+                    duracionCalculada === ""
+                      ? "Sale de las fechas"
+                      : "Días de trabajo, del calendario de la obra"
+                  }
+                  className="bg-black/5 dark:bg-white/5"
                 />
                 <Campo
                   etiqueta="% planeado"
