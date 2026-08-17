@@ -138,6 +138,42 @@ async function main() {
   }
   console.log(`Proveedores: ${nuevosProveedores} nuevos, ${PROVEEDORES.length - nuevosProveedores} ya estaban`);
 
+  // --- Avance reportado --------------------------------------------------
+  /**
+   * La curva real sale de AQUI, no del Excel.
+   *
+   * El cronograma importado trae un «% Avance» que se guarda como
+   * `porcentajeArchivo`: es lo que DICE el archivo, y solo se ensena en la
+   * vista previa de la importacion. El avance real de GCM son partes con
+   * fecha y autor —`AvanceTarea`—, y sin ellos la curva S dibuja el plan y
+   * una linea real plana en cero, que es justo lo que hace pensar que la
+   * obra no ha empezado.
+   *
+   * Dos cortes, no uno: con un solo punto no hay linea que dibujar.
+   */
+  const AVANCE: ReadonlyArray<readonly [number, number]> = [
+    [41, 100], [42, 100], [43, 100], [44, 100], [45, 60], [46, 0], [47, 0], [48, 0],
+  ];
+
+  const yaAvance = await prisma.avanceTarea.findFirst({
+    where: { projectId: obra.id },
+    select: { id: true },
+  });
+
+  if (yaAvance) {
+    console.log("Avance: ya hay partes reportados, no se toca");
+  } else if (!escribir) {
+    console.log("Avance: se reportarian 2 cortes (10/08 y 17/08)");
+  } else {
+    const partes = AVANCE.filter(([, real]) => real > 0).flatMap(([uid, real]) => [
+      // El corte anterior lleva la mitad, para que la curva tenga pendiente.
+      { projectId: obra.id, uid, fecha: dia("2026-08-10"), porcentaje: Math.round(real / 2).toFixed(2), reportadoPor: "Siembra de ejemplo" },
+      { projectId: obra.id, uid, fecha: dia("2026-08-17"), porcentaje: real.toFixed(2), reportadoPor: "Siembra de ejemplo" },
+    ]);
+    await prisma.avanceTarea.createMany({ data: partes });
+    console.log(`Avance: ${partes.length} partes en 2 cortes`);
+  }
+
   // --- Lookahead ---------------------------------------------------------
   // Tres tareas: una LISTO —lo unico comprometible en el plan semanal—, una
   // BLOQUEADO con sus dos restricciones abiertas, y una sin analizar.
