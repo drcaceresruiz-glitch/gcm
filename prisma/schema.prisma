@@ -285,6 +285,7 @@ model User {
   /// relacion porque el dia que haya un segundo vinculo entre las dos tablas
   /// —quien la resolvio, por ejemplo— Prisma no sabria cual es cual.
   restriccionesACargo Restriccion[] @relation("RestriccionesResponsable")
+  hitosACargo         HitoObra[]    @relation("HitosResponsable")
   /// Analisis de causa raiz de los que se hizo cargo. Mismo motivo que arriba
   /// para llevar nombre de relacion.
   analisisACargo AnalisisCausa[] @relation("AnalisisResponsable")
@@ -523,6 +524,7 @@ model Project {
   cronogramas Cronograma[]
   avances     AvanceTarea[]
   mapeos      MapeoTareaPartida[]
+  hitos       HitoObra[]
   encargos    EncargoProveedor[]
   planesSemanales PlanSemanal[]
   calendariosLaborales WorkCalendar[]
@@ -1501,6 +1503,61 @@ model MapeoTareaPartida {
   @@index([projectId, uid])
   @@index([projectId, codigoPartida])
   @@map("mapeo_tarea_partida")
+}
+
+/// Lo que hay que saber de un hito y no cabe en la tarea que lo representa.
+///
+/// Un hito ES una fila del cronograma con `esHito`: asi lo dibuja el Gantt —un
+/// rombo, sin barra— y asi sale en la tabla de hitos. Lo que se guarda aqui es
+/// lo que esa fila no puede llevar encima.
+///
+/// NO SON COLUMNAS DE `TareaCronograma`, y es deliberado. Las versiones del
+/// cronograma se SUSTITUYEN enteras al importar un corte nuevo, asi que un
+/// responsable escrito dentro de la tarea se perderia en el siguiente jueves.
+/// Se ancla en `(projectId, uid)` sin clave ajena, que es la misma doctrina de
+/// `AvanceTarea` y `MapeoTareaPartida`.
+model HitoObra {
+  id        String @id @default(cuid())
+  projectId String
+
+  /// El `uid` de la tarea que es este hito. Ancla estable, sin clave ajena.
+  uid Int
+
+  /// Tras que partida va en la EDT. El CODIGO, no el id, por lo mismo que en
+  /// `MapeoTareaPartida`: reimportar el presupuesto recrea las filas con
+  /// identificadores nuevos y el codigo sobrevive a eso.
+  ///
+  /// Nulo = el hito no cuelga de ninguna partida y vive al final. Es lo que
+  /// queda tambien cuando la partida que lo anclaba desaparece.
+  anclaCodigo String? @db.VarChar(32)
+
+  /// Quien responde de que este hito se cumpla. Uno de los dos, nunca ambos:
+  /// un usuario de GCM, o alguien de fuera. Lo valida el servicio, que la base
+  /// no puede.
+  ///
+  /// Misma doctrina que las restricciones: el responsable es quien responde
+  /// DENTRO de la organizacion, no el proveedor al que se persigue.
+  responsableUserId     String?
+  responsableContactoId String?
+
+  /// Con cuantos dias de antelacion avisar de que se acerca.
+  diasAviso Int @default(7)
+
+  creadoPor String   @db.VarChar(150)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// `SetNull` en los dos: dar de baja a alguien no puede borrar la traza de
+  /// que un hito estuvo a su nombre.
+  responsable User?          @relation("HitosResponsable", fields: [responsableUserId], references: [id], onDelete: SetNull)
+  contacto    ContactoAviso? @relation(fields: [responsableContactoId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, uid])
+  @@index([projectId, anclaCodigo])
+  @@index([responsableUserId])
+  @@index([responsableContactoId])
+  @@map("hitos_obra")
 }
 
 // ---------------------------------------------------------------------------
@@ -2483,6 +2540,9 @@ model ContactoAviso {
   /// Restricciones de las que se hizo cargo. Alguien de fuera puede ser el
   /// responsable de levantar una, aunque no sea lo habitual ni lo deseable.
   restricciones Restriccion[]
+  /// Hitos de los que responde. Mismo caso: la supervision externa o el
+  /// cliente pueden responder de una fecha clave.
+  hitos         HitoObra[]
 
   /// MySQL admite varios NULL en un indice unico, asi que esto no estorba a
   /// quien solo tiene correo o solo celular.
