@@ -224,8 +224,8 @@ export function EmisoresSms({
             <Campo
               id="numero"
               nombre="numero"
-              etiqueta="Número de la SIM (opcional)"
-              ayuda="Solo para saber qué aparato es."
+              etiqueta="Celular de ese teléfono"
+              ayuda="Las 9 cifras a las que llamarías, no el número largo de la tarjeta. Te preparamos el WhatsApp con los pasos y el token para ese número."
               tipo="tel"
             />
           </div>
@@ -442,8 +442,9 @@ function TokenNuevo({
         </a>
       ) : (
         <p className="text-xs opacity-60">
-          Si hubieras puesto el número de la SIM, GCM te prepararía el WhatsApp
-          con estos pasos ya escritos para ese teléfono.
+          No pusiste el celular de ese teléfono, así que no hay a dónde mandar
+          los pasos. Copia el token de arriba y sigue la lista a mano, o revoca
+          y vincula de nuevo poniendo el número.
         </p>
       )}
 

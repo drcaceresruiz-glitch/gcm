@@ -96,8 +96,9 @@ export async function vincularEmisor(
   const v = validarEtiquetaEmisor(datos.etiqueta);
   if (!v.ok) return { ok: false, error: v.error };
 
-  // El numero es informativo: sirve para saber que aparato es sin ir a
-  // buscarlo. Se normaliza igual, para que no acabe siendo texto libre.
+  // Se normaliza SIEMPRE, y ahora importa mas que cuando era solo informativo:
+  // con este numero se arma el enlace de WhatsApp que lleva los pasos y el
+  // token, asi que no puede ser texto libre que venga del formulario.
   const bruto = datos.numero.trim();
   let numero: string | null = null;
   if (bruto !== "") {

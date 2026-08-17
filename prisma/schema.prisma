@@ -154,9 +154,10 @@ model EmisorSms {
   /// para saber cual revocar cuando haya dos.
   etiqueta String @db.VarChar(80)
 
-  /// El numero de la SIM, si se sabe. Solo informativo: GCM no lo usa, porque
-  /// no es el quien manda sino el telefono. Sirve para que el administrador
-  /// sepa que aparato es sin ir a buscarlo.
+  /// El celular de ese telefono, en nueve cifras, si se sabe. GCM no manda
+  /// nada A este numero por su cuenta —no es el quien envia, sino el telefono—,
+  /// pero SI se usa: con el se prepara el WhatsApp con los pasos y el token al
+  /// vincularlo, y sirve para saber que aparato es sin ir a buscarlo.
   numero String? @db.VarChar(20)
 
   tokenHash String @unique @db.Char(64)
