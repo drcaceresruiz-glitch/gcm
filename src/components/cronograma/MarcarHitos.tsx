@@ -213,7 +213,7 @@ export function MarcarHitos({
                 <option value="">— al final del cronograma —</option>
                 {anclas.map((a) => (
                   <option key={a.codigo} value={a.codigo}>
-                    {" ".repeat((a.nivel - 1) * 3)}
+                    {" ".repeat(Math.max(0, (a.nivel - 1) * 3))}
                     {a.codigo} {a.nombre.slice(0, 40)}
                   </option>
                 ))}
