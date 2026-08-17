@@ -121,9 +121,35 @@ export function planSincronizacion(
     .filter((t) => t.codigo === null || !deLaEdt.has(t.codigo))
     .sort((a, b) => a.fila - b.fila);
 
+  /**
+   * Y SUBEN TODAS A RAIZ, conservando su jerarquia relativa.
+   *
+   * No es cosmetico: en el cronograma una fila es RESUMEN cuando la siguiente
+   * cuelga mas adentro. Si la primera suelta conserva un nivel profundo —una
+   * subpartida cuya madre desaparecio—, se traga a la ultima fila de la EDT y
+   * la convierte en resumen. Y una partida costeada marcada como resumen
+   * queda excluida de la valorizacion en nueve sitios del sistema SIN dar
+   * ningun error: es el mismo agujero que ya costo una revision entera,
+   * entrando por otra puerta.
+   *
+   * Se desplazan todas por el MISMO salto para que la minima quede en 1: asi
+   * el bloque de sueltas no puede tocar a la EDT, y entre ellas se conserva
+   * quien colgaba de quien —que es lo unico que hay que respetar de lo que
+   * alguien tecleo a mano—. Si ya estaban a raiz, no se toca nada.
+   */
+  const nivelMinimo = sueltas.reduce(
+    (min, t) => Math.min(min, t.nivel),
+    Number.POSITIVE_INFINITY,
+  );
+  const salto = sueltas.length > 0 ? 1 - nivelMinimo : 0;
+
   sueltas.forEach((t, i) => {
     const fila = edt.length + i + 1;
-    if (t.fila !== fila) cambios.push({ uid: t.uid, fila });
+    const nivel = t.nivel + salto;
+    const cambio: CambioEdt = { uid: t.uid };
+    if (t.fila !== fila) cambio.fila = fila;
+    if (t.nivel !== nivel) cambio.nivel = nivel;
+    if (Object.keys(cambio).length > 1) cambios.push(cambio);
   });
 
   return {

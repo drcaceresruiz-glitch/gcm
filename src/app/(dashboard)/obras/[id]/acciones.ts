@@ -16,10 +16,19 @@ import {
 } from "@/services/partidas.service";
 import { eliminarObra, cambiarEstadoObra } from "@/services/obras.service";
 import { eliminarObraCerrada } from "@/services/obra-borrado.service";
+import { ponerEdtAlDia } from "@/services/edt-sincronizar";
 
 export interface RespuestaEdicion {
   ok: boolean;
   error?: string;
+  /**
+   * Algo que hay que contar aunque la operacion saliera bien.
+   *
+   * Dos cosas caben aqui: que el costo directo se haya movido de una forma que
+   * nadie espera al teclear una fila, y que el cronograma se haya puesto al
+   * dia detras —o no haya podido—.
+   */
+  aviso?: string;
 }
 
 /**
@@ -88,6 +97,38 @@ async function intentar(
   }
 }
 
+/**
+ * El cronograma sigue al presupuesto SIN QUE NADIE LO PIDA.
+ *
+ * Anadir una partida y que no aparezca en el cronograma es el divorcio entre
+ * las dos estructuras que toda esta parte existe para evitar; y dejarlo en un
+ * boton no lo arregla, porque quien teclea una partida no se acuerda de
+ * pulsarlo.
+ *
+ * Va DESPUES de que la operacion del presupuesto haya terminado, y en su
+ * propia transaccion: la partida ya se guardo y es correcta, asi que si el
+ * cronograma no puede seguirla eso es una noticia, no un motivo para deshacer
+ * lo que el usuario acaba de hacer bien.
+ */
+async function alDiaLaEdt(
+  sesion: Awaited<ReturnType<typeof obtenerSesion>>,
+  obraId: string,
+): Promise<string | undefined> {
+  if (!sesion) return undefined;
+  try {
+    return await ponerEdtAlDia(sesion, obraId);
+  } catch (e) {
+    console.error("[edt] no se pudo poner al dia", e);
+    return "AVISO: el cambio se guardo, pero el cronograma no se pudo poner al dia.";
+  }
+}
+
+/// Junta los avisos que haya, sin dejar cadenas vacias ni dobles espacios.
+function juntar(...avisos: (string | undefined)[]): string | undefined {
+  const hay = avisos.filter((a): a is string => Boolean(a && a.trim()));
+  return hay.length > 0 ? hay.join(" ") : undefined;
+}
+
 export async function accionEditarPartida(
   obraId: string,
   partidaId: string,
@@ -103,8 +144,10 @@ export async function accionEditarPartida(
   const r = await intentar(() => actualizarPartida(sesion, partidaId, campos));
   if (!r.ok) return r;
 
+  const alDia = await alDiaLaEdt(sesion, obraId);
+
   revalidatePath(`/obras/${obraId}`);
-  return { ok: true };
+  return { ok: true, aviso: alDia };
 }
 
 export async function accionCrearPartida(
@@ -126,8 +169,10 @@ export async function accionCrearPartida(
 
   if (!r.ok) return r;
 
+  const alDia = await alDiaLaEdt(sesion, obraId);
+
   revalidatePath(`/obras/${obraId}`);
-  return { ok: true, aviso };
+  return { ok: true, aviso: juntar(aviso, alDia) };
 }
 
 export async function accionEliminarPartida(
@@ -140,8 +185,10 @@ export async function accionEliminarPartida(
   const r = await intentar(() => eliminarPartida(sesion, partidaId));
   if (!r.ok) return r;
 
+  const alDia = await alDiaLaEdt(sesion, obraId);
+
   revalidatePath(`/obras/${obraId}`);
-  return { ok: true };
+  return { ok: true, aviso: alDia };
 }
 
 /**
@@ -167,8 +214,12 @@ export async function accionRenumerarPartidas(
 
   if (!r.ok) return r;
 
+  // Renumerar ya arrastra el mapeo por su cuenta, pero los CODIGOS de las
+  // tareas tambien cambian: sin esto la EDT seguiria mostrando los viejos.
+  const alDia = await alDiaLaEdt(sesion, obraId);
+
   revalidatePath(`/obras/${obraId}`);
-  return { ok: true, cambiadas };
+  return { ok: true, cambiadas, aviso: alDia };
 }
 
 /**
@@ -195,8 +246,10 @@ export async function accionAgruparPartidas(
 
   if (!r.ok) return r;
 
+  const alDia = await alDiaLaEdt(sesion, obraId);
+
   revalidatePath(`/obras/${obraId}`);
-  return { ok: true, ...(salida ?? {}) };
+  return { ok: true, ...(salida ?? {}), aviso: alDia };
 }
 
 /**

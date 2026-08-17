@@ -199,3 +199,75 @@ describe("planSincronizacion", () => {
     expect([...finales].sort((a, b) => a - b)).toEqual([1, 2, 3, 4]);
   });
 });
+
+/**
+ * EL BLOQUE DE SOBRANTES NO PUEDE TOCAR A LA EDT.
+ *
+ * Lo encontro una prueba contra la base real, no el razonamiento: al anadir
+ * una partida al capitulo, la ultima fila de la EDT salio marcada como
+ * RESUMEN. El culpable era el bloque de detras: una subpartida sobrante
+ * conservaba su nivel 3 y, al quedar justo despues de una partida de nivel 2,
+ * la convertia en resumen por orden de documento. Y esa partida llevaba
+ * dinero y estaba enlazada: una partida costeada marcada como resumen queda
+ * fuera de la valorizacion en nueve sitios, sin dar ningun error.
+ */
+describe("el bloque de sobrantes no se traga la ultima fila de la EDT", () => {
+  it("la sobrante profunda sube a raiz y deja en paz a la de delante", () => {
+    const objetivo = edt(
+      ["2.0", "INSTALACIONES", 1, true],
+      ["2.3", "Pozo a tierra", 2, false],
+      ["2.4", "Tablero adicional", 2, false],
+    );
+    // "2.3.1" fue subpartida de "2.3" y ya no esta en el presupuesto.
+    const hay = [
+      tarea(-1, "2.0", "INSTALACIONES", 1, 1, true),
+      tarea(-2, "2.3", "Pozo a tierra", 2, 2),
+      tarea(-3, "2.3.1", "Excavacion", 3, 3),
+    ];
+
+    const plan = planSincronizacion(objetivo, hay);
+
+    // Sube a raiz: si se quedara en 3, la fila anterior —"2.4", que lleva
+    // dinero— pasaria a resumen y se caeria de la valorizacion.
+    expect(plan.cambios).toContainEqual({ uid: -3, fila: 4, nivel: 1 });
+
+    // Y la comprobacion de verdad: reconstruido el documento final, ninguna
+    // fila de la EDT queda con una siguiente que cuelgue mas adentro.
+    const finales = [
+      ...objetivo.map((f) => ({ fila: f.fila, nivel: f.nivel, deLaEdt: true })),
+      { fila: 4, nivel: 1, deLaEdt: false },
+    ].sort((a, b) => a.fila - b.fila);
+
+    const ultimaDeLaEdt = finales.find((f) => f.fila === objetivo.length)!;
+    const primeraSuelta = finales.find((f) => f.fila === objetivo.length + 1)!;
+    expect(primeraSuelta.nivel).toBeLessThanOrEqual(ultimaDeLaEdt.nivel);
+  });
+
+  it("varias sobrantes conservan entre ellas quien colgaba de quien", () => {
+    const objetivo = edt(["1.0", "ESTRUCTURAS", 1, true], ["1.1", "Zapatas", 2, false]);
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-2, "1.1", "Zapatas", 2, 2),
+      tarea(-7, "9.1", "Madre que se fue", 2, 3),
+      tarea(-8, "9.1.1", "Hija que se fue", 3, 4),
+    ];
+
+    const plan = planSincronizacion(objetivo, hay);
+
+    // El salto es el mismo para las dos: 2 -> 1 y 3 -> 2. Las filas ya eran
+    // las que les tocaban, asi que solo cambia el nivel.
+    expect(plan.cambios).toContainEqual({ uid: -7, nivel: 1 });
+    expect(plan.cambios).toContainEqual({ uid: -8, nivel: 2 });
+  });
+
+  it("lo tecleado a mano que ya estaba a raiz no se toca", () => {
+    const objetivo = edt(["1.0", "ESTRUCTURAS", 1, true], ["1.1", "Zapatas", 2, false]);
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-2, "1.1", "Zapatas", 2, 2),
+      tarea(-9, null, "Movilizacion", 1, 3),
+    ];
+
+    expect(planSincronizacion(objetivo, hay).cambios).toEqual([]);
+  });
+});

@@ -32,6 +32,53 @@ export interface EdtSincronizada {
   sobrantes: string[];
 }
 
+/**
+ * Poner la EDT al dia DESPUES DE TOCAR EL PRESUPUESTO, sin que nadie lo pida.
+ *
+ * Es la forma en que esto se usa de verdad. Un boton no sirve: quien anade una
+ * partida no se acuerda de pulsarlo, y el cronograma se queda sin ella —que es
+ * justo el divorcio entre las dos estructuras que todo esto existe para
+ * evitar—.
+ *
+ * NUNCA hace fallar la operacion del presupuesto. La partida ya se guardo y es
+ * correcta; que el cronograma no haya podido seguirla es una noticia, no un
+ * motivo para deshacerla. Por eso devuelve un aviso en vez de un error.
+ *
+ * Devuelve `undefined` cuando no hay nada que decir: o no hay cronograma
+ * todavia —lo normal al empezar una obra— o la EDT ya estaba al dia.
+ */
+export async function ponerEdtAlDia(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<string | undefined> {
+  const hayCronograma = await prisma.cronograma.count({
+    where: { projectId: obraId },
+  });
+  if (hayCronograma === 0) return undefined;
+
+  const r = await sincronizarEdtConPresupuesto(sesion, obraId);
+
+  if (!r.ok) {
+    return `AVISO: el cambio se guardo, pero el cronograma no se pudo poner al dia. ${r.error}`;
+  }
+
+  const d = r.datos;
+  const partes: string[] = [];
+  if (d.altas) partes.push(`${d.altas} tarea(s) nueva(s)`);
+  if (d.cambios) partes.push(`${d.cambios} ajuste(s)`);
+  if (d.enlacesCreados) partes.push(`${d.enlacesCreados} enlace(s) puesto(s)`);
+  if (d.enlacesRetirados) partes.push(`${d.enlacesRetirados} retirado(s)`);
+
+  const sobra =
+    d.sobrantes.length > 0
+      ? ` ${d.sobrantes.length} tarea(s) ya no estan en el presupuesto y se dejaron al final, sin borrar.`
+      : "";
+
+  if (partes.length === 0) return sobra ? `AVISO:${sobra}` : undefined;
+
+  return `El cronograma se puso al dia: ${partes.join(", ")}.${sobra}`;
+}
+
 export async function sincronizarEdtConPresupuesto(
   sesion: SesionActiva,
   obraId: string,
