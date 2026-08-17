@@ -7,6 +7,7 @@ import {
   calcularProfundidades,
 } from "@/lib/jerarquia-partidas";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
+import { partidasEnEjecucionQueDesaparecen } from "@/services/partidas-en-ejecucion";
 import type { FilaImportada } from "@/lib/excel-presupuesto";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -136,6 +137,39 @@ export async function aplicarImportacion(
 
   const codigos = new Set(filas.map((f) => f.codigo));
   const montoTotal = sumarHojas(filas);
+
+  /**
+   * LO QUE YA SE ESTA EJECUTANDO NO SE PUEDE TIRAR.
+   *
+   * `eliminarPartida` ya se niega en seco a borrar una partida con avance
+   * reportado, y sin segundo paso que valga: lo que se perderia no es una
+   * referencia, es historia. Pero reemplazar el presupuesto borra TODAS las
+   * partidas de golpe por otro camino, y hasta aqui no lo miraba.
+   *
+   * El motivo es de obra, no de programacion: si una partida se esta
+   * ejecutando hay una cuadrilla trabajando y un contratista al que hay que
+   * pagarle, y ese pago sale del presupuesto. Una partida en ejecucion sin
+   * respaldo presupuestal es dinero que se debe y no esta en ninguna parte.
+   *
+   * Se comprueba en dos saltos, como en `eliminarPartida`: el avance no
+   * cuelga de la partida por clave ajena, se ancla al `uid` de la tarea del
+   * cronograma, y lo que las une es `MapeoTareaPartida` POR CODIGO.
+   */
+  if (existentes > 0) {
+    const vivas = await partidasEnEjecucionQueDesaparecen(obraId, codigos);
+    if (vivas.length > 0) {
+      const lista = vivas.slice(0, 5).join(", ");
+      const resto = vivas.length > 5 ? `, y ${vivas.length - 5} mas` : "";
+      return {
+        ok: false,
+        error:
+          `El archivo no trae ${vivas.length} partida(s) que YA SE ESTAN ` +
+          `EJECUTANDO en obra: ${lista}${resto}. No se pueden borrar: hay ` +
+          `trabajo hecho y un pago que sale de ellas. Anadelas al archivo con ` +
+          `su codigo, o registra el cambio como adicional o deductivo.`,
+      };
+    }
+  }
 
   // Orden de presentacion: el del documento original. Mas abajo se insertan
   // por niveles para que el padre exista antes que el hijo, pero ese orden

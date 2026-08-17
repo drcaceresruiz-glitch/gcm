@@ -111,6 +111,9 @@ vi.mock("@/lib/prisma", () => {
       },
     },
     cronograma: {
+      // El recalculo de resumenes lo pide para saber de que obra es el
+      // cronograma, y con ello su calendario laboral.
+      findUnique: () => Promise.resolve({ projectId: "obra" }),
       findFirst: () => Promise.resolve(estado.vigente),
       create: (args: { data: Record<string, unknown> }) => {
         estado.cronogramaCreado = args.data;

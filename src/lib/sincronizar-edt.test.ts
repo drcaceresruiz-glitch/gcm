@@ -1,0 +1,201 @@
+import { describe, it, expect } from "vitest";
+
+import { planSincronizacion, type TareaExistente } from "./sincronizar-edt";
+import type { FilaEdt } from "./edt-desde-presupuesto";
+
+/**
+ * La EDT sale del presupuesto, pero el presupuesto sigue vivo. Esto fija que
+ * la reconciliacion no destruya nada, no toque lo tecleado a mano, y deje el
+ * conjunto enlazado igual al de las partidas que llevan el dinero.
+ */
+
+function edt(...filas: [string, string, number, boolean][]): FilaEdt[] {
+  return filas.map(([codigo, nombre, nivel, esResumen], i) => ({
+    codigo,
+    nombre,
+    nivel,
+    fila: i + 1,
+    esResumen,
+  }));
+}
+
+function tarea(
+  uid: number,
+  codigo: string | null,
+  nombre: string,
+  nivel: number,
+  fila: number,
+  esResumen = false,
+): TareaExistente {
+  return { uid, codigo, nombre, nivel, fila, esResumen };
+}
+
+describe("planSincronizacion", () => {
+  it("sin cambios en el presupuesto no propone nada", () => {
+    const objetivo = edt(["1.0", "ESTRUCTURAS", 1, true], ["1.1", "Zapatas", 2, false]);
+    const hay = [tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true), tarea(-2, "1.1", "Zapatas", 2, 2)];
+
+    const plan = planSincronizacion(objetivo, hay);
+
+    expect(plan.altas).toEqual([]);
+    expect(plan.cambios).toEqual([]);
+    expect(plan.sobrantes).toEqual([]);
+    expect(plan.enlacesDeseados).toEqual(["1.1"]);
+  });
+
+  it("una partida nueva entra en su sitio y recoloca a las de detras", () => {
+    const objetivo = edt(
+      ["1.0", "ESTRUCTURAS", 1, true],
+      ["1.1", "Zapatas", 2, false],
+      ["1.2", "Columnas", 2, false],
+    );
+    // "1.2" no existe todavia, y "1.1" estaba en la fila 2.
+    const hay = [tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true), tarea(-2, "1.1", "Zapatas", 2, 2)];
+
+    const plan = planSincronizacion(objetivo, hay);
+
+    expect(plan.altas.map((a) => [a.codigo, a.fila])).toEqual([["1.2", 3]]);
+    expect(plan.cambios).toEqual([]);
+  });
+
+  it("una partida insertada en medio recoloca a las siguientes", () => {
+    const objetivo = edt(
+      ["1.0", "ESTRUCTURAS", 1, true],
+      ["1.1", "Zapatas", 2, false],
+      ["1.2", "Columnas", 2, false],
+    );
+    // "1.2" ya existia pero estaba antes que "1.1".
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-3, "1.2", "Columnas", 2, 2),
+      tarea(-2, "1.1", "Zapatas", 2, 3),
+    ];
+
+    const plan = planSincronizacion(objetivo, hay);
+
+    expect(plan.altas).toEqual([]);
+    expect(plan.cambios).toEqual([
+      { uid: -2, fila: 2 },
+      { uid: -3, fila: 3 },
+    ]);
+  });
+
+  /**
+   * El caso que decide el dinero. Una partida costeada gana subpartidas que
+   * ahora lo cubren: pasa de paquete a capitulo, deja de llevar importe y por
+   * tanto deja de valorizar. Su enlace TIENE que desaparecer, o su avance y el
+   * de sus hijas contarian dos veces el mismo dinero.
+   */
+  it("la partida que gana subpartidas deja de estar enlazada", () => {
+    const objetivo = edt(
+      ["4.0", "CAPITULO IV", 1, true],
+      ["4.1", "Concreto en zapatas", 2, true],
+      ["4.1.1", "Encofrado", 3, false],
+      ["4.1.2", "Vaciado", 3, false],
+    );
+    // Antes "4.1" era hoja y llevaba el dinero.
+    const hay = [
+      tarea(-1, "4.0", "CAPITULO IV", 1, 1, true),
+      tarea(-2, "4.1", "Concreto en zapatas", 2, 2, false),
+    ];
+
+    const plan = planSincronizacion(objetivo, hay);
+
+    expect(plan.cambios).toContainEqual({ uid: -2, esResumen: true });
+    expect(plan.enlacesDeseados).toEqual(["4.1.1", "4.1.2"]);
+    expect(plan.enlacesDeseados).not.toContain("4.1");
+  });
+
+  it("y al reves: la que se queda sin subpartidas vuelve a llevar el dinero", () => {
+    const objetivo = edt(["4.0", "CAPITULO IV", 1, true], ["4.1", "Concreto", 2, false]);
+    const hay = [
+      tarea(-1, "4.0", "CAPITULO IV", 1, 1, true),
+      tarea(-2, "4.1", "Concreto", 2, 2, true),
+    ];
+
+    const plan = planSincronizacion(objetivo, hay);
+
+    expect(plan.cambios).toContainEqual({ uid: -2, esResumen: false });
+    expect(plan.enlacesDeseados).toEqual(["4.1"]);
+  });
+
+  it("el cambio de nombre de una partida llega a su tarea", () => {
+    const objetivo = edt(["1.1", "Concreto f'c=280", 1, false]);
+    const hay = [tarea(-1, "1.1", "Concreto f'c=210", 1, 1)];
+
+    expect(planSincronizacion(objetivo, hay).cambios).toEqual([
+      { uid: -1, nombre: "Concreto f'c=280" },
+    ]);
+  });
+
+  /**
+   * Regla 2: lo que se tecleo a mano no sale del presupuesto y no se toca.
+   * Solo se corre al final para no partir la lectura de la EDT viva.
+   */
+  it("no borra ni reescribe lo tecleado a mano", () => {
+    const objetivo = edt(["1.0", "ESTRUCTURAS", 1, true], ["1.1", "Zapatas", 2, false]);
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-2, "1.1", "Zapatas", 2, 2),
+      tarea(-9, null, "Movilizacion de equipos", 1, 3),
+    ];
+
+    const plan = planSincronizacion(objetivo, hay);
+
+    expect(plan.sobrantes.map((s) => s.uid)).toEqual([-9]);
+    // Ya estaba en la fila 3, que es la que le toca: no se toca.
+    expect(plan.cambios).toEqual([]);
+  });
+
+  /**
+   * NO SE BORRA NADA. Una tarea cuya partida ya no esta se informa, no se
+   * destruye: lleva colgados avance, enlaces, lookahead y fotos, todos
+   * anclados al uid sin clave ajena.
+   */
+  it("la tarea cuya partida ya no existe se informa, no se borra", () => {
+    const objetivo = edt(["1.0", "ESTRUCTURAS", 1, true], ["1.1", "Zapatas", 2, false]);
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-2, "1.1", "Zapatas", 2, 2),
+      tarea(-3, "1.9", "Partida que se borro", 2, 3),
+    ];
+
+    const plan = planSincronizacion(objetivo, hay);
+
+    expect(plan.sobrantes.map((s) => s.codigo)).toEqual(["1.9"]);
+    expect(plan.enlacesDeseados).not.toContain("1.9");
+  });
+
+  it("una obra sin cronograma todavia es todo altas", () => {
+    const objetivo = edt(["1.0", "ESTRUCTURAS", 1, true], ["1.1", "Zapatas", 2, false]);
+
+    const plan = planSincronizacion(objetivo, []);
+
+    expect(plan.altas.map((a) => a.codigo)).toEqual(["1.0", "1.1"]);
+    expect(plan.cambios).toEqual([]);
+    expect(plan.sobrantes).toEqual([]);
+  });
+
+  it("las filas quedan contiguas y sin repetir", () => {
+    const objetivo = edt(
+      ["1.0", "ESTRUCTURAS", 1, true],
+      ["1.1", "Zapatas", 2, false],
+      ["1.2", "Columnas", 2, false],
+    );
+    const hay = [
+      tarea(-1, "1.0", "ESTRUCTURAS", 1, 5, true),
+      tarea(-2, "1.1", "Zapatas", 2, 9),
+      tarea(-9, null, "Movilizacion", 1, 2),
+    ];
+
+    const plan = planSincronizacion(objetivo, hay);
+
+    const finales = [
+      ...plan.altas.map((a) => a.fila),
+      ...plan.cambios.filter((c) => c.fila !== undefined).map((c) => c.fila!),
+      // La que no cambia conserva la suya.
+    ];
+    expect(new Set(finales).size).toBe(finales.length);
+    expect([...finales].sort((a, b) => a - b)).toEqual([1, 2, 3, 4]);
+  });
+});

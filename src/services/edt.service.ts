@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { hoy as hoyCalendario } from "@/utils/fechas";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
+import { diasLaborablesEntre, type DiaLaboral } from "@/lib/calendario";
 import {
   edtDesdePresupuesto,
   resumenesPorOrden,
@@ -66,6 +67,28 @@ export async function recalcularResumenes(
     },
   });
 
+  /**
+   * La duracion del resumen se mide EN LO MISMO que la de sus tareas.
+   *
+   * Las hojas la sacan de sus fechas contando dias de TRABAJO, con el
+   * calendario de la obra. Si el resumen contara dias naturales, la misma
+   * columna llevaria dos medidas distintas: un paquete que cruce un domingo
+   * diria un dia mas que la suma de lo que contiene, sin que nada falle.
+   */
+  const cronograma = await tx.cronograma.findUnique({
+    where: { id: cronogramaId },
+    select: { projectId: true },
+  });
+
+  const calendario = cronograma
+    ? (
+        await tx.workCalendar.findMany({
+          where: { projectId: cronograma.projectId },
+          select: { diaSemana: true, laborable: true, horas: true },
+        })
+      ).map((d) => ({ ...d, horas: d.horas.toString() }))
+    : [];
+
   const dia = (f: Date) => f.toISOString().slice(0, 10);
 
   /**
@@ -128,11 +151,11 @@ export async function recalcularResumenes(
       ) {
         cambios["inicio"] = new Date(`${t.inicio}T00:00:00.000Z`);
         cambios["fin"] = new Date(`${t.fin}T00:00:00.000Z`);
-        // La duracion de un resumen es su envoltura, en dias de calendario. No
-        // hay otra fuente: las hojas la traen del teclado y el resumen no se
-        // teclea. Se documenta aqui porque el resto del sistema toma la
-        // duracion del archivo y NUNCA de restar fechas.
-        cambios["duracionDias"] = diasEntre(t.inicio, t.fin);
+        // La duracion de un resumen es su ENVOLTURA —de la primera tarea que
+        // empieza a la ultima que acaba—, no la suma de las suyas: dos tareas
+        // de tres dias en paralelo son tres dias de paquete, no seis. Y se
+        // cuenta en dias de trabajo, igual que las hojas.
+        cambios["duracionDias"] = diasEntre(t.inicio, t.fin, calendario);
         cambios["sinProgramar"] = false;
       }
     }
@@ -146,11 +169,23 @@ export async function recalcularResumenes(
   }
 }
 
-function diasEntre(inicio: string, fin: string): string {
-  const a = Date.parse(`${inicio}T00:00:00Z`);
-  const b = Date.parse(`${fin}T00:00:00Z`);
-  const dias = Math.round((b - a) / 86_400_000) + 1;
-  return `${Math.max(dias, 0)}.00`;
+/**
+ * Dias de trabajo entre dos fechas de calendario, ambas incluidas.
+ *
+ * Las fechas se parten a mano en vez de pasarlas por `new Date(iso)`: eso las
+ * interpreta en UTC, y en Peru —UTC-5— el dia sale corrido uno atras, con lo
+ * que `getDay()` diria domingo donde hay lunes.
+ */
+function diasEntre(
+  inicio: string,
+  fin: string,
+  calendario: readonly DiaLaboral[],
+): string {
+  const dia = (iso: string) => {
+    const [anio, mes, d] = iso.split("-").map(Number);
+    return new Date(anio!, mes! - 1, d!);
+  };
+  return `${diasLaborablesEntre(dia(inicio), dia(fin), calendario)}.00`;
 }
 
 export async function generarEdtDesdePresupuesto(
