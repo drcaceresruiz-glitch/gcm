@@ -109,6 +109,15 @@ async function intentar(
  * propia transaccion: la partida ya se guardo y es correcta, asi que si el
  * cronograma no puede seguirla eso es una noticia, no un motivo para deshacer
  * lo que el usuario acaba de hacer bien.
+ *
+ * OJO AL REVALIDADO, que es la otra mitad de esto y se olvida sola. Tocar el
+ * presupuesto ya no afecta solo a `/obras/{id}`: afecta al cronograma, al
+ * Gantt, al mapeo, al informe y al valor ganado, que son RUTAS DISTINTAS. Con
+ * `revalidatePath` a secas la tarea se creaba bien en la base y la pantalla
+ * del cronograma seguia sirviendo la version cacheada —el cambio estaba hecho
+ * y no se veia, que es la peor de las dos formas de fallar—. Por eso las cinco
+ * acciones revalidan con `"layout"`, que alcanza a todo lo que cuelga de la
+ * obra.
  */
 async function alDiaLaEdt(
   sesion: Awaited<ReturnType<typeof obtenerSesion>>,
@@ -146,7 +155,7 @@ export async function accionEditarPartida(
 
   const alDia = await alDiaLaEdt(sesion, obraId);
 
-  revalidatePath(`/obras/${obraId}`);
+  revalidatePath(`/obras/${obraId}`, "layout");
   return { ok: true, aviso: alDia };
 }
 
@@ -171,7 +180,7 @@ export async function accionCrearPartida(
 
   const alDia = await alDiaLaEdt(sesion, obraId);
 
-  revalidatePath(`/obras/${obraId}`);
+  revalidatePath(`/obras/${obraId}`, "layout");
   return { ok: true, aviso: juntar(aviso, alDia) };
 }
 
@@ -187,7 +196,7 @@ export async function accionEliminarPartida(
 
   const alDia = await alDiaLaEdt(sesion, obraId);
 
-  revalidatePath(`/obras/${obraId}`);
+  revalidatePath(`/obras/${obraId}`, "layout");
   return { ok: true, aviso: alDia };
 }
 
@@ -218,7 +227,7 @@ export async function accionRenumerarPartidas(
   // tareas tambien cambian: sin esto la EDT seguiria mostrando los viejos.
   const alDia = await alDiaLaEdt(sesion, obraId);
 
-  revalidatePath(`/obras/${obraId}`);
+  revalidatePath(`/obras/${obraId}`, "layout");
   return { ok: true, cambiadas, aviso: alDia };
 }
 
@@ -248,7 +257,7 @@ export async function accionAgruparPartidas(
 
   const alDia = await alDiaLaEdt(sesion, obraId);
 
-  revalidatePath(`/obras/${obraId}`);
+  revalidatePath(`/obras/${obraId}`, "layout");
   return { ok: true, ...(salida ?? {}), aviso: alDia };
 }
 
