@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, Share2 } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import Link from "next/link";
@@ -9,7 +9,14 @@ import { fechaCorta, hoy } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
 import { BotonImprimir } from "@/components/cronograma/BotonImprimir";
 import { EnviarInforme } from "@/components/cronograma/EnviarInforme";
+import { EnviarInformeSms } from "@/components/cronograma/EnviarInformeSms";
 import { InformeSemanal } from "@/components/cronograma/InformeSemanal";
+import { hayCanalSms } from "@/services/sms.service";
+import {
+  enlaceWhatsApp,
+  textoSms,
+  textoWhatsApp,
+} from "@/lib/informe-mensaje";
 
 export const metadata: Metadata = { title: "Informe semanal" };
 
@@ -49,6 +56,13 @@ export default async function InformePage({
   const datos = informe.datos;
   const corteIso = datos.fechaCorte.toISOString().slice(0, 10);
 
+  // Los dos mensajes se componen AQUI, en el servidor, por lo mismo que el
+  // correo: un resumen firmado por GCM no puede llevar cifras que vengan del
+  // navegador. Al cliente solo baja el texto ya hecho.
+  const paraWhatsApp = enlaceWhatsApp(textoWhatsApp(datos));
+  const paraSms = textoSms(datos);
+  const canalSms = await hayCanalSms(sesion.companyId);
+
   return (
     <div className="space-y-4">
       {/* Todo este bloque desaparece al imprimir: el papel que recibe el
@@ -79,6 +93,27 @@ export default async function InformePage({
             Descargar datos (CSV)
           </a>
           <EnviarInforme obraId={id} corteIso={corteIso} />
+
+          {/* Un enlace normal, sin JavaScript: WhatsApp lo abre el sistema con
+              el texto ya escrito, y quien manda elige el chat. GCM no envia
+              nada aqui —no puede— y por eso no hace falta canal ninguno. */}
+          <a
+            href={paraWhatsApp}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <Share2 className="size-4" aria-hidden="true" />
+            Compartir por WhatsApp
+          </a>
+
+          <EnviarInformeSms
+            obraId={id}
+            corteIso={corteIso}
+            texto={paraSms}
+            hayCanal={canalSms}
+          />
           <BotonImprimir />
         </div>
       </div>
