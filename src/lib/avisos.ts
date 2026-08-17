@@ -156,6 +156,22 @@ export function quiereEvento(s: SuscripcionAviso, evento: EventoAviso): boolean 
       return s.momentos.alQuedarLista;
     case "RESUMEN":
       return s.momentos.enResumen;
+    /**
+     * Los hitos NO tienen interruptor propio, y es a proposito.
+     *
+     * Los cuatro momentos de arriba son del Lookahead: dicen de que parte del
+     * analisis de restricciones quiere enterarse cada quien. Un hito es otra
+     * cosa —la fecha comprometida de la obra— y quien esta suscrito a los
+     * avisos de una obra quiere saber que una fecha clave se le echa encima.
+     *
+     * Anadir un quinto interruptor sonaria a completitud y seria una trampa:
+     * nace apagado o encendido, y en cualquiera de los dos casos alguien se
+     * entera tarde de que existia. Si algun dia estorban, se apagan con
+     * `AjustesAvisosObra.activo`, que ya apaga todo lo de la obra.
+     */
+    case "HITO_CERCA":
+    case "HITO_VENCIDO":
+      return true;
     default:
       return false;
   }
@@ -175,7 +191,11 @@ export function cubreFlujo(s: SuscripcionAviso, tipo: TipoRestriccion): boolean 
  * que se levanto —que es justo el que ya lo sabia—.
  */
 export function seFiltraPorFlujo(evento: EventoAviso): boolean {
-  return evento !== "LISTA";
+  // Los hitos tampoco, y por una razon mas fuerte: un hito NO TIENE flujo. No
+  // es que no convenga filtrarlo, es que no hay por que filtrarlo, y dejarlo
+  // pasar por el filtro lo compararia contra un tipo que no existe —con lo que
+  // no le llegaria a nadie que tuviera la suscripcion acotada a un flujo—.
+  return evento !== "LISTA" && evento !== "HITO_CERCA" && evento !== "HITO_VENCIDO";
 }
 
 /**

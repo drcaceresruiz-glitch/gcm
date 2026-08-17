@@ -38,6 +38,8 @@ const ETIQUETA_EVENTO: Record<EventoAviso, string> = {
   RECORDAR: "recordatorio",
   LISTA: "quedó lista",
   RESUMEN: "resumen del día",
+  HITO_CERCA: "hito cerca",
+  HITO_VENCIDO: "hito vencido",
 };
 
 function hora(f: Date): string {

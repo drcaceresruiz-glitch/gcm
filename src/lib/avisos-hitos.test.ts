@@ -7,6 +7,7 @@ import {
   textoDeHito,
   type HitoParaAviso,
 } from "./avisos-hitos";
+import { quiereEvento, seFiltraPorFlujo } from "./avisos";
 
 /**
  * Lo que decide a quien se molesta y cuanto SMS se gasta. Por eso vive en
@@ -153,5 +154,49 @@ describe("los textos", () => {
     expect(v.titulo).toContain("vencido");
     expect(v.cuerpo).toContain("6 día(s)");
     expect(v.cuerpo).toContain("dependía");
+  });
+});
+
+/**
+ * LAS DOS PUERTAS DEL MOTOR QUE LE CERRABAN EL PASO A UN HITO.
+ *
+ * El motor de avisos nacio para el Lookahead, y sus dos filtros dan por hecho
+ * que todo aviso pertenece a un flujo de restricciones. Un hito no. Sin estas
+ * dos correcciones el aviso se calculaba bien y no le llegaba a nadie, que es
+ * la peor forma de fallar: silenciosa.
+ */
+describe("un hito pasa los filtros del motor de avisos", () => {
+  const suscripcion = (tipo: string | null, momentos: Record<string, boolean>) =>
+    ({ tipo, momentos } as never);
+
+  const TODO_APAGADO = {
+    alAbrir: false,
+    alRecordar: false,
+    alQuedarLista: false,
+    enResumen: false,
+  };
+
+  it("llega aunque la suscripcion tenga todos los momentos apagados", () => {
+    // Los cuatro momentos son del Lookahead: dicen de que parte del analisis
+    // de restricciones quiere enterarse cada quien. Un hito es otra cosa.
+    const s = suscripcion(null, TODO_APAGADO);
+    expect(quiereEvento(s, "HITO_CERCA")).toBe(true);
+    expect(quiereEvento(s, "HITO_VENCIDO")).toBe(true);
+  });
+
+  it("no se filtra por flujo, porque un hito no tiene flujo", () => {
+    expect(seFiltraPorFlujo("HITO_CERCA")).toBe(false);
+    expect(seFiltraPorFlujo("HITO_VENCIDO")).toBe(false);
+    // Y lo de siempre sigue igual.
+    expect(seFiltraPorFlujo("RECORDAR")).toBe(true);
+    expect(seFiltraPorFlujo("LISTA")).toBe(false);
+  });
+
+  it("le llega a quien tiene la suscripcion acotada a un solo flujo", () => {
+    // Este es el caso que se rompia: alguien suscrito solo a MATERIALES no
+    // recibiria ningun hito, porque se comparaba contra un tipo inexistente.
+    const soloMateriales = suscripcion("MATERIALES", TODO_APAGADO);
+    expect(quiereEvento(soloMateriales, "HITO_VENCIDO")).toBe(true);
+    expect(seFiltraPorFlujo("HITO_VENCIDO")).toBe(false);
   });
 });

@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import Link from "next/link";
-import { BellRing, CircleCheck, Clock, Inbox } from "lucide-react";
+import { BellRing, CircleCheck, Clock, Diamond, Inbox } from "lucide-react";
 import { fechaCorta } from "@/utils/fechas";
 import { accionMarcarLeidos } from "@/app/(dashboard)/avisos/acciones";
 import type { AvisoBandeja } from "@/services/avisos-bandeja";
@@ -25,6 +25,9 @@ const ICONO: Record<EventoAviso, typeof BellRing> = {
   RECORDAR: Clock,
   LISTA: CircleCheck,
   RESUMEN: Inbox,
+  // El rombo es como el Gantt dibuja un hito: sin barra, porque no dura.
+  HITO_CERCA: Diamond,
+  HITO_VENCIDO: Diamond,
 };
 
 const COLOR: Record<EventoAviso, string> = {
@@ -32,6 +35,9 @@ const COLOR: Record<EventoAviso, string> = {
   RECORDAR: "var(--color-alerta)",
   LISTA: "var(--color-exito)",
   RESUMEN: "var(--color-marca-500)",
+  // «Se acerca» avisa, «vencido» ya duele: el color lo dice antes de leer.
+  HITO_CERCA: "var(--color-alerta)",
+  HITO_VENCIDO: "var(--color-peligro)",
 };
 
 export function BandejaAvisos({ avisos }: { avisos: AvisoBandeja[] }) {
