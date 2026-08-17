@@ -103,6 +103,29 @@ function posicionDelHito(
   return { indice: fin, nivel };
 }
 
+/**
+ * La fila que ENCABEZA el documento: la obra.
+ *
+ * Es la que trae la plantilla oficial de cronograma —nivel 1, sin codigo de
+ * partida— y de la que cuelga todo lo demas. Se reconoce por estar EN SU
+ * SITIO, la primera del documento, y no solo por su forma: una tarea escrita a
+ * mano en la raiz tambien es de nivel 1 y puede no llevar codigo, y tomarla
+ * por cabecera la haria tragarse el cronograma entero.
+ *
+ * Con una sola fila no hay cabecera que valga: un documento de una linea es
+ * esa linea, no un encabezado sin contenido.
+ */
+function cabeceraDeLaObra(
+  tareas: readonly TareaExistente[],
+): TareaExistente | null {
+  if (tareas.length < 2) return null;
+
+  const primera = tareas.reduce((a, b) => (a.fila <= b.fila ? a : b));
+  if (primera.codigo !== null || primera.nivel !== 1) return null;
+
+  return primera;
+}
+
 export function planSincronizacion(
   edt: readonly FilaEdt[],
   tareas: readonly TareaExistente[],
@@ -115,6 +138,31 @@ export function planSincronizacion(
     // documento; la otra cae en sobrantes y se informa.
     if (t.codigo !== null && !porCodigo.has(t.codigo)) porCodigo.set(t.codigo, t);
   }
+
+  /**
+   * LA CABECERA DE LA OBRA, si el cronograma trae una.
+   *
+   * La plantilla oficial —y todo lo importado con ella— encabeza el documento
+   * con la obra: nivel 1, sin codigo, y todo lo demas colgando por debajo. El
+   * presupuesto no tiene esa fila, asi que la EDT tampoco: sus capitulos son
+   * la raiz.
+   *
+   * Antes esa cabecera caia en «sobrantes» —no casa con ninguna partida— y se
+   * iba al final del documento, donde la regla del orden la convertia en una
+   * TAREA EJECUTABLE: barra en el Gantt, ofrecida en el Lookahead,
+   * comprometible en el Plan Semanal y dentro del denominador del avance
+   * ponderado. Un encabezado contando como trabajo.
+   *
+   * Ahora se reconoce y **la EDT se genera un nivel mas adentro**, para que la
+   * cabecera siga conteniendo a todo. Las dos estructuras encajan en vez de
+   * pelearse por la raiz.
+   *
+   * Se exige que este EN SU SITIO —la primera fila del documento— y no solo
+   * que sea de nivel 1 sin codigo: una tarea escrita a mano en la raiz cumple
+   * eso ultimo, y promoverla a cabecera se tragaria el cronograma entero.
+   */
+  const cabecera = cabeceraDeLaObra(tareas);
+  const hundir = cabecera ? 1 : 0;
 
   const deLaEdt = new Set(edt.map((f) => f.codigo));
 
@@ -150,15 +198,32 @@ export function planSincronizacion(
     if (i < edt.length) documento.push({ tipo: "edt", fila: edt[i]! });
   }
 
+  // La cabecera ocupa la fila 1 y el resto del documento empieza detras.
+  if (cabecera) {
+    const cambio: CambioEdt = { uid: cabecera.uid };
+    if (cabecera.fila !== 1) cambio.fila = 1;
+    if (cabecera.nivel !== 1) cambio.nivel = 1;
+    // Contiene a toda la EDT, asi que agrupa por definicion. Se corrige aqui
+    // y no solo se deja al recalculo, para que una cabecera que llegue con la
+    // marca mal —degradada por una version anterior, o tecleada a mano— vuelva
+    // a su sitio en la misma pasada.
+    //
+    // OJO: esto repara la cabecera que sigue ENCABEZANDO. A la que ya fue
+    // desterrada al final por una version anterior no la alcanza —alli deja de
+    // reconocerse como cabecera—, y se recupera reimportando el cronograma.
+    if (!cabecera.esResumen) cambio.esResumen = true;
+    if (Object.keys(cambio).length > 1) cambios.push(cambio);
+  }
+
   documento.forEach((entrada, i) => {
-    const fila = i + 1;
+    const fila = i + 1 + hundir;
 
     if (entrada.tipo === "hito") {
       const t = porUid.get(entrada.uid);
       if (!t) return;
       const cambio: CambioEdt = { uid: t.uid };
       if (t.fila !== fila) cambio.fila = fila;
-      if (t.nivel !== entrada.nivel) cambio.nivel = entrada.nivel;
+      if (t.nivel !== entrada.nivel + hundir) cambio.nivel = entrada.nivel + hundir;
       // Un hito no agrupa nada: si venia marcado como resumen, se corrige.
       if (t.esResumen) cambio.esResumen = false;
       if (Object.keys(cambio).length > 1) cambios.push(cambio);
@@ -169,13 +234,13 @@ export function planSincronizacion(
     const existente = porCodigo.get(f.codigo);
 
     if (!existente) {
-      altas.push({ ...f, fila });
+      altas.push({ ...f, fila, nivel: f.nivel + hundir });
       return;
     }
 
     const cambio: CambioEdt = { uid: existente.uid };
     if (existente.nombre !== f.nombre) cambio.nombre = f.nombre;
-    if (existente.nivel !== f.nivel) cambio.nivel = f.nivel;
+    if (existente.nivel !== f.nivel + hundir) cambio.nivel = f.nivel + hundir;
     if (existente.esResumen !== f.esResumen) cambio.esResumen = f.esResumen;
     if (existente.fila !== fila) cambio.fila = fila;
 
@@ -192,6 +257,8 @@ export function planSincronizacion(
    */
   const sueltas = tareas
     .filter((t) => !anclados.has(t.uid))
+    // La cabecera NO es una suelta: encabeza el documento y contiene a la EDT.
+    .filter((t) => t.uid !== cabecera?.uid)
     .filter((t) => t.codigo === null || !deLaEdt.has(t.codigo))
     .sort((a, b) => a.fila - b.fila);
 
@@ -218,8 +285,9 @@ export function planSincronizacion(
   const salto = sueltas.length > 0 ? 1 - nivelMinimo : 0;
 
   sueltas.forEach((t, i) => {
-    // Detras de TODO el documento, que ya incluye los hitos intercalados.
-    const fila = documento.length + i + 1;
+    // Detras de TODO el documento, que ya incluye la cabecera y los hitos
+    // intercalados.
+    const fila = documento.length + hundir + i + 1;
     const nivel = t.nivel + salto;
     const cambio: CambioEdt = { uid: t.uid };
     if (t.fila !== fila) cambio.fila = fila;

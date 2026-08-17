@@ -425,3 +425,91 @@ describe("los hitos anclados a una partida", () => {
     expect(plan.cambios).toContainEqual({ uid: -95, fila: 5 });
   });
 });
+
+
+/**
+ * LA CABECERA DE LA OBRA, QUE ACABABA SIENDO UNA TAREA.
+ *
+ * La plantilla oficial de cronograma encabeza el documento con la obra —nivel
+ * 1, sin codigo— y el presupuesto no tiene esa fila. Antes caia en sobrantes,
+ * se iba al final y alli, sin nada colgando por debajo, la regla del orden la
+ * degradaba a hoja: salia en el Lookahead, se podia comprometer en el Plan
+ * Semanal y entraba en el denominador del avance ponderado. Paso en una obra
+ * real.
+ */
+describe("planSincronizacion: la cabecera de la obra", () => {
+  const OBJETIVO = edt(["1.0", "ESTRUCTURAS", 1, true], ["1.1", "Zapatas", 2, false]);
+
+  it("hunde la EDT un nivel para que la cabecera siga conteniendo todo", () => {
+    const hay = [
+      tarea(-1, null, "EDIFICIO LOS ROBLES", 1, 1, true),
+      tarea(-2, "1.0", "ESTRUCTURAS", 2, 2, true),
+      tarea(-3, "1.1", "Zapatas", 3, 3),
+    ];
+
+    const plan = planSincronizacion(OBJETIVO, hay);
+
+    // Todo sigue en su sitio: la EDT ya venia hundida bajo la cabecera.
+    expect(plan.cambios).toEqual([]);
+    expect(plan.altas).toEqual([]);
+    // Y NO es un sobrante, que es de donde venia todo el mal.
+    expect(plan.sobrantes).toEqual([]);
+  });
+
+  it("no la destierra al final ni la convierte en hoja", () => {
+    // Como queda un cronograma recien importado, con la EDT a nivel 1 y 2.
+    const hay = [
+      tarea(-1, null, "EDIFICIO LOS ROBLES", 1, 1, true),
+      tarea(-2, "1.0", "ESTRUCTURAS", 1, 2, true),
+      tarea(-3, "1.1", "Zapatas", 2, 3),
+    ];
+
+    const plan = planSincronizacion(OBJETIVO, hay);
+
+    expect(plan.sobrantes).toEqual([]);
+    // La cabecera se queda en la fila 1; la EDT baja un nivel.
+    expect(plan.cambios.find((c) => c.uid === -1)).toBeUndefined();
+    expect(plan.cambios).toContainEqual({ uid: -2, nivel: 2 });
+    expect(plan.cambios).toContainEqual({ uid: -3, nivel: 3 });
+  });
+
+  it("le devuelve la marca de resumen si llega mal puesta", () => {
+    const hay = [
+      // Degradada por una version anterior, pero todavia encabezando.
+      tarea(-1, null, "EDIFICIO LOS ROBLES", 1, 1, false),
+      tarea(-2, "1.0", "ESTRUCTURAS", 2, 2, true),
+      tarea(-3, "1.1", "Zapatas", 3, 3),
+    ];
+
+    const plan = planSincronizacion(OBJETIVO, hay);
+
+    expect(plan.cambios).toContainEqual({ uid: -1, esResumen: true });
+  });
+
+  /**
+   * Una tarea escrita a mano en la raiz tambien es de nivel 1 y puede no
+   * llevar codigo. Tomarla por cabecera le haria tragarse el cronograma.
+   */
+  it("una suelta de nivel 1 que NO encabeza sigue siendo sobrante", () => {
+    const hay = [
+      tarea(-2, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-3, "1.1", "Zapatas", 2, 2),
+      tarea(-9, null, "Reunion de arranque", 1, 3),
+    ];
+
+    const plan = planSincronizacion(OBJETIVO, hay);
+
+    expect(plan.sobrantes.map((s) => s.uid)).toEqual([-9]);
+    // Y la EDT NO se hunde: sin cabecera, los capitulos son la raiz.
+    expect(plan.cambios.filter((c) => c.nivel !== undefined)).toEqual([]);
+  });
+
+  it("un cronograma sin cabecera se comporta como siempre", () => {
+    const hay = [
+      tarea(-2, "1.0", "ESTRUCTURAS", 1, 1, true),
+      tarea(-3, "1.1", "Zapatas", 2, 2),
+    ];
+
+    expect(planSincronizacion(OBJETIVO, hay).cambios).toEqual([]);
+  });
+});
