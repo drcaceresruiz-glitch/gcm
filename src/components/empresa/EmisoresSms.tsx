@@ -23,6 +23,7 @@ import {
 } from "@/lib/vinculo-emisor";
 import { enlaceWhatsApp } from "@/lib/whatsapp";
 import { haceCuanto } from "@/utils/fechas";
+import { ProbarSms } from "@/components/empresa/ProbarSms";
 import {
   accionVincularEmisor,
   accionCambiarEstadoEmisor,
@@ -225,6 +226,11 @@ export function EmisoresSms({
 
         <Avisos estado={cambio} />
         <Avisos estado={borrado} />
+
+        {/* Despues de configurar, la unica forma de saber que esto funciona era
+            esperar a que alguien pidiera un codigo de verdad, y descubrirlo
+            entonces es descubrirlo tarde. */}
+        <ProbarSms hayCanal={hayActivos} />
       </SeccionTarjeta>
 
       <SeccionTarjeta

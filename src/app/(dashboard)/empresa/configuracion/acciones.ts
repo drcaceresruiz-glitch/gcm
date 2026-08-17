@@ -10,6 +10,10 @@ import {
   type ResultadoVinculo,
   type ResultadoEmisor,
 } from "@/services/emisor-sms.service";
+import {
+  enviarSmsDePrueba,
+  estadoSmsDePrueba,
+} from "@/services/sms-prueba.service";
 
 /**
  * Acciones del tablero de configuracion.
@@ -30,6 +34,8 @@ export interface EstadoConfiguracion {
   token?: string;
   /// El celular de ese emisor, ya normalizado, para poder mandarle los pasos.
   numero?: string | null;
+  /// El SMS de prueba recien encolado, para poder seguir si sale de la SIM.
+  mensajeId?: string;
 }
 
 export async function accionVincularEmisor(
@@ -99,4 +105,42 @@ export async function accionEliminarEmisor(
 
   revalidatePath("/empresa/configuracion");
   return { ok: "Teléfono eliminado de la lista." };
+}
+
+/**
+ * Manda el SMS de prueba.
+ *
+ * No se dice «enviado» sino lo que de verdad ha pasado: por la cola, el
+ * mensaje queda ESPERANDO a que el telefono lo recoja, y quien confirma que
+ * salio es el propio telefono. La pantalla lo pregunta luego.
+ */
+export async function accionEnviarSmsDePrueba(
+  _previo: EstadoConfiguracion,
+  datos: FormData,
+): Promise<EstadoConfiguracion> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await enviarSmsDePrueba(sesion, String(datos.get("numero") ?? ""));
+  if (!r.ok) return { error: r.error };
+
+  return {
+    ok:
+      r.canal === "cola"
+        ? "Mensaje puesto en la cola. Esperando a que tu teléfono lo mande…"
+        : "json.pe aceptó el envío. Ese canal no avisa después, así que compruébalo en el celular.",
+    // Se devuelve para poder seguir ESTE mensaje. Por la pasarela no lo hay:
+    // ahi no queda nada que consultar despues.
+    mensajeId: r.mensajeId,
+  };
+}
+
+/** Si la prueba ya salio de la SIM. La pantalla lo pregunta cada pocos segundos. */
+export async function accionEstadoSmsDePrueba(
+  mensajeId: string,
+): Promise<"pendiente" | "salio" | "perdida" | "ninguna"> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  return estadoSmsDePrueba(sesion, mensajeId);
 }

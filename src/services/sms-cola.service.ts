@@ -108,10 +108,10 @@ export async function encolarSms(
   numero: string,
   texto: string,
   opciones?: { projectId?: string | null; prioridad?: number },
-): Promise<boolean> {
+): Promise<string | null> {
   try {
     const ahora = new Date();
-    await prisma.mensajeSms.create({
+    const creado = await prisma.mensajeSms.create({
       data: {
         companyId,
         numero: numero.slice(0, 20),
@@ -120,13 +120,20 @@ export async function encolarSms(
         projectId: opciones?.projectId ?? null,
         prioridad: opciones?.prioridad ?? PRIORIDAD_CODIGO,
       },
+      select: { id: true },
     });
-    return true;
+    // Devuelve el ID y no un `true` porque hay quien necesita seguir ESTE
+    // mensaje —el SMS de prueba de la configuracion, que espera a que el
+    // telefono confirme que salio—. Buscarlo despues por su texto no vale:
+    // `confirmarEnviados` VACIA el texto justo al confirmar, que es el momento
+    // en que hace falta encontrarlo. Como cadena sigue siendo cierto para un
+    // `if`, asi que quien solo quiera saber si se encolo no cambia.
+    return creado.id;
   } catch (e) {
     // Igual que el envio directo: un fallo aqui no puede tumbar la operacion
     // que lo pidio. Quedan el correo y el codigo dictado en pantalla.
     console.error("[sms-cola] No se pudo encolar:", e);
-    return false;
+    return null;
   }
 }
 

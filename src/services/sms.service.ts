@@ -55,6 +55,9 @@ export interface ResultadoSms {
   enviado: boolean;
   /// Salio por la cola propia y no por la pasarela.
   encolado?: boolean;
+  /// El mensaje en la cola, para quien necesite seguir ESTE envio. Solo lo hay
+  /// por la cola: la pasarela no deja nada que consultar despues.
+  mensajeId?: string;
   /// Por que no se envio, para el log. Nunca se ensena al usuario: delataria
   /// si un contacto existe.
   motivo?: string;
@@ -133,10 +136,10 @@ async function porLaCola(
   mensaje: string,
   opciones?: { projectId?: string | null; prioridad?: number },
 ): Promise<ResultadoSms> {
-  const encolado = await encolarSms(companyId, numero, mensaje, opciones);
+  const mensajeId = await encolarSms(companyId, numero, mensaje, opciones);
 
-  return encolado
-    ? { enviado: true, encolado: true }
+  return mensajeId
+    ? { enviado: true, encolado: true, mensajeId }
     : { enviado: false, motivo: "cola" };
 }
 
