@@ -7,9 +7,7 @@
  * depender de que la empresa tenga telefono emisor.
  */
 
-/// Peru. Va aparte porque el dia que GCM salga del pais esto deja de valer, y
-/// es mejor que se vea que suponerlo escondido dentro de una plantilla.
-const CODIGO_PAIS = "51";
+import { conCodigoDePais } from "./contacto";
 
 /**
  * @param texto El mensaje. Se codifica entero: un salto de linea o un `&`
@@ -19,6 +17,6 @@ const CODIGO_PAIS = "51";
  *   Con el, va directo a esa persona.
  */
 export function enlaceWhatsApp(texto: string, numero?: string | null): string {
-  const destino = numero ? `${CODIGO_PAIS}${numero}` : "";
+  const destino = numero ? conCodigoDePais(numero) : "";
   return `https://wa.me/${destino}?text=${encodeURIComponent(texto)}`;
 }

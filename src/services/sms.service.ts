@@ -2,6 +2,7 @@ import "server-only";
 
 import { env } from "@/lib/env";
 import { canalesAProbar } from "@/lib/sms";
+import { conCodigoDePais } from "@/lib/contacto";
 import { encolarSms, hayColaSms } from "@/services/sms-cola.service";
 
 /**
@@ -153,7 +154,14 @@ async function enviarPorPasarela(
         Authorization: `Bearer ${env.SMS_TOKEN}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ number: numero, message: mensaje }),
+      // CON CODIGO DE PAIS. Su documentacion es explicita —«con codigo de
+      // pais, sin el simbolo +»— y GCM le mandaba las nueve cifras que guarda.
+      // No se noto nunca porque este canal esta sin configurar: el dia que se
+      // encendiera, el respaldo habria fallado justo cuando hacia falta.
+      body: JSON.stringify({
+        number: conCodigoDePais(numero),
+        message: mensaje,
+      }),
       signal: corte,
     });
 
@@ -164,6 +172,22 @@ async function enviarPorPasarela(
         `[sms] La pasarela respondio ${respuesta.status}: ${detalle.slice(0, 200)}`,
       );
       return { enviado: false, motivo: `http-${respuesta.status}` };
+    }
+
+    // Un 200 NO basta: su respuesta trae `success`, y darlo por enviado solo
+    // porque contesto convierte un rechazo suyo en un envio bueno. Aqui eso no
+    // seria un log feo: `enviarSms` para en el primer canal que dice «si», asi
+    // que un falso «si» de la pasarela se traga tambien a los que vengan
+    // detras. Si algun dia deja de mandar `success`, se sigue aceptando: no se
+    // rompe un canal que funciona por un campo que quiza no venga.
+    const cuerpo = (await respuesta.json().catch(() => null)) as {
+      success?: boolean;
+      message?: string;
+    } | null;
+
+    if (cuerpo && cuerpo.success === false) {
+      console.error(`[sms] La pasarela rechazo el envio: ${cuerpo.message ?? "?"}`);
+      return { enviado: false, motivo: "pasarela-rechazo" };
     }
 
     return { enviado: true };

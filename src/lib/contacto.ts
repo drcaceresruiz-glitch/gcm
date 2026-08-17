@@ -41,6 +41,27 @@ export function normalizarCelular(entrada: string): string | null {
 }
 
 /**
+ * El codigo de pais. Peru.
+ *
+ * Vive aqui, con el resto de lo que sabe como se escribe un movil peruano, y
+ * no repetido en cada sitio que lo necesita. El dia que GCM salga del pais,
+ * este es el archivo que hay que abrir.
+ */
+export const CODIGO_PAIS = "51";
+
+/**
+ * El mismo celular con el prefijo de pais, para quien lo exige.
+ *
+ * GCM lo guarda en nueve cifras —ver `normalizarCelular`— porque es lo que la
+ * gente teclea. Pero hay sitios de fuera que lo quieren completo y sin `+`:
+ * `wa.me` y la pasarela de json.pe, que lo documenta asi de explicito y
+ * rechaza el numero corto.
+ */
+export function conCodigoDePais(celular: string): string {
+  return `${CODIGO_PAIS}${celular}`;
+}
+
+/**
  * Correo en minusculas y sin espacios.
  *
  * La comprobacion es deliberadamente laxa, la misma que el alta de usuarios
