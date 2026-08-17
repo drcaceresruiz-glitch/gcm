@@ -1,7 +1,13 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { normalizarDecimal, multiplicar, sumar, restar } from "@/lib/decimal";
+import {
+  normalizarDecimal,
+  multiplicar,
+  sumar,
+  restar,
+  esPositivo,
+} from "@/lib/decimal";
 import {
   codigoPadre,
   calcularProfundidades,
@@ -474,7 +480,7 @@ export async function crearPartida(
   sesion: SesionActiva,
   obraId: string,
   nueva: NuevaPartida,
-): Promise<Resultado<{ id: string }>> {
+): Promise<Resultado<{ id: string; aviso?: string }>> {
   if (!puede(sesion, "partida:crear")) {
     return { ok: false, error: "No tienes permiso para crear partidas." };
   }
@@ -532,6 +538,9 @@ export async function crearPartida(
       orden: true,
       parentId: true,
       tipo: true,
+      // El importe hace falta para poder comprobar que crear este codigo no
+      // cambia quien cuenta en el costo directo.
+      parcial: true,
     },
   });
 
@@ -685,6 +694,58 @@ export async function crearPartida(
     };
   }
 
+  /**
+   * Crear un codigo cambia de quien cuelgan las filas que YA estaban.
+   *
+   * La jerarquia sale del texto del codigo, asi que teclear "11.11" en una
+   * obra que tiene "11.11.02".."11.11.19" no anade una fila mas: pone una
+   * cabecera encima de dieciocho partidas costeadas. Y una fila cubierta por
+   * una descendiente con importe no aporta al costo directo: el precio que se
+   * acaba de teclear no aparece por ningun sitio.
+   *
+   * Se distinguen los dos sentidos porque NO son lo mismo:
+   *
+   *   - Que el importe RECIEN TECLEADO no cuente no es nunca lo que se
+   *     pretende. Se rechaza.
+   *   - Que una partida existente deje de contar porque la nueva la detalla SI
+   *     es el comportamiento pactado —es como "7.09.00" cede ante su hija—.
+   *     Se avisa, no se bloquea: bloquearlo romperia uso legitimo.
+   */
+  const importesAntes = existentes.map((e) => ({
+    codigo: e.codigoPartida,
+    // Capitulos anulados, el mismo criterio que el resto del sistema.
+    parcial: e.tipo === "PARTIDA" ? (e.parcial?.toString() ?? null) : null,
+  }));
+
+  const parcialNuevo = tipo === "PARTIDA" ? parcial : null;
+  const importesDespues = [...importesAntes, { codigo, parcial: parcialNuevo }];
+
+  const cuentanAntes = new Set(aportantes(importesAntes).map((n) => n.codigo));
+  const cuentanDespues = new Set(aportantes(importesDespues).map((n) => n.codigo));
+
+  if (
+    parcialNuevo !== null &&
+    esPositivo(parcialNuevo) &&
+    !cuentanDespues.has(codigo)
+  ) {
+    const debajo = [...codigos].filter(
+      (c) => c !== codigo && codigoPadre(c, codigos) === codigo,
+    );
+
+    return {
+      ok: false,
+      error:
+        `El codigo ${codigo} queda por encima de ${debajo.slice(0, 3).join(", ")}` +
+        `${debajo.length > 3 ? ` y ${debajo.length - 3} mas` : ""}, ` +
+        `${debajo.length === 1 ? "que ya lleva importe" : "que ya llevan importe"}. ` +
+        `Su precio quedaria detallado por ${debajo.length === 1 ? "ella" : "ellas"} ` +
+        `y no contaria en el costo directo. Elige otro codigo.`,
+    };
+  }
+
+  // Las que dejan de contar porque la nueva las detalla. Se dira al terminar.
+  const cedenALaNueva = [...cuentanAntes].filter((c) => !cuentanDespues.has(c));
+
   const profundidades = calcularProfundidades([...codigos]);
 
   /**
@@ -747,7 +808,25 @@ export async function crearPartida(
     despues: { codigo, descripcion, metrado, precioUnitario, parcial },
   });
 
-  return { ok: true, datos: { id: creada.id } };
+  /**
+   * Si alguna existente ha dejado de contar, se dice.
+   *
+   * No es un error —es como funciona el reparto: una partida detallada por sus
+   * hijas cede el importe a ellas— pero el total de la obra cambia de una
+   * forma que nadie espera al teclear una fila, y callarlo lo convierte en un
+   * descuadre que se descubre semanas despues.
+   */
+  const aviso =
+    cedenALaNueva.length > 0
+      ? `Ojo: ${cedenALaNueva.slice(0, 3).join(", ")}` +
+        `${cedenALaNueva.length > 3 ? ` y ${cedenALaNueva.length - 3} mas` : ""} ` +
+        `${cedenALaNueva.length === 1 ? "ha dejado" : "han dejado"} de contar en ` +
+        `el costo directo, porque ahora ${cedenALaNueva.length === 1 ? "la" : "las"} detalla ` +
+        `${codigo}. El costo directo pasa de ${sumarHojas(importesAntes)} a ` +
+        `${sumarHojas(importesDespues)}.`
+      : undefined;
+
+  return { ok: true, datos: { id: creada.id, aviso } };
 }
 
 

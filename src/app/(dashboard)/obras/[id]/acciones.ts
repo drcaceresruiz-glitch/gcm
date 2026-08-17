@@ -110,15 +110,24 @@ export async function accionEditarPartida(
 export async function accionCrearPartida(
   obraId: string,
   nueva: NuevaPartida,
-): Promise<RespuestaEdicion> {
+): Promise<RespuestaEdicion & { aviso?: string }> {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
-  const r = await intentar(() => crearPartida(sesion, obraId, nueva));
+  // El aviso no es un error: la partida se ha creado. Dice que el costo
+  // directo ha cambiado de una forma que nadie espera al teclear una fila.
+  let aviso: string | undefined;
+
+  const r = await intentar(async () => {
+    const hecho = await crearPartida(sesion, obraId, nueva);
+    if (hecho.ok) aviso = hecho.datos.aviso;
+    return hecho;
+  });
+
   if (!r.ok) return r;
 
   revalidatePath(`/obras/${obraId}`);
-  return { ok: true };
+  return { ok: true, aviso };
 }
 
 export async function accionEliminarPartida(

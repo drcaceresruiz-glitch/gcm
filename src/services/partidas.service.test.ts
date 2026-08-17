@@ -964,3 +964,104 @@ describe("agrupar no puede hacer desaparecer el importe que acaba de cerrar", ()
     expect(r.ok === false && r.error).toContain("proveedor");
   });
 });
+
+
+/**
+ * Crear un codigo cambia de quien cuelgan las filas que YA estaban.
+ *
+ * Es el mismo agujero que se tapo al agrupar, en la puerta de al lado: la
+ * jerarquia sale del TEXTO del codigo, asi que teclear "11.11" en una obra que
+ * tiene "11.11.02".."11.11.19" no anade una fila mas, pone una cabecera encima
+ * de dieciocho partidas costeadas.
+ *
+ * Los dos sentidos NO son lo mismo y por eso se tratan distinto.
+ */
+describe("crear un codigo que cambia el reparto", () => {
+  function conHuerfanas() {
+    estado.existentes = [
+      { id: "cap", codigoPartida: "11", orden: 1, parentId: null, tipo: "CAPITULO" },
+      { id: "h1", codigoPartida: "11.11.02", orden: 2, parentId: "cap", tipo: "PARTIDA", parcial: "300.00" },
+      { id: "h2", codigoPartida: "11.11.03", orden: 3, parentId: "cap", tipo: "PARTIDA", parcial: "200.00" },
+    ];
+  }
+
+  /**
+   * El sentido que SIEMPRE es un error: el importe recien tecleado no cuenta.
+   */
+  it("rechaza el codigo que quedaria por encima de partidas costeadas", async () => {
+    conHuerfanas();
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "11.11",
+      descripcion: "Cabecera con precio",
+      tipo: "PARTIDA",
+      modalidad: "SUMA_ALZADA",
+      parcial: "5000",
+    });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("11.11.02");
+    expect(estado.creada).toBeNull();
+  });
+
+  /**
+   * El sentido que SI es el comportamiento pactado: la nueva detalla a una que
+   * ya estaba, y esa cede el importe. No se bloquea —romperia uso legitimo—,
+   * se avisa, porque el total de la obra cambia sin que nadie lo pida.
+   */
+  it("crea y AVISA cuando la nueva hace que otra deje de contar", async () => {
+    estado.existentes = [
+      { id: "cap", codigoPartida: "7", orden: 1, parentId: null, tipo: "CAPITULO" },
+      { id: "g", codigoPartida: "7.09.00", orden: 2, parentId: "cap", tipo: "PARTIDA", parcial: "779.10" },
+    ];
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "7.09.01",
+      descripcion: "Detalle del grupo",
+      tipo: "PARTIDA",
+      modalidad: "SUMA_ALZADA",
+      parcial: "500",
+    });
+
+    expect(r.ok).toBe(true);
+    expect(estado.creada).not.toBeNull();
+    // Se creo, y se cuenta lo que ha pasado con el dinero.
+    expect(r.ok === true && r.datos.aviso).toContain("7.09.00");
+    expect(r.ok === true && r.datos.aviso).toContain("779.10");
+  });
+
+  it("no avisa de nada cuando el reparto no cambia", async () => {
+    estado.existentes = [
+      { id: "cap", codigoPartida: "2.0", orden: 1, parentId: null, tipo: "CAPITULO" },
+      { id: "p", codigoPartida: "2.1", orden: 2, parentId: "cap", tipo: "PARTIDA", parcial: "100.00" },
+    ];
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "2.2",
+      descripcion: "Otra partida normal",
+      tipo: "PARTIDA",
+      modalidad: "PRECIOS_UNITARIOS",
+      metrado: "2",
+      precioUnitario: "50",
+    });
+
+    expect(r.ok).toBe(true);
+    expect(r.ok === true && r.datos.aviso).toBeUndefined();
+  });
+
+  /**
+   * Un capitulo no lleva importe, asi que crear uno encima de partidas
+   * costeadas no esconde ningun precio: no se rechaza.
+   */
+  it("deja crear un capitulo por encima, que no lleva importe", async () => {
+    conHuerfanas();
+
+    const r = await crearPartida(sesion, "obra", {
+      codigoPartida: "11.11",
+      descripcion: "CABECERA DEL GRUPO",
+      tipo: "CAPITULO",
+    });
+
+    expect(r.ok).toBe(true);
+  });
+});

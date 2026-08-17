@@ -228,6 +228,9 @@ export function NuevaFila({
 
       setCampos({ ...VACIO, codigoPartida: siguiente });
       setError(null);
+      // La partida SE HA CREADO; esto cuenta que el costo directo ha cambiado
+      // de una forma que nadie espera al teclear una fila.
+      setAvisoCodigo(r.aviso ?? null);
     });
   }
 

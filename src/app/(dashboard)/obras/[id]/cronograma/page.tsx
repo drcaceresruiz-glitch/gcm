@@ -39,6 +39,8 @@ import { Mascota } from "@/components/ui/Mascota";
 import { Chip } from "@/components/ui/Chip";
 import { Tarjeta } from "@/components/ui/Tarjeta";
 import { TablaCronograma } from "@/components/cronograma/TablaCronograma";
+import { TareasAMano } from "@/components/cronograma/TareasAMano";
+import { listarTareasManuales } from "@/services/cronograma-manual.service";
 
 export const metadata: Metadata = { title: "Cronograma" };
 
@@ -81,6 +83,10 @@ export default async function CronogramaPage({
   ]);
 
   const puedeImportar = puede(sesion, "cronograma:importar");
+  const puedeEditarTareas = puede(sesion, "cronograma:editar");
+  const puedeEliminarTareas = puede(sesion, "cronograma:eliminar");
+  // Las escritas a mano se leen aparte: solo esta pantalla las distingue.
+  const tareasAMano = await listarTareasManuales(sesion, id);
   const puedeLineaBase = puede(sesion, "cronograma:linea_base");
 
   // La fecha por defecto del reporte se alinea al ultimo dia de corte semanal.
@@ -189,6 +195,18 @@ export default async function CronogramaPage({
               Cargar el cronograma desde MS Project
             </Link>
           )}
+
+          {/* La tercera via: teclearlo. Una obra pequena no tiene planificador
+              ni licencia de Project, y sin cronograma no hay curva S, ni valor
+              ganado, ni informe semanal. La primera tarea crea la version. */}
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <TareasAMano
+              obraId={id}
+              tareas={tareasAMano}
+              puedeEditar={puedeEditarTareas}
+              puedeEliminar={puedeEliminarTareas}
+            />
+          </div>
         </div>
       ) : (
         <>
@@ -366,6 +384,15 @@ export default async function CronogramaPage({
             tareas={cronograma.tareas}
             puedeRegistrar={puede(sesion, "avance:registrar")}
             fechaReporteDefecto={fechaReporteDefecto}
+          />
+
+          {/* Solo las escritas aqui. Las que vinieron de un archivo no se
+              editan: el siguiente corte las devolveria como estaban. */}
+          <TareasAMano
+            obraId={id}
+            tareas={tareasAMano}
+            puedeEditar={puedeEditarTareas}
+            puedeEliminar={puedeEliminarTareas}
           />
 
           <p className="text-xs opacity-60">
