@@ -128,7 +128,17 @@ export function CierrePlanSemanal({
       );
       if (r.ok) return; // revalidatePath repinta la pagina ya cerrada.
       if ("requiereConfirmacion" in r) {
-        setSinAvance(r.sinAvance);
+        if ("sinAvance" in r) {
+          setSinAvance(r.sinAvance);
+          return;
+        }
+        // Semana sin compromisos. Esta pantalla no deja llegar aqui —sin
+        // compromisos no ensena el boton de cerrar—, pero el servicio lo
+        // comprueba igual porque es la frontera real, y el tipo hay que
+        // atenderlo. Si algun dia otra ruta cierra semanas, dira esto.
+        setError(
+          "Esta semana no tiene compromisos: cerrarla no registra PPC ni cuenta para la capacidad.",
+        );
         return;
       }
       setError(r.error ?? "No se pudo cerrar la semana.");

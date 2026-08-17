@@ -60,6 +60,72 @@ describe("ambicionDelPlan", () => {
     expect(ambicionDelPlan(orden, 3)).toEqual(ambicionDelPlan(alReves, 3));
   });
 
+  /**
+   * Una semana cerrada VACIA no dice nada del rendimiento del equipo.
+   *
+   * Es el caso que hacia que el aviso mintiera: GCM deja cerrar una semana sin
+   * compromisos (la obra paro, o se creo por error), y al promediarla aportaba
+   * un cero que hundia la media y disparaba el rojo.
+   */
+  describe("las semanas cerradas sin compromisos no cuentan", () => {
+    const reales: SemanaCerrada[] = [
+      { numero: 1, comprometidos: 5, cumplidos: 4 },
+      { numero: 2, comprometidos: 5, cumplidos: 4 },
+      { numero: 3, comprometidos: 5, cumplidos: 4 },
+    ];
+    const vacia: SemanaCerrada = { numero: 4, comprometidos: 0, cumplidos: 0 };
+
+    it("no hunden la media ni disparan el rojo", () => {
+      const sinElla = ambicionDelPlan(reales, 5);
+      const conElla = ambicionDelPlan([...reales, vacia], 5);
+
+      expect(sinElla?.rendimiento).toBe(4);
+      expect(sinElla?.nivel).toBe("ambicioso");
+
+      // Lo que importa: el equipo no cambio, asi que el veredicto tampoco.
+      expect(conElla?.rendimiento).toBe(4);
+      expect(conElla?.nivel).toBe("ambicioso");
+      expect(conElla?.semanas).toBe(3);
+    });
+
+    /**
+     * El limite del filtro, y la razon de que esta prueba exista: si se
+     * descartara por «no cumplio nada» en vez de por «no prometio nada», se
+     * estaria borrando la peor evidencia de rendimiento que hay.
+     */
+    it("pero una semana donde se prometio y no se cumplio NADA si cuenta", () => {
+      const fallida: SemanaCerrada = { numero: 4, comprometidos: 6, cumplidos: 0 };
+      const a = ambicionDelPlan([...reales, fallida], 5);
+
+      expect(a?.semanas).toBe(4);
+      expect(a?.rendimiento).toBe(3); // (4+4+4+0)/4
+      expect(a?.nivel).toBe("sobrecarga");
+    });
+
+    it("se descartan ANTES de recortar la ventana, para que no ocupen plaza", () => {
+      // Seis vacias recientes y tres reales detras: sin descartarlas primero,
+      // las vacias coparian las seis plazas y la media saldria de la nada.
+      const vacias = Array.from({ length: 6 }, (_, i) => ({
+        numero: 10 + i,
+        comprometidos: 0,
+        cumplidos: 0,
+      }));
+      const a = ambicionDelPlan([...reales, ...vacias], 5);
+
+      expect(a?.semanas).toBe(3);
+      expect(a?.rendimiento).toBe(4);
+    });
+
+    it("si TODAS las cerradas estan vacias, calla en vez de inventar", () => {
+      const vacias = Array.from({ length: 5 }, (_, i) => ({
+        numero: i + 1,
+        comprometidos: 0,
+        cumplidos: 0,
+      }));
+      expect(ambicionDelPlan(vacias, 5)).toBeNull();
+    });
+  });
+
   describe("cuando NO hay con que responder, calla", () => {
     it("con menos semanas que el minimo", () => {
       expect(ambicionDelPlan(semanas(SEMANAS_MINIMAS - 1, 4), 4)).toBeNull();

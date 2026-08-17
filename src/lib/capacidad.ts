@@ -90,9 +90,30 @@ export function ambicionDelPlan(
 ): Ambicion | null {
   if (comprometidos <= 0) return null;
 
+  /**
+   * Una semana cerrada SIN compromisos no es evidencia de nada.
+   *
+   * Se puede crear una semana y cerrarla vacia —la obra paro, o se creo por
+   * error y se prefirio cerrarla a borrarla—, y GCM lo permite a proposito.
+   * Pero al promediarla aportaba `cumplidos: 0` y **hundia el rendimiento**:
+   * con tres semanas cumpliendo 4, una vacia baja la media de 4,0 a 3,0 y
+   * prometer 5 pasa de «ambicioso» (1,3) a «sobrecarga» en rojo (1,7). El
+   * equipo no cambio; cambio que alguien cerro una semana sin planificar.
+   *
+   * Se descarta ANTES de recortar la ventana: si se filtrara despues, una
+   * semana vacia seguiria ocupando plaza entre las seis y expulsaria a una
+   * real, que es el mismo daño por otra puerta.
+   *
+   * OJO al limite: una semana donde SI se prometio y no se cumplio nada
+   * (`comprometidos > 0`, `cumplidos: 0`) es evidencia legitima de rendimiento
+   * y tiene que seguir contando. De ese caso ya se ocupa `rendimiento <= 0`
+   * mas abajo, devolviendo null en vez de una cifra imposible.
+   */
+  const conTrabajo = cerradas.filter((s) => s.comprometidos > 0);
+
   // Las mas recientes. Se ordena aqui y no se confia en como lleguen: el
   // servicio que las trae puede cambiar su orden sin saber que esto depende.
-  const ventana = [...cerradas]
+  const ventana = [...conTrabajo]
     .sort((a, b) => b.numero - a.numero)
     .slice(0, VENTANA_SEMANAS);
 

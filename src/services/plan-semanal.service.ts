@@ -955,7 +955,18 @@ export type ResultadoCerrarPlan =
       ok: false;
       requiereConfirmacion: true;
       sinAvance: { compromisoId: string; descripcion: string }[];
-    };
+    }
+  /**
+   * La semana no tiene ni un compromiso. Cerrarla esta permitido —la obra
+   * paro, o se creo por error y se prefiere cerrarla a borrarla— pero no
+   * aporta nada: no da PPC, y desde el 17 de agosto de 2026 tampoco entra en
+   * la media de capacidad, porque hundia el rendimiento y disparaba el aviso
+   * de sobrecarga sin que el equipo hubiera cambiado.
+   *
+   * Se avisa para que nadie cierre una semana vacia creyendo que registra
+   * algo. Se avisa, no se impide, como en el resto de GCM.
+   */
+  | { ok: false; requiereConfirmacion: true; semanaVacia: true };
 
 /**
  * Cierra la semana: marca cada compromiso cumplido/no y, si no, su causa; deja
@@ -1009,6 +1020,13 @@ export async function cerrarPlanSemanal(
   if (!plan) return { ok: false, error: "Plan no encontrado." };
   if (plan.estado !== "ABIERTO") {
     return { ok: false, error: "La semana ya esta cerrada." };
+  }
+
+  // Semana sin compromisos: se puede cerrar, pero que quede dicho que no
+  // registra nada. Va ANTES de recorrer las evaluaciones porque no hay
+  // ninguna que recorrer.
+  if (plan.compromisos.length === 0 && !confirmado) {
+    return { ok: false, requiereConfirmacion: true, semanaVacia: true };
   }
 
   const idsPlan = new Set(plan.compromisos.map((c) => c.id));
