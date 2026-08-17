@@ -166,3 +166,64 @@ describe("lo que tolera", () => {
     expect(r.tareas[1]?.aviso).toContain("no hay ninguna tarea con ese ID");
   });
 });
+
+
+/**
+ * LA CONVERSION SILENCIOSA QUE COSTO UNA PARTIDA.
+ *
+ * Un cronograma real trajo «1.3 Resaneamiento» con la duracion en cero, y el
+ * importador la convirtio en hito sin decir nada. En pantalla se vio como un
+ * rombo sin barra; por debajo, `esHito` la saco del avance ponderado y del
+ * enlace con el presupuesto, y eso no da ningun error nunca.
+ *
+ * La regla de «duracion cero = hito» se queda —es la convencion de Project y
+ * pedir ademas un booleano invita a que se contradigan—. Lo que no se queda
+ * es el silencio.
+ */
+describe("un hito que en realidad es una partida sin duracion", () => {
+  it("se importa como hito, pero lo dice y nombra el codigo", async () => {
+    const r = await analizarCronogramaExcel(
+      await libro([
+        OBRA,
+        CAPITULO,
+        [3, 3, 3, "1.3", "Resaneamiento", "2026-06-01", "2026-06-01", 0, 50, 40, ""],
+      ]),
+    );
+
+    const partida = r.tareas.find((t) => t.codigo === "1.3");
+    expect(partida?.esHito).toBe(true);
+    expect(partida?.hitoDerivado).toBe(true);
+    expect(partida?.aviso).toContain("1.3");
+    expect(partida?.aviso).toContain("HITO");
+    // Lo que se pierde, dicho: es la razon por la que el aviso existe.
+    expect(partida?.aviso).toMatch(/avance|presupuesto/);
+  });
+
+  /**
+   * Un hito de verdad no lleva codigo de partida, y avisar de todos
+   * convertiria la lista en ruido —que es la forma segura de que no se lea el
+   * aviso que importa—.
+   */
+  it("un hito sin codigo no genera ningun aviso", async () => {
+    const r = await analizarCronogramaExcel(
+      await libro([
+        OBRA,
+        CAPITULO,
+        [3, 3, 3, "", "Fin de estructuras", "2026-06-30", "2026-06-30", 0, 50, 40, ""],
+      ]),
+    );
+
+    const hito = r.tareas.find((t) => t.nombre === "Fin de estructuras");
+    expect(hito?.esHito).toBe(true);
+    expect(hito?.hitoDerivado).toBeUndefined();
+    expect(hito?.aviso).toBeUndefined();
+  });
+
+  it("una partida con duracion normal no se toca", async () => {
+    const r = await analizarCronogramaExcel(await libro([OBRA, CAPITULO, PARTIDA]));
+
+    const partida = r.tareas.find((t) => t.codigo === "1.1");
+    expect(partida?.esHito).toBe(false);
+    expect(partida?.aviso).toBeUndefined();
+  });
+});

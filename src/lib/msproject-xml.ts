@@ -44,6 +44,17 @@ export interface TareaImportada {
   holguraInferida: boolean;
   /// Aviso no bloqueante: la tarea se importa igual.
   aviso?: string;
+  /**
+   * El hito NO venia marcado: se dedujo de que la duracion fuera cero, y la
+   * fila lleva codigo de partida.
+   *
+   * Solo lo pone el lector de Excel, donde la conversion es derivada y por
+   * tanto nadie la pidio. En MS Project la marca es explicita y esto se queda
+   * sin poner a proposito: la pantalla lo pinta en rojo, y hacerlo sonar en
+   * cada importacion de Project —donde los hitos reales llevan codigo—
+   * convertiria la alarma en decorado.
+   */
+  hitoDerivado?: boolean;
 }
 
 export interface DependenciaImportada {
@@ -522,6 +533,17 @@ export async function analizarProjectXml(
     tareas.push({
       uid, fila, codigo, nombre, nivel,
       esResumen: bandera(nodo, "Summary"),
+      /**
+       * Aqui la marca es EXPLICITA del archivo, y por eso no se avisa de
+       * ella como si hace el lector de Excel.
+       *
+       * La diferencia no es de forma. En Project alguien marco `Milestone`
+       * a proposito, y ademas los hitos reales de estos cronogramas llevan
+       * codigo («0.1 Inicio de Obra»): avisar de todos seria una alarma en
+       * cada importacion, y una alarma que siempre suena no la lee nadie.
+       * Lo que hay que delatar es la conversion que NADIE pidio, y esa solo
+       * ocurre al deducir el hito de una duracion cero.
+       */
       esHito: bandera(nodo, "Milestone"),
       // Viene dado por el archivo. No se deduce de la holgura: en el
       // cronograma real hay 18 tareas con holgura cero que no son criticas.

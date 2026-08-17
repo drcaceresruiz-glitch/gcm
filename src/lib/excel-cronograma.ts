@@ -608,6 +608,35 @@ export async function analizarCronogramaExcel(
       avisos.push("Duracion 0 pero el inicio y el fin no coinciden: se toma como hito en la fecha de inicio.");
     }
 
+    /**
+     * Un hito CON CODIGO DE PARTIDA casi nunca es un hito: es una partida a
+     * la que se le olvido la duracion.
+     *
+     * Y la conversion no es cosmetica. `esHito` saca esa fila del dinero y
+     * del avance en varios sitios a la vez —no se puede enlazar con partidas
+     * (`mapeo.service`), no pondera en el avance ni entra en la ruta critica
+     * (`control-avance`), no sale en el parte del dia ni cuenta en el
+     * tablero—, y todo eso **sin un solo error**. Una partida costeada deja
+     * de estar cubierta por ninguna tarea y nadie se entera.
+     *
+     * Por eso se avisa aqui y no se calla: la fila se importa igual —el
+     * archivo manda sobre el plan— pero quien lo sube lo ve ANTES de
+     * confirmar, que es cuando todavia sale barato.
+     *
+     * Solo se avisa de las que llevan codigo. Un hito de verdad —«fin de
+     * estructuras»— no lleva ninguno, y llenar la lista con esos convertiria
+     * el aviso en ruido, que es la forma segura de que no se lea el que
+     * importa.
+     */
+    const hitoDerivado = esHito && t.codigo !== null;
+    if (hitoDerivado) {
+      avisos.push(
+        `Duracion 0 en una fila con codigo de partida (${t.codigo}): se importa como HITO, ` +
+          `y un hito no cuenta en el avance ni se puede enlazar con el presupuesto. ` +
+          `Si esta partida lleva dinero, ponle su duracion real en dias.`,
+      );
+    }
+
     if (t.depende !== "") {
       const r = leerDependencias(t.depende, t.uid, conocidos);
       dependencias.push(...r.enlaces);
@@ -644,6 +673,7 @@ export async function analizarCronogramaExcel(
       holguraInferida: true,
     };
     if (avisos.length > 0) tarea.aviso = avisos.join(" ");
+    if (hitoDerivado) tarea.hitoDerivado = true;
     return tarea;
   });
 

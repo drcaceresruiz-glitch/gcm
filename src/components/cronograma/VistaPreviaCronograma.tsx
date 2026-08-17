@@ -25,6 +25,23 @@ export function VistaPreviaCronograma({
   const visibles = analisis.tareas.slice(0, MAXIMO_VISIBLE);
   const ocultas = analisis.tareas.length - visibles.length;
 
+  /**
+   * Los hitos que llevan CODIGO DE PARTIDA, que casi nunca son hitos.
+   *
+   * Van en su propio bloque y en rojo, separados de los avisos corrientes,
+   * porque no se parecen en nada: los demas avisos dicen que algo se acoto o
+   * se dejo sin asignar, y este dice que una partida costeada va a dejar de
+   * contar en el avance y en el enlace con el presupuesto **sin dar ningun
+   * error**. Enterrado en la lista de «N aviso(s) — conviene revisarlas» no
+   * lo lee nadie, que es exactamente como se importo una partida como hito.
+   *
+   * Se filtra por `hitoDerivado` y no por «es hito y tiene codigo»: en un
+   * archivo de MS Project los hitos de verdad TAMBIEN llevan codigo («0.1
+   * Inicio de Obra»), asi que esa condicion pintaria de rojo cada
+   * importacion. Solo se delata lo que se dedujo, que es lo que nadie pidio.
+   */
+  const hitosConCodigo = analisis.tareas.filter((t) => t.hitoDerivado);
+
   return (
     <div className="space-y-5">
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -95,6 +112,45 @@ export function VistaPreviaCronograma({
               </li>
             ))}
           </ul>
+        </Aviso>
+      )}
+
+      {hitosConCodigo.length > 0 && (
+        <Aviso
+          peligro
+          titulo={`${hitosConCodigo.length} partida(s) se importarán como HITO`}
+          icono={<XCircle className="size-4" aria-hidden="true" />}
+        >
+          <p className="mt-1 text-sm">
+            Estas filas llevan código de partida y duración cero, así que
+            entran como hito: un rombo sin barra en el Gantt. Un hito{" "}
+            <strong>no cuenta en el avance ponderado y no se puede enlazar
+            con el presupuesto</strong>, así que si alguna lleva dinero dejará
+            de estar cubierta por ninguna tarea — y eso no da ningún error
+            después.
+          </p>
+          <p className="mt-2 text-xs opacity-70">
+            Si son hitos de verdad, adelante. Si no, ponles su duración real en
+            días en el archivo y vuelve a subirlo.
+          </p>
+          <ul className="mt-3 max-h-40 space-y-1.5 overflow-y-auto text-sm">
+            {hitosConCodigo.slice(0, 30).map((t) => (
+              <li key={t.uid} className="flex gap-2">
+                <span className="shrink-0 font-mono text-xs opacity-60">
+                  Fila {t.fila}
+                </span>
+                <span>
+                  <span className="font-mono text-xs opacity-70">{t.codigo}</span>{" "}
+                  {t.nombre}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {hitosConCodigo.length > 30 && (
+            <p className="mt-2 text-xs opacity-70">
+              Y otras {hitosConCodigo.length - 30}.
+            </p>
+          )}
         </Aviso>
       )}
 
