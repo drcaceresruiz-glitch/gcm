@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search, Plus, ExternalLink, Layers } from "lucide-react";
@@ -73,6 +73,54 @@ export function FormularioEncargo({
   const [seleccion, setSeleccion] = useState<Map<string, string>>(
     () => new Map(inicial?.partidas.map((p) => [p.wbsItemId, p.fraccion])),
   );
+
+  /**
+   * Las fechas que propone el cronograma para lo marcado.
+   *
+   * LA PARTIDA NO TIENE FECHAS: vienen de las tareas del cronograma vigente que
+   * casan por codigo, y solo de las PROGRAMADAS. Las partidas marcadas que no
+   * tengan ninguna simplemente no entran en el rango, en vez de estirarlo con
+   * una fecha inventada.
+   */
+  const rango = useMemo(() => {
+    const iso = (f: Date) => new Date(f).toISOString().slice(0, 10);
+
+    // Se quedan solo las que tienen las DOS fechas, y se estrechan a un tipo
+    // sin nulos para no ir arrastrando `!` por todo el calculo.
+    const conFecha = partidas
+      .filter((p) => seleccion.has(p.id))
+      .flatMap((p) => (p.inicio && p.fin ? [{ inicio: p.inicio, fin: p.fin }] : []));
+
+    const primera = conFecha[0];
+    if (!primera) return null;
+
+    return {
+      inicio: iso(conFecha.reduce((m, p) => (p.inicio < m ? p.inicio : m), primera.inicio)),
+      fin: iso(conFecha.reduce((m, p) => (p.fin > m ? p.fin : m), primera.fin)),
+      cuantas: conFecha.length,
+      sinFecha: [...seleccion.keys()].length - conFecha.length,
+    };
+  }, [partidas, seleccion]);
+
+  /**
+   * Se propone, no se impone.
+   *
+   * Solo se escribe si el campo esta vacio o si sigue teniendo LA PROPUESTA
+   * ANTERIOR: en cuanto alguien teclea una fecha, marcar otra partida ya no se
+   * la pisa. Un encargo no tiene por que empezar el dia que empieza el plan
+   * —el contratista entra dos dias antes, o remata la semana siguiente— y lo
+   * que vale es lo pactado, no lo planeado.
+   */
+  const propuesta = useRef<{ inicio: string; fin: string } | null>(null);
+
+  useEffect(() => {
+    if (!rango) return;
+
+    setFechaInicio((v) => (!v || v === propuesta.current?.inicio ? rango.inicio : v));
+    setFechaFin((v) => (!v || v === propuesta.current?.fin ? rango.fin : v));
+
+    propuesta.current = { inicio: rango.inicio, fin: rango.fin };
+  }, [rango]);
 
   const filtradas = useMemo(() => {
     const q = filtro.trim().toLowerCase();
@@ -313,6 +361,18 @@ export function FormularioEncargo({
               style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
             />
           </div>
+
+          {/* De donde salen. Sin decirlo, unas fechas que aparecen solas en un
+              contrato se leen como un error de la aplicacion. */}
+          <p className="col-span-2 -mt-1 text-xs opacity-60">
+            {rango
+              ? `Propuestas desde el cronograma vigente (${rango.cuantas} partida(s) programada(s))${
+                  rango.sinFecha > 0
+                    ? `. ${rango.sinFecha} de las marcadas no están programadas y no cuentan.`
+                    : ". Cámbialas si lo pactado es otra cosa."
+                }`
+              : "Marca partidas y se propondrán las fechas del cronograma. La partida en sí no tiene fechas: salen de las tareas programadas que casan por código."}
+          </p>
         </div>
       </div>
 

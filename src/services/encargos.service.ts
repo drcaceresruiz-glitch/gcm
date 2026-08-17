@@ -43,6 +43,16 @@ export interface PartidaAsignable {
   /// fracciones) y a que proveedores. Para no repartir de mas sin darse cuenta.
   asignadoPorcentaje: number;
   proveedores: string[];
+  /**
+   * Cuando esta programada esta partida en el cronograma vigente.
+   *
+   * `null` cuando no hay cronograma, cuando ninguna tarea casa por codigo, o
+   * cuando las que casan estan SIN PROGRAMAR. Ese null es informacion: dice que
+   * no hay fecha que proponer, y la pantalla deja el campo vacio en vez de
+   * inventarla.
+   */
+  inicio: Date | null;
+  fin: Date | null;
 }
 
 export interface EncargoResumen {
@@ -317,6 +327,10 @@ export async function partidasAsignables(
 ): Promise<PartidaAsignable[]> {
   if (!puede(sesion, "encargo:leer")) return [];
 
+  // En paralelo: las partidas y cuando estan programadas. La segunda consulta
+  // es lo que evita pedir a mano unas fechas que el cronograma ya sabe.
+  const fechas = await fechasDelCronograma(sesion.companyId, obraId);
+
   const partidas = await prisma.wbsItem.findMany({
     where: {
       tipo: "PARTIDA",
@@ -355,8 +369,68 @@ export async function partidasAsignables(
       parcial: p.parcial?.toString() ?? "0.00",
       asignadoPorcentaje: asignado,
       proveedores: [...new Set(vivos.map((e) => e.encargo.proveedor.razonSocial))],
+      ...(fechas.get(p.codigoPartida) ?? { inicio: null, fin: null }),
     };
   });
+}
+
+/**
+ * Cuando esta programada cada partida, segun el cronograma vigente.
+ *
+ * LA PARTIDA NO TIENE FECHAS: `WbsItem` guarda metrado, precio y parcial, y se
+ * acabo. Las fechas viven en el cronograma, que es otro arbol. Lo que une a los
+ * dos es el CODIGO —el «4.4» que `TareaCronograma` guarda aparte del nombre—,
+ * que casa porque la EDT se genera desde el presupuesto.
+ *
+ * SE DESCARTAN LAS TAREAS `sinProgramar`, y esto no es un detalle: en esas
+ * filas, dice el propio esquema, «inicio y fin no son un plan, son solo el
+ * relleno que exige la columna». Proponerlas convertiria un hueco del
+ * cronograma en las fechas de un CONTRATO con un proveedor.
+ *
+ * Tambien se descartan los resumenes: sus fechas son las de sus hijas, y
+ * mezclarlas ensancharia el rango con algo que nadie ejecuta.
+ *
+ * Devuelve vacio si la obra no tiene cronograma. Entonces la pantalla no
+ * propone nada, que es lo correcto: no hay de donde sacarlo.
+ */
+async function fechasDelCronograma(
+  companyId: string,
+  obraId: string,
+): Promise<Map<string, { inicio: Date | null; fin: Date | null }>> {
+  const salida = new Map<string, { inicio: Date | null; fin: Date | null }>();
+
+  // Acotado por empresa, no solo por obra. Lo caz  la prueba de aislamiento y
+  // tenia razon: un `projectId` es adivinable, y aunque de aqui solo salgan
+  // fechas, la regla de la casa es que NINGUNA consulta se fie del id suelto.
+  const cronograma = await prisma.cronograma.findFirst({
+    where: { projectId: obraId, vigente: true, project: { companyId } },
+    select: { id: true },
+  });
+  if (!cronograma) return salida;
+
+  const tareas = await prisma.tareaCronograma.findMany({
+    where: {
+      cronogramaId: cronograma.id,
+      esResumen: false,
+      sinProgramar: false,
+      codigo: { not: null },
+    },
+    select: { codigo: true, inicio: true, fin: true },
+  });
+
+  // Una partida puede tener varias tareas (se parte en fases): se abraza todo
+  // lo suyo, de la mas temprana a la mas tardia.
+  for (const t of tareas) {
+    if (!t.codigo) continue;
+
+    const previo = salida.get(t.codigo);
+    salida.set(t.codigo, {
+      inicio: !previo?.inicio || t.inicio < previo.inicio ? t.inicio : previo.inicio,
+      fin: !previo?.fin || t.fin > previo.fin ? t.fin : previo.fin,
+    });
+  }
+
+  return salida;
 }
 
 export interface CapituloAsignable {
