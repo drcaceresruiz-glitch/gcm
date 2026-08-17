@@ -11,13 +11,19 @@ No hace nada más que esto, cada veinte segundos:
 
 ## Cómo obtener el APK
 
-No hace falta instalar el SDK de Android en ningún sitio: lo compila GitHub.
+**Desde el propio teléfono**, que es donde hay que instalarlo:
 
-1. En GitHub → pestaña **Actions** → **APK del emisor de SMS** → **Run
-   workflow**.
-2. Cuando termine (unos minutos), abre el run y descarga el artefacto
-   `emisor-sms-apk`.
-3. Descomprime y pasa el `.apk` al teléfono.
+https://github.com/drcaceresruiz-glitch/gcm/releases/latest/download/emisor-sms.apk
+
+Esa dirección no cambia nunca y también está enlazada dentro de GCM, en
+**Empresa → Configuración**. Se puede abrir esa pantalla en el móvil.
+
+No hace falta instalar el SDK de Android en ningún sitio: lo compila GitHub. El
+flujo **APK del emisor de SMS** se lanza solo cuando cambia `movil/emisor-sms`,
+o a mano desde Actions, y cada vez reemplaza el archivo de esa release. El run
+deja además el APK como artefacto, útil para guardar el de una versión
+concreta, pero se descarga en `.zip` y pide sesión de GitHub: para instalar,
+usa el enlace de arriba.
 
 ## Cómo instalarlo
 

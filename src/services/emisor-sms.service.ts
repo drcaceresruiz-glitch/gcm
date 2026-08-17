@@ -175,3 +175,70 @@ export async function cambiarEstadoEmisor(
 
   return { ok: true };
 }
+
+/**
+ * Borrar un telefono de la lista, revocado o no.
+ *
+ * EL ESQUEMA DECIA «revocar no borra: la fila queda para saber que existio y
+ * quien lo puso», y era razonable mientras hubiera dos o tres. Con el uso real
+ * la lista crece cada vez que se pierde un token, y una lista interminable de
+ * telefonos muertos esconde al que importa —el que esta vivo—.
+ *
+ * La trazabilidad NO se pierde: se muda al registro de auditoria, que es su
+ * sitio. Por eso el apunte guarda la etiqueta, el numero y quien lo vinculo:
+ * borrada la fila, esa sigue siendo la unica forma de responder «¿que telefono
+ * mandaba los SMS en agosto?».
+ *
+ * No hace falta borrar nada mas: `MensajeSms` no apunta al emisor —solo lleva
+ * `companyId`—, asi que aqui no queda ningun mensaje huerfano.
+ */
+export async function eliminarEmisor(
+  sesion: SesionActiva,
+  emisorId: string,
+): Promise<ResultadoEmisor> {
+  if (!puede(sesion, "configuracion:editar")) {
+    return {
+      ok: false,
+      error: "No tienes permiso para configurar el envío de SMS.",
+    };
+  }
+
+  // Se lee ANTES de borrar: despues ya no hay de donde sacar la etiqueta ni
+  // quien lo puso, y el apunte de auditoria se quedaria en un identificador.
+  const emisor = await prisma.emisorSms.findFirst({
+    where: { id: emisorId, companyId: sesion.companyId },
+    select: {
+      etiqueta: true,
+      numero: true,
+      activo: true,
+      vinculadoPor: true,
+      ultimaConsultaAt: true,
+    },
+  });
+  if (!emisor) return { ok: false, error: "Teléfono no encontrado." };
+
+  // Acotado por empresa tambien al borrar, no solo al leer: la accion es un
+  // endpoint invocable sin haber pintado jamas esta pantalla.
+  await prisma.emisorSms.deleteMany({
+    where: { id: emisorId, companyId: sesion.companyId },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      companyId: sesion.companyId,
+      userId: sesion.userId,
+      entidad: "EmisorSms",
+      entidadId: emisorId,
+      accion: "DELETE",
+      antes: {
+        etiqueta: emisor.etiqueta,
+        numero: emisor.numero,
+        activo: emisor.activo,
+        vinculadoPor: emisor.vinculadoPor,
+        ultimaConsulta: emisor.ultimaConsultaAt?.toISOString() ?? null,
+      },
+    },
+  });
+
+  return { ok: true };
+}

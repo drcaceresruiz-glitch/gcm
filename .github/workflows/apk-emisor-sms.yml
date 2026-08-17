@@ -22,6 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # Para poder publicar la release con el instalador. Un artefacto de Actions
+    # no sirve para esto: se baja en .zip y pide sesion de GitHub, y quien
+    # instala esto lo hace DESDE EL TELEFONO.
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
 
@@ -55,3 +61,27 @@ jobs:
           path: movil/emisor-sms/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 90
+
+      # Y ADEMAS como release, que es lo que hace instalable esto de verdad.
+      #
+      # El artefacto de arriba se queda: sirve para guardar el APK de cada run.
+      # Pero se descarga en .zip y exige sesion de GitHub, asi que desde el
+      # telefono —que es donde hay que instalarlo— no vale. Una release da una
+      # direccion fija y publica que se abre en el navegador del movil:
+      #
+      #   .../releases/latest/download/emisor-sms.apk
+      #
+      # La etiqueta es SIEMPRE la misma para que esa direccion no cambie nunca;
+      # cada compilacion reemplaza el archivo. Se usa `gh`, que ya viene en el
+      # runner, en vez de una accion de terceros. Ver [[registro-terceros]].
+      - name: Publicar el instalador
+        working-directory: movil/emisor-sms
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/*.apk emisor-sms.apk
+          gh release create emisor-sms \
+            --title "Emisor de SMS de GCM" \
+            --notes "Instalador para el telefono de la empresa que manda los SMS. Android avisara de que viene de un origen desconocido: es correcto, se instala de lado en un telefono conocido y no puede ir a Google Play porque Play reserva el permiso de enviar SMS para la aplicacion de mensajes del telefono." \
+            || echo "La release ya existia; solo se reemplaza el archivo."
+          gh release upload emisor-sms emisor-sms.apk --clobber

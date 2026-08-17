@@ -6,6 +6,7 @@ import { obtenerSesion } from "@/services/sesion.service";
 import {
   vincularEmisor,
   cambiarEstadoEmisor,
+  eliminarEmisor,
   type ResultadoVinculo,
   type ResultadoEmisor,
 } from "@/services/emisor-sms.service";
@@ -71,4 +72,28 @@ export async function accionCambiarEstadoEmisor(
       ? "Teléfono reactivado."
       : "Teléfono revocado. Su token deja de servir en el acto.",
   };
+}
+
+/**
+ * Borra un telefono de la lista.
+ *
+ * Lo pide el uso real: cada token perdido dejaba una fila revocada para
+ * siempre, y con cinco o seis ya no se distingue cual es el que manda los SMS.
+ * Quien existio y quien lo puso queda en la auditoria, que es su sitio.
+ */
+export async function accionEliminarEmisor(
+  _previo: EstadoConfiguracion,
+  datos: FormData,
+): Promise<EstadoConfiguracion> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r: ResultadoEmisor = await eliminarEmisor(
+    sesion,
+    String(datos.get("id") ?? ""),
+  );
+  if (!r.ok) return { error: r.error };
+
+  revalidatePath("/empresa/configuracion");
+  return { ok: "Teléfono eliminado de la lista." };
 }

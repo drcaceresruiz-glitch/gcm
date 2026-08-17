@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -12,10 +12,13 @@ import {
   Smartphone,
   RotateCcw,
   Ban,
+  Trash2,
+  Download,
 } from "lucide-react";
 import {
   accionVincularEmisor,
   accionCambiarEstadoEmisor,
+  accionEliminarEmisor,
   type EstadoConfiguracion,
 } from "@/app/(dashboard)/empresa/configuracion/acciones";
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
@@ -29,6 +32,18 @@ import type { EstadoEmisor } from "@/lib/emisor-sms";
  * que pregunta a GCM cada veinte segundos y usa su propia SIM. Aqui se le da
  * permiso a ese telefono y se le quita.
  */
+
+/**
+ * De donde se baja el instalador del emisor.
+ *
+ * Es una release de etiqueta fija —la publica el flujo `apk-emisor-sms`—, asi
+ * que la direccion no cambia aunque se recompile. Va aqui como constante y no
+ * en la configuracion porque HOY el APK es el mismo para todas las empresas: es
+ * la aplicacion de GCM, no la de la constructora. Si algun dia cada cliente
+ * quiere la suya, esto pasa a ser un campo de empresa.
+ */
+const URL_INSTALADOR =
+  "https://github.com/drcaceresruiz-glitch/gcm/releases/latest/download/emisor-sms.apk";
 
 /** Como se pinta cada estado. Color e icono juntos, nunca el color solo. */
 const ESTADOS: Record<
@@ -116,6 +131,10 @@ export function EmisoresSms({
     accionCambiarEstadoEmisor,
     {},
   );
+  const [borrado, borrar] = useActionState<EstadoConfiguracion, FormData>(
+    accionEliminarEmisor,
+    {},
+  );
 
   const activos = emisores.filter((e) => e.activo).length;
 
@@ -151,7 +170,7 @@ export function EmisoresSms({
         {emisores.length > 0 && (
           <ul className="space-y-2">
             {emisores.map((e) => (
-              <Fila key={e.id} emisor={e} cambiar={cambiar} />
+              <Fila key={e.id} emisor={e} cambiar={cambiar} borrar={borrar} />
             ))}
           </ul>
         )}
@@ -169,6 +188,7 @@ export function EmisoresSms({
         )}
 
         <Avisos estado={cambio} />
+        <Avisos estado={borrado} />
       </SeccionTarjeta>
 
       <SeccionTarjeta
@@ -214,12 +234,26 @@ export function EmisoresSms({
 
         {vinculo.token && <TokenNuevo token={vinculo.token} />}
 
-        <p className="text-xs opacity-60">
-          ¿No tienes la aplicación en ese teléfono? Pídesela a quien administra
-          GCM: es un instalador de Android que se pone a mano, no está en la
-          tienda —Google reserva el permiso de enviar SMS para la aplicación de
-          mensajes del teléfono—.
-        </p>
+        {/* El enlace, no «pidesela a quien administra GCM». Quien instala esto
+            lo hace DESDE EL TELEFONO: se abre esta pantalla en el movil, o se
+            manda esta direccion por WhatsApp, y se descarga ahi mismo. */}
+        <div className="space-y-1">
+          <p className="text-xs font-medium">La aplicación para ese teléfono</p>
+          <a
+            href={URL_INSTALADOR}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <Download className="size-3.5" aria-hidden="true" />
+            Descargar el instalador (.apk)
+          </a>
+          <p className="text-xs opacity-60">
+            Ábrelo en el propio teléfono. Android avisará de que viene de un
+            origen desconocido: hay que permitirlo esa vez. No está en Google
+            Play porque Play reserva el permiso de enviar SMS para la
+            aplicación de mensajes del teléfono.
+          </p>
+        </div>
       </SeccionTarjeta>
     </Tarjeta>
   );
@@ -228,11 +262,18 @@ export function EmisoresSms({
 function Fila({
   emisor,
   cambiar,
+  borrar,
 }: {
   emisor: EmisorLista;
   cambiar: (datos: FormData) => void;
+  borrar: (datos: FormData) => void;
 }) {
   const estado = ESTADOS[emisor.estado];
+
+  // Borrar va en DOS pasos siempre, tambien sobre uno revocado. Es un boton
+  // que vive al lado de «Revocar»/«Reactivar» y no se puede deshacer: un dedo
+  // torpe en el telefono que SI manda los SMS deja la obra sin codigos.
+  const [confirmando, setConfirmando] = useState(false);
 
   return (
     <li
@@ -270,6 +311,7 @@ function Fila({
         </p>
       </div>
 
+      <div className="flex items-center gap-2">
       <form action={cambiar}>
         <input type="hidden" name="id" value={emisor.id} />
         <input type="hidden" name="activo" value={emisor.activo ? "no" : "si"} />
@@ -291,6 +333,43 @@ function Fila({
           )}
         </button>
       </form>
+
+      {confirmando ? (
+        <form action={borrar} className="flex items-center gap-1.5">
+          <input type="hidden" name="id" value={emisor.id} />
+          <span className="text-xs opacity-70">¿Seguro?</span>
+          <button
+            type="submit"
+            className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium"
+            style={{
+              borderColor: "var(--color-peligro)",
+              color: "var(--color-peligro)",
+            }}
+          >
+            Sí, eliminar
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmando(false)}
+            className="rounded-lg border px-2.5 py-1.5 text-xs"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            No
+          </button>
+        </form>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirmando(true)}
+          aria-label={`Eliminar ${emisor.etiqueta} de la lista`}
+          className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <Trash2 className="size-3.5" aria-hidden="true" />
+          Eliminar
+        </button>
+      )}
+      </div>
     </li>
   );
 }
