@@ -124,7 +124,11 @@ export async function importarCronograma(
    * acabaria con dos puntos sobre el mismo dia.
    */
   const mismoCorte = await prisma.cronograma.findFirst({
-    where: { projectId: obraId, fechaCorte },
+    // Solo cuenta como «ya cargado» una version que salio de un ARCHIVO. Una
+    // version tecleada en GCM con la misma fecha de corte no es el mismo dato,
+    // y sin este filtro bloqueaba la importacion devolviendo `yaEstaba: true`
+    // sin haber escrito nada: el archivo se perdia en silencio.
+    where: { projectId: obraId, fechaCorte, origen: "IMPORTADO" },
     select: { version: true, _count: { select: { tareas: true, dependencias: true } } },
   });
 

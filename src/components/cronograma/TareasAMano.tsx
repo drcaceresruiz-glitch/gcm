@@ -1,0 +1,387 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { AlertCircle, CalendarPlus, LoaderCircle, Pencil, Trash2 } from "lucide-react";
+
+import {
+  accionCrearTareaManual,
+  accionEditarTareaManual,
+  accionEliminarTareaManual,
+} from "@/app/(dashboard)/obras/[id]/cronograma/acciones-manual";
+
+export interface TareaManual {
+  uid: number;
+  codigo: string | null;
+  nombre: string;
+  inicio: string;
+  fin: string;
+  duracionDias: string;
+  porcentajePlaneado: string;
+  esHito: boolean;
+}
+
+/**
+ * Teclear el cronograma, la tercera via.
+ *
+ * Una obra pequena no tiene planificador ni licencia de MS Project, y sin
+ * cronograma no hay curva S, ni valor ganado, ni informe semanal. Esto permite
+ * escribir las tareas a mano y corregirlas despues.
+ *
+ * Solo se listan y se tocan las tareas ESCRITAS AQUI. Las que vinieron de un
+ * archivo no se editan: el siguiente corte las devolveria como estaban, asi
+ * que cambiarlas seria una perdida silenciosa. El servicio lo impide tambien.
+ */
+const VACIA = {
+  codigo: "",
+  nombre: "",
+  inicio: "",
+  fin: "",
+  duracionDias: "",
+  porcentajePlaneado: "",
+  esHito: false,
+};
+
+function Campo({
+  etiqueta,
+  ayuda,
+  ancho,
+  ...props
+}: {
+  etiqueta: string;
+  ayuda?: string;
+  ancho?: string;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <label className={`text-xs ${ancho ?? ""}`}>
+      <span className="mb-0.5 block font-medium opacity-70">{etiqueta}</span>
+      <input
+        {...props}
+        className="w-full rounded border px-2 py-1.5 text-sm"
+        style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+      />
+      {ayuda && <span className="mt-0.5 block opacity-60">{ayuda}</span>}
+    </label>
+  );
+}
+
+export function TareasAMano({
+  obraId,
+  tareas,
+  puedeEditar,
+  puedeEliminar,
+}: {
+  obraId: string;
+  /// Solo las de origen MANUAL. Las importadas no se pintan aqui.
+  tareas: TareaManual[];
+  puedeEditar: boolean;
+  puedeEliminar: boolean;
+}) {
+  const router = useRouter();
+  const [abierto, setAbierto] = useState(false);
+  const [campos, setCampos] = useState({ ...VACIA });
+  const [editando, setEditando] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [porConfirmar, setPorConfirmar] = useState<{ uid: number; texto: string } | null>(null);
+  const [guardando, guardar] = useTransition();
+
+  if (!puedeEditar && tareas.length === 0) return null;
+
+  function limpiar() {
+    setCampos({ ...VACIA });
+    setEditando(null);
+    setError(null);
+  }
+
+  function enviar() {
+    setError(null);
+    setPorConfirmar(null);
+
+    guardar(async () => {
+      const datos = {
+        codigo: campos.codigo || null,
+        nombre: campos.nombre,
+        inicio: campos.inicio,
+        fin: campos.fin,
+        duracionDias: campos.duracionDias,
+        porcentajePlaneado: campos.porcentajePlaneado || null,
+        esHito: campos.esHito,
+      };
+
+      const r =
+        editando === null
+          ? await accionCrearTareaManual(obraId, datos)
+          : await accionEditarTareaManual(obraId, editando, datos);
+
+      if (!r.ok) {
+        setError(r.error ?? "No se pudo guardar.");
+        return;
+      }
+
+      limpiar();
+      router.refresh();
+    });
+  }
+
+  function editar(t: TareaManual) {
+    setEditando(t.uid);
+    setAbierto(true);
+    setError(null);
+    setCampos({
+      codigo: t.codigo ?? "",
+      nombre: t.nombre,
+      inicio: t.inicio,
+      fin: t.fin,
+      duracionDias: t.duracionDias,
+      porcentajePlaneado: t.porcentajePlaneado,
+      esHito: t.esHito,
+    });
+  }
+
+  function borrar(uid: number, confirmado = false) {
+    setError(null);
+
+    guardar(async () => {
+      const r = await accionEliminarTareaManual(obraId, uid, confirmado);
+
+      if (!r.ok) {
+        // Si paro para preguntar, se ofrece el segundo paso en vez de un error.
+        if (r.pideConfirmacion) setPorConfirmar({ uid, texto: r.error ?? "" });
+        else setError(r.error ?? "No se pudo eliminar.");
+        return;
+      }
+
+      setPorConfirmar(null);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-3">
+      {tareas.length > 0 && (
+        <div
+          className="overflow-x-auto rounded-xl border"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <table className="w-full text-sm">
+            <caption className="sr-only">
+              Tareas del cronograma escritas en GCM
+            </caption>
+            <thead>
+              <tr className="text-left text-xs opacity-60">
+                <th className="px-3 py-2 font-medium">CÓDIGO</th>
+                <th className="px-3 py-2 font-medium">TAREA</th>
+                <th className="px-3 py-2 font-medium">INICIO</th>
+                <th className="px-3 py-2 font-medium">FIN</th>
+                <th className="px-3 py-2 text-right font-medium">DÍAS</th>
+                {(puedeEditar || puedeEliminar) && <th className="px-3 py-2" />}
+              </tr>
+            </thead>
+            <tbody>
+              {tareas.map((t) => (
+                <tr key={t.uid} className="border-t" style={{ borderColor: "var(--borde)" }}>
+                  <td className="px-3 py-2 tabular-nums opacity-70">{t.codigo ?? "—"}</td>
+                  <td className="px-3 py-2">
+                    {t.nombre}
+                    {t.esHito && <span className="ml-2 text-xs opacity-60">(hito)</span>}
+                  </td>
+                  <td className="px-3 py-2 tabular-nums">{t.inicio}</td>
+                  <td className="px-3 py-2 tabular-nums">{t.fin}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{t.duracionDias}</td>
+                  {(puedeEditar || puedeEliminar) && (
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {puedeEditar && (
+                        <button
+                          type="button"
+                          onClick={() => editar(t)}
+                          aria-label={`Editar ${t.nombre}`}
+                          className="rounded p-1 opacity-50 hover:opacity-100"
+                        >
+                          <Pencil className="size-4" aria-hidden="true" />
+                        </button>
+                      )}
+                      {puedeEliminar && (
+                        <button
+                          type="button"
+                          onClick={() => borrar(t.uid)}
+                          aria-label={`Eliminar ${t.nombre}`}
+                          className="rounded p-1 opacity-50 hover:opacity-100"
+                          style={{ color: "var(--color-peligro)" }}
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* El segundo paso del borrado: no es un error, es una pregunta. */}
+      {porConfirmar && (
+        <div
+          role="alert"
+          className="rounded-lg px-3 py-2 text-sm text-pretty"
+          style={{
+            backgroundColor:
+              "color-mix(in oklab, var(--color-alerta) 15%, transparent)",
+          }}
+        >
+          <p>{porConfirmar.texto}</p>
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => borrar(porConfirmar.uid, true)}
+              disabled={guardando}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-white"
+              style={{ backgroundColor: "var(--color-peligro)" }}
+            >
+              Eliminar de todos modos
+            </button>
+            <button
+              type="button"
+              onClick={() => setPorConfirmar(null)}
+              className="text-sm underline opacity-70"
+            >
+              Dejarlo
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <p
+          role="alert"
+          className="flex items-start gap-2 rounded-lg px-3 py-2 text-sm text-pretty"
+          style={{
+            backgroundColor:
+              "color-mix(in oklab, var(--color-peligro) 15%, transparent)",
+          }}
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {error}
+        </p>
+      )}
+
+      {puedeEditar &&
+        (abierto ? (
+          <div
+            className="rounded-xl border p-4"
+            style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
+          >
+            <fieldset>
+              <legend className="text-sm font-semibold">
+                {editando === null ? "Añadir una tarea" : "Editar la tarea"}
+              </legend>
+
+              <p className="mt-2 text-xs text-pretty opacity-70">
+                Sin la red de precedencias no hay ruta crítica, así que estas
+                tareas nacen sin ella y con la holgura marcada como no conocida.
+                No se inventa lo que el archivo sabría y aquí no se sabe.
+              </p>
+
+              <div className="mt-4 flex flex-wrap items-start gap-3">
+                <Campo
+                  etiqueta="Código"
+                  ancho="w-24"
+                  value={campos.codigo}
+                  onChange={(e) => setCampos({ ...campos, codigo: e.target.value })}
+                  placeholder="4.1"
+                />
+                <Campo
+                  etiqueta="Tarea"
+                  ancho="min-w-56 flex-1"
+                  value={campos.nombre}
+                  onChange={(e) => setCampos({ ...campos, nombre: e.target.value })}
+                  placeholder="Vaciado de zapatas"
+                />
+                <Campo
+                  etiqueta="Inicio"
+                  ancho="w-40"
+                  type="date"
+                  value={campos.inicio}
+                  onChange={(e) => setCampos({ ...campos, inicio: e.target.value })}
+                />
+                <Campo
+                  etiqueta="Fin"
+                  ancho="w-40"
+                  type="date"
+                  value={campos.fin}
+                  onChange={(e) => setCampos({ ...campos, fin: e.target.value })}
+                />
+                <Campo
+                  etiqueta="Duración"
+                  ancho="w-28"
+                  inputMode="decimal"
+                  value={campos.duracionDias}
+                  onChange={(e) => setCampos({ ...campos, duracionDias: e.target.value })}
+                  placeholder="3"
+                  ayuda="Días de trabajo"
+                />
+                <Campo
+                  etiqueta="% planeado"
+                  ancho="w-28"
+                  inputMode="decimal"
+                  value={campos.porcentajePlaneado}
+                  onChange={(e) =>
+                    setCampos({ ...campos, porcentajePlaneado: e.target.value })
+                  }
+                  placeholder="0"
+                />
+              </div>
+
+              <label className="mt-3 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={campos.esHito}
+                  onChange={(e) => setCampos({ ...campos, esHito: e.target.checked })}
+                />
+                Es un hito
+              </label>
+
+              <div className="mt-4 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={enviar}
+                  disabled={guardando || campos.nombre.trim() === ""}
+                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  style={{ backgroundColor: "var(--color-marca)" }}
+                >
+                  {guardando ? (
+                    <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <CalendarPlus className="size-4" aria-hidden="true" />
+                  )}
+                  {editando === null ? "Añadir tarea" : "Guardar cambios"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    limpiar();
+                    setAbierto(false);
+                  }}
+                  className="text-sm underline opacity-70"
+                >
+                  {editando === null ? "Terminar" : "Cancelar"}
+                </button>
+              </div>
+            </fieldset>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAbierto(true)}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <CalendarPlus className="size-4" aria-hidden="true" />
+            Escribir una tarea a mano
+          </button>
+        ))}
+    </div>
+  );
+}

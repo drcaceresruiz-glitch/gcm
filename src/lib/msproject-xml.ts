@@ -384,6 +384,28 @@ export async function analizarProjectXml(
       continue;
     }
 
+    /**
+     * El espacio NEGATIVO es de las tareas tecleadas en GCM, y solo suyo.
+     *
+     * `entero()` admite el signo porque otros campos —el desfase de un
+     * enlace— lo necesitan de verdad. Aqui no: un archivo con `<UID>-3` se
+     * llevaria por delante el ancla de una tarea escrita a mano, y con ella su
+     * avance, sin que nada lo dijera. Project no exporta uids negativos, asi
+     * que rechazarlos no cierra ninguna puerta legitima.
+     */
+    // Se rechaza el NEGATIVO y no el cero: el cero es el `<UID>` de la fila del
+    // proyecto, que Project si exporta y que unas lineas mas abajo se descarta
+    // por su nivel de esquema. Cortarla aqui la convertiria en un error a la
+    // vista del usuario en todos los archivos.
+    if (uid < 0) {
+      errores.push({
+        fila,
+        uid,
+        mensaje: `La fila ${fila} trae el UID ${uid}. Los negativos estan reservados para las tareas escritas en GCM y no pueden venir de un archivo. Se descarta.`,
+      });
+      continue;
+    }
+
     const nivelLeido = entero(texto(nodo, "OutlineLevel"));
 
     /**

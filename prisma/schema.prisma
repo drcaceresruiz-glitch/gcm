@@ -477,6 +477,20 @@ model Project {
   /// Last Planner). ISO: 1=lunes … 7=domingo. Viernes por defecto.
   diaCorteSemanal Int @default(5)
 
+  /// El ultimo `uid` que se ha entregado a una tarea tecleada a mano. Va en
+  /// NEGATIVO y solo baja: 0, -1, -2…
+  ///
+  /// Existe porque el uid es el ancla contra la que se guardan `AvanceTarea` y
+  /// `MapeoTareaPartida`, y esas dos anclan a `(projectId, uid)` **sin clave
+  /// foranea**. Si al borrar una tarea manual su uid volviera al saco, la
+  /// siguiente tarea lo heredaria junto con el avance de la muerta, y el aviso
+  /// de huerfanos se apagaria justo en ese momento —porque el uid vuelve a
+  /// existir—: el dato se corrompe y la alarma se calla a la vez.
+  ///
+  /// Vive en la OBRA y no en el cronograma porque las versiones se sustituyen
+  /// y el ancla tiene que sobrevivir a eso.
+  ultimoUidManual Int @default(0)
+
   /// Con fecha = esta obra NO es una obra: es una COPIA restaurada de un
   /// respaldo, cargada para revisarla. Nace y muere en modo auditoria y no
   /// admite un solo cambio.
