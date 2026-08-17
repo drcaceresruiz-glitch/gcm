@@ -73,7 +73,15 @@ export interface SeccionMenu {
 
 export interface FaseMenu {
   clave: string;
-  titulo: string;
+  /**
+   * El rotulo del grupo, en mayusculas sobre sus secciones.
+   *
+   * OPCIONAL a proposito: una fase de una sola seccion —el Tablero— pintaria
+   * «TABLERO» encima de «Tablero», que es ruido. Sin titulo, sus secciones
+   * quedan sueltas arriba, que es lo que se quiere para una entrada que no
+   * pertenece a ninguna fase del trabajo.
+   */
+  titulo?: string;
   secciones: SeccionMenu[];
 }
 
@@ -136,9 +144,11 @@ export function MenuObra({ fases }: { fases: FaseMenu[] }) {
       <div className="sticky top-20 hidden lg:block">
         {fases.map((fase) => (
           <div key={fase.clave} className="mb-3 last:mb-0">
-            <p className="mb-1 px-1.5 text-[11px] font-semibold tracking-wider uppercase opacity-45">
-              {fase.titulo}
-            </p>
+            {fase.titulo && (
+              <p className="mb-1 px-1.5 text-[11px] font-semibold tracking-wider uppercase opacity-45">
+                {fase.titulo}
+              </p>
+            )}
             <ol>
               {fase.secciones.map((s) => (
                 <li key={s.clave}>
@@ -194,7 +204,10 @@ export function MenuObra({ fases }: { fases: FaseMenu[] }) {
                 opacity: f.clave === faseActiva.clave ? 1 : 0.6,
               }}
             >
-              {f.titulo}
+              {/* Una fase sin rotulo —la del Tablero— se anuncia con el
+                  nombre de su unica seccion. Dejar la ficha vacia seria un
+                  hueco que no se puede pulsar ni entender. */}
+              {f.titulo ?? f.secciones[0]?.titulo}
             </span>
           ))}
         </div>

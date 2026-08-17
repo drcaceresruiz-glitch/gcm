@@ -18,6 +18,29 @@ describe("la cadena de migas", () => {
     ]);
   });
 
+  /**
+   * Hay DOS tableros y se llaman igual: el de supervision de la obra y el
+   * semanal del Last Planner. Al añadir el primero, el patron corto podia
+   * comerse al largo; se fijan los dos juntos para que no se pueda romper uno
+   * sin que se note.
+   */
+  it("distingue el tablero de la obra del tablero de una semana", () => {
+    const obra = migasDeRuta("/obras/abc/tablero", { obra: "CRIOCORD" });
+    expect(obra.map((x) => x.texto)).toEqual(["Obras", "CRIOCORD", "Tablero"]);
+
+    const semana = migasDeRuta("/obras/abc/plan-semanal/xyz/tablero", {
+      obra: "CRIOCORD",
+      plan: "Semana 3",
+    });
+    expect(semana.map((x) => x.texto)).toEqual([
+      "Obras",
+      "CRIOCORD",
+      "Plan semanal",
+      "Semana 3",
+      "Tablero",
+    ]);
+  });
+
   it("la ultima nunca lleva enlace: es donde estas", () => {
     const m = migasDeRuta("/obras/abc/cronograma/gantt", { obra: "CRIOCORD" });
 

@@ -11,6 +11,23 @@ const RAIZ = "/obras/x";
  * prefijo declarado a mano.
  */
 const FASES: FaseMenu[] = [
+  /**
+   * La fase del Tablero va SIN titulo: es una sola seccion suelta arriba, y
+   * un rotulo «TABLERO» sobre «Tablero» seria ruido. Entra en este mapa para
+   * que la resolucion de la seccion activa se pruebe CON ella presente: el
+   * rotulo es cosa del pintado, no debe cambiar que seccion se resalta.
+   */
+  {
+    clave: "tablero",
+    secciones: [
+      {
+        clave: "tablero",
+        titulo: "Tablero",
+        pregunta: "",
+        href: `${RAIZ}/tablero`,
+      },
+    ],
+  },
   {
     clave: "plan",
     titulo: "Plan",
@@ -80,6 +97,19 @@ describe("gana el prefijo mas largo", () => {
   it("una ruta de dos niveles no se confunde con la de uno", () => {
     expect(seccionActiva(`${RAIZ}/cronograma`, FASES)).toBe("cronograma");
     expect(seccionActiva(`${RAIZ}/cronograma/gantt`, FASES)).toBe("cronograma");
+  });
+});
+
+describe("la fase sin rotulo se resuelve como cualquier otra", () => {
+  it("el tablero de la obra enciende su propia seccion", () => {
+    expect(seccionActiva(`${RAIZ}/tablero`, FASES)).toBe("tablero");
+  });
+
+  it("y no le roba la portada al Presupuesto", () => {
+    // La fase del Tablero va PRIMERA en la lista. Si el orden mandara sobre
+    // la regla del prefijo mas largo, la raiz habria cambiado de dueño al
+    // meterla delante.
+    expect(seccionActiva(RAIZ, FASES)).toBe("presupuesto");
   });
 });
 

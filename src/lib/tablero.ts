@@ -175,7 +175,6 @@ export const MODULOS_POR_DEFECTO: readonly ModuloTablero[] = MODULOS.map(
  * quien la tuviera; a cambio, no vuelve a pasar.
  */
 export const COOKIE_TABLERO = "gcm-tablero-off";
-export const COOKIE_TABLERO_OBRA = "gcm-tablero-obra";
 
 /// Un año: es una preferencia, no una sesion.
 const DURACION_COOKIE = 60 * 60 * 24 * 365;
@@ -209,13 +208,10 @@ export function modulosValidos(
  * enseñar u ocultar. Ir al servidor por esto añadiria una espera a una accion
  * que debe ser instantanea.
  *
- * Cambiar de OBRA si necesita servidor, y eso lo hace el componente con una
- * navegacion: son cifras distintas, no las mismas escondidas.
+ * Es la UNICA preferencia del tablero. La obra ya no se guarda: desde que el
+ * tablero vive dentro de cada obra, sale de la ruta.
  */
-export function guardarTablero(
-  modulos: readonly ModuloTablero[],
-  obraId?: string,
-): void {
+export function guardarTablero(modulos: readonly ModuloTablero[]): void {
   if (typeof document === "undefined") return;
 
   // Se recibe lo VISIBLE, que es lo que maneja la interfaz, y se guarda su
@@ -226,9 +222,9 @@ export function guardarTablero(
     (m) => m.clave,
   );
 
-  const comun = `path=/; max-age=${DURACION_COOKIE}; SameSite=Lax`;
-  document.cookie = `${COOKIE_TABLERO}=${apagados.join(",")}; ${comun}`;
-  if (obraId) document.cookie = `${COOKIE_TABLERO_OBRA}=${obraId}; ${comun}`;
+  document.cookie =
+    `${COOKIE_TABLERO}=${apagados.join(",")}; ` +
+    `path=/; max-age=${DURACION_COOKIE}; SameSite=Lax`;
 }
 
 /**

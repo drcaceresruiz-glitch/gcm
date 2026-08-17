@@ -68,6 +68,25 @@ export default async function ObraLayout({
    * los dias.
    */
   const fases = [
+    /**
+     * El tablero va SUELTO arriba, sin rotulo de fase.
+     *
+     * No pertenece a ninguna: no es plan, ni ejecucion, ni compras, sino el
+     * resumen de las tres. Vivio en el panel con un desplegable de obra hasta
+     * el 17 de agosto de 2026; sus once modulos siempre describieron una sola
+     * obra, asi que su sitio es este.
+     */
+    {
+      clave: "tablero",
+      secciones: [
+        puede(sesion, "obra:leer") && {
+          clave: "tablero",
+          titulo: "Tablero",
+          pregunta: "cómo va la obra",
+          href: `${raiz}/tablero`,
+        },
+      ].filter(Boolean),
+    },
     {
       clave: "plan",
       titulo: "Plan",

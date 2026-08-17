@@ -46,52 +46,19 @@ import type { SesionActiva } from "@/services/sesion.service";
  * cree ninguno de los dos.
  */
 
-export interface ObraDelSelector {
+/**
+ * La obra que encabeza el tablero.
+ *
+ * Se llamaba `ObraDelSelector` cuando el tablero vivia en el panel y habia que
+ * elegir obra en un desplegable. Ese desplegable ya no existe —el tablero es
+ * de cada obra y la obra sale de la ruta—, pero la forma sigue haciendo falta:
+ * es lo que se pinta en la cabecera del tablero.
+ */
+export interface ObraDelTablero {
   id: string;
   correlativo: string | null;
   nombre: string;
   estado: string;
-}
-
-/**
- * Las obras para el desplegable del tablero: TODAS, no una pagina.
- *
- * `listarObras` devuelve doce por pagina y ademas calcula presupuesto y
- * comprometido de cada una. Aqui hacen falta los nombres de todas y nada mas:
- * la obra que se supervisa puede estar en la pagina tres, o filtrada fuera
- * por la busqueda que hay escrita arriba.
- */
-export async function listarObrasParaTablero(
-  sesion: SesionActiva,
-): Promise<ObraDelSelector[]> {
-  if (!puede(sesion, "obra:leer")) return [];
-
-  const obras = await prisma.project.findMany({
-    where: { companyId: sesion.companyId },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, correlativo: true, nombreObra: true, estado: true },
-  });
-
-  // Las EN EJECUCION primero, para que el tablero abra en la obra que de
-  // verdad se supervisa y no en una de planificacion vacia. El orden del enum
-  // que usa el panel pone PLANIFICACION delante, que alli tiene sentido pero
-  // aqui dejaba el tablero arrancando en una obra sin cronograma ni
-  // presupuesto —y sus KPIs parecian «no corresponder» a ninguna obra real—.
-  const PRIORIDAD: Record<string, number> = {
-    EN_EJECUCION: 0,
-    PARALIZADA: 1,
-    PLANIFICACION: 2,
-    CERRADA: 3,
-  };
-
-  return obras
-    .map((o) => ({
-      id: o.id,
-      correlativo: o.correlativo,
-      nombre: o.nombreObra,
-      estado: o.estado,
-    }))
-    .sort((a, b) => (PRIORIDAD[a.estado] ?? 9) - (PRIORIDAD[b.estado] ?? 9));
 }
 
 /// Un punto de la curva en miniatura. `t` es 0..1 sobre el eje de tiempo y
@@ -102,7 +69,7 @@ export interface PuntoMini {
 }
 
 export interface DatosTablero {
-  obra: ObraDelSelector;
+  obra: ObraDelTablero;
   plazo: {
     inicio: string;
     fin: string;
