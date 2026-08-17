@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +22,7 @@ import {
   pasosDeVinculo,
 } from "@/lib/vinculo-emisor";
 import { enlaceWhatsApp } from "@/lib/whatsapp";
+import { haceCuanto } from "@/utils/fechas";
 import {
   accionVincularEmisor,
   accionCambiarEstadoEmisor,
@@ -150,6 +151,27 @@ export function EmisoresSms({
   // saber si habia funcionado, y no tiene por que adivinar que hay que
   // recargar.
   const sinEstrenar = emisores.some((e) => e.activo && e.estado === "nunca");
+  const hayActivos = emisores.some((e) => e.activo);
+
+  // La pantalla se refresca sola mientras se mira. Antes el estado era una
+  // FOTO del momento en que se pinto la pagina: quien acababa de configurar el
+  // telefono se quedaba mirando «Sin estrenar» sin saber si habia funcionado,
+  // y tenia que recargar para enterarse. Aqui la pregunta es «¿esta conectado
+  // AHORA?», y una respuesta de hace cinco minutos no la contesta.
+  //
+  // Cada 15 segundos, que es menos que los 20 del emisor: asi el contador de
+  // abajo se ve volver a cero. Y solo con la pestana a la vista, para no pedir
+  // al servidor cada quince segundos toda la tarde por una pantalla que nadie
+  // tiene delante.
+  useEffect(() => {
+    if (!hayActivos) return;
+
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 15_000);
+
+    return () => clearInterval(id);
+  }, [hayActivos, router]);
 
   return (
     <Tarjeta>
@@ -182,16 +204,23 @@ export function EmisoresSms({
           </ul>
         )}
 
-        {sinEstrenar && (
-          <button
-            type="button"
-            onClick={() => router.refresh()}
-            className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
-            style={{ borderColor: "var(--borde)" }}
-          >
-            <RefreshCw className="size-3.5" aria-hidden="true" />
-            Comprobar de nuevo
-          </button>
+        {hayActivos && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <RefreshCw className="size-3.5" aria-hidden="true" />
+              Comprobar ahora
+            </button>
+            <span className="text-xs opacity-60">
+              {sinEstrenar
+                ? "Esto se comprueba solo cada 15 segundos: si el teléfono está bien configurado, en menos de un minuto dirá «Preguntando»."
+                : "Se comprueba solo cada 15 segundos. Mientras el contador vuelva a cero, la conexión está viva."}
+            </span>
+          </div>
         )}
 
         <Avisos estado={cambio} />
@@ -310,6 +339,7 @@ function Fila({
             >
               <MessageSquare className="size-3.5 shrink-0" aria-hidden="true" />
               {estado.texto}
+              <UltimaVezQuePregunto fecha={emisor.ultimaConsultaAt} />
             </p>
             <p className="mt-0.5 text-xs opacity-60">{estado.ayuda}</p>
           </>
@@ -385,6 +415,37 @@ function Fila({
       </div>
     </li>
   );
+}
+
+/**
+ * Cuanto hace que ese telefono pregunto, contando en vivo.
+ *
+ * ES LA PRUEBA DE QUE LA CONEXION ESTA VIVA, y por eso corre sola: se mira la
+ * pantalla y el numero sube —1 s, 2 s, 3 s— hasta que el telefono vuelve a
+ * preguntar y cae a cero. Un rotulo quieto que diga «Preguntando» no distingue
+ * un telefono conectado de la foto de uno que lo estuvo hace media hora.
+ *
+ * No se pinta hasta que el componente monta: el servidor y el navegador
+ * calcularian «hace cuanto» en instantes distintos y React se quejaria de que
+ * el HTML no coincide.
+ */
+function UltimaVezQuePregunto({ fecha }: { fecha: Date | null }) {
+  const [texto, setTexto] = useState<string | null>(null);
+  const instante = fecha ? new Date(fecha).getTime() : null;
+
+  useEffect(() => {
+    if (instante === null) return;
+
+    const pintar = () => setTexto(haceCuanto(new Date(instante)));
+    pintar();
+    const id = setInterval(pintar, 1000);
+
+    return () => clearInterval(id);
+  }, [instante]);
+
+  if (texto === null) return null;
+
+  return <span className="font-normal opacity-70">· {texto}</span>;
 }
 
 /**
