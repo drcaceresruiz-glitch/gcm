@@ -524,9 +524,22 @@ export function CurvaS({
             {Number(medida.desfase) > 0 ? "+" : ""}
             {medida.desfase}%
           </strong>{" "}
-          respecto al plan. Ritmo actual:{" "}
-          <strong>{textoRitmo(datos.factor)}%</strong> de lo previsto.{" "}
-          {datos.terminoProyectado ? (
+          respecto al plan.{" "}
+          {/* Con plan 0 el factor vale 1 solo para poder seguir proyectando;
+              decir «ritmo 100%» ahi seria afirmar algo que nadie midio. Pasa
+              el primer dia de obra, cuando ya hay avance reportado. */}
+          {datos.ritmoMedible ? (
+            <>
+              Ritmo actual: <strong>{textoRitmo(datos.factor)}%</strong> de lo
+              previsto.{" "}
+            </>
+          ) : (
+            <>
+              Todavía no hay plan contra el que medir el ritmo: a esta fecha no
+              había nada programado.{" "}
+            </>
+          )}
+          {!datos.ritmoMedible ? null : datos.terminoProyectado ? (
             <>
               A este paso la obra terminaría el{" "}
               <strong>{fechaCronograma(datos.terminoProyectado)}</strong>, frente al{" "}

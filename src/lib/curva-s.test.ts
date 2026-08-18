@@ -230,6 +230,32 @@ describe("curvaPlaneada", () => {
 });
 
 describe("proyectar", () => {
+  it("SIN PLAN TODAVIA, EL RITMO NO ES MEDIBLE", () => {
+    // El primer dia de obra el plan es 0 y el factor vale 1 solo para poder
+    // seguir proyectando. Decir «ritmo 100% de lo previsto» seria afirmar una
+    // conclusion que nadie midio, que es como se pierde la confianza en una
+    // cifra: hay que poder distinguir «va al ritmo» de «no hay ritmo».
+    const plan = [
+      { fecha: new Date("2026-08-18T00:00:00Z"), valor: 0 },
+      { fecha: new Date("2026-09-04T00:00:00Z"), valor: 100 },
+    ];
+    const r = proyectar(plan, new Date("2026-08-18T00:00:00Z"), 70);
+
+    expect(r.ritmoMedible).toBe(false);
+    expect(r.factor).toBe(1);
+  });
+
+  it("con plan por delante, el ritmo si es medible", () => {
+    const plan = [
+      { fecha: new Date("2026-08-18T00:00:00Z"), valor: 50 },
+      { fecha: new Date("2026-09-04T00:00:00Z"), valor: 100 },
+    ];
+    const r = proyectar(plan, new Date("2026-08-18T00:00:00Z"), 25);
+
+    expect(r.ritmoMedible).toBe(true);
+    expect(r.factor).toBeCloseTo(0.5, 10);
+  });
+
   it("continua al ritmo que se lleva y arranca en el punto real", async () => {
     // A mitad del plazo se lleva el 25% donde tocaba el 50%: se rinde a la
     // mitad, asi que la obra acabaria al 50% de lo previsto en la fecha fin.

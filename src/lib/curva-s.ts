@@ -310,7 +310,21 @@ export function proyectar(
   plan: readonly PuntoDiario[],
   corte: Date,
   realEnCorte: number,
-): { puntos: PuntoDiario[]; factor: number; terminoProyectado: Date | null } {
+): {
+  puntos: PuntoDiario[];
+  factor: number;
+  terminoProyectado: Date | null;
+  /**
+   * Si el `factor` significa algo.
+   *
+   * Con plan 0 no hay division posible y `factor` vale 1 para poder seguir
+   * proyectando, pero eso NO es «se rinde al 100% de lo previsto»: es que no
+   * hay previsto contra el que comparar. Sin este aviso, el primer dia de una
+   * obra con avance reportado se lee «ritmo 100%», que es una conclusion que
+   * nadie midio —el mismo defecto que tenia la alerta del telefono SMS—.
+   */
+  ritmoMedible: boolean;
+} {
   const enCorte =
     plan.find((p) => p.fecha.getTime() >= corte.getTime())?.valor ??
     plan[plan.length - 1]?.valor ??
@@ -318,7 +332,8 @@ export function proyectar(
 
   // Sin nada planeado todavia no hay ritmo que medir: se proyecta el plan tal
   // cual en vez de dividir por cero y disparar la curva al infinito.
-  const factor = enCorte > 0 ? realEnCorte / enCorte : 1;
+  const ritmoMedible = enCorte > 0;
+  const factor = ritmoMedible ? realEnCorte / enCorte : 1;
 
   const puntos: PuntoDiario[] = [];
   let terminoProyectado: Date | null = null;
@@ -347,7 +362,7 @@ export function proyectar(
     }
   }
 
-  return { puntos, factor, terminoProyectado };
+  return { puntos, factor, terminoProyectado, ritmoMedible };
 }
 
 /**

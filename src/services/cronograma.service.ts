@@ -1726,6 +1726,8 @@ export interface DatosCurva {
   proyeccion: PuntoDiario[];
   /// Real entre planeado en la fecha de corte. 1 es ir justo al plan.
   factor: number;
+  /// Si actor significa algo: con plan 0 no hay nada contra que medir.
+  ritmoMedible: boolean;
   terminoProyectado: Date | null;
   inicio: Date | null;
   fin: Date | null;
@@ -1762,7 +1764,7 @@ export async function datosCurvaS(
 ): Promise<DatosCurva> {
   const vacio: DatosCurva = {
     cortes: [], plan: [], proyeccion: [],
-    factor: 1, terminoProyectado: null, inicio: null, fin: null,
+    factor: 1, ritmoMedible: false, terminoProyectado: null, inicio: null, fin: null,
     fuentePlan: "vigente", planeadoBaseEnCorte: null, lineaBase: null,
     realSemanal: [], diaCorteSemanal: 5,
     cadencia: { ultimoCorteEsperado: null, semanaPendiente: false },
@@ -1933,7 +1935,7 @@ export async function datosCurvaS(
     ? realSemanal[realSemanal.length - 1]!
     : { fecha: ultimo.fecha, valor: Number(ultimo.real) || 0 };
 
-  const { puntos, factor, terminoProyectado } = proyectar(
+  const { puntos, factor, terminoProyectado, ritmoMedible } = proyectar(
     plan,
     anclaReal.fecha,
     anclaReal.valor,
@@ -1953,6 +1955,7 @@ export async function datosCurvaS(
     plan,
     proyeccion: puntos,
     factor,
+    ritmoMedible,
     terminoProyectado,
     inicio,
     fin,
