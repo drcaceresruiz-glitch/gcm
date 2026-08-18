@@ -194,6 +194,14 @@ export default async function PanelPage({
           pregunta: "lo que ya terminó",
           href: "/empresa/archivo",
         },
+        // Sin puerta de permisos a proposito: el manual es para todos, y
+        // quien menos permisos tiene es quien mas lo necesita.
+        {
+          clave: "manual",
+          titulo: "Manual",
+          pregunta: "cómo funciona GCM",
+          href: "/manual",
+        },
       ].filter(Boolean) as FaseMenu["secciones"],
     },
     // Quien opera GCM, no quien lo usa. Va al final y en su propio grupo
