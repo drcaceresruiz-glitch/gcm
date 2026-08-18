@@ -87,6 +87,7 @@ function compromiso(cambios: Record<string, unknown> = {}) {
     lookaheadTaskId: "lt-1",
     cumplido: null,
     causa: null,
+    enEjecucionAt: null,
     cantidadPlan: "200.0000",
     cantidadEjec: "120.0000",
     unidad: "m2",
@@ -252,7 +253,7 @@ describe("kanbanDeObra: lo que lleva la tarjeta", () => {
     expect(r!.semanaCerrada).toBeNull();
   });
 
-  it("devuelve las cinco columnas siempre, aunque no haya nada", async () => {
+  it("devuelve las seis columnas siempre, aunque no haya nada", async () => {
     // El tablero no cambia de forma segun los datos: cinco columnas fijas.
     // Si desaparecieran las vacias, la lectura de izquierda a derecha —que es
     // lo unico que aporta un Kanban— cambiaria cada semana.
@@ -263,7 +264,59 @@ describe("kanbanDeObra: lo que lleva la tarjeta", () => {
       "CON_RESTRICCIONES",
       "LISTA",
       "COMPROMETIDA",
+      "EN_EJECUCION",
       "CERRADA",
     ]);
+  });
+});
+
+describe("kanbanDeObra: la columna EN EJECUCION", () => {
+  it("un compromiso con la fecha sellada sale en EN_EJECUCION", async () => {
+    // El dato es EXPLICITO: lo marca alguien en obra. No se deduce de la
+    // cantidad ejecutada, porque un cero no distingue «empezo sin avance
+    // medible» de «no ha empezado».
+    estado.planesAbiertos = [
+      {
+        id: "p-1",
+        numero: 3,
+        compromisos: [
+          compromiso({ id: "c-1", enEjecucionAt: new Date("2026-08-18T10:00:00Z") }),
+        ],
+      },
+    ];
+
+    const r = await kanbanDeObra(COMPLETA, "obra-1");
+
+    expect(columna(r!, "EN_EJECUCION")).toHaveLength(1);
+    expect(columna(r!, "COMPROMETIDA")).toHaveLength(0);
+  });
+
+  it("sin sellar se queda en COMPROMETIDA", async () => {
+    // El reverso: sin esto, un servicio que mandara todo a EN_EJECUCION
+    // pasaria la prueba de arriba.
+    estado.planesAbiertos = [
+      { id: "p-1", numero: 3, compromisos: [compromiso({ id: "c-2" })] },
+    ];
+
+    const r = await kanbanDeObra(COMPLETA, "obra-1");
+
+    expect(columna(r!, "COMPROMETIDA")).toHaveLength(1);
+    expect(columna(r!, "EN_EJECUCION")).toHaveLength(0);
+  });
+
+  it("la tarjeta lleva el id del compromiso, para poder moverla", async () => {
+    // Sin id no hay boton: la tarjeta seria de solo lectura y la columna
+    // nunca se llenaria.
+    estado.planesAbiertos = [
+      { id: "p-1", numero: 3, compromisos: [compromiso({ id: "c-9" })] },
+    ];
+
+    const [t] = columna((await kanbanDeObra(COMPLETA, "obra-1"))!, "COMPROMETIDA") as {
+      compromisoId: string | null;
+      enEjecucion: boolean;
+    }[];
+
+    expect(t?.compromisoId).toBe("c-9");
+    expect(t?.enEjecucion).toBe(false);
   });
 });

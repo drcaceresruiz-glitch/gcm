@@ -9,6 +9,7 @@ import type {
 import { FLUJOS_RESTRICCION } from "@/lib/lookahead";
 import { ETIQUETA_CNC } from "@/lib/plan-semanal";
 import { fechaCorta } from "@/utils/fechas";
+import { BotonEnEjecucion } from "@/components/kanban/BotonEnEjecucion";
 
 /**
  * El flujo del Last Planner en cinco columnas.
@@ -34,6 +35,7 @@ const TONO: Record<ColumnaKanban, string> = {
   CON_RESTRICCIONES: "border-t-rose-500",
   LISTA: "border-t-emerald-500",
   COMPROMETIDA: "border-t-sky-500",
+  EN_EJECUCION: "border-t-amber-500",
   CERRADA: "border-t-slate-300",
 };
 
@@ -49,7 +51,7 @@ export function TableroKanban({
     // movil, y apilarlas destruiria la lectura de izquierda a derecha, que es
     // justo lo que aporta el tablero.
     <div className="-mx-4 overflow-x-auto px-4 pb-2">
-      <div className="grid min-w-[64rem] grid-cols-5 gap-3">
+      <div className="grid min-w-[76rem] grid-cols-6 gap-3">
         {datos.columnas.map((col) => (
           <section
             key={col.clave}
@@ -184,6 +186,16 @@ function Tarjeta({
           significa otra cosa (una tarea que nadie ha mirado). Con ese texto,
           seis tarjetas de la derecha parecian estar en la columna de la
           izquierda. Solo se vio abriendo la pantalla. */}
+      {/* Solo en los compromisos vivos: una tarea del Lookahead todavia no
+          es compromiso, y uno ya evaluado pertenece a una semana cerrada. */}
+      {t.compromisoId && t.cumplido === null && (
+        <BotonEnEjecucion
+          obraId={obraId}
+          compromisoId={t.compromisoId}
+          enMarcha={t.enEjecucion}
+        />
+      )}
+
       {t.libre && (
         <p className="mt-1.5 flex items-center gap-1 opacity-60">
           <Link2Off className="size-3" aria-hidden />

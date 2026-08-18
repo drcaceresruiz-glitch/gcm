@@ -36,6 +36,7 @@ export type ColumnaKanban =
   | "CON_RESTRICCIONES"
   | "LISTA"
   | "COMPROMETIDA"
+  | "EN_EJECUCION"
   | "CERRADA";
 
 export interface BloqueoTarjeta {
@@ -72,6 +73,10 @@ export interface TarjetaKanban {
   causa: CausaNoCumplimiento | null;
   /// Nacio de una tarea del Lookahead o es una linea libre de la semana.
   libre: boolean;
+  /// Id del compromiso, para poder moverlo de columna. Null en las tareas
+  /// del Lookahead, que todavia no son compromiso.
+  compromisoId: string | null;
+  enEjecucion: boolean;
 }
 
 export interface ColumnaConTarjetas {
@@ -104,6 +109,7 @@ const TITULOS: Record<ColumnaKanban, { titulo: string; pregunta: string }> = {
   },
   LISTA: { titulo: "Lista", pregunta: "se puede comprometer" },
   COMPROMETIDA: { titulo: "Comprometida", pregunta: "prometida esta semana" },
+  EN_EJECUCION: { titulo: "En ejecución", pregunta: "ya empezó en obra" },
   CERRADA: { titulo: "Cerrada", pregunta: "se cumplió o no, y por qué" },
 };
 
@@ -149,6 +155,7 @@ export async function kanbanDeObra(
     CON_RESTRICCIONES: [],
     LISTA: [],
     COMPROMETIDA: [],
+    EN_EJECUCION: [],
     CERRADA: [],
   };
 
@@ -192,11 +199,20 @@ export async function kanbanDeObra(
       cumplido: null,
       causa: null,
       libre: false,
+      compromisoId: null,
+      enEjecucion: false,
     });
   }
 
   for (const c of abiertos) {
-    porColumna.COMPROMETIDA.push(tarjetaDeCompromiso(c));
+    // La columna sale de un dato EXPLICITO, no de deducir nada: una cantidad
+    // ejecutada en cero no distingue «empezo sin avance medible» de «no ha
+    // empezado», y confundirlas es como una fila cambia de naturaleza sin que
+    // nadie lo note.
+    const columna: ColumnaKanban = c.enEjecucion
+      ? "EN_EJECUCION"
+      : "COMPROMETIDA";
+    porColumna[columna].push(tarjetaDeCompromiso(c));
   }
   for (const c of cerrada?.compromisos ?? []) {
     porColumna.CERRADA.push(tarjetaDeCompromiso(c));
@@ -227,6 +243,8 @@ interface CompromisoDelTablero {
   lookaheadTaskId: string | null;
   cumplido: boolean | null;
   causa: CausaNoCumplimiento | null;
+  /// Sellada la fecha de arranque = ya empezo en obra.
+  enEjecucion: boolean;
   cantidadPlan: string | null;
   cantidadEjec: string | null;
   unidad: string | null;
@@ -241,6 +259,7 @@ const CAMPOS_COMPROMISO = {
   lookaheadTaskId: true,
   cumplido: true,
   causa: true,
+  enEjecucionAt: true,
   cantidadPlan: true,
   cantidadEjec: true,
   unidad: true,
@@ -282,6 +301,7 @@ async function compromisosDelTablero(obraId: string): Promise<{
       lookaheadTaskId: string | null;
       cumplido: boolean | null;
       causa: CausaNoCumplimiento | null;
+      enEjecucionAt: Date | null;
       cantidadPlan: unknown;
       cantidadEjec: unknown;
       unidad: string | null;
@@ -298,6 +318,7 @@ async function compromisosDelTablero(obraId: string): Promise<{
       lookaheadTaskId: c.lookaheadTaskId,
       cumplido: c.cumplido,
       causa: c.causa,
+      enEjecucion: c.enEjecucionAt !== null,
       // Los decimales viajan como texto hasta la pantalla, como en el resto
       // del proyecto: convertirlos a numero aqui perderia centimos.
       cantidadPlan: c.cantidadPlan?.toString() ?? null,
@@ -339,5 +360,7 @@ function tarjetaDeCompromiso(c: CompromisoDelTablero): TarjetaKanban {
     cumplido: c.cumplido,
     causa: c.causa,
     libre: c.lookaheadTaskId === null,
+    compromisoId: c.id,
+    enEjecucion: c.enEjecucion,
   };
 }

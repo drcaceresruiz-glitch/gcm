@@ -1984,6 +1984,19 @@ model CompromisoSemanal {
 
   notaCierre String? @db.Text
 
+  /// Cuando el trabajo EMPEZO en obra. Null = prometido pero sin arrancar.
+  ///
+  /// Es la fecha de la TRANSICION y no un booleano, igual que `listaAt` o
+  /// `analizadaAt`: guarda CUANDO paso, que es lo que permite medir cuanto
+  /// tarda un compromiso en arrancar desde que se prometio.
+  ///
+  /// NO se deduce de `cantidadEjec`. Una cantidad ejecutada en cero puede
+  /// significar «empezo y aun no hay avance medible» o «no ha empezado», y
+  /// son cosas distintas: deducirlo es exactamente como una fila cambia de
+  /// naturaleza sin que nadie lo note, que es el modo de fallo caro de esta
+  /// aplicacion.
+  enEjecucionAt DateTime?
+
   createdAt DateTime @default(now())
 
   // --- PTS operativo (Last Planner Fase 1): cantidad + zonificacion ---
