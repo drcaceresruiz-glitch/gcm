@@ -32,15 +32,17 @@ export default async function AvancePage({
   if (!obra) redirect("/panel");
   if (!puede(sesion, "cronograma:leer")) redirect(`/obras/${id}`);
 
+  // Sin eleccion en la URL no se impone ventana: decide el servicio segun lo
+  // larga que sea la lista. Asi una obra pequena se ensena entera.
   const pedido = (await searchParams).dias;
-  const diasVista =
+  const elegido =
     pedido === TODAS
       ? null
       : DIAS.includes(Number(pedido) as (typeof DIAS)[number])
         ? Number(pedido)
-        : 7;
+        : undefined;
 
-  const parte = await obtenerParteDelDia(sesion, id, { diasVista });
+  const parte = await obtenerParteDelDia(sesion, id, { diasVista: elegido });
   const puedeReportar = puede(sesion, "avance:registrar");
 
   if (!parte) {
@@ -112,8 +114,9 @@ export default async function AvancePage({
               href={`/obras/${id}/avance?dias=${d}`}
               className="rounded-lg border px-2 py-1 font-medium"
               style={{
-                borderColor: d === diasVista ? "var(--color-marca-600)" : "var(--borde)",
-                color: d === diasVista ? "var(--color-marca-600)" : undefined,
+                borderColor:
+                  d === parte.diasVista ? "var(--color-marca-600)" : "var(--borde)",
+                color: d === parte.diasVista ? "var(--color-marca-600)" : undefined,
               }}
             >
               {d} días
@@ -126,8 +129,8 @@ export default async function AvancePage({
             className="rounded-lg border px-2 py-1 font-medium"
             style={{
               borderColor:
-                diasVista === null ? "var(--color-marca-600)" : "var(--borde)",
-              color: diasVista === null ? "var(--color-marca-600)" : undefined,
+                parte.diasVista === null ? "var(--color-marca-600)" : "var(--borde)",
+              color: parte.diasVista === null ? "var(--color-marca-600)" : undefined,
             }}
           >
             Todas

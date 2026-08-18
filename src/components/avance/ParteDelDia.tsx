@@ -173,10 +173,16 @@ export function ParteDelDia({
         style={{ borderColor: "var(--borde)" }}
       >
         <table className="w-full text-sm">
-          <thead
-            className="sticky top-[73px] z-[5]"
-            style={{ backgroundColor: "var(--superficie)" }}
-          >
+          {/* `top-0`, NO `top-[73px]`.
+              
+              Los 73px se pusieron pensando en la cabecera de la app, pero el
+              envoltorio de arriba lleva `overflow-x-auto` y eso lo convierte
+              en su propio contenedor de scroll (`overflow-y` pasa a `auto`).
+              El pegado se mide desde el borde de la TABLA, no de la ventana:
+              la cabecera aparcaba 73px mas abajo de su sitio, justo encima de
+              la primera fila, y con fondo opaco y z-5 la borraba de la vista.
+              La partida 1.1 existia, se contaba y no se podia reportar. */}
+          <thead className="sticky top-0 z-[5]" style={{ backgroundColor: "var(--superficie)" }}>
             <tr className="text-left text-xs opacity-70">
               <th className="px-3 py-2 font-medium">Partida</th>
               <th className="px-3 py-2 text-right font-medium">Hoy</th>

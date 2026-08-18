@@ -1468,6 +1468,10 @@ export async function informeAlCorte(
   };
 }
 
+/// Hasta aqui se ensena la obra entera sin ventana. Por encima, la lista se
+/// hace inmanejable y los 7 dias vuelven a ganarse el sitio.
+const SIN_VENTANA_HASTA = 60;
+
 export interface ParteDelDia {
   grupos: GrupoParte[];
   /// Cuantas casillas se van a pintar. Es el numero del boton.
@@ -1503,10 +1507,27 @@ export async function obtenerParteDelDia(
 
   const calendario = await obtenerCalendario(sesion, obraId);
   const ahora = hoyUtc();
-  // `??` no vale: convertiria el `null` de «todas» en la ventana de 7 dias.
-  const diasVista = opciones.diasVista === undefined ? 7 : opciones.diasVista;
+  /*
+   * Sin eleccion explicita se ensena la obra ENTERA, y la ventana solo entra
+   * si la lista se hace larga.
+   *
+   * Al reves —que es como estaba— una obra de 17 dias con seis partidas
+   * abria mostrando tres: la mitad de la obra escondida detras de un boton
+   * que hay que descubrir, en la pantalla que existe justamente para no
+   * dejarse nada sin reportar. La ventana es una comodidad para cronogramas
+   * de cientos de filas, asi que se aplica cuando hay cientos de filas.
+   *
+   * No cuesta una consulta mas: `obtenerCronograma` ya trajo todas las
+   * tareas y el recorte es en memoria.
+   */
+  const eligio = opciones.diasVista !== undefined;
+  let diasVista = eligio ? opciones.diasVista! : null;
+  let { dentro, fuera } = tareasAbiertas(vigente.tareas, ahora, diasVista);
 
-  const { dentro, fuera } = tareasAbiertas(vigente.tareas, ahora, diasVista);
+  if (!eligio && dentro.length > SIN_VENTANA_HASTA) {
+    diasVista = 7;
+    ({ dentro, fuera } = tareasAbiertas(vigente.tareas, ahora, diasVista));
+  }
 
   // El capitulo sale del orden del documento —`capituloDeCadaTarea`—, no del
   // prefijo del codigo: "7.3.1" es hermana de "7.3" y no su hija.

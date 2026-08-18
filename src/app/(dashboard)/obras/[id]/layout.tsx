@@ -145,12 +145,6 @@ export default async function ObraLayout({
       clave: "ejecucion",
       titulo: "Ejecución",
       secciones: [
-        puede(sesion, "cronograma:leer") && {
-          clave: "avance",
-          titulo: "Parte del día",
-          pregunta: "cuánto se avanzó hoy",
-          href: `${raiz}/avance`,
-        },
         puede(sesion, "lookahead:leer") && {
           clave: "lookahead",
           titulo: "Lookahead",
@@ -183,6 +177,16 @@ export default async function ObraLayout({
             titulo: `Semana ${s.numero}`,
             href: `${raiz}/plan-semanal/${s.id}`,
           })),
+        },
+        /// El parte va DESPUES del Plan semanal, que es el orden del Last
+        /// Planner: se prepara (Lookahead), se compromete (PTS) y solo
+        /// entonces se reporta lo que se hizo. Estaba primero, y eso invitaba
+        /// a reportar avance sobre tareas que nadie habia comprometido.
+        puede(sesion, "cronograma:leer") && {
+          clave: "avance",
+          titulo: "Parte del día",
+          pregunta: "cuánto se avanzó hoy",
+          href: `${raiz}/avance`,
         },
         /// El escaparate: las fotos de avance que se curan y, si gerencia
         /// quiere, se ensenan al cliente. Va tras el Plan semanal porque la
