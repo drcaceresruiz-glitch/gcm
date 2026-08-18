@@ -69,10 +69,61 @@ export default async function MetaPage({
 
   if (!puede(sesion, "meta:leer")) redirect(`/obras/${id}`);
 
-  const [metas, comparacion] = await Promise.all([
-    listarMetas(sesion, id),
-    compararConContractual(sesion, id),
-  ]);
+  /*
+   * Se captura AQUI, en el servidor, a proposito.
+   *
+   * En produccion Next.js borra el mensaje de cualquier error que llega a la
+   * frontera `error.tsx` y lo cambia por uno generico, asi que la pantalla
+   * moria con un «no se pudo cargar» que no decia nada —y por eso este fallo
+   * arrastro toda una sesion sin poder diagnosticarse—. Capturandolo aqui el
+   * mensaje real sobrevive: se renderiza como contenido, no como excepcion.
+   *
+   * Cubre las DOS consultas. El caso mas probable, ya visto en produccion: una
+   * columna nueva (`metaIncluyeGastosGenerales`) pedida en un `select` antes de
+   * que su migracion se aplicara. Prisma no valida el select al compilar, asi
+   * que solo se cae en runtime.
+   */
+  let metas: Awaited<ReturnType<typeof listarMetas>>;
+  let comparacion: Awaited<ReturnType<typeof compararConContractual>>;
+  try {
+    [metas, comparacion] = await Promise.all([
+      listarMetas(sesion, id),
+      compararConContractual(sesion, id),
+    ]);
+  } catch (e) {
+    const detalle = e instanceof Error ? e.message : String(e);
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Presupuesto meta</h2>
+        </div>
+        <section
+          className="space-y-3 rounded-xl border p-6"
+          style={{ borderColor: "var(--color-peligro)" }}
+        >
+          <h3 className="text-sm font-semibold">
+            No se pudo calcular la bolsa de esta obra
+          </h3>
+          <p className="max-w-2xl text-sm text-pretty opacity-80">
+            El resto de la obra sigue funcionando; es solo esta pantalla. Vuelve a
+            intentarlo en un momento. Si persiste, este es el motivo exacto para
+            quien lo revise:
+          </p>
+          <pre
+            className="overflow-x-auto rounded-lg p-3 text-xs"
+            style={{
+              backgroundColor: "color-mix(in oklab, var(--color-peligro) 8%, transparent)",
+            }}
+          >
+            {detalle}
+          </pre>
+          <Link href={`/obras/${id}/meta`} className="text-sm font-medium underline">
+            Reintentar
+          </Link>
+        </section>
+      </div>
+    );
+  }
 
   const { creada, aprobada, eliminada } = await searchParams;
   const puedeCrear = puede(sesion, "meta:crear");
