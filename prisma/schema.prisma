@@ -1852,14 +1852,26 @@ model EncargoProveedor {
 
   notas String? @db.Text
 
+  /// Cada cuantos dias le toca valorizar a ESTE contratista.
+  ///
+  /// `null` = HEREDA la cadencia de la obra, que es semanal atada a su
+  /// `diaCorteSemanal`. Nula por defecto a proposito: la mayoria de los
+  /// contratistas siguen el corte de la obra, y obligar a configurar uno por
+  /// uno convertiria la funcion en una lista de pendientes que nadie llena.
+  ///
+  /// Si el encargo tiene `fechasValorizacion`, esas MANDAN sobre esto.
+  cadenciaDias Int?
+
   creadoPor String   @db.VarChar(150)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  proveedor      Proveedor             @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
-  partidas       EncargoPartida[]
-  valorizaciones ValorizacionEncargo[]
+  project             Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  proveedor           Proveedor             @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  partidas            EncargoPartida[]
+  valorizaciones      ValorizacionEncargo[]
+  fechasValorizacion  FechaValorizacion[]
+  pagos               PagoEncargo[]
 
   @@unique([projectId, numero])
   @@index([projectId, estado])
@@ -1918,9 +1930,112 @@ model ValorizacionEncargo {
   createdAt     DateTime @default(now())
 
   encargo EncargoProveedor @relation(fields: [encargoId], references: [id], onDelete: Cascade)
+  pagos   PagoEncargo[]
 
   @@index([encargoId, fecha])
   @@map("valorizaciones_encargo")
+}
+
+/// Una fecha pactada de valorizacion para ESTE encargo (un hito de pago).
+///
+/// El segundo nivel de la cadencia, para el contratista que no valoriza cada
+/// N dias sino en fechas acordadas ("al terminar el casco", "el 15 y el 30").
+/// Si un encargo tiene fechas, MANDAN sobre la cadencia periodica: se pactaron
+/// una a una, asi que son mas especificas que cualquier periodo.
+model FechaValorizacion {
+  id        String @id @default(cuid())
+  encargoId String
+
+  fecha DateTime @db.Date
+
+  /// Como se llama ese hito en la conversacion con el contratista.
+  descripcion String? @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+
+  encargo EncargoProveedor @relation(fields: [encargoId], references: [id], onDelete: Cascade)
+
+  @@unique([encargoId, fecha])
+  @@index([encargoId, fecha])
+  @@map("fechas_valorizacion")
+}
+
+/// Un pago hecho al contratista contra su encargo.
+///
+/// Cuelga del ENCARGO y no de la orden: el encargo es el contrato marco, y es
+/// a el a quien se le paga. Ver la decision en el modelo de negocio —la
+/// empresa subcontrata a todo riesgo y le paga al contratista, no al
+/// proveedor de materiales—.
+///
+/// APPEND-ONLY como las valorizaciones: un pago no se edita, se registra. Si
+/// se equivoco el importe, se registra el ajuste; lo pagado ya salio de caja
+/// y el historico tiene que poder explicarlo.
+model PagoEncargo {
+  id        String @id @default(cuid())
+  encargoId String
+
+  /// La valorizacion que se esta pagando, si el pago corresponde a un corte
+  /// concreto. Opcional: hay adelantos que no valorizan nada todavia, y
+  /// pagos que cubren varios cortes. `SetNull` porque el pago sobrevive
+  /// aunque el corte se rehaga.
+  valorizacionId String?
+
+  /// Lo pagado, en la moneda de la obra. Como todo el dinero aqui: Decimal,
+  /// nunca coma flotante.
+  monto Decimal @db.Decimal(14, 2)
+
+  /// El dia en que salio el dinero (calendario), que no es el dia en que
+  /// alguien lo tecleo: `createdAt` guarda eso.
+  fecha DateTime @db.Date
+
+  /// Quien lo registra, por nombre: tiene que seguir diciendolo aunque el
+  /// usuario se desactive, igual que `registradoPor` de la valorizacion.
+  registradoPor String @db.VarChar(150)
+
+  nota String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  encargo      EncargoProveedor     @relation(fields: [encargoId], references: [id], onDelete: Cascade)
+  valorizacion ValorizacionEncargo? @relation(fields: [valorizacionId], references: [id], onDelete: SetNull)
+  comprobantes ComprobantePago[]
+
+  @@index([encargoId, fecha])
+  @@index([valorizacionId])
+  @@map("pagos_encargo")
+}
+
+/// El respaldo de un pago: la constancia de transferencia o la factura.
+///
+/// Tabla PROPIA y no un ancla mas de `FotoEvidencia`, a proposito: la
+/// evidencia de obra se ensena en la galeria y en el informe —y la galeria
+/// tiene un enlace que ve el CLIENTE—. Una constancia de pago a un
+/// contratista no puede aparecer ahi por un descuido en un `where`.
+///
+/// Guarda lo mismo que `FotoEvidencia` y por los mismos motivos: el archivo
+/// va al disco (`STORAGE_ROOT`), aqui solo su ruta, su tipo y su huella.
+/// A diferencia de aquella, ADMITE PDF: una constancia bancaria casi nunca es
+/// una foto, y un PDF no se puede comprimir en el navegador como una imagen.
+model ComprobantePago {
+  id     String @id @default(cuid())
+  pagoId String
+
+  /// Ruta RELATIVA dentro de STORAGE_ROOT ("pagos/<obra>/<id>.pdf").
+  ruta String @db.VarChar(255)
+
+  nombreOriginal String @db.VarChar(255)
+  mimeType       String @db.VarChar(100)
+  tamano         Int
+  /// SHA-256 del contenido.
+  hash           String @db.VarChar(64)
+
+  subidoPor String   @db.VarChar(150)
+  createdAt DateTime @default(now())
+
+  pago PagoEncargo @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+
+  @@index([pagoId])
+  @@map("comprobantes_pago")
 }
 
 // ---------------------------------------------------------------------------
@@ -2811,6 +2926,13 @@ enum EventoAviso {
   HITO_CERCA
   /// Una fecha clave paso sin cumplirse. Insiste cada `diasRecordatorio`.
   HITO_VENCIDO
+
+  /// A un contratista le toco valorizar y no consta el corte.
+  ///
+  /// AVISA, NO BLOQUEA: decision del usuario. El avance de la obra no se
+  /// detiene porque un contratista deba una valorizacion; lo que no puede
+  /// pasar es que nadie se entere hasta que llegue la factura.
+  VALORIZACION_PENDIENTE
 }
 
 /// El aviso dentro de GCM.
