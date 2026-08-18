@@ -9,6 +9,27 @@ import type { Role } from "../src/generated/prisma/enums";
  *   npx tsx scripts/sembrar-equipo-inicial.ts          (ensayo: no escribe)
  *   npx tsx scripts/sembrar-equipo-inicial.ts --si     (escribe)
  *
+ * ---------------------------------------------------------------------------
+ * ESTO NO CORRE EN EL SERVIDOR. Comprobado el 18/08/2026, fallando.
+ *
+ * El paquete de despliegue (`.github/workflows/desplegar.yml`) lleva
+ * `.next/standalone`, los estaticos, `public` y `prisma`. NO lleva `scripts/`
+ * ni `src/`, asi que ni el guion esta alli ni podria importar el cliente de
+ * Prisma generado. Da `ERR_MODULE_NOT_FOUND`, se ejecute desde donde se
+ * ejecute.
+ *
+ * EN PRODUCCION se hace por SQL, desde phpMyAdmin. Primero el ensayo:
+ *
+ *   SELECT COUNT(*) FROM users u
+ *   JOIN projects p ON p.companyId = u.companyId
+ *   WHERE u.role <> 'ADMIN' AND u.estado = 'ACTIVO'
+ *     AND NOT EXISTS (SELECT 1 FROM project_memberships m
+ *                     WHERE m.userId = u.id AND m.projectId = p.id);
+ *
+ * Y si el numero cuadra, el mismo criterio en un INSERT ... SELECT con
+ * `UUID()` como id. Ver [[acceso-por-obra]] en la memoria.
+ * ---------------------------------------------------------------------------
+ *
  * Existe por el dia del cambio, y solo por ese dia.
  *
  * Hasta ahora `project_memberships` estaba vacia y no importaba: todo el
