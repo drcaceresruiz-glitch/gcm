@@ -130,6 +130,10 @@ export default async function PanelPage({
     {
       clave: "empresa",
       titulo: "Mi constructora",
+      // Plegado: son siete entradas de consulta ocasional —contratistas,
+      // permisos, formas de pago— que, siempre abiertas, empujan hacia abajo
+      // las obras, que es a lo que se entra a diario.
+      plegable: true,
       secciones: [
         puede(sesion, "proveedor:leer") && {
           clave: "contratistas",

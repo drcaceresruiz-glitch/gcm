@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 
 /**
  * El mapa de la obra: fases, secciones y la rama abierta, en un solo sitio.
@@ -82,6 +83,16 @@ export interface FaseMenu {
    * pertenece a ninguna fase del trabajo.
    */
   titulo?: string;
+  /**
+   * Nace plegada y se despliega al pulsar su titulo.
+   *
+   * Para grupos que se consultan de vez en cuando —la ficha de la
+   * constructora— y que, siempre desplegados, empujan hacia abajo lo que se
+   * usa a diario. No se recuerda entre paginas a proposito: el usuario pidio
+   * que volviera a su estado plegado, y un lateral que cada dia amanece
+   * distinto segun lo que tocaste ayer deja de ser un mapa fijo.
+   */
+  plegable?: boolean;
   secciones: SeccionMenu[];
 }
 
@@ -128,6 +139,57 @@ export function seccionActiva(ruta: string, fases: FaseMenu[]): string | null {
   return ganadora;
 }
 
+/**
+ * Un grupo del riel. Plegable solo si su fase lo pide.
+ *
+ * El estado vive AQUI y no en `MenuObra` porque asi cada grupo recuerda lo
+ * suyo sin que el padre lleve un mapa de claves abiertas, y porque al navegar
+ * el componente se vuelve a montar y el grupo vuelve a nacer plegado, que es
+ * justo lo pedido.
+ */
+function Grupo({
+  fase,
+  dentro,
+  children,
+}: {
+  fase: FaseMenu;
+  dentro: boolean;
+  children: React.ReactNode;
+}) {
+  const [abierto, setAbierto] = useState(dentro);
+
+  if (!fase.plegable || !fase.titulo) {
+    return (
+      <div className="mb-3 last:mb-0">
+        {fase.titulo && (
+          <p className="mb-1 px-1.5 text-[11px] font-semibold tracking-wider uppercase opacity-45">
+            {fase.titulo}
+          </p>
+        )}
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-3 last:mb-0">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        className="mb-1 flex w-full items-center gap-1 rounded px-1.5 py-0.5 text-left text-[11px] font-semibold tracking-wider uppercase opacity-45 hover:opacity-80"
+      >
+        <ChevronRight
+          className={`size-3 shrink-0 transition-transform ${abierto ? "rotate-90" : ""}`}
+          aria-hidden="true"
+        />
+        {fase.titulo}
+      </button>
+      {abierto && children}
+    </div>
+  );
+}
+
 export function MenuObra({ fases }: { fases: FaseMenu[] }) {
   const ruta = usePathname();
   const actual = seccionActiva(ruta, fases);
@@ -143,12 +205,13 @@ export function MenuObra({ fases }: { fases: FaseMenu[] }) {
           de cien filas la ubicacion sigue a la vista, que es el encargo. */}
       <div className="sticky top-20 hidden lg:block">
         {fases.map((fase) => (
-          <div key={fase.clave} className="mb-3 last:mb-0">
-            {fase.titulo && (
-              <p className="mb-1 px-1.5 text-[11px] font-semibold tracking-wider uppercase opacity-45">
-                {fase.titulo}
-              </p>
-            )}
+          <Grupo
+            key={fase.clave}
+            fase={fase}
+            // Si estas DENTRO del grupo nace abierto: un lateral que esconde
+            // la pantalla en la que estas no dice donde estas.
+            dentro={fase.secciones.some((s) => s.clave === actual)}
+          >
             <ol>
               {fase.secciones.map((s) => (
                 <li key={s.clave}>
@@ -181,7 +244,7 @@ export function MenuObra({ fases }: { fases: FaseMenu[] }) {
                 </li>
               ))}
             </ol>
-          </div>
+          </Grupo>
         ))}
       </div>
 
