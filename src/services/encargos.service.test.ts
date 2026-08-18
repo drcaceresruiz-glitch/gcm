@@ -33,6 +33,10 @@ const estado: {
   /// El `where` con el que el servicio pidio los encargos ya asignados. Es
   /// lo unico observable del filtro por estado desde aqui.
   filtroEncargos: Record<string, unknown> | null;
+  /// El encargo que se va a valorizar, o null si no es de esta obra/empresa.
+  encargo: { id: string; estado: string } | null;
+  /// Los cortes escritos. Append-only: aqui solo se puede acumular.
+  valorizaciones: Record<string, unknown>[];
 } = {
   obra: { id: "obra-1" },
   proveedor: { id: "prov-1", tipoImpuesto: "IGV" },
@@ -40,6 +44,8 @@ const estado: {
   cerrada: null,
   creados: [],
   filtroEncargos: null,
+  encargo: { id: "enc-1", estado: "VIGENTE" },
+  valorizaciones: [],
 };
 
 vi.mock("@/services/obra-abierta", () => ({
@@ -55,12 +61,21 @@ vi.mock("@/lib/prisma", () => {
         return Promise.resolve({ id: "encargo-nuevo" });
       },
     },
+    // Solo `create`: si algun dia alguien cambiara el corte por un `update`
+    // sobre el anterior, esto reventaria en vez de sobrescribir en silencio.
+    valorizacionEncargo: {
+      create: (args: { data: Record<string, unknown> }) => {
+        estado.valorizaciones.push(args.data);
+        return Promise.resolve({ id: "val-nueva" });
+      },
+    },
     auditLog: { create: () => Promise.resolve({}) },
   };
 
   return {
     prisma: {
       project: { findFirst: () => Promise.resolve(estado.obra) },
+      encargoProveedor: { findFirst: () => Promise.resolve(estado.encargo) },
       proveedor: { findFirst: () => Promise.resolve(estado.proveedor) },
       wbsItem: {
         findMany: (args: {
@@ -78,7 +93,9 @@ vi.mock("@/lib/prisma", () => {
   };
 });
 
-const { crearEncargo } = await import("@/services/encargos.service");
+const { crearEncargo, valorizarEncargo } = await import(
+  "@/services/encargos.service"
+);
 
 function sesion(permisos: string[]): SesionActiva {
   return {
@@ -119,6 +136,8 @@ beforeEach(() => {
   estado.cerrada = null;
   estado.creados = [];
   estado.filtroEncargos = null;
+  estado.encargo = { id: "enc-1", estado: "VIGENTE" };
+  estado.valorizaciones = [];
 });
 
 function seNego(r: { ok: boolean; error?: string }, trozo: string) {
@@ -262,5 +281,172 @@ describe("crearEncargo: quien puede, cuando, y que llega", () => {
       encargo({ partidas: [{ wbsItemId: "p-1", fraccion: "120" }] }),
     );
     seNego(r, "entre 0 y 100");
+  });
+});
+
+/**
+ * `valorizarEncargo`: el corte de avance del contratista. Es contra esto que
+ * se le paga, asi que un corte de mas o de menos es dinero de verdad.
+ *
+ * Es append-only por diseño: cada corte es una fila nueva y NO sobrescribe al
+ * anterior. Perder eso borraria el historial de lo ya reconocido.
+ */
+
+/** Corte valido al que cada prueba cambia solo lo que examina. */
+function corte(cambios: Record<string, unknown> = {}) {
+  return { fecha: "2026-08-18", porcentaje: "45", ...cambios };
+}
+
+function noValorizo(r: { ok: boolean; error?: string }, trozo: string) {
+  expect(r.ok).toBe(false);
+  expect(!r.ok && r.error).toContain(trozo);
+  expect(estado.valorizaciones).toHaveLength(0);
+}
+
+describe("valorizarEncargo: el camino bueno y el historial", () => {
+  it("un corte valido se guarda con el porcentaje a tres decimales", async () => {
+    const r = await valorizarEncargo(
+      sesion(["encargo:valorizar"]),
+      "obra-1",
+      "enc-1",
+      corte(),
+    );
+    expect(r.ok).toBe(true);
+    expect(estado.valorizaciones).toHaveLength(1);
+    expect(estado.valorizaciones[0]).toMatchObject({
+      encargoId: "enc-1",
+      porcentaje: "45.000",
+    });
+  });
+
+  it("dos cortes seguidos se acumulan: el segundo no pisa al primero", async () => {
+    // Append-only. Si esto se rompiera, el historial de lo reconocido
+    // desapareceria y solo quedaria la ultima cifra, sin rastro de la
+    // anterior ni de quien la puso.
+    const quien = sesion(["encargo:valorizar"]);
+    await valorizarEncargo(quien, "obra-1", "enc-1", corte({ porcentaje: "30" }));
+    await valorizarEncargo(quien, "obra-1", "enc-1", corte({ porcentaje: "55" }));
+    expect(estado.valorizaciones).toHaveLength(2);
+    expect(estado.valorizaciones.map((v) => v["porcentaje"])).toEqual([
+      "30.000",
+      "55.000",
+    ]);
+  });
+});
+
+describe("valorizarEncargo: el rango del avance", () => {
+  it("acepta el 0 %: un corte sin avance tambien es un hecho", async () => {
+    // Aqui el 0 SI vale, al reves que la fraccion de un encargo. Registrar
+    // que el contratista no avanzo esta semana es informacion, y ademas es
+    // lo que sostiene el indicador de cumplimiento.
+    const r = await valorizarEncargo(
+      sesion(["encargo:valorizar"]),
+      "obra-1",
+      "enc-1",
+      corte({ porcentaje: "0" }),
+    );
+    expect(r.ok).toBe(true);
+    expect(estado.valorizaciones).toHaveLength(1);
+  });
+
+  it("acepta el 100 %: el encargo terminado", async () => {
+    const r = await valorizarEncargo(
+      sesion(["encargo:valorizar"]),
+      "obra-1",
+      "enc-1",
+      corte({ porcentaje: "100" }),
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it("mas del 100 % se rechaza: no se paga por encima de lo contratado", async () => {
+    const r = await valorizarEncargo(
+      sesion(["encargo:valorizar"]),
+      "obra-1",
+      "enc-1",
+      corte({ porcentaje: "110" }),
+    );
+    noValorizo(r, "entre 0 y 100");
+  });
+
+  it("un avance negativo se rechaza", async () => {
+    const r = await valorizarEncargo(
+      sesion(["encargo:valorizar"]),
+      "obra-1",
+      "enc-1",
+      corte({ porcentaje: "-5" }),
+    );
+    noValorizo(r, "entre 0 y 100");
+  });
+
+  it("un porcentaje que no es un numero se rechaza", async () => {
+    const r = await valorizarEncargo(
+      sesion(["encargo:valorizar"]),
+      "obra-1",
+      "enc-1",
+      corte({ porcentaje: "casi la mitad" }),
+    );
+    noValorizo(r, "entre 0 y 100");
+  });
+
+  it("sin fecha de corte no se valoriza: un avance sin fecha no situa nada", async () => {
+    const r = await valorizarEncargo(
+      sesion(["encargo:valorizar"]),
+      "obra-1",
+      "enc-1",
+      corte({ fecha: "" }),
+    );
+    noValorizo(r, "fecha del corte");
+  });
+});
+
+describe("valorizarEncargo: quien puede y sobre que", () => {
+  it("valorizar pide su propio permiso, no el de gestionar encargos", async () => {
+    // Son dos cosas distintas: repartir el trabajo es de oficina, reconocer
+    // el avance es de obra. Quien solo gestiona encargos NO valoriza.
+    const r = await valorizarEncargo(
+      sesion(["encargo:gestionar"]),
+      "obra-1",
+      "enc-1",
+      corte(),
+    );
+    noValorizo(r, "No tienes permiso para valorizar");
+  });
+
+  it("con la obra cerrada no se valoriza, aunque tenga permiso", async () => {
+    estado.cerrada = "La obra esta cerrada desde el 01/07/2026.";
+    const r = await valorizarEncargo(
+      sesion(["encargo:valorizar"]),
+      "obra-1",
+      "enc-1",
+      corte(),
+    );
+    noValorizo(r, "cerrada");
+  });
+
+  it("un encargo anulado no se valoriza", async () => {
+    // Anulado quiere decir que ese contrato ya no rige. Reconocerle avance
+    // seria reconocer trabajo contra algo que no existe.
+    estado.encargo = { id: "enc-1", estado: "ANULADO" };
+    const r = await valorizarEncargo(
+      sesion(["encargo:valorizar"]),
+      "obra-1",
+      "enc-1",
+      corte(),
+    );
+    noValorizo(r, "anulado no se valoriza");
+  });
+
+  it("un encargo de otra obra o de otra empresa no se encuentra", async () => {
+    // La consulta filtra por `projectId` y por `companyId`. Sin eso, se
+    // podria valorizar el encargo de otra constructora sabiendo su id.
+    estado.encargo = null;
+    const r = await valorizarEncargo(
+      sesion(["encargo:valorizar"]),
+      "obra-1",
+      "enc-1",
+      corte(),
+    );
+    noValorizo(r, "Encargo no encontrado");
   });
 });
