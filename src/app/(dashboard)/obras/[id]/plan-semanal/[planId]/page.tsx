@@ -290,6 +290,12 @@ export default async function DetallePlanSemanalPage({
               cantidadPlan: c.cantidadPlan,
               unidad: c.unidad,
               cantidadEjec: c.cantidadEjec,
+              // SIN ESTO la interpolacion parte de cero y propone un
+              // RETROCESO: una partida al 70% con la quinta parte de su
+              // compromiso hecha salia al 17%, no al 73%. Y el freno de «nunca
+              // hacia atras» no podia saltar, porque comparaba contra un cero
+              // que no era el avance real.
+              avanceActual: c.avanceActual,
               fotos: c.fotos,
             }))}
           />
