@@ -241,6 +241,21 @@ export interface Bolsa {
   bolsaPlazo: string;
   /// El criterio con el que se calculo, para que la pantalla no lo adivine.
   incluyeGastosGenerales: boolean;
+  /**
+   * Gastos generales contratados menos los presupuestados. SIEMPRE, entre o
+   * no entre en la bolsa.
+   *
+   * NO es bolsa aunque salga positivo, y por eso tiene nombre propio: es el
+   * resultado de la ESTRUCTURA, y lo gestiona la empresa, no el residente.
+   * Negativo significa que los gastos generales cuestan mas de lo que el
+   * contrato reconoce y esa diferencia sale del bolsillo de la empresa.
+   *
+   * Se calcula siempre porque esconderlo era el agujero del diseño anterior:
+   * al sacar los gastos generales de la bolsa, simplemente desaparecian, y
+   * una obra podia ir perfecta en costo directo y perder dinero sin que nada
+   * lo dijera.
+   */
+  resultadoGastosGenerales: string;
 
   /// Produccion + plazo. SIN utilidad.
   bolsaTotal: string;
@@ -289,6 +304,12 @@ export function calcularBolsa(datos: DatosBolsa): Bolsa {
    * pantalla los pueda mostrar aparte con su aviso de sobrecosto.
    */
   const incluyeGG = datos.incluyeGastosGenerales ?? true;
+  // El resultado de estructura se calcula SIEMPRE. La bolsa lo usa o no,
+  // segun el criterio de la obra, pero la cifra existe en los dos casos.
+  const resultadoGastosGenerales =
+    restar(datos.gastosGeneralesContractual, datos.gastosGeneralesMeta) ??
+    "0.00";
+
   const bolsaPlazo = incluyeGG
     ? restar(datos.gastosGeneralesContractual, datos.gastosGeneralesMeta) ??
       "0.00"
@@ -305,6 +326,7 @@ export function calcularBolsa(datos: DatosBolsa): Bolsa {
     gastosGeneralesMeta: datos.gastosGeneralesMeta,
     bolsaPlazo,
     incluyeGastosGenerales: incluyeGG,
+    resultadoGastosGenerales,
     bolsaTotal,
     utilidadContractual: datos.utilidadContractual,
     margenEsperado: sumar([bolsaTotal, datos.utilidadContractual]),
@@ -441,4 +463,82 @@ export function gastosGeneralesInverosimiles(datos: {
   return esPositivo(
     restar(datos.gastosGeneralesMeta, datos.costoDirectoMeta) ?? "0.00",
   );
+}
+
+/**
+ * El resultado de gastos generales es un DEFICIT: cuestan mas de lo que el
+ * contrato reconoce.
+ *
+ * Es la situacion que el usuario describe como la corriente en obra pequena,
+ * y no es un detalle contable: una obra no puede perder dinero, no puede
+ * tocar su utilidad, y una vez firmado no puede volver a presupuestar de cara
+ * al cliente. Solo hay tres salidas, y las tres son decisiones de personas:
+ *
+ *   1. Meter los gastos generales en la bolsa, si se habian dejado fuera, y
+ *      cubrirlos con el margen de produccion.
+ *   2. Quitar o recortar lineas de gasto general hasta que quepan.
+ *   3. Gestionar un ADICIONAL al contrato y que se apruebe. Sube el costo
+ *      directo vigente y, con el mismo porcentaje, los gastos generales que
+ *      el contrato reconoce.
+ *
+ * Por eso esto devuelve un booleano y no arregla nada: el sistema señala, la
+ * decision es de gerencia.
+ */
+export function hayDeficitDeEstructura(bolsa: {
+  resultadoGastosGenerales: string;
+}): boolean {
+  return esNegativo(bolsa.resultadoGastosGenerales);
+}
+
+export interface SalidasDelDeficit {
+  /// Lo que falta, en positivo, para poder escribirlo sin el signo.
+  falta: string;
+  /// true si la bolsa de produccion da para cubrirlo.
+  laCubreLaProduccion: boolean;
+  /// Lo que quedaria de bolsa despues de cubrirlo con produccion.
+  bolsaDespues: string;
+  /**
+   * De cuanto tendria que ser el ADICIONAL de costo directo para que los
+   * gastos generales que reconoce el contrato suban lo que falta.
+   *
+   * El contrato reconoce gastos generales como un PORCENTAJE del costo
+   * directo, asi que para subirlos en X hay que ampliar el contrato en
+   * X / porcentaje. Con un porcentaje bajo la cifra se dispara, y eso es
+   * justo lo que hay que ver antes de ir a pedirlo: dice si esa via es
+   * realista o si toca recortar.
+   *
+   * null cuando no se puede calcular (sin gastos generales contractuales no
+   * hay porcentaje del que tirar).
+   */
+  adicionalNecesario: string | null;
+}
+
+/**
+ * Las tres salidas del deficit de estructura, con su numero.
+ *
+ * Avisar sin cuantificar deja al usuario con la misma pregunta: «¿y cuanto
+ * recorto?». Aqui cada salida viene con la cifra que la hace decidible.
+ */
+export function salidasDelDeficit(bolsa: {
+  resultadoGastosGenerales: string;
+  bolsaProduccion: string;
+  costoDirectoContractual: string;
+  gastosGeneralesContractual: string;
+}): SalidasDelDeficit {
+  const falta = multiplicar(bolsa.resultadoGastosGenerales, "-1", 2) ?? "0.00";
+  const bolsaDespues = sumar([bolsa.bolsaProduccion, bolsa.resultadoGastosGenerales]);
+
+  const gg = Number(bolsa.gastosGeneralesContractual);
+  const cd = Number(bolsa.costoDirectoContractual);
+  const adicionalNecesario =
+    gg > 0 && cd > 0
+      ? multiplicar(falta, (cd / gg).toFixed(6), 2)
+      : null;
+
+  return {
+    falta,
+    laCubreLaProduccion: !esNegativo(bolsaDespues),
+    bolsaDespues,
+    adicionalNecesario,
+  };
 }

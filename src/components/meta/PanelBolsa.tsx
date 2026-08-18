@@ -1,9 +1,14 @@
+import Link from "next/link";
 import { AlertTriangle, CalendarClock, Info, Lock } from "lucide-react";
 
 import { soles } from "@/utils/formato";
 import { fechaCorta } from "@/utils/fechas";
 import { esNegativo, esPositivo } from "@/lib/decimal";
-import { gastosGeneralesInverosimiles } from "@/lib/bolsa";
+import {
+  gastosGeneralesInverosimiles,
+  hayDeficitDeEstructura,
+  salidasDelDeficit,
+} from "@/lib/bolsa";
 import { origenDeEjemplo } from "@/lib/datos-de-ejemplo";
 import { BotonAjustarMeses } from "@/components/meta/BotonAjustarMeses";
 import type { ComparacionMeta } from "@/services/meta.service";
@@ -83,6 +88,8 @@ export function PanelBolsa({
   const negativa = esNegativo(bolsa.bolsaTotal);
   const ggRaros = gastosGeneralesInverosimiles(bolsa);
   const ejemplo = origenDeEjemplo(bolsa);
+  const deficit = hayDeficitDeEstructura(bolsa);
+  const salidas = salidasDelDeficit(bolsa);
 
   return (
     <section className="space-y-5">
@@ -197,6 +204,17 @@ export function PanelBolsa({
             nota="resultado esperado, no gastable"
             valor={bolsa.utilidadContractual}
           />
+          {/* El resultado de ESTRUCTURA, siempre. No es bolsa aunque salga
+              positivo: lo gestiona la empresa, no el residente. Esconderlo
+              era el agujero del diseño anterior —al sacar los gastos
+              generales de la bolsa desaparecian—, y una obra podia ir
+              perfecta en costo directo y perder dinero sin que nada lo
+              dijera. */}
+          <Fila
+            etiqueta="Resultado de gastos generales"
+            nota="de la empresa, no de la obra"
+            valor={bolsa.resultadoGastosGenerales}
+          />
           <Fila
             etiqueta="Margen esperado"
             nota="bolsa + utilidad"
@@ -205,6 +223,74 @@ export function PanelBolsa({
           />
         </div>
       </div>
+
+      {/* El deficit de estructura va EL PRIMERO de los avisos: es el unico
+          que puede hacer que la obra pierda dinero yendo bien en produccion.
+          Y no propone una salida sino las TRES que existen, porque las tres
+          son decisiones de personas y el sistema no elige por gerencia. */}
+      {deficit && (
+        <Aviso
+          tono="peligro"
+          icono={AlertTriangle}
+          titulo={`Los gastos generales cuestan ${soles(bolsa.gastosGeneralesMeta)} y el contrato solo reconoce ${soles(bolsa.gastosGeneralesContractual)}`}
+        >
+          Faltan {soles(salidas.falta)} que hoy salen de la
+          empresa. Una obra no puede perder dinero ni tocar su utilidad, y un
+          presupuesto ya firmado no se vuelve a presupuestar de cara al
+          cliente. Hay tres salidas:
+          <span className="mt-2 block">
+            <strong>1.</strong>{" "}
+            {bolsa.incluyeGastosGenerales ? (
+              <>
+                Cubrirlos con la bolsa de producción: ya entran en ella.
+              </>
+            ) : (
+              <>
+                Volver a incluirlos en la bolsa para cubrirlos con el margen
+                de producción:{" "}
+                <Link href={`/obras/${obraId}/criterio`} className="underline">
+                  cambiar el criterio de la obra
+                </Link>
+                .
+              </>
+            )}
+            {salidas.laCubreLaProduccion ? (
+              <em className="block opacity-80">
+                La bolsa de producción da para cubrirlo: quedarían{" "}
+                {soles(salidas.bolsaDespues)}.
+              </em>
+            ) : (
+              <em className="block opacity-80">
+                Ojo: la bolsa de producción NO llega. Aun cubriéndolo entero
+                faltarían {soles(salidas.bolsaDespues)}.
+              </em>
+            )}
+          </span>
+          <span className="mt-1 block">
+            <strong>2.</strong> Recortar {soles(salidas.falta)} en líneas de
+            gasto general. Se hace volviendo a cargar la meta sin esas líneas o
+            ajustando sus meses.
+          </span>
+          <span className="mt-1 block">
+            <strong>3.</strong> Gestionar un{" "}
+            <Link
+              href={`/obras/${obraId}/movimientos/nuevo`}
+              className="underline"
+            >
+              adicional al contrato
+            </Link>
+            . Si se aprueba, sube el costo directo contratado y con él los
+            gastos generales que el contrato reconoce.
+            {salidas.adicionalNecesario && (
+              <em className="block opacity-80">
+                Para cubrir el hueco por esta vía haría falta un adicional de{" "}
+                {soles(salidas.adicionalNecesario)} de costo directo, porque el
+                contrato reconoce los gastos generales como un porcentaje de él.
+              </em>
+            )}
+          </span>
+        </Aviso>
+      )}
 
       {c.lineasLargas.length > 0 && (
         <Aviso
