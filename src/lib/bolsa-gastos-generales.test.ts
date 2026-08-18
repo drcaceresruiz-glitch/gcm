@@ -66,7 +66,7 @@ describe("la bolsa de plazo sigue siendo lo que dice ser", () => {
     // alguien los quitara del resultado, la pantalla dejaria de cuadrar.
     const b = calcularBolsa({
       modo: "PARTIDA",
-      contractual: [{ codigoRef: "1.1", descripcion: "Concreto", importe: "18509.00" }],
+      contractual: [{ codigo: "1.1", descripcion: "Concreto", importe: "18509.00" }],
       meta: [{ codigoRef: "1.1", descripcion: "Concreto", importe: "15478.00" }],
       gastosGeneralesContractual: "2076.65",
       gastosGeneralesMeta: "125000.30",
