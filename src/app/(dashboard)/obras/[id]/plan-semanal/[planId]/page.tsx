@@ -200,6 +200,33 @@ export default async function DetallePlanSemanalPage({
               Elige tareas del cronograma o añade líneas libres para esta semana.
             </p>
           )}
+          {/* Que es esto y para que sirve, dicho en la pantalla. Sin esta
+              explicacion el bloque se lee como una lista de tareas mas, y la
+              casilla «meta» como un dato administrativo que se puede saltar
+              —que es exactamente lo que pasaba—. */}
+          <div
+            className="mb-4 rounded-lg border p-3 text-sm"
+            style={{
+              borderColor: "var(--borde)",
+              backgroundColor: "var(--superficie)",
+            }}
+          >
+            <p className="text-pretty">
+              <strong>Esto es lo que el equipo promete hacer esta semana.</strong>{" "}
+              De comparar esta promesa con lo que ocurra sale el PPC, que no mide
+              cuánto avanzaste sino <strong>si cumples lo que prometes</strong>.
+              Prometer de menos para que salga bonito se ve enseguida: el PPC sube
+              y la obra no se mueve.
+            </p>
+            <p className="mt-2 text-pretty">
+              <strong>Qué tienes que hacer:</strong> por cada tarea, fija la{" "}
+              <strong>meta %</strong> — el porcentaje acumulado al que prometes
+              llegar el día del corte. Es obligatoria en las tareas nuevas, y no
+              es burocracia: al cerrar la semana, esa meta es lo que permite saber
+              a qué avance equivale haber cumplido. Sin ella, el compromiso cuenta
+              para el PPC pero la obra se sigue viendo parada en la curva S.
+            </p>
+          </div>
           <FormularioPlanSemanal
             obraId={id}
             planId={planId}
@@ -218,6 +245,31 @@ export default async function DetallePlanSemanalPage({
           <p className="mb-3 text-sm opacity-70">
             Marca cada compromiso y, si no se cumplió, su causa. De aquí sale el PPC.
           </p>
+          <div
+            className="mb-4 rounded-lg border p-3 text-sm"
+            style={{
+              borderColor: "var(--borde)",
+              backgroundColor: "var(--superficie)",
+            }}
+          >
+            <p className="text-pretty">
+              <strong>Esto es lo que pasó de verdad</strong>, frente a lo prometido
+              arriba. Es la mitad que da valor a la otra: sin cerrar, la promesa no
+              se contrasta con nada y el PPC no existe.
+            </p>
+            <p className="mt-2 text-pretty">
+              <strong>Qué tienes que hacer:</strong> anota la{" "}
+              <strong>cantidad ejecutada</strong> de cada compromiso. El{" "}
+              <strong>% alcanzado</strong> se calcula solo a partir de ella y de la
+              meta que pactaste, y puedes corregirlo si no cuadra. Ese porcentaje
+              es lo que llega a la curva S, al valor ganado y al SPI.
+            </p>
+            <p className="mt-2 text-pretty">
+              Lo que <strong>no</strong> se cumplió necesita su causa. No es para
+              buscar culpables: contadas de mayor a menor, esas causas son lo único
+              que dice dónde atacar para que la semana que viene salga mejor.
+            </p>
+          </div>
           <CierrePlanSemanal
             obraId={id}
             planId={planId}

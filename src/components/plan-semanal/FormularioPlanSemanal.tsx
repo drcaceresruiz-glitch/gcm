@@ -26,6 +26,27 @@ interface Item {
   /// Trazabilidad al Lookahead. Viaja de ida y vuelta para no perderse al
   /// guardar (planificar REEMPLAZA la semana entera).
   lookaheadTaskId: string | null;
+  /**
+   * Si ya estaba guardado en la semana al abrir la pantalla.
+   *
+   * Decide si se le exige meta: la regla es para lo que se compromete de
+   * ahora en adelante, y una semana en marcha no se queda bloqueada por una
+   * regla que llego despues. El servidor lo comprueba por su cuenta contra la
+   * base; esto solo evita ensenar un rojo que alli no se va a exigir.
+   */
+  yaGuardado: boolean;
+}
+
+/**
+ * Le falta la meta y se le va a exigir.
+ *
+ * Solo a las tareas del cronograma —una linea libre no tiene avance que
+ * registrar— y solo a las NUEVAS: la regla es para lo que se compromete de
+ * ahora en adelante. El servidor decide lo mismo por su cuenta contra la base;
+ * esto evita ensenar un rojo que alli no se va a exigir.
+ */
+function faltaMeta(it: Item): boolean {
+  return it.uid !== null && !it.yaGuardado && it.meta.trim() === "";
 }
 
 interface TareaOpcion {
@@ -87,6 +108,8 @@ export function FormularioPlanSemanal({
       cantidad: c.cantidadPlan ?? "",
       unidad: c.unidad ?? "",
       lookaheadTaskId: c.lookaheadTaskId,
+      // Vino de la base: la regla de la meta no le aplica.
+      yaGuardado: true,
     })),
   );
   const [uidSel, setUidSel] = useState("");
@@ -119,6 +142,7 @@ export function FormularioPlanSemanal({
         cantidad: t.cantidadSugerida ?? "",
         unidad: t.unidadSugerida ?? "",
         lookaheadTaskId: null,
+        yaGuardado: false,
       },
     ]);
     setUidSel("");
@@ -138,6 +162,7 @@ export function FormularioPlanSemanal({
         cantidad: "",
         unidad: "",
         lookaheadTaskId: null,
+        yaGuardado: false,
       },
     ]);
     setLibre("");
@@ -203,6 +228,7 @@ export function FormularioPlanSemanal({
         cantidad: a.cantidadPlan ?? "",
         unidad: a.unidad ?? "",
         lookaheadTaskId: null,
+        yaGuardado: false,
       },
     ]);
     setOk(false);
@@ -428,19 +454,18 @@ export function FormularioPlanSemanal({
                   value={it.meta}
                   onChange={(e) => cambiarMeta(it.key, e.target.value)}
                   inputMode="decimal"
-                  placeholder={it.uid !== null ? "obligatorio" : "0-100"}
-                  aria-invalid={it.uid !== null && it.meta.trim() === ""}
+                  placeholder={faltaMeta(it) ? "obligatorio" : "0-100"}
+                  aria-invalid={faltaMeta(it)}
                   title={
                     it.uid !== null
-                      ? "% ACUMULADO al que prometes llegar al final de la semana. Obligatorio: de aqui sale el avance al cerrar."
+                      ? "% ACUMULADO al que prometes llegar al final de la semana. De aqui sale el avance al cerrar: sin meta, cumplir no dice a que porcentaje llego la tarea."
                       : "Porcentaje de 0 a 100"
                   }
                   className="ml-1 w-24 rounded border px-1.5 py-1 text-xs tabular-nums"
                   style={{
-                    borderColor:
-                      it.uid !== null && it.meta.trim() === ""
-                        ? "var(--color-peligro)"
-                        : "var(--borde)",
+                    borderColor: faltaMeta(it)
+                      ? "var(--color-peligro)"
+                      : "var(--borde)",
                     backgroundColor: "var(--fondo)",
                   }}
                 />

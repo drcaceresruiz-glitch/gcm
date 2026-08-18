@@ -989,16 +989,22 @@ export function mapaPreservablePorUid(
  * asi que no hay avance fisico que registrar. Exigirla ahi seria pedir un dato
  * que no significa nada.
  *
+ * Tampoco se exige a los compromisos que YA estaban guardados sin ella. Una
+ * regla nueva no puede dejar bloqueada una semana en marcha: quien entrara a
+ * corregir una descripcion se encontraria con que no puede guardar hasta
+ * rellenar metas de un trabajo que quiza ya termino. Se pide a lo que entra
+ * de ahora en adelante.
+ *
  * Cero no vale como meta: prometer llegar al 0% no es un compromiso.
  */
 export function validarMetaPorcentaje(
   texto: string | null | undefined,
-  esTareaDelCronograma: boolean,
+  exigir: boolean,
 ): CantidadValidada {
   const t = texto?.trim();
 
   if (!t) {
-    return esTareaDelCronograma
+    return exigir
       ? {
           ok: false,
           error:

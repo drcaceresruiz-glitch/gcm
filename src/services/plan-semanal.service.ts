@@ -835,10 +835,31 @@ export async function guardarCompromisos(
    * El rango tambien se valida aqui y no solo en la pantalla: un 1000
    * desbordaba la columna Decimal(5,2) y la accion caia con un 500.
    */
+  /*
+   * Solo se exige a los compromisos NUEVOS. Se decide contra lo que ya hay
+   * guardado en esta semana, no contra lo que diga el navegador: una regla
+   * que se puede esquivar mandando otro formulario no es una regla.
+   *
+   * Una semana en marcha no se queda bloqueada por una regla que llego
+   * despues: quien entre a corregir una descripcion podria no poder guardar
+   * hasta rellenar metas de un trabajo que quiza ya termino.
+   */
+  const yaGuardados = new Set(
+    (
+      await prisma.compromisoSemanal.findMany({
+        where: { planSemanalId: planId, uid: { not: null } },
+        select: { uid: true },
+      })
+    ).flatMap((c) => (c.uid === null ? [] : [c.uid])),
+  );
+
   const metas: (string | null)[] = [];
   for (const c of compromisos) {
     const esTarea = c.uid !== null && c.uid !== undefined;
-    const v = validarMetaPorcentaje(c.metaPorcentaje, esTarea);
+    const v = validarMetaPorcentaje(
+      c.metaPorcentaje,
+      esTarea && !yaGuardados.has(c.uid!),
+    );
     if (!v.ok) return { ok: false, error: v.error };
     metas.push(v.valor);
   }
