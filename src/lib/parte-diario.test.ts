@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   validarLoteAvance,
+  resolverAvance,
   ultimoDiaLaborableDeLaSemana,
   filasDelParte,
   tareasAbiertas,
@@ -148,6 +149,39 @@ describe("ultimoDiaLaborableDeLaSemana", () => {
     expect(ultimoDiaLaborableDeLaSemana(d("2026-08-12"), [])).toEqual(
       d("2026-08-16"),
     );
+  });
+});
+
+describe("resolverAvance", () => {
+  it("UN NUMERO A SECAS ES EL ACUMULADO, COMO SIEMPRE", () => {
+    expect(resolverAvance("70", "40.00")).toBe("70");
+  });
+
+  it("CON + SE SUMA A LO QUE YA HABIA", () => {
+    // El caso que perdia datos: la pantalla se llama «cuanto se avanzo hoy»,
+    // el residente escribe 10 pensando «hoy diez puntos» y dejaba en 10% una
+    // partida que iba al 70%. Ahora tiene como decirlo.
+    expect(resolverAvance("+10", "70.00")).toBe("80.00");
+  });
+
+  it("no pasa de 100", () => {
+    // «+20» sobre un 95 es una forma normal de decir «terminala».
+    expect(resolverAvance("+20", "95.00")).toBe("100.00");
+  });
+
+  it("acepta decimales y espacios", () => {
+    expect(resolverAvance("  +2.5  ", "10.00")).toBe("12.50");
+  });
+
+  it("un texto que no se entiende pasa TAL CUAL, para que lo rechace la validacion", () => {
+    // Aqui no se inventa un valor ni se traga un error.
+    expect(resolverAvance("+hola", "10.00")).toBe("+hola");
+    expect(resolverAvance("abc", "10.00")).toBe("abc");
+  });
+
+  it("una casilla vacia sigue significando «de esta no se nada hoy»", () => {
+    expect(resolverAvance("", "10.00")).toBe("");
+    expect(resolverAvance("   ", "10.00")).toBe("");
   });
 });
 

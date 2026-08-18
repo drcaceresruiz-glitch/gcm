@@ -6,7 +6,7 @@ import {
   accionGuardarParte,
   type EstadoParte,
 } from "@/app/(dashboard)/obras/[id]/avance/acciones";
-import type { GrupoParte } from "@/lib/parte-diario";
+import { resolverAvance, type GrupoParte } from "@/lib/parte-diario";
 import { conSignoFijo } from "@/lib/redondeo";
 
 /**
@@ -46,6 +46,9 @@ export function ParteDelDia({
   /// propio campo.
   const [escritos, setEscritos] = useState<Record<number, string>>({});
 
+  /// Confirmacion de que bajar el avance es intencionado. Ver `retrocesos`.
+  const [aceptaRetroceso, setAceptaRetroceso] = useState(false);
+
   /// El orden de captura, aplanado: es el que sigue el salto con Enter.
   const orden = useMemo(
     () => grupos.flatMap((g) => g.filas.map((f) => f.uid)),
@@ -76,6 +79,19 @@ export function ParteDelDia({
       atrasadas: filas.filter((f) => Number(f.desfase) < 0).length,
       fueraDePlan: conValor.filter((f) => f.sinComprometer).length,
       conRestriccion: conValor.filter((f) => f.restriccionesAbiertas > 0).length,
+      /*
+       * Las que van a QUEDAR por debajo de donde estaban.
+       *
+       * Un avance que retrocede es casi siempre el malentendido de esta
+       * pantalla —se llama «cuanto se avanzo hoy» y la casilla guarda el
+       * acumulado, asi que un 10 sobre una partida al 70% le come sesenta
+       * puntos—, y a veces una correccion legitima. No se puede distinguir
+       * solo mirando el numero, asi que no se prohibe: se hace decirlo.
+       */
+      retrocesos: conValor.filter((f) => {
+        const nuevo = Number(resolverAvance(escritos[f.uid] ?? "", f.porcentajeActual));
+        return !Number.isNaN(nuevo) && nuevo < Number(f.porcentajeActual);
+      }),
     };
   }, [grupos, escritos]);
 
@@ -135,9 +151,58 @@ export function ParteDelDia({
           </p>
         )}
 
+        {/* No se prohibe retroceder —a veces es una correccion de verdad— pero
+            se hace decirlo, porque el acumulado de estas casillas es la fuente
+            del real de la curva S, del EV y del SPI: un retroceso por error
+            mueve la obra entera hacia atras sin dar ni un aviso. */}
+        {resumen.retrocesos.length > 0 && (
+          <div
+            className="space-y-2 rounded-lg border p-3 text-sm"
+            style={{
+              borderColor: "var(--color-peligro)",
+              backgroundColor:
+                "color-mix(in srgb, var(--color-peligro) 8%, transparent)",
+            }}
+          >
+            <p className="font-medium">
+              {resumen.retrocesos.length === 1
+                ? "Una partida va a quedar por debajo de donde estaba:"
+                : `${resumen.retrocesos.length} partidas van a quedar por debajo de donde estaban:`}
+            </p>
+            <ul className="space-y-0.5 text-xs">
+              {resumen.retrocesos.map((f) => (
+                <li key={f.uid}>
+                  {f.codigo && <span className="opacity-60">{f.codigo} </span>}
+                  {f.nombre}: {f.porcentajeActual}% →{" "}
+                  <strong>
+                    {resolverAvance(escritos[f.uid] ?? "", f.porcentajeActual)}%
+                  </strong>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs opacity-80">
+              Si querías decir «hoy avanzamos tanto», escribe{" "}
+              <strong>+10</strong> en vez de <strong>10</strong>: con el signo se
+              suma a lo que ya había.
+            </p>
+            <label className="flex items-center gap-2 text-xs font-medium">
+              <input
+                type="checkbox"
+                checked={aceptaRetroceso}
+                onChange={(e) => setAceptaRetroceso(e.target.checked)}
+              />
+              Es una corrección: entiendo que baja el avance.
+            </label>
+          </div>
+        )}
+
         <button
           type="submit"
-          disabled={pendiente || cuantos === 0}
+          disabled={
+            pendiente ||
+            cuantos === 0 ||
+            (resumen.retrocesos.length > 0 && !aceptaRetroceso)
+          }
           className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
           style={{ backgroundColor: "var(--color-marca-600)" }}
         >
@@ -205,7 +270,10 @@ export function ParteDelDia({
               <th className="px-3 py-2 text-right font-medium">Hoy</th>
               <th className="px-3 py-2 text-right font-medium">Desfase</th>
               <th className="px-3 py-2 text-right font-medium">Sin reportar</th>
-              <th className="px-3 py-2 text-right font-medium">Nuevo %</th>
+              {/* «% acumulado», no «Nuevo %». Con el rotulo viejo, en una
+                  pantalla que se llama «cuanto se avanzo hoy», escribir 10
+                  parecia decir «hoy diez puntos» y dejaba la partida EN 10. */}
+              <th className="px-3 py-2 text-right font-medium">% acumulado</th>
             </tr>
           </thead>
           <tbody>
@@ -224,7 +292,10 @@ export function ParteDelDia({
       </div>
 
       <p className="text-xs opacity-60">
-        Enter salta a la casilla siguiente. Lo que dejes en blanco no se guarda.
+        La casilla es el <strong>acumulado</strong> de la partida: escribe{" "}
+        <strong>80</strong> para dejarla al 80 %, o <strong>+10</strong> para
+        sumar diez puntos a lo que ya llevaba. Enter salta a la casilla
+        siguiente. Lo que dejes en blanco no se guarda.
       </p>
     </form>
   );
@@ -337,10 +408,18 @@ function Capitulo({
               )}
             </td>
             <td className="px-3 py-1.5 text-right">
+              {/* Lo que viaja es el ACUMULADO ya resuelto, no lo tecleado:
+                  «+10» se convierte aqui en «80.00». El campo visible guarda
+                  el texto tal cual para que quien escribio «+10» siga viendo
+                  «+10» y entienda que le entendieron. */}
+              <input
+                type="hidden"
+                name={`avance-${f.uid}`}
+                value={resolverAvance(escritos[f.uid] ?? "", f.porcentajeActual)}
+              />
               <input
                 type="text"
                 inputMode="decimal"
-                name={`avance-${f.uid}`}
                 value={escritos[f.uid] ?? ""}
                 onChange={(e) =>
                   setEscritos((p) => ({ ...p, [f.uid]: e.target.value }))

@@ -1,5 +1,5 @@
 import type { DiaLaboral } from "@/lib/calendario";
-import { normalizarDecimal } from "@/lib/decimal";
+import { normalizarDecimal, sumar } from "@/lib/decimal";
 
 /**
  * El parte diario: el avance de todas las tareas activas, de una vez.
@@ -303,6 +303,36 @@ export interface EntradaParte {
   uid: number;
   /// Lo que se tecleo. Vacio = no se toco esta tarea.
   porcentaje: string;
+}
+
+/**
+ * Que acumulado deja en la tarea lo que se acaba de teclear.
+ *
+ * La casilla guarda el ACUMULADO de la tarea, pero la pantalla se llama
+ * «cuanto se avanzo hoy», asi que el residente escribe 10 queriendo decir
+ * «hoy diez puntos» y deja en 10% una partida que iba al 70%. No da error, y
+ * ese numero es la fuente del real de la curva S, del EV y del SPI: la obra
+ * entera retrocede en silencio.
+ *
+ * Se resuelve dando las dos formas de decirlo, sin quitar ninguna:
+ *
+ * - `70`  -> «la tarea queda al 70%». Es lo de siempre.
+ * - `+10` -> «hoy avanzamos diez puntos», que se suman a lo que ya habia.
+ *
+ * Un texto que no se entiende se devuelve TAL CUAL para que lo rechace
+ * `validarLoteAvance`: aqui no se inventa un valor ni se traga un error.
+ */
+export function resolverAvance(texto: string, actual: string): string {
+  const t = texto.trim();
+  if (t === "" || !t.startsWith("+")) return t;
+
+  const incremento = normalizarDecimal(t.slice(1), 2);
+  if (incremento === null) return t;
+
+  const suma = sumar([actual, incremento]);
+  // Por encima de 100 no hay avance que medir, y «+20» sobre un 95 es una
+  // forma normal de decir «terminala».
+  return Number(suma) > 100 ? "100.00" : suma;
 }
 
 export type ValidacionParte =
