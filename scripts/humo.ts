@@ -189,7 +189,13 @@ interface Resultado {
 function errorEnElCuerpo(cuerpo: string): string | undefined {
   // La fila de error del payload de React, escapada o sin escapar segun donde
   // caiga dentro del HTML. Se captura el DIGEST, no solo su presencia.
-  const fila = /\d+:E\{\\?"digest\\?":\\?"([^"\\]*)/.exec(cuerpo);
+  //
+  // EL IDENTIFICADOR DE FILA ES HEXADECIMAL (`6c:E{`), no decimal. Escrito
+  // como `\d+` esto funcionaba de casualidad —el primer caso que se probo
+  // cayo en la fila `71`— y dejaba de encontrar el error en cuanto el id
+  // llevaba una letra. Costo dar por buena una pantalla rota: la prueba dijo
+  // «65 de 65» sobre una pagina que no cargaba.
+  const fila = /[0-9a-f]+:E\{\\?"digest\\?":\\?"([^"\\]*)/.exec(cuerpo);
 
   if (fila) {
     const digest = fila[1] ?? "";
