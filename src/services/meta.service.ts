@@ -235,7 +235,12 @@ export async function compararConContractual(
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
-    select: { id: true, fechaInicio: true, fechaFinProgramada: true },
+    select: {
+        id: true,
+        fechaInicio: true,
+        fechaFinProgramada: true,
+        metaIncluyeGastosGenerales: true,
+      },
   });
   if (!obra) return { ok: false, error: "Obra no encontrada." };
 
@@ -300,6 +305,10 @@ export async function compararConContractual(
     gastosGeneralesContractual: vigente.cascadaVigente.gastosGenerales,
     gastosGeneralesMeta: meta.gastosGenerales.toString(),
     utilidadContractual: vigente.cascadaVigente.utilidad,
+    // El criterio lo decide la OBRA, no la meta: por eso se puede cambiar en
+    // cualquier momento sin tocar ninguna version guardada. Sin decidir aun,
+    // se calcula como siempre; la obra ya bloquea el paso en ese caso.
+    incluyeGastosGenerales: obra.metaIncluyeGastosGenerales ?? true,
   });
 
   // Los movimientos aprobados DESPUES de fijar la meta. Se ordenan por numero

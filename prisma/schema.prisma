@@ -513,6 +513,28 @@ model Project {
   correlativo String? @db.VarChar(20)
 
   ubicacion   String? @db.VarChar(255)
+
+  /// Si los gastos generales de la meta cuentan en la BOLSA OPERATIVA.
+  ///
+  /// Por defecto true, que es como se venia calculando: cambiar el default
+  /// movería la bolsa de todas las obras existentes sin que nadie lo pidiera,
+  /// y este proyecto ya sabe lo que cuesta una cifra que cambia sola.
+  ///
+  /// Es de PRESENTACION, no de datos: los gastos generales se siguen cargando
+  /// y guardando siempre. Apagarlo solo los saca del calculo de la bolsa, y
+  /// por eso se puede cambiar EN CUALQUIER MOMENTO —incluso con metas ya
+  /// aprobadas y congeladas— sin migrar nada ni tocar el historico.
+  ///
+  /// Existe porque en la practica del usuario los gastos generales (y la
+  /// utilidad) NO son del presupuesto que gestiona la obra: solo se tocan si
+  /// el gerente general autoriza pasar dinero de ahi para cubrir un
+  /// comprometido cuando la bolsa ya se agoto.
+  /// null = TODAVIA NO SE HA DECIDIDO. No lleva default a proposito: es una
+  /// decision que hay que tomar, no un valor que se hereda sin mirarlo. La
+  /// obra no deja avanzar mientras siga en null y ya haya presupuesto
+  /// contractual cargado, que es el momento en que la pregunta tiene sentido
+  /// (antes no se sabe contra que se compara).
+  metaIncluyeGastosGenerales Boolean?
   cliente     String? @db.VarChar(200)
   descripcion String? @db.Text
 

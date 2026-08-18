@@ -3,6 +3,8 @@ import { CalendarDays, Download, MapPin, Pencil } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, hitosDeObra, avisosDeSeccion } from "@/services/obras.service";
 import { planesAbiertos } from "@/services/plan-semanal.service";
+import { criterioDeObra } from "@/services/criterio-obra.service";
+import { AvisoCriterio } from "@/components/obras/AvisoCriterio";
 import { puede } from "@/lib/rbac";
 import { fechaCorta } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
@@ -44,7 +46,7 @@ export default async function ObraLayout({
   // Solo hace falta publicarlo para que la miga —montada arriba del todo,
   // en el layout raiz— lo pueda leer sin volver a consultar nada.
   const raiz = `/obras/${id}`;
-  const [hitos, avisos, semanasAbiertas] = await Promise.all([
+  const [hitos, avisos, semanasAbiertas, criterio] = await Promise.all([
     hitosDeObra(sesion, id),
     avisosDeSeccion(sesion, id),
     // Solo las ABIERTAS: es una consulta plana (id, numero, fechaCorte, sin
@@ -52,6 +54,10 @@ export default async function ObraLayout({
     // cerradas son historia, no trabajo por hacer, y ya se ven enteras desde
     // dentro de `/plan-semanal`.
     planesAbiertos(sesion, id),
+    // El criterio de gastos generales. Si esta sin decidir y ya hay
+    // presupuesto, la obra no deja avanzar: cualquier cifra de margen que se
+    // enseñara estaria calculada con un criterio que nadie ha confirmado.
+    criterioDeObra(sesion, id),
   ]);
 
   /**
@@ -245,6 +251,10 @@ export default async function ObraLayout({
       <MenuObra fases={fases} />
 
       <div className="space-y-6">
+      {/* La decision pendiente va ARRIBA DEL TODO y en todas las pantallas
+          de la obra: no es de una seccion, condiciona como se lee el dinero
+          en todas. Con boton, porque un aviso sin salida se ignora. */}
+      {criterio?.faltaDecidir && <AvisoCriterio obraId={id} />}
       {/* Todo el marco desaparece al imprimir: la vista del documento de la
           orden cuelga de esta ruta, y el papel que recibe el proveedor no
           puede salir con pestanas encima. */}

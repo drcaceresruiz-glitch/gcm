@@ -216,6 +216,14 @@ export interface DatosBolsa {
   /// Utilidad del contractual. Viaja para poder ensenarla al lado de la
   /// bolsa; NUNCA se suma a ella.
   utilidadContractual: string;
+  /**
+   * Si los gastos generales cuentan en la bolsa. Lo decide la obra.
+   *
+   * Opcional y por defecto true para no cambiar el resultado de quien no lo
+   * pase: cambiar una cifra de dinero por omision es justo lo que no puede
+   * pasar aqui.
+   */
+  incluyeGastosGenerales?: boolean;
 }
 
 export interface Bolsa {
@@ -228,8 +236,11 @@ export interface Bolsa {
 
   gastosGeneralesContractual: string;
   gastosGeneralesMeta: string;
-  /// Gastos generales contractuales - gastos generales meta.
+  /// Gastos generales contractuales - gastos generales meta. "0.00" cuando la
+  /// obra decidio que los gastos generales NO entran en la bolsa.
   bolsaPlazo: string;
+  /// El criterio con el que se calculo, para que la pantalla no lo adivine.
+  incluyeGastosGenerales: boolean;
 
   /// Produccion + plazo. SIN utilidad.
   bolsaTotal: string;
@@ -270,9 +281,18 @@ export function calcularBolsa(datos: DatosBolsa): Bolsa {
 
   const bolsaProduccion =
     restar(costoDirectoContractual, costoDirectoMeta) ?? "0.00";
-  const bolsaPlazo =
-    restar(datos.gastosGeneralesContractual, datos.gastosGeneralesMeta) ??
-    "0.00";
+  /**
+   * La bolsa de plazo solo existe si la obra decidio que los gastos
+   * generales entran. Cuando no entran es "0.00" y no null: sigue siendo una
+   * cifra sumable, y quien la pinte decide si la enseña. Los gastos
+   * generales se devuelven igual —se cargaron y se guardaron—, para que la
+   * pantalla los pueda mostrar aparte con su aviso de sobrecosto.
+   */
+  const incluyeGG = datos.incluyeGastosGenerales ?? true;
+  const bolsaPlazo = incluyeGG
+    ? restar(datos.gastosGeneralesContractual, datos.gastosGeneralesMeta) ??
+      "0.00"
+    : "0.00";
 
   const bolsaTotal = sumar([bolsaProduccion, bolsaPlazo]);
 
@@ -284,6 +304,7 @@ export function calcularBolsa(datos: DatosBolsa): Bolsa {
     gastosGeneralesContractual: datos.gastosGeneralesContractual,
     gastosGeneralesMeta: datos.gastosGeneralesMeta,
     bolsaPlazo,
+    incluyeGastosGenerales: incluyeGG,
     bolsaTotal,
     utilidadContractual: datos.utilidadContractual,
     margenEsperado: sumar([bolsaTotal, datos.utilidadContractual]),

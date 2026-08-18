@@ -139,12 +139,23 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
           valor={bolsa.bolsaProduccion}
           sangrado
         />
-        <Fila
-          etiqueta="Bolsa de plazo"
-          nota="gastos generales del contrato menos los de la meta"
-          valor={bolsa.bolsaPlazo}
-          sangrado
-        />
+        {/* La bolsa de plazo solo se pinta si la obra decidio que los gastos
+            generales entran. Cuando no entran, un «S/ 0.00» seria peor que
+            nada: parece que no se ahorro, cuando lo que pasa es que esa
+            partida no es de la obra. */}
+        {bolsa.incluyeGastosGenerales ? (
+          <Fila
+            etiqueta="Bolsa de plazo"
+            nota="gastos generales del contrato menos los de la meta"
+            valor={bolsa.bolsaPlazo}
+            sangrado
+          />
+        ) : (
+          <p className="py-2 pl-4 text-sm opacity-60">
+            Los gastos generales no entran en la bolsa de esta obra. Se siguen
+            registrando, y su desviación de plazo se avisa abajo.
+          </p>
+        )}
 
         <div
           className="my-1 border-t-2"
