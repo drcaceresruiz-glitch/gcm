@@ -243,6 +243,14 @@ export default async function ObraLayout({
           pregunta: "quién hace cada frente",
           href: `${raiz}/proveedores`,
         },
+        /// Va DESPUES de Proveedores y ANTES de Órdenes: el orden del trabajo
+        /// real es contratar el frente, valorizar lo avanzado y pagarlo.
+        puede(sesion, "encargo:leer") && {
+          clave: "valorizaciones",
+          titulo: "Valorizaciones",
+          pregunta: "a quién le toca y a quién se le debe",
+          href: `${raiz}/valorizaciones`,
+        },
         puede(sesion, "orden:leer") && {
           clave: "ordenes",
           titulo: "Órdenes",

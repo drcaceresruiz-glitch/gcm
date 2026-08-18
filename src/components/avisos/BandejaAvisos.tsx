@@ -2,7 +2,14 @@
 
 import { useTransition } from "react";
 import Link from "next/link";
-import { BellRing, CircleCheck, Clock, Diamond, Inbox } from "lucide-react";
+import {
+  Banknote,
+  BellRing,
+  CircleCheck,
+  Clock,
+  Diamond,
+  Inbox,
+} from "lucide-react";
 import { fechaCorta } from "@/utils/fechas";
 import { accionMarcarLeidos } from "@/app/(dashboard)/avisos/acciones";
 import type { AvisoBandeja } from "@/services/avisos-bandeja";
@@ -28,6 +35,8 @@ const ICONO: Record<EventoAviso, typeof BellRing> = {
   // El rombo es como el Gantt dibuja un hito: sin barra, porque no dura.
   HITO_CERCA: Diamond,
   HITO_VENCIDO: Diamond,
+  // El billete: lo que se espera es un corte de valorizacion, o sea dinero.
+  VALORIZACION_PENDIENTE: Banknote,
 };
 
 const COLOR: Record<EventoAviso, string> = {
@@ -38,6 +47,8 @@ const COLOR: Record<EventoAviso, string> = {
   // «Se acerca» avisa, «vencido» ya duele: el color lo dice antes de leer.
   HITO_CERCA: "var(--color-alerta)",
   HITO_VENCIDO: "var(--color-peligro)",
+  // Ambar y no rojo: AVISA, no bloquea. El rojo es para lo que ya duele.
+  VALORIZACION_PENDIENTE: "var(--color-alerta)",
 };
 
 export function BandejaAvisos({ avisos }: { avisos: AvisoBandeja[] }) {
