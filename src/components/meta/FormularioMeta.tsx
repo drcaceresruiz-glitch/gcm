@@ -119,26 +119,20 @@ export function FormularioMeta({
         ))}
       </fieldset>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <CampoTexto
-          id="fechaMeta"
-          name="fechaMeta"
-          type="date"
-          etiqueta="Fecha de la meta"
-          defaultValue={fechaHoy}
-          required
-        />
-        <CampoTexto
-          id="mesesPlazo"
-          name="mesesPlazo"
-          type="text"
-          inputMode="decimal"
-          etiqueta="Plazo en meses"
-          ayuda="Con el que presupuestas los gastos generales. Se guarda: si la obra se atrasa, la desviación tiene que poder verse."
-          defaultValue={mesesSugeridos}
-          required
-        />
-      </div>
+      {/* NO se piden ni la fecha ni el plazo: el sistema YA los sabe. La
+          fecha es hoy y el plazo sale de las fechas de la obra, fijadas al
+          crearla. Pedirlos era hacer teclear un dato que el sistema tenia
+          delante, y encima dejaba que no coincidiera con la obra. Se guardan
+          igual, congelados en esta version: es lo que permite ver la
+          desviacion si el cronograma se estira despues. */}
+      <p className="rounded-lg border border-dashed px-4 py-3 text-sm opacity-80">
+        Esta meta se fija a <strong>{fechaHoy}</strong> y presupuesta{" "}
+        <strong>{mesesSugeridos} meses</strong> de gastos generales, que es el
+        plazo de la obra. Si el cronograma se alarga, la diferencia aparecerá
+        como sobrecosto de plazo.
+      </p>
+      <input type="hidden" name="fechaMeta" value={fechaHoy} />
+      <input type="hidden" name="mesesPlazo" value={mesesSugeridos} />
 
       <div className="space-y-1.5">
         <label htmlFor="archivo" className="block text-sm font-medium">
