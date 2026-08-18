@@ -88,6 +88,13 @@ export const EXCLUIDAS: Readonly<Record<string, string>> = {
     "Es el registro de los respaldos que se han hecho, no contenido de la " +
     "obra. Y tiene que SOBREVIVIR al borrado —es la prueba de que hubo " +
     "respaldo antes—, asi que meterla dentro de si misma no tendria sentido.",
+  mensajes_contratista:
+    "Es historial del CONTRATISTA, no de la obra, por el mismo motivo que " +
+    "`mensajes_sms`: el contratista es de la empresa y sigue trabajando en " +
+    "otras obras cuando esta se cierra. Su `projectId` se pone a null al " +
+    "borrar la obra y la ficha conserva lo que se le escribio. Meterlo en el " +
+    "zip lo duplicaria al restaurar, y ademas un respaldo de obra que viaja " +
+    "por correo no deberia llevar dentro la correspondencia con terceros.",
 };
 
 /**

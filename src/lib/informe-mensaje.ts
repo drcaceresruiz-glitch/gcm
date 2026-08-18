@@ -1,6 +1,7 @@
 import type { DatosCsvInforme } from "./informe-csv";
 import { fechaCsv } from "./informe-documento";
 import { resumenParaCorreo, UMBRAL_AL_DIA } from "./informe-correo";
+import { aAscii, acortar, MAX_SMS } from "./texto-sms";
 
 /**
  * El informe dicho en un mensaje: uno para WhatsApp y otro para SMS.
@@ -18,17 +19,11 @@ import { resumenParaCorreo, UMBRAL_AL_DIA } from "./informe-correo";
  */
 
 /**
- * Lo que cabe en UN SMS. Pasarse no lo alarga: lo parte en dos, que se cobran
- * como dos y pueden llegar desordenados.
- *
- * Y hay una trampa peor que la longitud. Un SMS con solo caracteres del
- * alfabeto GSM cabe en 160; en cuanto entra UNA letra fuera de el —una «ó» de
- * «Cimentación», por ejemplo— el mensaje entero pasa a UCS-2 y el limite cae a
- * SETENTA. Los textos de los codigos ya se escribian a mano sin tildes; aqui no
- * vale, porque dentro va el nombre de la obra y de las partidas, que salen del
- * XML del usuario. Por eso se transcribe a ASCII antes de medir nada.
+ * El limite del SMS y la transcripcion a ASCII viven en `lib/texto-sms`, que
+ * es de donde beben tambien los mensajes a contratistas. Se reexportan para
+ * que lo que ya los importaba de aqui siga funcionando igual.
  */
-export const MAX_SMS = 160;
+export { aAscii, MAX_SMS } from "./texto-sms";
 
 /// Por debajo de esto el nombre de la obra deja de identificarla y el mensaje
 /// no sirve para nada.
@@ -36,36 +31,6 @@ const MINIMO_NOMBRE_OBRA = 8;
 
 /// Tope sano del texto de WhatsApp: viaja dentro de una URL.
 export const MAX_WHATSAPP = 1000;
-
-/**
- * A ASCII, para que el SMS quepa en 160 y no en 70.
- *
- * `normalize("NFD")` separa la letra de su tilde y luego se tiran las tildes.
- * Lo que no es una letra acentuada —comillas angulares, la raya del correo, el
- * punto medio— se cambia a mano, y lo que quede fuera de ASCII se descarta:
- * mejor perder un simbolo raro que mandar setenta caracteres.
- */
-export function aAscii(texto: string): string {
-  return texto
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[«»“”]/g, '"')
-    .replace(/[‘’]/g, "'")
-    .replace(/[—–]/g, "-")
-    .replace(/·/g, "-")
-    .replace(/…/g, "...")
-    .replace(/[¿¡]/g, "")
-    .replace(/[^\x20-\x7E]/g, "");
-}
-
-/// Recorta sin partir una palabra por la mitad si se puede evitar.
-function acortar(texto: string, tope: number): string {
-  if (texto.length <= tope) return texto;
-  const cortado = texto.slice(0, tope - 3);
-  const ultimoEspacio = cortado.lastIndexOf(" ");
-  const base = ultimoEspacio > tope / 2 ? cortado.slice(0, ultimoEspacio) : cortado;
-  return `${base.trimEnd()}...`;
-}
 
 /**
  * El informe en un SMS: sin tildes, sin enlaces y sin pasar de 160.

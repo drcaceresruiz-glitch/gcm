@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Ban,
   RotateCcw,
+  Send,
   TrendingUp,
 } from "lucide-react";
 import type { EncargoResumen } from "@/services/encargos.service";
@@ -45,11 +46,15 @@ export function TarjetaEncargo({
   encargo,
   puedeGestionar,
   puedeValorizar,
+  puedeContactar,
 }: {
   obraId: string;
   encargo: EncargoResumen;
   puedeGestionar: boolean;
   puedeValorizar: boolean;
+  /// Escribirle. Va aparte de gestionar: el residente avisa al contratista
+  /// aunque no reparta alcances ni pacte montos.
+  puedeContactar: boolean;
 }) {
   const c = encargo.cuentas;
   const anulado = encargo.estado === "ANULADO";
@@ -84,16 +89,37 @@ export function TarjetaEncargo({
           </p>
         </div>
 
-        {puedeGestionar && !anulado && (
-          <Link
-            href={`/obras/${obraId}/proveedores/${encargo.id}`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
-            style={{ borderColor: "var(--borde)" }}
-          >
-            <Pencil className="size-3.5" aria-hidden="true" />
-            Editar
-          </Link>
-        )}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {/* Se puede escribir a un contratista aunque el encargo este
+              anulado —«se anulo tu frente» es justo de lo que hay que
+              avisarle— y sin necesidad de `puedeGestionar`: el residente
+              avisa, aunque no reparta alcances.
+
+              Lleva `?obra=` para que el mensaje quede atado a esta obra y
+              firmado con su nombre; sin eso saldria firmado por la empresa y
+              el contratista no sabria de cual de sus frentes le hablan. */}
+          {puedeContactar && (
+            <Link
+              href={`/empresa/proveedores/${encargo.proveedor.id}/mensajes?obra=${obraId}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <Send className="size-3.5" aria-hidden="true" />
+              Escribir
+            </Link>
+          )}
+
+          {puedeGestionar && !anulado && (
+            <Link
+              href={`/obras/${obraId}/proveedores/${encargo.id}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Editar
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Las tres cifras que miden lo mismo en bases distintas, sin

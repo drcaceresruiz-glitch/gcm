@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Building2, Pencil, Phone, Plus, Users } from "lucide-react";
+import { Building2, Mail, Pencil, Phone, Plus, Send, Users } from "lucide-react";
 import type { ProveedorResumen } from "@/services/proveedores.service";
 import {
   ROTULO_CONTRATO,
@@ -30,6 +30,9 @@ interface Props {
   verTodos: boolean;
   puedeCrear: boolean;
   puedeEditar: boolean;
+  /// Escribirle es OTRO permiso que editar su ficha: mandar un correo con el
+  /// membrete de la empresa a alguien de fuera no se deshace.
+  puedeContactar: boolean;
   /// Estado de contrato por id de proveedor, en la obra elegida. `null` cuando
   /// no se eligio ninguna: entonces la columna no se pinta.
   semaforo: Record<string, EstadoContrato> | null;
@@ -41,6 +44,7 @@ export function ListaProveedores({
   verTodos,
   puedeCrear,
   puedeEditar,
+  puedeContactar,
   semaforo,
 }: Props) {
   /// null = cerrado; "nuevo" = alta; un id = editando ese proveedor.
@@ -113,6 +117,7 @@ export function ListaProveedores({
               <Fila
                 proveedor={p}
                 puedeEditar={puedeEditar}
+                puedeContactar={puedeContactar}
                 editando={abierto === p.id}
                 onEditar={() => setAbierto(p.id)}
                 contrato={semaforo?.[p.id] ?? null}
@@ -128,12 +133,14 @@ export function ListaProveedores({
 function Fila({
   proveedor: p,
   puedeEditar,
+  puedeContactar,
   editando,
   onEditar,
   contrato,
 }: {
   proveedor: ProveedorResumen;
   puedeEditar: boolean;
+  puedeContactar: boolean;
   editando: boolean;
   onEditar: () => void;
   /// null cuando no se eligio obra: entonces no se pinta nada, que es distinto
@@ -213,6 +220,23 @@ function Fila({
           </p>
         )}
 
+        {/* El correo se venia guardando desde siempre y no se ensenaba en
+            ninguna pantalla: estaba en la ficha, en el Excel y en la base, y
+            era invisible. Como enlace, ademas, abre el cliente de correo para
+            lo que no da para un mensaje formal. */}
+        {p.email && (
+          <p className="mt-0.5 text-xs">
+            <a
+              href={`mailto:${p.email}`}
+              className="inline-flex items-center gap-1.5 underline underline-offset-2"
+              style={{ color: "var(--color-marca-600)" }}
+            >
+              <Mail className="size-3" aria-hidden="true" />
+              {p.email}
+            </a>
+          </p>
+        )}
+
         {(p.cuentaBancaria || p.banco) && (
           <p className="mt-0.5 text-xs opacity-60">
             {[
@@ -244,9 +268,24 @@ function Fila({
         </p>
       </div>
 
-      {puedeEditar && (
+      {/* Escribir va SEPARADO de editar, y no es un detalle: el residente
+          puede escribirle a un contratista pero no tocar su ficha, asi que
+          colgar el boton de `puedeEditar` se lo habria escondido justo a
+          quien mas lo necesita —el que esta en obra—. */}
+      {(puedeEditar || puedeContactar) && (
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {!editando && (
+          {puedeContactar && (
+            <Link
+              href={`/empresa/proveedores/${p.id}/mensajes`}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <Send className="size-3.5" aria-hidden="true" />
+              Escribir
+            </Link>
+          )}
+
+          {puedeEditar && !editando && (
             <button
               type="button"
               onClick={onEditar}
@@ -258,12 +297,14 @@ function Fila({
             </button>
           )}
 
-          <BotonEstadoProveedor
-            proveedorId={p.id}
-            razonSocial={p.razonSocial}
-            activo={p.activo}
-            totalOrdenes={p.totalOrdenes}
-          />
+          {puedeEditar && (
+            <BotonEstadoProveedor
+              proveedorId={p.id}
+              razonSocial={p.razonSocial}
+              activo={p.activo}
+              totalOrdenes={p.totalOrdenes}
+            />
+          )}
         </div>
       )}
     </div>

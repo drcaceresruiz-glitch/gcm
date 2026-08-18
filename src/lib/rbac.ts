@@ -85,6 +85,10 @@ export const PERMISOS = [
   "proveedor:leer",
   "proveedor:crear",
   "proveedor:editar",
+  /// Escribirle. Va aparte de `editar` porque no es lo mismo mantener una
+  /// ficha que mandar un correo con el membrete de la empresa a alguien de
+  /// fuera: lo primero se deshace, lo segundo ya llego.
+  "proveedor:contactar",
 
   "encargo:leer",
   "encargo:gestionar",
@@ -241,6 +245,10 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// Ve a quien se le compra y cuanto se ha comprometido contra SU
     /// presupuesto, pero no pide ni aprueba: eso es administracion.
     "proveedor:leer",
+    /// Y le escribe. Es quien esta en obra: el que sabe que manana no hay
+    /// agua o que falta el plano es el residente, y hacerlo pasar por
+    /// administracion para avisar convierte el aviso en algo que llega tarde.
+    "proveedor:contactar",
     "orden:leer",
     /// Los encargos son el frente de cada proveedor en la obra. El residente
     /// los ve y VALORIZA el avance —esta en obra, es quien lo sabe, como con
@@ -270,6 +278,7 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "proveedor:leer",
     "proveedor:crear",
     "proveedor:editar",
+    "proveedor:contactar",
     "orden:leer",
     "orden:crear",
     /// Ve la meta y la bolsa —es el perfil economico de la obra y el margen es

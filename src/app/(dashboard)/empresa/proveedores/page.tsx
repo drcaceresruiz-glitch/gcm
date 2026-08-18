@@ -120,6 +120,7 @@ export default async function ProveedoresPage({
         verTodos={verTodos}
         puedeCrear={puede(sesion, "proveedor:crear")}
         puedeEditar={puede(sesion, "proveedor:editar")}
+        puedeContactar={puede(sesion, "proveedor:contactar")}
         // Un `Map` no cruza de servidor a cliente: se manda como objeto llano.
         semaforo={semaforo ? Object.fromEntries(semaforo) : null}
       />

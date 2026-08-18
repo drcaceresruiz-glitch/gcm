@@ -86,6 +86,7 @@ const NOMBRE: Record<string, string> = {
   Baseline: "Revision",
   WbsItem: "Presupuesto",
   FormaPagoPlantilla: "Forma de pago",
+  MensajeContratista: "Mensaje a contratista",
   CompanyPermission: "Permisos",
 };
 

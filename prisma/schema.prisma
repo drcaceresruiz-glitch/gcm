@@ -1053,6 +1053,7 @@ model Proveedor {
   encargos  EncargoProveedor[]
   lookaheadTareas LookaheadTask[]
   compromisos     CompromisoSemanal[]
+  mensajes        MensajeContratista[]
 
   @@unique([companyId, ruc])
   @@index([companyId])
@@ -2527,6 +2528,79 @@ model MensajeSms {
   /// Para el tope diario de SMS de aviso por obra.
   @@index([projectId, createdAt])
   @@map("mensajes_sms")
+}
+
+/// Por donde salio un mensaje a un contratista.
+enum CanalMensaje {
+  CORREO
+  SMS
+  WHATSAPP
+}
+
+/// Lo que se le ha escrito a un contratista, y por donde.
+///
+/// EXISTE PARA PODER DECIR «te avise el martes». GCM ya sabia a quien tenia
+/// contratado en cada frente, pero hablarle obligaba a salirse a WhatsApp,
+/// y entonces la unica constancia quedaba en el telefono de una persona —que
+/// se va de la empresa, o cambia de movil—.
+///
+/// NO GUARDA LOS ADJUNTOS, solo sus nombres y su tamano. Se decidio asi: el
+/// archivo ya viajo en el correo y esta en la bandeja de enviados de quien lo
+/// mando; guardarlo aqui obligaria a meterlo en el respaldo, en el borrado de
+/// obra y en la restauracion para no dejar huerfanos, a cambio de poco.
+///
+/// `projectId` NO tiene clave foranea, igual que en `MensajeSms` y por el
+/// mismo motivo: el mensaje es del CONTRATISTA, no de la obra. Al borrar una
+/// obra se pone a null y la ficha del contratista conserva su historial.
+model MensajeContratista {
+  id          String  @id @default(cuid())
+  companyId   String
+  proveedorId String
+
+  /// De que obra salio, cuando sale de una. Null cuando se escribe desde el
+  /// catalogo de empresa, que es una conversacion sin frente de por medio.
+  projectId String?
+
+  canal CanalMensaje
+
+  /// El correo o el celular al que fue. Se guarda el de ENTONCES: si manana
+  /// el contratista cambia de numero, el historial tiene que seguir diciendo
+  /// a donde se mando, no a donde se mandaria hoy.
+  destino String @db.VarChar(150)
+
+  /// Solo el correo lo tiene.
+  asunto String? @db.VarChar(200)
+
+  cuerpo String @db.Text
+
+  /// Nombres y tamanos de lo que se adjunto. Nunca el contenido.
+  adjuntos Json?
+
+  /// A donde iba la respuesta. Sirve para saber a quien le llego el «no me
+  /// llego el plano» cuando quien pregunta ya no esta en la empresa.
+  respuestaA String? @db.VarChar(150)
+
+  /// Si GCM lo entrego al canal.
+  ///
+  /// WHATSAPP se queda SIEMPRE en false, y no es un fallo: GCM no envia por
+  /// WhatsApp —la API oficial exige cuenta Business verificada—, solo prepara
+  /// el texto para que lo mande la persona desde su telefono. Marcarlo como
+  /// enviado seria decir que llego algo que GCM no ha mandado.
+  enviado Boolean
+
+  /// Por que no salio, cuando no salio.
+  motivo String? @db.VarChar(60)
+
+  enviadoPor String   @db.VarChar(150)
+  createdAt  DateTime @default(now())
+
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
+
+  /// El historial de la ficha del contratista.
+  @@index([proveedorId, createdAt])
+  /// Para poder ver lo escrito desde una obra.
+  @@index([projectId, createdAt])
+  @@map("mensajes_contratista")
 }
 
 

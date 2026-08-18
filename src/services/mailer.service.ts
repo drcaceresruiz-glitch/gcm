@@ -54,6 +54,19 @@ export interface Correo {
   texto: string;
   html: string;
   adjuntos?: Adjunto[];
+  /**
+   * A donde va la respuesta si el que recibe le da a «Responder».
+   *
+   * Casi todos los correos de GCM son automaticos y NO lo llevan: van
+   * firmados por la empresa y responderlos no serviria de nada, que es lo que
+   * dice su pie. Lo usan los que escribe una persona a otra —hoy, los
+   * mensajes a contratistas—, donde el contratista responde «no me llego el
+   * plano» y eso tiene que llegarle a alguien.
+   *
+   * Sin esto, la respuesta va al buzon del remitente tecnico (`SMTP_FROM`),
+   * que normalmente no lee nadie.
+   */
+  respuestaA?: string;
 }
 
 export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }> {
@@ -75,6 +88,8 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
     await t.sendMail({
       from: env.SMTP_FROM ?? env.SMTP_USER,
       to: correo.para,
+      // Si no viene, nodemailer no pone la cabecera y todo sigue como estaba.
+      replyTo: correo.respuestaA,
       subject: correo.asunto,
       text: correo.texto,
       html: correo.html,
@@ -103,8 +118,22 @@ const MARCA = "GCM - Gestion en Construccion Moderna";
 /**
  * Envoltorio HTML comun a todos los correos: una caja centrada, sobria, sin
  * imagenes remotas (que muchos clientes bloquean) ni dependencias externas.
+ *
+ * @param opciones `seResponde` cambia el pie. Por defecto dice que no se
+ *   responda, que es la verdad de casi todos: son avisos automaticos y del
+ *   otro lado no hay nadie. Los que SI se responden —los que escribe una
+ *   persona a un contratista— lo pasan a `true`, y entonces el pie no puede
+ *   seguir diciendo lo contrario de lo que hace la cabecera `Reply-To`.
  */
-function plantilla(titulo: string, cuerpo: string): string {
+function plantilla(
+  titulo: string,
+  cuerpo: string,
+  opciones?: { seResponde?: boolean },
+): string {
+  const pie = opciones?.seResponde
+    ? `Enviado desde ${MARCA}. Puedes responder a este correo.`
+    : `Este es un correo automatico de ${MARCA}. No respondas a este mensaje.`;
+
   return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
 <body style="margin:0;background:#f1f5f6;font-family:Arial,Helvetica,sans-serif;color:#1b2733;">
@@ -117,7 +146,7 @@ function plantilla(titulo: string, cuerpo: string): string {
       ${cuerpo}
     </div>
     <p style="color:#6b7a82;font-size:12px;margin:16px 4px;">
-      Este es un correo automatico de ${MARCA}. No respondas a este mensaje.
+      ${pie}
     </p>
   </div>
 </body></html>`;
@@ -591,4 +620,66 @@ export function correoInformeObra(datos: {
     texto,
     html,
   };
+}
+
+/**
+ * Correo de una persona de la obra a un contratista.
+ *
+ * ES EL PRIMERO QUE NO ES AUTOMATICO, y de ahi todo lo que lo distingue del
+ * resto: el cuerpo lo escribe una persona, lleva `Reply-To` a un buzon que
+ * alguien lee, y el pie lo dice en vez de pedir que no se responda. Un correo
+ * que dice «no respondas» y ademas trae Reply-To se contradice a si mismo.
+ *
+ * Como todos los de obra, sale UNO A UNO —aqui es literal: hay un solo
+ * destinatario— y el tipo lo garantiza devolviendo `Omit<Correo, "para">`.
+ *
+ * TODO SE ESCAPA. El cuerpo lo teclea el usuario y la razon social viene del
+ * catalogo (o de SUNAT): sin escapar, un `<a href>` en cualquiera de los dos
+ * sale como enlace de verdad en un correo con el membrete de la empresa. Ya
+ * paso una vez con los siete correos anteriores (`dab8a00`).
+ */
+export function correoAlContratista(datos: {
+  contratista: string;
+  /// La obra de la que sale, si sale de una. Encabeza el asunto para que el
+  /// contratista sepa de cual de sus frentes le hablan.
+  obra?: string | null;
+  asunto: string;
+  cuerpo: string;
+  remitente: string;
+  /// Solo los nombres: se listan para que se note si el adjunto no llego.
+  adjuntos: readonly string[];
+}): Omit<Correo, "para"> {
+  const encabezado = datos.obra?.trim();
+  const asunto = encabezado ? `${encabezado}: ${datos.asunto}` : datos.asunto;
+
+  const texto = [
+    datos.cuerpo,
+    ``,
+    ...(datos.adjuntos.length > 0
+      ? [`Adjuntos:`, ...datos.adjuntos.map((a) => `- ${a}`), ``]
+      : []),
+    `Enviado por ${datos.remitente}${encabezado ? ` — ${encabezado}` : ""}.`,
+  ].join("\n");
+
+  // Escapar ANTES de meter los <br>: al reves, el `<br>` recien puesto se
+  // escaparia y el correo ensenaria la etiqueta en crudo.
+  const cuerpoHtml = esc(datos.cuerpo).replace(/\r?\n/g, "<br>");
+
+  const html = plantilla(
+    esc(datos.asunto),
+    `${encabezado ? `<p style="margin:0 0 12px;color:#6b7a82;">${esc(encabezado)}</p>` : ""}
+     <p style="white-space:pre-wrap;">${cuerpoHtml}</p>
+     ${
+       datos.adjuntos.length > 0
+         ? `<p style="color:#6b7a82;font-size:13px;margin-top:16px;">
+              ${datos.adjuntos.length === 1 ? "Va un archivo adjunto" : "Van estos archivos adjuntos"}:<br>
+              ${datos.adjuntos.map((a) => `<strong>${esc(a)}</strong>`).join("<br>")}
+            </p>`
+         : ""
+     }
+     <p style="color:#6b7a82;font-size:13px;margin-top:16px;">Enviado por ${esc(datos.remitente)}.</p>`,
+    { seResponde: true },
+  );
+
+  return { asunto, texto, html };
 }

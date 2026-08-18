@@ -285,6 +285,17 @@ async function borrarLaObra(
       });
       if (sms.count > 0) borradas.mensajes_sms = sms.count;
 
+      // `mensajes_contratista` tambien se ANULA, por otro motivo: es el
+      // historial de lo que se le ha escrito a un CONTRATISTA, y el
+      // contratista es de la empresa —sigue trabajando en otras obras cuando
+      // esta se cierra—. Borrarlo dejaria su ficha diciendo que nunca se le
+      // aviso de nada, que es justo lo contrario de para lo que existe.
+      const mensajes = await tx.mensajeContratista.updateMany({
+        where: { projectId: obra.id },
+        data: { projectId: null },
+      });
+      if (mensajes.count > 0) borradas.mensajes_contratista = mensajes.count;
+
       // `audit_logs` NO se borra, y es deliberado: es la prueba de que la obra
       // existio y, sobre todo, de que alguien la borro. Su `projectId` no
       // tiene clave foranea, asi que las filas se quedan apuntando a una obra

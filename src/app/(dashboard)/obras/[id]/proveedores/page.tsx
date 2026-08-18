@@ -134,6 +134,7 @@ export default async function ProveedoresPage({
               encargo={e}
               puedeGestionar={puedeGestionar}
               puedeValorizar={puedeValorizar}
+              puedeContactar={puede(sesion, "proveedor:contactar")}
             />
           ))}
         </ul>
