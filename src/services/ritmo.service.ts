@@ -10,6 +10,15 @@ export interface RitmoDeObra {
   /// El mayor `ganado` de la serie. La pantalla dibuja las barras contra esto,
   /// asi que se calcula una vez aqui y no en cada fila.
   techo: number;
+  /**
+   * Por que no hay tramos, cuando no los hay.
+   *
+   * Antes esto devolvia `null` y la seccion desaparecia sin mas, que se lee
+   * como «esto no funciona». Una pantalla que se calla no explica; una obra
+   * recien empezada no tiene ritmo porque no ha pasado una semana, y eso hay
+   * que decirlo.
+   */
+  motivo: "sin-partes" | "primera-semana" | null;
 }
 
 /// Cuantos tramos se ensenan. Doce semanas es un trimestre: suficiente para
@@ -73,9 +82,16 @@ export async function ritmoDeObra(
     }),
   ]);
 
-  // Sin partes no hay ritmo que medir, y una tabla de ceros no informa: dice
-  // «la obra esta parada» cuando lo cierto es «nadie ha reportado todavia».
-  if (!corte || corte.tareas.length === 0 || avances.length === 0) return null;
+  // Sin cronograma no hay nada que medir, y la pantalla ya lo dice en otro
+  // sitio: aqui se calla del todo.
+  if (!corte || corte.tareas.length === 0) return null;
+
+  // Sin partes no hay ritmo, pero se explica en vez de desaparecer: una tabla
+  // de ceros diria «la obra esta parada» cuando lo cierto es «nadie ha
+  // reportado todavia», y una seccion que se esfuma se lee como una averia.
+  if (avances.length === 0) {
+    return { tramos: [], techo: 0, motivo: "sin-partes" };
+  }
 
   /*
    * El capitulo sale del ORDEN y el NIVEL del documento, no del prefijo del
@@ -130,10 +146,16 @@ export async function ritmoDeObra(
   const semanas = fechasSemanales(primero, new Date(), obra?.diaCorteSemanal ?? 5);
 
   const tramos = ritmoPorTramos(tareas, reportes, semanas).slice(-TRAMOS_MAXIMOS);
-  if (tramos.length === 0) return null;
+
+  // Hace falta cerrar al menos un corte para que haya un tramo: con todos los
+  // partes dentro de la misma semana no hay dos medidas que restar.
+  if (tramos.length === 0) {
+    return { tramos: [], techo: 0, motivo: "primera-semana" };
+  }
 
   return {
     tramos,
     techo: Math.max(...tramos.map((t) => t.ganado), 0),
+    motivo: null,
   };
 }

@@ -16,6 +16,34 @@ import type { RitmoDeObra as Datos } from "@/services/ritmo.service";
 export function RitmoDeObra({ datos }: { datos: Datos }) {
   const { tramos, techo } = datos;
 
+  // Sin tramos se explica POR QUE, en vez de esconder la seccion. Una
+  // pantalla que desaparece se lee como una averia, y el usuario acaba
+  // preguntandose si el dato se perdio.
+  if (datos.motivo !== null) {
+    return (
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold">Ritmo de avance</h2>
+        <p className="max-w-3xl text-sm text-pretty opacity-70">
+          {datos.motivo === "sin-partes" ? (
+            <>
+              Aquí se verá cuántos puntos de obra se ganan cada semana y qué
+              capítulo los pone. Todavía no hay ningún parte del día, así que no
+              hay nada que medir — no es que la obra esté parada, es que aún no
+              se ha reportado.
+            </>
+          ) : (
+            <>
+              Aquí se verá cuántos puntos de obra se ganan cada semana y qué
+              capítulo los pone. Hace falta que <strong>cierre una semana</strong>{" "}
+              para tener dos medidas que restar; con todos los partes dentro del
+              mismo corte no hay ritmo que calcular todavía.
+            </>
+          )}
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-3">
       <div>
