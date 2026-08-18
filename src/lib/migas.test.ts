@@ -41,6 +41,20 @@ describe("la cadena de migas", () => {
     ]);
   });
 
+  /**
+   * El Kanban es la TERCERA pantalla del mismo territorio, y la unica que no
+   * se llama «Tablero». Se fija aqui junto a las otras dos para que nadie la
+   * renombre por parecer mas coherente: el nombre distinto es justo lo que
+   * impide volver a confundirlas.
+   */
+  it("el Kanban no se confunde con ninguno de los dos tableros", () => {
+    const kanban = migasDeRuta("/obras/abc/kanban", { obra: "CRIOCORD" });
+    expect(kanban.map((x) => x.texto)).toEqual(["Obras", "CRIOCORD", "Kanban"]);
+
+    const obra = migasDeRuta("/obras/abc/tablero", { obra: "CRIOCORD" });
+    expect(obra.map((x) => x.texto)).toEqual(["Obras", "CRIOCORD", "Tablero"]);
+  });
+
   it("la ultima nunca lleva enlace: es donde estas", () => {
     const m = migasDeRuta("/obras/abc/cronograma/gantt", { obra: "CRIOCORD" });
 

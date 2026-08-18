@@ -181,6 +181,16 @@ export default async function ObraLayout({
         /// El escaparate: las fotos de avance que se curan y, si gerencia
         /// quiere, se ensenan al cliente. Va tras el Plan semanal porque la
         /// foto se sube cuando el trabajo ya se hizo.
+        /// El mismo trabajo del Lookahead y del PTS, ordenado por madurez.
+        /// Va DESPUES de los dos porque los resume: no aporta datos nuevos,
+        /// los dispone de otra forma. Se llama Kanban y no «Tablero» a
+        /// proposito: ya hay dos pantallas con ese nombre.
+        puede(sesion, "lookahead:leer") && {
+          clave: "kanban",
+          titulo: "Kanban",
+          pregunta: "en qué punto está cada tarea",
+          href: `${raiz}/kanban`,
+        },
         puede(sesion, "galeria:leer") && {
           clave: "galeria",
           titulo: "Galería",

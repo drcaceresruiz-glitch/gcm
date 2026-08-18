@@ -81,6 +81,7 @@ const TABLA_OBRA: readonly Entrada[] = [
   { patron: "/obras/:obra/tablero", texto: "Tablero" },
 
   { patron: "/obras/:obra/lookahead", texto: "Lookahead" },
+  { patron: "/obras/:obra/kanban", texto: "Kanban" },
   { patron: "/obras/:obra/lookahead/codigos", texto: "Códigos QR" },
 
   { patron: "/obras/:obra/plan-semanal", texto: "Plan semanal" },
