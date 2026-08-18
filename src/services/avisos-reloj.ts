@@ -34,6 +34,7 @@ import {
   repartoDeAviso,
   suscripcionesResueltas,
 } from "@/services/avisos-envio";
+import { avisarValorizacionesPendientes } from "@/services/avisos-valorizacion";
 import type { EventoAviso, TipoRestriccion } from "@/generated/prisma/enums";
 
 /**
@@ -158,6 +159,9 @@ export async function pasadaDelReloj(): Promise<ResumenPasada> {
         id: true,
         companyId: true,
         nombreObra: true,
+        // La cadencia de la obra: de ella cuelga, por herencia, la de cada
+        // contratista que no tenga la suya. Ver `lib/cadencia-valorizacion`.
+        diaCorteSemanal: true,
         estado: true,
         archivadaEn: true,
       },
@@ -222,6 +226,8 @@ interface ObraDelReloj {
   id: string;
   companyId: string;
   nombreObra: string;
+  /// ISO 1..7. La cadencia por defecto de las valorizaciones de la obra.
+  diaCorteSemanal: number;
 }
 
 async function pasadaDeObra(
@@ -298,6 +304,26 @@ async function pasadaDeObra(
   let avisosApp = porHitos.avisosApp;
   let correos = porHitos.correos;
   let sms = porHitos.sms;
+
+  /**
+   * Las valorizaciones que tocaban y no constan.
+   *
+   * Va aqui dentro y no antes del `if (!ajustes || !ajustes.activo)`: el
+   * interruptor de la obra apaga TODO lo que suena solo, y hacer una
+   * excepcion con este seria justo lo que lleva a que alguien apague los
+   * avisos enteros por no poder callar uno.
+   *
+   * Solo escribe en la campanita, asi que no consume presupuesto de correo ni
+   * de SMS: se suma a `avisosApp` y no toca los otros dos contadores.
+   */
+  avisosApp += await avisarValorizacionesPendientes(
+    {
+      id: obra.id,
+      companyId: obra.companyId,
+      diaCorteSemanal: obra.diaCorteSemanal,
+    },
+    ahora,
+  );
 
   if (abiertas.length === 0) return { avisosApp, correos, sms };
 
