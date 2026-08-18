@@ -225,7 +225,45 @@ function pintarCabecera(fila: ExcelJS.Row, titulos: readonly string[]) {
   });
 }
 
-export async function generarPlantillaMeta(): Promise<ArrayBuffer> {
+/**
+ * Ajusta los meses de los ejemplos al plazo REAL de la obra.
+ *
+ * Los ejemplos traian 8 meses escritos a mano, pensados para una obra de ese
+ * tamano. Descargada para una obra de trece dias, quien no cambiara esa
+ * columna presupuestaba ocho meses de residente: de ahi salieron 125.700 de
+ * gastos generales sobre un costo directo de 15.478.
+ *
+ * Se conserva la PROPORCION entre lineas —el almacenero entra mas tarde y
+ * lleva 6 de los 8 meses, que es la leccion que enseña la plantilla— en vez
+ * de poner el mismo numero en todas.
+ */
+function ajustarMeses(
+  filas: readonly FilaGasto[],
+  mesesObra: number | null,
+): FilaGasto[] {
+  if (mesesObra === null || mesesObra <= 0) return [...filas];
+
+  const plazoEjemplo = Math.max(...filas.map((f) => f.meses ?? 0));
+  if (plazoEjemplo <= 0) return [...filas];
+
+  return filas.map((f) => {
+    if (f.meses === undefined) return f;
+    const proporcion = f.meses / plazoEjemplo;
+    // Dos decimales, como el resto de los plazos del modulo, y nunca cero:
+    // una linea de cero meses no cuesta nada y desaparece de la suma.
+    const meses = Math.max(0.01, Math.round(mesesObra * proporcion * 100) / 100);
+    return { ...f, meses };
+  });
+}
+
+/**
+ * @param mesesObra Plazo real de la obra. Si viene, los ejemplos se ajustan a
+ *   el; si no, se generan con los meses de siempre (y el test de ida y vuelta
+ *   sigue fijando los mismos totales).
+ */
+export async function generarPlantillaMeta(
+  mesesObra: number | null = null,
+): Promise<ArrayBuffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = "GCM";
 
@@ -287,7 +325,7 @@ export async function generarPlantillaMeta(): Promise<ArrayBuffer> {
   pintarCabecera(gastos.getRow(FILA_CABECERA), CABECERAS_GASTOS);
 
   let g = FILA_CABECERA;
-  for (const f of FILAS_GASTOS) {
+  for (const f of ajustarMeses(FILAS_GASTOS, mesesObra)) {
     g++;
     const fila = gastos.getRow(g);
     fila.getCell(1).value = f.concepto;

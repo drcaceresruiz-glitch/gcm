@@ -163,7 +163,7 @@ export function FormularioMeta({
       <div className="flex flex-wrap items-center gap-3">
         <Boton />
         <a
-          href="/plantilla-meta"
+          href={`/plantilla-meta?meses=${mesesSugeridos}`}
           className="inline-flex items-center gap-2 text-sm font-medium underline"
         >
           <Download className="size-4" aria-hidden="true" />

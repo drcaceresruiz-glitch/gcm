@@ -8,7 +8,7 @@ import { origenDeEjemplo } from "@/lib/datos-de-ejemplo";
 import type { ComparacionMeta } from "@/services/meta.service";
 
 /**
- * La cascada de la bolsa operativa.
+ * La cascada de la bolsa de la obra.
  *
  * El orden de las filas ES el argumento: contractual, meta, y de ahi las dos
  * bolsas por separado. La utilidad va DESPUES de la bolsa total y con su
@@ -81,7 +81,7 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
     <section className="space-y-5">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold">
-          Bolsa operativa
+          Bolsa de la obra
           <span className="ml-2 text-sm font-normal opacity-70">
             meta v{meta.version} · {fechaCorta(meta.fechaMeta)}
           </span>
@@ -133,28 +133,31 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
           aria-hidden="true"
         />
 
-        <Fila
-          etiqueta="Bolsa de producción"
-          nota="se gana ejecutando por debajo de la meta"
-          valor={bolsa.bolsaProduccion}
-          sangrado
-        />
-        {/* La bolsa de plazo solo se pinta si la obra decidio que los gastos
-            generales entran. Cuando no entran, un «S/ 0.00» seria peor que
-            nada: parece que no se ahorro, cuando lo que pasa es que esa
-            partida no es de la obra. */}
-        {bolsa.incluyeGastosGenerales ? (
-          <Fila
-            etiqueta="Bolsa de plazo"
-            nota="gastos generales del contrato menos los de la meta"
-            valor={bolsa.bolsaPlazo}
-            sangrado
-          />
-        ) : (
-          <p className="py-2 pl-4 text-sm opacity-60">
-            Los gastos generales no entran en la bolsa de esta obra. Se siguen
-            registrando, y su desviación de plazo se avisa abajo.
-          </p>
+        {/* UNA SOLA BOLSA.
+
+            Antes se pintaban dos —«de produccion» y «de plazo»— y no son
+            terminos del sector: el desglose era nuestro. Con los gastos
+            generales fuera de la bolsa, que es el caso corriente, la segunda
+            era siempre cero y la primera era la bolsa entera con otro nombre.
+
+            Cuando los gastos generales SI entran, el desglose se enseña como
+            detalle debajo, que es donde ayuda: dice de donde sale el margen
+            sin partir la cifra que se lee. */}
+        {bolsa.incluyeGastosGenerales && (
+          <>
+            <Fila
+              etiqueta="Por ejecutar bajo la meta"
+              nota="lo que se gana construyendo mas barato"
+              valor={bolsa.bolsaProduccion}
+              sangrado
+            />
+            <Fila
+              etiqueta="Por gastos generales"
+              nota="los contratados menos los presupuestados"
+              valor={bolsa.bolsaPlazo}
+              sangrado
+            />
+          </>
         )}
 
         <div
@@ -167,7 +170,12 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
           className="flex items-baseline justify-between gap-4 py-2 text-lg font-semibold"
           style={negativa ? { color: "var(--color-peligro)" } : undefined}
         >
-          <span>Bolsa operativa</span>
+          <span>
+            Bolsa
+            <span className="ml-2 text-sm font-normal opacity-60">
+              lo que la obra puede gestionar
+            </span>
+          </span>
           <span className="tabular-nums">{soles(bolsa.bolsaTotal)}</span>
         </div>
 
@@ -190,6 +198,23 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
           />
         </div>
       </div>
+
+      {c.lineasLargas.length > 0 && (
+        <Aviso
+          tono="alerta"
+          icono={CalendarClock}
+          titulo={`${c.lineasLargas.length} gasto(s) general(es) duran mas que la obra`}
+        >
+          La obra son {c.mesesObra} meses y estas lineas presupuestan mas:{" "}
+          {c.lineasLargas
+            .map((l) => `${l.concepto} (${l.meses} meses, ${l.exceso} de mas)`)
+            .join("; ")}
+          . Los meses se escriben a mano en el Excel y nada los ata al plazo
+          real, asi que suelen venir de la plantilla sin ajustar. Si es a
+          proposito —una fianza que sigue viva tras entregar— dejalo; si no,
+          corrige los meses y vuelve a cargar.
+        </Aviso>
+      )}
 
       {ejemplo.hay && (
         <Aviso
@@ -219,7 +244,7 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
           {soles(bolsa.costoDirectoMeta)} de costo directo. En una obra suelen
           ser una fraccion de el, asi que casi siempre es una fila mal cargada
           —un monto mensual multiplicado por un plazo equivocado—. Mientras
-          este asi, la bolsa de plazo y la bolsa operativa no significan nada.
+          este asi, la bolsa no significa nada.
         </Aviso>
       )}
 

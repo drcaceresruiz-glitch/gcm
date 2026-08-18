@@ -15,14 +15,24 @@ import { generarPlantillaMeta } from "@/lib/plantilla-meta";
  * deja fuera. A quien no puede ver el margen no se le entrega el manual de
  * como se construye.
  */
-export async function GET() {
+export async function GET(peticion: Request) {
   const sesion = await obtenerSesion();
   if (!sesion) return new Response("No autorizado", { status: 401 });
   if (!puede(sesion, "meta:leer")) {
     return new Response("No autorizado", { status: 403 });
   }
 
-  const buffer = await generarPlantillaMeta();
+  /**
+   * El plazo de la obra viaja por la URL. La ruta es generica —no cuelga de
+   * una obra— porque la plantilla no lleva ni un dato de la empresa; lo unico
+   * que necesita es cuantos meses dura, para que los ejemplos no propongan
+   * ocho meses en una obra de trece dias.
+   */
+  const pedido = new URL(peticion.url).searchParams.get("meses");
+  const meses = pedido === null ? null : Number(pedido);
+  const buffer = await generarPlantillaMeta(
+    meses !== null && Number.isFinite(meses) && meses > 0 ? meses : null,
+  );
 
   return new Response(new Uint8Array(buffer), {
     headers: {

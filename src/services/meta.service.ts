@@ -25,6 +25,10 @@ import {
   SinLineaBaseError,
 } from "@/services/movimientos.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
+import {
+  lineasMasLargasQueLaObra,
+  type LineaLarga,
+} from "@/lib/gastos-contra-plazo";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -149,6 +153,10 @@ export interface AvisoPlazo {
 export interface ComparacionMeta {
   meta: MetaResumen;
   bolsa: Bolsa;
+  /// Gastos generales que duran mas que la obra. Vacio = todos cuadran.
+  lineasLargas: LineaLarga[];
+  /// El plazo de la obra, en meses, contra el que se comparan.
+  mesesObra: string;
   /// Cuanto exagera la bolsa por movimientos aprobados despues de fijarla.
   desfase: Desfase;
   plazo: AvisoPlazo;
@@ -344,6 +352,22 @@ export async function compararConContractual(
     hay: esPositivo(desviacion),
   };
 
+  /**
+   * Las lineas de gasto que duran mas que la obra.
+   *
+   * Se compara contra `mesesProgramados` —las fechas de la obra— y no contra
+   * `mesesMeta`: si alguien presupuesto ocho meses en una obra de trece dias,
+   * comparar contra su propio ocho no delataria nada.
+   */
+  const lineasLargas = lineasMasLargasQueLaObra(
+    gastos.map((g) => ({
+      concepto: g.concepto,
+      tipo: g.tipo,
+      meses: g.meses?.toString() ?? null,
+    })),
+    mesesProgramados,
+  );
+
   return {
     ok: true,
     comparacion: {
@@ -370,6 +394,8 @@ export async function compararConContractual(
         posteriores.map((m) => ({ importeNeto: m.importeNeto.toString() })),
       ),
       plazo,
+      lineasLargas,
+      mesesObra: mesesProgramados,
     },
   };
 }

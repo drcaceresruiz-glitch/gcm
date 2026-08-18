@@ -46,7 +46,7 @@ function mesesEntre(inicio: Date, fin: Date): string {
 }
 
 /**
- * El presupuesto meta y la bolsa operativa de la obra.
+ * El presupuesto meta y la bolsa de la obra.
  *
  * La pantalla responde a una sola pregunta —«cuanto margen tiene esta obra y
  * de donde sale»— y por eso el orden es: la cascada, los avisos que la matizan
@@ -89,8 +89,9 @@ export default async function MetaPage({
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-pretty opacity-70">
           Lo que la empresa se compromete a gastar, frente a lo que el cliente
-          paga. La diferencia es la <strong>bolsa operativa</strong> de la obra.
-          La utilidad se muestra aparte: es el resultado esperado, no dinero
+          paga. La diferencia es la <strong>bolsa</strong>: lo que la obra
+          puede gestionar. La utilidad se muestra aparte: es el resultado
+          esperado, no dinero
           disponible.
         </p>
       </div>
