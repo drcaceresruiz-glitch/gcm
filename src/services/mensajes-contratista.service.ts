@@ -328,6 +328,9 @@ export async function escribirAlContratista(
       para: contratista.email,
       adjuntos: adjuntos.length ? adjuntos : undefined,
       respuestaA: respuestaA ?? undefined,
+      // Para que salga con el logo de la constructora: es un correo a alguien
+      // de fuera y tiene que parecer de la empresa, no del sistema.
+      companyId: sesion.companyId,
     });
 
     await apuntar({

@@ -8,6 +8,8 @@ import { Volver } from "@/components/ui/Volver";
 import { PanelAyuda } from "@/components/ui/PanelAyuda";
 import { IlustracionDocumento } from "@/components/ui/IlustracionDocumento";
 import { FormularioEmpresa } from "@/components/empresa/FormularioEmpresa";
+import { LogoEmpresa } from "@/components/empresa/LogoEmpresa";
+import { logoDeEmpresa } from "@/services/logo.service";
 
 export const metadata: Metadata = { title: "Datos de la empresa" };
 
@@ -60,10 +62,17 @@ export default async function DatosEmpresaPage({
       )}
 
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
-        <FormularioEmpresa
-          empresa={empresa}
-          soloLectura={!puede(sesion, "empresa:editar")}
-        />
+        <div className="space-y-6">
+          <LogoEmpresa
+            logo={await logoDeEmpresa(sesion)}
+            soloLectura={!puede(sesion, "empresa:editar")}
+          />
+
+          <FormularioEmpresa
+            empresa={empresa}
+            soloLectura={!puede(sesion, "empresa:editar")}
+          />
+        </div>
 
         <PanelAyuda
           ilustracion={<IlustracionDocumento />}

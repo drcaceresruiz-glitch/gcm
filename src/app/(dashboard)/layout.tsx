@@ -7,6 +7,7 @@ import {
   obtenerFotoPerfil,
 } from "@/services/perfil.service";
 import { contarAvisosSinLeer } from "@/services/avisos-bandeja";
+import { logoDeEmpresa } from "@/services/logo.service";
 import { puede } from "@/lib/rbac";
 import {
   Navegacion,
@@ -41,10 +42,13 @@ export default async function DashboardLayout({
   //
   // El de avisos corre en CADA carga del area privada, asi que es un `count`
   // con su indice hecho a medida (`userId, leidoAt, createdAt`) y nada mas.
-  const [pendientes, foto, avisosSinLeer] = await Promise.all([
+  const [pendientes, foto, avisosSinLeer, logo] = await Promise.all([
     contarSolicitudesPendientes(sesion),
     obtenerFotoPerfil(sesion),
     contarAvisosSinLeer(sesion),
+    // Una fila por su clave primaria: entra en el mismo `Promise.all` para no
+    // sumar su latencia a la de la cabecera, que se pinta en cada pantalla.
+    logoDeEmpresa(sesion),
   ]);
 
   // Los permisos se resuelven aqui y no en el componente de navegacion: la
@@ -130,14 +134,35 @@ export default async function DashboardLayout({
           {/* El logotipo era un `div`. Convertirlo en enlace es lo que hace
               que se pueda volver al panel desde cualquier pantalla, que
               hasta ahora dependia de que cada pagina se escribiera el suyo. */}
+          {/* Con logo de empresa, manda el logo: quien trabaja aqui todo el
+              dia tiene que ver SU constructora, no las siglas del sistema.
+              Sin logo se queda el casco de siempre.
+
+              La caja tiene alto fijo y la imagen va con `object-contain` y
+              `w-auto`: cabe dentro sin salirse y sin estirarse, sea cuadrada
+              o muy apaisada. El `max-w` evita que un logo panoramico se coma
+              la cabecera entera. */}
           <Link href="/panel" className="flex items-center gap-2.5">
-            <div
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg"
-              style={{ backgroundColor: "var(--color-marca-500)" }}
-            >
-              <HardHat className="size-4 text-white" aria-hidden="true" />
-            </div>
-            <span className="font-semibold">GCM</span>
+            {logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logo.src}
+                alt={logo.alt}
+                width={logo.ancho}
+                height={logo.alto}
+                className="h-8 w-auto max-w-40 object-contain"
+              />
+            ) : (
+              <>
+                <div
+                  className="flex size-8 shrink-0 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: "var(--color-marca-500)" }}
+                >
+                  <HardHat className="size-4 text-white" aria-hidden="true" />
+                </div>
+                <span className="font-semibold">GCM</span>
+              </>
+            )}
           </Link>
 
           {/* En el medio de la cabecera y no en un rincon: es la unica

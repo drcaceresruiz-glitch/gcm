@@ -125,6 +125,31 @@ model Company {
   representanteLegal String? @db.VarChar(150)
   cargoRepresentante String? @db.VarChar(100)
 
+  /// El logo de la constructora: cabecera del panel, informe en PDF y correos.
+  ///
+  /// SOLO PNG Y JPG, y no es un capricho de gusto: el informe lo dibuja
+  /// `pdf-lib`, que unicamente sabe incrustar esos dos. Aceptar SVG o WebP
+  /// daria un logo que se ve en la web y NO en el papel que recibe el
+  /// cliente, que es justo donde mas se nota.
+  ///
+  /// Ruta RELATIVA a `STORAGE_ROOT`, como la galeria y la evidencia: el
+  /// archivo vive fuera del arbol de la aplicacion para que un despliegue no
+  /// se lo lleve por delante.
+  logoRuta String? @db.VarChar(255)
+  logoMime String? @db.VarChar(100)
+
+  /// SHA-256 del contenido. Sirve de version para el navegador: la direccion
+  /// del logo lleva `?v=<hash>`, asi que al cambiarlo se ve el nuevo sin
+  /// esperar a que caduque la cache.
+  logoHash String? @db.VarChar(64)
+
+  /// El tamano REAL del archivo, medido de sus bytes al subirlo (no de lo que
+  /// diga el formulario). Sin la proporcion no se puede colocar el logo en el
+  /// PDF ni en el correo sin deformarlo, y deformarlo es lo unico que no se
+  /// puede hacer: se lee como descuido de la empresa que lo manda.
+  logoAncho Int?
+  logoAlto  Int?
+
   /// Texto que se repite al pie de todas las ordenes del cliente, sobre la
   /// responsabilidad del traslado. Va en la empresa y no escrito en el
   /// codigo porque es una condicion contractual suya, no del sistema.

@@ -2,6 +2,7 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { componerInforme } from "@/services/informe.service";
 import { generarInformePdf } from "@/services/informe-pdf.service";
 import { nombreArchivoInforme } from "@/lib/informe-documento";
+import { bytesDelLogo } from "@/services/logo.service";
 
 /**
  * El informe al corte en PDF, completo.
@@ -38,7 +39,13 @@ export async function GET(
   }
 
   const datos = informe.datos;
-  const pdf = await generarInformePdf(datos, new Date());
+  // El logo se lee del disco aqui, no dentro del generador: asi el modulo del
+  // PDF no necesita saber nada de la sesion ni de la base.
+  const pdf = await generarInformePdf(
+    datos,
+    new Date(),
+    await bytesDelLogo(sesion.companyId),
+  );
   const nombre = nombreArchivoInforme(datos.obra, datos.fechaCorte, "pdf");
 
   return new Response(new Uint8Array(pdf), {

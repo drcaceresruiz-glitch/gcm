@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { componerInforme } from "./informe.service";
 import { correoInformeObra, enviarCorreo } from "./mailer.service";
 import { generarInformePdf } from "./informe-pdf.service";
+import { bytesDelLogo } from "./logo.service";
 import { generarCsv } from "@/lib/csv";
 import {
   filasDelInformeCsv,
@@ -69,7 +70,8 @@ export async function enviarInformePorCorreo(
   // Los DOS: el PDF es el informe para leer y archivar, el CSV es el mismo
   // contenido para cruzarlo con lo de cada uno. Quien recibe el correo no
   // tiene por que saber cual necesita antes de abrirlo.
-  const pdf = await generarInformePdf(d, generadoEl);
+  const logo = await bytesDelLogo(sesion.companyId);
+  const pdf = await generarInformePdf(d, generadoEl, logo);
   const csv = generarCsv(filasDelInformeCsv(d, generadoEl));
 
   const cuerpo = correoInformeObra({
@@ -100,7 +102,11 @@ export async function enviarInformePorCorreo(
   ];
 
   const resultados = await Promise.all(
-    destinos.lista.map((para) => enviarCorreo({ ...cuerpo, para, adjuntos })),
+    destinos.lista.map((para) =>
+      // Con `companyId` para que lleve el logo: este correo va al cliente y a
+      // los contratistas, y es de la constructora, no de GCM.
+      enviarCorreo({ ...cuerpo, para, adjuntos, companyId: sesion.companyId }),
+    ),
   );
   const enviados = resultados.filter((r) => r.enviado).length;
 

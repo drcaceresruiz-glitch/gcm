@@ -2,6 +2,7 @@ import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
 import { env, isProduction } from "@/lib/env";
 import { escaparHtml as esc } from "@/lib/html";
+import { logoParaCorreo } from "./logo.service";
 
 /**
  * Envio de correo.
@@ -67,6 +68,15 @@ export interface Correo {
    * que normalmente no lee nadie.
    */
   respuestaA?: string;
+  /**
+   * De quien sale, para poner su logo en la cabecera.
+   *
+   * Se resuelve AQUI y no en cada constructor de correo: son ocho, y hacer
+   * que cada uno cargue el logo por su cuenta es garantizar que el noveno se
+   * olvide. Quien no lo pase manda el correo con el membrete de texto de
+   * siempre, que es lo que hacian todos hasta ahora.
+   */
+  companyId?: string;
 }
 
 export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }> {
@@ -85,6 +95,46 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
   }
 
   try {
+    const adjuntos = (correo.adjuntos ?? []).map((a) => ({
+      filename: a.nombre,
+      content: a.contenido,
+      encoding: "base64" as const,
+      contentType: a.tipo,
+    }));
+
+    /**
+     * El logo viaja como ADJUNTO INCRUSTADO (`cid:`), no como `data:`.
+     *
+     * Es la unica forma que funciona: las imagenes remotas las bloquean casi
+     * todos los clientes —por eso esta plantilla nunca las uso— y las
+     * incrustadas en base64 dentro del HTML las descarta Gmail, que es lo que
+     * ya se aprendio con la curva del informe. Un `cid` es una parte mas del
+     * mensaje y se ve sin pedir permiso.
+     *
+     * Si aun asi no cargara, la cabecera sigue llevando el nombre en texto
+     * detras: no queda un hueco vacio.
+     */
+    const logo = correo.companyId ? await logoParaCorreo(correo.companyId) : null;
+
+    if (logo) {
+      adjuntos.push({
+        filename: logo.nombre,
+        content: logo.contenido,
+        encoding: "base64" as const,
+        contentType: logo.tipo,
+        // @ts-expect-error nodemailer acepta `cid`; el tipo del array de
+        // arriba se infiere de los adjuntos normales, que no lo llevan.
+        cid: CID_LOGO,
+      });
+    }
+
+    const html = correo.html.replace(
+      MARCA_LOGO,
+      logo
+        ? `<img src="cid:${CID_LOGO}" alt="" height="28" style="height:28px;width:auto;vertical-align:middle;margin-right:10px;border:0;">`
+        : "",
+    );
+
     await t.sendMail({
       from: env.SMTP_FROM ?? env.SMTP_USER,
       to: correo.para,
@@ -92,13 +142,8 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
       replyTo: correo.respuestaA,
       subject: correo.asunto,
       text: correo.texto,
-      html: correo.html,
-      attachments: correo.adjuntos?.map((a) => ({
-        filename: a.nombre,
-        content: a.contenido,
-        encoding: "base64",
-        contentType: a.tipo,
-      })),
+      html,
+      attachments: adjuntos.length > 0 ? adjuntos : undefined,
     });
     return { enviado: true };
   } catch (error) {
@@ -114,6 +159,22 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
 
 /// El remitente y la marca que encabeza los correos.
 const MARCA = "GCM - Gestion en Construccion Moderna";
+
+/**
+ * Donde entra el logo de la empresa dentro de la cabecera, si lo hay.
+ *
+ * Es un COMENTARIO HTML, y eso es lo que lo hace seguro: `plantilla` lo emite
+ * siempre y `enviarCorreo` lo sustituye por la imagen cuando hay logo. Si
+ * nadie lo sustituye —los correos que no dicen de que empresa son— el
+ * comentario no se ve, y no queda ni un hueco ni una imagen rota.
+ *
+ * La alternativa era pasar el logo por los ocho constructores de correo. Esto
+ * es una costura declarada en un sitio; aquello, ocho firmas que mantener.
+ */
+const MARCA_LOGO = "<!--GCM_LOGO-->";
+
+/// Como se referencia el adjunto incrustado desde el HTML.
+const CID_LOGO = "logo-de-empresa";
 
 /**
  * Envoltorio HTML comun a todos los correos: una caja centrada, sobria, sin
@@ -139,7 +200,7 @@ function plantilla(
 <body style="margin:0;background:#f1f5f6;font-family:Arial,Helvetica,sans-serif;color:#1b2733;">
   <div style="max-width:520px;margin:0 auto;padding:24px;">
     <div style="background:#0f7186;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;font-weight:bold;">
-      ${MARCA}
+      ${MARCA_LOGO}${MARCA}
     </div>
     <div style="background:#fff;border:1px solid #d9e2e5;border-top:none;border-radius:0 0 12px 12px;padding:20px;">
       <h1 style="font-size:18px;margin:0 0 12px;">${titulo}</h1>
