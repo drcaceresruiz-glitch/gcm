@@ -1176,6 +1176,13 @@ model OrdenCompra {
   projectId   String
   proveedorId String
 
+  /// Contra que encargo se emite. NULL = orden SUELTA, que cuenta por si
+  /// misma en el comprometido. Con encargo, el compromiso de la obra ya lo
+  /// puso el monto contratado del encargo y la orden solo lo FORMALIZA:
+  /// contarla ademas seria contar dos veces el mismo dinero. Es la decision
+  /// de que el encargo es el contrato marco y manda sobre sus ordenes.
+  encargoId String?
+
   /// El numero tal como lo escribe el cliente ("2026-07-00113").
   ///
   /// NO se genera ni se ordena por el: en las ordenes reales el correlativo
@@ -1241,10 +1248,14 @@ model OrdenCompra {
   company      Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
   project      Project            @relation(fields: [projectId], references: [id], onDelete: Restrict)
   proveedor    Proveedor          @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  /// Restrict: un encargo con ordenes emitidas no desaparece en silencio;
+  /// primero se decide que pasa con sus ordenes.
+  encargo      EncargoProveedor?  @relation(fields: [encargoId], references: [id], onDelete: Restrict)
   lineas       OrdenLinea[]
   imputaciones OrdenImputacion[]
 
   @@unique([companyId, numero])
+  @@index([encargoId])
   @@index([projectId, estado])
   @@index([proveedorId])
   @@index([fecha])
@@ -1872,6 +1883,8 @@ model EncargoProveedor {
   valorizaciones      ValorizacionEncargo[]
   fechasValorizacion  FechaValorizacion[]
   pagos               PagoEncargo[]
+  /// Las ordenes emitidas CONTRA este encargo, que lo formalizan por partes.
+  ordenes             OrdenCompra[]
 
   @@unique([projectId, numero])
   @@index([projectId, estado])

@@ -1,4 +1,11 @@
-import { sumar, restar, multiplicar, dividir, esPositivo } from "@/lib/decimal";
+import {
+  sumar,
+  restar,
+  multiplicar,
+  dividir,
+  esPositivo,
+  esCero,
+} from "@/lib/decimal";
 
 /**
  * Cuentas de los encargos a proveedores. Logica pura, sin base de datos.
@@ -174,5 +181,149 @@ export function coberturaObra(total: string, asignado: string): Cobertura {
     asignado,
     sinAsignar: restar(total, asignado) ?? "0.00",
     porcentaje,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// El COMPROMETIDO: encargos vigentes + ordenes sueltas
+// ---------------------------------------------------------------------------
+
+export interface PartidaDeReparto {
+  /// Con que se identifica la partida en el resultado (el id del WbsItem).
+  clave: string;
+  /// Parcial de la partida en TU presupuesto, sin IGV.
+  parcial: string;
+  /// Fraccion de esa partida asignada al encargo, 0..100.
+  fraccion: string;
+}
+
+/**
+ * Reparte el monto contratado de un encargo entre sus partidas, EXACTO.
+ *
+ * El encargo reparte su frente por FRACCIONES del presupuesto y el
+ * comprometido se lee por IMPORTES: esta es la unica conversion entre los
+ * dos mundos, y por eso vive aqui y en ningun otro sitio. Convertirla mal
+ * descuadra los capitulos sin dar error.
+ *
+ * - El peso de cada partida es `parcial x fraccion`: el trozo de TU
+ *   presupuesto que el encargo se lleva de ella. El monto del contratista se
+ *   reparte proporcional a esos pesos.
+ * - Si los pesos no suman nada —partidas sin costear, o parciales que se
+ *   cancelan—, se reparte a partes iguales: peor reparto, pero ningun sol se
+ *   queda invisible.
+ * - LA INVARIANTE: la suma de las partes es SIEMPRE el monto contratado. El
+ *   residuo del redondeo se carga a la partida de mayor peso, donde menos se
+ *   nota, en vez de dejarse caer.
+ */
+export function repartirContratado(
+  montoContratado: string,
+  partidas: readonly PartidaDeReparto[],
+): { clave: string; importe: string }[] {
+  if (partidas.length === 0) return [];
+
+  const pesos = partidas.map(
+    (p) => multiplicar(p.parcial, p.fraccion, 6) ?? "0",
+  );
+  const totalPesos = sumar(pesos, 6);
+
+  const aPartesIguales = esCero(totalPesos);
+  const cuotas = aPartesIguales ? partidas.map(() => "1") : pesos;
+  const divisor = aPartesIguales ? String(partidas.length) : totalPesos;
+
+  const importes = cuotas.map((cuota) => {
+    const producto = multiplicar(montoContratado, cuota, 6);
+    if (producto === null) return "0.00";
+    return dividir(producto, divisor, 2) ?? "0.00";
+  });
+
+  const residuo = restar(montoContratado, sumar(importes));
+  if (residuo !== null && !esCero(residuo)) {
+    // Elegir la fila es una comparacion, no dinero: aqui si vale Number.
+    let mayor = 0;
+    for (let i = 1; i < cuotas.length; i++) {
+      if (Math.abs(Number(cuotas[i])) > Math.abs(Number(cuotas[mayor]))) {
+        mayor = i;
+      }
+    }
+    importes[mayor] = sumar([importes[mayor]!, residuo]);
+  }
+
+  return partidas.map((p, i) => ({ clave: p.clave, importe: importes[i]! }));
+}
+
+export interface EncargoDelComprometido {
+  montoContratado: string;
+  partidas: readonly PartidaDeReparto[];
+}
+
+/**
+ * LA DEFINICION de «Comprometido», en un solo sitio (decision del 18/08):
+ *
+ *     encargos VIGENTES (su monto contratado, repartido entre sus partidas)
+ *   + ordenes sueltas APROBADAS (las que no cuelgan de ningun encargo)
+ *
+ * Una orden emitida CONTRA un encargo NO suma: su dinero ya lo puso el monto
+ * contratado, y contarla ademas seria contar dos veces el mismo compromiso.
+ * Quien la excluye es la CONSULTA (filtra `encargoId: null`); aqui solo se
+ * funden los dos origenes por partida.
+ *
+ * Los tres sitios que ensenan comprometido por partida —la pantalla de
+ * ordenes, el cruce fisico-economico y las alertas de sobregiro— pasan por
+ * aqui: dos copias de esta cuenta acabarian dando dos cifras distintas del
+ * mismo dinero.
+ */
+export function comprometidoPorPartida(
+  encargos: readonly EncargoDelComprometido[],
+  sueltas: readonly { clave: string; importe: string }[],
+): Map<string, string> {
+  const importesPorClave = new Map<string, string[]>();
+
+  const anotar = (clave: string, importe: string) => {
+    const lista = importesPorClave.get(clave);
+    if (lista) lista.push(importe);
+    else importesPorClave.set(clave, [importe]);
+  };
+
+  for (const encargo of encargos) {
+    for (const parte of repartirContratado(
+      encargo.montoContratado,
+      encargo.partidas,
+    )) {
+      anotar(parte.clave, parte.importe);
+    }
+  }
+  for (const suelta of sueltas) anotar(suelta.clave, suelta.importe);
+
+  return new Map(
+    [...importesPorClave].map(([clave, importes]) => [clave, sumar(importes)]),
+  );
+}
+
+export interface DesgloseComprometido {
+  total: string;
+  /// Monto contratado de los encargos vigentes. Es el precio del CONTRATISTA,
+  /// no tu presupuesto: la pantalla lo tiene que decir con esas palabras.
+  deEncargos: string;
+  deOrdenesSueltas: string;
+}
+
+/**
+ * Los totales del comprometido, desde las mismas dos listas.
+ *
+ * `deEncargos` sale de los MONTOS y no del reparto: un encargo sin partidas
+ * repartidas no aparece en ninguna fila, pero su dinero esta igual de
+ * comprometido y el total lo tiene que contar. La diferencia entre el total
+ * y la suma de filas es visible en pantalla, no un descuadre silencioso.
+ */
+export function desgloseComprometido(
+  montosDeEncargos: readonly string[],
+  importesSueltos: readonly string[],
+): DesgloseComprometido {
+  const deEncargos = sumar([...montosDeEncargos]);
+  const deOrdenesSueltas = sumar([...importesSueltos]);
+  return {
+    deEncargos,
+    deOrdenesSueltas,
+    total: sumar([deEncargos, deOrdenesSueltas]),
   };
 }

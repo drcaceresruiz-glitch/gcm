@@ -23,6 +23,14 @@ import type { SesionActiva } from "@/services/sesion.service";
  *     ejecutar. Solo se ve con permiso de ordenes; sin el, el EVM se queda en
  *     su mitad de PLAZO.
  *
+ *     OJO: el AC cuenta TODAS las ordenes aprobadas —sueltas y contra
+ *     encargo— y NO es el «Comprometido» de las pantallas, que desde la
+ *     decision del 18/08 suma encargos vigentes + ordenes sueltas. Aqui el
+ *     monto de un encargo no entra a proposito: es promesa de costo, no costo
+ *     formalizado, y meterlo hundiria el CPI el dia de la firma sin que se
+ *     haya movido un ladrillo. El costo del encargo entra al AC a medida que
+ *     sus ordenes lo formalizan.
+ *
  * La aritmetica esta en `@/lib/evm` (pura, probada); aqui solo se traen los
  * datos y se cruzan.
  */

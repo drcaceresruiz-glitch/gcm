@@ -6,6 +6,7 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import {
   contarOrdenesDeObra,
+  desgloseComprometidoDeObra,
   listarOrdenes,
   listarProveedoresConOrdenes,
   obtenerComprometido,
@@ -75,24 +76,27 @@ export default async function OrdenesPage({
 
   const hayFiltro = Object.values(filtros).some(Boolean);
 
-  // El comprometido se calcula aparte y sobre TODAS las ordenes aprobadas:
-  // ni paginar ni filtrar el historial pueden mover la cifra de control.
-  const [ordenes, comprometido, proveedores, totalDeLaObra] = await Promise.all([
-    listarOrdenes(sesion, id, {
-      pagina: consulta.p,
-      // De cinco en cinco: cada orden ocupa una tarjeta con su reparto, y
-      // veinte de golpe dejan la pantalla imposible de recorrer.
-      porPagina: 5,
-      q: consulta.q,
-      proveedorId: consulta.proveedor,
-      desde: consulta.desde,
-      hasta: consulta.hasta,
-      estado: consulta.estado,
-    }),
-    obtenerComprometido(sesion, id),
-    listarProveedoresConOrdenes(sesion, id),
-    contarOrdenesDeObra(sesion, id),
-  ]);
+  // El comprometido se calcula aparte y sobre la obra entera —encargos
+  // vigentes mas ordenes sueltas aprobadas—: ni paginar ni filtrar el
+  // historial pueden mover la cifra de control.
+  const [ordenes, comprometido, desglose, proveedores, totalDeLaObra] =
+    await Promise.all([
+      listarOrdenes(sesion, id, {
+        pagina: consulta.p,
+        // De cinco en cinco: cada orden ocupa una tarjeta con su reparto, y
+        // veinte de golpe dejan la pantalla imposible de recorrer.
+        porPagina: 5,
+        q: consulta.q,
+        proveedorId: consulta.proveedor,
+        desde: consulta.desde,
+        hasta: consulta.hasta,
+        estado: consulta.estado,
+      }),
+      obtenerComprometido(sesion, id),
+      desgloseComprometidoDeObra(sesion, id),
+      listarProveedoresConOrdenes(sesion, id),
+      contarOrdenesDeObra(sesion, id),
+    ]);
 
   // Sin linea base no hay vigente contra el que comparar, y eso no impide
   // registrar ordenes: se muestran igual, sin la comparacion.
@@ -107,8 +111,8 @@ export default async function OrdenesPage({
 
   const avisos = [
     creada && `Orden ${creada} guardada como borrador. Todavía no cuenta en el comprometido: hay que aprobarla.`,
-    aprobada && `Orden ${aprobada} aprobada. Ya cuenta en el comprometido.`,
-    anulada && `Orden ${anulada} anulada. Deja de contar en el comprometido y se conserva con su motivo.`,
+    aprobada && `Orden ${aprobada} aprobada. Si es suelta, ya cuenta en el comprometido; emitida contra un encargo, formaliza lo que el monto del encargo ya puso.`,
+    anulada && `Orden ${anulada} anulada y conservada con su motivo. Si era suelta, deja de contar en el comprometido; contra un encargo, el compromiso del encargo sigue igual.`,
     eliminada && `Orden ${eliminada} eliminada. No contaba en el comprometido, así que ninguna cifra cambia.`,
   ].filter(Boolean) as string[];
 
@@ -148,6 +152,7 @@ export default async function OrdenesPage({
 
       <PanelComprometido
         comprometido={comprometido}
+        desglose={desglose}
         presupuesto={presupuesto}
         // El total de la obra SIN filtrar. Con el total filtrado, buscar algo
         // que no coincide dejaba el panel en cero y desaparecia: parecia que

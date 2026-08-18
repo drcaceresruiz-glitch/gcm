@@ -98,6 +98,19 @@ export function TarjetaOrden({
               {o.referencia && ` · ${o.referencia}`}
             </p>
 
+            {/* Contra que contrato marco va. Importa para leer la cifra: una
+                orden con encargo no suma al comprometido —lo puso el monto
+                del encargo—, solo lo formaliza. */}
+            {o.encargo && (
+              <p className="mt-1 text-xs opacity-70">
+                Contra el encargo{" "}
+                <span className="font-medium">
+                  E-{String(o.encargo.numero).padStart(3, "0")}
+                </span>{" "}
+                · {o.encargo.descripcion}
+              </p>
+            )}
+
             {/* Plegada, el motivo es lo unico que hay que poder leer de una
                 anulada sin abrirla: es la razon de que siga ahi. */}
             {anulada && !abierta && o.motivoAnulado && (

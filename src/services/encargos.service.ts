@@ -78,11 +78,13 @@ export interface EncargosDeObra {
 /**
  * Los encargos de una obra, con sus cuentas ya cruzadas contra las ordenes.
  *
- * El comprometido de cada encargo NO es el de sus partidas a secas, sino lo
- * que se le ha pedido A ESE PROVEEDOR imputado a esas partidas: si una partida
- * se reparte entre dos, cada encargo cuenta solo el dinero de su proveedor.
- * Por eso se traen las imputaciones con su proveedor y se suman en memoria en
- * vez de con un `groupBy`, que no sabe agrupar por un campo de la relacion.
+ * El comprometido de cada encargo son las ordenes APROBADAS emitidas CONTRA
+ * EL —`encargoId` en la orden—, por su importe imputable. Antes de existir
+ * ese vinculo se deducia cruzando proveedor y partida, y esa cuenta atribuia
+ * al encargo cualquier orden suelta del mismo proveedor sobre sus partidas:
+ * ahora la orden dice de que contrato es, y la deduccion sobra. Una orden
+ * vieja sin vincular no cuenta contra ningun encargo; se anula y se vuelve a
+ * emitir contra el suyo, que deja rastro de ambas cosas.
  */
 export async function listarEncargos(
   sesion: SesionActiva,
@@ -124,20 +126,20 @@ export async function listarEncargos(
         },
       },
     }),
-    // Todo lo pedido y aprobado en la obra, con su proveedor y su partida:
-    // de aqui sale el comprometido de cada encargo, cruzando proveedor+partida.
+    // Lo aprobado CONTRA un encargo, con cual: de aqui sale el comprometido
+    // de cada uno. Las ordenes sueltas no entran: no son de ningun contrato.
     prisma.ordenImputacion.findMany({
       where: {
         ordenCompra: {
           projectId: obraId,
           companyId: sesion.companyId,
           estado: "APROBADA",
+          encargoId: { not: null },
         },
       },
       select: {
-        wbsItemId: true,
         importe: true,
-        ordenCompra: { select: { proveedorId: true } },
+        ordenCompra: { select: { encargoId: true } },
       },
     }),
     // El denominador de la cobertura, con la regla de hojas: una suma plana
@@ -146,14 +148,14 @@ export async function listarEncargos(
     totalDeObra(obraId),
   ]);
 
-  // Comprometido por (proveedor, partida): la clave es el par, porque el mismo
-  // proveedor puede tener varias partidas y la misma partida varios proveedores.
-  const comprometidoPar = new Map<string, string[]>();
+  // Comprometido por encargo: la orden ya dice de que contrato es.
+  const comprometidoPorEncargo = new Map<string, string[]>();
   for (const i of imputaciones) {
-    const clave = `${i.ordenCompra.proveedorId}::${i.wbsItemId}`;
-    const lista = comprometidoPar.get(clave) ?? [];
+    const clave = i.ordenCompra.encargoId;
+    if (!clave) continue;
+    const lista = comprometidoPorEncargo.get(clave) ?? [];
     lista.push(i.importe.toString());
-    comprometidoPar.set(clave, lista);
+    comprometidoPorEncargo.set(clave, lista);
   }
 
   let asignadoTotal = "0.00";
@@ -166,12 +168,8 @@ export async function listarEncargos(
     const presupuestoFrente = importeDeFrente(partidasFrente);
     asignadoTotal = sumar([asignadoTotal, presupuestoFrente]);
 
-    // Comprometido = lo pedido a ESTE proveedor en las partidas del encargo.
-    const comprometido = sumar(
-      e.partidas.flatMap(
-        (p) => comprometidoPar.get(`${e.proveedor.id}::${p.wbsItemId}`) ?? [],
-      ),
-    );
+    // Comprometido = lo pedido en ordenes emitidas CONTRA este encargo.
+    const comprometido = sumar(comprometidoPorEncargo.get(e.id) ?? []);
 
     const vigente = avanceVigente(
       e.valorizaciones.map((v) => ({
@@ -924,4 +922,37 @@ export async function valorizarEncargo(
   });
 
   return { ok: true, id: encargoId };
+}
+
+export interface EncargoParaOrden {
+  id: string;
+  numero: number;
+  descripcion: string;
+  proveedorId: string;
+}
+
+/**
+ * Los encargos VIGENTES de la obra, para el desplegable del formulario de
+ * ordenes: al elegir proveedor, la orden puede emitirse contra uno de sus
+ * encargos en vez de quedar suelta.
+ *
+ * Solo vigentes a proposito: contra un encargo cerrado o anulado ya no se
+ * emite nada, y ofrecerlo seria ofrecer un error. El permiso es el de crear
+ * ordenes, que es quien va a usar la lista.
+ */
+export async function encargosParaOrden(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<EncargoParaOrden[]> {
+  if (!puede(sesion, "orden:crear")) return [];
+
+  return prisma.encargoProveedor.findMany({
+    where: {
+      projectId: obraId,
+      estado: "VIGENTE",
+      project: { companyId: sesion.companyId },
+    },
+    orderBy: { numero: "asc" },
+    select: { id: true, numero: true, descripcion: true, proveedorId: true },
+  });
 }

@@ -107,6 +107,9 @@ export async function accionCrearOrden(
     lineas: lineas.data,
     imputaciones: imputaciones.data,
     recordarPartidas: datos.get("recordarPartidas") === "on",
+    // Vacio = orden suelta. Que el encargo exista, sea de esta obra y del
+    // mismo proveedor lo comprueba el servicio contra la base.
+    encargoId: texto("encargoId") || undefined,
   });
 
   if (!resultado.ok) return { error: resultado.error };

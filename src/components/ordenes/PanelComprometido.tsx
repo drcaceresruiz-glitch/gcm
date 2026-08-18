@@ -1,29 +1,39 @@
 import { AlertTriangle, HandCoins } from "lucide-react";
-import type { ComprometidoPorPartida } from "@/services/ordenes.service";
+import type {
+  ComprometidoPorPartida,
+  DesgloseDeObra,
+} from "@/services/ordenes.service";
 import type { PresupuestoVigente } from "@/services/movimientos.service";
 import { esNegativo, restar, sumar } from "@/lib/decimal";
 import { soles } from "@/utils/formato";
 
 /**
- * El COMPROMETIDO: lo que ya se pacto con proveedores.
+ * El COMPROMETIDO: lo que ya se pacto con proveedores. Desde la decision de
+ * que el encargo manda, son DOS origenes y la pantalla los separa:
+ *
+ *   - el monto contratado de los encargos VIGENTES —que es el precio del
+ *     CONTRATISTA, no tu presupuesto—, repartido entre sus partidas, y
+ *   - las ordenes SUELTAS aprobadas, por su importe imputable.
+ *
+ * Una orden emitida contra un encargo no suma: solo formaliza lo que el
+ * monto del encargo ya puso.
  *
  * Puesto solo, un total comprometido no dice nada. Lo que responde a la
  * pregunta real —«¿me estoy pasando?»— es ponerlo al lado del vigente de cada
  * partida y ensenar el saldo. Por eso esta tabla solo aparece entera cuando
  * hay linea base: sin ella no hay vigente contra el que comparar.
  *
- * Ninguna de las dos cifras cuenta dinero que la obra vaya a recuperar, que
- * es lo que las hace comparables. El vigente es presupuesto SIN IGV. El
- * comprometido es el importe IMPUTABLE de cada orden: el neto en las que
- * llevan IGV —credito fiscal, no costo— y el total en las de retencion de
- * renta, donde lo retenido se paga igual, solo que a SUNAT.
- *
- * Decir «todo sin IGV» era comodo y falso: en una orden con retencion no hay
- * IGV que quitar, y la cifra que cuenta es el total.
+ * Ninguna de las cifras cuenta dinero que la obra vaya a recuperar, que es
+ * lo que las hace comparables. El vigente es presupuesto SIN IGV. De una
+ * orden cuenta su importe IMPUTABLE: el neto en las que llevan IGV —credito
+ * fiscal, no costo— y el total en las de retencion de renta, donde lo
+ * retenido se paga igual, solo que a SUNAT.
  */
 
 interface Props {
   comprometido: ComprometidoPorPartida[];
+  /// Los totales por origen. Null solo sin permiso de ordenes.
+  desglose: DesgloseDeObra | null;
   /// null si la obra no tiene linea base aprobada.
   presupuesto: PresupuestoVigente | null;
   totalOrdenes: number;
@@ -31,12 +41,20 @@ interface Props {
 
 export function PanelComprometido({
   comprometido,
+  desglose,
   presupuesto,
   totalOrdenes,
 }: Props) {
-  const total = sumar(comprometido.map((c) => c.comprometido));
+  // El total sale de los MONTOS: un encargo sin partidas repartidas no pinta
+  // fila, pero su dinero esta igual de comprometido.
+  const total = desglose?.total ?? sumar(comprometido.map((c) => c.comprometido));
 
-  if (totalOrdenes === 0) return null;
+  // Con encargos vigentes el panel aparece aunque no haya ni una orden: el
+  // compromiso ya existe desde que se firmo el encargo.
+  const sinNada =
+    totalOrdenes === 0 &&
+    (desglose === null || esCeroTexto(desglose.deEncargos));
+  if (sinNada) return null;
 
   const porId = new Map(comprometido.map((c) => [c.wbsItemId, c.comprometido]));
 
@@ -81,9 +99,21 @@ export function PanelComprometido({
           <p className="mt-1 text-2xl font-semibold tabular-nums">
             {soles(total)}
           </p>
-          <p className="mt-0.5 text-xs opacity-60">
-            Sin IGV. Solo órdenes aprobadas: un borrador todavía no compromete
-            a nadie, y una anulada dejó de hacerlo.
+          <p className="mt-0.5 max-w-2xl text-xs opacity-60">
+            {desglose && (
+              <>
+                {soles(desglose.deEncargos)} de{" "}
+                {desglose.encargosVigentes === 1
+                  ? "1 encargo vigente"
+                  : `${desglose.encargosVigentes} encargos vigentes`}{" "}
+                + {soles(desglose.deOrdenesSueltas)} en órdenes sueltas
+                aprobadas.{" "}
+              </>
+            )}
+            El monto de un encargo es el precio del contratista, no tu
+            presupuesto; las órdenes emitidas contra un encargo no suman, solo
+            lo formalizan. Un borrador todavía no compromete a nadie y una
+            anulada dejó de hacerlo.
           </p>
         </div>
       </div>
@@ -133,9 +163,9 @@ export function PanelComprometido({
                   "color-mix(in oklab, var(--color-alerta) 15%, transparent)",
               }}
             >
-              Hay {soles(huerfano)} comprometidos contra partidas que ya no
-              están en el presupuesto vigente. Cuentan en el total pero no
-              aparecen en la tabla.
+              Hay {soles(huerfano)} comprometidos que la tabla no puede
+              repartir: partidas que ya no están en el presupuesto vigente, o
+              encargos sin partidas asignadas. Cuentan en el total igual.
             </p>
           )}
 

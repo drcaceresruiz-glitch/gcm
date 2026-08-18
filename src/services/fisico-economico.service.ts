@@ -63,6 +63,9 @@ export async function cruceDeObra(
   }));
 
   // --- El dinero: de id de partida a codigo, que es como indexa el cruce ---
+  // `obtenerComprometido` trae LA definicion completa: encargos vigentes
+  // repartidos mas ordenes sueltas aprobadas. Asi el cruce dice lo mismo que
+  // la pantalla de ordenes, que es la unica forma de que ambos sean creibles.
   const codigoPorId = new Map(filas.map((f) => [f.id, f.codigoPartida]));
   const puedeCosto = puede(sesion, "orden:leer");
   const gastoPorCodigo = new Map<string, string>();

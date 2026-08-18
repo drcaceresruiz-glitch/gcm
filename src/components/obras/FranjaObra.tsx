@@ -9,8 +9,8 @@ import { AlertTriangle, Info, X } from "lucide-react";
  * Solo se dibuja lo que el sistema puede afirmar HOY:
  *
  *   - **Calendario**: dias transcurridos sobre el plazo. Es tiempo, no avance.
- *   - **Comprometido**: lo pactado con proveedores sobre el presupuesto, sin
- *     IGV y solo de ordenes aprobadas.
+ *   - **Comprometido**: lo pactado con proveedores sobre el presupuesto:
+ *     encargos vigentes (monto contratado) mas ordenes sueltas aprobadas.
  *
  * El **avance fisico** sale del cronograma, ponderado por la duracion de cada
  * tarea. Mientras la obra no tenga cronograma cargado, su barra sigue vacia y

@@ -21,7 +21,9 @@ export function FisicoVsEconomico({ cruce }: { cruce: CruceDeObra }) {
         <h2 className="text-lg font-semibold">Avance contra gasto</h2>
         <p className="mt-0.5 max-w-3xl text-sm text-pretty opacity-70">
           Cuánto se ha ejecutado de cada capítulo y cuánto de su dinero está ya
-          comprometido en órdenes aprobadas. Lo que importa es la diferencia:
+          comprometido con proveedores: encargos vigentes al precio del
+          contratista, más las órdenes sueltas aprobadas. Lo que importa es la
+          diferencia:
           gastar más deprisa de lo que se avanza se ve aquí antes que en el saldo.
         </p>
       </div>

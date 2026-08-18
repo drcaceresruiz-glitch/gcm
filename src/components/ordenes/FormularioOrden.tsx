@@ -118,6 +118,15 @@ interface Props {
   formasPago: OpcionFormaPago[];
   /// Partidas habituales de cada proveedor en esta obra, por id de proveedor.
   habituales: Record<string, string[]>;
+  /// Encargos VIGENTES de la obra, para emitir la orden contra uno.
+  encargos: OpcionEncargo[];
+}
+
+export interface OpcionEncargo {
+  id: string;
+  numero: number;
+  descripcion: string;
+  proveedorId: string;
 }
 
 export function FormularioOrden({
@@ -127,6 +136,7 @@ export function FormularioOrden({
   partidas,
   formasPago,
   habituales,
+  encargos,
 }: Props) {
   const [estado, accion] = useActionState<EstadoOrden, FormData>(
     accionCrearOrden,
@@ -134,6 +144,11 @@ export function FormularioOrden({
   );
 
   const [proveedorId, setProveedorId] = useState("");
+  // Contra que encargo se emite. Vacio = orden suelta. Controlado porque
+  // cambiar de proveedor tiene que soltarlo: un encargo es un contrato CON
+  // alguien, y arrastrarlo al proveedor siguiente emitiria la orden contra
+  // el contrato de otro sin que nada diera error.
+  const [encargoId, setEncargoId] = useState("");
 
   // Controlados para el semaforo de requisitos: son los datos minimos que
   // identifican la orden.
@@ -267,6 +282,7 @@ export function FormularioOrden({
    */
   function elegirProveedor(id: string) {
     setProveedorId(id);
+    setEncargoId("");
 
     /**
      * El impuesto se hereda del proveedor.
@@ -305,6 +321,13 @@ export function FormularioOrden({
       previas.map((i) => (i.clave === clave ? { ...i, ...cambios } : i)),
     );
   }
+
+  // Solo los encargos DEL proveedor elegido: un encargo es un contrato con
+  // alguien, y ofrecer los de otros seria ofrecer el error que el servidor
+  // rechaza.
+  const encargosDelProveedor = encargos.filter(
+    (e) => e.proveedorId === proveedorId,
+  );
 
   return (
     <form action={accion} className="space-y-8" noValidate>
@@ -363,6 +386,30 @@ export function FormularioOrden({
             <option value="COMPRA">Orden de compra</option>
           </CampoSelect>
         </div>
+
+        {/* Solo aparece si el proveedor elegido tiene encargos vigentes: a
+            quien no subcontrata por encargos, este campo no le dice nada. */}
+        {encargosDelProveedor.length > 0 && (
+          <CampoSelect
+            id="encargoId"
+            name="encargoId"
+            etiqueta="Contra el encargo"
+            value={encargoId}
+            onChange={(e) => setEncargoId(e.target.value)}
+            ayuda={
+              encargoId
+                ? "El comprometido de la obra ya cuenta el monto del encargo: esta orden lo formaliza, no lo suma otra vez."
+                : "Suelta, la orden cuenta por sí misma en el comprometido. Contra un encargo, solo formaliza lo ya pactado."
+            }
+          >
+            <option value="">Orden suelta (sin encargo)</option>
+            {encargosDelProveedor.map((e) => (
+              <option key={e.id} value={e.id}>
+                E-{String(e.numero).padStart(3, "0")} · {e.descripcion}
+              </option>
+            ))}
+          </CampoSelect>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-3">
           <CampoTexto

@@ -8,6 +8,7 @@ import { listarPartidas, obtenerObra } from "@/services/obras.service";
 import { listarProveedores } from "@/services/proveedores.service";
 import { listarFormasPago } from "@/services/formas-pago.service";
 import { obtenerPartidasHabituales } from "@/services/ordenes.service";
+import { encargosParaOrden } from "@/services/encargos.service";
 import {
   obtenerPresupuestoVigente,
   SinLineaBaseError,
@@ -44,12 +45,15 @@ export default async function NuevaOrdenPage({
 
   if (!puede(sesion, "orden:crear")) redirect(`/obras/${id}/ordenes`);
 
-  const [proveedores, { filas }, formasPago, habituales] = await Promise.all([
-    listarProveedores(sesion),
-    listarPartidas(sesion, id),
-    listarFormasPago(sesion),
-    obtenerPartidasHabituales(sesion, id),
-  ]);
+  const [proveedores, { filas }, formasPago, habituales, encargos] =
+    await Promise.all([
+      listarProveedores(sesion),
+      listarPartidas(sesion, id),
+      listarFormasPago(sesion),
+      obtenerPartidasHabituales(sesion, id),
+      // Para poder emitir la orden CONTRA un encargo del proveedor elegido.
+      encargosParaOrden(sesion, id),
+    ]);
 
   // El vigente es la mejor referencia, pero solo existe con linea base
   // aprobada. Sin ella se usa el parcial del presupuesto.
@@ -137,6 +141,7 @@ export default async function NuevaOrdenPage({
           partidas={partidas}
           formasPago={formasPago}
           habituales={habituales}
+          encargos={encargos}
         />
       )}
     </div>

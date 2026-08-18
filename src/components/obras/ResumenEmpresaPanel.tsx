@@ -66,7 +66,7 @@ export function ResumenEmpresaPanel({
         numero={Number(resumen.comprometido)}
         moneda
         acento="var(--color-alerta)"
-        detalle="En ejecución, órdenes aprobadas"
+        detalle="En ejecución: encargos vigentes + órdenes sueltas"
       />
 
       <Cifra

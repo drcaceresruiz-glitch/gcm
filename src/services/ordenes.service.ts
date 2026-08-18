@@ -12,6 +12,11 @@ import {
   type TipoImpuesto,
 } from "@/lib/ordenes";
 import {
+  comprometidoPorPartida,
+  desgloseComprometido,
+  type DesgloseComprometido,
+} from "@/lib/encargos";
+import {
   contarPaginas,
   normalizarPagina,
   saltar,
@@ -95,6 +100,10 @@ export interface DatosOrden {
   /// Guardar las partidas imputadas como habituales de este proveedor en
   /// esta obra, para que la proxima orden las traiga puestas.
   recordarPartidas?: boolean;
+  /// Contra que encargo se emite. Ausente = orden SUELTA, que cuenta por si
+  /// misma en el comprometido; con encargo, el compromiso ya lo puso su
+  /// monto contratado y la orden solo lo formaliza.
+  encargoId?: string;
 }
 
 export type ResultadoOrden =
@@ -324,6 +333,39 @@ export async function crearOrden(
     }
   }
 
+  /**
+   * La orden contra un encargo: el contrato marco manda.
+   *
+   * Se comprueban las tres costuras que, mal cosidas, descuadran sin dar
+   * error: que el encargo sea de ESTA obra, del MISMO proveedor —el encargo
+   * es un contrato con alguien, y formalizarlo con una orden a otro no
+   * significa nada— y que siga VIGENTE, porque uno cerrado o anulado ya no
+   * recibe pedidos nuevos.
+   */
+  let encargo: { id: string; numero: number } | null = null;
+  if (datos.encargoId) {
+    const fila = await prisma.encargoProveedor.findFirst({
+      where: { id: datos.encargoId, projectId: obraId },
+      select: { id: true, numero: true, estado: true, proveedorId: true },
+    });
+    if (!fila) {
+      return { ok: false, error: "El encargo elegido no existe en esta obra." };
+    }
+    if (fila.proveedorId !== proveedor.id) {
+      return {
+        ok: false,
+        error: `El encargo E-${String(fila.numero).padStart(3, "0")} es de otro contratista. Una orden contra un encargo se emite al mismo proveedor del encargo.`,
+      };
+    }
+    if (fila.estado !== "VIGENTE") {
+      return {
+        ok: false,
+        error: `El encargo E-${String(fila.numero).padStart(3, "0")} esta ${fila.estado.toLowerCase()} y ya no recibe ordenes. Si hace falta pedir mas, es una orden suelta o un encargo nuevo.`,
+      };
+    }
+    encargo = { id: fila.id, numero: fila.numero };
+  }
+
   const texto = (v: string | undefined, largo: number) =>
     v?.trim() ? v.trim().slice(0, largo) : null;
 
@@ -333,6 +375,7 @@ export async function crearOrden(
         companyId: sesion.companyId,
         projectId: obraId,
         proveedorId: proveedor.id,
+        encargoId: encargo?.id ?? null,
         numero,
         tipo: datos.tipo,
         estado: "BORRADOR",
@@ -394,6 +437,11 @@ export async function crearOrden(
         despues: {
           numero: orden.numero,
           proveedor: proveedor.razonSocial,
+          // Contra que contrato marco se emitio, si hay. La cifra de la obra
+          // no cambia al aprobarla: el compromiso ya lo puso el encargo.
+          encargo: encargo
+            ? `E-${String(encargo.numero).padStart(3, "0")}`
+            : null,
           tipo: datos.tipo,
           origen,
           tipoImpuesto,
@@ -723,6 +771,9 @@ export async function anularOrden(
       // El total y el tipo de impuesto hacen falta para saber cuanto se
       // libera de verdad: en una orden con retencion no es el neto.
       neto: true, total: true, tipoImpuesto: true,
+      // Y el encargo, porque una orden emitida contra uno nunca sumo al
+      // comprometido: anularla no libera nada de la obra.
+      encargoId: true,
     },
   });
 
@@ -766,8 +817,12 @@ export async function anularOrden(
           // cifra que cambia en el control al anular. Y es el IMPUTABLE, no el
           // neto: en una orden con retencion lo comprometido era el total, asi
           // que anotar el neto decia que se libera un 8% menos de lo que de
-          // verdad se libera.
-          liberado: orden.estado === "APROBADA" ? imputable : "0.00",
+          // verdad se libera. Una orden CONTRA un encargo libera cero: nunca
+          // sumo por si misma —el compromiso lo pone el monto del encargo—.
+          liberado:
+            orden.estado === "APROBADA" && !orden.encargoId
+              ? imputable
+              : "0.00",
         },
       },
     });
@@ -786,41 +841,129 @@ export interface ComprometidoPorPartida {
 }
 
 /**
- * Lo comprometido con proveedores, por partida.
+ * Lo comprometido con proveedores, por partida. LA DEFINICION cambio el
+ * 18/08 con la decision de que el encargo es el contrato marco y manda:
  *
- * Solo cuentan las APROBADAS: un borrador todavia no es un compromiso con
- * nadie, y una anulada dejo de serlo. Ese filtro es la definicion de la
- * columna, no una optimizacion.
+ *     encargos VIGENTES (su monto contratado, repartido entre sus partidas)
+ *   + ordenes sueltas APROBADAS (las que no cuelgan de ningun encargo)
  *
- * Devuelve el IMPORTE IMPUTABLE de cada orden, que es el neto en las que
- * llevan IGV y el total en las de retencion o sin impuesto. No es «sin IGV» a
- * secas: eso solo describe al primer caso. Lo que tienen en comun las tres
- * reglas es que ninguna cuenta dinero que la obra vaya a recuperar.
+ * Una orden emitida CONTRA un encargo no suma: su compromiso ya lo puso el
+ * monto contratado, y contarla ademas seria contar el mismo dinero dos
+ * veces. El filtro `encargoId: null` de la consulta es esa regla, no una
+ * optimizacion. Igual que siempre, un BORRADOR no compromete a nadie y una
+ * ANULADA dejo de hacerlo; y de las sueltas cuenta el importe IMPUTABLE, que
+ * es el neto con IGV y el total con retencion o sin impuesto.
+ *
+ * El monto de los encargos es EL PRECIO DEL CONTRATISTA, no tu presupuesto:
+ * puede quedar por encima o por debajo del parcial, y por eso el sobregiro
+ * por fin puede verse al contratar, no recien al emitir ordenes.
+ *
+ * La aritmetica del reparto y de la fusion vive en `@/lib/encargos` —pura y
+ * probada—; aqui solo se traen las filas.
  */
 export async function obtenerComprometido(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<ComprometidoPorPartida[]> {
   if (!puede(sesion, "orden:leer")) return [];
+  const { porPartida } = await comprometidoDeObra(sesion, obraId);
+  return porPartida;
+}
 
-  const porPartida = await prisma.ordenImputacion.groupBy({
-    by: ["wbsItemId"],
-    where: {
-      ordenCompra: {
+export interface DesgloseDeObra extends DesgloseComprometido {
+  /// Cuantos encargos vigentes ponen la parte `deEncargos`.
+  encargosVigentes: number;
+}
+
+/**
+ * Los totales del comprometido de la obra, separados por origen.
+ *
+ * Existe para que la pantalla pueda ROTULAR de donde sale la cifra: un total
+ * que mezcla el precio pactado con contratistas y las ordenes sueltas, sin
+ * decirlo, invita a leer el monto del contratista como si fuera presupuesto.
+ */
+export async function desgloseComprometidoDeObra(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<DesgloseDeObra | null> {
+  if (!puede(sesion, "orden:leer")) return null;
+  const { desglose } = await comprometidoDeObra(sesion, obraId);
+  return desglose;
+}
+
+/**
+ * Las dos consultas del comprometido, UNA vez para las dos lecturas.
+ *
+ * `porPartida` sale del reparto y `desglose.total` de los montos: un encargo
+ * vigente sin partidas repartidas cuenta en el total aunque no pinte fila, y
+ * la pantalla ensena esa diferencia en vez de dejarla descuadrar en silencio.
+ */
+async function comprometidoDeObra(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<{ porPartida: ComprometidoPorPartida[]; desglose: DesgloseDeObra }> {
+  const [encargos, sueltas] = await Promise.all([
+    prisma.encargoProveedor.findMany({
+      where: {
         projectId: obraId,
-        estado: "APROBADA",
-        company: { id: sesion.companyId },
+        estado: "VIGENTE",
+        project: { companyId: sesion.companyId },
       },
-    },
-    _sum: { importe: true },
-  });
+      select: {
+        montoContratado: true,
+        partidas: {
+          select: {
+            wbsItemId: true,
+            fraccion: true,
+            partida: { select: { parcial: true } },
+          },
+        },
+      },
+    }),
+    prisma.ordenImputacion.groupBy({
+      by: ["wbsItemId"],
+      where: {
+        ordenCompra: {
+          projectId: obraId,
+          estado: "APROBADA",
+          encargoId: null,
+          company: { id: sesion.companyId },
+        },
+      },
+      _sum: { importe: true },
+    }),
+  ]);
 
-  // `_sum` es null cuando no hay filas, y `sumar` no lo tolera. Ademas
-  // normaliza a dos decimales: Prisma devuelve "10000" y no "10000.00".
-  return porPartida.map((p) => ({
-    wbsItemId: p.wbsItemId,
-    comprometido: sumar([p._sum.importe?.toString() ?? "0"]),
+  // Los Decimal a texto en la frontera, como en todo el sistema. `_sum` es
+  // null sin filas, y ademas normaliza: Prisma devuelve "10000", no "10000.00".
+  const paraReparto = encargos.map((e) => ({
+    montoContratado: e.montoContratado.toString(),
+    partidas: e.partidas.map((p) => ({
+      clave: p.wbsItemId,
+      parcial: p.partida.parcial?.toString() ?? "0",
+      fraccion: p.fraccion.toString(),
+    })),
   }));
+  const importesSueltos = sueltas.map((s) => ({
+    clave: s.wbsItemId,
+    importe: s._sum.importe?.toString() ?? "0",
+  }));
+
+  const mapa = comprometidoPorPartida(paraReparto, importesSueltos);
+
+  return {
+    porPartida: [...mapa].map(([wbsItemId, comprometido]) => ({
+      wbsItemId,
+      comprometido,
+    })),
+    desglose: {
+      ...desgloseComprometido(
+        paraReparto.map((e) => e.montoContratado),
+        importesSueltos.map((s) => s.importe),
+      ),
+      encargosVigentes: encargos.length,
+    },
+  };
 }
 
 export interface OrdenResumen {
@@ -834,6 +977,9 @@ export interface OrdenResumen {
   referencia: string | null;
   formaPago: string | null;
   proveedor: { id: string; razonSocial: string; ruc: string };
+  /// Contra que encargo se emitio, si hay. Una orden con encargo no suma al
+  /// comprometido —lo puso el monto del encargo—, y la lista lo dice.
+  encargo: { id: string; numero: number; descripcion: string } | null;
   subtotal: string;
   descuentoComercial: string;
   tipoImpuesto: TipoImpuesto;
@@ -992,6 +1138,7 @@ export async function listarOrdenes(
       total: true, aprobadaAt: true, aprobadaPor: true, anuladaAt: true,
       motivoAnulado: true,
       proveedor: { select: { id: true, razonSocial: true, ruc: true } },
+      encargo: { select: { id: true, numero: true, descripcion: true } },
       _count: { select: { lineas: true } },
       imputaciones: {
         select: {
@@ -1013,6 +1160,7 @@ export async function listarOrdenes(
     referencia: o.referencia,
     formaPago: o.formaPago,
     proveedor: o.proveedor,
+    encargo: o.encargo,
     subtotal: o.subtotal.toString(),
     descuentoComercial: o.descuentoComercial.toString(),
     tipoImpuesto: o.tipoImpuesto,

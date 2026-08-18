@@ -1532,7 +1532,8 @@ function Ordenes({
             : `Sin órdenes vivas (${ordenes.anuladas} ${ordenes.anuladas === 1 ? "anulada" : "anuladas"}).`}
         </p>
         <p className="mt-1 text-xs opacity-50">
-          El comprometido del presupuesto sale de las órdenes aprobadas.
+          Una orden suelta suma al comprometido al aprobarse; emitida contra
+          un encargo, formaliza lo que el encargo ya puso.
         </p>
         <EnlaceModulo href={`/obras/${obraId}/ordenes`}>
           Ver órdenes

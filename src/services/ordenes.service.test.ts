@@ -37,6 +37,17 @@ const estado: {
   ocupado: { id: string; descripcion: string; estado: string } | null;
   cerrada: string | null;
   creadas: Record<string, unknown>[];
+  /// El encargo que la base devolveria al validar `encargoId`.
+  encargo: {
+    id: string;
+    numero: number;
+    estado: string;
+    proveedorId: string;
+  } | null;
+  /// Para `obtenerComprometido`: encargos vigentes y sueltas agrupadas.
+  encargosVigentes: unknown[];
+  sueltasAgrupadas: unknown[];
+  consultas: { modelo: string; args: unknown }[];
 } = {
   proveedor: null,
   obra: { id: "obra-1" },
@@ -44,6 +55,10 @@ const estado: {
   ocupado: null,
   cerrada: null,
   creadas: [],
+  encargo: null,
+  encargosVigentes: [],
+  sueltasAgrupadas: [],
+  consultas: [],
 };
 
 vi.mock("@/services/obra-abierta", () => ({
@@ -78,12 +93,27 @@ vi.mock("@/lib/prisma", () => {
             estado.partidas.filter((p) => args.where.id.in.includes(p.id)),
           ),
       },
+      encargoProveedor: {
+        findFirst: () => Promise.resolve(estado.encargo),
+        findMany: (args: unknown) => {
+          estado.consultas.push({ modelo: "encargoProveedor", args });
+          return Promise.resolve(estado.encargosVigentes);
+        },
+      },
+      ordenImputacion: {
+        groupBy: (args: unknown) => {
+          estado.consultas.push({ modelo: "ordenImputacion", args });
+          return Promise.resolve(estado.sueltasAgrupadas);
+        },
+      },
       $transaction: async (fn: (t: unknown) => Promise<unknown>) => fn(tx),
     },
   };
 });
 
-const { crearOrden } = await import("@/services/ordenes.service");
+const { crearOrden, obtenerComprometido } = await import(
+  "@/services/ordenes.service"
+);
 
 function sesion(permisos: string[]): SesionActiva {
   return {
@@ -138,6 +168,10 @@ beforeEach(() => {
   estado.ocupado = null;
   estado.cerrada = null;
   estado.creadas = [];
+  estado.encargo = null;
+  estado.encargosVigentes = [];
+  estado.sueltasAgrupadas = [];
+  estado.consultas = [];
 });
 
 function seNego(r: { ok: boolean; error?: string }, trozo: string) {
@@ -306,5 +340,128 @@ describe("crearOrden: quien puede, cuando, y que llega", () => {
       orden({ descuentoComercial: "1000.00" }),
     );
     seNego(r, "neto de la orden");
+  });
+});
+
+describe("crearOrden: contra un encargo", () => {
+  const VIGENTE = {
+    id: "enc-1",
+    numero: 3,
+    estado: "VIGENTE",
+    proveedorId: "prov-1",
+  };
+
+  it("guarda el vinculo cuando el encargo es del proveedor y sigue vigente", async () => {
+    estado.encargo = VIGENTE;
+    const r = await crearOrden(
+      CON_PERMISO,
+      "obra-1",
+      orden({ encargoId: "enc-1" }),
+    );
+    expect(r.ok).toBe(true);
+    expect(estado.creadas[0]).toMatchObject({ encargoId: "enc-1" });
+  });
+
+  it("sin encargo, la orden queda SUELTA y lo dice la fila", async () => {
+    // El null es la marca de «cuenta por si misma en el comprometido»: si un
+    // dia se guardara undefined, el filtro `encargoId: null` dejaria de
+    // encontrarla y la orden desapareceria del comprometido sin dar error.
+    const r = await crearOrden(CON_PERMISO, "obra-1", orden());
+    expect(r.ok).toBe(true);
+    expect(estado.creadas[0]).toMatchObject({ encargoId: null });
+  });
+
+  it("un encargo de otro contratista se rechaza", async () => {
+    // Un encargo es un contrato CON alguien. Formalizarlo con una orden a
+    // otro proveedor mezclaria el dinero de dos contratos sin dar error.
+    estado.encargo = { ...VIGENTE, proveedorId: "prov-2" };
+    const r = await crearOrden(
+      CON_PERMISO,
+      "obra-1",
+      orden({ encargoId: "enc-1" }),
+    );
+    seNego(r, "otro contratista");
+  });
+
+  it("un encargo cerrado ya no recibe ordenes", async () => {
+    estado.encargo = { ...VIGENTE, estado: "CERRADO" };
+    const r = await crearOrden(
+      CON_PERMISO,
+      "obra-1",
+      orden({ encargoId: "enc-1" }),
+    );
+    seNego(r, "ya no recibe ordenes");
+  });
+
+  it("un encargo de otra obra no existe para el servicio", async () => {
+    // La consulta filtra por `projectId`; el doble devuelve null como haria
+    // la base.
+    estado.encargo = null;
+    const r = await crearOrden(
+      CON_PERMISO,
+      "obra-1",
+      orden({ encargoId: "enc-ajeno" }),
+    );
+    seNego(r, "no existe en esta obra");
+  });
+});
+
+describe("obtenerComprometido: encargos vigentes + ordenes sueltas", () => {
+  const LEE = sesion(["orden:leer"]);
+
+  it("funde el reparto de los encargos con las ordenes sueltas", async () => {
+    // Encargo de 9.000 sobre dos partidas (pesos 10.000 y 5.000: dos tercios
+    // y un tercio) mas una orden suelta de 500 en la primera.
+    estado.encargosVigentes = [
+      {
+        montoContratado: "9000.00",
+        partidas: [
+          { wbsItemId: "p-1", fraccion: "100", partida: { parcial: "10000.00" } },
+          { wbsItemId: "p-2", fraccion: "50", partida: { parcial: "10000.00" } },
+        ],
+      },
+    ];
+    estado.sueltasAgrupadas = [
+      { wbsItemId: "p-1", _sum: { importe: "500.00" } },
+    ];
+
+    const r = await obtenerComprometido(LEE, "obra-1");
+
+    expect(r).toEqual(
+      expect.arrayContaining([
+        { wbsItemId: "p-1", comprometido: "6500.00" },
+        { wbsItemId: "p-2", comprometido: "3000.00" },
+      ]),
+    );
+    expect(r).toHaveLength(2);
+  });
+
+  /**
+   * LA REGLA que evita contar dos veces: la consulta de sueltas exige
+   * `encargoId: null`, y la de encargos, `estado: "VIGENTE"`. Si alguien
+   * quita cualquiera de los dos filtros, el mismo dinero entra por las dos
+   * puertas y ninguna prueba de suma lo nota: por eso se fijan los filtros.
+   */
+  it("pide solo ordenes SUELTAS y encargos VIGENTES", async () => {
+    await obtenerComprometido(LEE, "obra-1");
+
+    const sueltas = estado.consultas.find((c) => c.modelo === "ordenImputacion");
+    expect(
+      (sueltas?.args as { where: { ordenCompra: { encargoId: unknown } } }).where
+        .ordenCompra.encargoId,
+    ).toBeNull();
+
+    const encargos = estado.consultas.find(
+      (c) => c.modelo === "encargoProveedor",
+    );
+    expect(
+      (encargos?.args as { where: { estado: string } }).where.estado,
+    ).toBe("VIGENTE");
+  });
+
+  it("sin permiso de ordenes devuelve vacio y no consulta", async () => {
+    estado.encargosVigentes = [{ montoContratado: "9000.00", partidas: [] }];
+    expect(await obtenerComprometido(sesion([]), "obra-1")).toEqual([]);
+    expect(estado.consultas).toEqual([]);
   });
 });
