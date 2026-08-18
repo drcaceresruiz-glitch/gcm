@@ -18,6 +18,7 @@ import {
 } from "@/lib/jerarquia-partidas";
 import { calcularRenumeracion } from "@/lib/renumerar-partidas";
 import { motivoNoAdmiteCambios } from "@/lib/obras";
+import { alcanzaObra, filtroDeObras, FUERA_DE_ALCANCE } from "@/lib/alcance-obras";
 import type { SesionActiva } from "@/services/sesion.service";
 import type {
   AuditAction,
@@ -44,7 +45,15 @@ async function contextoEditable(sesion: SesionActiva, partidaId: string) {
   const partida = await prisma.wbsItem.findFirst({
     // El filtro por empresa sale de la sesion: sin esto, cambiar el id en la
     // peticion permitiria editar el presupuesto de otro cliente.
-    where: { id: partidaId, project: { companyId: sesion.companyId } },
+    //
+    // Y el alcance por obra cuelga del MISMO `project`, donde `id` es el de
+    // la obra y no el de la partida: aqui si se compone, porque este `where`
+    // no fija ninguna obra concreta. Sin esto se podria editar una partida de
+    // una obra de la propia empresa que no se tiene asignada, mandando su id.
+    where: {
+      id: partidaId,
+      project: { companyId: sesion.companyId, ...filtroDeObras(sesion) },
+    },
     select: {
       id: true,
       projectId: true,
@@ -533,6 +542,12 @@ export async function crearPartida(
     return { ok: false, error: "No tienes permiso para crear partidas." };
   }
 
+  // Este servicio resuelve la obra por su cuenta y comprueba el estado con
+  // `motivoNoAdmiteCambios`, asi que NO pasa por `motivoSiObraCerrada`, que
+  // es donde vive la guarda de acceso de las demas escrituras. Aqui hay que
+  // ponerla a mano, y es justo la pantalla del dinero.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
+
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
     select: { id: true, estado: true, archivadaEn: true },
@@ -941,6 +956,12 @@ export async function renumerarPartidas(
     return { ok: false, error: "No tienes permiso para editar partidas." };
   }
 
+  // Este servicio resuelve la obra por su cuenta y comprueba el estado con
+  // `motivoNoAdmiteCambios`, asi que NO pasa por `motivoSiObraCerrada`, que
+  // es donde vive la guarda de acceso de las demas escrituras. Aqui hay que
+  // ponerla a mano, y es justo la pantalla del dinero.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
+
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
     select: { id: true, estado: true, archivadaEn: true },
@@ -1288,6 +1309,12 @@ export async function agruparEnSumaAlzada(
   if (!puede(sesion, "partida:editar")) {
     return { ok: false, error: "No tienes permiso para editar partidas." };
   }
+
+  // Este servicio resuelve la obra por su cuenta y comprueba el estado con
+  // `motivoNoAdmiteCambios`, asi que NO pasa por `motivoSiObraCerrada`, que
+  // es donde vive la guarda de acceso de las demas escrituras. Aqui hay que
+  // ponerla a mano, y es justo la pantalla del dinero.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },

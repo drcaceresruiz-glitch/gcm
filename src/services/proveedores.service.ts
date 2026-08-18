@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { alcanzaObra } from "@/lib/alcance-obras";
 import {
   contarPaginas,
   normalizarPagina,
@@ -495,6 +496,9 @@ export async function semaforoDeContratos(
   const salida = new Map<string, EstadoContrato>();
   if (proveedorIds.length === 0) return salida;
   if (!puede(sesion, "proveedor:leer")) return salida;
+  // El pool de contratistas SI se comparte entre obras; su contrato en ESTA
+  // obra, no. Ver `@/lib/alcance-obras`.
+  if (!alcanzaObra(sesion, obraId)) return salida;
 
   // Que la obra sea de la empresa se comprueba aqui: sin esto, un id de obra
   // ajena devolveria los encargos de otra constructora.

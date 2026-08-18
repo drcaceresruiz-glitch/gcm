@@ -125,6 +125,15 @@ const sesion = {
   companyId: "c1",
   role: "RESIDENTE",
   permisos: ["partida:editar", "partida:crear", "partida:eliminar"],
+  // `null` = ve todas las obras, que es lo que estas pruebas dan por supuesto:
+  // lo que miden es el presupuesto, no el alcance. El alcance de partidas se
+  // prueba en `aislamiento.test.ts`.
+  //
+  // Va explicito porque el `as unknown as` de abajo apaga el control de tipos:
+  // sin este campo, `alcanzaObra` recibia `undefined` —que no es ni «todas» ni
+  // «ninguna»— y las 55 pruebas de este archivo se caian de golpe. Ese es el
+  // precio del casteo, y por eso conviene que se note.
+  obrasAsignadas: null,
 } as unknown as SesionActiva;
 
 beforeEach(() => {

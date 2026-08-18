@@ -93,13 +93,23 @@ const meta = await import("@/services/meta.service");
 const tablero = await import("@/services/tablero-semanal.service");
 const galeria = await import("@/services/galeria.service");
 
-function sesion(companyId: string, permisos: Permiso[]): SesionActiva {
+/**
+ * El alcance por defecto es `null` —sin restriccion— porque lo que audita
+ * este archivo es la frontera ENTRE empresas. La capa de dentro, el alcance
+ * por obra, tiene su propio bloque al final.
+ */
+function sesion(
+  companyId: string,
+  permisos: Permiso[],
+  obrasAsignadas: string[] | null = null,
+): SesionActiva {
   return {
     sesionId: "s1",
     userId: "u1",
     companyId,
     role: "RESIDENTE",
     permisos,
+    obrasAsignadas,
     nombres: "Ana",
     apellidos: "Perez",
     email: "ana@ejemplo.pe",
@@ -805,5 +815,199 @@ describe("galeria", () => {
     await exigeNiTocarLaBase(() =>
       galeria.listarGaleria(sesion(MIA, []), obraAjena),
     );
+  });
+});
+
+/**
+ * ---------------------------------------------------------------------------
+ * La capa de DENTRO: el alcance por obra.
+ *
+ * Lo de arriba defiende la frontera entre constructoras. Esto defiende la de
+ * dentro de una: un residente no ve —ni escribe en— las obras que no
+ * gestiona, aunque sean de su propia empresa.
+ *
+ * Se prueban los DOS embudos, que son los que hacen que ninguna pantalla
+ * pueda saltarselo:
+ *
+ *   - `obtenerObra`, por la que pasa el layout de `/obras/[id]` y con el las
+ *     mas de cincuenta pantallas de dentro;
+ *   - `motivoSiObraCerrada`, por la que pasan las escrituras de treinta
+ *     servicios.
+ *
+ * Y se prueba que ninguno de los dos CONSULTA cuando deniega. No es una
+ * optimizacion: si contestaran distinto segun la obra exista o no, probar
+ * identificadores seria una forma de averiguar que obras tiene la empresa.
+ * ---------------------------------------------------------------------------
+ */
+
+const { obtenerObra } = await import("@/services/obras.service");
+const { motivoSiObraCerrada } = await import("@/services/obra-abierta");
+
+/// Una obra de MI empresa que NO me han asignado. Es el caso entero.
+const OBRA_MIA_AJENA = "obra-de-un-companero";
+const OBRA_ASIGNADA = "obra-que-llevo-yo";
+
+describe("alcance por obra", () => {
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  describe("obtenerObra", () => {
+    it("sin restriccion la busca, y acotada a la empresa", async () => {
+      await exigeFiltroDeEmpresa(() =>
+        obtenerObra(sesion(MIA, ["obra:leer"]), OBRA_MIA_AJENA),
+      );
+    });
+
+    it("con la obra asignada, la busca", async () => {
+      await exigeFiltroDeEmpresa(() =>
+        obtenerObra(sesion(MIA, ["obra:leer"], [OBRA_ASIGNADA]), OBRA_ASIGNADA),
+      );
+    });
+
+    /**
+     * El corazon de P0: la obra es de mi empresa —el filtro de arriba la
+     * dejaria pasar— y aun asi no se abre.
+     */
+    it("una obra de mi empresa que no me han asignado NO se abre", async () => {
+      const s = sesion(MIA, ["obra:leer"], [OBRA_ASIGNADA]);
+      expect(await obtenerObra(s, OBRA_MIA_AJENA)).toBeNull();
+    });
+
+    it("y al denegar no consulta nada: no confirma si existe", async () => {
+      await exigeNiTocarLaBase(() =>
+        obtenerObra(sesion(MIA, ["obra:leer"], [OBRA_ASIGNADA]), OBRA_MIA_AJENA),
+      );
+    });
+
+    /**
+     * La distincion de la que depende todo. Sin asignaciones NO se alcanza
+     * nada; escrito con un `if (!lista.length)` pasaria justo lo contrario y
+     * el agujero seguiria abierto para cada usuario recien creado.
+     */
+    it("sin ninguna asignacion no se abre ninguna obra", async () => {
+      const s = sesion(MIA, ["obra:leer"], []);
+      expect(await obtenerObra(s, OBRA_ASIGNADA)).toBeNull();
+    });
+  });
+
+  describe("motivoSiObraCerrada (la guarda de escritura)", () => {
+    it("da motivo para una obra que no me han asignado", async () => {
+      const s = sesion(MIA, ["partida:editar"], [OBRA_ASIGNADA]);
+      expect(await motivoSiObraCerrada(s, OBRA_MIA_AJENA)).toBe(
+        "No tienes acceso a esta obra.",
+      );
+    });
+
+    it("y lo da sin consultar: la puerta esta antes de la base", async () => {
+      await exigeNiTocarLaBase(() =>
+        motivoSiObraCerrada(
+          sesion(MIA, ["partida:editar"], [OBRA_ASIGNADA]),
+          OBRA_MIA_AJENA,
+        ),
+      );
+    });
+
+    it("con la obra asignada sigue su camino normal y consulta acotado", async () => {
+      await exigeFiltroDeEmpresa(() =>
+        motivoSiObraCerrada(
+          sesion(MIA, ["partida:editar"], [OBRA_ASIGNADA]),
+          OBRA_ASIGNADA,
+        ),
+      );
+    });
+  });
+
+  describe("listarObras", () => {
+    /**
+     * El filtro va en el `where` y no despues: si se filtrara en memoria, el
+     * total y la paginacion contarian obras que la pagina no ensena.
+     */
+    it("acota la consulta a las obras asignadas", async () => {
+      llamadas.length = 0;
+      await listarObras(
+        sesion(MIA, ["obra:leer"], [OBRA_ASIGNADA]),
+      ).catch(() => undefined);
+
+      const sobreObras = llamadas.filter((l) => l.modelo === "project");
+      expect(sobreObras.length).toBeGreaterThan(0);
+
+      for (const c of sobreObras) {
+        const where = c.args?.where as { id?: { in?: string[] } } | undefined;
+        expect(where?.id?.in).toEqual([OBRA_ASIGNADA]);
+      }
+    });
+
+    it("sin restriccion no acota por identificador", async () => {
+      llamadas.length = 0;
+      await listarObras(sesion(MIA, ["obra:leer"])).catch(() => undefined);
+
+      const sobreObras = llamadas.filter((l) => l.modelo === "project");
+      expect(sobreObras.length).toBeGreaterThan(0);
+
+      for (const c of sobreObras) {
+        const where = c.args?.where as { id?: unknown } | undefined;
+        expect(where?.id).toBeUndefined();
+      }
+    });
+  });
+});
+
+/**
+ * Las partidas, que son el dinero, y el unico servicio que NO pasa por
+ * ninguno de los dos embudos.
+ *
+ * `partidas.service` resuelve la obra por su cuenta y comprueba el estado con
+ * `motivoNoAdmiteCambios`, asi que la guarda de `motivoSiObraCerrada` no le
+ * alcanza. Se le puso a mano, y esto es lo que avisa el dia que alguien la
+ * quite creyendo que sobra porque «ya lo cubre la guarda general».
+ */
+describe("alcance por obra: partidas", () => {
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  type Nueva = Parameters<typeof partidas.crearPartida>[2];
+  const NUEVA = { codigoPartida: "1.1", descripcion: "Excavacion" } as Nueva;
+
+  it("no crea una partida en una obra de mi empresa que no llevo", async () => {
+    const s = sesion(MIA, ["partida:crear"], [OBRA_ASIGNADA]);
+    const r = await partidas.crearPartida(s, OBRA_MIA_AJENA, NUEVA);
+
+    expect(r).toEqual({ ok: false, error: "No tienes acceso a esta obra." });
+  });
+
+  it("y ni siquiera consulta para negarlo", async () => {
+    await exigeNiTocarLaBase(() =>
+      partidas.crearPartida(
+        sesion(MIA, ["partida:crear"], [OBRA_ASIGNADA]),
+        OBRA_MIA_AJENA,
+        NUEVA,
+      ),
+    );
+  });
+
+  /**
+   * Editar y borrar no reciben `obraId` sino el id de la PARTIDA, asi que la
+   * guarda no puede ser un `if`: va dentro del `where`, colgando de `project`.
+   * Aqui se comprueba que ese filtro viaja de verdad a la base.
+   */
+  it("al editar por id de partida, la consulta acota la obra", async () => {
+    llamadas.length = 0;
+    await partidas
+      .actualizarPartida(
+        sesion(MIA, ["partida:editar"], [OBRA_ASIGNADA]),
+        "partida-de-otra-obra",
+        {},
+      )
+      .catch(() => undefined);
+
+    const sobrePartidas = llamadas.filter((l) => l.modelo === "wbsItem");
+    expect(sobrePartidas.length).toBeGreaterThan(0);
+
+    const where = sobrePartidas[0]?.args?.where as
+      | { project?: { id?: { in?: string[] } } }
+      | undefined;
+    expect(where?.project?.id?.in).toEqual([OBRA_ASIGNADA]);
   });
 });

@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { alcanzaObra } from "@/lib/alcance-obras";
 import type { CanalAviso, EventoAviso } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -87,6 +88,7 @@ export async function auditoriaDeAvisos(
   obraId: string,
 ): Promise<AuditoriaAvisos | null> {
   if (!puede(sesion, "lookahead:leer")) return null;
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },

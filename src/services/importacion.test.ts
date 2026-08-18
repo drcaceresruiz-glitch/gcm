@@ -113,6 +113,9 @@ function sesion(permisos: Permiso[] = ["partida:importar"]): SesionActiva {
     companyId: "empresa-1",
     role: "RESIDENTE",
     permisos,
+    // Sin restriccion de obra: lo que se prueba aqui es el importador, no el
+    // alcance. Ese tiene su bloque en `aislamiento.test.ts`.
+    obrasAsignadas: null,
     nombres: "Ana",
     apellidos: "Perez",
     email: "ana@ejemplo.pe",

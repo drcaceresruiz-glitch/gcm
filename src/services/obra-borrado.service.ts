@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { alcanzaObra, FUERA_DE_ALCANCE } from "@/lib/alcance-obras";
 import { env } from "@/lib/env";
 import { verifyPassword } from "@/lib/password";
 import { ORDEN_BORRADO, filtroPorObra } from "@/lib/respaldo-esquema";
@@ -50,6 +51,14 @@ export async function eliminarObraCerrada(
       ok: false,
       error: "Solo el administrador de la empresa puede eliminar una obra cerrada.",
     };
+  }
+
+  // Hoy este permiso es INNEGOCIABLE y solo lo tiene el ADMIN, que ve todas
+  // las obras: la guarda no cambia nada. Se pone igual porque el dia que se
+  // delegue —el otro borrado, `obra:eliminar`, ya es delegable— este seria
+  // el peor sitio del sistema para descubrir que faltaba.
+  if (!alcanzaObra(sesion, obraId)) {
+    return { ok: false, error: FUERA_DE_ALCANCE };
   }
 
   const obra = await prisma.project.findFirst({
@@ -147,6 +156,8 @@ export async function constaRespaldoReciente(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<boolean> {
+  if (!alcanzaObra(sesion, obraId)) return false;
+
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
     select: { archivadaEn: true },

@@ -37,10 +37,20 @@ function siguientePaso(
   vacia: boolean,
   alertas: AlertaEmpresa[],
   enEjecucion: number,
+  puedeCrear: boolean,
 ): Guia {
   if (vacia) {
+    /**
+     * «Vacía» dejo de significar una sola cosa desde que existe el alcance
+     * por obra: para el administrador es que la constructora no tiene
+     * ninguna, y para todos los demas puede ser que no les hayan asignado
+     * ninguna. Decirle «crea tu primera obra» a quien no puede crearlas es
+     * mandarle a un sitio donde no hay boton.
+     */
     return {
-      texto: "Crea tu primera obra: la guía te acompaña paso a paso.",
+      texto: puedeCrear
+        ? "Crea tu primera obra: la guía te acompaña paso a paso."
+        : "Todavía no tienes ninguna obra asignada. El administrador de la empresa te asigna las tuyas desde la pestaña Equipo de cada obra.",
       href: null,
       esAviso: false,
     };
@@ -99,7 +109,12 @@ export function Bienvenida({
     month: "long",
   }).format(ahora);
 
-  const guia = siguientePaso(vacia, alertas, resumen.obrasEnEjecucion);
+  const guia = siguientePaso(
+    vacia,
+    alertas,
+    resumen.obrasEnEjecucion,
+    puedeCrear,
+  );
 
   return (
     <section

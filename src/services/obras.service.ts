@@ -5,6 +5,7 @@ import { verificarSalud } from "@/services/salud.service";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { alcanzaObra, filtroDeObras } from "@/lib/alcance-obras";
 import { esPositivo, restar, sumar } from "@/lib/decimal";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
 import { totalDeEmpresa, totalesPorObra } from "@/services/presupuesto-obra";
@@ -36,6 +37,13 @@ import type { SesionActiva } from "@/services/sesion.service";
  * Regla de aislamiento: el `companyId` sale SIEMPRE de la sesion, nunca de
  * un parametro de la peticion. Es lo unico que impide que un usuario de una
  * empresa vea las obras de otra manipulando un identificador en la URL.
+ *
+ * Y DENTRO de la empresa manda el alcance por obra (`@/lib/alcance-obras`),
+ * que sale tambien de la sesion. Aqui esta el embudo que lo cierra para toda
+ * la aplicacion: `obtenerObra` es la puerta por la que pasa el layout de
+ * `/obras/[id]`, asi que negarla ahi apaga de golpe todas las pantallas de
+ * dentro de una obra; y `listarObras` con el resumen y las alertas son lo
+ * unico que nombra obras en el panel.
  */
 
 export interface ObraResumen {
@@ -111,16 +119,29 @@ export async function obtenerResumenEmpresa(
 
   const deLaEmpresa = { companyId: sesion.companyId };
 
+  /**
+   * Las obras que ESTE usuario puede contar. Las cifras de cabecera son la
+   * exposicion de lo que uno gestiona, no la de la constructora: un residente
+   * que lee el presupuesto y el comprometido de la cartera entera sigue
+   * sabiendo justo lo que esta capa viene a no contarle.
+   *
+   * Va en su propio objeto y NO dentro de `deLaEmpresa`, que se esparce
+   * tambien en filtros de `OrdenCompra`: alli `id` es el de la ORDEN, no el
+   * de la obra, y el filtro no daria error —devolveria cero, y el panel
+   * ensenaria un comprometido de 0,00 perfectamente creible—.
+   */
+  const obrasDelAlcance = { ...deLaEmpresa, ...filtroDeObras(sesion) };
+
   // Las cifras de sobregiro y plazo vencido salen de `datosAlertasEmpresa`, que
   // esta cacheada por peticion: el panel tambien pide las alertas para el
   // popup, asi que ese trabajo se hace una sola vez y aqui solo se leen sus
   // totales. Lo demas son agregados propios que van en el mismo lote.
   const [obras, obrasEnEjecucion, presupuesto, comprometido, alertas] =
     await Promise.all([
-      prisma.project.count({ where: deLaEmpresa }),
+      prisma.project.count({ where: obrasDelAlcance }),
 
       prisma.project.count({
-        where: { ...deLaEmpresa, estado: "EN_EJECUCION" },
+        where: { ...obrasDelAlcance, estado: "EN_EJECUCION" },
       }),
 
       // Con la regla de hojas y no con un `SUM` plano: filtrar por `tipo` no
@@ -128,14 +149,16 @@ export async function obtenerResumenEmpresa(
       // costeadas tambien es PARTIDA. Acotado a EN_EJECUCION igual que el
       // comprometido de abajo: las dos cifras se restan para dar el saldo, y
       // restar ambitos distintos daria un numero que no es de nadie.
-      totalDeEmpresa(sesion.companyId, "EN_EJECUCION"),
+      totalDeEmpresa(sesion, "EN_EJECUCION"),
 
       prisma.ordenImputacion.aggregate({
         where: {
           ordenCompra: {
             ...deLaEmpresa,
             estado: "APROBADA",
-            project: { estado: "EN_EJECUCION" },
+            // El alcance se aplica a la OBRA de la orden, que es donde `id`
+            // significa lo que aqui hace falta.
+            project: { estado: "EN_EJECUCION", ...filtroDeObras(sesion) },
           },
         },
         _sum: { importe: true },
@@ -192,12 +215,21 @@ const datosAlertasEmpresa = cache(async function datosAlertasEmpresa(
   const [porPartida, vencidas] = await Promise.all([
     prisma.ordenImputacion.groupBy({
       by: ["wbsItemId"],
-      where: { ordenCompra: { ...deLaEmpresa, estado: "APROBADA" } },
+      // El alcance cuelga de `project` y no del `id` de la orden: aqui el
+      // sujeto de la consulta es la imputacion, no la obra.
+      where: {
+        ordenCompra: {
+          ...deLaEmpresa,
+          estado: "APROBADA",
+          project: filtroDeObras(sesion),
+        },
+      },
       _sum: { importe: true },
     }),
     prisma.project.findMany({
       where: {
         ...deLaEmpresa,
+        ...filtroDeObras(sesion),
         estado: "EN_EJECUCION",
         fechaFinProgramada: { lt: new Date() },
       },
@@ -418,6 +450,10 @@ export async function listarObras(
 
   const where = {
     companyId: sesion.companyId,
+    // Dentro de la empresa, solo las asignadas. Va en el `where` y no
+    // filtrando despues: la paginacion y el total tienen que contar lo mismo
+    // que se ensena, o la pagina 2 traeria huecos.
+    ...filtroDeObras(sesion),
     ...(estado ? { estado } : {}),
     ...(texto
       ? {
@@ -575,6 +611,23 @@ export const obtenerObra = cache(async function obtenerObra(
 ): Promise<ObraDetalle | null> {
   if (!puede(sesion, "obra:leer")) throw new SinPermisoError();
 
+  /**
+   * ESTA es la puerta de toda la obra.
+   *
+   * El layout de `/obras/[id]` llama aqui y hace `notFound()` con un null,
+   * asi que negar aqui apaga las mas de cincuenta pantallas de dentro sin
+   * que ninguna tenga que acordarse de nada.
+   *
+   * Se comprueba ANTES de consultar y se devuelve el MISMO null que una obra
+   * inexistente, a proposito: distinguir «no existe» de «existe pero no es
+   * tuya» ya seria contar algo. Y sale gratis —el alcance viaja en la
+   * sesion—, asi que no cuesta ni una consulta.
+   *
+   * No se compone con `filtroDeObras` porque este `where` ya fija `id`: la
+   * clave del filtro es tambien `id` y una pisaria a la otra.
+   */
+  if (!alcanzaObra(sesion, obraId)) return null;
+
   // El companyId sale de la sesion: manipular el id de la URL no permite
   // alcanzar la obra de otra empresa, simplemente no aparece.
   const obra = await prisma.project.findFirst({
@@ -636,6 +689,20 @@ export const hitosDeObra = cache(async function hitosDeObra(
   obraId: string,
 ): Promise<HitosObra> {
   if (!puede(sesion, "obra:leer")) throw new SinPermisoError();
+
+  // Defensa en profundidad: hoy solo se llega aqui tras `obtenerObra`, que ya
+  // habria negado. Se repite porque es gratis y porque la proteccion de una
+  // funcion no puede depender de en que orden la llame quien la use manana.
+  if (!alcanzaObra(sesion, obraId)) {
+    return {
+      presupuesto: false,
+      cronograma: false,
+      lineaBase: false,
+      lookahead: false,
+      planSemanal: false,
+      meta: false,
+    };
+  }
 
   // El companyId sale de la sesion, como en toda consulta de obra.
   const deLaObra = {
@@ -704,6 +771,7 @@ export const avisosDeSeccion = cache(async function avisosDeSeccion(
   obraId: string,
 ): Promise<AvisosSeccion> {
   if (!puede(sesion, "obra:leer")) return { lookahead: 0, planSemanal: 0 };
+  if (!alcanzaObra(sesion, obraId)) return { lookahead: 0, planSemanal: 0 };
 
   const hoyDia = hoy();
   const deLaObra = {

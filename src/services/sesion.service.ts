@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { env, isProduction } from "@/lib/env";
 import { resolverPermisos, type Permiso } from "@/lib/rbac";
+import { veTodasLasObras } from "@/lib/alcance-obras";
 import { parsearOperadores, esCorreoOperador } from "@/lib/operador";
 import type { Role } from "@/generated/prisma/enums";
 
@@ -50,6 +51,20 @@ export interface SesionActiva {
    * la siguiente: no hay que cerrar sesiones ni esperar a que caduquen.
    */
   permisos: Permiso[];
+  /**
+   * Las obras que alcanza DENTRO de su empresa, o `null` si las alcanza
+   * todas. Ver `@/lib/alcance-obras`: `null` es «sin restriccion», la lista
+   * vacia es «ninguna», y son cosas opuestas.
+   *
+   * Se resuelve aqui, una vez por peticion y sin consulta adicional —viaja
+   * en el mismo `findUnique` de la sesion—, para que `alcanzaObra()` sea
+   * sincrona y quepa en los sitios calientes: cada apertura de obra y cada
+   * escritura.
+   *
+   * Al recalcularse en cada peticion, asignar o quitar una obra surte efecto
+   * en la siguiente, igual que los permisos: no hay que cerrar sesiones.
+   */
+  obrasAsignadas: string[] | null;
   nombres: string;
   apellidos: string;
   email: string;
@@ -130,6 +145,13 @@ export const obtenerSesion = cache(async function obtenerSesion(): Promise<Sesio
           email: true,
           estado: true,
           mustChangePassword: true,
+          // Las obras asignadas, en la MISMA consulta: es una lectura por
+          // indice sobre una tabla de una fila por obra y persona, y traerla
+          // aparte costaria una ida y vuelta mas en cada peticion. Se pide
+          // siempre —tambien para el ADMIN, que no la usa— porque separarla
+          // por rol exigiria conocer el rol antes de consultar, que es la
+          // fila de al lado.
+          memberships: { select: { projectId: true } },
           // Las excepciones de permisos de su empresa, en la misma consulta.
           // Se traen todas y se filtran por rol en memoria: son como mucho
           // cinco roles por los permisos que existan, y filtrar aqui exigiria
@@ -199,6 +221,12 @@ export const obtenerSesion = cache(async function obtenerSesion(): Promise<Sesio
     companyId: sesion.user.companyId,
     role: sesion.user.role,
     permisos: resolverPermisos(sesion.user.role, excepciones),
+    // `null` = sin restriccion, y solo para el rol que ve toda la cartera.
+    // Para los demas, EXACTAMENTE lo asignado: si no tienen ninguna obra la
+    // lista sale vacia, que es lo correcto y no lo mismo que `null`.
+    obrasAsignadas: veTodasLasObras(sesion.user.role)
+      ? null
+      : sesion.user.memberships.map((m) => m.projectId),
     nombres: sesion.user.nombres,
     apellidos: sesion.user.apellidos,
     email: sesion.user.email,

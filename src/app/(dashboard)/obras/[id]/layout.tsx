@@ -213,6 +213,17 @@ export default async function ObraLayout({
           pregunta: "quién documenta en obra",
           href: `${raiz}/personal`,
         },
+        /// El equipo va JUNTO a Personal y no en otra fase: las dos contestan
+        /// «quién», y separarlas obligaria a buscar en dos sitios distintos a
+        /// las mismas personas. La diferencia es que Personal son los pases
+        /// de campo —gente sin cuenta— y esto son los usuarios de GCM que
+        /// tienen la obra asignada, que es lo que decide quién la ve.
+        puede(sesion, "obra:asignar_equipo") && {
+          clave: "equipo",
+          titulo: "Equipo",
+          pregunta: "quién ve esta obra",
+          href: `${raiz}/equipo`,
+        },
         puede(sesion, "movimiento:leer") &&
           obra.lineaBaseVersion !== null && {
             clave: "movimientos",

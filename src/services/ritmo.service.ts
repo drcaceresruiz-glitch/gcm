@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { alcanzaObra } from "@/lib/alcance-obras";
 import type { SesionActiva } from "@/services/sesion.service";
 import { capituloDeCadaTarea } from "@/lib/control-avance";
 import { fechasSemanales } from "@/lib/curva-s";
@@ -38,6 +39,7 @@ export async function ritmoDeObra(
   obraId: string,
 ): Promise<RitmoDeObra | null> {
   if (!puede(sesion, "cronograma:leer")) return null;
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const [corte, avances, obra] = await Promise.all([
     prisma.cronograma.findFirst({

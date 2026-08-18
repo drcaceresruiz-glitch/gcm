@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { alcanzaObra, FUERA_DE_ALCANCE } from "@/lib/alcance-obras";
 import { isProduction } from "@/lib/env";
 import { generateToken, hashToken, generateNumericCode } from "@/lib/tokens";
 import {
@@ -137,6 +138,10 @@ export async function crearPase(
   if (!puede(sesion, "lookahead:gestionar")) {
     return { ok: false, error: "No tienes permiso para dar pases en esta obra." };
   }
+
+  // El alcance por obra, antes de consultar: esto se llama desde una accion
+  // de servidor, que no pasa por el layout de la obra.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },

@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { alcanzaObra } from "@/lib/alcance-obras";
 import { esPositivo, restar } from "@/lib/decimal";
 import {
   agruparPorCapitulo,
@@ -637,6 +638,8 @@ async function presupuestoDeObra(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<DatosTablero["presupuesto"]> {
+  if (!alcanzaObra(sesion, obraId)) return PRESUPUESTO_VACIO;
+
   const obraDeLaEmpresa = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
     select: { id: true },

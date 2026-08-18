@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { motivoNoAdmiteCambios } from "@/lib/obras";
+import { alcanzaObra, FUERA_DE_ALCANCE } from "@/lib/alcance-obras";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -27,11 +28,36 @@ import type { SesionActiva } from "@/services/sesion.service";
  * Devuelve el mensaje de error, o `null` si la obra admite cambios. Se
  * devuelve el texto y no un booleano para que ningun servicio se invente su
  * propia forma de explicarlo.
+ *
+ * ---
+ *
+ * **Y por eso mismo es tambien donde se comprueba el ACCESO a la obra.**
+ *
+ * La pregunta que contesta esta funcion no es «esta cerrada» sino «puede
+ * este usuario cambiar algo aqui», y no tener la obra asignada es una
+ * respuesta tan valida como tenerla cerrada. Al vivir aqui, las treinta
+ * servicios que ya la llaman —setenta y seis escrituras— quedan cubiertos sin
+ * tocar ni uno: la accion de servidor no pasa por el layout de la obra, asi
+ * que sin esto un residente podia escribir en una obra ajena mandando su id,
+ * aunque no pudiera verla en ninguna pantalla.
+ *
+ * El nombre se queda corto para lo que hace. Se mantiene porque renombrar
+ * setenta y seis llamadas en la misma entrega que abre el alcance mezcla dos
+ * cambios de naturaleza distinta en un solo diff.
  */
 export async function motivoSiObraCerrada(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<string | null> {
+  /**
+   * Antes de consultar: el alcance viaja en la sesion y no cuesta nada.
+   *
+   * Se responde lo mismo exista la obra o no —y por eso va ANTES del
+   * `findFirst`—: si contestara distinto, probar ids seria una forma de
+   * averiguar que obras tiene la constructora.
+   */
+  if (!alcanzaObra(sesion, obraId)) return FUERA_DE_ALCANCE;
+
   const obra = await prisma.project.findFirst({
     // El filtro por empresa va aqui tambien: una obra de otro cliente no
     // existe, y responder "cerrada" o "abierta" sobre ella ya seria contar

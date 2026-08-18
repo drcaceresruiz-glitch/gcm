@@ -51,6 +51,26 @@ export async function listarActividad(
     where: {
       companyId: sesion.companyId,
       accion: { notIn: [...ACCIONES_DE_SESION] },
+      /**
+       * El alcance por obra tambien manda aqui, y NO es un detalle: la
+       * actividad nombra la obra en cada linea. Sin esto, un residente sin
+       * ninguna obra asignada veia un panel sin obras y debajo una lista
+       * diciendo que en CRIOCORD se aprobo la meta y se contrato a un
+       * proveedor. Lo cazo la comprobacion en el navegador; ni el typecheck
+       * ni las pruebas de servicio miran esta pantalla.
+       *
+       * Los apuntes SIN obra (`projectId: null`) se quedan: son de empresa
+       * —el catalogo de contratistas, que si es compartido, o los datos de la
+       * constructora— y no cuentan nada de una obra ajena.
+       */
+      ...(sesion.obrasAsignadas === null
+        ? {}
+        : {
+            OR: [
+              { projectId: null },
+              { projectId: { in: sesion.obrasAsignadas } },
+            ],
+          }),
     },
     orderBy: { createdAt: "desc" },
     take: limite,

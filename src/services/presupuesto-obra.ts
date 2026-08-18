@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { sumar } from "@/lib/decimal";
 import { sumarHojas, type NodoImporte } from "@/lib/jerarquia-partidas";
+import { filtroDeObras, type ConAlcance } from "@/lib/alcance-obras";
 import type { ProjectState } from "@/generated/prisma/enums";
 
 /**
@@ -182,13 +183,22 @@ export async function bacDeObra(obraId: string): Promise<BacObra> {
  * `estado` acota la suma a las obras en ese estado; sin el, entran todas.
  * Existe porque el panel ensena solo lo EN EJECUCION —la exposicion de
  * hoy—, mientras que la cartera completa es cifra de presentacion.
+ *
+ * El sujeto trae su ALCANCE y es obligatorio, no opcional: quien solo
+ * gestiona una obra no puede leer el presupuesto agregado de la cartera
+ * entera ni siquiera sumado. Al ser obligatorio, `tsc` obliga a decidirlo en
+ * cada sitio que llame aqui, hoy y el dia que aparezca el segundo.
  */
 export async function totalDeEmpresa(
-  companyId: string,
+  sujeto: { companyId: string } & ConAlcance,
   estado?: ProjectState,
 ): Promise<string> {
   const obras = await prisma.project.findMany({
-    where: { companyId, ...(estado ? { estado } : {}) },
+    where: {
+      companyId: sujeto.companyId,
+      ...(estado ? { estado } : {}),
+      ...filtroDeObras(sujeto),
+    },
     select: { id: true },
   });
 

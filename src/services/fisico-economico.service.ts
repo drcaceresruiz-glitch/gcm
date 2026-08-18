@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { alcanzaObra } from "@/lib/alcance-obras";
 import type { SesionActiva } from "@/services/sesion.service";
 import { sumar, dividir } from "@/lib/decimal";
 import { cobertura } from "@/lib/mapeo-partidas";
@@ -41,6 +42,7 @@ export async function cruceDeObra(
   obraId: string,
 ): Promise<CruceDeObra | null> {
   if (!puede(sesion, "partida:leer")) return null;
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },

@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { alcanzaObra } from "@/lib/alcance-obras";
 import { normalizarCelular, normalizarEmail } from "@/lib/contacto";
 import { PRIORIDAD_AVISO } from "@/lib/sms-cola";
 import {
@@ -95,12 +96,15 @@ export async function datosParaEscribir(
   // caza en tiempo de tipos —esto paso el typecheck y reventaba al abrir la
   // pantalla—, asi que el nombre se renombra aqui para que el resto del
   // servicio hable de `nombre` a secas.
-  const fila = obraId
-    ? await prisma.project.findFirst({
-        where: { id: obraId, companyId: sesion.companyId },
-        select: { id: true, nombreObra: true },
-      })
-    : null;
+  // Y contra el ALCANCE, no solo contra la empresa: si no, un `?obra=` de una
+  // obra propia pero no asignada revelaria su nombre a quien no la lleva.
+  const fila =
+    obraId && alcanzaObra(sesion, obraId)
+      ? await prisma.project.findFirst({
+          where: { id: obraId, companyId: sesion.companyId },
+          select: { id: true, nombreObra: true },
+        })
+      : null;
   const obra = fila ? { id: fila.id, nombre: fila.nombreObra } : null;
 
   const empresa = await prisma.company.findUnique({
@@ -159,7 +163,13 @@ export async function historialDeContratista(
   const idsObra = [...new Set(filas.map((f) => f.projectId).filter((id) => id !== null))];
   const obras = idsObra.length
     ? await prisma.project.findMany({
-        where: { id: { in: idsObra }, companyId: sesion.companyId },
+        // El alcance se cruza en JS y no componiendo el filtro: las dos
+        // claves serian `id` y la segunda pisaria a la primera, dejando ver
+        // el historial de obras que no se llevan.
+        where: {
+          id: { in: idsObra.filter((id) => alcanzaObra(sesion, id)) },
+          companyId: sesion.companyId,
+        },
         select: { id: true, nombreObra: true },
       })
     : [];

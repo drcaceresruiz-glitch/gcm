@@ -253,7 +253,17 @@ export default async function PanelPage({
                 barras y los globos no se explican en ningun otro sitio, y una
                 cifra sin leyenda se ignora o se malinterpreta. */}
             <p className="mt-1 text-sm opacity-70">
-              {obras.total} obra(s){hayFiltro ? " coinciden" : " en tu empresa"}.
+              {/* «En tu empresa» solo es cierto para quien las ve todas. Con
+                  el alcance por obra, a un residente con una asignada de
+                  cuatro le decia que su constructora tiene una: una frase
+                  falsa, y de las que nadie comprueba. */}
+              {obras.total} obra(s)
+              {hayFiltro
+                ? " coinciden"
+                : puedeCrear
+                  ? " en tu empresa"
+                  : " asignadas a ti"}
+              .
               {" "}Cada tarjeta lleva sus barras —calendario, comprometido y
               avance físico— y sus avisos en los globos de color.
             </p>
@@ -270,8 +280,13 @@ export default async function PanelPage({
           <div className="flex justify-center">
             <Mascota pose="saludando" alto={180} flotar />
           </div>
+          {/* Dos vacios distintos: la empresa sin obras (lo ve quien puede
+              crearlas) y la persona sin obras asignadas. Ver el comentario de
+              `siguientePaso` en Bienvenida. */}
           <p className="mt-3 text-sm opacity-70">
-            Crea tu primera obra para empezar a cargar el presupuesto.
+            {puedeCrear
+              ? "Crea tu primera obra para empezar a cargar el presupuesto."
+              : "Todavía no tienes ninguna obra asignada. Pídele al administrador de la empresa que te asigne la tuya."}
           </p>
           {puedeCrear && (
             <Link
