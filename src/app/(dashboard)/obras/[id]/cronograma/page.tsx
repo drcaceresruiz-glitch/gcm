@@ -22,6 +22,8 @@ import { datosEvm } from "@/services/evm.service";
 import { filasHitos } from "@/lib/hitos";
 import { CurvaS } from "@/components/cronograma/CurvaS";
 import { PanelEvm } from "@/components/cronograma/PanelEvm";
+import { RitmoDeObra } from "@/components/cronograma/RitmoDeObra";
+import { ritmoDeObra } from "@/services/ritmo.service";
 import { Hitos } from "@/components/cronograma/Hitos";
 import { BotonLineaBase } from "@/components/cronograma/BotonLineaBase";
 import { DiaCorteSemanal } from "@/components/cronograma/DiaCorteSemanal";
@@ -85,12 +87,13 @@ export default async function CronogramaPage({
 
   if (!puede(sesion, "cronograma:leer")) redirect(`/obras/${id}`);
 
-  const [cronograma, historial, curva, evm, baseCron] = await Promise.all([
+  const [cronograma, historial, curva, evm, baseCron, ritmo] = await Promise.all([
     obtenerCronograma(sesion, id),
     historialCronogramas(sesion, id),
     datosCurvaS(sesion, id),
     datosEvm(sesion, id),
     lineaBaseCronograma(sesion, id),
+    ritmoDeObra(sesion, id),
   ]);
 
   const puedeImportar = puede(sesion, "cronograma:importar");
@@ -375,6 +378,15 @@ export default async function CronogramaPage({
               </p>
 
               <PanelEvm datos={evm} />
+            </Tarjeta>
+          )}
+
+          {/* Debajo de la curva y del EVM porque contesta la pregunta que
+              deja abierta una curva acumulada: la meseta que se ve arriba,
+              ¿es que la obra frena o es que nadie reporta? */}
+          {ritmo && (
+            <Tarjeta>
+              <RitmoDeObra datos={ritmo} />
             </Tarjeta>
           )}
 
