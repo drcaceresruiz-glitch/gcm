@@ -46,7 +46,12 @@ export interface FotoResumen {
 
 export type DestinoEvidencia =
   | { restriccionId: string }
-  | { compromisoId: string };
+  | { compromisoId: string }
+  /// Una tarea del cronograma, por su uid. `obraId` viaja explicito porque el
+  /// uid no es una FK de la que derivar la obra —es estable entre versiones—,
+  /// asi que la pertenencia se comprueba contra el (obraId, companyId), no
+  /// siguiendo una relacion. `fecha` es el dia que documenta (el del parte).
+  | { obraId: string; uid: number; fecha: string };
 
 export type ResultadoSubida =
   | { ok: true; id: string }
@@ -77,6 +82,19 @@ async function resolverDestino(
       select: { tarea: { select: { projectId: true } } },
     });
     return r ? { obraId: r.tarea.projectId } : null;
+  }
+
+  // La foto de una tarea (parte del dia / partida en ejecucion) la sube quien
+  // reporta avance. El obraId viene en el destino y se verifica contra la
+  // empresa: es lo unico que impide adosar en una obra ajena.
+  if ("uid" in destino) {
+    if (!puede(sesion, "avance:registrar")) return null;
+
+    const obra = await prisma.project.findFirst({
+      where: { id: destino.obraId, companyId: sesion.companyId },
+      select: { id: true },
+    });
+    return obra ? { obraId: obra.id } : null;
   }
 
   // La de un compromiso (causa de no cumplimiento), quien gestiona el PTS.
@@ -141,6 +159,14 @@ export async function subirEvidenciaConPase(
   archivo: File,
   nota?: string,
 ): Promise<ResultadoSubida> {
+  // Un pase de obra documenta restricciones y compromisos, no reporta avance:
+  // el parte del dia lo llena el residente, con sesion. Cerrar esta puerta
+  // aqui evita que un pase escriba fotos de progreso sin el permiso que si se
+  // exige por la via normal.
+  if ("uid" in destino) {
+    return { ok: false, error: "Un pase de obra no reporta avance de tareas." };
+  }
+
   // Que el destino sea de SU obra. El `projectId` sale de la fila del pase,
   // nunca de la peticion: es lo unico que impide que un pase de una obra
   // adjunte en otra cambiando un id en el formulario.
@@ -238,6 +264,11 @@ async function guardarFoto(
       projectId: objetivo.obraId,
       restriccionId: "restriccionId" in destino ? destino.restriccionId : null,
       compromisoId: "compromisoId" in destino ? destino.compromisoId : null,
+      uid: "uid" in destino ? destino.uid : null,
+      // `@db.Date`: solo el dia. Se ancla a medianoche UTC como el resto de
+      // fechas de obra, para que no baile de dia segun la zona horaria.
+      fecha:
+        "uid" in destino ? new Date(`${destino.fecha}T00:00:00.000Z`) : null,
       ruta: "", // se completa abajo, cuando se conoce el id
       nombreOriginal: archivo.name.slice(0, 255) || `foto${extension}`,
       mimeType: archivo.type,
@@ -282,7 +313,12 @@ async function guardarFoto(
       entidadId: foto.id,
       accion: "CREATE",
       despues: {
-        destino: "restriccionId" in destino ? "restriccion" : "compromiso",
+        destino:
+          "restriccionId" in destino
+            ? "restriccion"
+            : "compromisoId" in destino
+              ? "compromiso"
+              : "tarea",
         hash,
         tamano: archivo.size,
         ...(autor.paseId
@@ -321,6 +357,52 @@ export async function fotosPorDestino(
   });
 
   return agrupar(fotos);
+}
+
+/**
+ * Las fotos ancladas a un conjunto de TAREAS (por uid), agrupadas por uid.
+ *
+ * Alimenta dos vistas con la misma consulta: el parte del dia (fotos de la
+ * jornada) y la partida en ejecucion (todas las suyas). El filtro opcional por
+ * fecha lo decide quien llama: el parte pasa el dia, la partida no pasa nada.
+ */
+export async function fotosDeTareas(
+  sesion: SesionActiva,
+  obraId: string,
+  uids: number[],
+  dia?: string,
+): Promise<Map<number, FotoResumen[]>> {
+  if (uids.length === 0) return new Map();
+
+  const fotos = await prisma.fotoEvidencia.findMany({
+    where: {
+      projectId: obraId,
+      project: { companyId: sesion.companyId },
+      uid: { in: uids },
+      ...(dia ? { fecha: new Date(`${dia}T00:00:00.000Z`) } : {}),
+    },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true, uid: true, nota: true, nombreOriginal: true,
+      subidaPor: true, createdAt: true, purgadaAt: true,
+    },
+  });
+
+  const salida = new Map<number, FotoResumen[]>();
+  for (const f of fotos) {
+    if (f.uid === null) continue;
+    const lista = salida.get(f.uid) ?? [];
+    lista.push({
+      id: f.id,
+      nota: f.nota,
+      nombreOriginal: f.nombreOriginal,
+      subidaPor: f.subidaPor,
+      createdAt: f.createdAt,
+      purgada: f.purgadaAt !== null,
+    });
+    salida.set(f.uid, lista);
+  }
+  return salida;
 }
 
 /** Agrupa por su ancla (restriccion o compromiso). */

@@ -2260,11 +2260,22 @@ model FotoEvidencia {
   id        String @id @default(cuid())
   projectId String
 
-  /// A que se adosa: exactamente UNO de los dos. Lo valida el servicio; la
-  /// FK va con SetNull para que la evidencia sobreviva aunque el objetivo
+  /// A que se adosa: exactamente UNO de los tres. Lo valida el servicio; las
+  /// FK van con SetNull para que la evidencia sobreviva aunque el objetivo
   /// desaparezca (el registro es inmutable, su ancla no).
   restriccionId String?
   compromisoId  String?
+
+  /// El TERCER ancla: una tarea del cronograma, por su `uid`.
+  ///
+  /// Por valor y no por FK, igual que `AvanceTarea` y `MapeoTareaPartida`: el
+  /// uid es estable entre versiones del cronograma, asi que la foto de una
+  /// partida en ejecucion sobrevive a que se reimporte el plan. `fecha` es el
+  /// dia que documenta —el del parte—, `@db.Date` como el resto de fechas de
+  /// obra. Sin fecha (una foto general de la partida) sigue siendo valida: la
+  /// fecha ordena el informe, no condiciona la existencia.
+  uid   Int?
+  fecha DateTime? @db.Date
 
   /// Pase de obra que la subio, si no la subio un usuario de GCM. Permite
   /// revisar de golpe todo lo que aporto una persona si su pase se revoca.
@@ -2299,6 +2310,8 @@ model FotoEvidencia {
   @@index([projectId, createdAt])
   @@index([restriccionId])
   @@index([compromisoId])
+  /// Para «las fotos de esta partida» (por uid) y el informe (por uid y dia).
+  @@index([projectId, uid])
   @@index([paseId])
   @@map("fotos_evidencia")
 }

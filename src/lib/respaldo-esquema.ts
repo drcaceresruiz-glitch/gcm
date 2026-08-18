@@ -329,6 +329,10 @@ export const TABLAS: readonly TablaRespaldo[] = [
       { campo: "compromisoId", a: "compromisos_semanales" },
       { campo: "paseId", a: "pases_obra" },
     ],
+    // `uid` no es una FK (ancla por valor a la tarea del cronograma), asi que
+    // no va en `refs`. `fecha` es dia de calendario y SI tiene que declararse:
+    // sin esto el respaldo la exportaria como instante y correria el dia.
+    fechas: ["fecha"],
   },
   // La galeria (el escaparate) va aparte de la evidencia a proposito, igual
   // que en el resto del sistema. `fotos_galeria` ANTES que `galerias_obra`:
