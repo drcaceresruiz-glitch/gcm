@@ -2,7 +2,15 @@ import "server-only";
 import nodemailer, { type Transporter } from "nodemailer";
 import { env, isProduction } from "@/lib/env";
 import { escaparHtml as esc } from "@/lib/html";
-import { logoParaCorreo } from "./logo.service";
+import { marcaParaCorreo } from "./logo.service";
+import {
+  CID_LOGO,
+  MARCA_GCM as MARCA,
+  MARCA_LOGO,
+  MARCA_NOMBRE,
+  MARCA_PIE,
+  rotularCorreo,
+} from "@/lib/correo-marca";
 
 /**
  * Envio de correo.
@@ -114,7 +122,8 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
      * Si aun asi no cargara, la cabecera sigue llevando el nombre en texto
      * detras: no queda un hueco vacio.
      */
-    const logo = correo.companyId ? await logoParaCorreo(correo.companyId) : null;
+    const marca = correo.companyId ? await marcaParaCorreo(correo.companyId) : null;
+    const logo = marca?.logo ?? null;
 
     if (logo) {
       adjuntos.push({
@@ -128,11 +137,12 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
       });
     }
 
-    const html = correo.html.replace(
-      MARCA_LOGO,
-      logo
-        ? `<img src="cid:${CID_LOGO}" alt="" height="28" style="height:28px;width:auto;vertical-align:middle;margin-right:10px;border:0;">`
-        : "",
+    // La regla —manda la constructora, GCM al pie— vive en `lib/correo-marca`
+    // y tiene sus pruebas: aqui dentro no se podria comprobar, porque sin
+    // SMTP esta funcion sale mucho antes de llegar a esta linea.
+    const html = rotularCorreo(
+      correo.html,
+      marca ? { razonSocial: marca.razonSocial, conLogo: logo !== null } : null,
     );
 
     await t.sendMail({
@@ -157,24 +167,18 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
   }
 }
 
-/// El remitente y la marca que encabeza los correos.
-const MARCA = "GCM - Gestion en Construccion Moderna";
 
 /**
- * Donde entra el logo de la empresa dentro de la cabecera, si lo hay.
+ * Las tres costuras que deja `plantilla` en el HTML —logo, nombre de quien
+ * firma y pie— viven en `lib/correo-marca` junto con la regla de que se pone
+ * en cada una, porque alli se pueden PROBAR: aqui dentro no, ya que sin SMTP
+ * `enviarCorreo` sale mucho antes de llegar a sustituirlas.
  *
- * Es un COMENTARIO HTML, y eso es lo que lo hace seguro: `plantilla` lo emite
- * siempre y `enviarCorreo` lo sustituye por la imagen cuando hay logo. Si
- * nadie lo sustituye —los correos que no dicen de que empresa son— el
- * comentario no se ve, y no queda ni un hueco ni una imagen rota.
- *
- * La alternativa era pasar el logo por los ocho constructores de correo. Esto
- * es una costura declarada en un sitio; aquello, ocho firmas que mantener.
+ * Son comentarios HTML a proposito: si nadie los sustituye no se ven, y no
+ * queda ni un hueco ni una imagen rota. La alternativa era pasar el logo y el
+ * nombre por los ocho constructores de correo; esto es una costura declarada
+ * en un sitio, aquello ocho firmas que mantener.
  */
-const MARCA_LOGO = "<!--GCM_LOGO-->";
-
-/// Como se referencia el adjunto incrustado desde el HTML.
-const CID_LOGO = "logo-de-empresa";
 
 /**
  * Envoltorio HTML comun a todos los correos: una caja centrada, sobria, sin
@@ -192,15 +196,15 @@ function plantilla(
   opciones?: { seResponde?: boolean },
 ): string {
   const pie = opciones?.seResponde
-    ? `Enviado desde ${MARCA}. Puedes responder a este correo.`
-    : `Este es un correo automatico de ${MARCA}. No respondas a este mensaje.`;
+    ? `Enviado desde ${MARCA_NOMBRE}. Puedes responder a este correo.`
+    : `Este es un correo automatico de ${MARCA_NOMBRE}. No respondas a este mensaje.`;
 
   return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
 <body style="margin:0;background:#f1f5f6;font-family:Arial,Helvetica,sans-serif;color:#1b2733;">
   <div style="max-width:520px;margin:0 auto;padding:24px;">
     <div style="background:#0f7186;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0;font-weight:bold;">
-      ${MARCA_LOGO}${MARCA}
+      ${MARCA_LOGO}${MARCA_NOMBRE}
     </div>
     <div style="background:#fff;border:1px solid #d9e2e5;border-top:none;border-radius:0 0 12px 12px;padding:20px;">
       <h1 style="font-size:18px;margin:0 0 12px;">${titulo}</h1>
@@ -209,6 +213,7 @@ function plantilla(
     <p style="color:#6b7a82;font-size:12px;margin:16px 4px;">
       ${pie}
     </p>
+    ${MARCA_PIE}
   </div>
 </body></html>`;
 }

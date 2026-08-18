@@ -112,22 +112,38 @@ export async function bytesDelLogo(
 }
 
 /**
- * El logo listo para incrustar en un correo.
+ * Con que se rotula un correo de esta empresa: su nombre y, si lo tiene, su
+ * logo listo para incrustar.
  *
- * En base64 porque es lo que espera nodemailer, y con nombre de archivo
- * porque un adjunto sin nombre lo ensenan algunos clientes como
- * «noname». Devuelve null sin ruido: un correo sin logo se manda igual.
+ * VAN JUNTOS a proposito. El nombre es lo que de verdad manda —el logo puede
+ * no cargar, o no existir— y separarlos invitaria a poner el logo de una
+ * empresa junto al nombre de otra.
+ *
+ * El logo en base64 porque es lo que espera nodemailer, y con nombre de
+ * archivo porque un adjunto sin nombre lo ensenan algunos clientes como
+ * «noname».
  */
-export async function logoParaCorreo(
-  companyId: string,
-): Promise<{ nombre: string; contenido: string; tipo: string } | null> {
+export async function marcaParaCorreo(companyId: string): Promise<{
+  razonSocial: string;
+  logo: { nombre: string; contenido: string; tipo: string } | null;
+} | null> {
+  const empresa = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { razonSocial: true },
+  });
+  if (!empresa) return null;
+
   const logo = await bytesDelLogo(companyId);
-  if (!logo) return null;
 
   return {
-    nombre: logo.mime === "image/png" ? "logo.png" : "logo.jpg",
-    contenido: logo.contenido.toString("base64"),
-    tipo: logo.mime,
+    razonSocial: empresa.razonSocial,
+    logo: logo
+      ? {
+          nombre: logo.mime === "image/png" ? "logo.png" : "logo.jpg",
+          contenido: logo.contenido.toString("base64"),
+          tipo: logo.mime,
+        }
+      : null,
   };
 }
 
