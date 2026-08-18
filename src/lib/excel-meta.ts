@@ -38,6 +38,29 @@ export interface ResultadoGastos {
   costeMensualDelAtraso: string;
 }
 
+/**
+ * Filas que son un RESUMEN y no un gasto: los totales del pie.
+ *
+ * La plantilla los trae con formulas —el usuario los pidio, y un Excel de
+ * obra sin totales es medio Excel— y sin esto el importador los leia como
+ * conceptos: «TOTAL GASTOS GENERALES» no tiene tipo FIJO ni VARIABLE, asi que
+ * la carga entera fallaba con un error que no decia nada util.
+ *
+ * Vive aqui y NO en la plantilla porque el importador tiene que reconocerlos
+ * aunque los escriba otro: cualquiera que arme su Excel a mano pone un total
+ * al pie, y es lo primero que hace.
+ */
+export const PREFIJOS_DE_RESUMEN: readonly RegExp[] = [
+  /^total\b/i,
+  /^sub\s*total\b/i,
+  /^gg\s/i,
+  /^gastos\s+generales\s+(variables|fijos)/i,
+];
+
+export function esFilaDeResumen(concepto: string): boolean {
+  return PREFIJOS_DE_RESUMEN.some((p) => p.test(concepto.trim()));
+}
+
 /** El nombre que lleva la hoja en la plantilla. */
 export const HOJA_GASTOS = "Gastos Generales";
 
@@ -49,6 +72,26 @@ function vacio(): ResultadoGastos {
     total: "0.00",
     costeMensualDelAtraso: "0.00",
   };
+}
+
+/**
+ * Una celda con FORMULA cuyo resultado no esta calculado.
+ *
+ * Excel guarda el ultimo resultado junto a la formula, pero hay archivos que
+ * llegan sin el: los generados por otra herramienta, o guardados sin
+ * recalcular. Entonces `result` viene undefined.
+ *
+ * Antes eso se volvia cadena vacia y seguia adelante: una linea se importaba
+ * con su importe en blanco y la meta salia mas barata de lo que es, sin un
+ * solo error. Es el modo de fallo caro de esta aplicacion —una cifra que
+ * desaparece sin avisar—, y por eso ahora se distingue del vacio de verdad.
+ */
+export function esFormulaSinResultado(
+  celda: ExcelJS.Cell | undefined,
+): boolean {
+  const v = celda?.value as Record<string, unknown> | null | undefined;
+  if (v === null || v === undefined || typeof v !== "object") return false;
+  return "formula" in v && v["result"] === undefined;
 }
 
 function texto(celda: ExcelJS.Cell | undefined): string {
@@ -156,12 +199,33 @@ export async function analizarGastosGenerales(
     const concepto = leer(f, "concepto");
     if (!concepto) continue;
 
+    // Los totales del pie no son gastos: se saltan en silencio, que es lo
+    // que espera quien los escribio.
+    if (esFilaDeResumen(concepto)) continue;
+
     const bruto = leer(f, "tipo").toUpperCase();
     if (bruto !== "FIJO" && bruto !== "VARIABLE") {
       errores.push({
         fila: n,
         columna: "Tipo",
         mensaje: `"${concepto}": el tipo tiene que ser FIJO o VARIABLE, y dice "${leer(f, "tipo")}".`,
+      });
+      continue;
+    }
+
+    // Una formula sin calcular NO es un cero: es un dato que no se puede
+    // leer. Se avisa en vez de importar la linea a la mitad.
+    const sinCalcular = (["montoMensual", "meses", "montoFijo"] as const).filter(
+      (clave) =>
+        columnas[clave] !== undefined &&
+        esFormulaSinResultado(f.getCell(columnas[clave]!)),
+    );
+    if (sinCalcular.length > 0) {
+      errores.push({
+        fila: n,
+        mensaje:
+          `"${concepto}": hay fórmulas sin calcular. Abre el archivo en Excel, ` +
+          `guárdalo para que recalcule, y vuelve a subirlo.`,
       });
       continue;
     }

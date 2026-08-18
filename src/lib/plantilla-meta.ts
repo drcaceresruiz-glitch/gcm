@@ -24,6 +24,60 @@ import { mesesAjustadosAlPlazo } from "@/lib/gastos-contra-plazo";
 
 const FILA_CABECERA = 4;
 
+/**
+ * Cuantas filas se dejan preparadas con formula por debajo de los ejemplos.
+ *
+ * CADA OBRA TIENE UN NUMERO DISTINTO DE PARTIDAS, asi que la plantilla no
+ * puede traer solo las del ejemplo: quien añada la suya numero 40 tendria que
+ * escribir la formula a mano, y quien no se diera cuenta se llevaria el
+ * parcial en blanco.
+ *
+ * Se preparan de mas y se dejan VACIAS: sin descripcion, el importador las
+ * salta. Y como los totales del pie cubren todo el bloque, insertar filas
+ * dentro no rompe nada —Excel ajusta el rango solo— y añadir al final
+ * tampoco, porque el rango ya llega hasta abajo.
+ */
+const FILAS_PREPARADAS = 60;
+
+/**
+ * El subtotal de una linea de gasto: mensual x meses si es VARIABLE, y su
+ * importe si es FIJO. Vacia mientras no haya concepto, para que las filas
+ * preparadas no ensucien la hoja con ceros.
+ */
+/** Gris de las celdas calculadas: se ven distintas de las que se escriben. */
+const GRIS_CALCULADO = "FFF1F3F5";
+
+/**
+ * Marca una celda como CALCULADA: gris, bloqueada y con su explicacion.
+ *
+ * El usuario pidio que lo que no se puede tocar no se pueda tocar. En un
+ * Excel eso son tres cosas a la vez, y las tres hacen falta: el color avisa
+ * antes de escribir, el bloqueo lo impide, y el comentario dice por que. Solo
+ * con color se escribe encima igual; solo con bloqueo parece que el archivo
+ * esta roto.
+ *
+ * La proteccion va SIN contraseña a proposito: no es seguridad, es evitar el
+ * accidente. Quien sepa lo que hace puede quitarla en dos clics.
+ */
+function marcarCalculada(celda: ExcelJS.Cell, nota: string): void {
+  celda.protection = { locked: true };
+  celda.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: GRIS_CALCULADO },
+  };
+  celda.note = nota;
+}
+
+/** Marca una celda como ESCRIBIBLE. Por defecto en Excel todo va bloqueado. */
+function marcarEditable(celda: ExcelJS.Cell): void {
+  celda.protection = { locked: false };
+}
+
+function formulaSubtotal(fila: number): string {
+  return `IF($A${fila}="","",IF($B${fila}="VARIABLE",$C${fila}*$D${fila},$E${fila}))`;
+}
+
 const CABECERAS_COSTO = [
   "Ítem",
   "Descripción",
@@ -39,6 +93,7 @@ const CABECERAS_GASTOS = [
   "Monto mensual",
   "Meses",
   "Importe fijo",
+  "Subtotal",
 ] as const;
 
 interface FilaCosto {
@@ -296,7 +351,27 @@ export async function generarPlantillaMeta(
     if (f.unidad) fila.getCell(3).value = f.unidad;
     if (f.metrado !== undefined) fila.getCell(4).value = f.metrado;
     if (f.precioUnitario !== undefined) fila.getCell(5).value = f.precioUnitario;
-    if (f.parcial !== undefined) fila.getCell(6).value = f.parcial;
+    // El parcial se CALCULA: metrado x precio. Antes era un numero escrito,
+    // y quien cambiaba el precio se llevaba un parcial que ya no cuadraba.
+    // Los capitulos suman sus hijas en vez de multiplicar.
+    if (f.metrado !== undefined && f.precioUnitario !== undefined) {
+      // La formula lleva su RESULTADO: ExcelJS no calcula, y un archivo con
+      // formulas sin resultado se lee como celdas vacias si se sube sin
+      // abrirlo antes en Excel.
+      fila.getCell(6).value = {
+        formula: `D${n}*E${n}`,
+        result: f.metrado * f.precioUnitario,
+      };
+    } else if (f.parcial !== undefined) {
+      // Suma alzada: lleva importe pero no metrado x precio. Sin esto se
+      // perdia entera, y el presupuesto salia 3.200 mas barato.
+      fila.getCell(6).value = f.parcial;
+    }
+    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
+    marcarCalculada(
+      fila.getCell(6),
+      "Se calcula solo: metrado x precio unitario. No escribas aquí.",
+    );
 
     fila.getCell(3).alignment = { horizontal: "center" };
     fila.getCell(4).numFmt = "#,##0.0000";
@@ -316,9 +391,56 @@ export async function generarPlantillaMeta(
     }
   }
 
+  /**
+   * Filas vacias con la formula del parcial ya puesta, y el total al pie.
+   *
+   * El total abarca TODO el bloque preparado, no solo los ejemplos: asi da
+   * igual cuantas partidas tenga la obra. Y va separado por una fila en
+   * blanco para que se lea como pie y no como una linea mas.
+   */
+
+  const primeraFila = FILA_CABECERA + 1;
+  const ultimaFila = FILA_CABECERA + FILAS_PREPARADAS;
+
+  for (let f = n + 1; f <= ultimaFila; f++) {
+    const fila = costo.getRow(f);
+    fila.getCell(4).numFmt = "#,##0.0000";
+    fila.getCell(5).numFmt = "#,##0.00";
+    fila.getCell(6).numFmt = "#,##0.00";
+    // Sin descripcion el importador la salta, asi que la formula puede estar
+    // puesta desde el principio: aparece sola en cuanto se escribe la linea.
+    fila.getCell(6).value = { formula: `IF(B${f}="","",D${f}*E${f})`, result: "" };
+    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
+    marcarCalculada(
+      fila.getCell(6),
+      "Se calcula solo: metrado x precio unitario. No escribas aquí.",
+    );
+  }
+
+  const filaTotal = ultimaFila + 2;
+  const total = costo.getRow(filaTotal);
+  total.getCell(2).value = "TOTAL COSTO DIRECTO";
+  total.getCell(2).font = { bold: true };
+  // Suma solo las HOJAS: los capitulos ya suman a las suyas, y contarlos
+  // otra vez duplicaria la obra entera. Se distinguen porque su codigo
+  // termina en ".0", asi que se suma por el codigo con SUMPRODUCT.
+  const totalHojas = FILAS_COSTO.filter(
+    (f) => f.metrado !== undefined && f.precioUnitario !== undefined,
+  ).reduce((s, f) => s + (f.metrado ?? 0) * (f.precioUnitario ?? 0), 0);
+
+  total.getCell(6).value = {
+    result: totalHojas,
+    formula:
+      `SUMPRODUCT((RIGHT($A$${primeraFila}:$A$${ultimaFila},2)<>".0")*` +
+      `($A$${primeraFila}:$A$${ultimaFila}<>"")*N($F$${primeraFila}:$F$${ultimaFila}))`,
+  };
+  total.getCell(6).numFmt = "#,##0.00";
+  total.getCell(6).font = { bold: true };
+
   const gastos = libro.addWorksheet(HOJA_GASTOS);
   gastos.columns = [
     { width: 44 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 16 },
+    { width: 16 },
   ];
 
   gastos.getCell("A1").value = "PRESUPUESTO META - GASTOS GENERALES";
@@ -343,6 +465,97 @@ export async function generarPlantillaMeta(
     fila.getCell(3).numFmt = "#,##0.00";
     fila.getCell(4).alignment = { horizontal: "center" };
     fila.getCell(5).numFmt = "#,##0.00";
+    // El subtotal de la linea, calculado: un VARIABLE es mensual x meses y un
+    // FIJO es su importe. Antes habia que multiplicarlo a mano y nada avisaba
+    // si el resultado no cuadraba con lo tecleado.
+    fila.getCell(6).value = {
+      formula: formulaSubtotal(g),
+      result:
+        f.tipo === "VARIABLE"
+          ? (f.montoMensual ?? 0) * (f.meses ?? 0)
+          : (f.montoFijo ?? 0),
+    };
+    fila.getCell(6).numFmt = "#,##0.00";
+    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
+    marcarCalculada(
+      fila.getCell(6),
+      "Se calcula solo: mensual x meses si es VARIABLE, o el importe fijo.",
+    );
+  }
+
+  // Igual que en el costo directo: filas preparadas para las que cada obra
+  // necesite, y totales que abarcan todo el bloque.
+  const primerGasto = FILA_CABECERA + 1;
+  const ultimoGasto = FILA_CABECERA + FILAS_PREPARADAS;
+
+  for (let f = g + 1; f <= ultimoGasto; f++) {
+    const fila = gastos.getRow(f);
+    fila.getCell(2).alignment = { horizontal: "center" };
+    fila.getCell(3).numFmt = "#,##0.00";
+    fila.getCell(4).alignment = { horizontal: "center" };
+    fila.getCell(5).numFmt = "#,##0.00";
+    fila.getCell(6).value = { formula: formulaSubtotal(f), result: "" };
+    fila.getCell(6).numFmt = "#,##0.00";
+    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
+    marcarCalculada(
+      fila.getCell(6),
+      "Se calcula solo: mensual x meses si es VARIABLE, o el importe fijo.",
+    );
+  }
+
+  const filaTotalGG = ultimoGasto + 2;
+  const rango = `$F$${primerGasto}:$F$${ultimoGasto}`;
+  const tipos = `$B$${primerGasto}:$B$${ultimoGasto}`;
+
+  const pie: readonly [string, string][] = [
+    ["TOTAL GASTOS GENERALES", `SUM(${rango})`],
+    ["GG Variables (crecen con el plazo)", `SUMIF(${tipos},"VARIABLE",${rango})`],
+    ["GG Fijos (no dependen del plazo)", `SUMIF(${tipos},"FIJO",${rango})`],
+  ];
+
+  pie.forEach(([etiqueta, formula], i) => {
+    const fila = gastos.getRow(filaTotalGG + i);
+    fila.getCell(1).value = etiqueta;
+    fila.getCell(1).font = { bold: i === 0 };
+    fila.getCell(6).value = { formula };
+    fila.getCell(6).numFmt = "#,##0.00";
+    fila.getCell(6).font = { bold: i === 0 };
+  });
+
+  /**
+   * La leyenda, arriba del todo y en las dos hojas.
+   *
+   * El gris no significa nada por si solo: hay que decir que quiere decir, y
+   * decirlo DONDE se ve, no en la hoja de instrucciones que se lee una vez.
+   */
+  for (const hoja of [costo, gastos]) {
+    const leyenda = hoja.getCell("A3");
+    leyenda.value =
+      "Las celdas en gris se calculan solas y están bloqueadas. Escribe solo en las blancas. " +
+      "Hay " + FILAS_PREPARADAS + " filas listas con sus fórmulas: rellena las que necesites y deja el resto vacías.";
+    leyenda.font = { italic: true, size: 10, color: { argb: "FF667788" } };
+
+    /**
+     * Se protege la hoja pero se DEJA insertar filas.
+     *
+     * Cada obra tiene un numero distinto de partidas, asi que impedirlo
+     * convertiria la plantilla en una camisa de fuerza. Al insertar dentro
+     * del bloque, Excel copia la formula de la fila de arriba y ajusta solo
+     * el rango de los totales.
+     *
+     * Sin contraseña: esto evita el accidente, no es seguridad.
+     */
+    hoja.protect("", {
+      selectLockedCells: true,
+      selectUnlockedCells: true,
+      formatCells: true,
+      formatColumns: true,
+      formatRows: true,
+      insertRows: true,
+      deleteRows: true,
+      sort: true,
+      autoFilter: true,
+    });
   }
 
   const instrucciones = libro.addWorksheet("Instrucciones");

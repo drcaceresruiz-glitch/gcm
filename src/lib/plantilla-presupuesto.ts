@@ -20,6 +20,15 @@ import ExcelJS from "exceljs";
 /** La fila donde empieza la tabla (antes van titulo y nombre de la obra). */
 const FILA_CABECERA = 4;
 
+/**
+ * Filas preparadas con formula por debajo de los ejemplos.
+ *
+ * CADA OBRA TIENE UN NUMERO DISTINTO DE PARTIDAS. Van vacias: sin
+ * descripcion el importador las salta, y la formula aparece sola en cuanto
+ * se escribe la linea.
+ */
+const FILAS_PREPARADAS = 60;
+
 const CABECERAS = [
   "Ítem",
   "Descripción",
@@ -178,7 +187,19 @@ export async function generarPlantillaPresupuesto(): Promise<ArrayBuffer> {
     if (f.unidad) fila.getCell(3).value = f.unidad;
     if (f.metrado !== undefined) fila.getCell(4).value = f.metrado;
     if (f.precioUnitario !== undefined) fila.getCell(5).value = f.precioUnitario;
-    if (f.parcial !== undefined) fila.getCell(6).value = f.parcial;
+    // El parcial se CALCULA, con su resultado dentro: ExcelJS no recalcula,
+    // y sin resultado el archivo se lee como celdas vacias si se sube sin
+    // haberlo abierto antes en Excel. Los capitulos suman sus hijas.
+    if (f.metrado !== undefined && f.precioUnitario !== undefined) {
+      fila.getCell(6).value = {
+        formula: `D${n}*E${n}`,
+        result: f.metrado * f.precioUnitario,
+      };
+    } else if (f.parcial !== undefined) {
+      // Suma alzada: lleva importe pero no metrado x precio. Sin esto se
+      // perdia entera, y el presupuesto salia 3.200 mas barato.
+      fila.getCell(6).value = f.parcial;
+    }
 
     fila.getCell(3).alignment = { horizontal: "center" };
     fila.getCell(4).numFmt = "#,##0.0000";
@@ -199,6 +220,83 @@ export async function generarPlantillaPresupuesto(): Promise<ArrayBuffer> {
       }
     }
   }
+
+  /**
+   * Filas listas para las partidas de CADA obra.
+   *
+   * Cada presupuesto tiene un numero distinto de partidas, asi que la
+   * plantilla no puede traer solo las del ejemplo. Se preparan de mas, vacias
+   * y con su formula: el importador salta las que no tengan descripcion.
+   */
+  const primera = FILA_CABECERA + 1;
+  const ultima = FILA_CABECERA + FILAS_PREPARADAS;
+
+  for (let f = n + 1; f <= ultima; f++) {
+    const fila = hoja.getRow(f);
+    fila.getCell(4).numFmt = "#,##0.0000";
+    fila.getCell(5).numFmt = "#,##0.00";
+    fila.getCell(6).numFmt = "#,##0.00";
+    fila.getCell(6).value = {
+      formula: `IF(B${f}="","",D${f}*E${f})`,
+      result: "",
+    };
+  }
+
+  // Bloqueo y leyenda: lo calculado no se toca, y se ve que no se toca.
+  for (let f = primera; f <= ultima; f++) {
+    const fila = hoja.getRow(f);
+    for (const col of [1, 2, 3, 4, 5]) {
+      fila.getCell(col).protection = { locked: false };
+    }
+    const parcial = fila.getCell(6);
+    parcial.protection = { locked: true };
+    parcial.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFF1F3F5" },
+    };
+    parcial.note = "Se calcula solo: metrado x precio unitario. No escribas aquí.";
+  }
+
+  const filaTotal = ultima + 2;
+  const total = hoja.getRow(filaTotal);
+  total.getCell(2).value = "TOTAL COSTO DIRECTO";
+  total.getCell(2).font = { bold: true };
+  total.getCell(6).value = {
+    // Suma solo las HOJAS: los capitulos ya suman las suyas, y contarlos otra
+    // vez duplicaria el presupuesto entero.
+    formula:
+      `SUMPRODUCT((RIGHT($A$${primera}:$A$${ultima},2)<>".0")*` +
+      `($A$${primera}:$A$${ultima}<>"")*N($F$${primera}:$F$${ultima}))`,
+    result: FILAS_EJEMPLO.reduce(
+      (s, f) => s + (f.metrado ?? 0) * (f.precioUnitario ?? 0),
+      0,
+    ),
+  };
+  total.getCell(6).numFmt = "#,##0.00";
+  total.getCell(6).font = { bold: true };
+
+  hoja.getCell("A3").value =
+    "Las celdas en gris se calculan solas y están bloqueadas. Escribe solo en las blancas. " +
+    "Hay " + FILAS_PREPARADAS + " filas listas con sus fórmulas: rellena las que necesites y deja el resto vacías.";
+  hoja.getCell("A3").font = {
+    italic: true,
+    size: 10,
+    color: { argb: "FF667788" },
+  };
+
+  // Se deja insertar filas: cada obra tiene las partidas que tiene.
+  hoja.protect("", {
+    selectLockedCells: true,
+    selectUnlockedCells: true,
+    formatCells: true,
+    formatColumns: true,
+    formatRows: true,
+    insertRows: true,
+    deleteRows: true,
+    sort: true,
+    autoFilter: true,
+  });
 
   const instrucciones = libro.addWorksheet("Instrucciones");
   instrucciones.columns = [{ width: 30 }, { width: 100 }];
