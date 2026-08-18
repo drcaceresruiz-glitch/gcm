@@ -255,13 +255,9 @@ export interface CompromisoDetalle {
   unidad: string | null;
   /// Cuanto se ejecuto, anotado al cerrar la semana.
   cantidadEjec: string | null;
-  /// Acumulado de la tarea ANTES de cerrar. Con la cantidad y el metrado
-  /// permite deducir el «% alcanzado» en vez de pedirlo dos veces.
+  /// Acumulado de la tarea ANTES de cerrar. Con la meta pactada permite
+  /// deducir el «% alcanzado» en vez de pedirlo dos veces.
   avanceActual: string | null;
-  /// Metrado de la partida enlazada. Null si no hay enlace o el mapeo es
-  /// ambiguo —varias partidas con unidades distintas—, y entonces no se
-  /// deduce nada.
-  metrado: string | null;
   /// De que tarea del Lookahead nacio, si vino de ahi.
   lookaheadTaskId: string | null;
   /// Fotos adosadas al compromiso: documentan la causa de no cumplimiento (o
@@ -602,13 +598,11 @@ export async function obtenerPlanSemanal(
     cantidadPlan: c.cantidadPlan?.toString() ?? null,
     unidad: c.unidad,
     cantidadEjec: c.cantidadEjec?.toString() ?? null,
-    // Los dos que permiten deducir el «% alcanzado»: donde iba la tarea y
-    // cuanto mide la partida. `sugerenciaPorUid` ya se abstiene cuando el
-    // mapeo es ambiguo, asi que un metrado nulo aqui significa «no se sabe»,
-    // no «cero».
+    // Donde iba la tarea antes de cerrar: con la meta pactada basta para
+    // deducir el «% alcanzado», y sirve de freno para no proponer nunca un
+    // valor por debajo del que ya tiene.
     avanceActual:
       c.uid !== null ? (avancePorUid.get(c.uid)?.toString() ?? null) : null,
-    metrado: c.uid !== null ? (sugerenciaPorUid.get(c.uid)?.cantidad ?? null) : null,
     lookaheadTaskId: c.lookaheadTaskId,
     estadoLookahead: c.uid !== null ? (estadoLkPorUid.get(c.uid) ?? null) : null,
     fotos: fotosPorCompromiso.get(c.id) ?? [],

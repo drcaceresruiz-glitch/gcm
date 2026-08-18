@@ -41,34 +41,9 @@ describe("sugerirPorcentaje", () => {
     cantidadEjec: null as string | null,
     avanceActual: "0.00" as string | null,
     metaPorcentaje: null as string | null,
-    metrado: null as string | null,
   };
 
-  it("EL COMPROMISO CUBRE LA PARTIDA ENTERA Y SE CUMPLIO", () => {
-    // El caso de la pantalla: «1 de 1 und» sobre una partida de 1 und que
-    // partia de cero. El 100% no se adivina, se divide.
-    expect(
-      sugerirPorcentaje({
-        ...base,
-        cantidadPlan: "1",
-        cantidadEjec: "1",
-        metrado: "1",
-      }),
-    ).toBe("100.00");
-  });
-
-  it("cubre la partida entera y se cumplio a medias", () => {
-    expect(
-      sugerirPorcentaje({
-        ...base,
-        cantidadPlan: "45",
-        cantidadEjec: "27",
-        metrado: "45",
-      }),
-    ).toBe("60.00");
-  });
-
-  it("CON META PACTADA INTERPOLA ENTRE DONDE ESTABA Y LA META", () => {
+  it("INTERPOLA ENTRE DONDE ESTABA Y LA META PACTADA", () => {
     // La meta es el acumulado prometido para el final de la semana: cumplir
     // la mitad de la cantidad deja la tarea a mitad de camino.
     expect(
@@ -82,7 +57,7 @@ describe("sugerirPorcentaje", () => {
     ).toBe("60.00");
   });
 
-  it("con meta pactada y cantidad completa, llega justo a la meta", () => {
+  it("con la cantidad completa llega justo a la meta, y no la pasa", () => {
     expect(
       sugerirPorcentaje({
         ...base,
@@ -94,58 +69,21 @@ describe("sugerirPorcentaje", () => {
     ).toBe("80.00");
   });
 
-  it("deduce aunque la tarea ya llevara avance, si el compromiso es la partida entera", () => {
-    // «45 de 45 m» se mide contra el metrado completo, asi que la cantidad
-    // ejecutada YA es la acumulada. Que la tarea fuera al 30% por un parte
-    // del dia no cambia esa cuenta.
+  it("SIN META NO DEDUCE NADA, AUNQUE HAYA CANTIDADES", () => {
+    // El avance se mide en PORCENTAJE, nunca en metrado: el metrado de la
+    // partida no dice cuanto de la TAREA cubre un compromiso, y una division
+    // que parece exacta acabaria escribiendo un 100 en la curva S.
     expect(
-      sugerirPorcentaje({
-        ...base,
-        cantidadPlan: "45",
-        cantidadEjec: "45",
-        metrado: "45",
-        avanceActual: "30.00",
-      }),
-    ).toBe("100.00");
-  });
-
-  it("NUNCA PROPONE UN RETROCESO", () => {
-    // «ejecutado» puede leerse como lo de esta semana o como lo acumulado, y
-    // ningun dato lo resuelve. Se corta por lo seguro: bajar el avance
-    // arrastraria la curva S hacia atras y lo decide una persona.
+      sugerirPorcentaje({ ...base, cantidadPlan: "1", cantidadEjec: "1" }),
+    ).toBeNull();
     expect(
-      sugerirPorcentaje({
-        ...base,
-        cantidadPlan: "45",
-        cantidadEjec: "18",
-        metrado: "45",
-        avanceActual: "60.00",
-      }),
+      sugerirPorcentaje({ ...base, cantidadPlan: "45", cantidadEjec: "45" }),
     ).toBeNull();
   });
 
-  it("NO DEDUCE si el compromiso es solo un tramo de la partida", () => {
-    // 45 de un metrado de 120: cumplir la semana no es acabar la tarea, y
-    // sin meta pactada no hay forma de saber a que acumulado equivale.
-    expect(
-      sugerirPorcentaje({
-        ...base,
-        cantidadPlan: "45",
-        cantidadEjec: "45",
-        metrado: "120",
-      }),
-    ).toBeNull();
-  });
-
-  it("no deduce sin cantidades, ni sin enlace a partida", () => {
-    expect(sugerirPorcentaje(base)).toBeNull();
-    expect(
-      sugerirPorcentaje({ ...base, cantidadPlan: "10", cantidadEjec: "10" }),
-    ).toBeNull();
-  });
-
-  it("no deduce si la meta esta por debajo de donde ya iba", () => {
-    // Seria proponer un retroceso, y eso lo decide una persona.
+  it("NO PROPONE UN RETROCESO", () => {
+    // Bajar el avance arrastraria la curva S hacia atras: lo decide una
+    // persona, no una interpolacion.
     expect(
       sugerirPorcentaje({
         ...base,
@@ -155,6 +93,13 @@ describe("sugerirPorcentaje", () => {
         metaPorcentaje: "50.00",
       }),
     ).toBeNull();
+  });
+
+  it("no deduce sin cantidad ejecutada: no hay fraccion que aplicar", () => {
+    expect(
+      sugerirPorcentaje({ ...base, cantidadPlan: "10", metaPorcentaje: "80.00" }),
+    ).toBeNull();
+    expect(sugerirPorcentaje(base)).toBeNull();
   });
 });
 

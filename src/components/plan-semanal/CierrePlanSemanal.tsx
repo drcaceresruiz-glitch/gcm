@@ -69,7 +69,6 @@ function conPorcentajeDeducido(
       cantidadEjec: f.cantidadEjec,
       avanceActual: c.avanceActual ?? null,
       metaPorcentaje: c.metaPorcentaje,
-      metrado: c.metrado ?? null,
     });
 
     return sugerido === null ? f : { ...f, porcentajeReal: sugerido };
@@ -123,7 +122,6 @@ export function CierrePlanSemanal({
         cantidadEjec,
         avanceActual: c.avanceActual ?? null,
         metaPorcentaje: c.metaPorcentaje,
-        metrado: c.metrado ?? null,
       });
       // Null = no se puede deducir con exactitud. Se deja como estaba: aqui
       // no se inventa un numero que acabaria en la curva S.

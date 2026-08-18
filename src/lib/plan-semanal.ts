@@ -49,11 +49,9 @@ export interface CompromisoDeCierre {
   cantidadPlan: string | null;
   unidad: string | null;
   cantidadEjec: string | null;
-  /// Acumulado de la tarea antes de cerrar, y metrado de la partida enlazada.
-  /// Opcionales porque solo los sabe el servicio que lee el mapeo; sin ellos
-  /// `sugerirPorcentaje` se abstiene, que es el comportamiento de antes.
+  /// Acumulado de la tarea antes de cerrar. Opcional porque solo lo sabe el
+  /// servicio; sin el, `sugerirPorcentaje` toma cero como punto de partida.
   avanceActual?: string | null;
-  metrado?: string | null;
 }
 
 /// La fila editable de la pantalla de cierre.
@@ -206,28 +204,23 @@ export function porcentajeARegistrar(entrada: {
  * deja rastro en la curva S. El dato estaba delante y habia que teclearlo dos
  * veces, en dos unidades distintas.
  *
- * Se deduce SOLO cuando la cuenta es exacta. Hay dos casos asi:
+ * **El avance se mide en PORCENTAJE, nunca en metrado.** Es una regla del
+ * usuario, y ademas evita la trampa de convertir: el metrado de la partida no
+ * dice cuanto de la TAREA cubre un compromiso, y una division que parece
+ * exacta acabaria escribiendo un 100 en la curva S.
  *
- * 1. **Hay meta pactada.** La meta es el acumulado prometido para el final de
- *    la semana, asi que cumplir la mitad de la cantidad deja la tarea a mitad
- *    de camino entre donde estaba y la meta. Interpolar aqui no es adivinar:
- *    es lo que significa haber pactado esa meta.
+ * Por eso solo se deduce cuando hay META pactada, que ya esta en porcentaje.
+ * La meta es el acumulado prometido para el final de la semana, asi que
+ * cumplir la mitad de la cantidad deja la tarea a mitad de camino entre donde
+ * estaba y la meta. Interpolar ahi no es adivinar: es lo que significa haber
+ * pactado esa meta.
  *
- * 2. **El compromiso cubre la partida entera.** Entonces «45 de 45 m» se mide
- *    contra el metrado completo, asi que la cantidad ejecutada YA es la
- *    acumulada y el porcentaje sale de una division. Si el compromiso fuera
- *    solo un tramo (45 de un metrado de 120) esto no valdria, y por eso se
- *    exige la igualdad.
+ * Sin meta devuelve null y la pantalla sigue pidiendo el dato. Callar es
+ * correcto; inventar un 100 es el fallo que ya falsifico esta curva una vez
+ * —ver `porcentajeARegistrar`—.
  *
- *    Queda una ambiguedad que no resuelve ningun dato: si «ejecutado» es lo
- *    de esta semana o lo acumulado. Se corta por lo seguro —nunca se propone
- *    un valor por debajo del que ya tiene la tarea—: un retroceso arrastraria
- *    la curva S hacia atras, y bajar el avance tiene que decidirlo una
- *    persona.
- *
- * Fuera de esos dos casos devuelve null y la pantalla sigue pidiendo el dato.
- * Callar es correcto; inventar un 100 es el fallo que ya falsifico esta curva
- * una vez —ver `porcentajeARegistrar`—.
+ * Nunca propone un valor por debajo del que ya tiene la tarea: un retroceso
+ * arrastraria la curva S hacia atras, y bajar el avance lo decide una persona.
  */
 export function sugerirPorcentaje(entrada: {
   cantidadPlan: string | null;
@@ -235,8 +228,6 @@ export function sugerirPorcentaje(entrada: {
   /// Acumulado de la tarea ANTES de cerrar esta semana.
   avanceActual: string | null;
   metaPorcentaje: string | null;
-  /// Metrado de la partida enlazada. Null si no hay enlace o es ambiguo.
-  metrado: string | null;
 }): string | null {
   const plan = entrada.cantidadPlan?.trim();
   const ejec = entrada.cantidadEjec?.trim();
@@ -249,24 +240,13 @@ export function sugerirPorcentaje(entrada: {
   const actual = Number(entrada.avanceActual ?? "0") || 0;
 
   const meta = entrada.metaPorcentaje?.trim();
-  if (meta && Number.isFinite(Number(meta))) {
-    const objetivo = Number(meta);
-    if (objetivo <= actual) return null;
-    return (actual + (objetivo - actual) * avance).toFixed(2);
-  }
+  if (!meta || !Number.isFinite(Number(meta))) return null;
 
-  const metrado = entrada.metrado?.trim();
-  if (metrado && esPositivo(metrado)) {
-    // Solo si la semana comprometio TODO el metrado de la partida: sobre un
-    // tramo, la cantidad no dice a que acumulado equivale.
-    if (Number(plan) !== Number(metrado)) return null;
+  const objetivo = Number(meta);
+  // Una meta por debajo de donde ya va la tarea seria proponer un retroceso.
+  if (objetivo <= actual) return null;
 
-    const propuesto = Math.min(100, avance * 100);
-    // Nunca hacia atras: ver la nota de arriba sobre «ejecutado».
-    return propuesto < actual ? null : propuesto.toFixed(2);
-  }
-
-  return null;
+  return (actual + (objetivo - actual) * avance).toFixed(2);
 }
 
 /// Un compromiso a punto de cerrarse, con lo minimo para saber si dejara
