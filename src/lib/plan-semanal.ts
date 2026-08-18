@@ -1,5 +1,5 @@
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
-import { normalizarDecimal, sumar } from "@/lib/decimal";
+import { esPositivo, normalizarDecimal, sumar } from "@/lib/decimal";
 
 /**
  * Plan Semanal (Last Planner): las cuentas del corto plazo, en logica pura.
@@ -49,6 +49,11 @@ export interface CompromisoDeCierre {
   cantidadPlan: string | null;
   unidad: string | null;
   cantidadEjec: string | null;
+  /// Acumulado de la tarea antes de cerrar, y metrado de la partida enlazada.
+  /// Opcionales porque solo los sabe el servicio que lee el mapeo; sin ellos
+  /// `sugerirPorcentaje` se abstiene, que es el comportamiento de antes.
+  avanceActual?: string | null;
+  metrado?: string | null;
 }
 
 /// La fila editable de la pantalla de cierre.
@@ -191,6 +196,67 @@ export function porcentajeARegistrar(entrada: {
 
   const meta = entrada.metaPorcentaje?.trim();
   return meta ? meta : null;
+}
+
+/**
+ * Que porcentaje acumulado se DEDUCE de la cantidad ejecutada.
+ *
+ * Al cerrar la semana el residente escribe «45 de 45 m» y el campo de
+ * porcentaje se queda vacio, asi que el compromiso cuenta para el PPC pero no
+ * deja rastro en la curva S. El dato estaba delante y habia que teclearlo dos
+ * veces, en dos unidades distintas.
+ *
+ * Se deduce SOLO cuando la cuenta es exacta. Hay dos casos asi:
+ *
+ * 1. **Hay meta pactada.** La meta es el acumulado prometido para el final de
+ *    la semana, asi que cumplir la mitad de la cantidad deja la tarea a mitad
+ *    de camino entre donde estaba y la meta. Interpolar aqui no es adivinar:
+ *    es lo que significa haber pactado esa meta.
+ *
+ * 2. **El compromiso cubre la partida entera y la tarea partia de cero.**
+ *    Entonces la cantidad de la semana ES el metrado total y el porcentaje
+ *    sale de una division. Se exige que partiera de cero: si ya llevaba
+ *    avance, semanas anteriores aportaron cantidad que aqui no se ve, y
+ *    dividir contarian dos veces el mismo trabajo.
+ *
+ * Fuera de esos dos casos devuelve null y la pantalla sigue pidiendo el dato.
+ * Callar es correcto; inventar un 100 es el fallo que ya falsifico esta curva
+ * una vez —ver `porcentajeARegistrar`—.
+ */
+export function sugerirPorcentaje(entrada: {
+  cantidadPlan: string | null;
+  cantidadEjec: string | null;
+  /// Acumulado de la tarea ANTES de cerrar esta semana.
+  avanceActual: string | null;
+  metaPorcentaje: string | null;
+  /// Metrado de la partida enlazada. Null si no hay enlace o es ambiguo.
+  metrado: string | null;
+}): string | null {
+  const plan = entrada.cantidadPlan?.trim();
+  const ejec = entrada.cantidadEjec?.trim();
+  if (!plan || !ejec || !esPositivo(plan)) return null;
+
+  const fraccion = Number(ejec) / Number(plan);
+  if (!Number.isFinite(fraccion) || fraccion < 0) return null;
+  const avance = Math.min(1, fraccion);
+
+  const actual = Number(entrada.avanceActual ?? "0") || 0;
+
+  const meta = entrada.metaPorcentaje?.trim();
+  if (meta && Number.isFinite(Number(meta))) {
+    const objetivo = Number(meta);
+    if (objetivo <= actual) return null;
+    return (actual + (objetivo - actual) * avance).toFixed(2);
+  }
+
+  const metrado = entrada.metrado?.trim();
+  if (metrado && esPositivo(metrado) && actual === 0) {
+    // Solo si la semana comprometio TODO el metrado de la partida.
+    if (Number(plan) !== Number(metrado)) return null;
+    return Math.min(100, avance * 100).toFixed(2);
+  }
+
+  return null;
 }
 
 /// Un compromiso a punto de cerrarse, con lo minimo para saber si dejara

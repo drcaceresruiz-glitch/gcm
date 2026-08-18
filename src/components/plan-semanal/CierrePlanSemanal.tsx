@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Check, LoaderCircle, TriangleAlert } from "lucide-react";
 import { accionCerrarPlanSemanal } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
 import {
   CAUSAS_CNC,
   ETIQUETA_CNC,
   construirFilasCierre,
+  sugerirPorcentaje,
   type CompromisoDeCierre,
   type FilaCierre,
 } from "@/lib/plan-semanal";
@@ -53,6 +54,50 @@ export function CierrePlanSemanal({
   const [filas, setFilas] = useState<Fila[]>(() =>
     construirFilasCierre(compromisos),
   );
+
+  /**
+   * Filas cuyo porcentaje escribio una persona.
+   *
+   * El «% alcanzado» se deduce de la cantidad ejecutada cuando la cuenta es
+   * exacta —ver `sugerirPorcentaje`—, pero en cuanto alguien lo teclea deja de
+   * recalcularse. Pisar un dato escrito a mano con uno derivado es la clase de
+   * cosa que hace desconfiar de la pantalla entera.
+   */
+  const [pctAMano, setPctAMano] = useState<Set<string>>(new Set());
+
+  /// Lo que el servidor sabe de cada compromiso y la fila editable no lleva:
+  /// donde iba la tarea y cuanto mide su partida.
+  const datos = useMemo(
+    () => new Map(compromisos.map((c) => [c.id, c])),
+    [compromisos],
+  );
+
+  /**
+   * Al escribir la cantidad ejecutada, deducir el porcentaje.
+   *
+   * El residente ya dijo «45 de 45 m»: pedirle ademas el porcentaje es pedir
+   * el mismo dato dos veces en dos unidades, y por eso el campo se quedaba
+   * vacio y el compromiso no dejaba rastro en la curva S.
+   */
+  function derivarAlEscribirCantidad(fila: Fila, cantidadEjec: string) {
+    const cambios: Partial<Fila> = { cantidadEjec };
+    const c = datos.get(fila.id);
+
+    if (fila.uid !== null && c && !pctAMano.has(fila.id)) {
+      const sugerido = sugerirPorcentaje({
+        cantidadPlan: fila.cantidadPlan,
+        cantidadEjec,
+        avanceActual: c.avanceActual ?? null,
+        metaPorcentaje: c.metaPorcentaje,
+        metrado: c.metrado ?? null,
+      });
+      // Null = no se puede deducir con exactitud. Se deja como estaba: aqui
+      // no se inventa un numero que acabaria en la curva S.
+      if (sugerido !== null) cambios.porcentajeReal = sugerido;
+    }
+
+    set(fila.id, cambios);
+  }
 
   /**
    * Los ids que se estan editando ahora mismo.
@@ -199,7 +244,7 @@ export function CierrePlanSemanal({
                   ejecutado
                   <input
                     value={f.cantidadEjec}
-                    onChange={(e) => set(f.id, { cantidadEjec: e.target.value })}
+                    onChange={(e) => derivarAlEscribirCantidad(f, e.target.value)}
                     inputMode="decimal"
                     title={`Cantidad ejecutada de ${f.cantidadPlan} ${f.unidad ?? ""} comprometidos`}
                     className="w-20 rounded border px-1.5 py-1 text-xs tabular-nums"
@@ -219,7 +264,12 @@ export function CierrePlanSemanal({
                     max={100}
                     step="0.01"
                     value={f.porcentajeReal}
-                    onChange={(e) => set(f.id, { porcentajeReal: e.target.value })}
+                    onChange={(e) => {
+                      // A partir de aqui manda la persona: no se vuelve a
+                      // recalcular esta fila aunque cambie la cantidad.
+                      setPctAMano((p) => new Set(p).add(f.id));
+                      set(f.id, { porcentajeReal: e.target.value });
+                    }}
                     title="Avance ACUMULADO de la tarea (0-100), no lo hecho esta semana"
                     className="w-16 rounded border px-1.5 py-1 text-xs tabular-nums"
                     style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
