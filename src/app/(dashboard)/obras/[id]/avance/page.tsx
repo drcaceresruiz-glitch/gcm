@@ -7,6 +7,8 @@ import { obtenerParteDelDia } from "@/services/cronograma.service";
 import { puede } from "@/lib/rbac";
 import { fechaLarga, hoy } from "@/utils/fechas";
 import { ParteDelDia } from "@/components/avance/ParteDelDia";
+import { fotosDeTareas, type FotoResumen } from "@/services/evidencia.service";
+import { accionSubirEvidencia } from "@/app/(dashboard)/obras/[id]/evidencia/acciones";
 
 export const metadata: Metadata = { title: "Parte del día" };
 
@@ -42,7 +44,56 @@ export default async function AvancePage({
         ? Number(pedido)
         : undefined;
 
-  const parte = await obtenerParteDelDia(sesion, id, { diasVista: elegido });
+  // Red de seguridad, como en `/meta`: el parte del dia es la pantalla que se
+  // usa a diario, y en produccion Next borra el mensaje de un error de
+  // servidor y lo cambia por «no se pudo cargar». Capturando aqui, la causa
+  // real se renderiza como contenido y sobrevive. Sin esto, un fallo en la
+  // carga de fotos o del cronograma dejaria la jornada sin poder reportarse y
+  // sin saber por que.
+  let parte: Awaited<ReturnType<typeof obtenerParteDelDia>>;
+  const fotosPorUid: Record<number, FotoResumen[]> = {};
+  try {
+    parte = await obtenerParteDelDia(sesion, id, { diasVista: elegido });
+    if (parte) {
+      // Las fotos de cada tarea —todas, no solo las de hoy— para que el clip
+      // muestre el historial de la partida y no un contador que se vacia cada
+      // mañana. Una sola consulta para toda la tabla.
+      const uids = parte.grupos.flatMap((g) => g.filas.map((f) => f.uid));
+      for (const [uid, fotos] of await fotosDeTareas(sesion, id, uids)) {
+        fotosPorUid[uid] = fotos;
+      }
+    }
+  } catch (e) {
+    const detalle = e instanceof Error ? e.message : String(e);
+    return (
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold">Parte del día</h2>
+        <section
+          className="space-y-3 rounded-xl border p-6"
+          style={{ borderColor: "var(--color-peligro)" }}
+        >
+          <h3 className="text-sm font-semibold">No se pudo cargar el parte</h3>
+          <p className="max-w-2xl text-sm text-pretty opacity-80">
+            El resto de la obra sigue funcionando. Vuelve a intentarlo; si
+            persiste, este es el motivo exacto para quien lo revise:
+          </p>
+          <pre
+            className="overflow-x-auto rounded-lg p-3 text-xs"
+            style={{
+              backgroundColor:
+                "color-mix(in oklab, var(--color-peligro) 8%, transparent)",
+            }}
+          >
+            {detalle}
+          </pre>
+          <Link href={`/obras/${id}/avance`} className="text-sm font-medium underline">
+            Reintentar
+          </Link>
+        </section>
+      </div>
+    );
+  }
+
   const puedeReportar = puede(sesion, "avance:registrar");
 
   if (!parte) {
@@ -148,6 +199,8 @@ export default async function AvancePage({
           obraId={id}
           grupos={parte.grupos}
           hoyIso={hoy().toISOString().slice(0, 10)}
+          fotosPorUid={fotosPorUid}
+          subirFoto={accionSubirEvidencia}
         />
       ) : (
         <p className="text-sm opacity-60">

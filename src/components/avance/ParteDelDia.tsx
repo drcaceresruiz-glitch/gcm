@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useRef, useState } from "react";
+import { Fragment, useActionState, useMemo, useRef, useState } from "react";
 import { LoaderCircle, Save, TriangleAlert, CircleCheck } from "lucide-react";
 import {
   accionGuardarParte,
@@ -8,6 +8,12 @@ import {
 } from "@/app/(dashboard)/obras/[id]/avance/acciones";
 import { resolverAvance, type GrupoParte } from "@/lib/parte-diario";
 import { conSignoFijo } from "@/lib/redondeo";
+import {
+  BotonEvidencia,
+  PanelEvidencia,
+  type AccionSubirEvidencia,
+} from "@/components/evidencia/PanelEvidencia";
+import type { FotoResumen } from "@/services/evidencia.service";
 
 /**
  * El barrido del dia: todas las tareas abiertas, una casilla cada una, un solo
@@ -32,10 +38,16 @@ export function ParteDelDia({
   obraId,
   grupos,
   hoyIso,
+  fotosPorUid,
+  subirFoto,
 }: {
   obraId: string;
   grupos: GrupoParte[];
   hoyIso: string;
+  /// Fotos ya adjuntas a cada tarea (todas, no solo las de hoy). Vacio = obra
+  /// sin fotos todavia.
+  fotosPorUid: Record<number, FotoResumen[]>;
+  subirFoto: AccionSubirEvidencia;
 }) {
   const [estado, enviar, pendiente] = useActionState<EstadoParte, FormData>(
     accionGuardarParte,
@@ -48,6 +60,15 @@ export function ParteDelDia({
 
   /// Confirmacion de que bajar el avance es intencionado. Ver `retrocesos`.
   const [aceptaRetroceso, setAceptaRetroceso] = useState(false);
+
+  /// La fecha del parte, CONTROLADA: la foto que se adjunta se ancla a este
+  /// dia, no siempre a hoy. Si el residente reporta el jueves lo del martes,
+  /// la foto va al martes.
+  const [fecha, setFecha] = useState(hoyIso);
+
+  /// Que fila tiene el panel de fotos abierto. Una sola a la vez: en un movil
+  /// dos paneles abiertos empujan la tabla hasta perder el hilo.
+  const [fotoAbierta, setFotoAbierta] = useState<number | null>(null);
 
   /// El orden de captura, aplanado: es el que sigue el salto con Enter.
   const orden = useMemo(
@@ -128,7 +149,8 @@ export function ParteDelDia({
           <input
             type="date"
             name="fecha"
-            defaultValue={hoyIso}
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
             max={hoyIso}
             required
             className="mt-1 rounded-lg border px-2 py-1.5 text-sm"
@@ -285,6 +307,12 @@ export function ParteDelDia({
                 setEscritos={setEscritos}
                 casillas={casillas}
                 alTeclear={alTeclear}
+                obraId={obraId}
+                fecha={fecha}
+                fotosPorUid={fotosPorUid}
+                subirFoto={subirFoto}
+                fotoAbierta={fotoAbierta}
+                setFotoAbierta={setFotoAbierta}
               />
             ))}
           </tbody>
@@ -307,12 +335,24 @@ function Capitulo({
   setEscritos,
   casillas,
   alTeclear,
+  obraId,
+  fecha,
+  fotosPorUid,
+  subirFoto,
+  fotoAbierta,
+  setFotoAbierta,
 }: {
   grupo: GrupoParte;
   escritos: Record<number, string>;
   setEscritos: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   casillas: React.RefObject<Map<number, HTMLInputElement>>;
   alTeclear: (e: React.KeyboardEvent<HTMLInputElement>, uid: number) => void;
+  obraId: string;
+  fecha: string;
+  fotosPorUid: Record<number, FotoResumen[]>;
+  subirFoto: AccionSubirEvidencia;
+  fotoAbierta: number | null;
+  setFotoAbierta: React.Dispatch<React.SetStateAction<number | null>>;
 }) {
   return (
     <>
@@ -331,8 +371,11 @@ function Capitulo({
       </tr>
       {grupo.filas.map((f) => {
         const desfase = Number(f.desfase);
+        const fotos = fotosPorUid[f.uid] ?? [];
+        const abierta = fotoAbierta === f.uid;
         return (
-          <tr key={f.uid} className="border-t" style={{ borderColor: "var(--borde)" }}>
+          <Fragment key={f.uid}>
+          <tr className="border-t" style={{ borderColor: "var(--borde)" }}>
             <td className="px-3 py-1.5">
               {f.codigo && <span className="opacity-60">{f.codigo} </span>}
               {f.nombre}
@@ -379,6 +422,14 @@ function Capitulo({
                   {f.restriccionesAbiertas === 1 ? "" : "es"}
                 </span>
               )}
+              <span className="ml-2 inline-block align-middle">
+                <BotonEvidencia
+                  cantidad={fotos.length}
+                  abierto={abierta}
+                  etiqueta={f.nombre}
+                  onClick={() => setFotoAbierta(abierta ? null : f.uid)}
+                />
+              </span>
             </td>
             <td className="px-3 py-1.5 text-right tabular-nums opacity-70">
               {f.porcentajeActual}%
@@ -439,6 +490,26 @@ function Capitulo({
               />
             </td>
           </tr>
+          {abierta && (
+            <tr>
+              <td colSpan={5} className="px-3 pb-3">
+                {/* La foto se ancla al DÍA del parte (`fecha`), pero el clip
+                    muestra TODAS las de la partida: su historial, no solo lo
+                    de hoy. Por eso el mismo panel sirve luego en la vista de
+                    la partida en ejecución. */}
+                <PanelEvidencia
+                  obraId={obraId}
+                  destino={{ uid: f.uid, fecha }}
+                  titulo={`${f.codigo ? `${f.codigo} ` : ""}${f.nombre}`}
+                  fotos={fotos}
+                  puedeSubir
+                  accion={subirFoto}
+                  onCerrar={() => setFotoAbierta(null)}
+                />
+              </td>
+            </tr>
+          )}
+          </Fragment>
         );
       })}
     </>

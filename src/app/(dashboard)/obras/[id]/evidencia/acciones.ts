@@ -34,22 +34,35 @@ export async function accionSubirEvidencia(
 
   const restriccionId = datos.get("restriccionId");
   const compromisoId = datos.get("compromisoId");
+  const uidBruto = datos.get("uid");
+  const fecha = datos.get("fecha");
   const nota = datos.get("nota");
 
-  // Exactamente uno de los dos. El modelo lo asume (`restriccionId` XOR
-  // `compromisoId`) y el servicio elige el permiso segun cual llegue: si
-  // llegaran los dos, se subiria comprobando el permiso equivocado.
+  // Exactamente UNO de los tres anclas. El servicio elige el permiso segun
+  // cual llegue, asi que dos a la vez subirian comprobando el equivocado.
   const aRestriccion = typeof restriccionId === "string" && restriccionId !== "";
   const aCompromiso = typeof compromisoId === "string" && compromisoId !== "";
-  if (aRestriccion === aCompromiso) {
+  const aTarea = typeof uidBruto === "string" && uidBruto !== "";
+  if ([aRestriccion, aCompromiso, aTarea].filter(Boolean).length !== 1) {
     return { ok: false, error: "No se indico a que adjuntar la foto." };
+  }
+
+  let destino;
+  if (aRestriccion) {
+    destino = { restriccionId: restriccionId as string };
+  } else if (aCompromiso) {
+    destino = { compromisoId: compromisoId as string };
+  } else {
+    const uid = Number(uidBruto);
+    if (!Number.isSafeInteger(uid) || typeof fecha !== "string" || !fecha) {
+      return { ok: false, error: "Falta la tarea o el día de la foto." };
+    }
+    destino = { obraId, uid, fecha };
   }
 
   const r = await subirEvidencia(
     sesion,
-    aRestriccion
-      ? { restriccionId: restriccionId as string }
-      : { compromisoId: compromisoId as string },
+    destino,
     archivo,
     typeof nota === "string" ? nota : undefined,
   );
@@ -57,9 +70,12 @@ export async function accionSubirEvidencia(
   if (r.ok) {
     // La foto de una restriccion se ve en el Lookahead y la de un compromiso
     // en su semana; pero una tarea comprometida aparece en las dos pantallas,
-    // y el contador del clip tiene que cuadrar en ambas.
+    // y el contador del clip tiene que cuadrar en ambas. La de una tarea, en
+    // el parte del dia y en el cronograma (partida en ejecucion).
     revalidatePath(`/obras/${obraId}/lookahead`);
     revalidatePath(`/obras/${obraId}/plan-semanal`, "layout");
+    revalidatePath(`/obras/${obraId}/avance`);
+    revalidatePath(`/obras/${obraId}/cronograma`);
   }
 
   return r;

@@ -43,7 +43,9 @@ const CALIDAD = 0.8;
 
 export type DestinoPanel =
   | { restriccionId: string }
-  | { compromisoId: string };
+  | { compromisoId: string }
+  /// Una tarea del cronograma. `fecha` es el dia que documenta (el del parte).
+  | { uid: number; fecha: string };
 
 /**
  * La puerta por la que sube la foto.
@@ -140,8 +142,11 @@ export function PanelEvidencia({
       if (nota.trim()) datos.set("nota", nota.trim());
       if ("restriccionId" in destino) {
         datos.set("restriccionId", destino.restriccionId);
-      } else {
+      } else if ("compromisoId" in destino) {
         datos.set("compromisoId", destino.compromisoId);
+      } else {
+        datos.set("uid", String(destino.uid));
+        datos.set("fecha", destino.fecha);
       }
 
       iniciar(async () => {
