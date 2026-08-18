@@ -1,3 +1,4 @@
+import { estructuraDelCronograma } from "@/lib/estructura-cronograma";
 import { restar, sumar } from "@/lib/decimal";
 import { ponderarPorDuracion } from "@/lib/curva-s";
 
@@ -84,8 +85,28 @@ function recorrerCapitulos(
   if (tareas.length === 0) return [];
 
   const orden = [...tareas].sort((a, b) => a.fila - b.fila);
-  const nivelRaiz = Math.min(...orden.map((t) => t.nivel));
-  const nivelCapitulo = nivelRaiz + 1;
+  /**
+   * Hay archivos CON fila de proyecto y archivos SIN ella, y de eso depende
+   * en que nivel viven los capitulos. Antes se daba por hecho que siempre la
+   * habia (`nivelRaiz + 1`), y en los archivos que empiezan directamente por
+   * los capitulos eso se comia un nivel entero: la tabla de «Avance por
+   * capitulo» listaba las PARTIDAS como si fueran capitulos, cada una con
+   * una sola partida debajo. Pasaba en las tres obras de la base.
+   *
+   * La senal es la AUSENCIA DE CODIGO, no el codigo en si: la fila que
+   * resume el proyecto entero no lleva codigo de capitulo, y los capitulos
+   * siempre lo llevan («1.0», «4.0», «7.0»). Ojo con la diferencia respecto
+   * a lo que dice el parrafo de arriba: NO se identifican los capitulos por
+   * su codigo —eso fallaria, porque «7.3.1» es hermana de «7.3»—, se usa la
+   * falta de codigo para reconocer la RAIZ, que es otra pregunta.
+   *
+   * Una sola tarea arriba CON codigo es una obra de un solo capitulo, no una
+   * fila de proyecto: es el caso de CRIOCORD, cuyo cronograma empieza por
+   * «4.0 CAPITULO IV».
+   */
+  const { nivelCapitulo } = estructuraDelCronograma(orden);
+  // null = cronograma plano: sin jerarquia no hay capitulos que agrupar.
+  if (nivelCapitulo === null) return [];
 
   const salida: { cabecera: TareaControlada; descendientes: TareaControlada[] }[] =
     [];

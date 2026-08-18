@@ -4,6 +4,7 @@ import { soles } from "@/utils/formato";
 import { fechaCorta } from "@/utils/fechas";
 import { esNegativo, esPositivo } from "@/lib/decimal";
 import { gastosGeneralesInverosimiles } from "@/lib/bolsa";
+import { origenDeEjemplo } from "@/lib/datos-de-ejemplo";
 import type { ComparacionMeta } from "@/services/meta.service";
 
 /**
@@ -74,6 +75,7 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
   const { bolsa, meta, desfase, plazo } = c;
   const negativa = esNegativo(bolsa.bolsaTotal);
   const ggRaros = gastosGeneralesInverosimiles(bolsa);
+  const ejemplo = origenDeEjemplo(bolsa);
 
   return (
     <section className="space-y-5">
@@ -177,6 +179,24 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
           />
         </div>
       </div>
+
+      {ejemplo.hay && (
+        <Aviso
+          tono="peligro"
+          icono={AlertTriangle}
+          titulo="Estas cifras son las de EJEMPLO de la plantilla, no las de tu obra"
+        >
+          {ejemplo.contractual && ejemplo.meta
+            ? "El presupuesto contractual y la meta coinciden al céntimo con las filas de ejemplo que trae la plantilla. "
+            : ejemplo.contractual
+              ? "El presupuesto contractual coincide al céntimo con las partidas de ejemplo de su plantilla. "
+              : "La meta coincide al céntimo con las filas de ejemplo de su plantilla. "}
+          Se cargaron sin borrarlas, y GCM las acepto como validas. Los dos
+          ejemplos estan pensados para obras de tamano distinto, asi que
+          compararlos da un margen que no significa nada. Borra las filas de
+          ejemplo del Excel, vuelve a cargarlo y esta pantalla dira la verdad.
+        </Aviso>
+      )}
 
       {ggRaros && (
         <Aviso
