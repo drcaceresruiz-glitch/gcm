@@ -213,11 +213,17 @@ export function porcentajeARegistrar(entrada: {
  *    de camino entre donde estaba y la meta. Interpolar aqui no es adivinar:
  *    es lo que significa haber pactado esa meta.
  *
- * 2. **El compromiso cubre la partida entera y la tarea partia de cero.**
- *    Entonces la cantidad de la semana ES el metrado total y el porcentaje
- *    sale de una division. Se exige que partiera de cero: si ya llevaba
- *    avance, semanas anteriores aportaron cantidad que aqui no se ve, y
- *    dividir contarian dos veces el mismo trabajo.
+ * 2. **El compromiso cubre la partida entera.** Entonces «45 de 45 m» se mide
+ *    contra el metrado completo, asi que la cantidad ejecutada YA es la
+ *    acumulada y el porcentaje sale de una division. Si el compromiso fuera
+ *    solo un tramo (45 de un metrado de 120) esto no valdria, y por eso se
+ *    exige la igualdad.
+ *
+ *    Queda una ambiguedad que no resuelve ningun dato: si «ejecutado» es lo
+ *    de esta semana o lo acumulado. Se corta por lo seguro —nunca se propone
+ *    un valor por debajo del que ya tiene la tarea—: un retroceso arrastraria
+ *    la curva S hacia atras, y bajar el avance tiene que decidirlo una
+ *    persona.
  *
  * Fuera de esos dos casos devuelve null y la pantalla sigue pidiendo el dato.
  * Callar es correcto; inventar un 100 es el fallo que ya falsifico esta curva
@@ -250,10 +256,14 @@ export function sugerirPorcentaje(entrada: {
   }
 
   const metrado = entrada.metrado?.trim();
-  if (metrado && esPositivo(metrado) && actual === 0) {
-    // Solo si la semana comprometio TODO el metrado de la partida.
+  if (metrado && esPositivo(metrado)) {
+    // Solo si la semana comprometio TODO el metrado de la partida: sobre un
+    // tramo, la cantidad no dice a que acumulado equivale.
     if (Number(plan) !== Number(metrado)) return null;
-    return Math.min(100, avance * 100).toFixed(2);
+
+    const propuesto = Math.min(100, avance * 100);
+    // Nunca hacia atras: ver la nota de arriba sobre «ejecutado».
+    return propuesto < actual ? null : propuesto.toFixed(2);
   }
 
   return null;

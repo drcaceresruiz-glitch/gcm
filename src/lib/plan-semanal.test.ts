@@ -94,9 +94,10 @@ describe("sugerirPorcentaje", () => {
     ).toBe("80.00");
   });
 
-  it("NO DEDUCE si la partida ya llevaba avance y solo hay metrado", () => {
-    // Semanas anteriores aportaron cantidad que aqui no se ve: dividir
-    // contaria dos veces el mismo trabajo.
+  it("deduce aunque la tarea ya llevara avance, si el compromiso es la partida entera", () => {
+    // «45 de 45 m» se mide contra el metrado completo, asi que la cantidad
+    // ejecutada YA es la acumulada. Que la tarea fuera al 30% por un parte
+    // del dia no cambia esa cuenta.
     expect(
       sugerirPorcentaje({
         ...base,
@@ -104,6 +105,21 @@ describe("sugerirPorcentaje", () => {
         cantidadEjec: "45",
         metrado: "45",
         avanceActual: "30.00",
+      }),
+    ).toBe("100.00");
+  });
+
+  it("NUNCA PROPONE UN RETROCESO", () => {
+    // «ejecutado» puede leerse como lo de esta semana o como lo acumulado, y
+    // ningun dato lo resuelve. Se corta por lo seguro: bajar el avance
+    // arrastraria la curva S hacia atras y lo decide una persona.
+    expect(
+      sugerirPorcentaje({
+        ...base,
+        cantidadPlan: "45",
+        cantidadEjec: "18",
+        metrado: "45",
+        avanceActual: "60.00",
       }),
     ).toBeNull();
   });

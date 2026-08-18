@@ -42,6 +42,40 @@ type Fila = FilaCierre;
 /// Lo que llega del servidor, mas las fotos (que no se editan aqui).
 type CompromisoProp = CompromisoDeCierre & { fotos: FotoResumen[] };
 
+/**
+ * Deduce el porcentaje de las filas que ya traen cantidad y lo tienen vacio.
+ *
+ * Sin esto, el calculo solo ocurria al TECLEAR la cantidad, y una semana cuyas
+ * cantidades ya estaban guardadas —el caso normal al volver a la pantalla—
+ * seguia con todos los porcentajes en blanco y sus avisos de «no se registrara
+ * avance fisico». El dato ya estaba; solo faltaba mirarlo.
+ *
+ * Un porcentaje ya escrito no se toca: si esta ahi, alguien lo puso.
+ */
+function conPorcentajeDeducido(
+  filas: Fila[],
+  compromisos: readonly CompromisoProp[],
+): Fila[] {
+  const porId = new Map(compromisos.map((c) => [c.id, c]));
+
+  return filas.map((f) => {
+    if (f.uid === null || f.porcentajeReal.trim() !== "") return f;
+
+    const c = porId.get(f.id);
+    if (!c) return f;
+
+    const sugerido = sugerirPorcentaje({
+      cantidadPlan: f.cantidadPlan,
+      cantidadEjec: f.cantidadEjec,
+      avanceActual: c.avanceActual ?? null,
+      metaPorcentaje: c.metaPorcentaje,
+      metrado: c.metrado ?? null,
+    });
+
+    return sugerido === null ? f : { ...f, porcentajeReal: sugerido };
+  });
+}
+
 export function CierrePlanSemanal({
   obraId,
   planId,
@@ -52,7 +86,7 @@ export function CierrePlanSemanal({
   compromisos: CompromisoProp[];
 }) {
   const [filas, setFilas] = useState<Fila[]>(() =>
-    construirFilasCierre(compromisos),
+    conPorcentajeDeducido(construirFilasCierre(compromisos), compromisos),
   );
 
   /**
