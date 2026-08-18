@@ -233,6 +233,11 @@ export default async function DetallePlanSemanalPage({
             tareas={tareas}
             arrastradas={plan.arrastradas}
             inicial={inicial}
+            // Lo GUARDADO, que no siempre es lo que se ensena: en una semana
+            // autocargada `inicial` son sugerencias que aun no existen.
+            uidsGuardados={plan.compromisos.flatMap((c) =>
+              c.uid === null ? [] : [c.uid],
+            )}
           />
         </Seccion>
       )}

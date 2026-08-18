@@ -84,11 +84,15 @@ export function FormularioPlanSemanal({
   tareas,
   arrastradas,
   inicial,
+  uidsGuardados,
 }: {
   obraId: string;
   planId: string;
   tareas: TareaOpcion[];
   arrastradas: Arrastrada[];
+  /// Los uid COMPROMETIDOS Y GUARDADOS de la semana. No se puede deducir de
+  /// `inicial`, que en una semana nueva son sugerencias sin guardar.
+  uidsGuardados: number[];
   inicial: {
     uid: number | null;
     descripcion: string;
@@ -110,19 +114,20 @@ export function FormularioPlanSemanal({
     })),
   );
   /**
-   * Los uid que YA estaban comprometidos en esta semana al abrir la pantalla.
+   * Los uid que ya estan GUARDADOS en la base para esta semana.
    *
-   * Es la misma cuenta que hace el servidor contra la base, y por eso se fija
-   * al montar y no se recalcula: si se recalculara sobre la lista viva, quitar
-   * una tarea la convertiria en «nueva» en la pantalla mientras el servidor la
-   * sigue viendo guardada.
+   * Tiene que venir del servidor y no deducirse de `inicial`: en una semana
+   * recien creada, `inicial` son las tareas AUTOCARGADAS —sugerencias que
+   * todavia no existen en la base—, asi que darlas por guardadas hacia que la
+   * pantalla no marcara nada y el guardado lo rechazara sin previo aviso.
+   * Salio probando la Semana 2 en produccion.
+   *
+   * Se congela al montar, que es cuando se sabe: si se recalculara sobre la
+   * lista viva, quitar una tarea la convertiria en «nueva» en la pantalla
+   * mientras el servidor la sigue viendo guardada.
    */
   const yaEnLaSemana = useMemo(
-    () =>
-      new Set(
-        inicial.flatMap((c) => (c.uid === null ? [] : [c.uid])),
-      ),
-    // Se congela a proposito: `inicial` es lo que habia al cargar.
+    () => new Set(uidsGuardados),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
