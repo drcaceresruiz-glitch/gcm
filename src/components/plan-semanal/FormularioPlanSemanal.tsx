@@ -418,16 +418,31 @@ export function FormularioPlanSemanal({
                   style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
                 />
               </label>
+              {/* Obligatoria en las tareas del cronograma: es lo que permite
+                  que al cerrar se sepa a que avance equivale haber cumplido.
+                  En las lineas libres no se pide —no hay tarea que avanzar—,
+                  y por eso el aviso rojo solo sale cuando hay uid. */}
               <label className="text-xs opacity-70">
-                meta
+                meta %
                 <input
                   value={it.meta}
                   onChange={(e) => cambiarMeta(it.key, e.target.value)}
                   inputMode="decimal"
-                  placeholder="0-100"
-                  title="Porcentaje de 0 a 100"
-                  className="ml-1 w-16 rounded border px-1.5 py-1 text-xs tabular-nums"
-                  style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+                  placeholder={it.uid !== null ? "obligatorio" : "0-100"}
+                  aria-invalid={it.uid !== null && it.meta.trim() === ""}
+                  title={
+                    it.uid !== null
+                      ? "% ACUMULADO al que prometes llegar al final de la semana. Obligatorio: de aqui sale el avance al cerrar."
+                      : "Porcentaje de 0 a 100"
+                  }
+                  className="ml-1 w-24 rounded border px-1.5 py-1 text-xs tabular-nums"
+                  style={{
+                    borderColor:
+                      it.uid !== null && it.meta.trim() === ""
+                        ? "var(--color-peligro)"
+                        : "var(--borde)",
+                    backgroundColor: "var(--fondo)",
+                  }}
                 />
               </label>
               <button

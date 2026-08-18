@@ -12,6 +12,7 @@ import {
   sugerirCantidad,
   mapaPreservablePorUid,
   validarCantidadPlan,
+  validarMetaPorcentaje,
   uidsDuplicados,
   avisoNumeracionSemana,
   semanasAContramano,
@@ -34,6 +35,36 @@ const dc = (s: string) => new Date(`${s}T00:00:00Z`);
 /// «Ninguna terminada»: el caso base de `tareasDeLaSemana` cuando lo que se
 /// prueba es el recorte por fechas y no el filtro de acabadas.
 const VACIO: ReadonlySet<number> = new Set();
+
+describe("validarMetaPorcentaje", () => {
+  it("LA EXIGE EN LAS TAREAS DEL CRONOGRAMA", () => {
+    // Sin meta, cumplir un compromiso no dice a que porcentaje llego la
+    // tarea: contaba para el PPC sin dejar rastro en la curva S, y la obra se
+    // veia parada mientras el PPC decia que todo iba bien.
+    const r = validarMetaPorcentaje("", true);
+    expect(r.ok).toBe(false);
+  });
+
+  it("NO la exige en las lineas libres", () => {
+    // No apuntan a ninguna tarea, asi que no hay avance fisico que registrar.
+    expect(validarMetaPorcentaje("", false)).toEqual({ ok: true, valor: null });
+    expect(validarMetaPorcentaje(null, false)).toEqual({ ok: true, valor: null });
+  });
+
+  it("normaliza y acepta el rango util", () => {
+    expect(validarMetaPorcentaje("60", true)).toEqual({ ok: true, valor: "60.00" });
+    expect(validarMetaPorcentaje(" 100 ", true)).toEqual({ ok: true, valor: "100.00" });
+  });
+
+  it("rechaza cero, negativos y lo que desborda la columna", () => {
+    // Prometer llegar al 0% no es un compromiso. Y un 1000 desbordaba el
+    // Decimal(5,2) y tumbaba la accion con un 500.
+    expect(validarMetaPorcentaje("0", true).ok).toBe(false);
+    expect(validarMetaPorcentaje("-5", true).ok).toBe(false);
+    expect(validarMetaPorcentaje("1000", true).ok).toBe(false);
+    expect(validarMetaPorcentaje("hola", true).ok).toBe(false);
+  });
+});
 
 describe("sugerirPorcentaje", () => {
   const base = {

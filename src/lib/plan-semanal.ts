@@ -976,6 +976,49 @@ export function mapaPreservablePorUid(
   return mapa;
 }
 
+/**
+ * Valida la meta de un compromiso: el % acumulado al que se promete llegar.
+ *
+ * **Obligatoria en las tareas del cronograma.** Es una regla del usuario, y
+ * cierra el agujero que dejaba el cierre a ciegas: sin meta, cumplir un
+ * compromiso no dice a que porcentaje llego la tarea, el campo «% alcanzado»
+ * se quedaba vacio y el compromiso contaba para el PPC sin dejar rastro en la
+ * curva S. La obra se veia parada mientras el PPC decia que todo iba bien.
+ *
+ * En las lineas LIBRES no se pide: no apuntan a ninguna tarea del cronograma,
+ * asi que no hay avance fisico que registrar. Exigirla ahi seria pedir un dato
+ * que no significa nada.
+ *
+ * Cero no vale como meta: prometer llegar al 0% no es un compromiso.
+ */
+export function validarMetaPorcentaje(
+  texto: string | null | undefined,
+  esTareaDelCronograma: boolean,
+): CantidadValidada {
+  const t = texto?.trim();
+
+  if (!t) {
+    return esTareaDelCronograma
+      ? {
+          ok: false,
+          error:
+            "Falta la meta de alguna tarea. Es el % acumulado al que prometes llegar esta semana, y sin ella el cierre no puede registrar avance.",
+        }
+      : { ok: true, valor: null };
+  }
+
+  const normal = normalizarDecimal(t, 2);
+  const n = normal === null ? NaN : Number(normal);
+  if (!Number.isFinite(n) || n <= 0 || n > 100) {
+    return {
+      ok: false,
+      error: "La meta de cada compromiso es un porcentaje mayor que 0 y hasta 100.",
+    };
+  }
+
+  return { ok: true, valor: normal };
+}
+
 /// Tope de `Decimal(14,4)`: 10 enteros + 4 decimales.
 const CANTIDAD_MAXIMA = 9_999_999_999.9999;
 

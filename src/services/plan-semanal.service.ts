@@ -16,6 +16,7 @@ import {
   sugerirCantidad,
   mapaPreservablePorUid,
   validarCantidadPlan,
+  validarMetaPorcentaje,
   uidsDuplicados,
   avisoNumeracionSemana,
   cumplidosSinAvance,
@@ -823,20 +824,23 @@ export async function guardarCompromisos(
     return { ok: false, error: "La semana esta cerrada. Reabrela para cambiar los compromisos." };
   }
 
-  // La meta es un PORCENTAJE de 0 a 100. Sin este control, un valor como 1000
-  // desbordaba la columna Decimal(5,2) (tope 999.99) y la accion caia con un
-  // 500 que dejaba la pagina en error. Se valida antes de tocar la base.
+  /*
+   * La meta es un PORCENTAJE, y en las tareas del cronograma es OBLIGATORIA.
+   *
+   * Obligatoria porque sin ella el cierre no sabe a que avance equivale haber
+   * cumplido: el «% alcanzado» se quedaba vacio y el compromiso contaba para
+   * el PPC sin dejar rastro en la curva S. La obra se veia parada mientras el
+   * PPC decia que todo iba bien.
+   *
+   * El rango tambien se valida aqui y no solo en la pantalla: un 1000
+   * desbordaba la columna Decimal(5,2) y la accion caia con un 500.
+   */
+  const metas: (string | null)[] = [];
   for (const c of compromisos) {
-    const m = c.metaPorcentaje?.trim();
-    if (m) {
-      const n = Number(m.replace(",", "."));
-      if (!Number.isFinite(n) || n < 0 || n > 100) {
-        return {
-          ok: false,
-          error: "La meta de cada compromiso es un porcentaje entre 0 y 100.",
-        };
-      }
-    }
+    const esTarea = c.uid !== null && c.uid !== undefined;
+    const v = validarMetaPorcentaje(c.metaPorcentaje, esTarea);
+    if (!v.ok) return { ok: false, error: v.error };
+    metas.push(v.valor);
   }
 
   // La cantidad va a un Decimal(14,4): se valida igual que la meta, antes de
@@ -855,10 +859,10 @@ export async function guardarCompromisos(
           ? null
           : c.uid,
       descripcion: c.descripcion.trim().slice(0, 300),
-      metaPorcentaje:
-        c.metaPorcentaje && c.metaPorcentaje.trim()
-          ? normalizarDecimal(c.metaPorcentaje, 2)
-          : null,
+      // Ya normalizada por `validarMetaPorcentaje`: normalizar dos veces con
+      // reglas distintas es como se acaban guardando dos valores para el
+      // mismo campo segun por donde entre.
+      metaPorcentaje: metas[i] ?? null,
       cantidadPlan: cantidades[i],
       unidad: c.unidad?.trim() ? c.unidad.trim().slice(0, 20) : null,
       lookaheadTaskId: c.lookaheadTaskId ?? null,
