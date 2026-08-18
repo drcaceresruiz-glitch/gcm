@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 
 import { HOJA_GASTOS } from "@/lib/excel-meta";
+import { mesesAjustadosAlPlazo } from "@/lib/gastos-contra-plazo";
 
 /**
  * La plantilla del PRESUPUESTO META, generada desde codigo.
@@ -243,17 +244,21 @@ function ajustarMeses(
 ): FilaGasto[] {
   if (mesesObra === null || mesesObra <= 0) return [...filas];
 
-  const plazoEjemplo = Math.max(...filas.map((f) => f.meses ?? 0));
-  if (plazoEjemplo <= 0) return [...filas];
+  // La MISMA regla que corrige la pantalla, no una copia: lo que propone el
+  // Excel y lo que arregla el boton tienen que dar el mismo numero.
+  const ajustes = mesesAjustadosAlPlazo(
+    filas.map((f) => ({
+      concepto: f.concepto,
+      tipo: f.tipo,
+      meses: f.meses?.toFixed(2) ?? null,
+    })),
+    String(mesesObra),
+  );
 
-  return filas.map((f) => {
-    if (f.meses === undefined) return f;
-    const proporcion = f.meses / plazoEjemplo;
-    // Dos decimales, como el resto de los plazos del modulo, y nunca cero:
-    // una linea de cero meses no cuesta nada y desaparece de la suma.
-    const meses = Math.max(0.01, Math.round(mesesObra * proporcion * 100) / 100);
-    return { ...f, meses };
-  });
+  const porIndice = new Map(ajustes.map((a) => [a.indice, Number(a.despues)]));
+  return filas.map((f, i) =>
+    porIndice.has(i) ? { ...f, meses: porIndice.get(i)! } : f,
+  );
 }
 
 /**

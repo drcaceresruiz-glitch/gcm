@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { obtenerSesion } from "@/services/sesion.service";
+import { ajustarMesesAlPlazo } from "@/services/meta-ajuste.service";
 import { puede } from "@/lib/rbac";
 import { analizarExcel } from "@/lib/excel-presupuesto";
 import { analizarGastosGenerales } from "@/lib/excel-meta";
@@ -212,4 +213,35 @@ export async function accionEliminarBorradorMeta(
   revalidatePath(`/obras/${obraId}`);
   revalidatePath(`/obras/${obraId}/meta`);
   redirect(`/obras/${obraId}/meta?eliminada=${resultado.version}`);
+}
+
+export interface EstadoAjuste {
+  error?: string;
+  hecho?: string;
+}
+
+/**
+ * Ajusta los meses de los gastos generales al plazo de la obra.
+ *
+ * Nace de un aviso que no se podia atender: la pantalla decia que cuatro
+ * lineas duraban mas que la obra y obligaba a salir, editar el Excel y volver
+ * a cargarlo entero.
+ */
+export async function accionAjustarMeses(
+  _previo: EstadoAjuste,
+  datos: FormData,
+): Promise<EstadoAjuste> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const metaId = String(datos.get("metaId") ?? "");
+  const obraId = String(datos.get("obraId") ?? "");
+
+  const r = await ajustarMesesAlPlazo(sesion, metaId);
+  if (!r.ok) return { error: r.error };
+
+  revalidatePath(`/obras/${obraId}/meta`);
+  return {
+    hecho: `${r.ajustadas} línea(s) ajustadas: los gastos generales pasan de S/ ${r.antes} a S/ ${r.despues}.`,
+  };
 }

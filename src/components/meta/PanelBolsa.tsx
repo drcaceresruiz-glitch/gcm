@@ -5,6 +5,7 @@ import { fechaCorta } from "@/utils/fechas";
 import { esNegativo, esPositivo } from "@/lib/decimal";
 import { gastosGeneralesInverosimiles } from "@/lib/bolsa";
 import { origenDeEjemplo } from "@/lib/datos-de-ejemplo";
+import { BotonAjustarMeses } from "@/components/meta/BotonAjustarMeses";
 import type { ComparacionMeta } from "@/services/meta.service";
 
 /**
@@ -71,7 +72,13 @@ function Aviso({
   );
 }
 
-export function PanelBolsa({ c }: { c: ComparacionMeta }) {
+export function PanelBolsa({
+  c,
+  obraId,
+}: {
+  c: ComparacionMeta;
+  obraId: string;
+}) {
   const { bolsa, meta, desfase, plazo } = c;
   const negativa = esNegativo(bolsa.bolsaTotal);
   const ggRaros = gastosGeneralesInverosimiles(bolsa);
@@ -212,7 +219,10 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
           . Los meses se escriben a mano en el Excel y nada los ata al plazo
           real, asi que suelen venir de la plantilla sin ajustar. Si es a
           proposito —una fianza que sigue viva tras entregar— dejalo; si no,
-          corrige los meses y vuelve a cargar.
+          corrige los meses y vuelve a cargar. O ajustalos aqui mismo:
+          {!meta.aprobada && (
+            <BotonAjustarMeses obraId={obraId} metaId={meta.id} />
+          )}
         </Aviso>
       )}
 
