@@ -273,6 +273,35 @@ describe("tareasAbiertas", () => {
     expect(r.fuera).toBe(0);
   });
 
+  it("SIN VENTANA OFRECE TODAS LAS PARTIDAS ABIERTAS", () => {
+    // El caso real: la obra no respeta el cronograma. Una cuadrilla que acaba
+    // antes arranca la partida del mes que viene, y con ventana esa partida no
+    // se puede reportar —queda en 0% mientras avanza de verdad—.
+    const r = tareasAbiertas(
+      [t(1), t(2, { inicio: d("2026-11-01") }), t(3, { inicio: d("2027-03-01") })],
+      HOY,
+      null,
+    );
+    expect(r.dentro.map((x) => x.uid)).toEqual([1, 2, 3]);
+    expect(r.fuera).toBe(0);
+  });
+
+  it("sin ventana SIGUE sin ofrecer resumenes, hitos ni terminadas", () => {
+    // Quitar la ventana abre el limite por fecha, no las otras tres puertas:
+    // reportar avance sobre un resumen descuadraria el dinero.
+    const r = tareasAbiertas(
+      [
+        t(1, { esResumen: true, inicio: d("2027-01-01") }),
+        t(2, { esHito: true, inicio: d("2027-01-01") }),
+        t(3, { porcentajeReal: "100.00", inicio: d("2027-01-01") }),
+        t(4, { inicio: d("2027-01-01") }),
+      ],
+      HOY,
+      null,
+    );
+    expect(r.dentro.map((x) => x.uid)).toEqual([4]);
+  });
+
   it("no ofrece resumenes, hitos ni terminadas", () => {
     const r = tareasAbiertas(
       [

@@ -188,11 +188,40 @@ export default async function MetaPage({
           <h2 className="text-lg font-semibold">
             {metas.length === 0 ? "Cargar la meta" : "Nueva versión de la meta"}
           </h2>
-          <p className="mt-1 mb-5 max-w-2xl text-sm text-pretty opacity-70">
+          <p className="mt-1 mb-4 max-w-2xl text-sm text-pretty opacity-70">
             {metas.length === 0
-              ? "Descarga la plantilla, llénala con tus precios reales y vuelve a subirla. Si prefieres, puedes escribirla en cualquier Excel que respete las columnas."
+              ? "Descarga la plantilla, llénala con tus precios reales y vuelve a subirla."
               : "Una versión nueva es la forma de responder a un adicional: el contrato subió y la meta tiene que incluir lo que cuesta construirlo."}
           </p>
+
+          {/* La plantilla, ANTES del formulario y en todas las versiones.
+              Estaba como enlace pequeño al pie y su mención desaparecia desde
+              la v2, asi que quien cargaba una version nueva subia su propio
+              Excel: de ahi salen casi todos los fallos del importador
+              —capitulos sin subtotal, formulas sin resultado calculado, meses
+              que exceden el plazo—, y ninguno da error al subir. */}
+          <div
+            className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4"
+            style={{
+              borderColor: "var(--borde)",
+              backgroundColor: "var(--superficie)",
+            }}
+          >
+            <p className="max-w-xl text-sm text-pretty">
+              <strong>Usa siempre la plantilla.</strong> Trae las dos hojas
+              —«Costo Directo» y «Gastos Generales»—, las fórmulas ya hechas y
+              las celdas que no se tocan bloqueadas, con {mesesSugeridos} mes(es)
+              de gastos generales, que es el plazo de esta obra. Un Excel propio
+              suele colar errores que el importador no puede ver.
+            </p>
+            <a
+              href={`/plantilla-meta?meses=${mesesSugeridos}`}
+              className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: "var(--color-marca-600)" }}
+            >
+              Descargar plantilla
+            </a>
+          </div>
 
           <FormularioMeta
             obraId={id}

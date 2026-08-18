@@ -1474,7 +1474,8 @@ export interface ParteDelDia {
   tareas: number;
   /// Cuantas quedaron fuera por empezar mas alla de la ventana.
   fuera: number;
-  diasVista: number;
+  /// `null` = sin ventana: se ofrecen TODAS las partidas abiertas.
+  diasVista: number | null;
   /// El ultimo dia laborable de esta semana: el dia en que toca cerrar.
   cierraEl: Date;
   /// Dias laborables desde el ultimo reporte de la obra, sea de la tarea que
@@ -1493,7 +1494,7 @@ export interface ParteDelDia {
 export async function obtenerParteDelDia(
   sesion: SesionActiva,
   obraId: string,
-  opciones: { diasVista?: number } = {},
+  opciones: { diasVista?: number | null } = {},
 ): Promise<ParteDelDia | null> {
   if (!puede(sesion, "cronograma:leer")) return null;
 
@@ -1502,7 +1503,8 @@ export async function obtenerParteDelDia(
 
   const calendario = await obtenerCalendario(sesion, obraId);
   const ahora = hoyUtc();
-  const diasVista = opciones.diasVista ?? 7;
+  // `??` no vale: convertiria el `null` de «todas» en la ventana de 7 dias.
+  const diasVista = opciones.diasVista === undefined ? 7 : opciones.diasVista;
 
   const { dentro, fuera } = tareasAbiertas(vigente.tareas, ahora, diasVista);
 

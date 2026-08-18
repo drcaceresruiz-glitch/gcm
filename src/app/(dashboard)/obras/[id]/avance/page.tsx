@@ -14,6 +14,9 @@ export const metadata: Metadata = { title: "Parte del día" };
 /// pantalla, como el Lookahead con sus semanas.
 const DIAS = [7, 14, 30] as const;
 
+/// La opcion sin ventana. Va en la URL como `?dias=todas`.
+const TODAS = "todas";
+
 export default async function AvancePage({
   params,
   searchParams,
@@ -29,8 +32,13 @@ export default async function AvancePage({
   if (!obra) redirect("/panel");
   if (!puede(sesion, "cronograma:leer")) redirect(`/obras/${id}`);
 
-  const pedidos = Number((await searchParams).dias);
-  const diasVista = DIAS.includes(pedidos as (typeof DIAS)[number]) ? pedidos : 7;
+  const pedido = (await searchParams).dias;
+  const diasVista =
+    pedido === TODAS
+      ? null
+      : DIAS.includes(Number(pedido) as (typeof DIAS)[number])
+        ? Number(pedido)
+        : 7;
 
   const parte = await obtenerParteDelDia(sesion, id, { diasVista });
   const puedeReportar = puede(sesion, "avance:registrar");
@@ -88,9 +96,14 @@ export default async function AvancePage({
           {/* Cuando la ventana esconde MAS de lo que ensena, decirlo no basta:
               hay que sugerir el remedio. Con 4 tareas dentro y 50 fuera, la
               pantalla parece decir que la obra tiene cuatro partidas. */}
-          {parte.fuera > parte.tareas && diasVista < 30 && (
+          {parte.fuera > 0 && (
             <span style={{ color: "var(--color-alerta)" }}>
-              La mayoría queda fuera de esta ventana.
+              {parte.fuera > parte.tareas
+                ? "La mayoría queda fuera de esta ventana."
+                : "Hay partidas fuera de esta ventana."}{" "}
+              <Link href={`/obras/${id}/avance?dias=${TODAS}`} className="underline">
+                Ver todas
+              </Link>
             </span>
           )}
           {DIAS.map((d) => (
@@ -106,6 +119,19 @@ export default async function AvancePage({
               {d} días
             </Link>
           ))}
+          {/* Sin esta opcion una partida que arranca fuera de la ventana no se
+              puede reportar aunque la cuadrilla ya la este ejecutando. */}
+          <Link
+            href={`/obras/${id}/avance?dias=${TODAS}`}
+            className="rounded-lg border px-2 py-1 font-medium"
+            style={{
+              borderColor:
+                diasVista === null ? "var(--color-marca-600)" : "var(--borde)",
+              color: diasVista === null ? "var(--color-marca-600)" : undefined,
+            }}
+          >
+            Todas
+          </Link>
         </div>
       </div>
 

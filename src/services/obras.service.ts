@@ -302,12 +302,30 @@ const datosAlertasEmpresa = cache(async function datosAlertasEmpresa(
     );
 
     if (emisores.length > 0 && !algunoVivo) {
+      /**
+       * El latido dice si la APP esta consultando, no si los SMS salen.
+       *
+       * El aviso afirmaba «los codigos de acceso no estan saliendo», que es
+       * una consecuencia que nunca comprobo: Android duerme la aplicacion al
+       * apagar la pantalla —lo dice el propio `lib/emisor-sms`—, asi que el
+       * latido se corta en un telefono que funciona y la alarma salia a
+       * diario siendo falsa.
+       *
+       * Lo que SI se puede comprobar es si hay mensajes esperando: con la
+       * cola vacia, un telefono callado no esta reteniendo nada.
+       */
+      const enCola = await prisma.mensajeSms.count({
+        where: { companyId: sesion.companyId, enviadoAt: null },
+      });
+
       alertas.push({
         obraId: null,
         obraNombre: "Mensajeria de la empresa",
         clave: "emisor-dormido",
         texto:
-          "Ningun telefono emisor esta respondiendo: los codigos de acceso no estan saliendo.",
+          enCola > 0
+            ? `Ningun telefono emisor responde y hay ${enCola} mensaje(s) sin salir.`
+            : "Ningun telefono emisor esta dando señal. No hay mensajes esperando, asi que puede ser solo que la aplicacion este en segundo plano.",
         camino: "/empresa/configuracion",
       });
     }

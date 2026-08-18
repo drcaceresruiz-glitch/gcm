@@ -154,20 +154,26 @@ export interface SeleccionParte<T> {
  * arriba —lo que aun no arranca— y lo que queda fuera se cuenta para poder
  * decirlo en pantalla.
  *
+ * `diasVista === null` quita ese limite por arriba. Hace falta porque la obra
+ * no respeta el cronograma: una cuadrilla que termina antes empieza la partida
+ * de la semana que viene, y con la ventana puesta esa partida no se puede
+ * reportar —queda congelada en 0% mientras avanza de verdad—. La ventana es
+ * una comodidad para no ensenar cien filas, no una regla de negocio.
+ *
  * El orden es el mismo que el del informe: primero lo que peor va.
  */
 export function tareasAbiertas<T extends TareaAbierta>(
   tareas: readonly T[],
   hoy: Date,
-  diasVista = 7,
+  diasVista: number | null = 7,
 ): SeleccionParte<T> {
-  const hasta = hoy.getTime() + diasVista * 86400000;
+  const hasta = diasVista === null ? null : hoy.getTime() + diasVista * 86400000;
   let fuera = 0;
 
   const dentro = tareas.filter((t) => {
     if (t.esResumen || t.esHito) return false;
     if (Number(t.porcentajeReal) >= 100) return false;
-    if (t.inicio.getTime() > hasta) {
+    if (hasta !== null && t.inicio.getTime() > hasta) {
       fuera++;
       return false;
     }
