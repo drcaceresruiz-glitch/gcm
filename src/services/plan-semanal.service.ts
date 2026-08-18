@@ -1698,3 +1698,147 @@ export async function comprometerAlPts(
     return { ok: false, error: "No se pudo comprometer. Vuelve a intentarlo." };
   }
 }
+
+
+// ---------------------------------------------------------------------------
+
+export interface SemanaDeObra {
+  obraId: string;
+  obra: string;
+  planId: string;
+  numero: number;
+  fechaCorte: Date;
+  /// Compromisos del plan abierto que siguen sin evaluar (`cumplido = null`).
+  sinEvaluar: number;
+  total: number;
+  /// El corte ya paso y la semana sigue abierta: habia que cerrarla.
+  vencida: boolean;
+  /**
+   * PPC de la ULTIMA semana ya cerrada de esa obra.
+   *
+   * `null` cuando no se puede saber —no hay semana cerrada, o la habia sin
+   * compromisos—, nunca cero. Es la misma regla que ya fijaron los
+   * indicadores del Lookahead: un cero se lee como «se incumple todo», que es
+   * lo contrario de «no hay dato».
+   */
+  ppcAnterior: number | null;
+}
+
+/**
+ * El estado del ritual semanal en TODA la empresa, para la pagina de inicio.
+ *
+ * Responde la pregunta que el panel no contestaba: **que me toca esta
+ * semana**. Las cifras que ya habia son de dinero y de plazo, y el ritual
+ * —cerrar la semana, evaluar los compromisos— solo se veia entrando obra por
+ * obra.
+ *
+ * Es de empresa a proposito, por el mismo motivo escrito para los avisos del
+ * panel: el plan que se te pasa es justo el de la obra que no estas mirando.
+ *
+ * NO devuelve un PPC agregado de la empresa, y es una decision, no un olvido:
+ * promediar el PPC de una obra con tres compromisos y otra con cuarenta trata
+ * igual dos cosas que no lo son. Cada obra trae el suyo.
+ *
+ * Las obras CERRADAS quedan fuera: en una obra cerrada no hay nada que hacer
+ * esta semana, y si arrastraba un plan sin cerrar seria ruido permanente.
+ */
+export async function semanaDeLaEmpresa(
+  sesion: SesionActiva,
+): Promise<SemanaDeObra[]> {
+  // Sin el permiso no se devuelve nada, igual que `planesAbiertos`: la franja
+  // simplemente no se pinta para quien no sigue el Last Planner.
+  if (!puede(sesion, "plan_semanal:leer")) return [];
+
+  const abiertos = await prisma.planSemanal.findMany({
+    where: {
+      estado: "ABIERTO",
+      project: {
+        companyId: sesion.companyId,
+        estado: { not: "CERRADA" },
+      },
+    },
+    orderBy: { fechaCorte: "asc" },
+    select: {
+      id: true,
+      numero: true,
+      fechaCorte: true,
+      projectId: true,
+      project: { select: { nombreObra: true } },
+      // Solo el booleano de cada compromiso: es lo unico que hace falta para
+      // contar los que faltan por evaluar, y evita traer descripciones,
+      // cantidades y zonas de toda la empresa a la pagina mas visitada.
+      compromisos: { select: { cumplido: true } },
+    },
+  });
+
+  if (abiertos.length === 0) return [];
+
+  const ppcPorObra = await ppcDeLaUltimaCerrada(
+    abiertos.map((p) => p.projectId),
+  );
+
+  const corteDeHoy = hoy();
+
+  return abiertos.map((plan) => ({
+    obraId: plan.projectId,
+    obra: plan.project.nombreObra,
+    planId: plan.id,
+    numero: plan.numero,
+    fechaCorte: plan.fechaCorte,
+    sinEvaluar: plan.compromisos.filter((c) => c.cumplido === null).length,
+    total: plan.compromisos.length,
+    vencida: plan.fechaCorte < corteDeHoy,
+    ppcAnterior: ppcPorObra.get(plan.projectId) ?? null,
+  }));
+}
+
+/**
+ * El PPC de la ultima semana cerrada de cada obra, en dos consultas.
+ *
+ * Se hace en dos pasos y no en una sola porque la ingenua —traer los planes
+ * cerrados de esas obras y quedarse con el ultimo en memoria— arrastra el
+ * historial ENTERO: con un año de obra son cincuenta semanas por obra, con
+ * todos sus compromisos, para acabar usando una de cada cincuenta.
+ *
+ * Primero se pregunta a la base cual es la fecha de corte mas alta de cada
+ * obra, que es un agregado barato, y solo despues se piden esos planes.
+ */
+async function ppcDeLaUltimaCerrada(
+  obraIds: readonly string[],
+): Promise<Map<string, number | null>> {
+  const porObra = new Map<string, number | null>();
+
+  const ultimas = await prisma.planSemanal.groupBy({
+    by: ["projectId"],
+    where: { estado: "CERRADO", projectId: { in: [...obraIds] } },
+    _max: { fechaCorte: true },
+  });
+
+  const pares = ultimas.flatMap((u) =>
+    u._max.fechaCorte
+      ? [{ projectId: u.projectId, fechaCorte: u._max.fechaCorte }]
+      : [],
+  );
+  if (pares.length === 0) return porObra;
+
+  const planes = await prisma.planSemanal.findMany({
+    where: { OR: pares },
+    select: {
+      projectId: true,
+      // `causa` no se usa para calcular el PPC, pero es parte de lo que define
+      // un compromiso ya evaluado y `ppcDePlan` la pide en su tipo. Se trae en
+      // vez de recortar el tipo compartido: cuesta una columna y deja el dato
+      // listo si algun dia el PPC separa los incumplidos por causa.
+      compromisos: { select: { cumplido: true, causa: true } },
+    },
+  });
+
+  for (const plan of planes) {
+    // `ppcDePlan` es el MISMO calculo que la pantalla de la obra, no una copia
+    // aparte: si algun dia cambia que cuenta como cumplido, cambia en los dos
+    // sitios a la vez. Ya devuelve null cuando no hay compromisos.
+    porObra.set(plan.projectId, ppcDePlan(plan.compromisos).ppc);
+  }
+
+  return porObra;
+}

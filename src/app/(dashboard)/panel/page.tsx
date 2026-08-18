@@ -27,10 +27,12 @@ import { FiltrosObras } from "@/components/obras/FiltrosObras";
 import { FranjaObra, type AlertaObra } from "@/components/obras/FranjaObra";
 import { ResumenEmpresaPanel } from "@/components/obras/ResumenEmpresaPanel";
 import { ActividadReciente } from "@/components/obras/ActividadReciente";
+import { FranjaSemana } from "@/components/obras/FranjaSemana";
 // El MISMO menu que dentro de una obra, con otro mapa: un solo vocabulario
 // para los dos niveles del sistema.
 import { MenuObra, type FaseMenu } from "@/components/obras/MenuObra";
 import { preliminaresDeEmpresa } from "@/services/preliminares.service";
+import { semanaDeLaEmpresa } from "@/services/plan-semanal.service";
 import { contarSolicitudesPendientes } from "@/services/perfil.service";
 
 export const metadata: Metadata = { title: "Panel" };
@@ -51,8 +53,15 @@ export default async function PanelPage({
   const filtros = { q: consulta.q, estado: consulta.estado };
   const hayFiltro = Object.values(filtros).some(Boolean);
 
-  const [obras, resumen, alertasEmpresa, actividad, preliminares, solicitudes] =
-    await Promise.all([
+  const [
+    obras,
+    resumen,
+    alertasEmpresa,
+    actividad,
+    preliminares,
+    solicitudes,
+    semanas,
+  ] = await Promise.all([
     listarObras(sesion, {
       pagina: consulta.p,
       // Doce por pagina: con la rejilla de tres columnas son cuatro filas
@@ -69,6 +78,10 @@ export default async function PanelPage({
     listarActividad(sesion),
     preliminaresDeEmpresa(sesion),
     contarSolicitudesPendientes(sesion),
+    // El estado del ritual semanal en TODAS las obras: es de empresa por la
+    // misma razon que las alertas, porque la semana que se pasa es la de la
+    // obra que no estas mirando.
+    semanaDeLaEmpresa(sesion),
   ]);
 
   // El avance fisico se pide DESPUES y solo para las obras de esta pagina:
@@ -218,6 +231,11 @@ export default async function PanelPage({
       {!vacioDeVerdad && (
         <ResumenEmpresaPanel resumen={resumen} alertas={alertasEmpresa} />
       )}
+
+      {/* Que toca ESTA semana, obra por obra. Debajo de las cifras porque
+          responde a otra pregunta: no como va la obra, sino que hay que
+          hacer. Se pinta sola solo si hay algun plan abierto. */}
+      {!vacioDeVerdad && <FranjaSemana semanas={semanas} />}
 
       {/* El titulo que antes encabezaba la pagina entera, ahora al frente de
           lo suyo: la lista. El buscador no se pinta con la empresa vacia; no
