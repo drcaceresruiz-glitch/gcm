@@ -135,6 +135,16 @@ export default async function PanelPage({
       // las obras, que es a lo que se entra a diario.
       plegable: true,
       secciones: [
+        /// Solo para quien ve TODA la cartera: es la misma puerta que usa el
+        /// servicio (`obrasAsignadas === null`), y no un permiso nuevo. A
+        /// quien lleva una obra, un resumen de las demas no le dice nada que
+        /// pueda usar. Va la PRIMERA porque es la lectura de arriba.
+        sesion.obrasAsignadas === null && {
+          clave: "gerencia",
+          titulo: "Gerencia",
+          pregunta: "cómo va la cartera",
+          href: "/gerencia",
+        },
         puede(sesion, "proveedor:leer") && {
           clave: "contratistas",
           titulo: "Contratistas",
