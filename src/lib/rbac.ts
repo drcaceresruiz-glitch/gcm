@@ -390,7 +390,3 @@ export interface ConPermisos {
 export function puede(sujeto: ConPermisos, permiso: Permiso): boolean {
   return sujeto.permisos.includes(permiso);
 }
-
-export function puedeTodos(sujeto: ConPermisos, permisos: Permiso[]): boolean {
-  return permisos.every((p) => puede(sujeto, p));
-}
