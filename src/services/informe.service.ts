@@ -19,6 +19,7 @@ import {
 } from "@/lib/control-avance";
 import { puede } from "@/lib/rbac";
 import type { SesionActiva } from "./sesion.service";
+import { fotosDeTareas, type FotoResumen } from "./evidencia.service";
 
 /**
  * El informe de obra a una fecha, compuesto una sola vez.
@@ -54,6 +55,8 @@ export interface InformeCompuesto {
   capitulos: Capitulo[];
   alertas: AlertaAtraso[];
   activas: PartidaActiva[];
+  /// Fotos de cada partida activa, por su uid. Vacio = sin fotos.
+  fotosPorUid: Record<number, FotoResumen[]>;
   lastPlanner: LastPlannerAlCorte | null;
   generadoPor: string;
   /// Las fechas que el selector puede ofrecer. Solo la pantalla las usa.
@@ -96,6 +99,19 @@ export async function componerInforme(
 
   const lastPlanner = await lastPlannerAlCorte(sesion, obraId, informe.fechaCorte);
 
+  // Las fotos de las tareas que salen en el informe. Es lo que da el valor
+  // agregado que se pidio: el reporte deja de ser solo cifras y ensena lo que
+  // se hizo. Se piden por los uids de las partidas activas —las que el informe
+  // destaca— en una consulta, sin dia: todo el historial de cada una.
+  const activas = partidasActivas(informe.tareas, informe.fechaCorte);
+  const fotos = await fotosDeTareas(
+    sesion,
+    obraId,
+    activas.map((p) => p.uid),
+  );
+  const fotosPorUid: Record<number, FotoResumen[]> = {};
+  for (const [uid, lista] of fotos) fotosPorUid[uid] = lista;
+
   return {
     estado: "ok",
     datos: {
@@ -114,7 +130,8 @@ export async function componerInforme(
       curva,
       capitulos: agruparPorCapitulo(informe.tareas),
       alertas: alertasDeAtraso(informe.tareas, informe.fechaCorte),
-      activas: partidasActivas(informe.tareas, informe.fechaCorte),
+      activas,
+      fotosPorUid,
       lastPlanner,
       generadoPor: `${sesion.nombres} ${sesion.apellidos}`.trim(),
       cortes: informe.cortes,

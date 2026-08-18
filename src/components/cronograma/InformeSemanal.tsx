@@ -16,6 +16,8 @@ import {
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 import { fechaCorta, fechaEje, fechaLarga } from "@/utils/fechas";
 import { decimal } from "@/utils/formato";
+import { GaleriaEvidencia } from "@/components/evidencia/GaleriaEvidencia";
+import type { FotoResumen } from "@/services/evidencia.service";
 
 /**
  * El informe semanal de obra, en una pagina.
@@ -61,6 +63,9 @@ export interface DatosInforme {
   capitulos: Capitulo[];
   alertas: AlertaAtraso[];
   activas: PartidaActiva[];
+  /// Fotos de cada partida activa, por su uid. Es lo que convierte el informe
+  /// de cifras en algo que ensena lo que se hizo.
+  fotosPorUid: Record<number, FotoResumen[]>;
   /// Null cuando quien mira no tiene permiso de plan semanal: el informe sale
   /// igual, sin ese bloque, en vez de fallar entero.
   lastPlanner: DatosLastPlanner | null;
@@ -276,11 +281,12 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
                 <th scope="col" className="pb-1 text-left font-normal opacity-60">Fechas</th>
                 <th scope="col" className="pb-1 text-right font-normal opacity-60">% Plan</th>
                 <th scope="col" className="pb-1 text-right font-normal opacity-60">% Real</th>
+                <th scope="col" className="pb-1 text-left font-normal opacity-60">Fotos</th>
               </tr>
             </thead>
             <tbody>
               {datos.activas.slice(0, 10).map((p) => (
-                <tr key={p.uid} className="border-b" style={{ borderColor: "var(--borde)" }}>
+                <tr key={p.uid} className="border-b align-top" style={{ borderColor: "var(--borde)" }}>
                   <td className="py-1.5 tabular-nums opacity-50">{p.fila}</td>
                   <td className="py-1.5 pr-3">
                     {p.codigo && <span className="mr-1">{p.codigo}</span>}
@@ -302,6 +308,15 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
                     }}
                   >
                     {decimal(p.porcentajeReal, "")}%
+                  </td>
+                  <td className="py-1.5">
+                    {/* Miniaturas pequenas: el informe se imprime, y a size-20
+                        una fila con fotos rompe la maqueta. `GaleriaEvidencia`
+                        se calla solo si la partida no tiene ninguna. */}
+                    <GaleriaEvidencia
+                      fotos={datos.fotosPorUid[p.uid] ?? []}
+                      tamano="size-12"
+                    />
                   </td>
                 </tr>
               ))}
