@@ -113,6 +113,12 @@ export interface FilaParte {
   /// mismo «sin restricciones» que «sin analizar».
   diasSinReportar: number | null;
   esCritico: boolean;
+  /// Se esta ejecutando sin que ninguna semana abierta la comprometiera. No
+  /// impide reportar: senala que el PPC de esa semana no cubre este trabajo.
+  sinComprometer: boolean;
+  /// Restricciones suyas sin levantar. Avanzar con ellas abiertas es la
+  /// definicion de trabajo no confiable en el Last Planner.
+  restriccionesAbiertas: number;
 }
 
 export interface GrupoParte {
@@ -195,6 +201,24 @@ export interface TareaDelParte {
 }
 
 /**
+ * Lo que el plan sabe de una tarea que se esta reportando.
+ *
+ * El parte del dia registra la REALIDAD y nunca la discute: si la cuadrilla
+ * avanzo, avanzo. Pero el Last Planner se sostiene sobre que lo ejecutado sea
+ * lo prometido, y sin esta comparacion el PPC puede marcar 90% mientras la
+ * obra entera avanza por fuera del plan. Un PPC alto sobre trabajo que nadie
+ * comprometio no mide confiabilidad: mide cuantas casillas se marcaron.
+ *
+ * Por eso se ensena, no se impide.
+ */
+export interface SenalDelPlan {
+  /// Ninguna semana ABIERTA la tiene comprometida.
+  sinComprometer: boolean;
+  /// Cuantas restricciones suyas siguen sin levantar.
+  restriccionesAbiertas: number;
+}
+
+/**
  * Las filas del parte, ya agrupadas por capitulo y en el orden en que se
  * reportan.
  *
@@ -208,6 +232,7 @@ export function filasDelParte(
   ultimoReportePorUid: ReadonlyMap<number, Date>,
   hoy: Date,
   calendario: readonly DiaLaboral[],
+  senales: ReadonlyMap<number, SenalDelPlan> = new Map(),
 ): GrupoParte[] {
   const grupos = new Map<string, FilaParte[]>();
 
@@ -225,6 +250,10 @@ export function filasDelParte(
       diasSinReportar:
         ultimo === null ? null : diasSinReportar(ultimo, hoy, calendario),
       esCritico: t.esCritico,
+      // Sin mapa de senales —obra que no usa Last Planner— no se marca nada:
+      // un aviso que sale en todas las filas no avisa de nada.
+      sinComprometer: senales.get(t.uid)?.sinComprometer ?? false,
+      restriccionesAbiertas: senales.get(t.uid)?.restriccionesAbiertas ?? 0,
     };
 
     grupos.set(capitulo, [...(grupos.get(capitulo) ?? []), fila]);

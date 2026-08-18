@@ -168,6 +168,43 @@ describe("filasDelParte", () => {
     [3, "ACABADOS"],
   ]);
 
+  it("marca lo que se ejecuta fuera del plan, sin impedirlo", () => {
+    // El PPC sale de los compromisos; si la obra avanza por fuera, un PPC del
+    // 90% describe una semana que no ocurrio. La fila se ofrece IGUAL: el
+    // parte registra la realidad, no la discute.
+    const grupos = filasDelParte(
+      [tarea(1), tarea(2)],
+      capitulos,
+      new Map(),
+      HOY,
+      [],
+      new Map([
+        [1, { sinComprometer: true, restriccionesAbiertas: 2 }],
+        [2, { sinComprometer: false, restriccionesAbiertas: 0 }],
+      ]),
+    );
+    const todas = grupos.flatMap((g) => g.filas);
+    expect(todas).toHaveLength(2);
+    expect(todas.find((f) => f.uid === 1)).toMatchObject({
+      sinComprometer: true,
+      restriccionesAbiertas: 2,
+    });
+    expect(todas.find((f) => f.uid === 2)).toMatchObject({
+      sinComprometer: false,
+      restriccionesAbiertas: 0,
+    });
+  });
+
+  it("sin mapa de senales no marca nada", () => {
+    // Una obra que no usa Last Planner no tiene compromisos, y marcar TODAS
+    // las filas como «sin comprometer» seria un aviso que no avisa.
+    const grupos = filasDelParte([tarea(1)], capitulos, new Map(), HOY, []);
+    expect(grupos[0]!.filas[0]).toMatchObject({
+      sinComprometer: false,
+      restriccionesAbiertas: 0,
+    });
+  });
+
   it("agrupa por capitulo y conserva el orden que le llega", () => {
     // `partidasActivas` ya ordena por desfase, lo mas atrasado primero: quien
     // rellena de arriba abajo empieza por lo que peor va.

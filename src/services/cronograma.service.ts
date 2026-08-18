@@ -17,6 +17,7 @@ import {
   validarLoteAvance,
   type EntradaParte,
   type GrupoParte,
+  type SenalDelPlan,
 } from "@/lib/parte-diario";
 import { capituloDeCadaTarea } from "@/lib/control-avance";
 import { obtenerCalendario } from "@/services/calendario.service";
@@ -1541,6 +1542,49 @@ export async function obtenerParteDelDia(
     if (nombre) capituloPorUid.set(uid, nombre);
   }
 
+  /*
+   * Que dice el plan de cada tarea que se va a reportar.
+   *
+   * Solo se compara si la obra USA Last Planner: sin ninguna semana abierta,
+   * «sin comprometer» saldria en todas las filas y un aviso que sale siempre
+   * deja de leerse. Las restricciones, en cambio, se miran siempre: una
+   * restriccion abierta lo es haya plan semanal o no.
+   */
+  const planesAbiertos = await prisma.planSemanal.findMany({
+    where: { projectId: obraId, estado: "ABIERTO" },
+    select: { id: true },
+  });
+
+  const comprometidos = new Set<number>();
+  if (planesAbiertos.length > 0) {
+    const filas = await prisma.compromisoSemanal.findMany({
+      where: {
+        planSemanalId: { in: planesAbiertos.map((p) => p.id) },
+        uid: { not: null },
+      },
+      select: { uid: true },
+    });
+    for (const f of filas) if (f.uid !== null) comprometidos.add(f.uid);
+  }
+
+  // Se cuentan aqui y no con `_count` para no depender de un filtro dentro de
+  // un agregado: son pocas filas y la cuenta en memoria no miente.
+  const conRestriccion = await prisma.lookaheadTask.findMany({
+    where: { projectId: obraId, restricciones: { some: { resuelta: false } } },
+    select: { uid: true, restricciones: { where: { resuelta: false }, select: { id: true } } },
+  });
+  const abiertasPorUid = new Map(
+    conRestriccion.map((t) => [t.uid, t.restricciones.length]),
+  );
+
+  const senales = new Map<number, SenalDelPlan>();
+  for (const t of dentro) {
+    senales.set(t.uid, {
+      sinComprometer: planesAbiertos.length > 0 && !comprometidos.has(t.uid),
+      restriccionesAbiertas: abiertasPorUid.get(t.uid) ?? 0,
+    });
+  }
+
   const ultimoReporte = new Map<number, Date>();
   for (const t of vigente.tareas) {
     if (t.avance) ultimoReporte.set(t.uid, t.avance.fecha);
@@ -1550,7 +1594,14 @@ export async function obtenerParteDelDia(
   const ultimoDeTodos = fechas.length > 0 ? new Date(Math.max(...fechas)) : null;
 
   return {
-    grupos: filasDelParte(dentro, capituloPorUid, ultimoReporte, ahora, calendario),
+    grupos: filasDelParte(
+      dentro,
+      capituloPorUid,
+      ultimoReporte,
+      ahora,
+      calendario,
+      senales,
+    ),
     tareas: dentro.length,
     fuera,
     diasVista,

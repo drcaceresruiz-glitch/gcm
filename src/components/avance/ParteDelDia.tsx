@@ -64,12 +64,20 @@ export function ParteDelDia({
   /// empezar cuando la lista es larga.
   const resumen = useMemo(() => {
     const filas = grupos.flatMap((g) => g.filas);
+    // Lo que se esta a punto de reportar FUERA del plan: se cuenta sobre lo
+    // escrito, no sobre la lista entera. Que la obra tenga diez partidas sin
+    // comprometer no importa mientras nadie reporte avance en ellas; lo que
+    // hay que ver es que de las tres que estas mandando, dos no las prometio
+    // nadie. Ahi es donde el PPC de la semana deja de significar algo.
+    const conValor = filas.filter((f) => (escritos[f.uid] ?? "").trim() !== "");
     return {
       total: filas.length,
       nunca: filas.filter((f) => f.diasSinReportar === null).length,
       atrasadas: filas.filter((f) => Number(f.desfase) < 0).length,
+      fueraDePlan: conValor.filter((f) => f.sinComprometer).length,
+      conRestriccion: conValor.filter((f) => f.restriccionesAbiertas > 0).length,
     };
-  }, [grupos]);
+  }, [grupos, escritos]);
 
   function alTeclear(e: React.KeyboardEvent<HTMLInputElement>, uid: number) {
     if (e.key !== "Enter") return;
@@ -117,6 +125,15 @@ export function ParteDelDia({
           {resumen.nunca > 0 && ` · ${resumen.nunca} sin reportar nunca`}
           {resumen.atrasadas > 0 && ` · ${resumen.atrasadas} por detrás del plan`}
         </p>
+        {(resumen.fueraDePlan > 0 || resumen.conRestriccion > 0) && (
+          <p className="text-xs" style={{ color: "var(--color-alerta)" }}>
+            {resumen.fueraDePlan > 0 &&
+              `${resumen.fueraDePlan} de las que estás reportando no las comprometió nadie esta semana.`}
+            {resumen.fueraDePlan > 0 && resumen.conRestriccion > 0 && " "}
+            {resumen.conRestriccion > 0 &&
+              `${resumen.conRestriccion} avanza(n) con restricciones sin levantar.`}
+          </p>
+        )}
 
         <button
           type="submit"
@@ -258,6 +275,37 @@ function Capitulo({
                   }}
                 >
                   crítica
+                </span>
+              )}
+              {/* El parte NUNCA discute la realidad: si la cuadrilla avanzo,
+                  avanzo. Pero si nadie lo comprometio, el PPC de esa semana
+                  no cubre este trabajo, y un PPC que no cubre lo que se hace
+                  no mide confiabilidad. Se ensena; no se impide. */}
+              {f.sinComprometer && (
+                <span
+                  className="ml-2 rounded px-1 text-[10px] font-medium"
+                  style={{
+                    color: "var(--color-alerta)",
+                    backgroundColor:
+                      "color-mix(in srgb, var(--color-alerta) 12%, transparent)",
+                  }}
+                  title="Ninguna semana abierta la comprometió: avanza fuera del plan y el PPC no la cuenta."
+                >
+                  sin comprometer
+                </span>
+              )}
+              {f.restriccionesAbiertas > 0 && (
+                <span
+                  className="ml-2 rounded px-1 text-[10px] font-medium"
+                  style={{
+                    color: "var(--color-peligro)",
+                    backgroundColor:
+                      "color-mix(in srgb, var(--color-peligro) 12%, transparent)",
+                  }}
+                  title="Tiene restricciones sin levantar en el Lookahead."
+                >
+                  {f.restriccionesAbiertas} restricción
+                  {f.restriccionesAbiertas === 1 ? "" : "es"}
                 </span>
               )}
             </td>
