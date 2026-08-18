@@ -12,6 +12,8 @@ import { NuevaFila } from "@/components/partidas/NuevaFila";
 import { PanelPresupuesto } from "@/components/partidas/PanelPresupuesto";
 import { Mascota } from "@/components/ui/Mascota";
 import { PanelAyuda, type PuntoAyuda } from "@/components/ui/PanelAyuda";
+import { FisicoVsEconomico } from "@/components/partidas/FisicoVsEconomico";
+import { cruceDeObra } from "@/services/fisico-economico.service";
 
 export const metadata: Metadata = { title: "Presupuesto de la obra" };
 
@@ -67,6 +69,7 @@ export default async function ObraPage({
   if (!obra) notFound();
 
   const { filas, totalPartidas, montoTotal } = await listarPartidas(sesion, id);
+  const cruce = await cruceDeObra(sesion, id);
   const { importadas } = await searchParams;
   const puedeImportar = puede(sesion, "partida:importar");
   const puedeCrear = puede(sesion, "partida:crear");
@@ -232,6 +235,12 @@ export default async function ObraPage({
             renderizaba nadie. Va aqui porque es donde se elige modalidad. */}
         {filas.length > 0 && <Explicacion texto={MODALIDAD_PARTIDA} />}
       </section>
+
+      {/* Va DEBAJO del presupuesto y no arriba: primero se lee cuanto cuesta
+          la obra, y solo despues tiene sentido preguntar cuanto de eso se ha
+          ejecutado y cuanto se ha comprometido. Se pinta solo cuando hay algo
+          que comparar; el propio componente se calla si no. */}
+      {cruce && <FisicoVsEconomico cruce={cruce} />}
     </div>
   );
 }
