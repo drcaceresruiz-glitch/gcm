@@ -27,6 +27,11 @@ import { FiltrosObras } from "@/components/obras/FiltrosObras";
 import { FranjaObra, type AlertaObra } from "@/components/obras/FranjaObra";
 import { ResumenEmpresaPanel } from "@/components/obras/ResumenEmpresaPanel";
 import { ActividadReciente } from "@/components/obras/ActividadReciente";
+// El MISMO menu que dentro de una obra, con otro mapa: un solo vocabulario
+// para los dos niveles del sistema.
+import { MenuObra, type FaseMenu } from "@/components/obras/MenuObra";
+import { preliminaresDeEmpresa } from "@/services/preliminares.service";
+import { contarSolicitudesPendientes } from "@/services/perfil.service";
 
 export const metadata: Metadata = { title: "Panel" };
 
@@ -46,7 +51,8 @@ export default async function PanelPage({
   const filtros = { q: consulta.q, estado: consulta.estado };
   const hayFiltro = Object.values(filtros).some(Boolean);
 
-  const [obras, resumen, alertasEmpresa, actividad] = await Promise.all([
+  const [obras, resumen, alertasEmpresa, actividad, preliminares, solicitudes] =
+    await Promise.all([
     listarObras(sesion, {
       pagina: consulta.p,
       // Doce por pagina: con la rejilla de tres columnas son cuatro filas
@@ -61,6 +67,8 @@ export default async function PanelPage({
     obtenerResumenEmpresa(sesion),
     listarAlertasEmpresa(sesion),
     listarActividad(sesion),
+    preliminaresDeEmpresa(sesion),
+    contarSolicitudesPendientes(sesion),
   ]);
 
   // El avance fisico se pide DESPUES y solo para las obras de esta pagina:
@@ -73,12 +81,127 @@ export default async function PanelPage({
 
   const puedeCrear = puede(sesion, "obra:crear");
 
+  /**
+   * El mapa de la CONSTRUCTORA, igual que el de la obra tiene el suyo.
+   *
+   * Se reusa `MenuObra` a proposito, con su mismo vocabulario —titulo, la
+   * pregunta que responde, y la marca de hecho—. Escribir un lateral paralelo
+   * habria obligado a aprender dos mapas del mismo territorio, que es
+   * exactamente el error que ya se corrigio dentro de la obra el 12/08.
+   *
+   * Lo que hay aqui vivia SOLO en el desplegable «Empresa» de la cabecera, que
+   * su propio codigo admite que llego a siete entradas seguidas y hubo que
+   * agrupar. Un desplegable esconde; un lateral enseña que existe.
+   *
+   * LAS MARCAS DE HECHO SE APAGAN SOLAS. Mientras la constructora esta a medio
+   * cargar, el menu es ademas la guia de puesta en marcha; cuando ya esta todo,
+   * `preliminares.completo` las quita y vuelve a ser navegacion a secas. Una
+   * fila de checks verdes permanente es ruido.
+   */
+  const marca = (hecho: boolean) => (preliminares.completo ? undefined : hecho);
+
+  const mapaEmpresa: FaseMenu[] = [
+    {
+      clave: "trabajo",
+      secciones: [
+        {
+          clave: "obras",
+          titulo: "Obras",
+          pregunta: "dónde se construye",
+          href: "/panel",
+          soloExacto: true,
+          hecho: marca(preliminares.obras),
+        },
+      ],
+    },
+    {
+      clave: "empresa",
+      titulo: "Mi constructora",
+      secciones: [
+        puede(sesion, "proveedor:leer") && {
+          clave: "contratistas",
+          titulo: "Contratistas",
+          pregunta: "quién ejecuta",
+          href: "/empresa/proveedores",
+          hecho: marca(preliminares.contratistas),
+        },
+        puede(sesion, "usuario:leer") && {
+          clave: "personas",
+          titulo: "Personas",
+          pregunta: "quién trabaja",
+          href: "/empresa/usuarios",
+          hecho: marca(preliminares.equipo),
+          // Las solicitudes de cambio de perfil esperan a alguien: es trabajo
+          // pendiente, no un hito, y por eso va de insignia y no de check.
+          pendientes:
+            solicitudes > 0 ? { cuantos: solicitudes, critico: false } : null,
+        },
+        puede(sesion, "permiso:leer") && {
+          clave: "permisos",
+          titulo: "Permisos",
+          pregunta: "quién puede qué",
+          href: "/empresa/permisos",
+        },
+        puede(sesion, "empresa:leer") && {
+          clave: "datos",
+          titulo: "Datos y logo",
+          pregunta: "cómo te ven fuera",
+          href: "/empresa/datos",
+          hecho: marca(preliminares.logo),
+        },
+        puede(sesion, "orden:leer") && {
+          clave: "formas-pago",
+          titulo: "Formas de pago",
+          pregunta: "cómo se paga",
+          href: "/empresa/formas-pago",
+        },
+        puede(sesion, "configuracion:editar") && {
+          clave: "configuracion",
+          titulo: "Configuración",
+          pregunta: "avisos y SMS",
+          href: "/empresa/configuracion",
+        },
+        puede(sesion, "obra:restaurar") && {
+          clave: "archivo",
+          titulo: "Archivo",
+          pregunta: "lo que ya terminó",
+          href: "/empresa/archivo",
+        },
+      ].filter(Boolean) as FaseMenu["secciones"],
+    },
+    // Quien opera GCM, no quien lo usa. Va al final y en su propio grupo
+    // porque esta POR ENCIMA de la empresa, no dentro de ella.
+    ...(sesion.esOperador
+      ? [
+          {
+            clave: "gcm",
+            titulo: "GCM",
+            secciones: [
+              {
+                clave: "constructoras",
+                titulo: "Constructoras",
+                pregunta: "quién usa GCM",
+                href: "/operador",
+              },
+            ],
+          },
+        ]
+      : []),
+  ].filter((f) => f.secciones.length > 0);
+
   // Sin filtros, «no hay obras» significa que la empresa esta vacia; con
   // filtros solo significa que ninguna coincide. Son dos pantallas distintas.
   const vacioDeVerdad = obras.total === 0 && !hayFiltro;
 
   return (
-    <div className="space-y-6">
+    // La misma rejilla que dentro de una obra —lateral fijo a la izquierda y
+    // el contenido a la derecha—, para que el sistema se comporte igual en
+    // los dos niveles. En pantalla estrecha se apila y el lateral queda
+    // arriba: en un movil no hay dos columnas que valgan.
+    <div className="space-y-4 lg:grid lg:grid-cols-[210px_minmax(0,1fr)] lg:gap-8 lg:space-y-0">
+      <MenuObra fases={mapaEmpresa} />
+
+      <div className="space-y-6">
       {/* El saludo con el «siguiente paso» encabeza el panel: contesta «qué
           tengo que mirar hoy» antes de ensenar nada mas. El titulo «Obras»
           baja a encabezar su propia lista, mas abajo. */}
@@ -364,6 +487,7 @@ export default async function PanelPage({
       {/* Debajo de las obras y no encima: contesta a «que ha pasado» cuando
           ya se ha visto «como va», que es el orden en que se mira un panel. */}
       <ActividadReciente entradas={actividad} />
+      </div>
     </div>
   );
 }
