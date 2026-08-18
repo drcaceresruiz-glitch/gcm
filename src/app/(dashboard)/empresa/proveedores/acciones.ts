@@ -148,3 +148,57 @@ export async function accionImportarProveedores(
   revalidatePath("/empresa/proveedores");
   return { resumen: r.resumen };
 }
+
+/**
+ * Alta de proveedor SIN salir de donde estabas.
+ *
+ * Existe aparte de `accionGuardarProveedor` por una razon concreta: aquella
+ * termina en `redirect`, y un redirect desde el formulario de un encargo se
+ * llevaria por delante el frente que se estaba armando —las partidas
+ * marcadas, las fracciones, el monto—. Esta devuelve el proveedor creado para
+ * que quien la llamo lo meta en su desplegable y siga.
+ *
+ * Pide los mismos minimos que el alta normal (razon social y RUC) y pasa por
+ * el MISMO `crearProveedor`, asi que hereda su validacion, su comprobacion de
+ * RUC repetido —con el nombre de quien lo tiene— y su apunte en auditoria. No
+ * es una puerta trasera: es la misma puerta sin el redirect.
+ */
+export type AltaRapida =
+  | { ok: true; proveedor: { id: string; razonSocial: string; ruc: string } }
+  | { ok: false; error: string };
+
+export async function accionCrearProveedorEnLinea(datos: {
+  ruc: string;
+  razonSocial: string;
+  rol: string;
+  contactoNombre?: string;
+  contactoTelefono?: string;
+  email?: string;
+}): Promise<AltaRapida> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const campos: DatosProveedor = {
+    razonSocial: datos.razonSocial.trim(),
+    ruc: datos.ruc.trim(),
+    contactoNombre: datos.contactoNombre?.trim() ?? "",
+    contactoTelefono: datos.contactoTelefono?.trim() ?? "",
+    email: datos.email?.trim() ?? "",
+    rol: datos.rol,
+  };
+
+  const resultado = await crearProveedor(sesion, campos);
+  if (!resultado.ok) return { ok: false, error: resultado.error };
+
+  // El catalogo de empresa tambien lo tiene que ver, no solo esta pantalla.
+  revalidatePath("/empresa/proveedores");
+
+  return {
+    ok: true,
+    proveedor: {
+      id: resultado.id,
+      razonSocial: campos.razonSocial,
+      ruc: campos.ruc,
+    },
+  };
+}

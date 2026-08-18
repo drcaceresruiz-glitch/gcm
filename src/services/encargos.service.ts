@@ -402,8 +402,15 @@ async function fechasDelCronograma(
   // Acotado por empresa, no solo por obra. Lo caz  la prueba de aislamiento y
   // tenia razon: un `projectId` es adivinable, y aunque de aqui solo salgan
   // fechas, la regla de la casa es que NINGUNA consulta se fie del id suelto.
+  // EL VIGENTE ES EL MAS RECIENTE, no una fila marcada: `Cronograma` no tiene
+  // columna `vigente` y nunca la tuvo. Esto decia `vigente: true` y Prisma
+  // rechazaba la consulta ENTERA por argumento desconocido, asi que la
+  // pantalla de nuevo encargo caia con 500 siempre —no en un caso raro—.
+  // Se elige como en todo el resto del codigo: corte mas nuevo, y a igualdad
+  // de corte la version mas alta.
   const cronograma = await prisma.cronograma.findFirst({
-    where: { projectId: obraId, vigente: true, project: { companyId } },
+    where: { projectId: obraId, project: { companyId } },
+    orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
     select: { id: true },
   });
   if (!cronograma) return salida;

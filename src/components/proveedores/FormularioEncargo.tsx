@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, Plus, ExternalLink, Layers } from "lucide-react";
+import { Search, Plus, UserPlus, Layers } from "lucide-react";
 import type {
   PartidaAsignable,
   CapituloAsignable,
@@ -13,6 +13,7 @@ import {
   accionCrearEncargo,
   accionEditarEncargo,
 } from "@/app/(dashboard)/obras/[id]/proveedores/acciones";
+import { AltaRapidaProveedor } from "@/components/proveedores/AltaRapidaProveedor";
 
 export interface ProveedorOpcion {
   id: string;
@@ -61,6 +62,13 @@ export function FormularioEncargo({
   const [error, setError] = useState<string | null>(null);
 
   const [proveedorId, setProveedorId] = useState(inicial?.proveedorId ?? "");
+
+  /// La lista del desplegable es ESTADO, no la prop a secas: al dar de alta
+  /// uno aqui mismo hay que poder anadirlo sin recargar la pagina, que es
+  /// justo lo que borraria el frente a medio armar.
+  const [lista, setLista] = useState<ProveedorOpcion[]>(proveedores);
+  const [alta, setAlta] = useState(false);
+
   const [descripcion, setDescripcion] = useState(inicial?.descripcion ?? "");
   const [monto, setMonto] = useState(inicial?.montoContratado ?? "");
   const [fechaInicio, setFechaInicio] = useState(inicial?.fechaInicio ?? "");
@@ -243,22 +251,48 @@ export function FormularioEncargo({
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
           >
             <option value="">— Elige un proveedor —</option>
-            {proveedores.map((p) => (
+            {lista.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.razonSocial} · {p.ruc}
               </option>
             ))}
           </select>
-          <Link
-            href="/empresa/proveedores"
-            target="_blank"
+          {/* Antes esto era un enlace a otra pestaña, y el problema no era el
+              clic: este formulario vive en estado de cliente, asi que al
+              volver habia que recargar para ver al proveedor nuevo en el
+              desplegable —y recargar borra las partidas marcadas, sus
+              fracciones y el monto—. Ahora se crea aqui y no se pierde nada. */}
+          <button
+            type="button"
+            onClick={() => setAlta((v) => !v)}
+            aria-expanded={alta}
             className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm"
-            style={{ borderColor: "var(--borde)" }}
+            style={{
+              borderColor: alta ? "var(--color-marca-600)" : "var(--borde)",
+              color: alta ? "var(--color-marca-600)" : undefined,
+            }}
           >
-            <ExternalLink className="size-3.5" aria-hidden="true" />
-            Crear proveedor
-          </Link>
+            <UserPlus className="size-3.5" aria-hidden="true" />
+            Nuevo contratista
+          </button>
         </div>
+
+        {alta && (
+          <AltaRapidaProveedor
+            onCerrar={() => setAlta(false)}
+            onCreado={(p) => {
+              // Se mete en la lista Y se elige: crear uno y tener que buscarlo
+              // luego en el desplegable seria dejar el trabajo a medias.
+              setLista((previa) =>
+                [...previa, p].sort((a, b) =>
+                  a.razonSocial.localeCompare(b.razonSocial, "es"),
+                ),
+              );
+              setProveedorId(p.id);
+              setAlta(false);
+            }}
+          />
+        )}
       </div>
 
       {/* El atajo del caso habitual: el frente ES un capitulo. Elegirlo
