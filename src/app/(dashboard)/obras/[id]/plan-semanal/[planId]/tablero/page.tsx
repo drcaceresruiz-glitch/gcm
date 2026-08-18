@@ -11,8 +11,11 @@ import { PublicarEtiqueta } from "@/components/navegacion/PublicarEtiqueta";
 import { Rejilla } from "@/components/tablero-semanal/Rejilla";
 import {
   ColocarTarjetas,
-  lineasDelTablero,
 } from "@/components/tablero-semanal/ColocarTarjetas";
+// De `lib` y NO del componente: aquel es `"use client"` y llamar a una de sus
+// funciones desde esta pagina —que es de servidor— es justo lo que tenia rota
+// esta pantalla.
+import { lineasDelTablero } from "@/lib/tablero-semanal";
 
 export const metadata: Metadata = { title: "Tablero semanal" };
 

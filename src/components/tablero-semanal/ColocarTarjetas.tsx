@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { AlertCircle, LoaderCircle, Save } from "lucide-react";
 
-import { PALETA_TABLERO, type Tablero } from "@/lib/tablero-semanal";
+import { PALETA_TABLERO, type LineaTablero as Linea } from "@/lib/tablero-semanal";
 import {
   accionColocarTarjetas,
   type EstadoTablero,
@@ -54,15 +54,7 @@ function Guardar() {
   );
 }
 
-interface Linea {
-  id: string;
-  descripcion: string;
-  proveedorId: string | null;
-  color: string | null;
-  diaInicio: number | null;
-  diaFin: number | null;
-  zona: string | null;
-}
+
 
 export function ColocarTarjetas({
   obraId,
@@ -194,26 +186,9 @@ export function ColocarTarjetas({
   );
 }
 
-/** Las lineas del formulario, sacadas del tablero ya construido. */
-export function lineasDelTablero(tablero: Tablero): Linea[] {
-  return tablero.filas.flatMap((f) => [
-    ...f.tarjetas.map((t) => ({
-      id: t.id,
-      descripcion: t.descripcion,
-      proveedorId: t.proveedorId,
-      color: t.color,
-      diaInicio: t.diaInicio,
-      diaFin: t.diaFin,
-      zona: t.zona,
-    })),
-    ...f.sinDia.map((t) => ({
-      id: t.id,
-      descripcion: t.descripcion,
-      proveedorId: t.proveedorId,
-      color: t.color,
-      diaInicio: t.diaInicio,
-      diaFin: t.diaFin,
-      zona: t.zona,
-    })),
-  ]);
-}
+// `lineasDelTablero` vivia AQUI y la llamaba la pagina, que es de servidor.
+// React lo prohibe —«Attempted to call lineasDelTablero() from the server but
+// lineasDelTablero is on the client»— y la pantalla del tablero semanal
+// llevaba rota quien sabe cuanto: respondia 200 con la cabecera pintada y sin
+// tablero. Se mudo a `lib/tablero-semanal`, que es de donde ya salian
+// `Tablero` y `PALETA_TABLERO` y no tiene lado.

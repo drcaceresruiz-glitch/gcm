@@ -237,3 +237,52 @@ export function textoSobre(hex: string | null): "claro" | "oscuro" {
 
   return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? "oscuro" : "claro";
 }
+
+/** Una tarjeta tal como la edita el formulario de colocacion. */
+export interface LineaTablero {
+  id: string;
+  descripcion: string;
+  proveedorId: string | null;
+  color: string | null;
+  diaInicio: number | null;
+  diaFin: number | null;
+  zona: string | null;
+}
+
+/**
+ * Las lineas del formulario, sacadas del tablero ya construido.
+ *
+ * VIVE AQUI Y NO EN EL COMPONENTE, y no es colocacion: estaba exportada desde
+ * `ColocarTarjetas.tsx`, que empieza por `"use client"`, y la llamaba la
+ * PAGINA, que es de servidor. React lo prohibe —«Attempted to call
+ * lineasDelTablero() from the server but lineasDelTablero is on the client»—
+ * y la pantalla del tablero semanal respondia con 200, la cabecera pintada y
+ * el tablero ausente.
+ *
+ * Lo encontro la prueba de humo (`scripts/humo.ts`) en su primera pasada de
+ * verdad. Ni el typecheck ni las pruebas lo veian: es una regla de React que
+ * solo se comprueba al ejecutar.
+ *
+ * La regla que se deriva: la logica pura no se exporta desde un archivo con
+ * `"use client"`. Aunque la funcion no toque el navegador, la directiva marca
+ * el MODULO entero, y quien la importe desde el servidor se lleva el error.
+ */
+export function lineasDelTablero(tablero: Tablero): LineaTablero[] {
+  // Se tipa por la FORMA y no por `Tarjeta`: las colocadas y las que estan
+  // sin dia no son el mismo tipo —aquellas llevan ademas `desde` y `hasta`—
+  // y lo unico que hace falta de ambas son estos siete campos.
+  const deTarjeta = (t: LineaTablero) => ({
+    id: t.id,
+    descripcion: t.descripcion,
+    proveedorId: t.proveedorId,
+    color: t.color,
+    diaInicio: t.diaInicio,
+    diaFin: t.diaFin,
+    zona: t.zona,
+  });
+
+  return tablero.filas.flatMap((f) => [
+    ...f.tarjetas.map(deTarjeta),
+    ...f.sinDia.map(deTarjeta),
+  ]);
+}
