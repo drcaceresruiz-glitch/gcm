@@ -3,6 +3,7 @@ import { AlertTriangle, CalendarClock, Info, Lock } from "lucide-react";
 import { soles } from "@/utils/formato";
 import { fechaCorta } from "@/utils/fechas";
 import { esNegativo, esPositivo } from "@/lib/decimal";
+import { gastosGeneralesInverosimiles } from "@/lib/bolsa";
 import type { ComparacionMeta } from "@/services/meta.service";
 
 /**
@@ -72,6 +73,7 @@ function Aviso({
 export function PanelBolsa({ c }: { c: ComparacionMeta }) {
   const { bolsa, meta, desfase, plazo } = c;
   const negativa = esNegativo(bolsa.bolsaTotal);
+  const ggRaros = gastosGeneralesInverosimiles(bolsa);
 
   return (
     <section className="space-y-5">
@@ -99,14 +101,28 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
         style={{ borderColor: "var(--borde)" }}
       >
         <Fila
-          etiqueta="Presupuesto contractual vigente"
-          nota="lo que paga el cliente"
+          etiqueta="Costo directo contractual"
+          nota="las partidas del contrato, sin gastos generales"
           valor={bolsa.costoDirectoContractual}
         />
         <Fila
-          etiqueta="Presupuesto meta"
-          nota="lo que nos comprometemos a gastar"
+          etiqueta="Costo directo meta"
+          nota="lo que planeamos gastar en esas partidas"
           valor={bolsa.costoDirectoMeta}
+        />
+
+        {/* Las dos cifras de las que sale la bolsa de plazo. Se pintan
+            aunque cuadren: una resta cuyos operandos no se ven por ninguna
+            parte es un numero que solo se puede creer o no. */}
+        <Fila
+          etiqueta="Gastos generales del contrato"
+          nota="los que el contrato reconoce"
+          valor={bolsa.gastosGeneralesContractual}
+        />
+        <Fila
+          etiqueta="Gastos generales de la meta"
+          nota="los que presupuestamos sostener"
+          valor={bolsa.gastosGeneralesMeta}
         />
 
         <div
@@ -123,7 +139,7 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
         />
         <Fila
           etiqueta="Bolsa de plazo"
-          nota="solo existe si se termina antes"
+          nota="gastos generales del contrato menos los de la meta"
           valor={bolsa.bolsaPlazo}
           sangrado
         />
@@ -161,6 +177,20 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
           />
         </div>
       </div>
+
+      {ggRaros && (
+        <Aviso
+          tono="peligro"
+          icono={AlertTriangle}
+          titulo="Revisa los gastos generales de la meta: superan a su costo directo"
+        >
+          Son {soles(bolsa.gastosGeneralesMeta)} contra{" "}
+          {soles(bolsa.costoDirectoMeta)} de costo directo. En una obra suelen
+          ser una fraccion de el, asi que casi siempre es una fila mal cargada
+          —un monto mensual multiplicado por un plazo equivocado—. Mientras
+          este asi, la bolsa de plazo y la bolsa operativa no significan nada.
+        </Aviso>
+      )}
 
       {esPositivo(bolsa.contractualSinMeta) && (
         <Aviso

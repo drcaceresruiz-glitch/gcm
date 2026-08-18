@@ -388,3 +388,36 @@ export function resumenGastosGenerales(
     invalidas: totales.length - validos.length,
   };
 }
+
+
+/**
+ * Los gastos generales de la meta son inverosimiles.
+ *
+ * En una obra, los gastos generales son una fraccion del costo directo —del
+ * orden del 8 % al 20 %—. Que SUPEREN al costo directo no es una obra cara:
+ * es una lista mal cargada, casi siempre por multiplicar un monto mensual por
+ * un numero de meses equivocado (`totalDeGasto` hace `mensual x meses`, y un
+ * plazo en dias donde iban meses infla el total treinta veces).
+ *
+ * Existe porque la `bolsaPlazo` se calcula contra esa cifra sin mirarla, y un
+ * gasto general disparado sale por pantalla como una bolsa operativa
+ * negativa enorme, indistinguible de una obra que de verdad va a perder
+ * dinero. La diferencia importa: una se arregla corrigiendo una fila, la otra
+ * cambiando como se construye.
+ *
+ * NO se bloquea nada por esto: es un aviso. Puede haber casos raros
+ * —una obra casi toda de supervision— y el sistema no esta para decidir por
+ * el jefe de obra.
+ */
+export function gastosGeneralesInverosimiles(datos: {
+  gastosGeneralesMeta: string;
+  costoDirectoMeta: string;
+}): boolean {
+  // Con costo directo cero no hay proporcion que juzgar: una meta a medio
+  // cargar no tiene por que gritar.
+  if (!esPositivo(datos.costoDirectoMeta)) return false;
+
+  return esPositivo(
+    restar(datos.gastosGeneralesMeta, datos.costoDirectoMeta) ?? "0.00",
+  );
+}
