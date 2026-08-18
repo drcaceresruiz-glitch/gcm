@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { Plus, Trash2, LoaderCircle, History } from "lucide-react";
 import { accionGuardarCompromisos } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
 import { ETIQUETA_CNC } from "@/lib/plan-semanal";
@@ -26,15 +26,6 @@ interface Item {
   /// Trazabilidad al Lookahead. Viaja de ida y vuelta para no perderse al
   /// guardar (planificar REEMPLAZA la semana entera).
   lookaheadTaskId: string | null;
-  /**
-   * Si ya estaba guardado en la semana al abrir la pantalla.
-   *
-   * Decide si se le exige meta: la regla es para lo que se compromete de
-   * ahora en adelante, y una semana en marcha no se queda bloqueada por una
-   * regla que llego despues. El servidor lo comprueba por su cuenta contra la
-   * base; esto solo evita ensenar un rojo que alli no se va a exigir.
-   */
-  yaGuardado: boolean;
 }
 
 /**
@@ -42,11 +33,19 @@ interface Item {
  *
  * Solo a las tareas del cronograma —una linea libre no tiene avance que
  * registrar— y solo a las NUEVAS: la regla es para lo que se compromete de
- * ahora en adelante. El servidor decide lo mismo por su cuenta contra la base;
- * esto evita ensenar un rojo que alli no se va a exigir.
+ * ahora en adelante.
+ *
+ * «Nueva» se decide POR UID contra lo que ya estaba en la semana, que es
+ * exactamente lo que mira el servidor. Con la comprobacion anterior —si esta
+ * fila concreta venia de la lista inicial— quitar una tarea y volver a
+ * anadirla la pintaba de rojo, pero el servidor la aceptaba porque en la base
+ * seguia estando. Una pantalla que exige algo que el servidor no exige ensena
+ * a ignorar sus avisos.
  */
-function faltaMeta(it: Item): boolean {
-  return it.uid !== null && !it.yaGuardado && it.meta.trim() === "";
+function faltaMeta(it: Item, yaEnLaSemana: ReadonlySet<number>): boolean {
+  return (
+    it.uid !== null && !yaEnLaSemana.has(it.uid) && it.meta.trim() === ""
+  );
 }
 
 interface TareaOpcion {
@@ -108,10 +107,26 @@ export function FormularioPlanSemanal({
       cantidad: c.cantidadPlan ?? "",
       unidad: c.unidad ?? "",
       lookaheadTaskId: c.lookaheadTaskId,
-      // Vino de la base: la regla de la meta no le aplica.
-      yaGuardado: true,
     })),
   );
+  /**
+   * Los uid que YA estaban comprometidos en esta semana al abrir la pantalla.
+   *
+   * Es la misma cuenta que hace el servidor contra la base, y por eso se fija
+   * al montar y no se recalcula: si se recalculara sobre la lista viva, quitar
+   * una tarea la convertiria en «nueva» en la pantalla mientras el servidor la
+   * sigue viendo guardada.
+   */
+  const yaEnLaSemana = useMemo(
+    () =>
+      new Set(
+        inicial.flatMap((c) => (c.uid === null ? [] : [c.uid])),
+      ),
+    // Se congela a proposito: `inicial` es lo que habia al cargar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   const [uidSel, setUidSel] = useState("");
   const [libre, setLibre] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -142,7 +157,6 @@ export function FormularioPlanSemanal({
         cantidad: t.cantidadSugerida ?? "",
         unidad: t.unidadSugerida ?? "",
         lookaheadTaskId: null,
-        yaGuardado: false,
       },
     ]);
     setUidSel("");
@@ -162,7 +176,6 @@ export function FormularioPlanSemanal({
         cantidad: "",
         unidad: "",
         lookaheadTaskId: null,
-        yaGuardado: false,
       },
     ]);
     setLibre("");
@@ -228,7 +241,6 @@ export function FormularioPlanSemanal({
         cantidad: a.cantidadPlan ?? "",
         unidad: a.unidad ?? "",
         lookaheadTaskId: null,
-        yaGuardado: false,
       },
     ]);
     setOk(false);
@@ -454,8 +466,8 @@ export function FormularioPlanSemanal({
                   value={it.meta}
                   onChange={(e) => cambiarMeta(it.key, e.target.value)}
                   inputMode="decimal"
-                  placeholder={faltaMeta(it) ? "obligatorio" : "0-100"}
-                  aria-invalid={faltaMeta(it)}
+                  placeholder={faltaMeta(it, yaEnLaSemana) ? "obligatorio" : "0-100"}
+                  aria-invalid={faltaMeta(it, yaEnLaSemana)}
                   title={
                     it.uid !== null
                       ? "% ACUMULADO al que prometes llegar al final de la semana. De aqui sale el avance al cerrar: sin meta, cumplir no dice a que porcentaje llego la tarea."
@@ -463,7 +475,7 @@ export function FormularioPlanSemanal({
                   }
                   className="ml-1 w-24 rounded border px-1.5 py-1 text-xs tabular-nums"
                   style={{
-                    borderColor: faltaMeta(it)
+                    borderColor: faltaMeta(it, yaEnLaSemana)
                       ? "var(--color-peligro)"
                       : "var(--borde)",
                     backgroundColor: "var(--fondo)",
