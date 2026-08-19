@@ -114,7 +114,7 @@ export async function eliminarObraCerrada(
 
   // Se leen ANTES de borrar: despues, las filas ya no estan para decir donde
   // vivian los archivos.
-  const [fotos, fotosGaleria] = await Promise.all([
+  const [fotos, fotosGaleria, comprobantes] = await Promise.all([
     prisma.fotoEvidencia.findMany({
       where: { projectId: obraId },
       select: { ruta: true },
@@ -122,6 +122,9 @@ export async function eliminarObraCerrada(
     prisma.fotoGaleria.findMany({
       where: { projectId: obraId },
       select: { ruta: true },
+    }),
+    prisma.comprobantePago.count({
+      where: { pago: { encargo: { projectId: obraId } } },
     }),
   ]);
 
@@ -138,6 +141,21 @@ export async function eliminarObraCerrada(
   }
   if (fotosGaleria.length > 0) {
     await rm(join(env.STORAGE_ROOT, "galeria", obraId), {
+      recursive: true,
+      force: true,
+    }).catch(() => {});
+  }
+  /**
+   * Las constancias de pago.
+   *
+   * Hasta ahora se quedaban en el disco despues de borrar la obra: no era
+   * perdida de datos —al reves— pero si documentos financieros de un
+   * contratista sobreviviendo a un borrado que el administrador dio por
+   * completo. Ahora que viajan en el zip se pueden limpiar, y la puerta de
+   * arriba garantiza que el respaldo las llevaba.
+   */
+  if (comprobantes > 0) {
+    await rm(join(env.STORAGE_ROOT, "pagos", obraId), {
       recursive: true,
       force: true,
     }).catch(() => {});
@@ -182,13 +200,19 @@ async function respaldoUtilizable(obraId: string) {
   // Cuentan las de evidencia Y las de galeria: `conFotos` dice que las fotos
   // de la obra viajaron en el zip, vengan de donde vengan.
   if (!respaldo.conFotos) {
-    const [evidencia, galeria] = await Promise.all([
+    const [evidencia, galeria, comprobantes] = await Promise.all([
       prisma.fotoEvidencia.count({
         where: { projectId: obraId, purgadaAt: null },
       }),
       prisma.fotoGaleria.count({ where: { projectId: obraId } }),
+      // Las constancias de pago cuentan igual desde que viajan en el zip. Un
+      // respaldo anterior a eso NO autoriza a borrar una obra que las tenga:
+      // se llevaria del disco los PDF que prueban lo que se pago.
+      prisma.comprobantePago.count({
+        where: { pago: { encargo: { projectId: obraId } } },
+      }),
     ]);
-    if (evidencia > 0 || galeria > 0) return null;
+    if (evidencia > 0 || galeria > 0 || comprobantes > 0) return null;
   }
 
   return respaldo;

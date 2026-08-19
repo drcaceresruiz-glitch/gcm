@@ -56,6 +56,15 @@ interface LecturaObra {
   /// Las de la galeria van aparte de las de evidencia: viajan en su propia
   /// carpeta del zip y el manifiesto las declara por separado.
   fotosGaleria: FilaJson[];
+  /**
+   * Las constancias de pago (PDF o imagen).
+   *
+   * En su propia carpeta y no con la evidencia, por lo mismo que estan en su
+   * propia tabla: la evidencia se ensena en la galeria, y la galeria tiene un
+   * enlace que ve el CLIENTE. Que en el zip vayan mezcladas invitaria a
+   * volverlas a mezclar al restaurarlas.
+   */
+  comprobantes: FilaJson[];
   hashDatos: string;
 }
 
@@ -181,6 +190,23 @@ export async function generarRespaldoDeObra(
   );
   manifiesto.contenido.galeria = conGaleria > 0 ? "incluida" : "omitida";
 
+  /**
+   * Las constancias de pago.
+   *
+   * Viajan por lo mismo que la evidencia, pero pesa mas: sin ellas, el zip
+   * dice cuanto se le pago a cada contratista y NO puede demostrarlo. La
+   * constancia es justo lo que se busca en la discusion de seis meses
+   * despues, que es la razon por la que GCM la pide en el momento del pago.
+   */
+  const conComprobantes = await adjuntarFotos(
+    zip,
+    lectura.comprobantes,
+    manifiesto.entradas,
+    "comprobantes",
+  );
+  manifiesto.contenido.comprobantes =
+    conComprobantes > 0 ? "incluida" : "omitida";
+
   const manifiestoJson = canonicalizar(manifiesto);
   const firma = firmar(
     manifiestoJson,
@@ -207,10 +233,12 @@ export async function generarRespaldoDeObra(
           conteos: Object.fromEntries(
             lectura.tablas.map((t) => [t.tabla, t.filas]),
           ),
-          // "Las fotos de la obra viajaron", vengan de la evidencia o de la
-          // galeria: es la condicion que el borrado comprueba antes de
-          // llevarse los archivos del disco.
-          conFotos: conFotos > 0 || conGaleria > 0,
+          // "Los archivos de la obra viajaron", vengan de la evidencia, de la
+          // galeria o de las constancias de pago: es la condicion que el
+          // borrado comprueba antes de llevarse los archivos del disco.
+          // Los comprobantes cuentan aqui desde que viajan; si no, el borrado
+          // se creeria autorizado a tirar un PDF que el zip no llevaba.
+          conFotos: conFotos > 0 || conGaleria > 0 || conComprobantes > 0,
         },
       })
       .catch(() => {
@@ -252,6 +280,7 @@ async function leerLaObra(obraId: string): Promise<LecturaObra> {
   const tablas: { tabla: string; filas: number }[] = [];
   let fotos: FilaJson[] = [];
   let fotosGaleria: FilaJson[] = [];
+  let comprobantes: FilaJson[] = [];
 
   for (const [indice, tabla] of TABLAS.entries()) {
     const delegado = (prisma as unknown as Record<string, DelegadoLectura>)[
@@ -265,6 +294,7 @@ async function leerLaObra(obraId: string): Promise<LecturaObra> {
 
     if (tabla.tabla === "fotos_evidencia") fotos = filas;
     if (tabla.tabla === "fotos_galeria") fotosGaleria = filas;
+    if (tabla.tabla === "comprobantes_pago") comprobantes = filas;
 
     // NDJSON: una fila por linea. Permite leer un respaldo grande sin meter
     // todo el archivo en memoria, y que un `diff` senale la fila que cambio.
@@ -286,6 +316,7 @@ async function leerLaObra(obraId: string): Promise<LecturaObra> {
     tablas,
     fotos,
     fotosGaleria,
+    comprobantes,
     // Una sola huella de TODOS los datos: es la que ata el apunte de
     // `respaldos_obra` con el archivo que el usuario tiene en su disco.
     hashDatos: sha256Hex(datos.map((d) => d.sha256).join("")),
@@ -312,7 +343,7 @@ async function adjuntarFotos(
   zip: Archiver,
   fotos: FilaJson[],
   entradas: EntradaZip[],
-  carpeta: "evidencia" | "galeria",
+  carpeta: "evidencia" | "galeria" | "comprobantes",
 ): Promise<number> {
   let puestas = 0;
 

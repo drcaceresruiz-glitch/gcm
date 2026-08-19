@@ -51,6 +51,15 @@ export interface Manifiesto {
     /// porque los respaldos anteriores a la galeria no traen la clave, y el
     /// manifiesto tiene que poder leerlos igual.
     galeria?: "incluida" | "omitida";
+    /**
+     * Las constancias de pago (PDF o imagen).
+     *
+     * Opcional por lo mismo que `galeria`: los respaldos emitidos antes de que
+     * los comprobantes viajaran no traen la clave, y siguen siendo validos —
+     * solo que sin ellas—. Ausente NO significa "omitida": significa que ese
+     * archivo es de antes y no se sabe.
+     */
+    comprobantes?: "incluida" | "omitida";
   };
   tablas: { tabla: string; filas: number }[];
   entradas: EntradaZip[];
