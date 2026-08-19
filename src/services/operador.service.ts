@@ -267,6 +267,166 @@ export async function listarConstructoras(
   }));
 }
 
+export interface ConstructoraDetalle extends ConstructoraResumen {
+  direccion: string | null;
+  telefono: string | null;
+  email: string | null;
+  /// Congelada por una migracion en curso. No es lo mismo que suspendida, y la
+  /// ficha las ensena por separado porque se arreglan de forma distinta.
+  enMigracionAt: Date | null;
+}
+
+/**
+ * Una constructora por dentro… hasta donde llega el operador.
+ *
+ * SIGUE SIN ENTRAR EN SUS DATOS: aqui hay identificacion, contacto y
+ * contadores, y ni un nombre de obra ni un usuario con nombre y apellido. La
+ * regla de `listarConstructoras` vale igual con un `id` delante, y es
+ * exactamente aqui donde alguien la romperia "solo para ver quien es el
+ * admin".
+ */
+export async function detalleConstructora(
+  sesion: SesionActiva,
+  empresaId: string,
+): Promise<ConstructoraDetalle | null> {
+  if (!sesion.esOperador) return null;
+
+  const e = await prisma.company.findUnique({
+    where: { id: empresaId },
+    select: {
+      id: true,
+      razonSocial: true,
+      ruc: true,
+      direccion: true,
+      telefono: true,
+      email: true,
+      activa: true,
+      enMigracionAt: true,
+      createdAt: true,
+      _count: { select: { users: true, projects: true } },
+    },
+  });
+  if (!e) return null;
+
+  return {
+    id: e.id,
+    razonSocial: e.razonSocial,
+    ruc: e.ruc,
+    direccion: e.direccion,
+    telefono: e.telefono,
+    email: e.email,
+    activa: e.activa,
+    enMigracionAt: e.enMigracionAt,
+    createdAt: e.createdAt,
+    usuarios: e._count.users,
+    obras: e._count.projects,
+    esLaPropia: e.id === sesion.companyId,
+  };
+}
+
+export type ResultadoEdicion = { ok: true } | { ok: false; error: string };
+
+/**
+ * Corrige los datos de una constructora desde el area del operador.
+ *
+ * POR QUE EXISTE, si la empresa ya edita lo suyo en `/empresa`: cuando un alta
+ * se teclea mal —un RUC cambiado, la razon social a medias— el cliente puede
+ * quedarse sin poder arreglarlo, y hasta hoy la unica salida era borrarla y
+ * volver a crearla, que ni siquiera es posible. Es un arreglo de operador, no
+ * una via para administrar al cliente.
+ *
+ * Valida con `validarAltaEmpresa` a proposito: son los mismos cinco campos con
+ * los mismos limites, y tener dos validaciones distintas para la misma fila es
+ * como se llega a que el alta rechace lo que la edicion acepta.
+ *
+ * NO se toca una empresa congelada: si hay una migracion en curso, sus datos
+ * estan viajando a otra instalacion y cambiarlos a media exportacion deja las
+ * dos copias diciendo cosas distintas.
+ */
+export async function editarConstructora(
+  sesion: SesionActiva,
+  empresaId: string,
+  datos: DatosAltaEmpresa,
+): Promise<ResultadoEdicion> {
+  if (!sesion.esOperador) {
+    return { ok: false, error: "Esta accion es solo para quien opera GCM." };
+  }
+
+  const validacion = validarAltaEmpresa(datos);
+  if (!validacion.ok) return { ok: false, error: validacion.error };
+
+  const antes = await prisma.company.findUnique({
+    where: { id: empresaId },
+    select: {
+      razonSocial: true,
+      ruc: true,
+      direccion: true,
+      telefono: true,
+      email: true,
+      enMigracionAt: true,
+    },
+  });
+  if (!antes) return { ok: false, error: "Constructora no encontrada." };
+
+  if (antes.enMigracionAt !== null) {
+    return {
+      ok: false,
+      error:
+        "Esa constructora esta congelada por una migracion. Terminala o descongelala antes de editarla.",
+    };
+  }
+
+  const d = validacion.datos;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.company.update({ where: { id: empresaId }, data: d });
+
+      // La auditoria guarda el ANTES y el DESPUES: corregir un RUC es tocar
+      // como se identifica a una empresa en documentos ya emitidos, y sin el
+      // valor anterior nadie podria reconstruir a que apuntaban.
+      await tx.auditLog.create({
+        data: {
+          companyId: empresaId,
+          userId: sesion.userId,
+          entidad: "Company",
+          entidadId: empresaId,
+          accion: "UPDATE",
+          antes: {
+            razonSocial: antes.razonSocial,
+            ruc: antes.ruc,
+            direccion: antes.direccion ?? "",
+            telefono: antes.telefono ?? "",
+            email: antes.email ?? "",
+          },
+          despues: {
+            evento: "editar_constructora",
+            razonSocial: d.razonSocial,
+            ruc: d.ruc,
+            direccion: d.direccion ?? "",
+            telefono: d.telefono ?? "",
+            email: d.email ?? "",
+          },
+        },
+      });
+    });
+  } catch (e) {
+    // El RUC es unico en TODO GCM. Se dice claro —es un dato publico de SUNAT—
+    // igual que en el alta, y se lee el codigo de la base con la misma forma
+    // que `falloDeAlta` para no arrastrar aqui el espacio de nombres de Prisma.
+    const codigo =
+      typeof e === "object" && e !== null && "code" in e
+        ? String((e as { code: unknown }).code)
+        : "";
+    if (codigo === "P2002") {
+      return { ok: false, error: "Ya existe otra constructora con ese RUC." };
+    }
+    return { ok: false, error: "No se pudo guardar. Vuelve a intentarlo." };
+  }
+
+  return { ok: true };
+}
+
 export type ResultadoSuspension = { ok: true } | { ok: false; error: string };
 
 /**

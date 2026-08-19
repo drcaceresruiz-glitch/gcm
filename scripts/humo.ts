@@ -105,8 +105,9 @@ function descubrirRutas(): { patron: string; grupo: string }[] {
 
 /** Un id de verdad para cada tramo dinamico, sacado de la base. */
 async function idsReales(): Promise<Record<string, string | null>> {
-  const [obra, proveedor, encargo, plan, orden, galeria] = await Promise.all([
+  const [obra, empresa, proveedor, encargo, plan, orden, galeria] = await Promise.all([
     prisma.project.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
+    prisma.company.findFirst({ select: { id: true }, orderBy: { createdAt: "asc" } }),
     prisma.proveedor.findFirst({ select: { id: true } }),
     prisma.encargoProveedor.findFirst({ select: { id: true } }),
     prisma.planSemanal.findFirst({ select: { id: true } }),
@@ -117,6 +118,10 @@ async function idsReales(): Promise<Record<string, string | null>> {
   return {
     "[id]": obra?.id ?? null,
     "[obraId]": obra?.id ?? null,
+    // La ficha del operador. Va con nombre propio y NO como `[id]`, que aqui
+    // significa obra: con el id equivocado la pantalla contestaria 404 —una
+    // respuesta, no una averia— y se quedaria sin ejercitar en silencio.
+    "[empresaId]": empresa?.id ?? null,
     "[proveedorId]": proveedor?.id ?? null,
     "[encargoId]": encargo?.id ?? null,
     "[planId]": plan?.id ?? null,

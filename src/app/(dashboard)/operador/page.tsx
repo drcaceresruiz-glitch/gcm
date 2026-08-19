@@ -16,8 +16,12 @@ export const metadata: Metadata = { title: "Constructoras" };
  * Las constructoras clientes de GCM.
  *
  * Solo METADATOS: cuantos usuarios y cuantas obras tiene cada una, y si esta
- * activa. Ninguna celda enlaza a su contenido, y no hay pantalla de detalle:
- * quien opera GCM da de alta y suspende, no entra en los datos de nadie.
+ * activa. Ninguna celda enlaza a su CONTENIDO: quien opera GCM da de alta,
+ * corrige la identificacion y suspende, pero no entra en los datos de nadie.
+ *
+ * Desde el 19/08/2026 la razon social lleva a su ficha (`/operador/[id]`), que
+ * es la misma promesa con un id delante: identificacion, contacto y
+ * contadores. Ni una obra, ni un usuario con nombre.
  *
  * SIN «Volver» hasta ahora, igual que Avisos y por el mismo motivo: se llega
  * desde el boton «Constructoras» de la cabecera, que esta en cualquier
@@ -101,7 +105,12 @@ export default async function OperadorPage() {
                   style={{ borderColor: "var(--borde)" }}
                 >
                   <td className="px-3 py-2 font-medium">
-                    {c.razonSocial}
+                    <Link
+                      href={`/operador/${c.id}`}
+                      className="underline decoration-transparent underline-offset-2 hover:decoration-inherit"
+                    >
+                      {c.razonSocial}
+                    </Link>
                     {c.esLaPropia && (
                       <span className="ml-2 text-xs opacity-60">tu empresa</span>
                     )}

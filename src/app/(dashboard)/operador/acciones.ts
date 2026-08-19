@@ -6,10 +6,13 @@ import { obtenerSesion } from "@/services/sesion.service";
 import {
   altaConstructora,
   alternarConstructora,
+  editarConstructora,
   type DatosAltaConstructora,
   type ResultadoAlta,
+  type ResultadoEdicion,
   type ResultadoSuspension,
 } from "@/services/operador.service";
+import type { DatosAltaEmpresa } from "@/lib/empresas";
 import { consultarRuc, type ConsultaRuc } from "@/services/sunat.service";
 
 /**
@@ -30,6 +33,22 @@ export async function accionAltaConstructora(
 
   const r = await altaConstructora(sesion, datos);
   if (r.ok) revalidatePath("/operador");
+  return r;
+}
+
+export async function accionEditarConstructora(
+  empresaId: string,
+  datos: DatosAltaEmpresa,
+): Promise<ResultadoEdicion> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await editarConstructora(sesion, empresaId, datos);
+  // Las dos pantallas: la ficha y el listado, que ensena razon social y RUC.
+  if (r.ok) {
+    revalidatePath("/operador");
+    revalidatePath(`/operador/${empresaId}`);
+  }
   return r;
 }
 
