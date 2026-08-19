@@ -304,7 +304,13 @@ function Acciones({
           </button>
         )}
 
-        {puedeGestionar && encargo.estado !== "ANULADO" && (
+        {/* Anular es decir «esto nunca fue»: con avance reconocido no se
+            ofrece siquiera. El servicio lo rechaza igual —ahi esta la regla—,
+            pero un boton que siempre falla invita a probar, y la salida
+            (Cerrar) ya esta ahi al lado. */}
+        {puedeGestionar &&
+          encargo.estado !== "ANULADO" &&
+          !encargo.ultimaValorizacion && (
           <button
             type="button"
             onClick={() => cambiarEstado("ANULADO")}

@@ -42,6 +42,13 @@ const estado: {
   cambios: { where: Record<string, unknown>; data: Record<string, unknown> }[];
   /// Cuantas filas dice la base que toco el ultimo `updateMany`.
   filasQueTocaria: number;
+  /// Cuantas valorizaciones tiene el encargo. Es lo que decide si se puede
+  /// anular.
+  avances: number;
+  /// El `where` con el que se contaron. La regla decide con ese numero, asi
+  /// que si el recuento no estuviera acotado por empresa, decidiria con datos
+  /// ajenos.
+  filtroAvances: Record<string, unknown> | null;
   apuntes: Record<string, unknown>[];
 } = {
   encargo: { id: "enc-1", estado: "VIGENTE" },
@@ -52,6 +59,8 @@ const estado: {
   partidasBorradas: 0,
   cambios: [],
   filasQueTocaria: 1,
+  avances: 0,
+  filtroAvances: null,
   apuntes: [],
 };
 
@@ -93,6 +102,12 @@ vi.mock("@/lib/prisma", () => {
         }) => {
           estado.cambios.push(args);
           return Promise.resolve({ count: estado.filasQueTocaria });
+        },
+      },
+      valorizacionEncargo: {
+        count: (args: { where: Record<string, unknown> }) => {
+          estado.filtroAvances = args.where;
+          return Promise.resolve(estado.avances);
         },
       },
       wbsItem: {
@@ -148,6 +163,8 @@ beforeEach(() => {
   estado.partidasBorradas = 0;
   estado.cambios = [];
   estado.filasQueTocaria = 1;
+  estado.avances = 0;
+  estado.filtroAvances = null;
   estado.apuntes = [];
 });
 
@@ -312,20 +329,69 @@ describe("cambiar el estado de un encargo", () => {
   });
 
   /**
-   * ANULAR SACA EL ENCARGO DEL COMPROMETIDO, porque «Comprometido» son los
-   * encargos VIGENTES. Aqui se fija que hoy **no hay ninguna regla que lo
-   * impida**: se puede anular uno que ya tiene avance reconocido, y su monto
-   * desaparece de la cuenta de la obra sin que nadie avise.
+   * LO INICIADO NO SE ANULA (regla del usuario, 19/08).
    *
-   * No se afirma que eso este BIEN —es una decision de producto pendiente, del
-   * mismo tipo que «lo iniciado no se borra»—. Se fija para que el dia que se
-   * decida poner la regla, sea ESTA prueba la que haya que cambiar a mano, y
-   * no un cambio de comportamiento que nadie note.
+   * Anular es decir «esto nunca fue». Un encargo con avance reconocido SI fue:
+   * sacarlo del comprometido —«Comprometido» son los VIGENTES— dejaria sus
+   * valorizaciones, y los pagos que cuelgan de ellas, apuntando a un contrato
+   * que dice que no existio.
+   *
+   * Cierra la simetria que el modulo ya tenia por los otros dos lados: un
+   * anulado no se edita y un anulado no se valoriza.
    */
-  it("HOY se puede anular sin mirar si tenia avance (regla pendiente)", async () => {
+  it("uno con avance reconocido NO se anula, y manda a cerrarlo", async () => {
+    estado.avances = 3;
+
+    const r = await cambiarEstadoEncargo(GESTOR, "obra-1", "enc-1", "ANULADO");
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain("3 valorización(es)");
+      expect(r.error).toContain("Ciérralo");
+    }
+    // Y no se toco: la negativa llega antes de escribir.
+    expect(estado.cambios).toEqual([]);
+    expect(estado.apuntes).toEqual([]);
+  });
+
+  /// La otra direccion, sin la cual un servicio que rechazara TODAS las
+  /// anulaciones quedaria en verde.
+  it("pero uno sin avance si se anula", async () => {
+    estado.avances = 0;
+
     const r = await cambiarEstadoEncargo(GESTOR, "obra-1", "enc-1", "ANULADO");
 
     expect(r.ok).toBe(true);
     expect(estado.cambios[0]?.data).toEqual({ estado: "ANULADO" });
+  });
+
+  /// Y CERRAR es justo la salida que ofrece el mensaje: tiene que funcionar
+  /// con avance, o el consejo mandaria a una puerta cerrada.
+  it("y con avance SI se puede cerrar, que es lo que el mensaje propone", async () => {
+    estado.avances = 3;
+
+    const r = await cambiarEstadoEncargo(GESTOR, "obra-1", "enc-1", "CERRADO");
+
+    expect(r.ok).toBe(true);
+    expect(estado.cambios[0]?.data).toEqual({ estado: "CERRADO" });
+  });
+
+  /**
+   * El recuento va acotado por obra Y empresa dentro de su propio `where`. Sin
+   * eso, el id de un encargo de otra constructora contaria cero avances y la
+   * regla lo dejaria anular — comprobando la propiedad justo despues, pero
+   * habiendo decidido con datos ajenos.
+   */
+  it("y ese recuento no mira los avances de otra empresa", async () => {
+    estado.avances = 1;
+    await cambiarEstadoEncargo(GESTOR, "obra-1", "enc-1", "ANULADO");
+
+    expect(estado.filtroAvances).toEqual({
+      encargoId: "enc-1",
+      encargo: {
+        projectId: "obra-1",
+        project: { companyId: "empresa-1" },
+      },
+    });
   });
 });

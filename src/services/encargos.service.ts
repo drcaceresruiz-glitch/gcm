@@ -814,7 +814,22 @@ export async function editarEncargo(
   }
 }
 
-/** Cambia el estado del encargo (cerrar, anular, reabrir). */
+/**
+ * Cambia el estado del encargo (cerrar, anular, reabrir).
+ *
+ * ANULAR ES DECIR «ESTO NUNCA FUE», y por eso un encargo con avance reconocido
+ * no se anula: si se valorizo, fue. Se CIERRA, que deja el historial en pie con
+ * lo valorizado como definitivo.
+ *
+ * Sin esa regla, anular un encargo a medio ejecutar lo sacaba del comprometido
+ * —«Comprometido» son los VIGENTES— y dejaba sus valorizaciones, y los pagos
+ * que cuelgan de ellas, apuntando a un contrato que dice que no existio. Es el
+ * modo de fallo de la casa: una fila cambia de naturaleza y el dinero deja de
+ * cuadrar sin que nadie vea un error.
+ *
+ * Cierra la simetria que ya tenia el modulo por los otros dos lados: un
+ * anulado no se edita y un anulado no se valoriza.
+ */
 export async function cambiarEstadoEncargo(
   sesion: SesionActiva,
   obraId: string,
@@ -827,6 +842,29 @@ export async function cambiarEstadoEncargo(
 
   const cerrada = await motivoSiObraCerrada(sesion, obraId);
   if (cerrada) return { ok: false, error: cerrada };
+
+  if (estado === "ANULADO") {
+    // El mismo acotado por obra y empresa que el `updateMany` de abajo: si se
+    // contara sin el, un id de otra constructora daria cero y dejaria anular.
+    const avances = await prisma.valorizacionEncargo.count({
+      where: {
+        encargoId,
+        encargo: {
+          projectId: obraId,
+          project: { companyId: sesion.companyId },
+        },
+      },
+    });
+
+    if (avances > 0) {
+      return {
+        ok: false,
+        error:
+          `Este encargo ya tiene ${avances} valorización(es): el contratista avanzó y eso no se borra. ` +
+          `Ciérralo en vez de anularlo — deja de contar en el comprometido igual, pero conserva lo valorizado y sus pagos.`,
+      };
+    }
+  }
 
   const { count } = await prisma.encargoProveedor.updateMany({
     where: {
