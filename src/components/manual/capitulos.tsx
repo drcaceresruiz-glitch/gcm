@@ -1040,11 +1040,16 @@ const PARTE = (
     <S titulo="Las fotos van pegadas a la tarea">
       <p>
         Cada tarea admite sus fotos del día, ancladas a{" "}
-        <strong>la tarea y la fecha</strong>. Después aparecen en el informe
-        semanal y pueden pasar a la <strong>galería</strong>, que es el
-        escaparate que —si la obra lo comparte— <strong>ve el
-        cliente</strong>. Conviene saberlo antes de subir: lo que se sube es
-        evidencia de obra, no un archivo privado.
+        <strong>la tarea y la fecha</strong>. Aparecen en el informe semanal,
+        pero <strong>solo en la pantalla y en su impresión</strong>: el PDF,
+        la hoja de cálculo y el correo no las llevan. Si el cliente tiene que
+        verlas, va el papel.
+      </p>
+      <p>
+        Y <strong>no pasan a la galería</strong>. La galería es un escaparate
+        aparte, con fotos que se suben allí y se eligen una a una. Lo que se
+        sube aquí es <strong>evidencia</strong>: registro de lo que pasó, que
+        no se cura ni se borra.
       </p>
     </S>
 
@@ -1723,6 +1728,623 @@ const CIERRE = (
 );
 
 // ---------------------------------------------------------------------------
+// Capitulo: en obra, tu dia en tres pasos (la guia de campo)
+//
+// UNICO capitulo que se aparta de la plantilla, y a proposito: lo lee quien
+// esta en la obra, en el movil, y no necesita «para quien es» ni un apartado
+// de modos de fallo. Frases cortas y dos recorridos, uno por cada forma de
+// entrar. Va el segundo, detras de «empezar», porque es el primero que hace
+// falta cuando la obra ya arranco.
+// ---------------------------------------------------------------------------
+
+const EN_OBRA = (
+  <>
+    <Clave>
+      Se apunta <strong>lo que pasó</strong>, no lo que debería haber pasado.
+      Si de una tarea no sabes nada hoy, se deja en blanco. En blanco es una
+      respuesta.
+    </Clave>
+
+    <S titulo="Si entras con el código del QR (no tienes usuario ni contraseña)">
+      <Recorrido
+        pasos={[
+          <>
+            <strong>Escanea el cartel</strong> de la caseta y pon tu celular o
+            tu correo. Te llega un código.
+          </>,
+          <>
+            <strong>Elige la tarea</strong> y sube las fotos de lo que falta o
+            de lo que se resolvió.
+          </>,
+          <>
+            Ya está. Tu teléfono <strong>queda reconocido</strong> y mañana
+            entras directo.
+          </>,
+        ]}
+      />
+      <p>
+        Si no te llega el código, no lo intentes más veces: avisa al
+        residente. Casi siempre es un dígito mal apuntado en tu número, y
+        hasta que no lo corrija no te va a llegar nunca.
+      </p>
+    </S>
+
+    <S titulo="Si entras con tu usuario (residente)">
+      <Recorrido
+        pasos={[
+          <>
+            Abre <strong>Parte del día</strong>. Salen las tareas vivas de
+            hoy, no el cronograma entero.
+          </>,
+          <>
+            Escribe el porcentaje <strong>solo de las que se tocaron</strong>.
+            Las demás, en blanco.
+          </>,
+          <>
+            Añade las fotos donde aporten y envía. Un solo envío para todo el
+            día.
+          </>,
+        ]}
+      />
+    </S>
+
+    <S titulo="Tres cosas que conviene saber">
+      <p>
+        <strong>Lo que subes no se borra</strong>: es la prueba de lo que se
+        hizo ese día, con tu nombre y la fecha.
+      </p>
+      <p>
+        Las fotos bonitas para el cliente van por otro sitio (la{" "}
+        <strong>galería</strong>). Lo que subes aquí es constancia de obra, no
+        escaparate.
+      </p>
+      <p>
+        Con el código del QR <strong>no se reporta avance</strong>, solo se
+        suben fotos. El porcentaje lo pone el residente.
+      </p>
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: los movimientos presupuestales
+// ---------------------------------------------------------------------------
+
+const MOVIMIENTOS = (
+  <>
+    <Clave>
+      La línea base es el presupuesto firmado y no se toca nunca más. Todo lo
+      que pase después va <strong>encima</strong>, en movimientos que se suman
+      aparte. Por eso hay tres cifras y no una: <strong>Base</strong> (lo
+      congelado) más <strong>Ajustes</strong> (los movimientos aprobados) da
+      el <strong>Vigente</strong>, que es contra lo que se mide todo.
+    </Clave>
+
+    <S titulo="Los tres tipos, y no hay más">
+      <p>
+        El <strong>adicional</strong> aumenta el presupuesto: solo lleva
+        entradas, y procede por vicios ocultos o cambios de diseño. El{" "}
+        <strong>deductivo</strong> reduce: solo salidas. La{" "}
+        <strong>reconversión</strong> no cambia el total —saca de una partida
+        y mete en otra—, y por eso sus líneas suman cero.
+      </p>
+      <p>
+        No se pueden mezclar: un adicional con una línea negativa se rechaza,
+        diciendo que para reducir se usa un deductivo. Y tampoco se presentan
+        compensados: un adicional y un deductivo del mismo importe{" "}
+        <strong>no se enseñan como 0,00</strong>, porque son dos hechos
+        distintos, cada uno con su documento detrás.
+      </p>
+    </S>
+
+    <S titulo="El recorrido de la primera vez">
+      <Recorrido
+        pasos={[
+          <>
+            Hace falta la <strong>línea base aprobada</strong>. Sin ella no
+            existe el «encima de la base», y la pantalla lo dice con esas
+            palabras en vez de enseñar una tabla vacía.
+          </>,
+          <>
+            Se redacta en <strong>borrador</strong>, con la fecha del
+            documento que lo respalda —no la del día en que se teclea— y su
+            correlativo, para poder citarlo en un acta: «Movimiento 003».
+          </>,
+          <>
+            Se <strong>aprueba</strong>, y ahí es cuando entra al presupuesto
+            vigente.
+          </>,
+          <>
+            Si el adicional traía partidas nuevas, es el momento de{" "}
+            <strong>enlazarlas con sus tareas</strong>: se ofrece ahí mismo.
+            Quien acaba de aprobar es quien sabe a cuál va cada una.
+          </>,
+        ]}
+      />
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Querer deshacer un movimiento ya aprobado",
+            pasa: (
+              <p>
+                No se puede, y es a propósito: los indicadores se miden contra
+                el vigente, y deshacerlo los recalcularía hacia atrás. Se
+                corrige registrando otro de signo contrario, y quedan los dos
+                rastros — que es lo que pasó de verdad.
+              </p>
+            ),
+          },
+          {
+            hace: "Intentar dar de alta partidas nuevas con un deductivo o una reconversión",
+            pasa: (
+              <p>
+                Solo el adicional puede. Y nacen <strong>al aprobar</strong>,
+                no al redactar: así un borrador descartado no deja partidas
+                fantasma en un árbol que la línea base ya no deja limpiar.
+              </p>
+            ),
+          },
+          {
+            hace: "Aprobar el adicional y dejar sus partidas sin enlazar",
+            pasa: (
+              <p>
+                Quedan fuera de la medición en dinero, y en un mes ya nadie
+                recuerda a qué tarea iban. Por eso el enlace se ofrece justo
+                al aprobar, y no en una pantalla a la que hay que volver.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: enlazar tareas con partidas
+// ---------------------------------------------------------------------------
+
+const MAPEO = (
+  <>
+    <Clave>
+      El cronograma dice <strong>cuándo</strong> y el presupuesto dice{" "}
+      <strong>cuánto</strong>, pero no se conocen entre sí. Enlazarlos permite
+      medir el avance <strong>en soles</strong> en vez de en días. Mientras no
+      haya enlaces, el avance se pondera por duración —lo único que trae el
+      archivo de Project— y una partida de 500 soles pesa igual que una de
+      200.000.
+    </Clave>
+
+    <S titulo="La cobertura es la cifra que manda">
+      <p>
+        La <strong>cobertura</strong> dice qué parte del presupuesto tiene ya
+        tarea enlazada. Al pasar del <strong>60%</strong>, el avance puede
+        ponderarse por dinero. Por debajo, pesar por dinero sería peor que no
+        hacerlo: la cifra parece más seria y describe una quinta parte de la
+        obra.
+      </p>
+      <p>
+        Ojo con una lectura tentadora: la cobertura no es la compuerta del
+        índice de costo. Que el CPI se calle al principio de la obra depende
+        de otra cosa —que el costo registrado respalde lo ya ganado—, y eso se
+        explica en el capítulo de indicadores. Lo que cambia aquí es{" "}
+        <strong>con qué se pesa el avance</strong>, que es lo que alimenta el
+        valor ganado.
+      </p>
+    </S>
+
+    <S titulo="Aquí solo se propone; decide una persona">
+      <p>
+        Y hay un motivo medido en los archivos reales de la empresa: enlazar
+        automáticamente por código resultó <strong>peor que no
+        enlazar</strong>. De 56 coincidencias de código, 36 apuntaban a otra
+        cosa, porque el capítulo 5 del cronograma va desplazado respecto al
+        del presupuesto y el «5.5» habría caído sobre un descuento comercial.
+      </p>
+      <p>
+        Por eso la coincidencia de código <strong>se marca pero no
+        puntúa</strong>: si puntuara, pondría arriba justo los emparejamientos
+        falsos, y quien revisa aceptaría el primero. Lo que ordena la lista es
+        el parecido de la descripción.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Aceptar la propuesta porque «el código coincide»",
+            pasa: (
+              <p>
+                Es la trampa medida, y la pantalla la rotula como poco fiable.
+                Se acepta leyendo el <strong>nombre</strong>, no el número. Un
+                mapeo equivocado no da ningún síntoma: la curva sale bonita y
+                miente.
+              </p>
+            ),
+          },
+          {
+            hace: "Esperar que enlazar cambie el avance",
+            pasa: (
+              <p>
+                No lo cambia: cambia con qué se pesa. La obra no avanza más,
+                se mide mejor — y por eso el porcentaje puede moverse al
+                cruzar el umbral sin que nadie haya ejecutado nada.
+              </p>
+            ),
+          },
+          {
+            hace: "Aprobar un adicional y dejar sus partidas nuevas sin enlazar",
+            pasa: (
+              <p>
+                Nacen sueltas, y quien las acaba de aprobar es el único que
+                sabe a qué tarea van. Es el mismo caso que cierra el capítulo
+                de movimientos, visto desde este lado.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: el Kanban de obra
+// ---------------------------------------------------------------------------
+
+const KANBAN = (
+  <>
+    <Clave>
+      Las mismas tareas del Lookahead y del plan semanal, en columnas para
+      verlas de un vistazo: <strong>Sin analizar → Con restricciones → Lista →
+      Comprometida → En ejecución → Cerrada</strong>. Las tres primeras salen
+      del Lookahead; las tres últimas, del plan semanal. Ninguna columna es
+      inventada: todas son estados que la obra ya recorre.
+    </Clave>
+
+    <S titulo="Una tarea, una sola columna">
+      <p>
+        Manda la de <strong>más a la derecha</strong>: si ya se evaluó,
+        cerrada; si se prometió, comprometida; si no, la que diga su análisis.
+        Sin esa regla, una tarea lista <em>y</em> comprometida aparecería dos
+        veces y el tablero contaría dos veces el mismo trabajo — que es peor
+        que no tenerlo, porque encima se planifica sobre eso.
+      </p>
+      <p>
+        Quien solo tiene permiso sobre el Lookahead ve las{" "}
+        <strong>tres primeras</strong> columnas y las tres últimas vacías, en
+        vez de un error: el plan semanal tiene su propio permiso.
+      </p>
+    </S>
+
+    <S titulo="Es de mirar, no de arrastrar">
+      <p>
+        Cada movimiento real —analizar, levantar una restricción, comprometer,
+        cerrar— tiene su pantalla, con su permiso y su registro de quién lo
+        hizo, y cada tarjeta <strong>enlaza</strong> a donde se actúa.
+        Arrastrar tarjetas duplicaría esas acciones donde no se ven las
+        consecuencias. Además, así funciona bien en el móvil.
+      </p>
+      <p>
+        La única excepción es un botón: marcar que un compromiso{" "}
+        <strong>empezó en obra</strong>, que es lo que llena la columna «En
+        ejecución». Se marca y se desmarca a mano —es reversible, porque no
+        mueve dinero— y sella la fecha en vez de un sí/no, para poder medir
+        algún día cuánto tarda en arrancar lo que se prometió. No se deduce de
+        la cantidad ejecutada a propósito: un cero significa a la vez «empezó
+        y no hay avance medible» y «no ha empezado».
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Buscar el histórico entero en el tablero",
+            pasa: (
+              <p>
+                Solo trae las semanas <strong>abiertas</strong> y la{" "}
+                <strong>última cerrada</strong>. Si creciera sin límite
+                dejaría de leerse, que es justo lo que un tablero no puede
+                permitirse.
+              </p>
+            ),
+          },
+          {
+            hace: "Leer «Sin analizar» como «sin restricciones»",
+            pasa: (
+              <p>
+                Son lo contrario. Sin analizar significa que{" "}
+                <strong>nadie la ha mirado todavía</strong>; lista significa
+                que se miró y no le falta nada. Es la misma distinción que
+                cuida el Lookahead.
+              </p>
+            ),
+          },
+          {
+            hace: "Extrañar una tarea comprometida a mano",
+            pasa: (
+              <p>
+                Si no vino del Lookahead, la tarjeta lo dice con esas palabras
+                («No vino del Lookahead»): se prometió sin pasar por el
+                análisis de restricciones. No es un error —a veces hay que
+                hacerlo— pero conviene verlo.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: el personal que documenta en obra (los pases)
+// ---------------------------------------------------------------------------
+
+const PERSONAL = (
+  <>
+    <Clave>
+      El maestro, el capataz o el subcontratista <strong>no tienen cuenta de
+      GCM</strong>: no recordarían una contraseña, y darles usuario les
+      abriría un sistema que maneja dinero. En su lugar tienen un{" "}
+      <strong>pase</strong>: entran con su celular o su correo, reciben un
+      código, y lo único que pueden hacer es adjuntar fotos de esa obra.
+    </Clave>
+
+    <S titulo="Cómo entra, y por qué no entra cualquiera">
+      <p>
+        Escanea el QR de la caseta, se identifica, y recibe un código{" "}
+        <strong>por SMS y por correo a la vez</strong>: el teléfono de la obra
+        puede estar sin saldo y el correo puede tardar, y mandarlo por los dos
+        cuesta lo mismo.
+      </p>
+      <p>
+        Solo entra quien el residente <strong>dio de alta antes en esa
+        obra</strong>. Si cualquiera pudiera teclear un número y recibir
+        código, el pase no valdría nada. Y la pantalla responde igual exista
+        el contacto o no, para no convertirse en un detector de quién trabaja
+        en la obra. Un pase alcanza <strong>una sola obra</strong>: la obra
+        sale de la ficha del pase, nunca de lo que se teclee.
+      </p>
+    </S>
+
+    <S titulo="Tres cosas parecidas que no son lo mismo">
+      <p>
+        <strong>Personal</strong> es quien documenta sin cuenta (los pases).{" "}
+        <strong>Equipo</strong> son los usuarios de GCM que tienen la obra
+        asignada, y eso es lo que decide quién la <em>ve</em>.{" "}
+        <strong>Contratistas</strong> son las empresas con las que se firma, y
+        no entran a la aplicación.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Esperar que el de campo reporte avance con su pase",
+            pasa: (
+              <p>
+                No puede: el sistema lo rechaza diciendo que un pase no
+                reporta avance de tareas. El parte del día lo llena el
+                residente, con sesión. El pase solo cuelga fotos de
+                restricciones y compromisos.
+              </p>
+            ),
+          },
+          {
+            hace: "Teclear mal el celular al dar de alta",
+            pasa: (
+              <p>
+                Esa persona <strong>no recibirá ningún código nunca</strong> y
+                nada lo avisa —el sistema calla a propósito ante un contacto
+                que no existe—. Se corrige editando el contacto, lo que además
+                cierra las sesiones abiertas con el número viejo.
+              </p>
+            ),
+          },
+          {
+            hace: "Borrar un pase en vez de revocarlo",
+            pasa: (
+              <p>
+                Revocar le quita el acceso al instante y conserva su ficha;
+                borrar se la lleva, y sus fotos quedan firmadas solo con un
+                nombre en texto, sin nadie detrás a quien volver. Sus fotos
+                son evidencia y su autoría tiene que poder rastrearse.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: la galeria
+// ---------------------------------------------------------------------------
+
+const GALERIA = (
+  <>
+    <Clave>
+      El escaparate de la obra, y un mundo <strong>aparte</strong> de la
+      evidencia. La evidencia del parte del día es registro probatorio y no se
+      toca; la galería <strong>se cura</strong>: se sube, se describe, se
+      publica foto a foto y, si una salió mal, se quita.
+    </Clave>
+
+    <S titulo="Aquí se sube; del parte del día no llega nada">
+      <p>
+        Las fotos de la galería se suben <strong>aquí</strong>. No llegan
+        solas desde el parte del día: no hay ningún camino entre las dos, y es
+        deliberado, porque curar el escaparate no puede tocar el archivo
+        probatorio.
+      </p>
+    </S>
+
+    <S titulo="Publicar es un permiso aparte de subir">
+      <p>
+        Subir y describir es trabajo de campo; decidir qué ve el cliente es un
+        acto de gerencia. Por eso el enlace nace <strong>apagado</strong> y
+        cada foto nace <strong>sin publicar</strong>: retratar personas y
+        errores es una decisión, nunca un descuido.
+      </p>
+      <p>
+        Al cliente se le enseñan el nombre de la obra y, de cada foto
+        publicada, su título, su descripción y su fecha.{" "}
+        <strong>Nunca quién la subió</strong>: los nombres del personal no son
+        parte del escaparate.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Activar el enlace sin haber publicado ninguna foto",
+            pasa: (
+              <p>
+                El cliente abre una página vacía con membrete. La pantalla lo
+                avisa antes, porque el enlace ya está repartido cuando alguien
+                se da cuenta.
+              </p>
+            ),
+          },
+          {
+            hace: "Rotar el enlace creyendo que se cierra",
+            pasa: (
+              <p>
+                Rotar reparte una llave nueva y deja la puerta{" "}
+                <strong>abierta</strong>: es lo que se quiere cuando se
+                compartió con quien ya no debe verlo. Para cerrarla está
+                «desactivar». El enlace viejo deja de funcionar al instante en
+                los dos casos.
+              </p>
+            ),
+          },
+          {
+            hace: "Suponer que lo del parte del día ya está publicado",
+            pasa: (
+              <p>
+                No lo está: son dos almacenes distintos. Y al revés, quitar
+                una foto de la galería no toca la evidencia — que es
+                exactamente lo que se busca.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: el informe semanal
+// ---------------------------------------------------------------------------
+
+const INFORME = (
+  <>
+    <Clave>
+      Una foto de la obra a una fecha, que sale por cinco puertas —pantalla,
+      impresión, PDF, hoja de cálculo y correo— <strong>todas con los mismos
+      datos</strong>. Se compone una sola vez para que el papel y el Excel no
+      puedan decir cosas distintas.
+    </Clave>
+
+    <S titulo="Qué lleva, y qué deja fuera a propósito">
+      <p>
+        En este orden: portada, resumen, lo que pasó en el período, avance por
+        capítulo, partidas activas de la semana, partidas atrasadas, Last
+        Planner (PPC y causas) y curva S. La <strong>fecha de corte es
+        libre</strong>: cualquier día, no solo los cortes del plan — un
+        informe se pide por una visita del cliente o por una valorización, no
+        por el calendario del PTS.
+      </p>
+      <p>
+        Quedan fuera los capítulos <strong>sin trabajo medible</strong> (los
+        de puros hitos darían un atraso que no existe), los que están{" "}
+        <strong>enteros a cero</strong> (son de más adelante y empujan fuera
+        de la página a los que están en marcha) y las partidas{" "}
+        <strong>ya terminadas</strong> (en un informe semanal interesa lo que
+        queda). Un capítulo atrasado tampoco se lista como alerta aparte: lo
+        está porque lo están sus partidas, y listarlo duplicaría el aviso.
+      </p>
+    </S>
+
+    <S titulo="Ojo con las fotos">
+      <p>
+        Salen <strong>solo en la pantalla y en la impresión</strong>. El PDF,
+        el CSV, el correo y el SMS no las llevan. Si el cliente tiene que
+        verlas, va el papel impreso o la galería.
+      </p>
+    </S>
+
+    <S titulo="Los canales, y sus reglas">
+      <p>
+        El <strong>correo</strong> se manda uno a uno —la lista puede llevar
+        al cliente y al contratista, y ninguno tiene por qué ver al otro— y
+        adjunta el PDF y el CSV a la vez.
+      </p>
+      <p>
+        El <strong>SMS</strong> va sin tildes y sin enlaces: las operadoras
+        marcan como spam los SMS con URL, así que el que lleve enlace es el
+        que no llega. Si no cabe, se sacrifican primero las partidas graves,
+        luego el PPC, y como último recurso se recorta el nombre de la obra —{" "}
+        <strong>nunca una cifra</strong>.
+      </p>
+      <p>
+        El umbral para decir «al día» es <strong>medio punto</strong> de
+        desviación, el mismo en el correo y en el SMS: sin él, un +0,02 se
+        anunciaría como «por delante del plan» en un correo que a veces va al
+        cliente.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Mandar el PDF esperando que lleve las fotos",
+            pasa: (
+              <p>
+                No las lleva, y es el malentendido más caro de esta pantalla
+                porque se descubre cuando el cliente ya lo abrió. Si las fotos
+                importan, va el papel o el enlace de la galería.
+              </p>
+            ),
+          },
+          {
+            hace: "Leer una tabla vacía como un fallo",
+            pasa: (
+              <p>
+                Cuando está vacía lo explica, y casi siempre significa «esa
+                semana no hubo». Es la misma disciplina del resto de GCM:
+                antes que un hueco mudo, el motivo.
+              </p>
+            ),
+          },
+          {
+            hace: "Esperar el PPC de una semana abierta",
+            pasa: (
+              <p>
+                No se calcula, ni en el cuerpo del correo ni en el SMS: un
+                porcentaje a medio evaluar acabaría promediándose con los de
+                verdad y ensuciaría la serie.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
 // El indice: los capitulos en el orden del trabajo real
 // ---------------------------------------------------------------------------
 
@@ -1738,6 +2360,16 @@ export const CAPITULOS: CapituloManual[] = [
     contenido: EMPEZAR,
   },
   {
+    slug: "en-obra",
+    titulo: "En obra: tu día en tres pasos",
+    pregunta: "qué tengo que hacer hoy",
+    paraQuien: "Quien está en la obra.",
+    resumen:
+      "La guía de campo, en frases cortas: cómo entrar con el QR o con tu " +
+      "usuario, qué se apunta y qué se deja en blanco.",
+    contenido: EN_OBRA,
+  },
+  {
     slug: "presupuesto",
     titulo: "La obra y su presupuesto",
     pregunta: "cuánto cuesta",
@@ -1749,6 +2381,16 @@ export const CAPITULOS: CapituloManual[] = [
     contenido: PRESUPUESTO,
   },
   {
+    slug: "movimientos",
+    titulo: "Los movimientos: adicionales, deductivos y reconversiones",
+    pregunta: "qué cambió sobre lo firmado",
+    paraQuien: "Quien administra el contrato.",
+    resumen:
+      "Base más ajustes igual a vigente: los tres tipos de movimiento, por " +
+      "qué ninguno se deshace y cuándo nacen las partidas de un adicional.",
+    contenido: MOVIMIENTOS,
+  },
+  {
     slug: "cronograma",
     titulo: "El cronograma y el avance",
     pregunta: "cuándo se hace",
@@ -1757,6 +2399,16 @@ export const CAPITULOS: CapituloManual[] = [
       "Importar de MS Project por cortes, el avance real que manda sobre el " +
       "archivo, la curva S y los hitos.",
     contenido: CRONOGRAMA,
+  },
+  {
+    slug: "mapeo",
+    titulo: "Enlazar tareas con partidas",
+    pregunta: "qué parte del presupuesto cubre cada tarea",
+    paraQuien: "Oficina técnica.",
+    resumen:
+      "La cobertura que permite pesar el avance por dinero, y por qué GCM " +
+      "propone pero no enlaza solo: enlazar por código se midió y falló.",
+    contenido: MAPEO,
   },
   {
     slug: "meta",
@@ -1789,6 +2441,16 @@ export const CAPITULOS: CapituloManual[] = [
     contenido: PLAN_SEMANAL,
   },
   {
+    slug: "kanban",
+    titulo: "El Kanban de obra",
+    pregunta: "en qué punto está cada tarea",
+    paraQuien: "Quien está en obra y quien supervisa.",
+    resumen:
+      "El flujo del Last Planner en columnas, la precedencia que impide " +
+      "contar dos veces el mismo trabajo y por qué no se arrastra.",
+    contenido: KANBAN,
+  },
+  {
     slug: "parte-del-dia",
     titulo: "El parte del día",
     pregunta: "cuánto se avanzó hoy",
@@ -1798,6 +2460,26 @@ export const CAPITULOS: CapituloManual[] = [
       "el valor ganado y el informe semanal. Y por qué una casilla vacía " +
       "no escribe nada.",
     contenido: PARTE,
+  },
+  {
+    slug: "personal",
+    titulo: "El personal que documenta en obra",
+    pregunta: "quién sube fotos desde el campo",
+    paraQuien: "Residencia lo configura; el de obra lo usa.",
+    resumen:
+      "Los pases: entrar con el QR sin tener cuenta, por qué solo entra " +
+      "quien está dado de alta, y revocar en vez de borrar.",
+    contenido: PERSONAL,
+  },
+  {
+    slug: "galeria",
+    titulo: "La galería",
+    pregunta: "cómo se ve la obra",
+    paraQuien: "Quien documenta sube; gerencia publica.",
+    resumen:
+      "El escaparate que ve el cliente: se cura foto a foto, publicar es " +
+      "un permiso aparte, y no tiene ningún camino desde la evidencia.",
+    contenido: GALERIA,
   },
   {
     slug: "dinero",
@@ -1829,6 +2511,17 @@ export const CAPITULOS: CapituloManual[] = [
       "El tablero de la obra, los semáforos, el valor ganado (SPI y CPI) y " +
       "qué significa cada rótulo — y cuándo una cifra calla a propósito.",
     contenido: INDICADORES,
+  },
+  {
+    slug: "informe",
+    titulo: "El informe semanal",
+    pregunta: "qué se le entrega al cliente",
+    paraQuien: "Residencia y gerencia.",
+    resumen:
+      "Una foto de la obra a una fecha por cinco puertas con los mismos " +
+      "datos, lo que deja fuera a propósito y dónde salen (y no salen) las " +
+      "fotos.",
+    contenido: INFORME,
   },
   {
     slug: "gerencia",
