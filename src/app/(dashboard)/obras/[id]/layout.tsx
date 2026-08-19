@@ -4,7 +4,8 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, hitosDeObra, avisosDeSeccion } from "@/services/obras.service";
 import { planesAbiertos } from "@/services/plan-semanal.service";
 import { criterioDeObra } from "@/services/criterio-obra.service";
-import { AvisoCriterio } from "@/components/obras/AvisoCriterio";
+import { PasoSiguiente } from "@/components/obras/PasoSiguiente";
+import { siguientePaso } from "@/lib/siguiente-paso";
 import { puede } from "@/lib/rbac";
 import { fechaCorta } from "@/utils/fechas";
 import { Volver } from "@/components/ui/Volver";
@@ -261,6 +262,45 @@ export default async function ObraLayout({
     },
   ].filter((f) => f.secciones.length > 0) as FaseMenu[];
 
+  /**
+   * Que toca ahora en esta obra: UNO, con su boton.
+   *
+   * No cuesta ni una consulta mas. Las tres cosas que mira —los hitos, el
+   * criterio y los avisos— ya estaban pedidas arriba para el riel del menu y
+   * para el aviso del criterio, y las tres van en `cache()`.
+   *
+   * En una obra CERRADA no se sugiere nada: no admite escrituras, asi que
+   * cualquier paso que se propusiera seria un boton que no lleva a ninguna
+   * parte. Una obra cerrada es historia, y a la historia no le falta nada.
+   */
+  const paso =
+    obra.estado === "CERRADA"
+      ? null
+      : siguientePaso(
+          {
+            presupuesto: hitos.presupuesto,
+            cronograma: hitos.cronograma,
+            equipo: hitos.equipo,
+            lineaBase: hitos.lineaBase,
+          },
+          criterio?.faltaDecidir ?? false,
+          {
+            // Para PROPONER un paso hace falta poder darlo, que no es lo
+            // mismo que poder ver la seccion. Los dos ultimos si son de
+            // lectura: lo que se propone ahi es mirar, no escribir.
+            presupuesto: puede(sesion, "partida:importar"),
+            cronograma: puede(sesion, "cronograma:importar"),
+            equipo: puede(sesion, "obra:asignar_equipo"),
+            lineaBase: puede(sesion, "linea_base:aprobar"),
+            lookahead: puede(sesion, "lookahead:leer"),
+            planSemanal: puede(sesion, "plan_semanal:leer"),
+          },
+          {
+            restriccionesVencidas: avisos.lookahead,
+            semanasSinCerrar: avisos.planSemanal,
+          },
+        );
+
 
 
   return (
@@ -274,10 +314,13 @@ export default async function ObraLayout({
       <MenuObra fases={fases} />
 
       <div className="space-y-6">
-      {/* La decision pendiente va ARRIBA DEL TODO y en todas las pantallas
-          de la obra: no es de una seccion, condiciona como se lee el dinero
-          en todas. Con boton, porque un aviso sin salida se ignora. */}
-      {criterio?.faltaDecidir && <AvisoCriterio obraId={id} />}
+      {/* El anclaje de continuidad va ARRIBA DEL TODO y en todas las
+          pantallas de la obra: eso es lo que lo hace util cuando uno se
+          desvia. Con boton, porque un aviso sin salida se ignora, y solo UNO,
+          porque la lista larga ya vive en el panel «Que falta» del tablero.
+          El propio componente se esconde si ya estas en la pantalla del
+          paso. */}
+      {paso && <PasoSiguiente obraId={id} paso={paso} />}
       {/* Todo el marco desaparece al imprimir: la vista del documento de la
           orden cuelga de esta ruta, y el papel que recibe el proveedor no
           puede salir con pestanas encima. */}

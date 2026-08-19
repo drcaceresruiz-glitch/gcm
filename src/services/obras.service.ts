@@ -821,9 +821,9 @@ export const obtenerObra = cache(async function obtenerObra(
 /**
  * Que pasos del ciclo de la obra tienen ya algo cargado.
  *
- * Alimenta la ruta de la obra (el riel de ubicacion del layout): seis
- * `findFirst` que solo piden el id, en paralelo. No cuenta nada —no importa
- * CUANTO hay, solo si el paso se dio—.
+ * Alimenta la ruta de la obra (el riel de ubicacion del layout) y el anclaje
+ * de continuidad: siete `findFirst` que solo piden el id, en paralelo. No
+ * cuenta nada —no importa CUANTO hay, solo si el paso se dio—.
  *
  * En `cache()` por lo mismo que `obtenerObra`: la pide el layout en cada
  * navegacion dentro de la obra.
@@ -842,6 +842,15 @@ export interface HitosObra {
   /// Hay un presupuesto meta APROBADO. El borrador no cuenta: hasta que se
   /// congela no gobierna ninguna bolsa, igual que en `metaQueManda`.
   meta: boolean;
+  /**
+   * Hay alguien asignado a la obra.
+   *
+   * NO alimenta el riel del menu —no hay seccion «Equipo» en las fases del
+   * ciclo— sino el anclaje de continuidad: es el paso del alta que mas se
+   * olvida y el unico cuyo sintoma aparece en la pantalla de OTRA persona
+   * («entro y no veo ninguna obra»), asi que quien lo omite no lo nota.
+   */
+  equipo: boolean;
 }
 
 export const hitosDeObra = cache(async function hitosDeObra(
@@ -861,6 +870,7 @@ export const hitosDeObra = cache(async function hitosDeObra(
       lookahead: false,
       planSemanal: false,
       meta: false,
+      equipo: false,
     };
   }
 
@@ -870,7 +880,8 @@ export const hitosDeObra = cache(async function hitosDeObra(
     project: { companyId: sesion.companyId },
   };
 
-  const [partida, cronograma, base, lookahead, plan, meta] = await Promise.all([
+  const [partida, cronograma, base, lookahead, plan, meta, miembro] =
+    await Promise.all([
     prisma.wbsItem.findFirst({ where: deLaObra, select: { id: true } }),
     prisma.cronograma.findFirst({ where: deLaObra, select: { id: true } }),
     prisma.baseline.findFirst({
@@ -886,6 +897,13 @@ export const hitosDeObra = cache(async function hitosDeObra(
       where: { ...deLaObra, aprobadaAt: { not: null } },
       select: { id: true },
     }),
+    // La pertenencia NO lleva `project: { companyId }` como las demas: la
+    // tabla cuelga de la obra, y la obra ya se comprobo de esta empresa en
+    // `alcanzaObra` y en el `obtenerObra` del layout.
+    prisma.projectMembership.findFirst({
+      where: { projectId: obraId },
+      select: { userId: true },
+    }),
   ]);
 
   return {
@@ -895,6 +913,7 @@ export const hitosDeObra = cache(async function hitosDeObra(
     lookahead: lookahead !== null,
     planSemanal: plan !== null,
     meta: meta !== null,
+    equipo: miembro !== null,
   };
 });
 
