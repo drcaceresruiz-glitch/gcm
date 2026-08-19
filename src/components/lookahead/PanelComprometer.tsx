@@ -5,7 +5,7 @@ import Link from "next/link";
 import { LoaderCircle, TriangleAlert, X } from "lucide-react";
 import { fechaCorta } from "@/utils/fechas";
 import { accionComprometerAlPts } from "@/app/(dashboard)/obras/[id]/lookahead/acciones";
-import type { SemanaAbierta } from "@/services/plan-semanal.service";
+import type { SemanaDestino } from "@/services/plan-semanal.service";
 
 /**
  * Llevar al Plan Semanal las tareas elegidas en el Lookahead.
@@ -38,20 +38,39 @@ interface Aviso {
 export function PanelComprometer({
   obraId,
   seleccionadas,
-  semanasAbiertas,
+  semanasDestino,
   fechaProximoCorte,
+  fechaCorteSiguiente,
   onCerrar,
 }: {
   obraId: string;
   seleccionadas: TareaSeleccionada[];
-  semanasAbiertas: SemanaAbierta[];
-  /// Fecha (ISO corta) de la semana que se abriria si no hay ninguna.
+  /// Abiertas primero y, marcadas, las ultimas cerradas.
+  semanasDestino: SemanaDestino[];
+  /// Fecha (ISO corta) del corte de ESTA semana.
   fechaProximoCorte: string;
+  /// Y el de la semana de despues.
+  fechaCorteSiguiente: string;
   /// Cierra el panel Y limpia la seleccion (por eso no se limpia al terminar:
   /// el aviso de exito tiene que poder leerse).
   onCerrar: () => void;
 }) {
-  const [planId, setPlanId] = useState<string>(semanasAbiertas[0]?.id ?? "");
+  /**
+   * El destino, como una sola cadena.
+   *
+   * `crear:proximo` / `crear:siguiente` para las dos semanas que se pueden
+   * abrir, y el id para una que ya existe. Un solo estado y no tres: el
+   * desplegable ofrece una lista de opciones excluyentes, y partirlo en
+   * «planId + queCrear» abre la puerta a estados que no significan nada.
+   *
+   * Arranca en la primera ABIERTA; si no hay ninguna, en crear la de esta
+   * semana.
+   */
+  const [destino, setDestino] = useState<string>(
+    semanasDestino.find((s) => !s.cerrada)?.id ?? "crear:proximo",
+  );
+  const elegida = semanasDestino.find((s) => s.id === destino);
+  const esCerrada = elegida?.cerrada === true;
   const [avisos, setAvisos] = useState<{
     noListas: Aviso[];
     sinAnalizar: Aviso[];
@@ -72,8 +91,15 @@ export function PanelComprometer({
   function comprometer(confirmado: boolean) {
     setError(null);
     iniciar(async () => {
+      const crear = destino.startsWith("crear:");
       const r = await accionComprometerAlPts(obraId, {
-        planId: planId || null,
+        planId: crear ? null : destino,
+        ...(crear
+          ? { crearEn: destino === "crear:siguiente" ? "siguiente" : "proximo" }
+          : {}),
+        // Solo cuando de verdad hace falta: pedir reabrir sobre una semana
+        // abierta seria decirle al servidor que haga algo que no toca.
+        ...(esCerrada ? { reabrir: true } : {}),
         uids: seleccionadas.map((t) => t.uid),
         confirmado,
       });
@@ -153,21 +179,61 @@ export function PanelComprometer({
       <label className="block text-xs">
         <span className="block opacity-70">Semana destino</span>
         <select
-          value={planId}
-          onChange={(e) => setPlanId(e.target.value)}
+          value={destino}
+          onChange={(e) => setDestino(e.target.value)}
           className="mt-1 w-full max-w-sm rounded-lg border px-2 py-1.5 text-sm"
           style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
         >
-          {semanasAbiertas.map((s) => (
-            <option key={s.id} value={s.id}>
-              Semana {s.numero} — cierra el {fechaCorta(s.fechaCorte)}
-            </option>
-          ))}
-          <option value="">
+          {semanasDestino
+            .filter((s) => !s.cerrada)
+            .map((s) => (
+              <option key={s.id} value={s.id}>
+                Semana {s.numero} — cierra el {fechaCorta(s.fechaCorte)}
+              </option>
+            ))}
+
+          {/* LAS DOS que se pueden crear. La segunda existe porque un viernes
+              —con el corte de esta semana ya cerrado— la primera apuntaba a
+              una fecha muerta y no habia forma de planificar la entrante. */}
+          <option value="crear:proximo">
             Crear la semana que cierra el {fechaCorta(new Date(fechaProximoCorte))}
           </option>
+          <option value="crear:siguiente">
+            Crear la semana que cierra el{" "}
+            {fechaCorta(new Date(fechaCorteSiguiente))}
+          </option>
+
+          {/* Las cerradas SE VEN, agrupadas y dichas. Antes no salian, y su
+              ausencia se leia como «no existe» en vez de «esta cerrada». */}
+          {semanasDestino.some((s) => s.cerrada) && (
+            <optgroup label="Cerradas — hay que reabrirlas">
+              {semanasDestino
+                .filter((s) => s.cerrada)
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    Semana {s.numero} — cerró el {fechaCorta(s.fechaCorte)}
+                  </option>
+                ))}
+            </optgroup>
+          )}
         </select>
       </label>
+
+      {/* Lo que arrastra reabrir, dicho ANTES de pulsar. Reabrir no es gratis:
+          al volver a cerrarla se reescriben sus avances. */}
+      {esCerrada && (
+        <p
+          className="flex items-start gap-2 text-xs"
+          style={{ color: "var(--color-alerta)" }}
+        >
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+          <span className="text-pretty">
+            La Semana {elegida?.numero} está cerrada: se <strong>reabrirá</strong>{" "}
+            para poder añadir estas tareas, y su cierre —con el PPC que dejó—
+            habrá que volver a hacerlo.
+          </span>
+        </p>
+      )}
 
       {/* Lo que el SERVIDOR marco como riesgoso. No se decide aqui. */}
       {avisos && (
@@ -271,7 +337,13 @@ export function PanelComprometer({
           {pendiente && (
             <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
           )}
-          {avisos ? "Comprometer igual" : "Comprometer"}
+          {/* El boton DICE que va a reabrir. Un boton que pone «Comprometer»
+              y ademas deshace un cierre miente por omision. */}
+          {avisos
+            ? "Comprometer igual"
+            : esCerrada
+              ? "Reabrir y comprometer"
+              : "Comprometer"}
         </button>
         <button type="button" onClick={onCerrar} className="text-sm opacity-70 underline">
           Cancelar

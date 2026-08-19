@@ -41,7 +41,10 @@ import {
   type EstadoPromesa,
   type RestriccionConPromesa,
 } from "@/lib/lookahead-compromiso";
-import { planesAbiertos, type SemanaAbierta } from "@/services/plan-semanal.service";
+import {
+  semanasParaComprometer,
+  type SemanaDestino,
+} from "@/services/plan-semanal.service";
 import {
   fotosPorDestino,
   fotosPorDestinoDePase,
@@ -234,8 +237,10 @@ export interface LookaheadDatos {
   /// Cuantas semanas mira esta ventana (ya acotado).
   semanas: number;
   puedeGestionar: boolean;
-  /// Semanas del PTS que admiten compromisos (destino al comprometer).
-  semanasAbiertas: SemanaAbierta[];
+  /// Las semanas a las que se puede llevar trabajo: abiertas y, marcadas, las
+  /// ultimas cerradas. Se llamaba `semanasAbiertas` hasta que dejo de ser
+  /// verdad.
+  semanasDestino: SemanaDestino[];
   /// Comprometer escribe el PTS, asi que manda el permiso del plan semanal.
   puedeComprometer: boolean;
   /// A quien se le puede asignar una restriccion. Vacio sin permiso de gestion.
@@ -521,7 +526,11 @@ export async function obtenerLookahead(
     sinAnalizar: filas.filter((f) => f.fase === "SIN_ANALIZAR").length,
     semanas,
     puedeGestionar,
-    semanasAbiertas: puedeComprometer ? await planesAbiertos(sesion, obraId) : [],
+    // Abiertas Y las ultimas cerradas: una semana cerrada que no aparece se
+    // lee como que no existe. Ver `semanasParaComprometer`.
+    semanasDestino: puedeComprometer
+      ? await semanasParaComprometer(sesion, obraId)
+      : [],
     puedeComprometer,
     personas,
     liberacion: cumplimientoDeLiberacion(

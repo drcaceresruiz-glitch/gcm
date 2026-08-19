@@ -74,13 +74,17 @@ export function MatrizLookahead({
   obraId,
   datos,
   fechaProximoCorte,
+  fechaCorteSiguiente,
   abrirEvidencia = null,
   abrirTarea = null,
 }: {
   obraId: string;
   datos: LookaheadDatos;
-  /// Fecha ISO del corte que se abriria si no hay ninguna semana abierta.
+  /// Fecha ISO del corte de ESTA semana, el que se crearia por defecto.
   fechaProximoCorte: string;
+  /// Y el de la semana de despues. Son las dos unicas que se pueden crear
+  /// desde aqui.
+  fechaCorteSiguiente: string;
   /// Restriccion cuya evidencia se abre al entrar (viene del codigo QR).
   abrirEvidencia?: string | null;
   /// Tarea a la que se llega desde el codigo QR: se resalta y se despliega.
@@ -108,7 +112,7 @@ export function MatrizLookahead({
     sinAnalizar,
     semanas,
     puedeGestionar,
-    semanasAbiertas,
+    semanasDestino,
     puedeComprometer,
     personas,
     liberacion,
@@ -495,8 +499,9 @@ export function MatrizLookahead({
         <PanelComprometer
           obraId={obraId}
           seleccionadas={seleccionadas}
-          semanasAbiertas={semanasAbiertas}
+          semanasDestino={semanasDestino}
           fechaProximoCorte={fechaProximoCorte}
+          fechaCorteSiguiente={fechaCorteSiguiente}
           // La seleccion se limpia al CERRAR, no al comprometer: si se limpiara
           // antes, el panel se quedaria sin tareas y se desmontaria llevandose
           // el aviso de "listo, N comprometidas" sin que diera tiempo a leerlo.

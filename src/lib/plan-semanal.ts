@@ -488,6 +488,24 @@ export function proximoCorte(diaSemana: number, hoy: Date): Date {
   return new Date(hoy.getTime() + salto * DIA_MS);
 }
 
+/**
+ * El corte de LA SEMANA DE DESPUES: siete dias mas que `proximoCorte`.
+ *
+ * Existe por un callejon sin salida real. `proximoCorte` devuelve siempre una
+ * fecha entre hoy y hoy+6, asi que el viernes por la tarde —con el corte de
+ * esa semana ya cerrado— la unica semana que se podia crear desde el Lookahead
+ * era la que se acababa de cerrar. El servidor contestaba «esta cerrada, elige
+ * otra» y no habia otra que elegir: para planificar la semana entrante habia
+ * que irse a otra pantalla.
+ *
+ * Siete dias justos y no «el proximo corte a partir de manana»: el segundo
+ * daria el MISMO dia cuando hoy no es el corte, y entonces las dos opciones
+ * del desplegable dirian lo mismo.
+ */
+export function corteSiguiente(diaSemana: number, hoy: Date): Date {
+  return new Date(proximoCorte(diaSemana, hoy).getTime() + 7 * DIA_MS);
+}
+
 export interface SemanaNumerada {
   numero: number;
   fechaCorte: Date;

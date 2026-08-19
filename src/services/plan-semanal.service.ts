@@ -11,6 +11,7 @@ import {
   tendenciaPpc,
   rangoSemana,
   proximoCorte,
+  corteSiguiente,
   tareasDeLaSemana,
   restriccionDeTarea,
   sugerirCantidad,
@@ -1409,6 +1410,61 @@ export interface SemanaAbierta {
   fechaCorte: Date;
 }
 
+export interface SemanaDestino extends SemanaAbierta {
+  /// Cerrada: admite compromisos, pero hay que reabrirla primero y eso se
+  /// pide aparte.
+  cerrada: boolean;
+}
+
+/// Cuantas semanas CERRADAS se ofrecen. Las de hace meses no son un destino
+/// razonable y llenarian el desplegable de ruido.
+const CERRADAS_QUE_SE_OFRECEN = 4;
+
+/**
+ * Las semanas que pueden recibir compromisos desde el Lookahead: las abiertas
+ * y las ultimas cerradas.
+ *
+ * LAS CERRADAS SE ENSENAN, y eso es nuevo. Antes solo salian las abiertas, asi
+ * que la semana que acababas de cerrar simplemente NO ESTABA: su ausencia se
+ * leia como «no existe» y no como «esta cerrada», y el mensaje del servidor
+ * —«esta cerrada, elige otra»— mandaba a elegir algo que el desplegable no
+ * ofrecia. Verlas en la lista, marcadas, convierte un callejon en un paso mas.
+ */
+export async function semanasParaComprometer(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<SemanaDestino[]> {
+  if (!puede(sesion, "plan_semanal:leer")) return [];
+
+  const [abiertas, cerradas] = await Promise.all([
+    prisma.planSemanal.findMany({
+      where: {
+        projectId: obraId,
+        estado: "ABIERTO",
+        project: { companyId: sesion.companyId },
+      },
+      orderBy: { fechaCorte: "asc" },
+      select: { id: true, numero: true, fechaCorte: true },
+    }),
+    prisma.planSemanal.findMany({
+      where: {
+        projectId: obraId,
+        estado: "CERRADO",
+        project: { companyId: sesion.companyId },
+      },
+      // Las mas RECIENTES: si hay que reabrir una, es la de hace unos dias.
+      orderBy: { fechaCorte: "desc" },
+      take: CERRADAS_QUE_SE_OFRECEN,
+      select: { id: true, numero: true, fechaCorte: true },
+    }),
+  ]);
+
+  return [
+    ...abiertas.map((s) => ({ ...s, cerrada: false })),
+    ...cerradas.map((s) => ({ ...s, cerrada: true })),
+  ];
+}
+
 /// Las semanas que todavia admiten compromisos (para elegir destino).
 export async function planesAbiertos(
   sesion: SesionActiva,
@@ -1472,8 +1528,26 @@ async function sugerenciasPorTarea(
 
 
 export interface DatosComprometer {
-  /// Semana destino; null = crear la del proximo corte.
+  /// Semana destino; null = crear una nueva, y `crearEn` dice cual.
   planId: string | null;
+  /**
+   * Cual de las dos semanas creables. Solo se mira cuando `planId` es null.
+   *
+   * Es una ELECCION entre dos, no una fecha: el cliente no puede pedir crear
+   * una semana cualquiera desde aqui. Con una fecha libre, el Lookahead se
+   * convertiria en una segunda via de crear semanas —la primera es
+   * `crearPlanSemanal`, con su aviso de numeracion a contramano— y las dos
+   * acabarian discrepando.
+   */
+  crearEn?: "proximo" | "siguiente";
+  /**
+   * Reabrir la semana destino si esta cerrada.
+   *
+   * Va aparte de `planId` a proposito: reabrir es un acto distinto de
+   * comprometer —deshace un cierre, con su apunte— y tiene que pedirse.
+   * Elegir una semana cerrada sin esto sigue siendo un error.
+   */
+  reabrir?: boolean;
   uids: number[];
   /// El usuario ya vio y acepto los avisos (tareas no listas, repetidas).
   confirmado: boolean;
@@ -1575,11 +1649,38 @@ export async function comprometerAlPts(
     `${t.codigo ? `${t.codigo} ` : ""}${t.nombre}`.slice(0, 300);
 
 
-  // Semana destino: la pedida (debe estar abierta) o la del proximo corte.
-  const abiertas = await planesAbiertos(sesion, obraId);
+  /**
+   * Semana destino: la pedida, o una nueva.
+   *
+   * Se pregunta por ELLA en vez de buscarla en la lista de abiertas, que es lo
+   * que se hacia antes: con la lista, una semana cerrada era indistinguible de
+   * una que no existe, y las dos daban «ya no esta abierta». Ahora se sabe
+   * cual de las dos cosas pasa, que es justo lo que el usuario necesita para
+   * decidir si la reabre.
+   */
   let planId = datos.planId;
-  if (planId !== null && !abiertas.some((p) => p.id === planId)) {
-    return { ok: false, error: "Esa semana ya no esta abierta. Vuelve a elegir." };
+  const destino = planId
+    ? await prisma.planSemanal.findFirst({
+        where: {
+          id: planId,
+          projectId: obraId,
+          project: { companyId: sesion.companyId },
+        },
+        select: { id: true, numero: true, estado: true },
+      })
+    : null;
+
+  if (planId !== null && !destino) {
+    return { ok: false, error: "Esa semana ya no existe. Vuelve a elegir." };
+  }
+  // Cerrada SIN pedir reabrirla: no se reabre por el camino: reabrir deshace
+  // un cierre y tiene que ser un acto deliberado, no el efecto de elegir en
+  // un desplegable.
+  if (destino?.estado === "CERRADO" && datos.reabrir !== true) {
+    return {
+      ok: false,
+      error: `La Semana ${destino.numero} esta cerrada. Marca reabrirla, o elige otra.`,
+    };
   }
 
   // Avisos: lo que no esta LISTO y lo que ya vive en otra semana.
@@ -1645,7 +1746,12 @@ export async function comprometerAlPts(
       // correlativo dentro de transaccion que usa `crearPlanSemanal`.
       let numero: number;
       if (planId === null) {
-        const fechaCorte = proximoCorte(obra.diaCorteSemanal, hoy());
+        // La que eligio el usuario entre las DOS creables. `proximo` por
+        // defecto: es lo que hacia antes de existir la otra.
+        const fechaCorte =
+          datos.crearEn === "siguiente"
+            ? corteSiguiente(obra.diaCorteSemanal, hoy())
+            : proximoCorte(obra.diaCorteSemanal, hoy());
         const existente = await tx.planSemanal.findFirst({
           where: { projectId: obraId, fechaCorte },
           select: { id: true, numero: true, estado: true },
@@ -1672,7 +1778,35 @@ export async function comprometerAlPts(
           planId = creado.id;
         }
       } else {
-        numero = abiertas.find((p) => p.id === planId)?.numero ?? 0;
+        numero = destino?.numero ?? 0;
+
+        /**
+         * Reabrir, si el usuario lo pidio y hacia falta.
+         *
+         * DENTRO de la transaccion y no antes: si el compromiso fallara
+         * despues, una semana reabierta a medias quedaria abierta sin que
+         * nadie hubiera llevado nada a ella. Y con su apunte propio, porque
+         * reabrir tiene consecuencias que comprometer no tiene —al volver a
+         * cerrarla se reescriben sus avances— y no puede quedar disuelto
+         * dentro del apunte del compromiso.
+         */
+        if (destino?.estado === "CERRADO") {
+          await tx.planSemanal.update({
+            where: { id: planId },
+            data: { estado: "ABIERTO", cerradoPor: null, cerradoAt: null },
+          });
+          await tx.auditLog.create({
+            data: {
+              companyId: sesion.companyId,
+              userId: sesion.userId,
+              projectId: obraId,
+              entidad: "PlanSemanal",
+              entidadId: planId,
+              accion: "UPDATE",
+              despues: { evento: "reabrir", desde: "lookahead" },
+            },
+          });
+        }
       }
 
 

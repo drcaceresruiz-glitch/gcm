@@ -10,7 +10,7 @@ import { inventarioEjecutable } from "@/lib/indicadores-lps";
 import { PanelIndicadores } from "@/components/lookahead/PanelIndicadores";
 import { puede } from "@/lib/rbac";
 import { fechaCorta, hoy } from "@/utils/fechas";
-import { proximoCorte } from "@/lib/plan-semanal";
+import { proximoCorte, corteSiguiente } from "@/lib/plan-semanal";
 import { MatrizLookahead } from "@/components/lookahead/MatrizLookahead";
 import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 import { QrCode } from "lucide-react";
@@ -103,6 +103,11 @@ export default async function LookaheadPage({
           obraId={id}
           datos={datos}
           fechaProximoCorte={proximoCorte(obra.diaCorteSemanal, hoy())
+            .toISOString()
+            .slice(0, 10)}
+          /* La de dentro de siete dias. Sin ella, un viernes con la semana ya
+             cerrada no habia forma de planificar la entrante desde aqui. */
+          fechaCorteSiguiente={corteSiguiente(obra.diaCorteSemanal, hoy())
             .toISOString()
             .slice(0, 10)}
           abrirEvidencia={evidencia ?? null}

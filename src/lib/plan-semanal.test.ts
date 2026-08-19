@@ -6,6 +6,7 @@ import {
   sugerirPorcentaje,
   tendenciaPpc,
   proximoCorte,
+  corteSiguiente,
   rangoSemana,
   tareasDeLaSemana,
   restriccionDeTarea,
@@ -291,6 +292,47 @@ describe("proximoCorte", () => {
     const dia = hoy.getUTCDay() === 0 ? 7 : hoy.getUTCDay();
     const siguiente = dia === 7 ? 1 : dia + 1;
     expect(proximoCorte(siguiente, hoy)).toEqual(dc("2026-08-04"));
+  });
+});
+
+/**
+ * El corte de la semana de DESPUES.
+ *
+ * Existe por un callejon real: el viernes (corte por defecto) con la semana ya
+ * cerrada, `proximoCorte` devuelve HOY —la que se acaba de cerrar— y desde el
+ * Lookahead no habia forma de planificar la entrante.
+ */
+describe("corteSiguiente", () => {
+  it("cuando hoy ES el corte, da el de dentro de siete dias", () => {
+    const hoy = dc("2026-08-07"); // viernes
+    const dia = hoy.getUTCDay() === 0 ? 7 : hoy.getUTCDay();
+
+    expect(proximoCorte(dia, hoy)).toEqual(dc("2026-08-07"));
+    expect(corteSiguiente(dia, hoy)).toEqual(dc("2026-08-14"));
+  });
+
+  it("y cuando no lo es, sigue siendo una semana MAS que el proximo", () => {
+    const hoy = dc("2026-08-03"); // lunes
+    const dia = 5; // viernes
+
+    expect(proximoCorte(dia, hoy)).toEqual(dc("2026-08-07"));
+    expect(corteSiguiente(dia, hoy)).toEqual(dc("2026-08-14"));
+  });
+
+  /**
+   * Lo que NO puede pasar: que las dos opciones del desplegable digan la misma
+   * fecha. Seria el fallo de haberlo escrito como «el proximo corte a partir
+   * de manana», que da lo mismo que `proximoCorte` seis dias de cada siete.
+   */
+  it("nunca coincide con el proximo corte, sea cual sea el dia", () => {
+    for (let i = 0; i < 7; i++) {
+      const hoy = new Date(dc("2026-08-03").getTime() + i * 86_400_000);
+      for (let dia = 1; dia <= 7; dia++) {
+        expect(corteSiguiente(dia, hoy).getTime()).toBeGreaterThan(
+          proximoCorte(dia, hoy).getTime(),
+        );
+      }
+    }
   });
 });
 
