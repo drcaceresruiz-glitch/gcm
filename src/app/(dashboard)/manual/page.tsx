@@ -42,10 +42,22 @@ export default async function ManualPage() {
           manual que avisa dónde se tropieza vale más que uno que solo dice
           dónde pulsar.
         </p>
+        {/* Con el manual completo, «los demás están en el índice» no
+            describiría nada: el texto tiene que decir la verdad en los dos
+            estados, no solo mientras faltaba material. */}
         <p className="mt-2 text-xs opacity-60">
-          {escritos} de {CAPITULOS.length} capítulos escritos. Los demás
-          están en el índice con su pregunta, para que el mapa esté completo
-          desde hoy.
+          {escritos === CAPITULOS.length ? (
+            <>
+              Los {CAPITULOS.length} capítulos están escritos. Se leen en
+              orden o sueltos, según la pregunta que traigas.
+            </>
+          ) : (
+            <>
+              {escritos} de {CAPITULOS.length} capítulos escritos. Los demás
+              están en el índice con su pregunta, para que el mapa esté
+              completo desde hoy.
+            </>
+          )}
         </p>
       </div>
 

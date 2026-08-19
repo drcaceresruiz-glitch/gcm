@@ -1256,6 +1256,473 @@ const VALORIZACIONES = (
 );
 
 // ---------------------------------------------------------------------------
+// Capitulo: leer la obra (tablero e indicadores)
+// ---------------------------------------------------------------------------
+
+const INDICADORES = (
+  <>
+    <Clave>
+      Aquí no hay cifras nuevas: hay las mismas de siempre puestas juntas
+      para poder decidir. Y una regla que gobierna la pantalla entera —{" "}
+      <strong>cuando un número no se puede sostener, GCM no lo enseña</strong>
+      : dice por qué falta. Un indicador inventado es peor que un hueco,
+      porque el hueco se pregunta y el número se cree.
+    </Clave>
+
+    <S titulo="El tablero de la obra">
+      <p>
+        El tablero reúne lo que hay que mirar sin abrir nada: plazo,
+        avance contra plan, qué está frenando la obra, la ruta crítica, el
+        plan semanal y las órdenes. Se arma <strong>por módulos</strong> —se
+        encienden y apagan— porque cada obra y cada persona miran cosas
+        distintas.
+      </p>
+      <p>
+        Todas sus cifras salen de <strong>las mismas funciones que las
+        pantallas de detalle</strong> a las que enlaza. No es un detalle de
+        implementación: un tablero que calcula por su cuenta acaba diciendo
+        un número distinto del que dice la pantalla de al lado, y entonces
+        no se cree ninguno de los dos.
+      </p>
+    </S>
+
+    <S titulo="El valor ganado: SPI y CPI">
+      <p>
+        Tres cifras sostienen todo. El <strong>PV</strong> es cuánto del
+        presupuesto <em>deberías</em> haber ganado a la fecha según el plan;
+        el <strong>EV</strong>, cuánto has ganado de verdad (presupuesto ×
+        avance); el <strong>AC</strong>, cuánto te ha costado — en GCM, lo
+        comprometido en órdenes aprobadas.
+      </p>
+      <p>
+        De ahí salen los dos índices: <strong>SPI = EV/PV</strong> (plazo) y{" "}
+        <strong>CPI = EV/AC</strong> (costo). Por encima de 1 vas mejor que
+        el plan; por debajo, peor. El semáforo los lee igual en toda la
+        aplicación: <strong>verde</strong> por encima de 1,{" "}
+        <strong>ámbar</strong> entre 0,90 y 1 —ir justo al plan no es ir
+        sobrado— y <strong>rojo</strong> por debajo de 0,90.
+      </p>
+      <p>
+        La mitad de <strong>plazo</strong> (PV, EV, SPI) sale siempre. La de{" "}
+        <strong>costo</strong> exige ver órdenes: sin ese permiso, el panel
+        se queda en el plazo y lo dice, en vez de enseñar un cero que se
+        leería como «no hemos gastado nada».
+      </p>
+    </S>
+
+    <S titulo="Por qué a veces el CPI no aparece">
+      <p>
+        Al principio de una obra el costo registrado no representa todavía
+        el trabajo hecho, y proyectar el final desde ahí da disparates. Pasó
+        de verdad en una obra real: con una sola orden aprobada de 11 mil
+        frente a 62 mil ya ganados, el CPI salía <strong>5,6</strong> y la
+        pantalla anunciaba, en verde, un <strong>ahorro de 634 mil
+        soles</strong> — el 82% del presupuesto. No era un error de fórmula:
+        era proyectar desde un costo que aún no significaba nada.
+      </p>
+      <p>
+        Por eso hay una <strong>compuerta</strong>: mientras el costo
+        registrado no respalde lo ganado, el CPI y la proyección del
+        resultado no se enseñan, y en su lugar aparece el motivo. Las cifras
+        de plazo siguen siendo válidas y sí se ven.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Celebrar un CPI alto al principio de la obra",
+            pasa: (
+              <p>
+                Es el disparate de arriba, y por eso GCM ya no lo enseña. Si
+                alguna cifra de ahorro parece demasiado buena al principio,
+                casi siempre es que el costo va por detrás de lo ejecutado:
+                se trabaja y la orden se aprueba después.
+              </p>
+            ),
+          },
+          {
+            hace: "Leer un SPI de 1,00 sin mirar contra qué se mide",
+            pasa: (
+              <p>
+                Sin línea base, el plan es el último corte que subiste:
+                estás midiendo contra ti mismo y siempre irás al día. La
+                pantalla dice contra qué versión mide — conviene leerlo
+                antes de dar el plazo por sano.
+              </p>
+            ),
+          },
+          {
+            hace: "Comparar el «Comprometido» con el AC del valor ganado",
+            pasa: (
+              <p>
+                No son la misma cifra y no tienen por qué coincidir: el
+                Comprometido cuenta encargos vigentes más órdenes sueltas; el
+                AC cuenta órdenes aprobadas. Responden preguntas distintas
+                —cuánto he pactado y cuánto he formalizado— y el capítulo
+                del dinero explica por qué.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: gerencia
+// ---------------------------------------------------------------------------
+
+const GERENCIA = (
+  <>
+    <Clave>
+      Gerencia contesta lo que <strong>no se ve mirando las obras de una
+      en una</strong>: cuánto hay pedido en adicionales que todavía no
+      cuenta en ningún presupuesto, y qué partidas críticas van tarde en
+      toda la cartera. Es de empresa, no de obra — por eso no se llama
+      «tablero».
+    </Clave>
+
+    <S titulo="Quién entra: es el alcance, no un permiso">
+      <p>
+        La pantalla es para quien ve <strong>todas</strong> las obras. No
+        hace falta un permiso nuevo: quien tiene la cartera entera asignada
+        es, por definición, quien responde de ella. A quien lleva una obra,
+        un resumen de las demás no le dice nada que pueda usar — y ni
+        siquiera le aparece la entrada en el menú.
+      </p>
+    </S>
+
+    <S titulo="Adicionales pedidos y sin aprobar">
+      <p>
+        Un adicional en <strong>borrador</strong> es dinero que ya se pidió
+        y que todavía no cuenta en ningún sitio: el presupuesto solo suma
+        los aprobados. Obra por obra no se percibe; en la cartera junta
+        puede ser la diferencia entre el margen del año y su ausencia.
+      </p>
+      <p>
+        La cifra se calcula sumando <strong>las líneas</strong> de cada
+        movimiento, no su total guardado: mientras el adicional sigue en
+        borrador se le añaden y quitan líneas, así que el total guardado va
+        por detrás. Cada obra enlaza a sus Movimientos, que es donde el
+        adicional se revisa y se aprueba — aprobarlo es lo que lo mete en el
+        presupuesto.
+      </p>
+    </S>
+
+    <S titulo="El semáforo de partidas críticas y el SPI por duración">
+      <p>
+        Aquí solo salen las partidas que están <strong>en la ruta crítica y
+        atrasadas</strong>: su retraso corre la fecha de fin de toda la
+        obra. El resto de alertas ya se ven dentro de cada obra y aquí
+        serían ruido.
+      </p>
+      <p>
+        Junto a cada obra va su <strong>SPI por duración</strong>, con ese
+        nombre completo siempre. No es el SPI del valor ganado: este compara
+        avance real contra planeado ponderando por la duración de las
+        partidas, sin mirar dinero ni línea base. Llamar «SPI» a secas a dos
+        cuentas distintas según la pantalla es como se pierde la confianza
+        en las cifras.
+      </p>
+      <p>
+        Por cuidar el servidor, se examina un <strong>número limitado de
+        obras por carga</strong>. Si la cartera lo supera, la pantalla lo
+        dice con todas las letras: las demás <em>no están evaluadas</em>,
+        que no es lo mismo que estar bien.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Leer el semáforo como si cubriera toda la cartera",
+            pasa: (
+              <p>
+                Si hay más obras vivas que el tope por carga, arriba aparece
+                el aviso. Un panel que recorta en silencio se lee como «no
+                hay nada», que es justo lo contrario de la verdad.
+              </p>
+            ),
+          },
+          {
+            hace: "Comparar el SPI por duración con el SPI del valor ganado",
+            pasa: (
+              <p>
+                Miden cosas parecidas de forma distinta —uno pondera
+                duración contra el corte vigente, el otro dinero contra la
+                línea base— y pueden no coincidir. Por eso el rótulo lleva
+                siempre el apellido.
+              </p>
+            ),
+          },
+          {
+            hace: "Dar por bueno un total de adicionales sin abrir las obras",
+            pasa: (
+              <p>
+                Es una <em>intención</em>, no un compromiso: son borradores
+                que alguien está redactando y que pueden crecer, encogerse o
+                no aprobarse nunca. Sirve para anticiparse, no para
+                presupuestar.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: los avisos y el reloj
+// ---------------------------------------------------------------------------
+
+const AVISOS = (
+  <>
+    <Clave>
+      Casi todo en GCM lo provoca alguien pulsando algo. Los avisos son la
+      excepción: los provoca <strong>que pase el tiempo</strong>, y el
+      tiempo no pulsa botones. Por eso hay un <strong>reloj</strong> que
+      pasa cada pocos minutos y mira qué lleva días sin resolverse, qué
+      fecha se acerca y qué valorización no llegó.
+    </Clave>
+
+    <S titulo="El interruptor está apagado hasta que alguien lo enciende">
+      <p>
+        Los avisos automáticos se activan <strong>por obra</strong>, en su
+        configuración, y una obra recién creada los tiene apagados. Es
+        deliberado: los que insisten —el recordatorio y el resumen del día—
+        empezarían a escribirle a gente que no los pidió, y la forma más
+        rápida de que alguien apague los avisos <em>enteros</em> es
+        insistirle sin permiso.
+      </p>
+      <p>
+        Consecuencia que hay que saber:{" "}
+        <strong>con el interruptor apagado no suena nada en esa obra</strong>{" "}
+        — ni los recordatorios de restricciones, ni los hitos, ni el aviso
+        de valorización pendiente. Si alguien dice «no me llega nada», es lo
+        primero que hay que mirar.
+      </p>
+      <p>
+        Y al encenderlos, la primera pasada <strong>calla a
+        propósito</strong>: una obra con cuarenta restricciones viejas
+        mandaría cuarenta recordatorios de golpe, y quien acabara de
+        configurarlos concluiría —con razón— que esto es spam.
+      </p>
+    </S>
+
+    <S titulo="Qué avisa, y por dónde">
+      <p>
+        Hay tres canales. La <strong>campanita</strong> dentro de GCM, que
+        solo tienen los usuarios de la empresa; el <strong>correo</strong>,
+        que llega también a contactos de fuera; y el <strong>SMS</strong>,
+        que <strong>nace apagado siempre</strong> — detrás hay una SIM que
+        se paga, y nadie pidió gastarla en su nombre. Quien quiera SMS lo
+        enciende en su suscripción.
+      </p>
+      <p>
+        El reloj avisa de tres cosas: las <strong>restricciones</strong> que
+        llevan días abiertas o cuya fecha comprometida ya pasó (un
+        recordatorio, y un resumen del día a partir de la hora que diga la
+        obra); los <strong>hitos</strong> que se acercan o se pasan, con la
+        fecha del cronograma vigente; y las{" "}
+        <strong>valorizaciones</strong> que tocaban y no constan, que van
+        solo a la campanita de los residentes de esa obra.
+      </p>
+      <p>
+        Cuando una restricción tiene <strong>responsable</strong>, esa
+        persona recibe el aviso aunque no se haya suscrito a nada: una
+        suscripción es una regla general que alguien tuvo que configurar
+        bien; una restricción con su nombre encima es un hecho.
+      </p>
+    </S>
+
+    <S titulo="Los topes existen para que los avisos se sigan leyendo">
+      <p>
+        Hay un máximo de SMS por persona y día, y un presupuesto de correos
+        por pasada. Lo que no cabe en SMS <strong>degrada a correo</strong>{" "}
+        en vez de perderse, y los hitos van por delante en el reparto: son
+        pocos y hablan de una fecha que no vuelve, mientras que un
+        recordatorio vuelve mañana.
+      </p>
+      <p>
+        El mismo aviso <strong>no se repite</strong>: cada uno lleva su
+        marca. El de valorización es la excepción y suena una vez al día
+        mientras la deuda siga — si sonara una sola vez, una deuda que nadie
+        atendió desaparecería de la vista.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Dar por hecho que los avisos funcionan sin haberlos encendido",
+            pasa: (
+              <p>
+                Es el malentendido más común de todos. Sin el interruptor de
+                la obra no sale ni un aviso, y nada falla ni se queja: el
+                silencio se parece mucho a «no hay nada pendiente».
+              </p>
+            ),
+          },
+          {
+            hace: "Esperar el recordatorio de una restricción sin responsable",
+            pasa: (
+              <p>
+                No hay a quién escribirle. Lo recoge la suscripción general
+                de la obra si alguien la configuró, y el panel lo cuenta
+                como «sin responsable» — esa cifra debería tender a cero.
+              </p>
+            ),
+          },
+          {
+            hace: "Contar con que el SMS llegue porque es urgente",
+            pasa: (
+              <p>
+                El SMS está apagado salvo que alguien lo encienda en su
+                suscripción, y además tiene tope diario. Para algo que no
+                puede esperar, el aviso no sustituye a una llamada.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: cerrar, respaldar y restaurar
+// ---------------------------------------------------------------------------
+
+const CIERRE = (
+  <>
+    <Clave>
+      Cerrar una obra es declarar que su resultado ya es{" "}
+      <strong>historia</strong>: desde ese momento no admite cambios, porque
+      modificarla falsearía lo que de verdad pasó. Si además hay que
+      borrarla, el camino pasa siempre por{" "}
+      <strong>descargar antes su respaldo</strong> — y ese respaldo se puede
+      volver a cargar.
+    </Clave>
+
+    <S titulo="Cerrar: un cartel que sí se cumple">
+      <p>
+        Una obra cerrada no acepta escrituras en ninguna pantalla: ni
+        importar presupuesto, ni editar partidas, ni registrar avance, ni
+        emitir órdenes. Hubo un tiempo en que el cartel decía «no admite más
+        cambios» y era mentira —solo impedía cambiar de estado—, y un cartel
+        que no se cumple es peor que no ponerlo: enseña a no creerse los
+        carteles.
+      </p>
+      <p>
+        Lo que sí se puede siempre es <strong>leer</strong>: la obra cerrada
+        se consulta entera, con sus cifras y sus documentos.
+      </p>
+    </S>
+
+    <S titulo="El respaldo, el borrado y la vuelta">
+      <p>
+        El <strong>respaldo</strong> es un archivo comprimido con los datos
+        de la obra, sus fotos y un informe legible. Va{" "}
+        <strong>firmado</strong>: si alguien cambia un céntimo dentro, la
+        firma deja de validar, y un respaldo de otra empresa tampoco valida.
+      </p>
+      <p>
+        El <strong>borrado</strong> definitivo es solo del ADMIN y pide dos
+        cosas a la vez: escribir el <strong>nombre exacto</strong> de la
+        obra y su contraseña. No hay flujo de solicitud ni aprobación de
+        terceros — pero tampoco se borra de un clic.
+      </p>
+      <p>
+        La <strong>restauración</strong> devuelve la obra a la aplicación
+        como <strong>copia de auditoría</strong>: se ve entera, con todas
+        sus pantallas, y no admite ni un cambio. Solo se puede restaurar{" "}
+        <strong>en la misma empresa</strong> que generó el respaldo.
+      </p>
+      <p>
+        Dos detalles que conviene saber antes de necesitarlos: al restaurar,
+        los avisos de esa obra se fuerzan a <strong>apagados</strong> —si no,
+        el reloj empezaría a mandar recordatorios de una obra terminada hace
+        años—, y <strong>las fotos no vuelven al disco</strong>: se
+        restauran sus fichas, no los archivos. Si las imágenes importan, hay
+        que conservar el respaldo.
+      </p>
+    </S>
+
+    <S titulo="El recorrido, en orden">
+      <Recorrido
+        pasos={[
+          <>
+            <strong>Cerrar la obra</strong> cuando de verdad terminó. Desde
+            ahí es historia y deja de admitir cambios.
+          </>,
+          <>
+            <strong>Descargar el respaldo</strong> y guardarlo donde la
+            empresa guarde lo que no se puede perder. Este paso es el que
+            hace reversible el siguiente.
+          </>,
+          <>
+            <strong>Borrar</strong>, si hace falta: ADMIN, nombre exacto y
+            contraseña.
+          </>,
+          <>
+            Si algún día hay que revisarla,{" "}
+            <strong>cargar el respaldo</strong> desde el Archivo de la
+            empresa: vuelve como copia de auditoría, de solo lectura.
+          </>,
+        ]}
+      />
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Borrar una obra sin haber guardado el respaldo",
+            pasa: (
+              <p>
+                No hay vuelta atrás: el borrado es definitivo y se lleva
+                partidas, cronograma, avances, órdenes y encargos. El
+                respaldo es la única copia — por eso la pantalla lo pide
+                antes.
+              </p>
+            ),
+          },
+          {
+            hace: "Cerrar la obra con trabajo aún por registrar",
+            pasa: (
+              <p>
+                Todo lo que falte por reportar se queda fuera para siempre:
+                la obra deja de admitir escrituras. Conviene cerrar el
+                último parte, la última valorización y el último pago{" "}
+                <em>antes</em> de cerrar.
+              </p>
+            ),
+          },
+          {
+            hace: "Confiar en un respaldo que nadie ha probado a cargar",
+            pasa: (
+              <p>
+                La restauración está probada de ida y vuelta, pero el
+                archivo lo custodias tú: si se corrompe o se pierde en el
+                camino, la firma lo detectará y ya no habrá obra a la que
+                volver. Un respaldo sin guardar bien es un respaldo que no
+                existe.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
 // El indice: los capitulos en el orden del trabajo real
 // ---------------------------------------------------------------------------
 
@@ -1361,7 +1828,7 @@ export const CAPITULOS: CapituloManual[] = [
     resumen:
       "El tablero de la obra, los semáforos, el valor ganado (SPI y CPI) y " +
       "qué significa cada rótulo — y cuándo una cifra calla a propósito.",
-    contenido: null,
+    contenido: INDICADORES,
   },
   {
     slug: "gerencia",
@@ -1371,7 +1838,7 @@ export const CAPITULOS: CapituloManual[] = [
     resumen:
       "Los adicionales pedidos y sin aprobar, el semáforo de partidas " +
       "críticas y el SPI por duración de cada obra.",
-    contenido: null,
+    contenido: GERENCIA,
   },
   {
     slug: "avisos",
@@ -1381,7 +1848,7 @@ export const CAPITULOS: CapituloManual[] = [
     resumen:
       "La campanita, el correo y el SMS: qué avisa solo, por qué los " +
       "recordatorios nacen apagados y dónde se encienden por obra.",
-    contenido: null,
+    contenido: AVISOS,
   },
   {
     slug: "cierre",
@@ -1389,9 +1856,9 @@ export const CAPITULOS: CapituloManual[] = [
     pregunta: "lo que ya terminó",
     paraQuien: "ADMIN.",
     resumen:
-      "Qué significa cerrar una obra, el respaldo completo, la restauración " +
-      "para auditoría y lo único que no se borra jamás.",
-    contenido: null,
+      "Qué significa cerrar una obra, el respaldo firmado, el borrado en " +
+      "dos pasos y la restauración como copia de auditoría.",
+    contenido: CIERRE,
   },
 ];
 
