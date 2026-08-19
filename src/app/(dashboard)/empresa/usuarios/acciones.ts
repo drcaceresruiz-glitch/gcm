@@ -72,6 +72,7 @@ export async function accionEditarUsuario(
   const resultado = await editarUsuario(sesion, texto(datos, "id"), {
     nombres: texto(datos, "nombres"),
     apellidos: texto(datos, "apellidos"),
+    email: texto(datos, "email"),
     cargo: texto(datos, "cargo"),
     tipoDoc: texto(datos, "tipoDoc"),
     numDoc: texto(datos, "numDoc"),

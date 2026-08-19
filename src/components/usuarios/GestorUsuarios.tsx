@@ -156,7 +156,7 @@ function PanelAlta({ alCerrar }: { alCerrar: () => void }) {
               name="email"
               type="email"
               etiqueta="Correo"
-              ayuda="Será su usuario de acceso. No se puede cambiar después."
+              ayuda="Será su usuario de acceso. Después solo lo puede cambiar un administrador, desde aquí mismo."
               required
               maxLength={150}
             />
@@ -285,6 +285,22 @@ function FormEdicion({
       <div className="grid gap-4 sm:grid-cols-2">
         <CampoTexto id={`n-${usuario.id}`} name="nombres" etiqueta="Nombres" defaultValue={usuario.nombres} required maxLength={100} />
         <CampoTexto id={`a-${usuario.id}`} name="apellidos" etiqueta="Apellidos" defaultValue={usuario.apellidos} required maxLength={100} />
+      </div>
+
+      {/* El correo se edita AQUI y no en «Mi perfil»: es el identificador de
+          acceso, y quien perdio el buzon no puede entrar a cambiarlo. Por eso
+          lo cambia un administrador, no cada uno. */}
+      <div className="mt-4">
+        <CampoTexto
+          id={`e-${usuario.id}`}
+          name="email"
+          type="email"
+          etiqueta="Correo"
+          ayuda="Es su usuario de acceso. Si lo cambias, se cerrarán sus sesiones y tendrá que entrar con el nuevo."
+          defaultValue={usuario.email}
+          required
+          maxLength={150}
+        />
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">

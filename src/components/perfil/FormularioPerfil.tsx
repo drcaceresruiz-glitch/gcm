@@ -267,7 +267,7 @@ function BloqueSoloLectura({ perfil }: { perfil: Perfil }) {
     <Tarjeta>
       <SeccionTarjeta
         titulo="Datos que no se editan aquí"
-        nota="El correo es tu identificador de acceso; el rol y la empresa los gestiona un administrador."
+        nota="El correo es tu identificador de acceso: lo cambia un administrador, no tú. El rol y la empresa, igual."
         primera
       >
         <Dato etiqueta="Correo" valor={perfil.email} />

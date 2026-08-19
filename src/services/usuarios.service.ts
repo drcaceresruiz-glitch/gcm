@@ -12,10 +12,13 @@ import {
   correoClaveRestablecida,
 } from "@/services/mailer.service";
 import {
+  correoValido,
   validarAltaUsuario,
   rolValido,
   type DatosAltaUsuario,
 } from "@/lib/usuarios";
+import { esCorreoOperador, parsearOperadores } from "@/lib/operador";
+import { env } from "@/lib/env";
 import { validarDocumento } from "@/lib/perfil";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { Role } from "@/generated/prisma/enums";
@@ -237,6 +240,17 @@ export async function crearUsuario(
 export interface CambiosUsuario {
   nombres: string;
   apellidos: string;
+  /**
+   * El correo, que ADEMAS es el identificador de acceso.
+   *
+   * Hasta el 19/08/2026 no se podia cambiar por ninguna via: ni en «Mi
+   * perfil» —donde sale como solo lectura— ni aqui ni por la solicitud de
+   * cambio de perfil. Eso dejaba sin salida dos casos corrientes: un correo
+   * mal tecleado al dar de alta, y alguien que deja de tener acceso a ese
+   * buzon. Sin correo accesible no hay recuperacion de clave, y si ademas era
+   * el unico ADMIN, la constructora quedaba cerrada.
+   */
+  email: string;
   cargo: string;
   tipoDoc: string;
   numDoc: string;
@@ -266,6 +280,7 @@ export async function editarUsuario(
     select: {
       nombres: true,
       apellidos: true,
+      email: true,
       cargo: true,
       tipoDoc: true,
       numDoc: true,
@@ -309,6 +324,62 @@ export async function editarUsuario(
     }
   }
 
+  /**
+   * EL CORREO. Se normaliza igual que en el alta y en el acceso —minusculas y
+   * sin espacios— porque «Ana@X» y «ana@x» son la misma persona.
+   */
+  const email = cambios.email.trim().toLowerCase();
+  if (!correoValido(email)) {
+    return { ok: false, error: "El correo no tiene un formato valido." };
+  }
+
+  const cambiaCorreo = email !== usuario.email;
+
+  if (cambiaCorreo) {
+    /**
+     * NO SE TOCA EL CORREO DE UN OPERADOR, y es la guarda que mas importa.
+     *
+     * Quien opera GCM lo es por estar su correo en `GCM_OPERADORES`, una
+     * variable del SERVIDOR que no se puede editar desde la aplicacion.
+     * Cambiarlo aqui le quitaria el area de constructoras en silencio y sin
+     * forma de recuperarla desde dentro: habria que entrar a cPanel. Se
+     * rechaza y se dice el orden correcto.
+     */
+    if (esCorreoOperador(usuario.email, parsearOperadores(env.GCM_OPERADORES))) {
+      return {
+        ok: false,
+        error:
+          "Ese correo esta en la lista de operadores del servidor. Cambiarlo " +
+          "aqui dejaria a esa cuenta sin el area de constructoras y sin forma " +
+          "de recuperarla desde GCM. Cambialo primero en el servidor " +
+          "(GCM_OPERADORES) y despues aqui.",
+      };
+    }
+
+    /**
+     * El correo es unico en TODA la instalacion, no por empresa: es el
+     * identificador de acceso. Se comprueba aqui para poder decirlo con
+     * palabras en vez de dejar que reviente la clave unica.
+     *
+     * NO se dice de quien es cuando pertenece a otra empresa: seria contar
+     * que esa persona existe en esta instalacion.
+     */
+    const enUso = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, companyId: true, nombres: true, apellidos: true },
+    });
+
+    if (enUso && enUso.id !== userId) {
+      return {
+        ok: false,
+        error:
+          enUso.companyId === sesion.companyId
+            ? `Ese correo ya es de ${`${enUso.nombres} ${enUso.apellidos}`.trim()}.`
+            : "Ese correo ya esta en uso en GCM. Cada persona necesita el suyo.",
+      };
+    }
+  }
+
   // El documento propuesto no puede ser de otro de la empresa.
   if (numDoc !== usuario.numDoc) {
     const otro = await prisma.user.findFirst({
@@ -327,6 +398,7 @@ export async function editarUsuario(
   const datosNuevos = {
     nombres,
     apellidos,
+    email,
     cargo: cambios.cargo.trim() === "" ? null : cambios.cargo.trim().slice(0, 100),
     tipoDoc,
     numDoc,
@@ -348,6 +420,20 @@ export async function editarUsuario(
       },
     });
   });
+
+  /**
+   * Cambiar el correo cierra las sesiones de esa persona.
+   *
+   * El correo ES el identificador de acceso: dejarle la sesion abierta seria
+   * dejarle creyendo que entra con el de antes hasta que caduque y se
+   * encuentre fuera sin saber por que. Que tenga que volver a entrar es como
+   * se entera de cual es su nuevo identificador.
+   *
+   * Va FUERA de la transaccion y a proposito: si esto fallara, el correo ya
+   * esta cambiado y lo unico que queda es una sesion viva de mas, que caduca
+   * sola. Meterlo dentro arriesgaria deshacer un cambio de identidad correcto.
+   */
+  if (cambiaCorreo) await cerrarTodasLasSesiones(userId);
 
   return { ok: true };
 }

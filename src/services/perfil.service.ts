@@ -53,7 +53,15 @@ export interface Perfil {
   celular: string | null;
   /// Foto de perfil como data URL, o null. Libre, sin aprobacion.
   fotoPerfil: string | null;
-  /// Solo lectura: el correo es el identificador de acceso y no se edita.
+  /**
+   * Solo lectura AQUI: el correo es el identificador de acceso, y quien lo
+   * cambia es un administrador desde Empresa -> Usuarios.
+   *
+   * No lo cambia cada uno a proposito: el caso que hay que resolver es
+   * justamente el de quien YA NO PUEDE ENTRAR a su buzon, y ese no llega a
+   * esta pantalla. Dejarlo aqui ademas convertiria el robo de una sesion en
+   * el robo de la cuenta entera.
+   */
   email: string;
   role: string;
   /// Verificacion en dos pasos. Libre, la enciende y apaga cada persona.
