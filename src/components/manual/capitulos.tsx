@@ -204,14 +204,17 @@ const EMPEZAR = (
         verdad: son cuatro y tienen final. Y por último lo que quedó a medias
         y ya venció: restricciones con la fecha pasada, semanas sin cerrar.
       </p>
+    </S>
+
+    <S titulo="Sugiere, no lleva — y se aparta si molesta">
       <p>
-        <strong>Sugiere, no lleva.</strong> Nunca navega solo, ni siquiera
-        después de guardar algo: aprobar una revisión o un movimiento son
-        irreversibles, y encadenarlos sin leer es exactamente lo que no se
-        quiere enseñar. Tampoco propone lo que tú no puedes hacer —si no
-        tienes permiso para importar el presupuesto, no te lo pide— y se
-        esconde solo cuando ya estás en la pantalla del paso, para no robarte
-        la primera línea mientras trabajas.
+        <strong>Nunca navega solo</strong>, ni siquiera después de guardar
+        algo: aprobar una revisión o un movimiento son irreversibles, y
+        encadenarlos sin leer es exactamente lo que no se quiere enseñar.
+        Tampoco propone lo que tú no puedes hacer —si no tienes permiso para
+        importar el presupuesto, no te lo pide— y se esconde solo cuando ya
+        estás en la pantalla del paso, para no robarte la primera línea
+        mientras trabajas.
       </p>
       <p>
         Las sugerencias se apartan con <strong>«Ahora no»</strong>, que dura
