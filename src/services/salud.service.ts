@@ -2,7 +2,9 @@ import "server-only";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
 import { estadoDelReloj, type EstadoReloj } from "@/lib/avisos";
+import { parsearOperadores } from "@/lib/operador";
 import { shaDelPaquete } from "@/lib/version";
 
 export interface EstadoSalud {
@@ -57,6 +59,25 @@ export interface EstadoSalud {
    * Se expone precisamente para que ese hueco se pueda VER en vez de deducirlo.
    */
   shaArranque: string | null;
+  /**
+   * Cuantos correos hay en `GCM_OPERADORES`. El NUMERO, nunca los correos.
+   *
+   * Sin esto, una instalacion sin operadores y una con el correo mal tecleado
+   * se ven EXACTAMENTE igual desde fuera y desde dentro: `/operador` devuelve
+   * al panel en los dos casos, que es el comportamiento correcto —no se
+   * confirma a un desconocido que esa pantalla existe— pero deja a quien
+   * administra sin forma de saber si su despliegue quedo bien.
+   *
+   * Con el numero se distinguen los dos fallos: **0** = falta la variable en
+   * el servidor; **mayor que 0 y aun asi no ves la pantalla** = tu correo no
+   * es ninguno de los de la lista. Es la diferencia entre media hora y un
+   * minuto, y es el mismo motivo por el que aqui ya salen `despliegue` y
+   * `reloj`: un fallo de configuracion que no se ve no se arregla.
+   *
+   * Un numero no identifica a nadie ni ayuda a entrar: sin credenciales, saber
+   * que hay dos operadores no acerca a nadie a ser uno.
+   */
+  operadores: number;
 }
 
 /**
@@ -71,6 +92,11 @@ export async function verificarSalud(): Promise<EstadoSalud> {
   const desplieguePendiente = hayPaqueteSinAplicar();
   const shaPaquete = shaDelPaquete();
   const shaArranque = process.env["BUILD_SHA"] ?? null;
+  // Se cuenta con el MISMO parseador que decide quien es operador, no
+  // partiendo la cadena aqui: dos formas de leer la lista acabarian
+  // discrepando en los espacios o en los duplicados, y este numero existe
+  // justamente para que nadie tenga que dudar de el.
+  const operadores = parsearOperadores(env.GCM_OPERADORES).length;
 
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -81,6 +107,7 @@ export async function verificarSalud(): Promise<EstadoSalud> {
       reloj: await estadoDelRelojDeAvisos(),
       shaPaquete,
       shaArranque,
+      operadores,
     };
   } catch {
     return {
@@ -92,6 +119,7 @@ export async function verificarSalud(): Promise<EstadoSalud> {
       reloj: "nunca",
       shaPaquete,
       shaArranque,
+      operadores,
     };
   }
 }

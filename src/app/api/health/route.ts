@@ -62,6 +62,12 @@ export async function GET() {
       // y lleva media hora sin correr. Sin esto, unos avisos que no salen se
       // ven exactamente igual que unos avisos que no hacian falta.
       reloj: salud.reloj,
+      // Cuantos correos hay en `GCM_OPERADORES`. El NUMERO, nunca los correos.
+      // 0 = falta la variable y NADIE puede dar de alta constructoras, que es
+      // un despliegue a medias imposible de ver de otra forma: `/operador`
+      // devuelve al panel igual cuando falta la lista que cuando tu correo no
+      // esta en ella. Con el numero se distinguen los dos casos.
+      operadores: salud.operadores,
     },
     { headers: { "Cache-Control": "no-store" } },
   );
