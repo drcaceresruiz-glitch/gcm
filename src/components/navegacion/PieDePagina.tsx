@@ -1,6 +1,7 @@
 import { HardHat, Ruler, Tag } from "lucide-react";
 
 import { SelloMetodologia } from "@/components/ui/SelloMetodologia";
+import { versionParaMostrar } from "@/lib/version";
 
 /**
  * Pie de pagina del area privada: marca, ano, creditos y version.
@@ -9,11 +10,13 @@ import { SelloMetodologia } from "@/components/ui/SelloMetodologia";
  * —como el resto de fechas del sistema— para que el aviso de derechos no
  * cambie de ano un dia antes por el desfase del servidor. `print:hidden` para
  * no ensuciar los documentos que se imprimen.
+ *
+ * LA VERSION NO SE ESCRIBE AQUI, y es lo unico importante de este archivo.
+ * Aqui vivio `const VERSION = "0.1.0"` con la instruccion de tocarla a mano
+ * en cada publicacion; nadie la toco en 473 commits y el pie anuncio la
+ * version del andamio con la aplicacion ya en produccion. Ahora sale sola de
+ * `lib/version`: el numero de `package.json` y el SHA del paquete que corre.
  */
-
-/// Version de la aplicacion. Acompana a la de `package.json`; se toca a mano
-/// al publicar para que el pie diga que hay desplegado.
-const VERSION = "0.1.0";
 
 const ANIO = new Intl.DateTimeFormat("es-PE", {
   timeZone: "America/Lima",
@@ -52,7 +55,7 @@ export function PieDePagina() {
             style={{ textShadow: "0 1px 2px rgba(0,0,0,0.35)" }}
           >
             <Tag className="size-3.5 shrink-0" aria-hidden="true" />
-            v{VERSION}
+            {versionParaMostrar()}
           </span>
         </div>
 

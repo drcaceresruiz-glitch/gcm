@@ -1,8 +1,9 @@
 import "server-only";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { prisma } from "@/lib/prisma";
 import { estadoDelReloj, type EstadoReloj } from "@/lib/avisos";
+import { shaDelPaquete } from "@/lib/version";
 
 export interface EstadoSalud {
   baseDatosConectada: boolean;
@@ -68,7 +69,7 @@ export interface EstadoSalud {
 export async function verificarSalud(): Promise<EstadoSalud> {
   const inicio = Date.now();
   const desplieguePendiente = hayPaqueteSinAplicar();
-  const shaPaquete = leerShaDelPaquete();
+  const shaPaquete = shaDelPaquete();
   const shaArranque = process.env["BUILD_SHA"] ?? null;
 
   try {
@@ -95,28 +96,20 @@ export async function verificarSalud(): Promise<EstadoSalud> {
   }
 }
 
-/**
- * El SHA que viaja DENTRO del paquete.
+/*
+ * El SHA que viaja DENTRO del paquete se lee en `lib/version`, no aqui.
  *
  * Existe porque el 2026-08-15 `/api/health` decia la version nueva mientras
  * corria la vieja, y no habia forma de saberlo con un curl. La causa: el unico
  * SHA que se publicaba venia de `app.js`, que el FTP deja en su sitio ANTES de
- * que nadie aplique el `gcm.tar.gz`.
+ * que nadie aplique el `gcm.tar.gz`. El archivo `BUILD_SHA` se genera en el
+ * workflow y va dentro del paquete, asi que llega al arbol vivo por el MISMO
+ * camino que el codigo: si el codigo esta, esto esta.
  *
- * Este archivo se genera en el workflow y va dentro del paquete, asi que llega
- * al arbol vivo por el MISMO camino que el codigo: si el codigo esta, esto
- * esta, y si no, no. No hay forma de que uno cambie sin el otro.
+ * Se mudo a `lib/version` cuando el pie de pagina necesito la misma cifra.
+ * Vive una sola vez a proposito: dos lecturas del mismo archivo son dos
+ * sitios donde puede divergir el criterio de que hacer si falta.
  */
-function leerShaDelPaquete(): string | null {
-  try {
-    const sha = readFileSync(join(process.cwd(), "BUILD_SHA"), "utf8").trim();
-    return sha === "" ? null : sha;
-  } catch {
-    // En local no existe, y en un paquete anterior a esta comprobacion
-    // tampoco. Las dos cosas se dicen igual: no se sabe.
-    return null;
-  }
-}
 
 /**
  * Cuando corrio el reloj por ultima vez.

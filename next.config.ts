@@ -1,6 +1,23 @@
+import { readFileSync } from "node:fs";
 import type { NextConfig } from "next";
 
+/**
+ * La version del producto, leida de `package.json` en tiempo de compilacion.
+ *
+ * Va aqui y no copiada en un componente porque una copia hay que acordarse de
+ * tocarla: la que vivia en el pie de pagina se quedo en "0.1.0" durante 473
+ * commits. Ver la cabecera de `src/lib/version.ts`.
+ */
+const { version } = JSON.parse(
+  readFileSync("./package.json", "utf8"),
+) as { version: string };
+
 const nextConfig: NextConfig = {
+  // Se inyecta en el paquete al compilar: en ejecucion ya es un literal, sin
+  // leer ningun archivo ni depender de `npm_package_version`, que solo existe
+  // cuando el proceso lo arranca npm (y a este lo arranca Passenger).
+  env: { APP_VERSION: version },
+
   // Empaqueta un servidor autocontenido. Es el unico modo viable para
   // desplegar sobre cPanel/Passenger y tambien facilita el paso a un VPS.
   output: "standalone",
