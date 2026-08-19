@@ -1,6 +1,10 @@
 import { tokenDeCabecera, tokenValido } from "@/lib/sms-cola";
 import { env } from "@/lib/env";
 import { pasadaDelReloj } from "@/services/avisos-reloj";
+import {
+  pasadaDeCorreoEntrante,
+  type ResumenCorreoEntrante,
+} from "@/services/correo-entrante.service";
 
 /**
  * El reloj de GCM, visto desde el cron.
@@ -41,9 +45,35 @@ export async function POST(peticion: Request) {
 
   const resumen = await pasadaDelReloj();
 
+  /**
+   * Y DESPUES, la lectura de buzones.
+   *
+   * En este orden y en su propio `try/catch`, las dos cosas a proposito: una
+   * conversacion IMAP con un servidor lento puede tardar lo que quiera, y los
+   * avisos —que son lo unico que de verdad no puede fallar— ya salieron.
+   *
+   * Si revienta, se dice en el cuerpo y el resto de la respuesta sigue siendo
+   * valida. Nunca al reves.
+   */
+  let correo: ResumenCorreoEntrante;
+  try {
+    correo = await pasadaDeCorreoEntrante();
+  } catch (e) {
+    correo = {
+      ok: false,
+      buzones: 0,
+      respuestas: 0,
+      ignorados: 0,
+      siguiente: null,
+      cortadaPorTiempo: false,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+
   // 200 aunque la pasada falle: el cuerpo lo dice, y un 500 haria que `curl
   // -f` se callara justo cuando hay algo que contar.
-  return Response.json(resumen, {
-    headers: { "Cache-Control": "no-store" },
-  });
+  return Response.json(
+    { ...resumen, correoEntrante: correo },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

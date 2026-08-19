@@ -10,6 +10,7 @@ import {
   accionGuardarRemitente,
   accionProbarRemitente,
   accionCambiarEstadoRemitente,
+  accionCambiarLecturaRespuestas,
   type EstadoRemitente,
 } from "@/app/(dashboard)/empresa/configuracion/acciones-remitente";
 import type { RemitenteEnPantalla } from "@/services/remitente-correo.service";
@@ -105,6 +106,10 @@ export function RemitenteCorreo({
   const [probado, probar] = useActionState(accionProbarRemitente, {});
   const [estado, cambiarEstado] = useActionState(
     accionCambiarEstadoRemitente,
+    {},
+  );
+  const [lectura, cambiarLectura] = useActionState(
+    accionCambiarLecturaRespuestas,
     {},
   );
 
@@ -203,6 +208,38 @@ export function RemitenteCorreo({
 
           <Mensaje estado={probado} />
           <Mensaje estado={estado} />
+
+          {/* LEER EL BUZON ES OTRO PERMISO, no una casilla mas del envio. Va
+              en su propio bloque y apagado por defecto: haber configurado el
+              envio dice «manda en mi nombre», no «lee mi correo». */}
+          <div
+            className="mt-4 rounded-lg border p-3"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <p className="text-sm font-medium">
+              Recoger las respuestas de los contratistas
+            </p>
+            <p className="mt-1 text-sm opacity-70 text-pretty">
+              {remitente.leerRespuestas
+                ? "GCM mira este buzón y pone dentro de la obra lo que responden los contratistas. Solo lee lo que contesta a un mensaje enviado desde GCM; el resto no lo toca ni lo guarda, y nunca marca ni borra nada."
+                : "Ahora las respuestas llegan a tu buzón y ahí se quedan. Si lo enciendes, GCM las pondrá dentro de la obra, junto al mensaje que las provocó. Solo leerá lo que conteste a un mensaje suyo."}
+            </p>
+
+            <form action={cambiarLectura} className="mt-2">
+              <input
+                type="hidden"
+                name="leer"
+                value={remitente.leerRespuestas ? "0" : "1"}
+              />
+              <Boton variante="suave">
+                {remitente.leerRespuestas
+                  ? "Dejar de recoger"
+                  : "Recoger las respuestas"}
+              </Boton>
+            </form>
+
+            <Mensaje estado={lectura} />
+          </div>
         </div>
       )}
 

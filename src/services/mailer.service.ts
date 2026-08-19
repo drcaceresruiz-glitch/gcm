@@ -7,6 +7,7 @@ import {
   configuracionDeEnvio,
   crearTransporte,
 } from "./remitente-correo.service";
+import { dominioDe, mensajeIdDeHilo } from "@/lib/correo-entrante";
 import {
   CID_LOGO,
   MARCA_GCM as MARCA,
@@ -103,6 +104,23 @@ export interface Correo {
    * siempre, que es lo que hacian todos hasta ahora.
    */
   companyId?: string;
+  /**
+   * Marca este correo como cabecera de un hilo que GCM sabra reconocer.
+   *
+   * Con el, el `Message-ID` pasa a ser `<gcm.TOKEN@dominio>` en vez del que
+   * inventa nodemailer, y cuando el que recibe pulsa «Responder» su cliente
+   * devuelve ese identificador en `In-Reply-To`. Es lo unico que ata una
+   * respuesta a la conversacion —y por tanto a la obra— que la provoco.
+   *
+   * SE PASA EL TOKEN Y NO EL `Message-ID` ENTERO porque el dominio lo decide
+   * este modulo: puede salir por el buzon de la constructora o por el
+   * compartido, y quien llama no sabe cual. Firmarlo con un dominio que no es
+   * el que envia es de las cosas que miran los filtros de spam.
+   *
+   * Si no se puede sacar el dominio, no se pone cabecera y el correo sale
+   * igual: se pierde el emparejado de la respuesta, no el mensaje.
+   */
+  tokenDeHilo?: string;
 }
 
 /**
@@ -193,11 +211,21 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
       marca ? { razonSocial: marca.razonSocial, conLogo: logo !== null } : null,
     );
 
+    // El dominio sale del remitente REAL, que puede ser el de la constructora
+    // o el compartido. Sin dominio no hay cabecera: el correo sale igual y lo
+    // unico que se pierde es poder emparejar su respuesta.
+    const dominio = dominioDe(salida.desde);
+    const messageId =
+      correo.tokenDeHilo && dominio
+        ? mensajeIdDeHilo(correo.tokenDeHilo, dominio)
+        : undefined;
+
     await salida.t.sendMail({
       from: salida.desde,
       to: correo.para,
       // Si no viene, nodemailer no pone la cabecera y todo sigue como estaba.
       replyTo: correo.respuestaA,
+      messageId,
       subject: correo.asunto,
       text: correo.texto,
       html,

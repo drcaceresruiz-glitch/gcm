@@ -290,6 +290,27 @@ model RemitenteCorreo {
   /// Apagarlo devuelve la empresa al buzon compartido sin perder lo tecleado.
   activo Boolean @default(true)
 
+  /**
+   * Que GCM MIRE este buzon para recoger las respuestas de los contratistas.
+   *
+   * Apagado por defecto y se enciende a mano: leer el buzon de alguien no se
+   * da por supuesto por haber configurado el envio. Son dos permisos morales
+   * distintos aunque sea la misma contrasena.
+   *
+   * Lo que se lee es SOLO lo que responde a un mensaje de GCM —se reconoce por
+   * el `Message-ID` que GCM puso al enviar—. El resto del buzon se ignora y no
+   * llega nunca a la base: esto no es un cliente de correo.
+   *
+   * IMAP reutiliza `host`, `usuario` y `claveCifrada` con el puerto 993, que
+   * es lo correcto en cPanel y en la mayoria de proveedores. Si alguno lo
+   * tiene distinto se anadiran campos propios; hoy seria adivinar cuales.
+   */
+  leerRespuestas Boolean @default(false)
+
+  /// Hasta donde se leyo la ultima vez que se miro el buzon. Acota el `SEARCH`
+  /// de IMAP para no recorrer meses de correo en cada pasada.
+  leidoHastaAt DateTime?
+
   /// Ultimo envio de prueba que SALIO. Es lo unico que distingue «configurado»
   /// de «configurado y funciona», y sin esa distincion el primer correo que
   /// falla es el que iba al cliente.
@@ -2821,6 +2842,17 @@ enum CanalMensaje {
   WHATSAPP
 }
 
+/// Quien escribio: la constructora o el contratista.
+///
+/// Se anade a la MISMA tabla en vez de crear otra para las respuestas: una
+/// conversacion es una sola cosa, y dos tablas obligarian a mezclarlas y
+/// ordenarlas por fecha en cada pantalla, y a tratarlas dos veces en el
+/// respaldo y en el borrado de obra.
+enum DireccionMensaje {
+  SALIENTE
+  ENTRANTE
+}
+
 /// Lo que se le ha escrito a un contratista, y por donde.
 ///
 /// EXISTE PARA PODER DECIR «te avise el martes». GCM ya sabia a quien tenia
@@ -2878,12 +2910,58 @@ model MensajeContratista {
   enviadoPor String   @db.VarChar(150)
   createdAt  DateTime @default(now())
 
+  /// Quien escribio. Lo existente es todo SALIENTE, de ahi el valor por
+  /// defecto: la migracion no tiene que tocar ni una fila.
+  direccion DireccionMensaje @default(SALIENTE)
+
+  /**
+   * El identificador del hilo, en los SALIENTES por correo.
+   *
+   * Viaja dentro del `Message-ID` que GCM fija al enviar
+   * (`<gcm.TOKEN@dominio>`). Cuando el contratista pulsa «Responder», su
+   * cliente lo devuelve en `In-Reply-To`, y eso es lo que ata la respuesta a
+   * ESTA conversacion: mismo contratista y misma obra, sin adivinar.
+   *
+   * Aleatorio y no el `id` de la fila: un identificador adivinable dejaria
+   * inyectar respuestas falsas mandando un correo al buzon.
+   */
+  token String? @db.VarChar(40)
+
+  /// El mensaje que contesta, en los ENTRANTES. Sin clave ajena, igual que
+  /// `projectId` y por lo mismo: la respuesta sobrevive a que se purgue lo
+  /// que contestaba.
+  enRespuestaA String? @db.VarChar(30)
+
+  /**
+   * Quien lo escribio, para poder AVISARLE cuando llegue la respuesta.
+   *
+   * `enviadoPor` es un nombre para mostrar y no sirve para eso. Sin clave
+   * ajena a proposito: el mensaje es historia y tiene que sobrevivir a que su
+   * autor se dé de baja, igual que sobrevive a que se borre la obra.
+   */
+  userId String? @db.VarChar(30)
+
+  /**
+   * El `Message-ID` del correo ENTRANTE. Es la clave de la idempotencia.
+   *
+   * El buzon no se marca ni se vacia —es de la constructora y lo usa gente—,
+   * asi que la misma pasada puede volver a ver el mismo correo. Lo que impide
+   * duplicarlo es este indice unico, no el estado del buzon. Es la misma
+   * doctrina de `EnvioAviso`: la clave se reserva, no se confia en la memoria.
+   */
+  messageIdEntrante String? @db.VarChar(255)
+
   proveedor Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
 
   /// El historial de la ficha del contratista.
   @@index([proveedorId, createdAt])
   /// Para poder ver lo escrito desde una obra.
   @@index([projectId, createdAt])
+  /// Para encontrar la conversacion a la que responde un correo entrante.
+  @@index([companyId, token])
+  /// Que el mismo correo no entre dos veces. Por empresa: dos constructoras
+  /// pueden recibir copia del mismo correo y cada una guarda el suyo.
+  @@unique([companyId, messageIdEntrante])
   @@map("mensajes_contratista")
 }
 
@@ -3029,6 +3107,14 @@ enum EventoAviso {
   /// detiene porque un contratista deba una valorizacion; lo que no puede
   /// pasar es que nadie se entere hasta que llegue la factura.
   VALORIZACION_PENDIENTE
+
+  /// Un contratista contesto a un mensaje de la obra.
+  ///
+  /// Va a QUIEN ESCRIBIO, no a la obra entera: es su conversacion. Y solo
+  /// existe cuando la respuesta se pudo atar a una obra, porque `Aviso`
+  /// requiere `projectId`; las respuestas que no se atan viven en la ficha
+  /// del contratista y no suenan.
+  RESPUESTA_CONTRATISTA
 }
 
 /// El aviso dentro de GCM.

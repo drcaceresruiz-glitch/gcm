@@ -92,6 +92,29 @@ export async function configuracionDeEnvio(
   };
 }
 
+/**
+ * Si GCM recoge en esta empresa las respuestas de los contratistas.
+ *
+ * DECIDE A DONDE VUELVE LA RESPUESTA, y por eso no es solo informativo. Un
+ * mensaje a un contratista lleva «Responder a» con el correo de quien escribe;
+ * mientras GCM no lea el buzon, quitarlo mandaria la respuesta a un buzon que
+ * no mira nadie, que es peor que hoy. Con esto encendido pasa lo contrario:
+ * hay que dejar que vuelva al buzon de la empresa, porque es el unico que GCM
+ * puede abrir.
+ *
+ * Va atado a `activo` a proposito. La bandera vive en la fila del remitente,
+ * asi que una empresa sin buzon propio no puede tenerla encendida: sale por el
+ * buzon compartido de la instalacion, y ese no es suyo ni GCM lo va a leer en
+ * su nombre.
+ */
+export async function empresaLeeRespuestas(companyId: string): Promise<boolean> {
+  const fila = await prisma.remitenteCorreo.findFirst({
+    where: { companyId, activo: true, leerRespuestas: true },
+    select: { companyId: true },
+  });
+  return fila !== null;
+}
+
 /** Un transporte para una configuracion concreta. Lo usan el mailer y el probador. */
 export function crearTransporte(config: ConfiguracionEnvio): Transporter {
   return nodemailer.createTransport({
@@ -113,6 +136,8 @@ export interface RemitenteEnPantalla {
   remitenteNombre: string;
   remitenteCorreo: string;
   activo: boolean;
+  /// Si GCM recoge las respuestas de los contratistas de este buzon.
+  leerRespuestas: boolean;
   /// Nunca la clave. Solo si hay una guardada, para que el formulario pueda
   /// decir «déjalo vacío para conservarla».
   hayClave: boolean;
@@ -138,6 +163,7 @@ export async function leerRemitente(
       remitenteNombre: true,
       remitenteCorreo: true,
       activo: true,
+      leerRespuestas: true,
       claveCifrada: true,
       verificadoAt: true,
       ultimoError: true,
@@ -263,6 +289,52 @@ export async function cambiarEstadoRemitente(
       entidadId: sesion.companyId,
       accion: "UPDATE",
       despues: { evento: activo ? "activar" : "desactivar" },
+    },
+  });
+
+  return { ok: true };
+}
+
+/**
+ * Enciende o apaga que GCM RECOJA las respuestas de los contratistas.
+ *
+ * Separado de `cambiarEstadoRemitente` a proposito, aunque toque la misma
+ * fila. Configurar el envio y consentir que GCM abra el buzon son dos permisos
+ * morales distintos aunque sea la misma contrasena: uno dice «manda en mi
+ * nombre» y el otro «lee mi correo». Encadenarlos habria hecho que activar el
+ * envio activase la lectura sin que nadie lo pidiera.
+ */
+export async function cambiarLecturaRespuestas(
+  sesion: SesionActiva,
+  leer: boolean,
+): Promise<ResultadoRemitente> {
+  if (!puede(sesion, "configuracion:editar")) {
+    return { ok: false, error: "No tienes permiso para configurar el correo de la empresa." };
+  }
+
+  const { count } = await prisma.remitenteCorreo.updateMany({
+    where: { companyId: sesion.companyId },
+    data: {
+      leerRespuestas: leer,
+      // Al ENCENDER se borra la marca de hasta donde se leyo, para que la
+      // primera pasada mire los ultimos dias en vez de arrancar desde una
+      // fecha vieja de un encendido anterior. Al apagar no se toca: si se
+      // vuelve a encender manana, no hay por que releer una semana entera.
+      ...(leer ? { leidoHastaAt: null } : {}),
+    },
+  });
+  if (count === 0) return { ok: false, error: "No hay ningún buzón configurado." };
+
+  await prisma.auditLog.create({
+    data: {
+      companyId: sesion.companyId,
+      userId: sesion.userId,
+      entidad: "RemitenteCorreo",
+      entidadId: sesion.companyId,
+      accion: "UPDATE",
+      // Queda en el libro de la empresa: que alguien autorizara a leer el
+      // buzon es exactamente lo que un administrador querra poder consultar.
+      despues: { evento: leer ? "leer-respuestas" : "dejar-de-leer-respuestas" },
     },
   });
 

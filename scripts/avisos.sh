@@ -57,11 +57,13 @@ fi
 # entorno sin tocar el script.
 DESTINO="${GCM_URL:-https://gcm.drcaceresruiz.com}/api/reloj"
 
-# -m 60: mas que el presupuesto de una pasada (20 s) con holgura, pero acotado.
-# Un curl sin limite que se queda colgado deja el cron encadenando procesos.
+# -m 120: la peticion hace ahora DOS trabajos —los avisos (20 s) y la lectura
+# de buzones (15 s)—, y una conversacion IMAP con un servidor lento se lleva su
+# tiempo antes de que el presupuesto pueda cortarla. Sigue acotado: un curl sin
+# limite que se queda colgado deja el cron encadenando procesos.
 # --config: aqui es donde entra la cabecera con el token, sin pasar por
 # argumentos ni por la URL.
-RESPUESTA="$(curl -sS -m 60 -X POST --config "$CONFIG" \
+RESPUESTA="$(curl -sS -m 120 -X POST --config "$CONFIG" \
   -w '\n%{http_code}' "$DESTINO" 2>&1)"
 
 CODIGO="$(echo "$RESPUESTA" | tail -n 1)"
@@ -70,9 +72,16 @@ CUERPO="$(echo "$RESPUESTA" | sed '$d')"
 # El silencio solo cuando todo va bien Y no hubo nada que hacer: un log que
 # crece cada cinco minutos no lo lee nadie, y un log vacio no dice nada cuando
 # hace falta.
+#
+# SON DOS CONDICIONES, no una. La primera cadena depende del ORDEN de las
+# claves del JSON de `/api/reloj`: si alguien reordena `ResumenPasada`, esto
+# deja de casar y el cron pasa a escribir cada cinco minutos. La segunda cubre
+# la lectura de buzones: sin ella, una respuesta de un contratista entraria en
+# silencio y el log no ensenaria nunca que la funcionalidad esta viva.
 case "$CODIGO" in
   200)
-    if echo "$CUERPO" | grep -q '"avisosApp":0,"correos":0,"sms":0'; then
+    if echo "$CUERPO" | grep -q '"avisosApp":0,"correos":0,"sms":0' \
+      && echo "$CUERPO" | grep -q '"respuestas":0'; then
       exit 0
     fi
     anotar "$CUERPO"

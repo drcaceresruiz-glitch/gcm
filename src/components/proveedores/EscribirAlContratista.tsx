@@ -29,6 +29,9 @@ export interface DatosContratista {
   obra: { id: string; nombre: string } | null;
   hayCanalSms: boolean;
   respuestaPorDefecto: string;
+  /// Si GCM recoge las respuestas. Cambia el campo «Responder a» por la
+  /// promesa de que la respuesta aparecera aqui, que solo es cierta con esto.
+  respuestasEnGcm: boolean;
   firmaEmpresa: string;
 }
 
@@ -183,21 +186,39 @@ export function EscribirAlContratista({ contratista }: { contratista: DatosContr
             </span>
           </label>
 
-          <label className="block text-xs">
-            <span className="block opacity-70">Responder a</span>
-            <input
-              name="respuestaA"
-              type="email"
-              defaultValue={contratista.respuestaPorDefecto}
-              placeholder={contratista.respuestaPorDefecto}
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
-            />
-            <span className="mt-1 block opacity-60">
-              A donde le llega la respuesta cuando conteste. Si lo dejas vacío,
-              va al buzón configurado de la empresa.
-            </span>
-          </label>
+          {contratista.respuestasEnGcm ? (
+            /* Con GCM leyendo el buzón no hay nada que elegir: la respuesta
+               tiene que volver al buzón de la empresa, que es el único que
+               GCM puede abrir. Dejar el campo dejaría desviarla a un correo
+               personal y romper la función sin que se note. */
+            <p
+              className="rounded-lg border p-3 text-xs"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              Cuando conteste, <strong>su respuesta aparecerá aquí</strong>, en
+              el historial de este contratista
+              {contratista.obra ? " y en la obra" : ""}. Te avisará la
+              campanita.
+            </p>
+          ) : (
+            <label className="block text-xs">
+              <span className="block opacity-70">Responder a</span>
+              <input
+                name="respuestaA"
+                type="email"
+                defaultValue={contratista.respuestaPorDefecto}
+                placeholder={contratista.respuestaPorDefecto}
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+              />
+              <span className="mt-1 block opacity-60">
+                A dónde le llega la respuesta cuando conteste. Si lo dejas
+                vacío, va a tu correo. GCM no la recoge: para que aparezca
+                dentro de la obra hay que activar la lectura del buzón en
+                Empresa → Configuración.
+              </span>
+            </label>
+          )}
         </>
       )}
 

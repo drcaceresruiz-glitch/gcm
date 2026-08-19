@@ -9,6 +9,7 @@ import {
   Clock,
   Diamond,
   Inbox,
+  Mail,
 } from "lucide-react";
 import { fechaCorta } from "@/utils/fechas";
 import { accionMarcarLeidos } from "@/app/(dashboard)/avisos/acciones";
@@ -37,6 +38,8 @@ const ICONO: Record<EventoAviso, typeof BellRing> = {
   HITO_VENCIDO: Diamond,
   // El billete: lo que se espera es un corte de valorizacion, o sea dinero.
   VALORIZACION_PENDIENTE: Banknote,
+  // El sobre: alguien de fuera escribio y hay algo que leer.
+  RESPUESTA_CONTRATISTA: Mail,
 };
 
 const COLOR: Record<EventoAviso, string> = {
@@ -49,6 +52,8 @@ const COLOR: Record<EventoAviso, string> = {
   HITO_VENCIDO: "var(--color-peligro)",
   // Ambar y no rojo: AVISA, no bloquea. El rojo es para lo que ya duele.
   VALORIZACION_PENDIENTE: "var(--color-alerta)",
+  // El color de la marca: es una novedad que atender, no un problema.
+  RESPUESTA_CONTRATISTA: "var(--color-marca-500)",
 };
 
 export function BandejaAvisos({ avisos }: { avisos: AvisoBandeja[] }) {

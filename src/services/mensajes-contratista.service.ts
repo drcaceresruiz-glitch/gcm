@@ -13,7 +13,9 @@ import {
   type AdjuntoPropuesto,
   type Firma,
 } from "@/lib/mensaje-contratista";
+import { nuevoTokenDeHilo } from "@/lib/correo-entrante";
 import { correoAlContratista, enviarCorreo, type Adjunto } from "./mailer.service";
+import { empresaLeeRespuestas } from "./remitente-correo.service";
 import { enviarSms, hayCanalSms } from "./sms.service";
 import type { SesionActiva } from "./sesion.service";
 
@@ -54,6 +56,15 @@ export interface ContratistaParaEscribir {
   hayCanalSms: boolean;
   /// El correo de quien escribe, que es el «Responder a» por defecto.
   respuestaPorDefecto: string;
+  /**
+   * Si las respuestas vuelven a GCM en vez de al buzon de quien escribe.
+   *
+   * Cambia DOS cosas de la pantalla, y por eso viaja hasta ella: desaparece el
+   * campo «Responder a» —ya no hay nada que elegir— y el aviso pasa a decir
+   * que la respuesta aparecera aqui. Prometer eso sin tenerlo encendido seria
+   * mentir sobre donde buscar una respuesta que nunca va a llegar.
+   */
+  respuestasEnGcm: boolean;
   /**
    * Con que se FIRMA el mensaje: la constructora que escribe, no el
    * contratista que lo recibe.
@@ -123,12 +134,21 @@ export async function datosParaEscribir(
     obra,
     hayCanalSms: await hayCanalSms(sesion.companyId),
     respuestaPorDefecto: sesion.email,
+    respuestasEnGcm: await empresaLeeRespuestas(sesion.companyId),
     firmaEmpresa: empresa?.razonSocial ?? "",
   };
 }
 
 export interface MensajeEnHistorial {
   id: string;
+  /// Quien escribio. Lo entrante se lee distinto: no es un intento de envio
+  /// sino algo que llego, y confundirlos haria que el historial dijera
+  /// «enviado» sobre un correo que mando el contratista.
+  entrante: boolean;
+  /// El mensaje al que contesta, si esta entre los cargados. Se dice, no se
+  /// anida: el padre puede quedar fuera de las ultimas 50 y una conversacion
+  /// se lee mejor en orden que en arbol.
+  enRespuestaA: string | null;
   canal: Canal;
   destino: string;
   asunto: string | null;
@@ -177,6 +197,8 @@ export async function historialDeContratista(
 
   return filas.map((f) => ({
     id: f.id,
+    entrante: f.direccion === "ENTRANTE",
+    enRespuestaA: f.enRespuestaA,
     canal: f.canal as Canal,
     destino: f.destino,
     asunto: f.asunto,
@@ -242,6 +264,8 @@ export async function escribirAlContratista(
     motivo?: string | null;
     respuestaA?: string | null;
     adjuntos?: { nombre: string; tamano: number }[];
+    /// El hilo, solo en los correos: es lo que dejara reconocer la respuesta.
+    token?: string | null;
   }) =>
     prisma.$transaction(async (tx) => {
       const mensaje = await tx.mensajeContratista.create({
@@ -258,6 +282,11 @@ export async function escribirAlContratista(
           enviado: fila.enviado,
           motivo: fila.motivo ?? null,
           enviadoPor: nombreDe(sesion),
+          token: fila.token ?? null,
+          // Ademas del nombre para mostrar: `enviadoPor` no sirve para
+          // avisar a nadie, y cuando llegue la respuesta hay que saber a
+          // quien suena la campanita.
+          userId: sesion.userId,
         },
       });
 
@@ -309,14 +338,40 @@ export async function escribirAlContratista(
     const validacion = validarAdjuntos(propuestos);
     if (!validacion.ok) return { ok: false, error: validacion.error };
 
-    // Vacio = el preconfigurado. Un «Responder a» que no es un correo es peor
-    // que no ponerlo: la respuesta se pierde sin que nadie se entere.
-    const respuestaA = datos.respuestaA?.trim()
-      ? normalizarEmail(datos.respuestaA)
-      : normalizarEmail(contratista.respuestaPorDefecto);
-    if (datos.respuestaA?.trim() && !respuestaA) {
+    /**
+     * A DONDE VUELVE LA RESPUESTA. Son dos mundos distintos:
+     *
+     * - Con GCM leyendo el buzon, NO se pone «Responder a»: la respuesta tiene
+     *   que volver al buzon de la empresa —que es el `From`— porque es el
+     *   unico que GCM puede abrir. Ponerlo la desviaria al correo personal de
+     *   quien escribio y la funcionalidad no recibiria nunca nada.
+     * - Sin eso, se conserva lo de siempre: al buzon de quien escribe. Es lo
+     *   contrario de una mejora quitarlo aqui, porque mandaria la respuesta a
+     *   un buzon que no mira nadie.
+     *
+     * Vacio = el preconfigurado. Un «Responder a» que no es un correo es peor
+     * que no ponerlo: la respuesta se pierde sin que nadie se entere.
+     */
+    const respuestaA = contratista.respuestasEnGcm
+      ? null
+      : datos.respuestaA?.trim()
+        ? normalizarEmail(datos.respuestaA)
+        : normalizarEmail(contratista.respuestaPorDefecto);
+    if (
+      !contratista.respuestasEnGcm &&
+      datos.respuestaA?.trim() &&
+      !respuestaA
+    ) {
       return { ok: false, error: "El correo de respuesta no parece válido." };
     }
+
+    /**
+     * El hilo. Se genera SIEMPRE, tambien cuando la empresa aun no lee su
+     * buzon: no cuesta nada, no se ve, y el dia que lo encienda las
+     * conversaciones ya emitidas seguiran siendo reconocibles. Si se generara
+     * solo al encenderlo, todo lo escrito antes quedaria mudo para siempre.
+     */
+    const token = nuevoTokenDeHilo();
 
     const adjuntos: Adjunto[] = propuestos.map((a) => ({
       nombre: a.nombre,
@@ -338,6 +393,7 @@ export async function escribirAlContratista(
       para: contratista.email,
       adjuntos: adjuntos.length ? adjuntos : undefined,
       respuestaA: respuestaA ?? undefined,
+      tokenDeHilo: token,
       // Para que salga con el logo de la constructora: es un correo a alguien
       // de fuera y tiene que parecer de la empresa, no del sistema.
       companyId: sesion.companyId,
@@ -352,6 +408,7 @@ export async function escribirAlContratista(
       motivo: r.enviado ? null : "sin-smtp",
       respuestaA,
       adjuntos: propuestos.map((a) => ({ nombre: a.nombre, tamano: a.tamano })),
+      token,
     });
 
     if (!r.enviado) {

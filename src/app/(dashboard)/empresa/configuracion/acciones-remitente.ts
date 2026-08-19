@@ -7,6 +7,7 @@ import { obtenerSesion } from "@/services/sesion.service";
 import {
   guardarRemitente,
   cambiarEstadoRemitente,
+  cambiarLecturaRespuestas,
   probarRemitente,
 } from "@/services/remitente-correo.service";
 import { hayBuzonCompartido } from "@/services/mailer.service";
@@ -66,6 +67,26 @@ export async function accionProbarRemitente(
   return r.ok
     ? { ok: `Correo de prueba enviado a ${sesion.email}. Míralo para confirmar que llegó.` }
     : { error: r.error };
+}
+
+export async function accionCambiarLecturaRespuestas(
+  _previo: EstadoRemitente,
+  datos: FormData,
+): Promise<EstadoRemitente> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const leer = datos.get("leer") === "1";
+  const r = await cambiarLecturaRespuestas(sesion, leer);
+  if (!r.ok) return { error: r.error };
+
+  revalidatePath("/empresa/configuracion");
+
+  return {
+    ok: leer
+      ? "Listo. Las respuestas de los contratistas aparecerán dentro de la obra. La primera lectura tarda unos minutos."
+      : "GCM deja de mirar tu buzón. Las respuestas seguirán llegando ahí, pero ya no entrarán en la aplicación.",
+  };
 }
 
 export async function accionCambiarEstadoRemitente(
