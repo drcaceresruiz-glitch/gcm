@@ -144,6 +144,14 @@ export interface RemitenteEnPantalla {
   verificadoAt: Date | null;
   ultimoError: string | null;
   ultimoErrorAt: Date | null;
+  /// La ultima lectura del buzon que salio bien. Se mueve solo cuando la
+  /// pasada termina entera, asi que «hace 4 minutos» significa que la recogida
+  /// esta viva de verdad, no que este encendida.
+  leidoHastaAt: Date | null;
+  /// Por que fallo la ultima lectura. Aparte del error del envio: son dos
+  /// caminos distintos y uno puede estar roto con el otro perfecto.
+  lecturaError: string | null;
+  lecturaErrorAt: Date | null;
 }
 
 export async function leerRemitente(
@@ -168,6 +176,9 @@ export async function leerRemitente(
       verificadoAt: true,
       ultimoError: true,
       ultimoErrorAt: true,
+      leidoHastaAt: true,
+      lecturaError: true,
+      lecturaErrorAt: true,
     },
   });
   if (!fila) return null;
@@ -320,7 +331,10 @@ export async function cambiarLecturaRespuestas(
       // primera pasada mire los ultimos dias en vez de arrancar desde una
       // fecha vieja de un encendido anterior. Al apagar no se toca: si se
       // vuelve a encender manana, no hay por que releer una semana entera.
-      ...(leer ? { leidoHastaAt: null } : {}),
+      // Y con ella el fallo de lectura anterior: acusar de un error de hace
+      // un mes a una recogida que acaba de empezar es contar algo que ya no
+      // ha pasado. Si sigue roto, la primera pasada lo vuelve a apuntar.
+      ...(leer ? { leidoHastaAt: null, lecturaError: null, lecturaErrorAt: null } : {}),
     },
   });
   if (count === 0) return { ok: false, error: "No hay ningún buzón configurado." };

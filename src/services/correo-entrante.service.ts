@@ -530,17 +530,43 @@ export async function pasadaDeCorreoEntrante(): Promise<ResumenCorreoEntrante> {
         // La marca se mueve SOLO si el buzon se leyo entero y sin fallar. Con
         // el margen de `DIAS_MARGEN` al volver, un correo de la frontera no se
         // pierde por el desfase entre nuestro reloj y el del servidor.
+        //
+        // Y se BORRA el fallo anterior: una lectura correcta es la unica
+        // prueba de que lo que rompia ya no rompe. Dejarlo puesto haria que la
+        // pantalla acusara para siempre a un buzon ya arreglado.
         await prisma.remitenteCorreo.updateMany({
           where: { companyId: buzon.companyId },
-          data: { leidoHastaAt: ahora },
+          data: { leidoHastaAt: ahora, lecturaError: null, lecturaErrorAt: null },
         });
       } catch (e) {
         // Un buzon que falla —credenciales cambiadas, servidor caido— no puede
         // dejar sin leer a las demas constructoras. Se apunta y se sigue.
+        const motivo = e instanceof Error ? e.message : String(e);
         console.error(
           `[correo-entrante] No se pudo leer el buzon de ${buzon.companyId}:`,
-          e instanceof Error ? e.message : e,
+          motivo,
         );
+
+        // Y se apunta EN LA FILA, no solo en la consola: la consola de un
+        // hosting compartido no la lee nadie, y sin esto «encendido y no llega
+        // nada» se ve igual que «nadie ha contestado». Es lo unico que hace
+        // visible el fallo a quien puede arreglarlo.
+        //
+        // `leidoHastaAt` NO se toca: la proxima pasada tiene que volver a
+        // intentar desde donde se quedo, o los correos de la ventana fallida
+        // se perderian para siempre.
+        await prisma.remitenteCorreo
+          .updateMany({
+            where: { companyId: buzon.companyId },
+            data: {
+              lecturaError: motivo.slice(0, 300),
+              lecturaErrorAt: new Date(),
+            },
+          })
+          // Si ni siquiera se puede apuntar el fallo, la base esta peor que el
+          // buzon. Se sigue con las demas empresas: la alarma de la base ya la
+          // da `/api/health`.
+          .catch(() => {});
       }
 
       cursor = buzon.companyId;

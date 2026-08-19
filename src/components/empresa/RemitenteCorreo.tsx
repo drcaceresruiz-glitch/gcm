@@ -225,6 +225,46 @@ export function RemitenteCorreo({
                 : "Ahora las respuestas llegan a tu buzón y ahí se quedan. Si lo enciendes, GCM las pondrá dentro de la obra, junto al mensaje que las provocó. Solo leerá lo que conteste a un mensaje suyo."}
             </p>
 
+            {/* ENCENDIDO NO ES FUNCIONANDO, igual que configurado no es
+                probado. Sin esto, un buzon que no se puede leer se ve
+                exactamente igual que un buzon donde nadie ha contestado, y el
+                unico rastro del fallo estaba en la consola del servidor. */}
+            {remitente.leerRespuestas && (
+              <p className="mt-2 flex items-start gap-2 text-sm">
+                {remitente.lecturaError ? (
+                  <>
+                    <AlertCircle
+                      className="mt-0.5 size-4 shrink-0"
+                      style={{ color: "var(--color-alerta)" }}
+                      aria-hidden
+                    />
+                    <span className="text-pretty">
+                      <strong>No se está pudiendo leer el buzón</strong>
+                      {remitente.lecturaErrorAt &&
+                        ` (${haceCuanto(remitente.lecturaErrorAt)})`}
+                      : {remitente.lecturaError}
+                      <br />
+                      <span className="opacity-70">
+                        Mientras siga así, las respuestas se quedan en tu buzón
+                        y no entran en la obra. Suele ser la contraseña
+                        cambiada, o que el correo entrante de tu proveedor no
+                        esté en el mismo servidor que el de salida.
+                      </span>
+                    </span>
+                  </>
+                ) : remitente.leidoHastaAt ? (
+                  <span className="opacity-80">
+                    Última lectura correcta {haceCuanto(remitente.leidoHastaAt)}.
+                  </span>
+                ) : (
+                  <span className="opacity-80">
+                    Encendido, pero todavía no se ha leído ninguna vez. La
+                    primera pasada llega en unos minutos.
+                  </span>
+                )}
+              </p>
+            )}
+
             <form action={cambiarLectura} className="mt-2">
               <input
                 type="hidden"

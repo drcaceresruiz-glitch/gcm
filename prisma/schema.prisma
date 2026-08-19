@@ -309,7 +309,27 @@ model RemitenteCorreo {
 
   /// Hasta donde se leyo la ultima vez que se miro el buzon. Acota el `SEARCH`
   /// de IMAP para no recorrer meses de correo en cada pasada.
+  ///
+  /// Solo se mueve cuando el buzon se leyo ENTERO y sin fallar, asi que vale
+  /// tambien como «ultima lectura correcta» y la pantalla lo usa para eso.
   leidoHastaAt DateTime?
+
+  /**
+   * Que fallo la ultima vez que se intento LEER el buzon, y cuando.
+   *
+   * Va aparte de `ultimoError` —el del envio— porque las dos cosas fallan por
+   * causas distintas: el envio muere en el 465 y la lectura en el 993, y una
+   * puede llevar semanas rota con la otra perfecta. Con un solo campo, la
+   * ultima en fallar borraria la senal de la otra.
+   *
+   * Existe porque sin el, un buzon que no se puede leer se ve EXACTAMENTE
+   * igual que un buzon donde nadie ha contestado: la pasada se apuntaba el
+   * fallo en la consola del servidor y seguia, asi que la pantalla decia
+   * «recogiendo» para siempre. Es el modo de fallo de la casa —algo deja de
+   * contar sin dar error— aplicado a una bandeja de entrada.
+   */
+  lecturaError   String?   @db.VarChar(300)
+  lecturaErrorAt DateTime?
 
   /// Ultimo envio de prueba que SALIO. Es lo unico que distingue «configurado»
   /// de «configurado y funciona», y sin esa distincion el primer correo que
