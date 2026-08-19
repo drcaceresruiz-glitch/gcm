@@ -133,7 +133,7 @@ export async function auditoriaDeAvisos(
   const soloIds = (xs: (string | null)[]) =>
     xs.filter((x): x is string => x !== null);
 
-  const nombres = await nombresDe({
+  const nombres = await nombresDe(sesion.companyId, {
     usuarios: [
       ...soloIds(envios.map((e) => e.userId)),
       ...soloIds(recibidos.map((r) => r.userId)),
@@ -189,18 +189,30 @@ export async function auditoriaDeAvisos(
   };
 }
 
-/// Los nombres de usuarios y contactos en dos consultas, no una por fila.
-async function nombresDe(ids: {
-  usuarios: string[];
-  contactos: string[];
-}): Promise<Map<string, string>> {
+/**
+ * Los nombres de usuarios y contactos en dos consultas, no una por fila.
+ *
+ * `companyId` no sobra aunque los identificadores salgan de una obra que ya
+ * se filtro por empresa: resolver un nombre es ensenarselo a alguien, y esa
+ * comprobacion tiene que estar DONDE se lee, no confiada a que quien llama
+ * haya filtrado bien. El 19/08/2026 la lista de actividad del panel enseno el
+ * nombre de una persona de otra constructora por no tener este filtro; era
+ * otra consulta, pero el mismo descuido.
+ */
+async function nombresDe(
+  companyId: string,
+  ids: {
+    usuarios: string[];
+    contactos: string[];
+  },
+): Promise<Map<string, string>> {
   const usuarios = [...new Set(ids.usuarios)];
   const contactos = [...new Set(ids.contactos)];
 
   const [us, cs] = await Promise.all([
     usuarios.length
       ? prisma.user.findMany({
-          where: { id: { in: usuarios } },
+          where: { id: { in: usuarios }, companyId },
           select: { id: true, nombres: true, apellidos: true },
         })
       : Promise.resolve([]),

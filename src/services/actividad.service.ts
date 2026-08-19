@@ -96,6 +96,27 @@ export async function listarActividad(
     prisma.user.findMany({
       where: {
         id: { in: [...new Set(filas.map((f) => f.userId).filter(Boolean))] as string[] },
+        /**
+         * EL FILTRO POR EMPRESA TAMBIEN AQUI, igual que en la consulta de
+         * obras de abajo. Faltaba, y se escapaba un nombre de fuera.
+         *
+         * El apunte SI es de esta empresa —la consulta de arriba ya filtra por
+         * `companyId`—, pero su AUTOR puede no serlo: cuando el operador de
+         * GCM da de alta una constructora, el apunte queda a nombre de la
+         * empresa nueva y con el `userId` del operador, que vive en OTRA. Sin
+         * este filtro, el cliente veia en su panel «Administrador GCM», el
+         * nombre de una persona ajena a su constructora.
+         *
+         * Lo destapo el usuario mirando su propio panel el 19/08/2026, recien
+         * dada de alta su empresa. No lo vio ninguna prueba: las de servicio
+         * doblan Prisma y no cruzan empresas, y la de humo abre la pantalla
+         * con una sola constructora en la base.
+         *
+         * Sin autor la linea se pinta igual —el componente ya trata `autor:
+         * null`— y ademas dice lo correcto: quien registro la constructora no
+         * es nadie de dentro.
+         */
+        companyId: sesion.companyId,
       },
       select: { id: true, nombres: true, apellidos: true },
     }),
