@@ -80,19 +80,47 @@ Estas funcionan igual: necesitan conexión, no ser alcanzables.
 - Y si algún día se usa un proveedor de SMS por API en vez del teléfono
   vinculado, ese camino también sobreviviría — a diferencia de la cola.
 
-## E. La base de datos, que es el riesgo técnico mayor
+## E. La base de datos — COMPROBADO el 19/08/2026: el dinero sobrevive
 
-El paso de **MariaDB a SQLite** es el cambio con más superficie:
+Era el riesgo que parecía mayor. Se midió, y **no bloquea**. Los guiones que lo
+demuestran están en `storage/sqlite-dinero/` (fuera de git).
 
-- **La precisión del dinero.** Todo GCM se apoya en decimales exactos —los
-  importes viajan como texto hasta en el respaldo, a propósito— y hay que
-  verificar en serio que esa exactitud sobrevive al cambio de motor. Un
-  céntimo que se redondea distinto descuadra una valorización **sin dar
-  error**, que es el modo de fallo característico de este sistema.
-- Índices únicos, tipos de fecha y `ENUM` se comportan distinto.
+Lo que se midió, con Prisma 7 y el adaptador de SQLite:
 
-**Esto no está verificado.** Es la primera comprobación que habría que hacer, y
-antes de escribir una línea del instalable.
+| Prueba | Resultado |
+|---|---|
+| SQLite guarda `DECIMAL` como… | coma flotante (`real`) |
+| Prisma devuelve… | **un objeto Decimal**, no un `number` |
+| Importe de una obra real (1 515 163,22) | idéntico al escribir y leer |
+| Suma de 752 partidas (el tamaño real) | **idéntica al céntimo** |
+| Suma de 50 000 partidas | **idéntica al céntimo** |
+| `0.10 + 0.20` sumado por SQL | `0.30000000000000004` |
+| …formateado a 2 decimales | `0.30` |
+| Escala al leer | `0.10` vuelve como `0.1` |
+
+**Por qué sobrevive**: GCM no le pide las cuentas a la base. `src/lib/decimal.ts`
+hace aritmética exacta con enteros grandes sobre texto —«los valores viajan
+siempre como texto para no pasar nunca por un `number` intermedio»— así que
+sumar, restar, multiplicar y dividir dinero es exacto **con cualquier motor**.
+
+El único punto de contacto son ~10 sitios que sí piden la suma a la base
+(`_sum` sobre `importe` y `montoContratado`, en `tablero`, `gerencia`,
+`ordenes`, `obras` y `movimientos`). Los diez hacen `._sum.x.toString()` y se
+lo pasan a `sumar()`, que reaplica la escala; el error flotante queda muy por
+debajo de medio céntimo hasta magnitudes que una constructora no alcanza.
+
+**Lo que queda por hacer, y es acotado:**
+
+1. Repasar esos ~10 sitios y confirmar que ninguno compara por igualdad
+   **antes** de formatear.
+2. Revisar los invariantes de suma —el reparto de la meta que debe sumar 1,
+   los pagos que deben igualar el encargo—: si alguno compara exacto, que
+   compare en céntimos enteros.
+3. Comprobar en pantalla que la escala perdida al leer (`0.10` -> `0.1`) no
+   asoma. El respaldo no se ve afectado: su catálogo ya reaplica la escala.
+
+Sigue sin comprobar el resto del cambio de motor: índices únicos, tipos de
+fecha y `ENUM` se comportan distinto en SQLite.
 
 ## F. Lo que aparece nuevo
 
@@ -107,15 +135,24 @@ Cosas que hoy no existen porque las resuelve el hosting:
 
 ---
 
-## Resumen: lo que hay que decidir antes
+## Resumen: se puede vender completo, pero no es «compilar lo que hay»
 
-1. **Qué pasa con la galería del cliente y con el pase de obra.** Son las dos
-   que bloquean y las dos que se ven. Sin respuesta, «sin dependencias web» no
-   se puede prometer entero.
-2. **Si algo corre cuando la aplicación está cerrada.** De eso dependen los
-   avisos, los SMS y la lectura de respuestas.
-3. **Si el dinero sobrevive al cambio de motor de base de datos.** Es
-   comprobable hoy, con una prueba, y conviene hacerlo antes que nada.
+**El dinero ya no es un obstáculo** (ver E). Lo que queda son tres funciones
+que suponen que alguien entra al PC desde fuera — y las tres tienen salida sin
+que GCM opere nada, porque la aplicación instalada **sí puede salir**:
+
+| Función | Salida propuesta |
+|---|---|
+| **SMS** | Un proveedor por API: la app sale, nadie entra. Ya hay medio camino (`SMS_TOKEN`) |
+| **Pase de obra** | La red local de la obra o de la oficina: el personal está físicamente ahí |
+| **Galería del cliente** | Dar la vuelta: que la app **envíe** —el informe por correo— en vez de esperar a que el cliente entre |
+
+Y una cuarta, de otra naturaleza: **algo tiene que correr con la aplicación
+cerrada** (avisos, cola de SMS, lectura de respuestas). Servicio de Windows,
+tarea programada, o decir en pantalla que solo corre con la app abierta.
+
+**Lo que no se debe hacer**: prometer «todas las funciones» y descubrir en el
+primer cliente que su cliente no puede abrir la galería.
 
 Lo demás —el buzón, la llave, el operador— ya tiene camino conocido o se
 degrada de forma explicable.
