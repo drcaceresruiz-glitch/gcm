@@ -32,6 +32,20 @@ import {
 
 let transporte: Transporter | null | undefined;
 
+/**
+ * Si esta instalacion tiene un buzon compartido al que caer.
+ *
+ * Existe para que la pantalla no MIENTA sobre lo que pasa cuando una empresa
+ * no configura el suyo. En la version web hay un buzon de la instalacion y el
+ * correo sale igual; en la version instalable —GCM vende el programa y no
+ * opera nada— NO habra ninguno, y entonces sin buzon propio no sale ni un
+ * correo. Las dos cosas son ciertas en su sitio, asi que la pantalla lo
+ * pregunta en vez de dar por hecho la primera.
+ */
+export function hayBuzonCompartido(): boolean {
+  return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD);
+}
+
 function obtenerTransporte(): Transporter | null {
   // `undefined` = aun no se intento; `null` = se intento y no hay config.
   if (transporte !== undefined) return transporte;

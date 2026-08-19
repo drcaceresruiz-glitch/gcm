@@ -9,6 +9,7 @@ import {
   cambiarEstadoRemitente,
   probarRemitente,
 } from "@/services/remitente-correo.service";
+import { hayBuzonCompartido } from "@/services/mailer.service";
 
 /**
  * Acciones del buzon propio de la empresa.
@@ -79,9 +80,19 @@ export async function accionCambiarEstadoRemitente(
   if (!r.ok) return { error: r.error };
 
   revalidatePath("/empresa/configuracion");
+
+  // Que pasa al apagarlo depende de si esta instalacion tiene buzon
+  // compartido. En la version instalable no lo hay, y decir que «sale por el
+  // compartido» dejaria creer que el informe salio cuando no sale nada.
+  if (!activo && !hayBuzonCompartido()) {
+    return {
+      ok: "Apagado. Esta instalación no tiene otro buzón, así que hasta que lo enciendas no saldrá ningún correo.",
+    };
+  }
+
   return {
     ok: activo
       ? "El correo vuelve a salir desde tu buzón."
-      : "Apagado. El correo sale por el buzón compartido de GCM.",
+      : "Apagado. El correo sale por el buzón compartido de esta instalación.",
   };
 }

@@ -10,6 +10,7 @@ import { IlustracionDocumento } from "@/components/ui/IlustracionDocumento";
 import { EmisoresSms } from "@/components/empresa/EmisoresSms";
 import { RemitenteCorreo } from "@/components/empresa/RemitenteCorreo";
 import { leerRemitente } from "@/services/remitente-correo.service";
+import { hayBuzonCompartido } from "@/services/mailer.service";
 import { hayLlaveDeCifrado } from "@/lib/secreto";
 
 export const metadata: Metadata = { title: "Configuración" };
@@ -53,7 +54,11 @@ export default async function ConfiguracionPage() {
       {/* El buzon propio va ARRIBA del emisor de SMS: el correo lo usa todo el
           mundo desde el primer dia y el SMS es opcional. Ancho completo,
           porque su formulario son seis campos. */}
-      <RemitenteCorreo remitente={remitente} hayLlave={hayLlaveDeCifrado()} />
+      <RemitenteCorreo
+        remitente={remitente}
+        hayLlave={hayLlaveDeCifrado()}
+        hayCompartido={hayBuzonCompartido()}
+      />
 
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
         {/* La direccion se calcula, no se escribe: si algun dia GCM vive en

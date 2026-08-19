@@ -17,10 +17,20 @@ import type { RemitenteEnPantalla } from "@/services/remitente-correo.service";
 /**
  * Desde que buzon sale el correo de esta constructora.
  *
- * Sin configurar, el correo sale por el buzon compartido de GCM y todo
- * funciona: esto no es obligatorio. Lo que cambia al ponerlo es lo que ve
- * quien recibe —la direccion de la constructora, no una tecnica que no
- * reconoce— y a donde va la respuesta.
+ * LO QUE PASA SIN CONFIGURARLO DEPENDE DE LA INSTALACION, y por eso no se da
+ * por hecho en ningun texto:
+ *
+ * - **Con buzon compartido** (la version web, donde GCM opera el servidor):
+ *   el correo sale igual por una direccion tecnica. Poner el propio es una
+ *   mejora —lo que ve quien recibe y a donde va la respuesta—, no un
+ *   requisito.
+ * - **Sin buzon compartido** (la version instalable, donde GCM vende el
+ *   programa y no opera nada): NO SALE NI UN CORREO hasta que la constructora
+ *   ponga el suyo. Deja de ser una mejora y pasa a ser el unico camino.
+ *
+ * Decirle a la segunda que «sale por el buzon compartido de GCM» seria
+ * prometer un servicio que ahi no existe, y ademas dejaria creer que el
+ * informe llego cuando no salio.
  *
  * LA CONTRASENA NUNCA VUELVE A LA PANTALLA. El campo nace vacio incluso
  * cuando hay una guardada, y vacio significa «conserva la que ya estaba». Si
@@ -80,12 +90,16 @@ function Mensaje({ estado }: { estado: EstadoRemitente }) {
 export function RemitenteCorreo({
   remitente,
   hayLlave,
+  hayCompartido,
 }: {
   remitente: RemitenteEnPantalla | null;
   /// Sin llave de cifrado en el servidor no se puede guardar ninguna
   /// contrasena. Se dice en pantalla en vez de dejar que el formulario falle
   /// al guardar: el problema no lo puede arreglar quien lo esta leyendo.
   hayLlave: boolean;
+  /// Si esta instalacion tiene un buzon al que caer. Cambia el tono entero de
+  /// la seccion: mejora opcional o unico camino. Ver la cabecera.
+  hayCompartido: boolean;
 }) {
   const [guardado, guardar] = useActionState(accionGuardarRemitente, {});
   const [probado, probar] = useActionState(accionProbarRemitente, {});
@@ -99,13 +113,21 @@ export function RemitenteCorreo({
       <SeccionTarjeta
         primera
         titulo="Desde qué buzón sale tu correo"
-        nota="Sin configurar, el informe y los avisos salen desde una dirección técnica de GCM. Con tu buzón, el cliente los ve llegar desde tu constructora y la respuesta te llega a ti."
+        nota={
+          hayCompartido
+            ? "El informe y los avisos salen desde una dirección técnica de esta instalación. Con tu buzón, el cliente los ve llegar desde tu constructora y la respuesta te llega a ti."
+            : "Esta instalación no envía correo por su cuenta: el informe y los avisos salen desde el buzón que configures aquí, y solo desde él."
+        }
       >
-        <p className="flex items-center gap-2 text-sm opacity-70">
-          <Mail className="size-4 shrink-0" aria-hidden />
-          {remitente?.activo
-            ? "Ahora mismo sale desde tu buzón."
-            : "Ahora mismo sale por el buzón compartido de GCM."}
+        <p className="flex items-start gap-2 text-sm opacity-70">
+          <Mail className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span className="text-pretty">
+            {remitente?.activo
+              ? "Ahora mismo sale desde tu buzón."
+              : hayCompartido
+                ? "Ahora mismo sale por el buzón compartido de esta instalación."
+                : "Ahora mismo no sale ningún correo. Ni el informe al cliente, ni los avisos, ni las claves temporales de tus usuarios: hasta que configures tu buzón hay que comunicarlas a mano."}
+          </span>
         </p>
       </SeccionTarjeta>
 
@@ -143,7 +165,9 @@ export function RemitenteCorreo({
               cliente. */}
           <p className="mt-1 opacity-80">
             {!remitente.activo
-              ? "Apagado: el correo sale por el buzón compartido."
+              ? hayCompartido
+                ? "Apagado: el correo sale por el buzón compartido."
+                : "Apagado, y esta instalación no tiene otro: no sale ningún correo."
               : remitente.verificadoAt
                 ? `Probado ${haceCuanto(remitente.verificadoAt)} y funcionó.`
                 : "Guardado pero sin probar todavía."}
