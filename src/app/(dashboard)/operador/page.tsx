@@ -29,8 +29,23 @@ export default async function OperadorPage() {
   // A /panel y no a un 403: no se confirma que esta ruta exista siquiera.
   if (!sesion.esOperador) redirect("/panel");
 
+  /**
+   * TODAS, incluida la del propio operador.
+   *
+   * El cartel de «no hay ninguna» y la tabla tienen que mirar LA MISMA lista,
+   * y hasta el 19/08/2026 no lo hacian: el cartel se decidia con las clientes
+   * —descontando la propia— y la tabla se dibujaba con todas. Con una sola
+   * constructora, la del operador, se cumplia la condicion del cartel y la
+   * tabla no se pintaba nunca: la pantalla decia «no has dado de alta
+   * ninguna» mientras esa una existia y salia en el panel. El usuario llego a
+   * dudar de si su empresa estaba registrada, que es el dano que hace un
+   * cartel que miente.
+   *
+   * La propia SI se ensena, marcada «tu empresa» y sin boton de suspender —
+   * las dos cosas ya estaban escritas en la tabla, esperando a que alguien la
+   * dejara pintarse—.
+   */
   const constructoras = await listarConstructoras(sesion);
-  const clientes = constructoras.filter((c) => !c.esLaPropia);
 
   return (
     <div className="space-y-6">
@@ -54,7 +69,7 @@ export default async function OperadorPage() {
         </Link>
       </div>
 
-      {clientes.length === 0 ? (
+      {constructoras.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-10 text-center">
           <Mascota pose="saludando" alto={170} flotar />
           <p className="text-sm opacity-70">
