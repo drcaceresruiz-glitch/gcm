@@ -126,6 +126,17 @@ async function idsReales(): Promise<Record<string, string | null>> {
     // «este enlace ya no vale» en vez de reventar. Un token valido no se
     // puede fabricar sin pedir una recuperacion de verdad.
     "[token]": "token-que-no-existe-de-prueba",
+    /**
+     * El manual NO vive en la base: sus capitulos son codigo, asi que aqui
+     * va un slug real y ya escrito en vez de una consulta.
+     *
+     * Si algun dia se renombra o se retira ese capitulo, la ruta pasa a
+     * contestar 404 —que esta prueba trata como respuesta, no como averia—
+     * y la pantalla del capitulo dejaria de ejercitarse EN SILENCIO. Es el
+     * unico tramo con ese riesgo; los demas se omiten con motivo cuando la
+     * base esta vacia.
+     */
+    "[capitulo]": "empezar",
   };
 }
 
