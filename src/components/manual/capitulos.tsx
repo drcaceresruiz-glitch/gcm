@@ -497,6 +497,384 @@ const DINERO = (
 );
 
 // ---------------------------------------------------------------------------
+// Capitulo: el cronograma y el avance
+// ---------------------------------------------------------------------------
+
+const CRONOGRAMA = (
+  <>
+    <Clave>
+      El plan lo manda MS Project; el avance real, GCM. El cronograma entra
+      por <strong>cortes</strong> —cada semana se carga el archivo con el
+      plan al día— y el avance que se reporta en obra{" "}
+      <strong>vive aparte y sobrevive</strong> a cada corte nuevo. De ese
+      cruce salen la curva S, las alertas de atraso y el valor ganado.
+    </Clave>
+
+    <S titulo="Cortes, versiones y el ancla que no cambia">
+      <p>
+        Cada importación es un <strong>corte</strong> con su fecha: la foto
+        del plan tal como estaba esa semana. GCM guarda la serie entera —por
+        eso la curva S puede contar la historia— y trabaja siempre sobre el
+        corte vigente, el más reciente.
+      </p>
+      <p>
+        Cada tarea trae del archivo un <strong>identificador estable (su
+        uid)</strong>, y es el ancla de todo lo que GCM le cuelga: el avance
+        reportado, las fotos, los hitos, el Lookahead. Es lo único del
+        archivo que no cambia entre semanas — el número de fila se corre al
+        insertar, el código se recalcula y el nombre se edita. Por eso
+        reimportar no pierde el trabajo hecho… mientras la tarea siga
+        existiendo en Project.
+      </p>
+      <p>
+        Del archivo se <strong>lee</strong> el % planeado de cada fila (así
+        las cifras cuadran con el informe que ya se emite); el % real, en
+        cambio, <strong>lo manda lo reportado en GCM</strong> — el
+        porcentaje del archivo solo siembra la primera vez, para que un
+        cronograma recién importado no se vea entero a cero.
+      </p>
+    </S>
+
+    <S titulo="La curva S y la ponderación">
+      <p>
+        La curva compara lo planeado con lo medido en cada corte, y cada
+        tarea pesa <strong>según su duración</strong>: terminar una partida
+        de un día no es lo mismo que terminar una de veinte. Es el único
+        peso que trae el archivo — cuando el mapeo tarea-partida cubra
+        suficiente presupuesto, el avance pasará a ponderarse por dinero y
+        las cifras afinarán, sin cambiar de fórmula.
+      </p>
+      <p>
+        La <strong>línea base del cronograma</strong> congela contra qué se
+        miden el plan (PV) y el índice de plazo (SPI): sin ella, te comparas
+        contra el último corte que subiste — contra ti mismo. A diferencia
+        de la revisión del presupuesto, esta sí se puede re-fijar: fijar
+        otra versión limpia la anterior.
+      </p>
+    </S>
+
+    <S titulo="El recorrido de cada semana">
+      <Recorrido
+        pasos={[
+          <>
+            <strong>Exportar de MS Project</strong> el plan al día (o usar
+            la plantilla de Excel del cronograma, si la obra no usa
+            Project).
+          </>,
+          <>
+            <strong>Cargar el corte</strong> en la pantalla del cronograma.
+            El importador enseña qué entendió; las tareas conservan su
+            avance porque el ancla es el uid.
+          </>,
+          <>
+            <strong>Marcar los hitos</strong> que merecen aviso —las fechas
+            clave— con su responsable: el reloj avisará cuando se acerquen o
+            se pasen, con la fecha del cronograma vigente.
+          </>,
+          <>
+            El avance del día a día ya no se toca aquí:{" "}
+            <strong>entra por el parte del día</strong> y por el cierre del
+            plan semanal, y la curva lo recoge solo.
+          </>,
+        ]}
+      />
+      <p>
+        ¿La obra aún no usa Project? La EDT se puede{" "}
+        <strong>generar desde el presupuesto</strong>: trae la estructura y
+        el dinero, pero ninguna fecha — esas filas quedan marcadas «sin
+        programar» y no alertan ni mueven índices hasta que alguien las
+        programe. Sus fechas de relleno no son un plan, y GCM las trata
+        así.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Borrar o rehacer tareas en Project entre corte y corte",
+            pasa: (
+              <p>
+                Si la tarea desaparece del archivo, su avance reportado queda
+                huérfano — GCM lo aparta y lo enseña en vez de borrarlo,
+                porque es trabajo que alguien hizo y reportó. Pasó de verdad:
+                una partida al 100% desapareció del archivo entre dos
+                semanas. Antes de borrar en Project, conviene saber qué hay
+                colgado de esa tarea.
+              </p>
+            ),
+          },
+          {
+            hace: "Poner una tarea de trabajo con duración cero",
+            pasa: (
+              <p>
+                Project la trata como hito, y un hito no lleva peso ni
+                dinero: la partida sale de las cuentas sin dar error. Si es
+                trabajo, que dure; si es una fecha, que sea hito con nombre y
+                responsable.
+              </p>
+            ),
+          },
+          {
+            hace: "Fijar la línea base del cronograma con la obra ya atrasada",
+            pasa: (
+              <p>
+                El plan congelado ya incorpora el atraso y el SPI saldrá
+                cómodo para siempre. Se puede re-fijar —esta sí—, pero cada
+                re-fijado mueve el listón: la pantalla dice contra qué
+                versión se está midiendo, y conviene leerlo antes de
+                celebrar un 1.00.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: el presupuesto meta
+// ---------------------------------------------------------------------------
+
+const META = (
+  <>
+    <Clave>
+      El contractual dice lo que el cliente paga; la <strong>meta</strong>,
+      lo que tu empresa se compromete a gastar para ejecutarlo. La distancia
+      entre las dos es la <strong>bolsa operativa</strong>: el margen con el
+      que la obra respira. Sin meta, «vamos bien de plata» es una opinión.
+    </Clave>
+
+    <S titulo="Dos presupuestos con reglas distintas, a propósito">
+      <p>
+        El <strong>contractual</strong> se congela con su revisión y es
+        irreversible: una vez firmado es un contrato, y los cambios van
+        encima como adicionales o deductivos. La <strong>meta</strong>{" "}
+        también se aprueba y se congela… pero se puede{" "}
+        <strong>re-fijar creando una versión nueva</strong>. No es un
+        descuido: la meta es una promesa interna, y cuando el alcance cambia
+        —llega un adicional, se reconvierte una partida— una meta que no
+        pudiera rehacerse quedaría desfasada para siempre y la bolsa
+        exageraría sin remedio.
+      </p>
+      <p>
+        Cada versión de la meta recuerda contra qué contractual se fijó y
+        cuántos movimientos había entonces: si después entran más, la
+        pantalla avisa del desfase — es la señal de que toca re-fijar.
+      </p>
+    </S>
+
+    <S titulo="La decisión previa: los gastos generales">
+      <p>
+        Antes de leer ninguna bolsa, la obra pregunta{" "}
+        <strong>una sola vez</strong> si los gastos generales cuentan dentro
+        de ella o quedan fuera. No trae valor por defecto porque es una
+        decisión de cada constructora y de cada contrato: hay empresas donde
+        los gastos generales y la utilidad no son de la obra, y solo se
+        tocan con permiso del gerente general. Mientras nadie decida, GCM no
+        enseña margen — una cifra calculada con un criterio que nadie
+        confirmó es peor que ninguna.
+      </p>
+      <p>
+        El criterio es de <strong>presentación, no de datos</strong>: los
+        gastos se cargan y se guardan igual, decida lo que se decida, y por
+        eso se puede cambiar después sin migrar nada.
+      </p>
+    </S>
+
+    <S titulo="El recorrido de la primera vez">
+      <Recorrido
+        pasos={[
+          <>
+            <strong>Aprobar antes el contractual</strong> (la revisión):
+            la meta se fija contra él, y sin esa referencia no hay contra
+            qué comparar.
+          </>,
+          <>
+            <strong>Decidir el criterio</strong> de los gastos generales
+            cuando la obra lo pregunte. Es un aviso que no se quita solo: se
+            quita decidiendo.
+          </>,
+          <>
+            <strong>Cargar la meta</strong> — con su plantilla oficial, como
+            todo lo que se importa — y revisar los totales: costo directo,
+            gastos generales y plazo en meses.
+          </>,
+          <>
+            <strong>Aprobarla</strong> para congelarla. Desde ahí la bolsa
+            se lee sola: contractual vigente contra meta, con el criterio
+            que se decidió.
+          </>,
+        ]}
+      />
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Leer la bolsa sin haber decidido el criterio de gastos generales",
+            pasa: (
+              <p>
+                GCM no lo permite, y ese es el punto: dos criterios dan dos
+                márgenes distintos con los mismos números, y una obra puede
+                parecer holgada o ahogada según cuál se asuma sin decir.
+              </p>
+            ),
+          },
+          {
+            hace: "Dejar la meta congelada mientras entran adicionales",
+            pasa: (
+              <p>
+                El contractual crece y la meta no: la bolsa engorda sola y
+                se lee como holgura que no existe. El desfase se enseña en
+                pantalla; la respuesta es re-fijar la meta, que para eso es
+                la única congelada que puede rehacerse.
+              </p>
+            ),
+          },
+          {
+            hace: "Prometer gastos generales más largos que el plazo",
+            pasa: (
+              <p>
+                Un gasto mensual que dura más meses que la obra es plata
+                comprometida sobre un plazo que no existe. GCM cruza las
+                líneas de gasto contra el plazo y señala las que se pasan,
+                antes de que lo descubra el cierre.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: el Lookahead
+// ---------------------------------------------------------------------------
+
+const LOOKAHEAD = (
+  <>
+    <Clave>
+      El Lookahead mira las <strong>próximas semanas</strong> del cronograma
+      y hace una sola pregunta por tarea: ¿qué le falta para poder
+      ejecutarse? Cada falta es una <strong>restricción</strong> con nombre
+      y fecha comprometida, y la regla del Last Planner es simple:{" "}
+      <strong>al plan semanal solo entra lo liberado</strong>. Comprometer
+      trabajo con restricciones abiertas es prometer lo que no depende de
+      ti.
+    </Clave>
+
+    <S titulo="De dónde salen las tareas (y de dónde no)">
+      <p>
+        Las tareas del Lookahead <strong>no se crean a mano</strong>: se
+        derivan del cronograma vigente — las de trabajo cuyo rango toca la
+        ventana de las próximas semanas, ancladas por el mismo uid que el
+        avance. Así el mediano plazo no puede contradecir al plan: es el
+        plan, mirado de cerca.
+      </p>
+      <p>
+        Las restricciones tampoco se siembran solas. Quien analiza la tarea
+        marca cuáles de los <strong>siete flujos</strong> le aplican
+        —información, materiales, mano de obra, equipos, prerrequisitos,
+        espacio, permisos— <strong>incluida la respuesta «ninguno»</strong>.
+        GCM apunta cuándo se analizó, porque «revisada y sin restricciones»
+        y «nadie la ha mirado» se parecen en pantalla y son lo contrario en
+        obra.
+      </p>
+    </S>
+
+    <S titulo="Restricciones con dueño y con fecha">
+      <p>
+        Una restricción sin responsable es un deseo. Cada una lleva{" "}
+        <strong>quién</strong> la libera —alguien de la empresa o un
+        contacto externo— y <strong>para cuándo</strong> se comprometió. De
+        ahí salen tres cosas: la carga de cada responsable (a quién se le
+        está acumulando todo), los recordatorios del reloj cuando algo lleva
+        días abierto o su fecha ya pasó, y la{" "}
+        <strong>tasa de liberación</strong> — cuánto de lo que se promete
+        liberar se libera de verdad, que es la confiabilidad del equipo
+        medida y no opinada.
+      </p>
+    </S>
+
+    <S titulo="El recorrido de cada semana">
+      <Recorrido
+        pasos={[
+          <>
+            <strong>Recorrer la ventana</strong>: las tareas de las próximas
+            semanas, cada una con su fase y su estado.
+          </>,
+          <>
+            <strong>Analizar las nuevas</strong>: marcar qué flujos les
+            aplican, o «ninguno» — que también es una respuesta y queda
+            registrada.
+          </>,
+          <>
+            <strong>Asignar y fechar</strong> cada restricción: dueño y
+            fecha comprometida.
+          </>,
+          <>
+            <strong>Liberar</strong> durante la semana, y dejar que el reloj
+            recuerde lo que se atasca (si la obra tiene los avisos
+            encendidos).
+          </>,
+          <>
+            Al armar el plan de la semana,{" "}
+            <strong>comprometer solo lo liberado</strong>. El compromiso se
+            hace contra una semana ABIERTA del plan semanal; si la semana ya
+            se cerró, primero se reabre.
+          </>,
+        ]}
+      />
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Comprometer al plan semanal una tarea con restricciones abiertas",
+            pasa: (
+              <p>
+                La semana nace perdida: el viernes la causa de no
+                cumplimiento será «faltó el material» — algo que el martes ya
+                se sabía. El PPC baja y no por mala ejecución, sino por mala
+                preparación, que es justo lo que el Lookahead existe para
+                evitar.
+              </p>
+            ),
+          },
+          {
+            hace: "Dejar tareas sin analizar y leerlas como «sin restricciones»",
+            pasa: (
+              <p>
+                Son dos estados distintos y GCM los distingue: una tarea sin
+                analizar no está limpia, está pendiente. El tablero cuenta
+                las no analizadas aparte, porque diez tareas «limpias» que
+                nadie miró son diez sorpresas en cola.
+              </p>
+            ),
+          },
+          {
+            hace: "Apuntar la restricción sin responsable o sin fecha",
+            pasa: (
+              <p>
+                Nadie recibe el recordatorio y la fecha no puede vencerse:
+                la restricción envejece en silencio. El panel de «qué falta»
+                las cuenta como sin responsable, y esa columna debería
+                tender a cero.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
 // El indice: los capitulos en el orden del trabajo real
 // ---------------------------------------------------------------------------
 
@@ -530,7 +908,7 @@ export const CAPITULOS: CapituloManual[] = [
     resumen:
       "Importar de MS Project por cortes, el avance real que manda sobre el " +
       "archivo, la curva S y los hitos.",
-    contenido: null,
+    contenido: CRONOGRAMA,
   },
   {
     slug: "meta",
@@ -538,9 +916,9 @@ export const CAPITULOS: CapituloManual[] = [
     pregunta: "cuánto queremos gastar",
     paraQuien: "Gerencia y residencia.",
     resumen:
-      "El contractual contra el meta: la bolsa operativa de la obra y sus " +
-      "reglas.",
-    contenido: null,
+      "El contractual contra el meta: la bolsa operativa, el criterio de " +
+      "los gastos generales y por qué la meta sí se puede re-fijar.",
+    contenido: META,
   },
   {
     slug: "lookahead",
@@ -550,7 +928,7 @@ export const CAPITULOS: CapituloManual[] = [
     resumen:
       "Mirar unas semanas adelante, destapar restricciones y liberarlas " +
       "antes de comprometer nada.",
-    contenido: null,
+    contenido: LOOKAHEAD,
   },
   {
     slug: "plan-semanal",
