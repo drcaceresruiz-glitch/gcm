@@ -84,6 +84,8 @@ export function PasoSiguiente({
   const bloqueante = paso.gravedad === "bloqueante";
   const pathname = usePathname();
   const destino = `/obras/${obraId}${paso.camino}`;
+  // El id entra en la llave para que apartar «carga el presupuesto» en una
+  // obra no lo aparte en TODAS: la clave del paso es la misma en las dos.
   const llave = `gcm_paso_aplazado:${obraId}:${paso.clave}`;
 
   const aplazado = useSyncExternalStore(

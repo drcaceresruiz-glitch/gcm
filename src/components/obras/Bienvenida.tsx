@@ -31,14 +31,44 @@ interface Guia {
   href: string | null;
   /// El aviso pinta el chip en ambar; el resto, en color de marca.
   esAviso: boolean;
+  /// Enlace a la guia completa. Solo mientras la constructora se esta
+  /// montando: despues no hay guia que ver y seria un enlace muerto.
+  guiaCompleta: boolean;
 }
 
+/**
+ * ESTE ES EL UNICO «siguiente paso» DEL PANEL, y hay que mantenerlo asi.
+ *
+ * Cuando se escribio el anclaje de continuidad de la obra, la tentacion fue
+ * pintar aqui otro igual alimentado por la puesta en marcha. Habrian quedado
+ * dos carteles contestando la misma pregunta en la misma pantalla, que es el
+ * error de los dos mapas del mismo territorio que este proyecto ya pago
+ * dentro de la obra. En vez de eso, la puesta en marcha entra AQUI.
+ *
+ * El orden de prioridad es el de la pregunta que se hace quien abre el panel:
+ *
+ *   1. **La constructora todavia se esta montando.** Entonces «que miro hoy»
+ *      no es una alerta: es el paso que falta para que GCM sirva de algo. Una
+ *      alerta de una obra sin presupuesto cargado no significa nada.
+ *   2. **La alerta mas urgente**, que el servicio ya ordena.
+ *   3. **Sin nada urgente**, que tambien es una respuesta.
+ */
 function siguientePaso(
   vacia: boolean,
   alertas: AlertaEmpresa[],
   enEjecucion: number,
   puedeCrear: boolean,
+  pasoInicial: { titulo: string; camino: string } | null,
 ): Guia {
+  if (pasoInicial) {
+    return {
+      texto: pasoInicial.titulo,
+      href: pasoInicial.camino,
+      esAviso: false,
+      guiaCompleta: true,
+    };
+  }
+
   if (vacia) {
     /**
      * «Vacía» dejo de significar una sola cosa desde que existe el alcance
@@ -46,6 +76,10 @@ function siguientePaso(
      * ninguna, y para todos los demas puede ser que no les hayan asignado
      * ninguna. Decirle «crea tu primera obra» a quien no puede crearlas es
      * mandarle a un sitio donde no hay boton.
+     *
+     * Con `pasoInicial` resuelto arriba, aqui ya solo cae quien NO puede dar
+     * ningun paso de la puesta en marcha: tipicamente el residente al que
+     * nadie ha asignado su obra.
      */
     return {
       texto: puedeCrear
@@ -53,6 +87,7 @@ function siguientePaso(
         : "Todavía no tienes ninguna obra asignada. El administrador de la empresa te asigna las tuyas desde la pestaña Equipo de cada obra.",
       href: null,
       esAviso: false,
+      guiaCompleta: false,
     };
   }
 
@@ -68,6 +103,7 @@ function siguientePaso(
           : `${alerta.obraNombre}: ${alerta.texto}.`,
       href: alerta.camino,
       esAviso: true,
+      guiaCompleta: false,
     };
   }
 
@@ -78,6 +114,7 @@ function siguientePaso(
         : "Sin avisos urgentes ni obras en ejecución.",
     href: null,
     esAviso: false,
+    guiaCompleta: false,
   };
 }
 
@@ -87,12 +124,16 @@ export function Bienvenida({
   alertas,
   vacia,
   puedeCrear,
+  pasoInicial,
 }: {
   nombres: string;
   resumen: ResumenEmpresa;
   alertas: AlertaEmpresa[];
   vacia: boolean;
   puedeCrear: boolean;
+  /// El paso pendiente de la puesta en marcha, si queda alguno que quien
+  /// mira pueda dar. Manda sobre las alertas: ver `siguientePaso`.
+  pasoInicial: { titulo: string; camino: string } | null;
 }) {
   const ahora = new Date();
   const hora = Number(
@@ -114,6 +155,7 @@ export function Bienvenida({
     alertas,
     resumen.obrasEnEjecucion,
     puedeCrear,
+    pasoInicial,
   );
 
   return (
@@ -180,6 +222,18 @@ export function Bienvenida({
             >
               Ir
               <ArrowRight className="size-3.5" aria-hidden="true" />
+            </Link>
+          )}
+          {/* La guia entera, solo mientras queda algo por montar. Va DETRAS
+              del «Ir» y en tono menor: lo normal es dar el paso que toca; la
+              lista completa es para quien quiere sentarse a llenarlo todo de
+              una vez, que es justo lo que pedia el primer dia. */}
+          {guia.guiaCompleta && (
+            <Link
+              href="/empresa/puesta-en-marcha"
+              className="inline-flex items-center gap-1 opacity-70 hover:opacity-100"
+            >
+              Ver todos los pasos
             </Link>
           )}
         </p>

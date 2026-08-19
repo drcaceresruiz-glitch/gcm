@@ -32,6 +32,7 @@ import { FranjaSemana } from "@/components/obras/FranjaSemana";
 // para los dos niveles del sistema.
 import { MenuObra, type FaseMenu } from "@/components/obras/MenuObra";
 import { preliminaresDeEmpresa } from "@/services/preliminares.service";
+import { siguientePasoDeEmpresa } from "@/lib/puesta-en-marcha";
 import { semanaDeLaEmpresa } from "@/services/plan-semanal.service";
 import { contarSolicitudesPendientes } from "@/services/perfil.service";
 
@@ -112,6 +113,23 @@ export default async function PanelPage({
    * fila de checks verdes permanente es ruido.
    */
   const marca = (hecho: boolean) => (preliminares.completo ? undefined : hecho);
+
+  /**
+   * El paso que falta para tener la constructora en marcha.
+   *
+   * No pinta un cartel propio: se lo pasa a `Bienvenida`, que YA tiene el
+   * «Siguiente paso» del panel. Dos avisos contestando la misma pregunta en
+   * la misma pantalla es el error de los dos mapas del mismo territorio.
+   *
+   * No cuesta ni una consulta: `preliminares` ya estaba pedido arriba para
+   * las marcas del lateral.
+   */
+  const pasoInicial = siguientePasoDeEmpresa(preliminares, {
+    empresa: puede(sesion, "empresa:editar"),
+    contratistas: puede(sesion, "proveedor:crear"),
+    equipo: puede(sesion, "usuario:crear"),
+    obras: puedeCrear,
+  });
 
   const mapaEmpresa: FaseMenu[] = [
     {
@@ -246,6 +264,7 @@ export default async function PanelPage({
         alertas={alertasEmpresa}
         vacia={vacioDeVerdad}
         puedeCrear={puedeCrear}
+        pasoInicial={pasoInicial}
       />
 
       {/* Las cifras de empresa: lectura de gerencia de un vistazo. Con la
