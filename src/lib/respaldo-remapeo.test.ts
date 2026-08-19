@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   MapaDeIds,
+  ordenarPorPadres,
   remapearFila,
   reservarIds,
   type ReferenciasDeEmpresa,
@@ -178,5 +179,103 @@ describe("lo que vive fuera de la obra", () => {
     });
 
     expect(r.fila?.[conUsuario.campo]).toBe("u-nuevo");
+  });
+});
+
+/**
+ * EL ORDEN DE INSERCION DE UNA TABLA QUE SE APUNTA A SI MISMA.
+ *
+ * `wbs_items.parentId` es autorreferente y Restrict. Si una partida hija entra
+ * antes que su capitulo, la base la rechaza con un P2003 y la carga muere a
+ * mitad. Hasta el 19/08/2026 esto funcionaba por suerte: el respaldo salia en
+ * el orden en que la base tenia las filas —un `findMany` sin `ORDER BY`— y
+ * ademas se inserta en trozos de 500, asi que un padre en el segundo trozo y
+ * su hija en el primero rompian igual.
+ */
+describe("ordenarPorPadres", () => {
+  const WBS = tablaDelRespaldo("wbs_items")!;
+
+  function fila(id: string, parentId: string | null) {
+    return { id, parentId, codigoPartida: id };
+  }
+
+  /** Comprueba que ningun hijo aparece antes que su padre. */
+  function padreAntes(filas: Record<string, unknown>[]): boolean {
+    const vistos = new Set<string>();
+    for (const f of filas) {
+      const p = f["parentId"];
+      if (typeof p === "string" && !vistos.has(p)) {
+        // Solo cuenta si el padre viene en la lista: uno de fuera no se espera.
+        if (filas.some((o) => o["id"] === p)) return false;
+      }
+      vistos.add(f["id"] as string);
+    }
+    return true;
+  }
+
+  it("pone el padre antes que la hija aunque lleguen al reves", () => {
+    const desordenadas = [
+      fila("nieta", "hija"),
+      fila("hija", "raiz"),
+      fila("raiz", null),
+    ];
+
+    const ordenadas = ordenarPorPadres(desordenadas, WBS);
+
+    expect(ordenadas).toHaveLength(3);
+    expect(padreAntes(ordenadas)).toBe(true);
+    expect(ordenadas[0]!["id"]).toBe("raiz");
+  });
+
+  it("no pierde ni duplica ninguna fila", () => {
+    const filas = [
+      fila("c", "b"),
+      fila("b", "a"),
+      fila("a", null),
+      fila("d", "a"),
+      fila("e", null),
+    ];
+
+    const ordenadas = ordenarPorPadres(filas, WBS);
+
+    expect(ordenadas.map((f) => f["id"]).sort()).toEqual([
+      "a",
+      "b",
+      "c",
+      "d",
+      "e",
+    ]);
+  });
+
+  /**
+   * Un padre que NO viene en el archivo no se puede esperar. La fila pasa, y
+   * el remapeo la cazara con su propio mensaje: si aqui se quedara colgada, el
+   * error diria «hay un ciclo», que es mentira y manda a buscar donde no es.
+   */
+  it("deja pasar la fila cuyo padre no viene en el archivo", () => {
+    const ordenadas = ordenarPorPadres([fila("huerfana", "de-otra-obra")], WBS);
+    expect(ordenadas).toHaveLength(1);
+  });
+
+  it("una tabla sin autorreferencia se queda como estaba", () => {
+    const ordenes = tablaDelRespaldo("orden_lineas")!;
+    const filas = [{ id: "2" }, { id: "1" }, { id: "3" }];
+
+    expect(ordenarPorPadres(filas, ordenes).map((f) => f["id"])).toEqual([
+      "2",
+      "1",
+      "3",
+    ]);
+  });
+
+  /**
+   * Dos filas que se apuntan la una a la otra no se pueden ordenar. Se avisa
+   * aqui, con el nombre de la tabla, en vez de dejar que la base lo rechace a
+   * mitad de la carga sin decir que el problema era un ciclo.
+   */
+  it("un ciclo se denuncia, no se deja pasar", () => {
+    expect(() =>
+      ordenarPorPadres([fila("a", "b"), fila("b", "a")], WBS),
+    ).toThrow(/circulo/i);
   });
 });

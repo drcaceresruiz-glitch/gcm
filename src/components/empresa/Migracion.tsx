@@ -9,6 +9,7 @@ import {
   LoaderCircle,
   Lock,
   Unlock,
+  Upload,
 } from "lucide-react";
 
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
@@ -85,9 +86,12 @@ function Mensaje({ estado }: { estado: EstadoMigracionUi }) {
 export function Migracion({
   enMigracion,
   desde,
+  destino,
 }: {
   enMigracion: boolean;
   desde: Date | null;
+  /// Si esta empresa puede RECIBIR una constructora, y por que no.
+  destino: { vacia: boolean; motivo: string | null };
 }) {
   const [congelar, hacerCongelar] = useActionState(accionCongelar, {});
   const [descongelar, hacerDescongelar] = useActionState(
@@ -216,6 +220,79 @@ export function Migracion({
               <Boton>
                 <Download className="size-4" aria-hidden />
                 Descargar el archivo
+              </Boton>
+            </form>
+          )}
+        </SeccionTarjeta>
+      </Tarjeta>
+
+      <Tarjeta>
+        <SeccionTarjeta
+          titulo="Traer una constructora de otra instalación"
+          nota="El otro sentido: meter aquí el archivo que salió de otra instalación de GCM."
+          primera
+        >
+          {!destino.vacia ? (
+            /* El motivo sale del MISMO servicio que rechazaria la
+               importacion: si la pantalla dijera una cosa y el servicio otra,
+               la gente probaria a importar para averiguar cual manda. */
+            <p className="max-w-md text-sm opacity-70">
+              {destino.motivo ??
+                "Esta empresa no puede recibir una migración ahora mismo."}
+            </p>
+          ) : (
+            <form
+              method="post"
+              action="/empresa/migracion/importar"
+              encType="multipart/form-data"
+              className="space-y-4"
+            >
+              <div>
+                <label htmlFor="archivo" className="block text-sm font-medium">
+                  El archivo .zip
+                </label>
+                <input
+                  id="archivo"
+                  name="archivo"
+                  type="file"
+                  accept=".zip"
+                  required
+                  className="mt-1 w-full max-w-md text-sm"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="frase-importar"
+                  className="block text-sm font-medium"
+                >
+                  La frase que te dieron con él
+                </label>
+                <input
+                  id="frase-importar"
+                  name="frase"
+                  type="text"
+                  required
+                  minLength={MINIMO_FRASE}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="mt-1 w-full max-w-md rounded-lg px-3 py-2 text-sm"
+                  style={{ border: "1px solid var(--borde)" }}
+                />
+                <p className="mt-2 max-w-md text-sm opacity-70">
+                  Sin la frase exacta el archivo no se puede dar por bueno. No
+                  la tenemos nosotros: la eligió quien exportó.
+                </p>
+              </div>
+
+              <p className="max-w-md text-sm opacity-70">
+                Esto puede tardar varios minutos si la constructora trae muchas
+                obras y fotos. No cierres la pestaña.
+              </p>
+
+              <Boton>
+                <Upload className="size-4" aria-hidden />
+                Traer la constructora
               </Boton>
             </form>
           )}

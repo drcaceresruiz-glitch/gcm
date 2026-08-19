@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { puede } from "@/lib/rbac";
 import { leerEstadoMigracion } from "@/services/empresa-migracion.service";
+import { puedeRecibirMigracion } from "@/services/importacion-empresa.service";
 import { Volver } from "@/components/ui/Volver";
 import { PanelAyuda } from "@/components/ui/PanelAyuda";
 import { IlustracionDocumento } from "@/components/ui/IlustracionDocumento";
@@ -26,7 +27,10 @@ export default async function MigracionPage() {
 
   if (!puede(sesion, "empresa:migrar")) redirect("/panel");
 
-  const estado = await leerEstadoMigracion(sesion);
+  const [estado, destino] = await Promise.all([
+    leerEstadoMigracion(sesion),
+    puedeRecibirMigracion(sesion),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -43,7 +47,11 @@ export default async function MigracionPage() {
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
-        <Migracion enMigracion={estado.enMigracion} desde={estado.desde} />
+        <Migracion
+          enMigracion={estado.enMigracion}
+          desde={estado.desde}
+          destino={destino}
+        />
 
         <PanelAyuda
           ilustracion={<IlustracionDocumento />}

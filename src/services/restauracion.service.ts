@@ -14,6 +14,7 @@ import { TABLAS, tablaDelRespaldo } from "@/lib/respaldo-esquema";
 import { deserializarFila, type FilaJson } from "@/lib/respaldo-serializacion";
 import {
   MapaDeIds,
+  ordenarPorPadres,
   remapearFila,
   reservarIds,
   type ReferenciasDeEmpresa,
@@ -295,7 +296,10 @@ export async function restaurarObra(
     const listas: Record<string, unknown>[] = [];
     let descartadas = 0;
 
-    for (const cruda of origen) {
+    // El padre ANTES que la hija. `wbs_items.parentId` es autorreferente y
+    // Restrict: hasta ahora esto funcionaba porque el respaldo salia en el
+    // orden en que la base tenia las filas, que no lo garantiza nadie.
+    for (const cruda of ordenarPorPadres(origen, tabla)) {
       const r = remapearFila(cruda, tabla, mapa, empresa);
 
       if (r.fila === null) {

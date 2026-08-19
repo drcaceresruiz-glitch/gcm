@@ -67,8 +67,20 @@ export async function adjuntarArchivos(
       continue;
     }
 
+    /**
+     * SIEMPRE con barras normales, aunque la columna traiga las de Windows.
+     *
+     * `ruta` se guarda con el separador del sistema que subio el archivo, y en
+     * Windows eso es `\`. Dentro de un zip las entradas van con `/` y punto:
+     * quien lo escribe las normaliza, asi que el nombre acabaria en el
+     * manifiesto con `\` y en el zip con `/`, y al leerlo no se encontraria.
+     *
+     * No se ve en Linux, donde ya son `/`. Se ve al exportar desde Windows,
+     * que es exactamente donde vivira la version instalable.
+     */
+    const enBarras = ruta.replace(/\\/g, "/");
     const dentro =
-      forma === "ruta-completa" ? ruta : (ruta.split("/").pop() ?? id);
+      forma === "ruta-completa" ? enBarras : (enBarras.split("/").pop() ?? id);
     const nombre = `${carpeta}/${dentro}`;
 
     zip.append(createReadStream(absoluta), { name: nombre });
