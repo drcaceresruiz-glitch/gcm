@@ -103,24 +103,31 @@ hace aritmética exacta con enteros grandes sobre texto —«los valores viajan
 siempre como texto para no pasar nunca por un `number` intermedio»— así que
 sumar, restar, multiplicar y dividir dinero es exacto **con cualquier motor**.
 
-El único punto de contacto son ~10 sitios que sí piden la suma a la base
-(`_sum` sobre `importe` y `montoContratado`, en `tablero`, `gerencia`,
-`ordenes`, `obras` y `movimientos`). Los diez hacen `._sum.x.toString()` y se
-lo pasan a `sumar()`, que reaplica la escala; el error flotante queda muy por
-debajo de medio céntimo hasta magnitudes que una constructora no alcanza.
+El único punto de contacto son los sitios que sí piden la suma a la base
+(`_sum` sobre `importe` y `montoContratado`, en `obras`, `tablero`,
+`movimientos`, `presupuesto-obra`, `ordenes` y `gerencia`). Todos hacen
+`._sum.x.toString()` y se lo pasan a `sumar()`, que reaplica la escala; el
+error flotante queda muy por debajo de medio céntimo hasta magnitudes que una
+constructora no alcanza.
 
-**Lo que queda por hacer, y es acotado:**
+**Repasado el 19/08, y no hubo nada que arreglar.** Son **once** `_sum` sobre
+dinero y **cero** `_avg`/`_min`/`_max`. Los cuatro sitios donde uno llega a
+decidir algo —el signo del vigente al aprobar un movimiento, y el sobregiro
+por partida en tres pantallas— pasan todos por `sumar`/`restar` antes de la
+comparación. Los cuatro invariantes de suma cuadran, incluida la única
+igualdad literal sobre dinero de todo el sistema (`lib/ordenes.ts`,
+`diferencia === "0.00"`), que es segura porque su entrada ya pasó por `sumar`.
+Los pagos, además, se suman en GCM fila a fila y no en SQL.
 
-1. Repasar esos ~10 sitios y confirmar que ninguno compara por igualdad
-   **antes** de formatear.
-2. Revisar los invariantes de suma —el reparto de la meta que debe sumar 1,
-   los pagos que deben igualar el encargo—: si alguno compara exacto, que
-   compare en céntimos enteros.
-3. Comprobar en pantalla que la escala perdida al leer (`0.10` -> `0.1`) no
-   asoma. El respaldo no se ve afectado: su catálogo ya reaplica la escala.
+Lo único que faltaba era que algo lo sostuviera: era una costumbre, no una
+regla. Ahora lo sostiene `src/lib/dinero-desde-la-base.test.ts`, que saca los
+campos `Decimal` del propio `schema.prisma` y comprueba que ningún valor
+sumado por la base decide nada sin normalizar.
 
-Sigue sin comprobar el resto del cambio de motor: índices únicos, tipos de
-fecha y `ENUM` se comportan distinto en SQLite.
+Queda **sin comprobar** el resto del cambio de motor: índices únicos, tipos de
+fecha y `ENUM`. Y conviene mirar en pantalla que la escala perdida al leer
+(`0.10` -> `0.1`) no asoma; el respaldo no se ve afectado, porque su catálogo
+ya reaplica la escala.
 
 ## F. Lo que aparece nuevo
 
