@@ -112,7 +112,14 @@ export function PasoSiguiente({
             }
       }
     >
-      <p className="flex items-start gap-2">
+      {/* `flex-1 min-w-0` hace que el texto ocupe el hueco que quede y los
+          botones se queden a la derecha en una sola fila; sin el, el parrafo
+          se estiraba hasta el borde y el ancho al que rompia la caja dependia
+          del largo del texto, o sea del paso que tocara. `min-w-0` es lo que
+          permite que una linea larga se parta dentro de un flex en vez de
+          desbordar. Al plegarse, los botones caen bajo el texto con el mismo
+          `gap-3` del contenedor. */}
+      <p className="flex min-w-0 flex-1 items-start gap-2 text-pretty">
         {bloqueante && (
           <TriangleAlert
             className="mt-0.5 size-4 shrink-0"

@@ -48,7 +48,14 @@ export interface PasoSiguiente {
   gravedad: GravedadPaso;
   /// Que falta, en una linea.
   titulo: string;
-  /// Que se rompe si no se hace. Es lo que mueve a alguien, no el hecho.
+  /**
+   * Que se rompe si no se hace. Es lo que mueve a alguien, no el hecho.
+   *
+   * UNA FRASE, y es un limite medido en pantalla, no una manía: con dos, el
+   * anclaje ocupaba tres lineas en una caja que quiere ser discreta y pesaba
+   * mas que el contenido de la pantalla que encabeza. Lo que no cabe aqui va
+   * en la pantalla de destino, que es donde se actua.
+   */
   consecuencia: string;
   /// El texto del boton, nombrando la accion real.
   accion: string;
@@ -112,7 +119,7 @@ export function siguientePaso(
       gravedad: "bloqueante",
       titulo: "Falta decidir una cosa antes de seguir",
       consecuencia:
-        "Si los gastos generales cuentan en la bolsa de esta obra o quedan fuera. Hasta que lo elijas, el margen que se calcule no sería fiable.",
+        "Hasta que elijas si los gastos generales cuentan en la bolsa, el margen que se calcule no sería fiable.",
       accion: "Decidir ahora",
       camino: "/criterio",
     };
@@ -125,7 +132,7 @@ export function siguientePaso(
       gravedad: "sugerencia",
       titulo: "Esta obra todavía no tiene presupuesto",
       consecuencia:
-        "Todas las cifras de GCM cuelgan de ese árbol: sin él no hay avance valorizado, ni comprometido, ni alertas. Descarga la plantilla oficial en la propia pantalla y cárgala.",
+        "Sin él no hay avance valorizado, ni comprometido, ni alertas, y se carga con la plantilla oficial que ofrece esa misma pantalla.",
       accion: "Cargar el presupuesto",
       camino: "/importar",
     };
@@ -137,7 +144,7 @@ export function siguientePaso(
       gravedad: "sugerencia",
       titulo: "Falta el cronograma",
       consecuencia:
-        "Con presupuesto pero sin fechas, GCM sabe cuánto cuesta cada partida y no cuándo toca: no hay curva S, ni atrasos, ni Lookahead.",
+        "Sin fechas no hay curva S, ni atrasos, ni Lookahead: GCM sabe lo que cuesta cada partida, no cuándo toca.",
       accion: "Cargar el cronograma",
       camino: "/cronograma/importar",
     };
@@ -149,7 +156,7 @@ export function siguientePaso(
       gravedad: "sugerencia",
       titulo: "Nadie tiene asignada esta obra",
       consecuencia:
-        "Quien no sea ADMIN entra a un panel vacío y no la ve. No es un fallo: es que todavía no se le ha dicho cuáles son sus obras.",
+        "Quien no sea ADMIN entra a un panel vacío y no la ve, y no parece un permiso mal puesto sino una avería.",
       accion: "Asignar el equipo",
       camino: "/equipo",
     };
@@ -161,7 +168,7 @@ export function siguientePaso(
       gravedad: "sugerencia",
       titulo: "El presupuesto sigue siendo un borrador",
       consecuencia:
-        "Cuando ya sea EL plan, congélalo: la línea base es la referencia contra la que se miden los movimientos y el valor ganado. Fijarla con la obra andando deja un atraso que siempre parecerá pequeño.",
+        "Es la referencia contra la que se miden los movimientos y el valor ganado, y fijarla tarde deja un atraso que siempre parecerá pequeño.",
       accion: "Ver revisiones",
       camino: "/revisiones",
     };
@@ -175,7 +182,7 @@ export function siguientePaso(
       gravedad: "sugerencia",
       titulo: `${n} ${plural(n, "restricción con la fecha ya pasada", "restricciones con la fecha ya pasada")}`,
       consecuencia:
-        "Alguien dijo que las tendría y no las tuvo. Lo que dependa de ellas se comprometerá igual, y el viernes será una causa de no cumplimiento que el martes ya se sabía.",
+        "Lo que dependa de ellas se comprometerá igual, y el viernes será una causa de no cumplimiento que el martes ya se sabía.",
       accion: "Ver el Lookahead",
       camino: "/lookahead",
     };
@@ -188,7 +195,7 @@ export function siguientePaso(
       gravedad: "sugerencia",
       titulo: `${n} ${plural(n, "semana sin cerrar", "semanas sin cerrar")} con el corte ya pasado`,
       consecuencia:
-        "El PPC no cuenta lo que no se evalúa: un compromiso sin marcar cuenta como incumplido. No cerrar la semana no sube el indicador, solo lo deja sin causas.",
+        "Un compromiso sin evaluar cuenta como incumplido: no cerrar la semana no sube el PPC, solo lo deja sin causas.",
       accion: "Ver el plan semanal",
       camino: "/plan-semanal",
     };

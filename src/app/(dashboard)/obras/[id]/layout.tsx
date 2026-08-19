@@ -314,13 +314,6 @@ export default async function ObraLayout({
       <MenuObra fases={fases} />
 
       <div className="space-y-6">
-      {/* El anclaje de continuidad va ARRIBA DEL TODO y en todas las
-          pantallas de la obra: eso es lo que lo hace util cuando uno se
-          desvia. Con boton, porque un aviso sin salida se ignora, y solo UNO,
-          porque la lista larga ya vive en el panel «Que falta» del tablero.
-          El propio componente se esconde si ya estas en la pantalla del
-          paso. */}
-      {paso && <PasoSiguiente obraId={id} paso={paso} />}
       {/* Todo el marco desaparece al imprimir: la vista del documento de la
           orden cuelga de esta ruta, y el papel que recibe el proveedor no
           puede salir con pestanas encima. */}
@@ -416,6 +409,18 @@ export default async function ObraLayout({
           )}
         </div>
       </div>
+
+      {/* El anclaje de continuidad: en TODAS las pantallas de la obra —eso es
+          lo que lo hace util cuando uno se desvia— pero DEBAJO de la
+          cabecera, no encima. Estuvo arriba del todo y se leia el paso
+          pendiente antes que el nombre de la obra; el titulo manda, y la
+          sugerencia entra justo despues, pegada al contenido sobre el que
+          actua.
+
+          Solo UNO: la lista larga ya vive en el panel «Que falta» del
+          tablero. Con boton, porque un aviso sin salida se ignora. Y el
+          propio componente se esconde si ya estas en la pantalla del paso. */}
+      {paso && <PasoSiguiente obraId={id} paso={paso} />}
 
       {children}
       </div>
