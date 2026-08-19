@@ -5,6 +5,7 @@ import { Plus, Handshake } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import { listarEncargos } from "@/services/encargos.service";
+import { respuestasPorContratista } from "@/services/mensajes-contratista.service";
 import { puede } from "@/lib/rbac";
 import { soles } from "@/utils/formato";
 import { Mascota } from "@/components/ui/Mascota";
@@ -32,7 +33,12 @@ export default async function ProveedoresPage({
     );
   }
 
-  const { encargos, cobertura } = await listarEncargos(sesion, id);
+  // Las dos a la vez: el contador de respuestas es una consulta agrupada y no
+  // depende de los encargos, asi que esperarla en serie seria un viaje de mas.
+  const [{ encargos, cobertura }, respuestas] = await Promise.all([
+    listarEncargos(sesion, id),
+    respuestasPorContratista(sesion, id),
+  ]);
   const puedeGestionar = puede(sesion, "encargo:gestionar");
   const puedeValorizar = puede(sesion, "encargo:valorizar");
 
@@ -135,6 +141,7 @@ export default async function ProveedoresPage({
               puedeGestionar={puedeGestionar}
               puedeValorizar={puedeValorizar}
               puedeContactar={puede(sesion, "proveedor:contactar")}
+              respuestas={respuestas.get(e.proveedor.id) ?? 0}
             />
           ))}
         </ul>

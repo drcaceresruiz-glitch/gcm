@@ -202,6 +202,24 @@ async function aTexto(
   }
 }
 
+/**
+ * Bajar el texto de una parte de un correo.
+ *
+ * Lo unico que el guardado necesita del servidor de correo, y por eso se pasa
+ * como funcion en vez del cliente entero: deja explicito que de IMAP aqui solo
+ * se usa esto, y permite probar el emparejado y la idempotencia sin levantar
+ * un buzon.
+ */
+type BajarTexto = (uid: number, parte: string) => Promise<string>;
+
+/** La descarga de verdad, contra el cliente IMAP ya conectado. */
+function bajarTexto(cliente: ImapFlow): BajarTexto {
+  return async (uid, parte) => {
+    const descarga = await cliente.download(String(uid), parte, { uid: true });
+    return aTexto(descarga.content, descarga.meta?.charset);
+  };
+}
+
 /** Lo que se saca de un correo antes de decidir si es nuestro. */
 interface Candidato {
   uid: number;
@@ -282,7 +300,7 @@ async function leerBuzon(
         });
       }
 
-      const r = await emparejarYGuardar(buzon, cliente, candidatos);
+      const r = await emparejarYGuardar(buzon, bajarTexto(cliente), candidatos);
       respuestas += r.respuestas;
       ignorados += r.ignorados;
     } finally {
@@ -305,9 +323,14 @@ interface Hilo {
   userId: string | null;
 }
 
-async function emparejarYGuardar(
+/**
+ * Exportada PARA PODER PROBARLA. Es donde vive la idempotencia —que releer el
+ * buzon no duplique una respuesta— y eso no se puede comprobar de verdad
+ * desde fuera sin levantar un servidor de correo.
+ */
+export async function emparejarYGuardar(
   buzon: BuzonALeer,
-  cliente: ImapFlow,
+  bajar: BajarTexto,
   candidatos: readonly Candidato[],
 ): Promise<{ respuestas: number; ignorados: number }> {
   let respuestas = 0;
@@ -362,7 +385,7 @@ async function emparejarYGuardar(
       continue;
     }
 
-    const guardado = await guardarRespuesta(buzon, cliente, candidato, decision, porId);
+    const guardado = await guardarRespuesta(buzon, bajar, candidato, decision, porId);
     if (guardado) respuestas += 1;
     else ignorados += 1;
   }
@@ -380,7 +403,7 @@ async function emparejarYGuardar(
  */
 async function guardarRespuesta(
   buzon: BuzonALeer,
-  cliente: ImapFlow,
+  bajar: BajarTexto,
   candidato: Candidato,
   decision: Extract<Emparejado, { tipo: "hilo" } | { tipo: "contratista" }>,
   porId: ReadonlyMap<string, Hilo>,
@@ -392,14 +415,7 @@ async function guardarRespuesta(
   let cuerpo = "";
   if (candidato.parteTexto) {
     try {
-      const descarga = await cliente.download(
-        String(candidato.uid),
-        candidato.parteTexto,
-        { uid: true },
-      );
-      cuerpo = cuerpoEntrante(
-        await aTexto(descarga.content, descarga.meta?.charset),
-      );
+      cuerpo = cuerpoEntrante(await bajar(candidato.uid, candidato.parteTexto));
     } catch {
       // Una parte que no se puede bajar no tumba la pasada: se guarda la
       // respuesta sin texto, que sigue siendo el hecho de que contesto.

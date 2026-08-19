@@ -214,6 +214,37 @@ export async function historialDeContratista(
   }));
 }
 
+/**
+ * Cuantas respuestas ha dejado cada contratista EN ESTA OBRA.
+ *
+ * Existe para que desde la obra se vea que hay algo que leer sin tener que
+ * entrar contratista por contratista. Es un CONTADOR, no un «sin leer»:
+ * `MensajeContratista` no guarda estado de lectura, y decir «2 sin leer»
+ * sobre algo que nadie sabe si se leyo seria inventarse el dato. Quien avisa
+ * de lo nuevo es la campanita, que si sabe a quien y desde cuando.
+ *
+ * Una sola consulta agrupada para toda la lista: una por tarjeta convertiria
+ * una obra con veinte frentes en veinte consultas.
+ */
+export async function respuestasPorContratista(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<Map<string, number>> {
+  if (!puede(sesion, "proveedor:contactar")) return new Map();
+
+  const filas = await prisma.mensajeContratista.groupBy({
+    by: ["proveedorId"],
+    where: {
+      companyId: sesion.companyId,
+      projectId: obraId,
+      direccion: "ENTRANTE",
+    },
+    _count: { _all: true },
+  });
+
+  return new Map(filas.map((f) => [f.proveedorId, f._count._all]));
+}
+
 export interface DatosMensaje {
   proveedorId: string;
   obraId?: string | null;

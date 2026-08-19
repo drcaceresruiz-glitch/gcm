@@ -47,6 +47,7 @@ export function TarjetaEncargo({
   puedeGestionar,
   puedeValorizar,
   puedeContactar,
+  respuestas = 0,
 }: {
   obraId: string;
   encargo: EncargoResumen;
@@ -55,6 +56,9 @@ export function TarjetaEncargo({
   /// Escribirle. Va aparte de gestionar: el residente avisa al contratista
   /// aunque no reparta alcances ni pacte montos.
   puedeContactar: boolean;
+  /// Cuantas veces ha contestado este contratista en esta obra. Cero mientras
+  /// la empresa no active la recogida de respuestas, y entonces no se pinta.
+  respuestas?: number;
 }) {
   const c = encargo.cuentas;
   const anulado = encargo.estado === "ANULADO";
@@ -106,6 +110,19 @@ export function TarjetaEncargo({
             >
               <Send className="size-3.5" aria-hidden="true" />
               Escribir
+              {/* Cuantas veces ha contestado en ESTA obra. Es un contador, no
+                  un «sin leer»: no se guarda quien leyo que, y ponerle esa
+                  etiqueta seria inventarse el dato. De lo nuevo avisa la
+                  campanita, que si sabe a quien y desde cuando. */}
+              {respuestas > 0 && (
+                <span
+                  className="ml-0.5 rounded-full px-1.5 py-0.5 text-[0.65rem] font-medium text-white"
+                  style={{ backgroundColor: "var(--color-marca-600)" }}
+                  title={`${respuestas} ${respuestas === 1 ? "respuesta recibida" : "respuestas recibidas"} en esta obra`}
+                >
+                  {respuestas}
+                </span>
+              )}
             </Link>
           )}
 
