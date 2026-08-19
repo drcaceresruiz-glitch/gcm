@@ -88,6 +88,24 @@ const envSchema = z.object({
   GCM_OPERADORES: z.string().optional(),
 
   /**
+   * Frase con la que se cifra la contrasena del buzon propio de cada
+   * constructora. Ver `src/lib/secreto.ts`.
+   *
+   * Vive aqui y no en la base por lo mismo que `GCM_OPERADORES`: asi un
+   * volcado de la base no se lleva las contrasenas de correo de los clientes.
+   * Hacen falta las dos cosas.
+   *
+   * OPCIONAL, y su ausencia es el fallo seguro: sin ella no se puede guardar
+   * ningun remitente propio y los que hubiera dejan de usarse —el correo sale
+   * por el buzon compartido de siempre—. Nunca se guarda en claro.
+   *
+   * CAMBIARLA INUTILIZA lo ya guardado: los remitentes propios dejan de
+   * descifrarse y hay que volver a teclear su contrasena. No es una perdida
+   * de datos, pero conviene saberlo antes de rotarla.
+   */
+  CORREO_CLAVE_CIFRADO: z.string().optional(),
+
+  /**
    * Token de json.pe para enviar SMS (pases de obra).
    *
    * OPCIONAL, como el SMTP. Sin el, el codigo del pase sale por correo o lo

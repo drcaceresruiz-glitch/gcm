@@ -1,0 +1,267 @@
+"use client";
+
+import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
+import { AlertCircle, CheckCircle2, LoaderCircle, Mail, Send } from "lucide-react";
+
+import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
+import { haceCuanto } from "@/utils/fechas";
+import {
+  accionGuardarRemitente,
+  accionProbarRemitente,
+  accionCambiarEstadoRemitente,
+  type EstadoRemitente,
+} from "@/app/(dashboard)/empresa/configuracion/acciones-remitente";
+import type { RemitenteEnPantalla } from "@/services/remitente-correo.service";
+
+/**
+ * Desde que buzon sale el correo de esta constructora.
+ *
+ * Sin configurar, el correo sale por el buzon compartido de GCM y todo
+ * funciona: esto no es obligatorio. Lo que cambia al ponerlo es lo que ve
+ * quien recibe —la direccion de la constructora, no una tecnica que no
+ * reconoce— y a donde va la respuesta.
+ *
+ * LA CONTRASENA NUNCA VUELVE A LA PANTALLA. El campo nace vacio incluso
+ * cuando hay una guardada, y vacio significa «conserva la que ya estaba». Si
+ * viajara de vuelta acabaria en el HTML del formulario y en el historial del
+ * navegador.
+ */
+
+function Boton({
+  children,
+  variante = "principal",
+}: {
+  children: React.ReactNode;
+  variante?: "principal" | "suave";
+}) {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
+      style={
+        variante === "principal"
+          ? { backgroundColor: "var(--color-marca-600)", color: "white" }
+          : { border: "1px solid var(--borde)" }
+      }
+    >
+      {pending && <LoaderCircle className="size-4 animate-spin" aria-hidden />}
+      {children}
+    </button>
+  );
+}
+
+function Mensaje({ estado }: { estado: EstadoRemitente }) {
+  if (!estado.error && !estado.ok) return null;
+
+  const malo = Boolean(estado.error);
+  return (
+    <p
+      className="mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-sm"
+      style={{
+        backgroundColor: `color-mix(in oklab, ${
+          malo ? "var(--color-peligro)" : "var(--color-marca-500)"
+        } 14%, transparent)`,
+      }}
+    >
+      {malo ? (
+        <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+      ) : (
+        <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />
+      )}
+      <span className="text-pretty">{estado.error ?? estado.ok}</span>
+    </p>
+  );
+}
+
+export function RemitenteCorreo({
+  remitente,
+  hayLlave,
+}: {
+  remitente: RemitenteEnPantalla | null;
+  /// Sin llave de cifrado en el servidor no se puede guardar ninguna
+  /// contrasena. Se dice en pantalla en vez de dejar que el formulario falle
+  /// al guardar: el problema no lo puede arreglar quien lo esta leyendo.
+  hayLlave: boolean;
+}) {
+  const [guardado, guardar] = useActionState(accionGuardarRemitente, {});
+  const [probado, probar] = useActionState(accionProbarRemitente, {});
+  const [estado, cambiarEstado] = useActionState(
+    accionCambiarEstadoRemitente,
+    {},
+  );
+
+  return (
+    <Tarjeta>
+      <SeccionTarjeta
+        primera
+        titulo="Desde qué buzón sale tu correo"
+        nota="Sin configurar, el informe y los avisos salen desde una dirección técnica de GCM. Con tu buzón, el cliente los ve llegar desde tu constructora y la respuesta te llega a ti."
+      >
+        <p className="flex items-center gap-2 text-sm opacity-70">
+          <Mail className="size-4 shrink-0" aria-hidden />
+          {remitente?.activo
+            ? "Ahora mismo sale desde tu buzón."
+            : "Ahora mismo sale por el buzón compartido de GCM."}
+        </p>
+      </SeccionTarjeta>
+
+      {!hayLlave && (
+        <p
+          className="mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-sm"
+          style={{
+            backgroundColor:
+              "color-mix(in oklab, var(--color-alerta) 14%, transparent)",
+          }}
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span className="text-pretty">
+            Esta instalación no tiene clave de cifrado configurada, así que no
+            se puede guardar la contraseña de un buzón. Habla con quien
+            administra el servidor.
+          </span>
+        </p>
+      )}
+
+      {remitente && (
+        <div
+          className="mt-4 rounded-lg border p-3 text-sm"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <p className="flex flex-wrap items-center gap-2">
+            <strong>{remitente.remitenteCorreo}</strong>
+            <span className="opacity-70">
+              · {remitente.host}:{remitente.puerto}
+            </span>
+          </p>
+
+          {/* Configurado NO es lo mismo que funciona, y la diferencia se dice
+              aqui: sin esto, el primer correo que falla es el que iba al
+              cliente. */}
+          <p className="mt-1 opacity-80">
+            {!remitente.activo
+              ? "Apagado: el correo sale por el buzón compartido."
+              : remitente.verificadoAt
+                ? `Probado ${haceCuanto(remitente.verificadoAt)} y funcionó.`
+                : "Guardado pero sin probar todavía."}
+          </p>
+
+          {remitente.ultimoError && (
+            <p className="mt-1 opacity-80">
+              Último fallo{" "}
+              {remitente.ultimoErrorAt && haceCuanto(remitente.ultimoErrorAt)}:{" "}
+              {remitente.ultimoError}
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <form action={probar}>
+              <Boton variante="suave">
+                <Send className="size-4" aria-hidden />
+                Enviar correo de prueba
+              </Boton>
+            </form>
+
+            <form action={cambiarEstado}>
+              <input
+                type="hidden"
+                name="activo"
+                value={remitente.activo ? "0" : "1"}
+              />
+              <Boton variante="suave">
+                {remitente.activo ? "Apagar" : "Encender"}
+              </Boton>
+            </form>
+          </div>
+
+          <Mensaje estado={probado} />
+          <Mensaje estado={estado} />
+        </div>
+      )}
+
+      <form action={guardar} className="mt-4 space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="font-medium">Servidor de salida (SMTP)</span>
+            <input
+              name="host"
+              defaultValue={remitente?.host ?? ""}
+              placeholder="mail.tuempresa.pe"
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              style={{ borderColor: "var(--borde)" }}
+            />
+          </label>
+
+          <label className="text-sm">
+            <span className="font-medium">Puerto</span>
+            <input
+              name="puerto"
+              defaultValue={remitente?.puerto ?? 465}
+              inputMode="numeric"
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              style={{ borderColor: "var(--borde)" }}
+            />
+            <span className="mt-1 block text-xs opacity-70">
+              465 es lo habitual. Con 587 se usa STARTTLS.
+            </span>
+          </label>
+
+          <label className="text-sm">
+            <span className="font-medium">Usuario</span>
+            <input
+              name="usuario"
+              defaultValue={remitente?.usuario ?? ""}
+              placeholder="obras@tuempresa.pe"
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              style={{ borderColor: "var(--borde)" }}
+            />
+          </label>
+
+          <label className="text-sm">
+            <span className="font-medium">Contraseña</span>
+            <input
+              name="clave"
+              type="password"
+              autoComplete="new-password"
+              placeholder={remitente?.hayClave ? "Guardada — déjalo vacío para conservarla" : ""}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              style={{ borderColor: "var(--borde)" }}
+            />
+          </label>
+
+          <label className="text-sm">
+            <span className="font-medium">Nombre que se verá</span>
+            <input
+              name="remitenteNombre"
+              defaultValue={remitente?.remitenteNombre ?? ""}
+              placeholder="CONSTRUCTORA X SAC"
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              style={{ borderColor: "var(--borde)" }}
+            />
+          </label>
+
+          <label className="text-sm">
+            <span className="font-medium">Dirección de envío</span>
+            <input
+              name="remitenteCorreo"
+              defaultValue={remitente?.remitenteCorreo ?? ""}
+              placeholder="obras@tuempresa.pe"
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              style={{ borderColor: "var(--borde)" }}
+            />
+            <span className="mt-1 block text-xs opacity-70">
+              Casi siempre la misma que el usuario. Si no coinciden, muchos
+              servidores rechazan el envío.
+            </span>
+          </label>
+        </div>
+
+        <Boton>{remitente ? "Guardar cambios" : "Guardar buzón"}</Boton>
+        <Mensaje estado={guardado} />
+      </form>
+    </Tarjeta>
+  );
+}

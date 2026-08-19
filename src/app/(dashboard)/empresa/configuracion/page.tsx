@@ -8,6 +8,9 @@ import { Volver } from "@/components/ui/Volver";
 import { PanelAyuda } from "@/components/ui/PanelAyuda";
 import { IlustracionDocumento } from "@/components/ui/IlustracionDocumento";
 import { EmisoresSms } from "@/components/empresa/EmisoresSms";
+import { RemitenteCorreo } from "@/components/empresa/RemitenteCorreo";
+import { leerRemitente } from "@/services/remitente-correo.service";
+import { hayLlaveDeCifrado } from "@/lib/secreto";
 
 export const metadata: Metadata = { title: "Configuración" };
 
@@ -28,7 +31,10 @@ export default async function ConfiguracionPage() {
 
   if (!puede(sesion, "configuracion:editar")) redirect("/panel");
 
-  const emisores = await listarEmisores(sesion);
+  const [emisores, remitente] = await Promise.all([
+    listarEmisores(sesion),
+    leerRemitente(sesion),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -43,6 +49,11 @@ export default async function ConfiguracionPage() {
           administra.
         </p>
       </div>
+
+      {/* El buzon propio va ARRIBA del emisor de SMS: el correo lo usa todo el
+          mundo desde el primer dia y el SMS es opcional. Ancho completo,
+          porque su formulario son seis campos. */}
+      <RemitenteCorreo remitente={remitente} hayLlave={hayLlaveDeCifrado()} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
         {/* La direccion se calcula, no se escribe: si algun dia GCM vive en

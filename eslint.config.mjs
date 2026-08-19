@@ -30,6 +30,25 @@ const eslintConfig = [
     files: ["src/**/*.{ts,tsx}"],
     rules: {
       /**
+       * El guion bajo delante marca «este parametro existe por la firma, no
+       * porque haga falta».
+       *
+       * Es el convenio que ya usaba todo el proyecto —`_previo` en cada
+       * accion de servidor— pero sin declararlo: la regla solo avisa del
+       * ULTIMO parametro sin usar, asi que colaba mientras hubiera otro
+       * detras. Una accion que no recibe formulario lo destapo. Declararlo
+       * es preferible a inventarle un uso al parametro o a sembrar
+       * `eslint-disable` sueltos.
+       */
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+      /**
        * Regla de arquitectura: los componentes no importan Prisma
        * directamente. Todo acceso a datos pasa por src/services, que es
        * donde se verifican permisos y se filtra por empresa. Sin esta

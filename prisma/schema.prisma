@@ -175,6 +175,9 @@ model Company {
   emisoresSms       EmisorSms[]
   mensajesSms       MensajeSms[]
   respaldosObra     RespaldoObra[]
+  /// Singular, no lista: «desde donde sale mi correo» solo admite una
+  /// respuesta. Ver `RemitenteCorreo`.
+  remitenteCorreo   RemitenteCorreo?
 
   @@map("companies")
 }
@@ -223,6 +226,68 @@ model EmisorSms {
 
   @@index([companyId, activo])
   @@map("emisores_sms")
+}
+
+/// El buzon PROPIO de una constructora: desde donde sale su correo.
+///
+/// Sin esta fila, el correo de esa empresa sale por el buzon compartido de la
+/// instalacion (`SMTP_*` del entorno). Con ella, sale del suyo: el cliente ve
+/// llegar el informe desde la direccion de la constructora y no desde una
+/// tecnica que no reconoce, y la respuesta cae donde alguien la lee.
+///
+/// ES ADEMAS EL UNICO CAMINO PARA LA VERSION INSTALABLE. Cuando GCM se
+/// entregue como ejecutable en la maquina del cliente no habra ningun buzon
+/// compartido que compartir: o la constructora pone el suyo, o no hay correo.
+///
+/// UNA POR EMPRESA (`companyId` unico): no es una lista como los emisores de
+/// SMS —de los que puede haber varios telefonos— sino la respuesta a «desde
+/// donde sale mi correo», que solo admite una.
+model RemitenteCorreo {
+  id        String @id @default(cuid())
+  companyId String @unique
+
+  host   String  @db.VarChar(150)
+  puerto Int
+  /// TLS directo (465). Falso = STARTTLS (587), que nodemailer negocia solo.
+  seguro Boolean @default(true)
+
+  usuario String @db.VarChar(200)
+
+  /**
+   * La contrasena, CIFRADA. Ver `src/lib/secreto.ts`.
+   *
+   * Es el unico secreto de GCM que no se hashea, y no por descuido: hay que
+   * presentarsela al servidor SMTP en cada envio, asi que un hash no serviria.
+   * La llave de cifrado vive en el entorno, nunca aqui.
+   *
+   * NUNCA sale hacia la pantalla. La interfaz solo dice si esta puesta.
+   */
+  claveCifrada String @db.Text
+
+  /// Lo que ve quien recibe: «CONSTRUCTORA X <obras@constructora.pe>». El
+  /// correo suele tener que coincidir con `usuario` o el servidor lo rechaza.
+  remitenteNombre String @db.VarChar(150)
+  remitenteCorreo String @db.VarChar(150)
+
+  /// Apagarlo devuelve la empresa al buzon compartido sin perder lo tecleado.
+  activo Boolean @default(true)
+
+  /// Ultimo envio de prueba que SALIO. Es lo unico que distingue «configurado»
+  /// de «configurado y funciona», y sin esa distincion el primer correo que
+  /// falla es el que iba al cliente.
+  verificadoAt DateTime?
+  /// Que dijo el servidor la ultima vez que fallo, para poder arreglarlo sin
+  /// adivinar. Se guarda el mensaje, nunca la contrasena.
+  ultimoError   String?   @db.VarChar(300)
+  ultimoErrorAt DateTime?
+
+  configuradoPor String   @db.VarChar(150)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("remitentes_correo")
 }
 
 /// Excepcion al permiso que un rol trae por defecto, para UNA empresa.

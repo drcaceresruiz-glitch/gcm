@@ -4,6 +4,10 @@ import { env, isProduction } from "@/lib/env";
 import { escaparHtml as esc } from "@/lib/html";
 import { marcaParaCorreo } from "./logo.service";
 import {
+  configuracionDeEnvio,
+  crearTransporte,
+} from "./remitente-correo.service";
+import {
   CID_LOGO,
   MARCA_GCM as MARCA,
   MARCA_LOGO,
@@ -87,10 +91,40 @@ export interface Correo {
   companyId?: string;
 }
 
-export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }> {
-  const t = obtenerTransporte();
+/**
+ * El transporte y el remitente que le tocan a este correo.
+ *
+ * Si la empresa tiene buzon propio activo, sale del suyo; si no, del
+ * compartido de la instalacion, que es como funciono siempre. La eleccion se
+ * hace aqui y no en cada constructor de correo por lo mismo que el logo: son
+ * ocho, y repartir la decision garantiza que el noveno la olvide.
+ *
+ * NO SE CACHEA el transporte propio, al contrario que el compartido. Son
+ * pocos correos —un informe, un aviso— y a cambio un cambio de contrasena
+ * surte efecto en el envio siguiente en vez de al reiniciar el proceso. El
+ * compartido si se guarda porque lo usa todo y su configuracion solo cambia
+ * con un despliegue.
+ */
+async function transporteYRemitente(
+  companyId: string | undefined,
+): Promise<{ t: Transporter; desde: string } | null> {
+  if (companyId) {
+    const propio = await configuracionDeEnvio(companyId);
+    if (propio) {
+      return { t: crearTransporte(propio), desde: propio.desde };
+    }
+  }
 
-  if (!t) {
+  const compartido = obtenerTransporte();
+  if (!compartido) return null;
+
+  return { t: compartido, desde: env.SMTP_FROM ?? env.SMTP_USER! };
+}
+
+export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }> {
+  const salida = await transporteYRemitente(correo.companyId);
+
+  if (!salida) {
     // Sin SMTP no se envia nada. En desarrollo se deja constancia en consola
     // para poder ver que se HABRIA enviado; en produccion se calla, porque el
     // caso normal es que el correo este configurado y esto no deberia pasar.
@@ -145,8 +179,8 @@ export async function enviarCorreo(correo: Correo): Promise<{ enviado: boolean }
       marca ? { razonSocial: marca.razonSocial, conLogo: logo !== null } : null,
     );
 
-    await t.sendMail({
-      from: env.SMTP_FROM ?? env.SMTP_USER,
+    await salida.t.sendMail({
+      from: salida.desde,
       to: correo.para,
       // Si no viene, nodemailer no pone la cabecera y todo sigue como estaba.
       replyTo: correo.respuestaA,
