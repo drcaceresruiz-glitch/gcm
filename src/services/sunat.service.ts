@@ -1,5 +1,6 @@
 import "server-only";
 import { env } from "@/lib/env";
+import { crearLimitador } from "@/lib/limitador";
 import { leerRazonSocial, leerTexto } from "@/lib/sunat";
 
 /**
@@ -33,7 +34,37 @@ const TIEMPO_LIMITE_MS = 5000;
 
 export type ConsultaRuc =
   | { ok: true; razonSocial: string; direccion?: string; estado?: string }
-  | { ok: false; motivo: "sin_token" | "no_encontrado" | "fallo"; detalle: string };
+  | {
+      ok: false;
+      motivo: "sin_token" | "no_encontrado" | "fallo" | "demasiadas";
+      detalle: string;
+    };
+
+/**
+ * CUANTAS CONSULTAS SE DEJAN PASAR, y por que hacen falta las dos.
+ *
+ * El proveedor no ve empresas: ve **una IP**, la del hosting. Si una
+ * constructora agota la cuota, las demas se quedan sin consulta —y si el
+ * proveedor corta la IP, caen todas a la vez—. Ese es el riesgo que esto
+ * atiende, anotado en la auditoria del 18/08 y sin cubrir hasta el 19/08.
+ *
+ * - **Por empresa**: que nadie se lleve la cuota comun. Consultar un RUC es
+ *   una operacion rara —dar de alta un proveedor o una constructora—, asi que
+ *   diez por minuto es holgado para una persona y estrecho para un bucle.
+ * - **Global**: el techo de la instalacion. Con veinte constructoras
+ *   trabajando a la vez, cada una dentro de su limite, la suma seguiria
+ *   pudiendo tumbar la IP. Es el unico numero que ve el proveedor.
+ *
+ * Los dos son deliberadamente generosos: esto no es una defensa contra un
+ * atacante —para eso esta el permiso, que ya exige sesion— sino un freno para
+ * que un fallo nuestro (un bucle, un formulario que consulta al teclear) no se
+ * lleve por delante el servicio de todos.
+ */
+const POR_EMPRESA = crearLimitador({ maximo: 10, ventanaMs: 60_000 });
+const DE_LA_INSTALACION = crearLimitador({ maximo: 40, ventanaMs: 60_000 });
+
+/// La clave del cubo global. Una sola, a proposito.
+const TODA_LA_INSTALACION = "*";
 
 /** POST con `{ruc}`, y la respuesta envuelta en `data`. */
 const URL_JSONPE = "https://api.json.pe/api/ruc";
@@ -82,11 +113,48 @@ function aQuienSePregunta(
   return null;
 }
 
-export async function consultarRuc(ruc: string): Promise<ConsultaRuc> {
+export async function consultarRuc(
+  ruc: string,
+  /**
+   * De quien es la consulta, para su propio cubo.
+   *
+   * Opcional para no romper a quien ya llamaba sin el: sin empresa solo aplica
+   * el techo de la instalacion. Los dos sitios que llaman hoy la pasan.
+   */
+  companyId?: string,
+): Promise<ConsultaRuc> {
   const limpio = ruc.trim();
 
   if (!/^\d{11}$/.test(limpio)) {
     return { ok: false, motivo: "fallo", detalle: "El RUC son 11 digitos." };
+  }
+
+  /**
+   * El freno va ANTES de mirar si hay token o no.
+   *
+   * Si fuera despues, una instalacion sin configurar contaria cero consultas y
+   * el limite no se ejercitaria nunca — y el dia que se configurara el token,
+   * un bucle que llevaba semanas girando en vacio empezaria a salir a la red
+   * de golpe.
+   */
+  const ahora = Date.now();
+  const demasiadas = (esperaSegundos: number): ConsultaRuc => ({
+    ok: false,
+    motivo: "demasiadas",
+    detalle: `Demasiadas consultas de RUC seguidas. Espera ${esperaSegundos} s o escribe la razon social a mano.`,
+  });
+
+  /**
+   * Primero el techo de la INSTALACION, y con `return` en medio: los dos
+   * contadores apuntan al llamarlos, asi que preguntarles a la vez gastaria
+   * cupo de la empresa por una consulta que el techo global ya rechazo.
+   */
+  const global = DE_LA_INSTALACION.intentar(TODA_LA_INSTALACION, ahora);
+  if (!global.ok) return demasiadas(global.esperaSegundos);
+
+  if (companyId) {
+    const suyo = POR_EMPRESA.intentar(companyId, ahora);
+    if (!suyo.ok) return demasiadas(suyo.esperaSegundos);
   }
 
   const destino = aQuienSePregunta(limpio);

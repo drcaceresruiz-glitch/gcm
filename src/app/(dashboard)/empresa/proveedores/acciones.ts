@@ -110,7 +110,9 @@ export async function accionConsultarRuc(ruc: string): Promise<ConsultaRuc> {
     };
   }
 
-  return consultarRuc(ruc);
+  // Con su empresa: el cupo se cuenta por constructora, ademas del techo de
+  // toda la instalacion. Ver `sunat.service`.
+  return consultarRuc(ruc, sesion.companyId);
 }
 
 export interface EstadoImportacion {

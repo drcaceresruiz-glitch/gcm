@@ -107,5 +107,7 @@ export async function accionConsultarRucEmpresa(
     return { ok: false, motivo: "fallo", detalle: "No autorizado." };
   }
 
-  return consultarRuc(ruc);
+  // Con su empresa: el cupo se cuenta por constructora, ademas del techo de
+  // toda la instalacion. Ver `sunat.service`.
+  return consultarRuc(ruc, sesion.companyId);
 }

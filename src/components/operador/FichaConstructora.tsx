@@ -78,8 +78,11 @@ export function FichaConstructora({
         setGuardado(false);
       } else {
         setAvisoRuc(
-          r.motivo === "sin_token"
-            ? "La consulta a SUNAT no está configurada. Escribe la razón social a mano."
+          // `sin_token` y `demasiadas` traen su propio texto, y el segundo
+          // ademas dice cuanto esperar. Solo el caso «no lo encontro» se
+          // reescribe aqui, porque el del servicio es mas seco.
+          r.motivo === "sin_token" || r.motivo === "demasiadas"
+            ? r.detalle
             : "No se encontró ese RUC. Escribe la razón social a mano.",
         );
       }
