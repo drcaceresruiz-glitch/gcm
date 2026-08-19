@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   AlertCircle,
@@ -20,6 +20,61 @@ import {
   type EstadoMigracionUi,
 } from "@/app/(dashboard)/empresa/migracion/acciones";
 import { MINIMO_FRASE } from "@/lib/respaldo-migracion";
+import type { InformeImportacion } from "@/services/importacion-empresa.service";
+
+/**
+ * Lo que se ensena cuando la constructora ya entro.
+ *
+ * Se cuentan las tablas CON filas y se dice el total, en vez de listar las
+ * cuarenta y cuatro: a quien acaba de migrar le importa que llegaron sus
+ * obras y su dinero, no que `gastos_generales_meta` trajo cero.
+ *
+ * Los avisos se ensenan SIEMPRE y enteros: son las cosas que NO quedaron
+ * igual que en el origen —el buzon de correo, las personas que ya tenian
+ * cuenta— y esconderlas convertiria un traslado en una sorpresa.
+ */
+function Informe({ informe }: { informe: InformeImportacion }) {
+  const conFilas = informe.tablas.filter((t) => t.filas > 0);
+
+  return (
+    <div className="space-y-3">
+      <p className="flex items-start gap-2 text-sm">
+        <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />
+        <span>
+          Entró <strong>{informe.razonSocialOrigen}</strong>:{" "}
+          <strong>{informe.obras}</strong> obra(s),{" "}
+          <strong>{informe.filas.toLocaleString("es-PE")}</strong> registro(s) y{" "}
+          <strong>{informe.archivos}</strong> archivo(s).
+        </span>
+      </p>
+
+      {conFilas.length > 0 && (
+        <ul className="max-w-md space-y-0.5 text-sm opacity-70">
+          {conFilas.map((t) => (
+            <li key={t.tabla} className="flex justify-between gap-4">
+              <span>{t.tabla}</span>
+              <span className="tabular-nums">{t.filas.toLocaleString("es-PE")}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {informe.avisos.map((aviso) => (
+        <p
+          key={aviso}
+          className="flex max-w-md items-start gap-2 rounded-lg px-3 py-2 text-sm"
+          style={{
+            backgroundColor:
+              "color-mix(in oklab, var(--color-marca-500) 10%, transparent)",
+          }}
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>{aviso}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Llevarse la constructora entera a otra instalacion.
@@ -98,6 +153,44 @@ export function Migracion({
     accionDescongelar,
     {},
   );
+
+  const [trayendo, setTrayendo] = useState(false);
+  const [traida, setTraida] = useState<InformeImportacion | null>(null);
+  const [errorTraer, setErrorTraer] = useState<string | null>(null);
+
+  /**
+   * Sube el archivo y ensena el resultado AQUI, sin salir de la pantalla.
+   *
+   * El error se lee con `text()` y no con `json()`: la ruta devuelve el motivo
+   * en texto plano —«la frase no corresponde», «esta empresa ya tiene 3
+   * obras»— y es el mismo que escribio el servicio. Inventarle otro aqui
+   * seria explicar de dos maneras distintas la misma negativa.
+   */
+  async function enviar(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErrorTraer(null);
+    setTrayendo(true);
+
+    try {
+      const r = await fetch("/empresa/migracion/importar", {
+        method: "POST",
+        body: new FormData(e.currentTarget),
+      });
+
+      if (!r.ok) {
+        setErrorTraer(await r.text());
+        return;
+      }
+
+      setTraida((await r.json()) as InformeImportacion);
+    } catch {
+      setErrorTraer(
+        "Se cortó la subida. Si el archivo es grande y la conexión va justa, vuelve a intentarlo: no se ha escrito nada.",
+      );
+    } finally {
+      setTrayendo(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -240,13 +333,20 @@ export function Migracion({
               {destino.motivo ??
                 "Esta empresa no puede recibir una migración ahora mismo."}
             </p>
+          ) : traida ? (
+            <Informe informe={traida} />
           ) : (
-            <form
-              method="post"
-              action="/empresa/migracion/importar"
-              encType="multipart/form-data"
-              className="space-y-4"
-            >
+            /**
+             * Se envia con `fetch` y NO como formulario normal, aunque el
+             * archivo pese cientos de MB y la ruta sea la misma.
+             *
+             * Con un POST corriente el navegador NAVEGA a la respuesta, y la
+             * respuesta es JSON: el 19/08/2026, al probarlo en produccion, la
+             * importacion salio bien y al usuario le quedo en pantalla un
+             * volcado de `{"tablas":[{"tabla":"users","filas":0}…]}`. Funcionar
+             * y ser comprensible no son lo mismo.
+             */
+            <form onSubmit={enviar} className="space-y-4">
               <div>
                 <label htmlFor="archivo" className="block text-sm font-medium">
                   El archivo .zip
@@ -290,10 +390,32 @@ export function Migracion({
                 obras y fotos. No cierres la pestaña.
               </p>
 
-              <Boton>
-                <Upload className="size-4" aria-hidden />
-                Traer la constructora
-              </Boton>
+              {errorTraer && (
+                <p
+                  className="flex max-w-md items-start gap-2 rounded-lg px-3 py-2 text-sm"
+                  style={{
+                    backgroundColor:
+                      "color-mix(in oklab, var(--color-peligro) 10%, transparent)",
+                  }}
+                >
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>{errorTraer}</span>
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={trayendo}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                style={{ backgroundColor: "var(--color-marca-600)" }}
+              >
+                {trayendo ? (
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden />
+                ) : (
+                  <Upload className="size-4" aria-hidden />
+                )}
+                {trayendo ? "Trayendo la constructora…" : "Traer la constructora"}
+              </button>
             </form>
           )}
         </SeccionTarjeta>

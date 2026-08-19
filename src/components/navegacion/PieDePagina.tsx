@@ -1,6 +1,7 @@
 import { HardHat, Ruler, Tag } from "lucide-react";
 
 import { SelloMetodologia } from "@/components/ui/SelloMetodologia";
+import { AUTORIA } from "@/lib/autoria";
 import { versionParaMostrar } from "@/lib/version";
 
 /**
@@ -39,17 +40,32 @@ export function PieDePagina() {
             <HardHat className="size-3.5 text-white" aria-hidden="true" />
           </span>
           <span className="font-bold">GCM</span>
-          <span className="opacity-60">&copy; {ANIO}</span>
+          {/* El aviso de derechos va a nombre de la EMPRESA, no del producto:
+              «GCM © 2026» no atribuia nada a nadie. Sale de `lib/autoria`, que
+              es el unico sitio donde se escribe. */}
+          <span className="opacity-60">
+            &copy; {ANIO} {AUTORIA.empresa}
+          </span>
         </p>
 
         {/* Creditos y version, centrados y en negrita, envolviendo en pantallas
             estrechas. */}
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5">
-          <span>Dr. Cáceres Ruiz</span>
-          <span className="flex items-center gap-1.5">
-            <Ruler className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
-            Arq. Eduardo Antonio Pérez Moreno
-          </span>
+          {/* Los nombres tambien salen de `lib/autoria`: estaban escritos aqui
+              a mano, y un nombre escrito a mano en un sitio es un nombre que
+              algun dia solo se corrige en ese sitio. El `title` dice el papel
+              de cada uno, que en el pie no cabe. */}
+          {AUTORIA.personas.map(({ nombre, papel }, i) => (
+            <span key={nombre} className="flex items-center gap-1.5" title={papel}>
+              {i > 0 && (
+                <Ruler
+                  className="size-3.5 shrink-0 opacity-60"
+                  aria-hidden="true"
+                />
+              )}
+              {nombre}
+            </span>
+          ))}
           <span
             className="flex items-center gap-1.5 tracking-wider opacity-70"
             style={{ textShadow: "0 1px 2px rgba(0,0,0,0.35)" }}
