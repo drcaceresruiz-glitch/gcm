@@ -186,6 +186,42 @@ const EMPEZAR = (
       </p>
     </S>
 
+    <S titulo="Qué toca ahora: el anclaje de cada obra">
+      <p>
+        Dentro de una obra, encima del contenido y en{" "}
+        <strong>todas sus pantallas</strong>, GCM enseña{" "}
+        <strong>un solo paso</strong>: el que toca ahora, con su botón. No es
+        una lista —la lista larga vive en el tablero, en «Qué falta»—, porque
+        algo que se repite en veinte pantallas tiene que caber en una línea o
+        se deja de leer a la tercera.
+      </p>
+      <p>
+        El orden no es caprichoso. Primero lo que{" "}
+        <strong>bloquea una lectura correcta del dinero</strong>: hoy, la
+        decisión de si los gastos generales cuentan en la bolsa. Después el{" "}
+        <strong>alta de la obra</strong> —presupuesto, cronograma, equipo y
+        línea base—, que es el único tramo donde encadenar pasos aporta de
+        verdad: son cuatro y tienen final. Y por último lo que quedó a medias
+        y ya venció: restricciones con la fecha pasada, semanas sin cerrar.
+      </p>
+      <p>
+        <strong>Sugiere, no lleva.</strong> Nunca navega solo, ni siquiera
+        después de guardar algo: aprobar una revisión o un movimiento son
+        irreversibles, y encadenarlos sin leer es exactamente lo que no se
+        quiere enseñar. Tampoco propone lo que tú no puedes hacer —si no
+        tienes permiso para importar el presupuesto, no te lo pide— y se
+        esconde solo cuando ya estás en la pantalla del paso, para no robarte
+        la primera línea mientras trabajas.
+      </p>
+      <p>
+        Las sugerencias se apartan con <strong>«Ahora no»</strong>, que dura
+        lo que la pestaña: aplazar es «ahora no», no «nunca más». La decisión
+        bloqueante <strong>no se aparta</strong>, porque esconderla dejaría el
+        margen mudo sin decir por qué. Y en una obra cerrada no aparece nada:
+        es historia, y a la historia no le falta nada.
+      </p>
+    </S>
+
     <S titulo="Lo que sale mal">
       <SaleMal
         casos={[
@@ -196,6 +232,10 @@ const EMPEZAR = (
                 Entra y ve un panel sin obras. Es el comportamiento correcto
                 —nadie le ha dado acceso—, pero se lee como avería si no se
                 espera. La solución está en la obra: <em>Equipo → añadir</em>.
+                Es el paso del alta que más se olvida, porque su síntoma
+                aparece en la pantalla de <em>otra</em> persona y quien lo
+                omite no lo nota: por eso el anclaje de la obra lo dice con
+                todas las letras («Nadie tiene asignada esta obra»).
               </p>
             ),
           },
@@ -1545,6 +1585,24 @@ const AVISOS = (
       </p>
     </S>
 
+    <S titulo="El anclaje de la obra NO es un aviso">
+      <p>
+        Es fácil confundirlos y conviene no hacerlo. Lo que sale arriba de
+        cada pantalla de la obra diciendo qué toca ahora{" "}
+        <strong>no lo manda el reloj</strong>: se calcula al pintar la
+        pantalla, no se configura, no se enciende ni se apaga, no escribe a
+        nadie y no gasta un SMS. Está siempre, y solo mientras estés mirando
+        esa obra.
+      </p>
+      <p>
+        Los avisos de este capítulo son lo contrario: <strong>te
+        buscan</strong> —a la campanita, al correo, al móvil—, están apagados
+        hasta que alguien los enciende por obra, y siguen sonando aunque no
+        hayas abierto GCM en toda la semana. Uno te orienta cuando entras; el
+        otro te avisa cuando no estás.
+      </p>
+    </S>
+
     <S titulo="Los topes existen para que los avisos se sigan leyendo">
       <p>
         Hay un máximo de SMS por persona y día, y un presupuesto de correos
@@ -2356,7 +2414,8 @@ export const CAPITULOS: CapituloManual[] = [
     paraQuien: "Todos; el recorrido inicial es del ADMIN.",
     resumen:
       "Los roles, el alcance por obra (por qué un usuario nuevo no ve " +
-      "ninguna), y los preliminares de una constructora recién llegada.",
+      "ninguna), los preliminares de una constructora recién llegada y el " +
+      "anclaje que dice qué toca ahora en cada obra.",
     contenido: EMPEZAR,
   },
   {
