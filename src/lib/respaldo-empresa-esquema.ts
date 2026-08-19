@@ -60,6 +60,12 @@ export const EXCLUIDAS_MIGRACION: Readonly<Record<string, string>> = {
   solicitudes_cambio_perfil:
     "Tramites a medias —alguien pidio cambiar su celular— que en la " +
     "instalacion nueva no tienen a quien reclamar. Se vuelven a pedir.",
+  exportaciones_empresa:
+    "El recibo de que esta instalacion saco la empresa entera alguna vez. Es " +
+    "de la INSTALACION que lo emitio, no de la empresa que viaja: llevarlo al " +
+    "destino afirmaria alli una exportacion que nunca ocurrio, y de ese " +
+    "recibo se cuelga el permiso para borrar una constructora. Ademas tiene " +
+    "que sobrevivir al borrado de la empresa, que es cuando pasa a importar.",
   reloj_tareas:
     "Es el latido del propio servidor —cuando corrio la ultima pasada de " +
     "avisos—, no dato de ninguna empresa. En la instalacion nueva su reloj " +

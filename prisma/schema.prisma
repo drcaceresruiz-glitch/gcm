@@ -1860,6 +1860,53 @@ model RespaldoObra {
   @@map("respaldos_obra")
 }
 
+/// Cada vez que alguien saca la constructora ENTERA para llevarla a otra
+/// instalacion.
+///
+/// Hermana de `RespaldoObra` y por el mismo motivo: borrar una constructora
+/// EXIGE haberla exportado antes, y "antes" hay que poder demostrarlo. El
+/// apunte de auditoria de la exportacion no sirve para esto —se escribe al
+/// EMPEZAR, porque alli lo que interesa es el intento— y una condicion no se
+/// puede colgar de algo que significa "alguien lo intento".
+///
+/// SIN CLAVE FORANEA, y aqui la diferencia con `RespaldoObra` es el punto
+/// entero: esta fila tiene que sobrevivir al borrado de la empresa, que es
+/// justo el momento en que pasa a importar. Por eso se copian tambien la razon
+/// social y el RUC: cuando la empresa ya no exista, esto es lo unico que queda
+/// diciendo de cual hablaba.
+///
+/// LO QUE ESTA FILA NO DEMUESTRA: que quien exporto tenga el archivo guardado.
+/// Prueba que GCM lo genero entero (se escribe cuando el zip termina de
+/// salir), no que llegara a un disco. Nadie puede probar eso desde aqui, y la
+/// pantalla lo dice en vez de aparentarlo.
+model ExportacionEmpresa {
+  id        String  @id @default(cuid())
+  companyId String
+  userId    String?
+
+  razonSocial String @db.VarChar(200)
+  ruc         String @db.VarChar(11)
+
+  /// Version del formato de migracion, para saber si un archivo viejo se
+  /// puede seguir importando.
+  formato Int
+
+  /// SHA-256 del manifiesto canonico. Ata esta fila con el zip que alguien
+  /// tiene en su disco: si no coincide, no es esta exportacion.
+  hashManifiesto String @db.VarChar(64)
+
+  /// Bytes del zip, cuantas obras viajaron y filas por tabla, para poder decir
+  /// "se llevo 4 obras y 348 partidas" sin abrirlo.
+  tamano  Int
+  obras   Int
+  conteos Json
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@map("exportaciones_empresa")
+}
+
 // ---------------------------------------------------------------------------
 // Encargos a proveedores (subcontratos por obra)
 //

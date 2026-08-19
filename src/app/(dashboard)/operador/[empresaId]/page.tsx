@@ -71,6 +71,32 @@ export default async function FichaConstructoraPage({
         </div>
       </div>
 
+      {/* La constancia de que sus datos salieron enteros alguna vez. Se
+          ensena SIEMPRE, tambien cuando no hay ninguna: «nunca se ha
+          exportado» es justo lo que hay que saber antes de plantearse
+          borrarla, y una seccion que solo aparece cuando hay algo deja el
+          caso peligroso invisible. */}
+      <section
+        className="rounded-lg border p-4 text-sm"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <h3 className="text-base font-semibold">Su copia completa</h3>
+        {c.ultimaExportacion ? (
+          <p className="mt-1 opacity-80 text-pretty">
+            Se exportó entera el {fechaCorta(c.ultimaExportacion.at)} ·{" "}
+            {c.ultimaExportacion.obras} obra(s) ·{" "}
+            {Math.max(1, Math.round(c.ultimaExportacion.tamano / 1024 / 1024))} MB.
+            GCM sabe que el archivo se generó completo; que esté guardado en
+            algún sitio solo lo sabe quien lo descargó.
+          </p>
+        ) : (
+          <p className="mt-1 opacity-80 text-pretty">
+            Nunca se ha exportado. Sus obras, presupuestos y fotos solo existen
+            aquí.
+          </p>
+        )}
+      </section>
+
       <FichaConstructora
         empresaId={c.id}
         esLaPropia={c.esLaPropia}

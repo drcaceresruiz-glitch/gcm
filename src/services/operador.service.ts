@@ -274,6 +274,13 @@ export interface ConstructoraDetalle extends ConstructoraResumen {
   /// Congelada por una migracion en curso. No es lo mismo que suspendida, y la
   /// ficha las ensena por separado porque se arreglan de forma distinta.
   enMigracionAt: Date | null;
+  /**
+   * La ultima vez que esta constructora salio entera en un archivo.
+   *
+   * Es el recibo de `ExportacionEmpresa`, no el apunte de auditoria: significa
+   * que el zip se genero completo. De el se colgara el permiso para borrarla.
+   */
+  ultimaExportacion: { at: Date; obras: number; tamano: number } | null;
 }
 
 /**
@@ -308,6 +315,15 @@ export async function detalleConstructora(
   });
   if (!e) return null;
 
+  // Consulta aparte y no un campo mas del `select`: el recibo NO cuelga de la
+  // empresa (no tiene clave foranea, para sobrevivir a su borrado), asi que no
+  // se puede pedir con ella aunque se quisiera.
+  const exportacion = await prisma.exportacionEmpresa.findFirst({
+    where: { companyId: empresaId },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true, obras: true, tamano: true },
+  });
+
   return {
     id: e.id,
     razonSocial: e.razonSocial,
@@ -321,6 +337,13 @@ export async function detalleConstructora(
     usuarios: e._count.users,
     obras: e._count.projects,
     esLaPropia: e.id === sesion.companyId,
+    ultimaExportacion: exportacion
+      ? {
+          at: exportacion.createdAt,
+          obras: exportacion.obras,
+          tamano: exportacion.tamano,
+        }
+      : null,
   };
 }
 

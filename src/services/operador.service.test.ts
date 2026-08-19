@@ -50,12 +50,14 @@ const estado: {
   apuntes: Record<string, unknown>[];
   /// Simula el unico global de `ruc`.
   rucOcupado: string | null;
+  exportacion: { createdAt: Date; obras: number; tamano: number } | null;
 } = {
   empresa: { ...EMPRESA },
   selects: [],
   actualizada: null,
   apuntes: [],
   rucOcupado: null,
+  exportacion: null,
 };
 
 vi.mock("@/lib/prisma", () => {
@@ -82,10 +84,16 @@ vi.mock("@/lib/prisma", () => {
       return Promise.resolve({});
     },
   };
+  /// El recibo de la ultima exportacion. Vive en su propia tabla porque NO
+  /// cuelga de la empresa: tiene que sobrevivir a su borrado.
+  const exportacionEmpresa = {
+    findFirst: () => Promise.resolve(estado.exportacion),
+  };
   return {
     prisma: {
       company,
       auditLog,
+      exportacionEmpresa,
       $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
         fn({ company, auditLog }),
     },
@@ -123,6 +131,7 @@ beforeEach(() => {
   estado.actualizada = null;
   estado.apuntes = [];
   estado.rucOcupado = null;
+  estado.exportacion = null;
 });
 
 describe("solo el operador", () => {
@@ -169,6 +178,29 @@ describe("la ficha no asoma los datos del cliente", () => {
         .select,
     );
     expect(contadores.sort()).toEqual(["projects", "users"]);
+  });
+
+  /**
+   * El recibo NO cuelga de la empresa —no tiene clave foranea, para poder
+   * sobrevivir a su borrado—, asi que llega por su propia consulta. Sin el,
+   * «nunca se ha exportado» y «se exporto ayer» se verian igual, que es
+   * justo lo que no puede pasar antes de plantearse un borrado.
+   */
+  it("dice si hay copia completa y de cuando, o que no hay ninguna", async () => {
+    const sinCopia = await detalleConstructora(OPERADOR, "emp-cliente");
+    expect(sinCopia?.ultimaExportacion).toBeNull();
+
+    estado.exportacion = {
+      createdAt: new Date("2026-08-19T10:00:00Z"),
+      obras: 4,
+      tamano: 12_345_678,
+    };
+    const conCopia = await detalleConstructora(OPERADOR, "emp-cliente");
+    expect(conCopia?.ultimaExportacion).toEqual({
+      at: new Date("2026-08-19T10:00:00Z"),
+      obras: 4,
+      tamano: 12_345_678,
+    });
   });
 
   it("marca cual es la propia empresa del operador", async () => {

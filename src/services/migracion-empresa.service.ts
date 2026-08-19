@@ -208,6 +208,41 @@ export async function exportarEmpresa(
 
   await apuntarExportacion(sesion, lectura, manifiesto.generado.at);
 
+  /**
+   * El RECIBO, que es otra cosa que el apunte de auditoria de arriba.
+   *
+   * Se escribe cuando el zip TERMINA de salir —igual que el respaldo de una
+   * obra, y por la misma razon— porque de el se apoya el borrado de la
+   * constructora: si la descarga se corta a medias, no hubo exportacion y no
+   * debe haber recibo. El apunte de auditoria si queda: alli lo que interesa
+   * es que alguien lo intento.
+   *
+   * `void` y no `await`: la respuesta ya esta viajando cuando esto ocurre.
+   */
+  zip.on("end", () => {
+    void prisma.exportacionEmpresa
+      .create({
+        data: {
+          companyId: empresa.id,
+          userId: sesion.userId,
+          razonSocial: empresa.razonSocial,
+          ruc: empresa.ruc,
+          formato: FORMATO_MIGRACION,
+          hashManifiesto: sha256Hex(manifiestoJson),
+          tamano: zip.pointer(),
+          obras: lectura.obras,
+          conteos: Object.fromEntries(
+            lectura.tablas.map((t) => [t.tabla, t.filas]),
+          ),
+        },
+      })
+      .catch(() => {
+        // Un recibo que no se pudo escribir NO puede tumbar una exportacion ya
+        // entregada. Lo que se pierde es el permiso para borrar despues, que
+        // es el lado seguro de este fallo: obliga a exportar otra vez.
+      });
+  });
+
   void zip.finalize();
 
   const marca = new Date().toISOString().slice(0, 10);

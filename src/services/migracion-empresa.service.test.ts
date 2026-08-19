@@ -26,7 +26,10 @@ const estado: {
   /// Cuantas tablas se llegaron a leer. 0 = no se toco la base.
   lecturas: number;
   apuntes: Record<string, unknown>[];
-} = { enMigracionAt: null, lecturas: 0, apuntes: [] };
+  /// Los RECIBOS (`ExportacionEmpresa`), que no son lo mismo que los apuntes:
+  /// estos solo aparecen si el zip termino de salir.
+  recibos: Record<string, unknown>[];
+} = { enMigracionAt: null, lecturas: 0, apuntes: [], recibos: [] };
 
 /**
  * El doble cuenta lecturas por CUALQUIER delegado.
@@ -49,6 +52,14 @@ vi.mock("@/lib/prisma", () => ({
                 ruc: "20123456789",
                 enMigracionAt: estado.enMigracionAt,
               }),
+          };
+        }
+        if (modelo === "exportacionEmpresa") {
+          return {
+            create: (args: { data: Record<string, unknown> }) => {
+              estado.recibos.push(args.data);
+              return Promise.resolve({});
+            },
           };
         }
         if (modelo === "auditLog") {
@@ -92,6 +103,7 @@ beforeEach(() => {
   estado.enMigracionAt = null;
   estado.lecturas = 0;
   estado.apuntes = [];
+  estado.recibos = [];
 });
 
 describe("quien puede sacar la empresa entera", () => {
@@ -201,5 +213,66 @@ describe("la constancia de que alguien se llevo la constructora", () => {
     // El apunte ya esta escrito y del zip no se ha leido un solo byte.
     expect(r.ok).toBe(true);
     expect(estado.apuntes).toHaveLength(1);
+  });
+});
+
+/**
+ * El RECIBO es otra cosa que el apunte, y la diferencia es la que sostiene el
+ * borrado de una constructora.
+ *
+ * El apunte dice «alguien lo intento» y por eso se escribe al empezar. El
+ * recibo dice «el archivo salio entero», y de EL se cuelga el permiso para
+ * borrar: si bastara el intento, se podria pedir la exportacion, cortar la
+ * descarga y borrar la empresa igual, sin que nadie tenga sus datos.
+ */
+describe("el recibo de la exportacion", () => {
+  /// Deja salir el zip entero, que es lo que dispara el recibo.
+  async function vaciar(archivo: NodeJS.ReadableStream): Promise<void> {
+    await new Promise<void>((listo, falla) => {
+      archivo.on("data", () => {});
+      archivo.on("end", () => setTimeout(listo, 0));
+      archivo.on("error", falla);
+    });
+  }
+
+  it("no existe mientras el zip no ha terminado de salir", async () => {
+    estado.enMigracionAt = new Date("2026-08-19T12:00:00Z");
+    const r = await exportarEmpresa(ADMIN, FRASE);
+
+    expect(r.ok).toBe(true);
+    // El apunte si, el recibo no: son dos cosas distintas a proposito.
+    expect(estado.apuntes).toHaveLength(1);
+    expect(estado.recibos).toHaveLength(0);
+  });
+
+  it("se escribe cuando el archivo sale entero, y dice de que empresa hablaba", async () => {
+    estado.enMigracionAt = new Date("2026-08-19T12:00:00Z");
+    const r = await exportarEmpresa(ADMIN, FRASE);
+    if (!r.ok) throw new Error("no exporto");
+
+    await vaciar(r.migracion.archivo);
+
+    expect(estado.recibos).toHaveLength(1);
+    const recibo = estado.recibos[0]!;
+    expect(recibo).toMatchObject({
+      companyId: "empresa-1",
+      userId: "u-1",
+      // Copiados: cuando la empresa se borre, esto es lo unico que queda.
+      razonSocial: "Constructora de Prueba SAC",
+      ruc: "20123456789",
+    });
+    // El hash ata la fila con el zip que alguien tiene en su disco.
+    expect(String(recibo["hashManifiesto"])).toMatch(/^[0-9a-f]{64}$/);
+    expect(Number(recibo["tamano"])).toBeGreaterThan(0);
+  });
+
+  it("tampoco lleva la frase", async () => {
+    estado.enMigracionAt = new Date("2026-08-19T12:00:00Z");
+    const r = await exportarEmpresa(ADMIN, FRASE);
+    if (!r.ok) throw new Error("no exporto");
+
+    await vaciar(r.migracion.archivo);
+
+    expect(JSON.stringify(estado.recibos)).not.toContain(FRASE);
   });
 });
