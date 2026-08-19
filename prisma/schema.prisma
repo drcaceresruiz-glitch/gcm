@@ -174,7 +174,8 @@ model Company {
   solicitudesPerfil SolicitudCambioPerfil[]
   emisoresSms       EmisorSms[]
   mensajesSms       MensajeSms[]
-  respaldosObra     RespaldoObra[]
+  // `respaldosObra` ya NO es relacion: sus recibos tienen que sobrevivir al
+  // borrado de la empresa. Ver `RespaldoObra`.
   /// Singular, no lista: «desde donde sale mi correo» solo admite una
   /// respuesta. Ver `RemitenteCorreo`.
   remitenteCorreo   RemitenteCorreo?
@@ -1853,8 +1854,16 @@ model RespaldoObra {
 
   createdAt DateTime @default(now())
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
+  /**
+   * SIN clave foranea a `companies` desde el 19/08/2026, y por el mismo motivo
+   * por el que `projectId` nunca la tuvo.
+   *
+   * Era `Cascade`, asi que borrar la constructora se llevaba por delante TODOS
+   * los recibos de respaldo de sus obras: justo la prueba de que a esa empresa
+   * se le entrego su informacion antes de destruirla. La tabla existe porque
+   * «antes hay que poder demostrarlo», y una prueba que muere con lo que
+   * prueba no prueba nada.
+   */
   @@index([companyId, createdAt])
   @@index([projectId, createdAt])
   @@map("respaldos_obra")

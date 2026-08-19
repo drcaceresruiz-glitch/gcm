@@ -12,6 +12,11 @@ import {
   type ResultadoEdicion,
   type ResultadoSuspension,
 } from "@/services/operador.service";
+import {
+  eliminarConstructora,
+  type ConfirmacionBorradoEmpresa,
+  type ResultadoBorradoEmpresa,
+} from "@/services/empresa-borrado.service";
 import type { DatosAltaEmpresa } from "@/lib/empresas";
 import { consultarRuc, type ConsultaRuc } from "@/services/sunat.service";
 
@@ -60,6 +65,24 @@ export async function accionAlternarConstructora(
   if (!sesion) redirect("/login");
 
   const r = await alternarConstructora(sesion, empresaId, activa);
+  if (r.ok) revalidatePath("/operador");
+  return r;
+}
+
+/**
+ * Eliminar una constructora entera.
+ *
+ * No revalida la ficha: esa pantalla ya no existe. Se lleva al listado desde
+ * el componente, que es quien sabe si el borrado salio bien.
+ */
+export async function accionEliminarConstructora(
+  empresaId: string,
+  confirmacion: ConfirmacionBorradoEmpresa,
+): Promise<ResultadoBorradoEmpresa> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await eliminarConstructora(sesion, empresaId, confirmacion);
   if (r.ok) revalidatePath("/operador");
   return r;
 }

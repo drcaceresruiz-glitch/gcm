@@ -7,6 +7,8 @@ import { Chip } from "@/components/ui/Chip";
 import { Volver } from "@/components/ui/Volver";
 import { BotonSuspender } from "@/components/operador/BotonSuspender";
 import { FichaConstructora } from "@/components/operador/FichaConstructora";
+import { EliminarConstructora } from "@/components/operador/EliminarConstructora";
+import { motivoSiNoSePuedeBorrar } from "@/services/empresa-borrado.service";
 
 export const metadata: Metadata = { title: "Constructora" };
 
@@ -109,6 +111,19 @@ export default async function FichaConstructoraPage({
           email: c.email ?? "",
         }}
       />
+
+      {/* Lo irreversible, al final y separado. La propia empresa del operador
+          NO lo ofrece siquiera: el servicio lo rechaza igual, pero enseñar un
+          boton que nunca va a funcionar es una invitacion a probar. */}
+      {!c.esLaPropia && (
+        <EliminarConstructora
+          empresaId={c.id}
+          razonSocial={c.razonSocial}
+          obras={c.obras}
+          usuarios={c.usuarios}
+          motivoQueLoImpide={await motivoSiNoSePuedeBorrar(sesion, c.id)}
+        />
+      )}
     </div>
   );
 }
