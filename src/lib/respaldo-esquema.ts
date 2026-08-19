@@ -376,6 +376,53 @@ export const TABLAS: readonly TablaRespaldo[] = [
     fechas: ["fecha"],
   },
   {
+    /// Las fechas pactadas de valorizacion de ese encargo (los hitos de pago).
+    /// Sin ellas, la copia restaurada no sabria cuando le tocaba valorizar a
+    /// ese contratista y la cadencia caeria a la periodica de la obra, que es
+    /// justo lo que estas fechas existen para sustituir.
+    tabla: "fechas_valorizacion",
+    modelo: "fechaValorizacion",
+    refs: [{ campo: "encargoId", a: "encargos_proveedor" }],
+    fechas: ["fecha"],
+  },
+  {
+    /**
+     * LOS PAGOS. Faltaban, y era el agujero mas caro del respaldo.
+     *
+     * El respaldo es lo que hace reversible el borrado de una obra —el
+     * servicio no deja borrar sin uno reciente— asi que sin esta tabla borrar
+     * una obra cerrada se llevaba por delante el historial de lo que se le
+     * pago a cada contratista, sin que nada avisara. Es exactamente el modo de
+     * fallo que este catalogo existe para impedir.
+     *
+     * `valorizacionId` es opcional (hay adelantos que no valorizan nada), asi
+     * que si el corte no viajara la fila seguiria siendo valida con el campo
+     * a null; pero viaja, porque `valorizaciones_encargo` va antes.
+     */
+    tabla: "pagos_encargo",
+    modelo: "pagoEncargo",
+    refs: [
+      { campo: "encargoId", a: "encargos_proveedor" },
+      { campo: "valorizacionId", a: "valorizaciones_encargo" },
+    ],
+    decimales: { monto: 2 },
+    fechas: ["fecha"],
+  },
+  {
+    /**
+     * La constancia de cada pago.
+     *
+     * OJO: como `fotos_evidencia`, guarda la RUTA de un archivo que vive en
+     * `STORAGE_ROOT`, no el archivo. Restaurar la fila devuelve la ficha del
+     * comprobante —importe, fecha, quien lo subio, su huella— pero el PDF solo
+     * vuelve si el respaldo lo trajo. Es la misma limitacion que ya tienen las
+     * fotos y se dice igual de claro.
+     */
+    tabla: "comprobantes_pago",
+    modelo: "comprobantePago",
+    refs: [{ campo: "pagoId", a: "pagos_encargo" }],
+  },
+  {
     tabla: "ordenes_compra",
     modelo: "ordenCompra",
     refs: [{ campo: "projectId", a: "projects" }],
@@ -462,10 +509,16 @@ export const ORDEN_BORRADO: readonly TablaRespaldo[] = [...TABLAS].reverse();
  * de con un `IN (...)` de decenas de miles de ids que ademas chocaria contra
  * `max_allowed_packet`.
  *
- * Todas las tablas de aqui cuelgan de una que SI tiene `projectId`, asi que un
- * solo nivel de anidamiento basta. La prueba lo comprueba.
+ * Casi todas cuelgan de una que SI tiene `projectId` y les basta UN nivel, asi
+ * que el valor normal es una cadena. Cuando hacen falta dos —`comprobantes_pago`
+ * cuelga del pago, y el pago del encargo— se escribe el CAMINO como lista, de
+ * fuera hacia dentro. No se aplano a un solo nivel a proposito: seria anadir
+ * una columna redundante a la tabla solo para simplificar este mapa, y una
+ * columna redundante es una que algun dia dira algo distinto de la relacion.
  */
-export const RELACION_A_LA_OBRA: Readonly<Record<string, string>> = {
+export const RELACION_A_LA_OBRA: Readonly<
+  Record<string, string | readonly string[]>
+> = {
   baseline_items: "baseline",
   movimiento_lineas: "movimiento",
   proveedor_partidas: "partida",
@@ -475,6 +528,11 @@ export const RELACION_A_LA_OBRA: Readonly<Record<string, string>> = {
   dependencias_tarea: "cronograma",
   encargo_partidas: "encargo",
   valorizaciones_encargo: "encargo",
+  fechas_valorizacion: "encargo",
+  pagos_encargo: "encargo",
+  /// Dos niveles: el comprobante cuelga del pago y el pago del encargo, que es
+  /// el que tiene `projectId`.
+  comprobantes_pago: ["pago", "encargo"],
   presupuesto_meta_items: "meta",
   gastos_generales_meta: "meta",
   /// Por la PARTIDA y no por el item: ver el comentario de la tabla. Es la
@@ -497,7 +555,16 @@ export function filtroPorObra(
   if (tabla === "projects") return { id: obraId };
 
   const relacion = RELACION_A_LA_OBRA[tabla];
-  if (relacion) return { [relacion]: { projectId: obraId } };
+  if (relacion) {
+    // De dentro hacia fuera: se parte del filtro de la obra y se va envolviendo
+    // en cada paso del camino, para que ["pago","encargo"] de
+    // `{ pago: { encargo: { projectId } } }`.
+    const camino = typeof relacion === "string" ? [relacion] : relacion;
+    return camino.reduceRight<Record<string, unknown>>(
+      (dentro, paso) => ({ [paso]: dentro }),
+      { projectId: obraId },
+    );
+  }
 
   return { projectId: obraId };
 }

@@ -21,10 +21,22 @@ import {
  */
 
 interface ModeloEsquema {
+  /// El nombre del MODELO en Prisma. `tabla` se lo come `@@map`, y para
+  /// resolver una relacion hace falta saber a que modelo apunta.
+  modelo: string;
   tabla: string;
   decimales: Record<string, number>;
   fechas: string[];
   campos: string[];
+  /**
+   * Campo de relacion -> MODELO al que apunta (`pago` -> `PagoEncargo`).
+   *
+   * Hace falta para poder SEGUIR un camino de dos saltos como el de
+   * `comprobantes_pago`. Sin esto, la prueba solo sabria comprobar el primer
+   * paso y el resto del camino quedaria sin vigilar, que es justo donde un
+   * error borraria filas de otras obras.
+   */
+  relaciones: Record<string, string>;
 }
 
 function leerEsquema(): Map<string, ModeloEsquema> {
@@ -38,7 +50,14 @@ function leerEsquema(): Map<string, ModeloEsquema> {
   for (const linea of texto.split(/\r?\n/)) {
     const abre = linea.match(/^model\s+(\w+)\s*\{/);
     if (abre) {
-      actual = { tabla: abre[1]!, decimales: {}, fechas: [], campos: [] };
+      actual = {
+        modelo: abre[1]!,
+        tabla: abre[1]!,
+        decimales: {},
+        fechas: [],
+        campos: [],
+        relaciones: {},
+      };
       continue;
     }
     if (!actual) continue;
@@ -57,6 +76,12 @@ function leerEsquema(): Map<string, ModeloEsquema> {
 
     const campo = linea.match(/^\s{2}(\w+)\s+\w/);
     if (campo) actual.campos.push(campo[1]!);
+
+    // Un campo de relacion: `pago PagoEncargo @relation(...)`. El tipo empieza
+    // por mayuscula, que es lo que lo distingue de `String`/`Int`/`DateTime`
+    // —esos tambien la tienen— asi que se exige ademas el `@relation`.
+    const relacion = linea.match(/^\s{2}(\w+)\s+([A-Z]\w*)\??\s+.*@relation/);
+    if (relacion) actual.relaciones[relacion[1]!] = relacion[2]!;
 
     if (linea.startsWith("}")) {
       modelos.set(actual.tabla, actual);
@@ -199,32 +224,50 @@ describe("como se acota cada tabla a una obra", () => {
     }
   });
 
-  it("la relacion declarada existe en el esquema", () => {
-    for (const [tabla, relacion] of Object.entries(RELACION_A_LA_OBRA)) {
-      expect(ESQUEMA.get(tabla)?.campos, `${tabla}.${relacion}`).toContain(
-        relacion,
-      );
-    }
-  });
+  /**
+   * El camino se RECORRE entero, salto a salto.
+   *
+   * Antes solo se comprobaba el primer paso, porque todos los caminos tenian
+   * uno solo. Con `comprobantes_pago` —que cuelga del pago, y el pago del
+   * encargo— un camino mal escrito en el segundo salto daria un `where` que
+   * Prisma rechaza, y el borrado fallaria en produccion. O peor: si apuntara a
+   * otra relacion valida, borraria filas de otra obra.
+   */
+  it("cada salto del camino existe, y el ultimo llega a projectId", () => {
+    const porModelo = new Map(
+      [...ESQUEMA.values()].map((m) => [m.modelo, m]),
+    );
 
-  it("un solo nivel basta: el padre siempre tiene projectId", () => {
-    // Si algun dia dejara de ser cierto, el filtro anidado apuntaria a una
-    // columna que no existe y el borrado fallaria en produccion.
-    for (const tabla of Object.keys(RELACION_A_LA_OBRA)) {
-      const t = tablaDelRespaldo(tabla)!;
-      const padre = t.refs.find((r) => r.a !== tabla)!;
+    for (const [tabla, relacion] of Object.entries(RELACION_A_LA_OBRA)) {
+      const camino = typeof relacion === "string" ? [relacion] : relacion;
+      let actual = ESQUEMA.get(tabla)!;
+
+      for (const paso of camino) {
+        expect(actual.campos, `${actual.tabla}.${paso} no existe`).toContain(
+          paso,
+        );
+        const destino = actual.relaciones[paso];
+        expect(destino, `${actual.tabla}.${paso} no es una relacion`).toBeDefined();
+        actual = porModelo.get(destino!)!;
+        expect(actual, `${destino} no es un modelo`).toBeDefined();
+      }
+
       expect(
-        ESQUEMA.get(padre.a)!.campos,
-        `el padre de ${tabla} (${padre.a}) deberia tener projectId`,
+        actual.campos,
+        `el camino de ${tabla} acaba en ${actual.tabla}, que no tiene projectId`,
       ).toContain("projectId");
     }
   });
 
-  it("las tres formas de filtrar son las esperadas", () => {
+  it("las cuatro formas de filtrar son las esperadas", () => {
     expect(filtroPorObra("projects", "o1")).toEqual({ id: "o1" });
     expect(filtroPorObra("wbs_items", "o1")).toEqual({ projectId: "o1" });
     expect(filtroPorObra("orden_lineas", "o1")).toEqual({
       ordenCompra: { projectId: "o1" },
+    });
+    // Dos saltos: el comprobante cuelga del pago y el pago del encargo.
+    expect(filtroPorObra("comprobantes_pago", "o1")).toEqual({
+      pago: { encargo: { projectId: "o1" } },
     });
   });
 });
