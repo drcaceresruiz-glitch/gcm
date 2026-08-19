@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import { estadoDelReloj, type EstadoReloj } from "@/lib/avisos";
 import { parsearOperadores } from "@/lib/operador";
+import { hayLlaveDeCifrado } from "@/lib/secreto";
 import { shaDelPaquete } from "@/lib/version";
 
 export interface EstadoSalud {
@@ -78,6 +79,20 @@ export interface EstadoSalud {
    * que hay dos operadores no acerca a nadie a ser uno.
    */
   operadores: number;
+  /**
+   * Si `CORREO_CLAVE_CIFRADO` esta puesta. El SI o NO, jamas la frase.
+   *
+   * Mismo motivo que `operadores`: sin ella se caen dos cosas **calladas**, y
+   * de formas que no se parecen entre si. Guardar el buzon propio de una
+   * constructora avisa en pantalla —lo ve solo quien este en esa pantalla— y
+   * la lectura de respuestas de los contratistas **no falla: no hace nada**,
+   * porque `buzonesPendientes` se va de vacio sin mirar ningun buzon. Un
+   * modulo que no se queja y no funciona es el que mas tarda en descubrirse.
+   *
+   * Saber que hay llave no acerca a nadie a la llave: la frase no sale de
+   * aqui, y sin ella lo cifrado sigue siendo ilegible.
+   */
+  cifradoConfigurado: boolean;
 }
 
 /**
@@ -97,6 +112,10 @@ export async function verificarSalud(): Promise<EstadoSalud> {
   // discrepando en los espacios o en los duplicados, y este numero existe
   // justamente para que nadie tenga que dudar de el.
   const operadores = parsearOperadores(env.GCM_OPERADORES).length;
+  // Se pregunta al MISMO sitio que decide si se puede guardar un secreto, no
+  // mirando la variable aqui: si algun dia la llave se derivara de otra cosa,
+  // esta respuesta seguiria diciendo la verdad en vez de la verdad de ayer.
+  const cifradoConfigurado = hayLlaveDeCifrado();
 
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -108,6 +127,7 @@ export async function verificarSalud(): Promise<EstadoSalud> {
       shaPaquete,
       shaArranque,
       operadores,
+      cifradoConfigurado,
     };
   } catch {
     return {
@@ -120,6 +140,7 @@ export async function verificarSalud(): Promise<EstadoSalud> {
       shaPaquete,
       shaArranque,
       operadores,
+      cifradoConfigurado,
     };
   }
 }

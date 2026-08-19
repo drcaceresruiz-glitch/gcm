@@ -68,6 +68,11 @@ export async function GET() {
       // devuelve al panel igual cuando falta la lista que cuando tu correo no
       // esta en ella. Con el numero se distinguen los dos casos.
       operadores: salud.operadores,
+      // "falta" = no hay `CORREO_CLAVE_CIFRADO`, y entonces ninguna
+      // constructora puede guardar su buzon propio Y la recogida de respuestas
+      // de los contratistas no mira ningun buzon —sin quejarse—. El SI o NO,
+      // nunca la frase: la llave no sale de aqui.
+      cifrado: salud.cifradoConfigurado ? "configurado" : "falta",
     },
     { headers: { "Cache-Control": "no-store" } },
   );
