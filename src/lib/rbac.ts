@@ -24,6 +24,9 @@ import type { Role } from "@/generated/prisma/enums";
 export const PERMISOS = [
   "empresa:leer",
   "empresa:editar",
+  /// Congelar la constructora y sacarla entera en un archivo, para llevarla
+  /// a otra instalacion. Ver `INNEGOCIABLES`.
+  "empresa:migrar",
 
   "usuario:leer",
   "usuario:crear",
@@ -143,8 +146,18 @@ export type Permiso = (typeof PERMISOS)[number];
  * que se hizo, pero no lo que habia—, y por eso solo lo tiene el ADMIN. Notese
  * que es DISTINTO de `obra:eliminar`, que sigue siendo delegable porque solo
  * alcanza a obras en planificacion, donde no hay nada comprometido todavia.
+ *
+ * `empresa:migrar` hace dos cosas y las dos son del dueno del negocio y de
+ * nadie mas. La primera es CONGELAR la constructora entera: mientras dura,
+ * ninguna de sus obras admite un cambio, asi que activarlo a destiempo para
+ * la jornada de todos. La segunda es sacarla en un
+ * archivo que se abre en OTRA instalacion —usuarios con su hash de
+ * contrasena, contratistas, obras, dinero y fotos—, y ese archivo se
+ * verifica con una frase, no con el secreto de esta instalacion: quien lo
+ * tenga, la tiene entera. Es `obra:eliminar_cerrada` un piso mas arriba.
  */
 export const INNEGOCIABLES: readonly Permiso[] = [
+  "empresa:migrar",
   "linea_base:aprobar",
   "movimiento:aprobar",
   "meta:aprobar",

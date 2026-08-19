@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { motivoSiEmpresaEnMigracion } from "@/services/empresa-migracion.service";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -74,6 +75,9 @@ export async function guardarFormaPago(
       error: "No tienes permiso para editar las formas de pago.",
     };
   }
+
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
 
   const error = validar(datos);
   if (error) return { ok: false, error };
@@ -164,6 +168,9 @@ export async function cambiarEstadoFormaPago(
       error: "No tienes permiso para editar las formas de pago.",
     };
   }
+
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
 
   const forma = await prisma.formaPagoPlantilla.findFirst({
     where: { id: formaPagoId, companyId: sesion.companyId },

@@ -1,6 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
-import { firmar, firmaValida } from "@/lib/respaldo-manifiesto";
+import { firmar, firmaValida, type EntradaZip } from "@/lib/respaldo-manifiesto";
 
 /**
  * El respaldo que SI cruza de una instalacion a otra.
@@ -35,6 +35,51 @@ import { firmar, firmaValida } from "@/lib/respaldo-manifiesto";
 /// Marca de formato. Va DENTRO del texto firmado, asi que un archivo de
 /// migracion no puede hacerse pasar por un respaldo de obra ni al reves.
 export const TIPO_MIGRACION = "gcm.migracion.empresa";
+
+/**
+ * Version del FORMATO del archivo de migracion.
+ *
+ * Aparte de `FORMATO_RESPALDO` y no atada a el: el respaldo de obra se abre
+ * en la MISMA instalacion que lo hizo, asi que su formato solo tiene que
+ * sobrevivir a una actualizacion; este cruza a otra instalacion, que puede ir
+ * varias versiones por detras o por delante. Son dos compromisos distintos y
+ * mezclarlos obligaria a subir uno cada vez que cambia el otro.
+ */
+export const FORMATO_MIGRACION = 1;
+
+/**
+ * Que lleva el archivo de migracion.
+ *
+ * La empresa va aqui y NO como fila de datos: en el destino ya existe una
+ * empresa —la creo su operador— y traer la fila chocaria con el RUC unico.
+ * Lo que viaja es su ficha, para poder decir de quien es el archivo ANTES de
+ * importar nada.
+ *
+ * `sal` viaja en claro a proposito: su trabajo no es ser secreta sino que dos
+ * exportaciones con la misma frase no den la misma clave. Quien importa la
+ * necesita para derivar la suya, y sin la frase no le sirve de nada.
+ */
+export interface ManifiestoMigracion {
+  tipo: typeof TIPO_MIGRACION;
+  version: number;
+  sal: string;
+  empresa: {
+    id: string;
+    razonSocial: string;
+    ruc: string | null;
+    /// Cuantas obras van dentro. Se ensena antes de importar: es la cifra que
+    /// delata de un vistazo que el archivo no es el que se esperaba.
+    obras: number;
+  };
+  generado: { at: string; por: string; userId: string | null };
+  contenido: {
+    evidencia: "incluida" | "omitida";
+    galeria: "incluida" | "omitida";
+    comprobantes: "incluida" | "omitida";
+  };
+  tablas: { tabla: string; filas: number }[];
+  entradas: EntradaZip[];
+}
 
 /**
  * Coste de derivacion de la frase.

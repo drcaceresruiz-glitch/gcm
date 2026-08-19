@@ -4,6 +4,7 @@ import ExcelJS from "exceljs";
 
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { motivoSiEmpresaEnMigracion } from "@/services/empresa-migracion.service";
 import {
   CAMPOS_EXCEL,
   FILA_CABECERA,
@@ -118,6 +119,11 @@ export async function importarProveedores(
       error: "No tienes permiso para dar de alta ni completar proveedores.",
     };
   }
+
+  // Antes de leer el archivo, no despues: si la empresa esta congelada, el
+  // rechazo debe llegar sin haber cargado un Excel de miles de filas.
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
 
   let hoja;
   try {

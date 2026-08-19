@@ -63,7 +63,14 @@ export async function motivoSiObraCerrada(
     // existe, y responder "cerrada" o "abierta" sobre ella ya seria contar
     // algo que no le corresponde a quien pregunta.
     where: { id: obraId, companyId: sesion.companyId },
-    select: { estado: true, archivadaEn: true },
+    // El estado de la EMPRESA viaja en la misma consulta, no en otra: esta
+    // guarda corre en cada escritura y anadirle un viaje mas a la base seria
+    // pagar setenta y seis veces por un dato que ya se esta trayendo.
+    select: {
+      estado: true,
+      archivadaEn: true,
+      company: { select: { enMigracionAt: true } },
+    },
   });
 
   // La obra inexistente NO se trata aqui: cada servicio ya comprueba que
@@ -71,5 +78,9 @@ export async function motivoSiObraCerrada(
   // solo confundiria sobre que fallo.
   if (!obra) return null;
 
-  return motivoNoAdmiteCambios(obra);
+  return motivoNoAdmiteCambios({
+    estado: obra.estado,
+    archivadaEn: obra.archivadaEn,
+    empresaEnMigracion: obra.company.enMigracionAt !== null,
+  });
 }

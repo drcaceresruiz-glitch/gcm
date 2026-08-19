@@ -179,6 +179,24 @@ model Company {
   /// respuesta. Ver `RemitenteCorreo`.
   remitenteCorreo   RemitenteCorreo?
 
+  /**
+   * Desde cuando la empresa esta EN MIGRACION. Null = opera normal.
+   *
+   * NO es lo mismo que suspenderla, y la diferencia es justo el motivo de que
+   * exista: una empresa suspendida no deja entrar a NADIE suyo
+   * (`auth.service`), asi que su ADMIN no podria lanzar la exportacion de sus
+   * propios datos. En migracion si entra, pero **no puede escribir**.
+   *
+   * Es la doctrina de «obra cerrada» un piso mas arriba: lo que hace coherente
+   * al archivo exportado es que nadie escriba mientras se lee, y el respaldo
+   * de obra ya se apoya en eso mismo.
+   *
+   * Se guarda la FECHA y no un booleano, como `analizadaAt` o `verificadoAt`:
+   * asi el manifiesto del archivo puede decir desde cuando estaba congelada, y
+   * una empresa que lleva tres semanas «migrando» se ve de un vistazo.
+   */
+  enMigracionAt DateTime?
+
   @@map("companies")
 }
 

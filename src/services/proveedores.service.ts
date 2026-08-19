@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { motivoSiEmpresaEnMigracion } from "@/services/empresa-migracion.service";
 import { alcanzaObra } from "@/lib/alcance-obras";
 import {
   contarPaginas,
@@ -310,6 +311,12 @@ export async function crearProveedor(
     return { ok: false, error: "No tienes permiso para crear proveedores." };
   }
 
+  // Los contratistas viajan en el archivo de migracion, y se leen al
+  // principio: uno dado de alta mientras se exporta no entraria, pero si las
+  // partidas que lo nombran. Ver `motivoSiEmpresaEnMigracion`.
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
+
   const error = validar(datos);
   if (error) return { ok: false, error };
 
@@ -366,6 +373,9 @@ export async function editarProveedor(
   if (!puede(sesion, "proveedor:editar")) {
     return { ok: false, error: "No tienes permiso para editar proveedores." };
   }
+
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
 
   const error = validar(datos);
   if (error) return { ok: false, error };
@@ -445,6 +455,9 @@ export async function cambiarEstadoProveedor(
   if (!puede(sesion, "proveedor:editar")) {
     return { ok: false, error: "No tienes permiso para editar proveedores." };
   }
+
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
 
   const proveedor = await prisma.proveedor.findFirst({
     where: { id: proveedorId, companyId: sesion.companyId },

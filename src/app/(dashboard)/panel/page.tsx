@@ -212,6 +212,14 @@ export default async function PanelPage({
           pregunta: "lo que ya terminó",
           href: "/empresa/archivo",
         },
+        // Al lado del Archivo y no dentro de Configuracion: las dos son
+        // operaciones sobre datos que salen del sistema, no ajustes.
+        puede(sesion, "empresa:migrar") && {
+          clave: "migracion",
+          titulo: "Llevarse la empresa",
+          pregunta: "sacarla a otra instalación",
+          href: "/empresa/migracion",
+        },
         // Sin puerta de permisos a proposito: el manual es para todos, y
         // quien menos permisos tiene es quien mas lo necesita.
         {

@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { motivoSiEmpresaEnMigracion } from "@/services/empresa-migracion.service";
 import {
   esInnegociable,
   PERMISOS,
@@ -122,6 +123,12 @@ export async function guardarCambios(
       error: "No tienes permiso para editar la matriz de permisos.",
     };
   }
+
+  // `company_permissions` viaja en el archivo de migracion: sin ella, en
+  // destino se aplicaria la matriz de fabrica y alguien perderia en silencio
+  // un permiso que su empresa le habia dado a mano.
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
 
   if (cambios.length === 0) {
     return { ok: false, error: "No hay ningun cambio que guardar." };

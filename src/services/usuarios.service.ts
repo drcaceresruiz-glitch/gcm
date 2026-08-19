@@ -2,6 +2,7 @@ import "server-only";
 import { SinPermisoError } from "@/lib/errores";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { motivoSiEmpresaEnMigracion } from "@/services/empresa-migracion.service";
 import { hashPassword } from "@/lib/password";
 import { generateTemporaryPassword } from "@/lib/tokens";
 import { cerrarTodasLasSesiones } from "@/services/sesion.service";
@@ -150,6 +151,11 @@ export async function crearUsuario(
     return { ok: false, error: "No tienes permiso para crear usuarios." };
   }
 
+  // Las personas viajan en el archivo de migracion —con su hash de
+  // contrasena— y se leen las PRIMERAS. Ver `motivoSiEmpresaEnMigracion`.
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
+
   const validacion = validarAltaUsuario(datos);
   if (!validacion.ok) return { ok: false, error: validacion.error };
   const d = validacion.datos;
@@ -251,6 +257,9 @@ export async function editarUsuario(
   if (!puede(sesion, "usuario:editar")) {
     return { ok: false, error: "No tienes permiso para editar usuarios." };
   }
+
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
 
   const usuario = await prisma.user.findFirst({
     where: { id: userId, companyId: sesion.companyId },
@@ -357,6 +366,9 @@ export async function cambiarEstadoUsuario(
     return { ok: false, error: "No tienes permiso para activar o desactivar usuarios." };
   }
 
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
+
   if (userId === sesion.userId) {
     return { ok: false, error: "No puedes desactivarte a ti mismo." };
   }
@@ -412,6 +424,9 @@ export async function resetearClave(
   if (!puede(sesion, "usuario:resetear_clave")) {
     return { ok: false, error: "No tienes permiso para resetear claves." };
   }
+
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
 
   // Uno no se resetea a si mismo: el reseteo genera una clave temporal y
   // cierra las sesiones, lo que te sacaria de la que estas usando. Para la
@@ -489,6 +504,9 @@ export async function desactivarDosFactoresUsuario(
     };
   }
 
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
+
   // Para la propia esta el perfil, que ademas explica lo que implica.
   if (userId === sesion.userId) {
     return {
@@ -555,6 +573,9 @@ export async function eliminarUsuario(
   if (!puede(sesion, "usuario:desactivar")) {
     return { ok: false, error: "No tienes permiso para eliminar usuarios." };
   }
+
+  const congelada = await motivoSiEmpresaEnMigracion(sesion.companyId);
+  if (congelada) return { ok: false, error: congelada };
 
   if (userId === sesion.userId) {
     return { ok: false, error: "No puedes eliminarte a ti mismo." };

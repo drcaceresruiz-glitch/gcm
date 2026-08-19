@@ -1,14 +1,12 @@
 import "server-only";
 
-import { ZipArchive, type Archiver } from "archiver";
-import { createReadStream } from "node:fs";
-import { access } from "node:fs/promises";
-import { join } from "node:path";
+import { ZipArchive } from "archiver";
 
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { env } from "@/lib/env";
 import { generarCsv } from "@/lib/csv";
+import { adjuntarArchivos } from "@/lib/respaldo-archivos";
 import { FORMATO_RESPALDO, TABLAS, filtroPorObra } from "@/lib/respaldo-esquema";
 import { serializarFila, type FilaJson } from "@/lib/respaldo-serializacion";
 import {
@@ -174,7 +172,7 @@ export async function generarRespaldoDeObra(
     name: "informe/resumen.csv",
   });
 
-  const conFotos = await adjuntarFotos(
+  const conFotos = await adjuntarArchivos(
     zip,
     lectura.fotos,
     manifiesto.entradas,
@@ -182,7 +180,7 @@ export async function generarRespaldoDeObra(
   );
   manifiesto.contenido.evidencia = conFotos > 0 ? "incluida" : "omitida";
 
-  const conGaleria = await adjuntarFotos(
+  const conGaleria = await adjuntarArchivos(
     zip,
     lectura.fotosGaleria,
     manifiesto.entradas,
@@ -198,7 +196,7 @@ export async function generarRespaldoDeObra(
    * constancia es justo lo que se busca en la discusion de seis meses
    * despues, que es la razon por la que GCM la pide en el momento del pago.
    */
-  const conComprobantes = await adjuntarFotos(
+  const conComprobantes = await adjuntarArchivos(
     zip,
     lectura.comprobantes,
     manifiesto.entradas,
@@ -321,56 +319,6 @@ async function leerLaObra(obraId: string): Promise<LecturaObra> {
     // `respaldos_obra` con el archivo que el usuario tiene en su disco.
     hashDatos: sha256Hex(datos.map((d) => d.sha256).join("")),
   };
-}
-
-/**
- * Mete las fotos en el zip, transmitidas desde disco.
- *
- * Sirve a la evidencia y a la galeria (por eso `carpeta`): ambas guardan
- * `ruta`, `hash` y `tamano` con el mismo contrato, y el zip las separa en
- * su propia carpeta para que abrir el respaldo cuente la misma historia que
- * la aplicacion —lo probatorio y el escaparate no se mezclan—.
- *
- * No se vuelve a calcular su huella: la columna `hash` ya guarda el SHA-256
- * del contenido desde que se subio. Reusarlo ahorra leer cada archivo dos
- * veces y, sobre todo, hace que la comprobacion al restaurar sea contra la
- * MISMA huella que se calculo el dia que se tomo la foto.
- *
- * Una foto que falta no aborta nada: se anota su ausencia por omision y la
- * fila sigue contando quien la subio, cuando y con que huella.
- */
-async function adjuntarFotos(
-  zip: Archiver,
-  fotos: FilaJson[],
-  entradas: EntradaZip[],
-  carpeta: "evidencia" | "galeria" | "comprobantes",
-): Promise<number> {
-  let puestas = 0;
-
-  for (const foto of fotos) {
-    const ruta = typeof foto.ruta === "string" ? foto.ruta : null;
-    const id = typeof foto.id === "string" ? foto.id : null;
-    const hash = typeof foto.hash === "string" ? foto.hash : "";
-    const tamano = typeof foto.tamano === "number" ? foto.tamano : 0;
-    // Con `purgadaAt` el archivo ya no existe por decision propia: la fila se
-    // conserva a proposito, sin el binario. Las filas de galeria no traen la
-    // columna, de ahi el `?? null`: `undefined !== null` las saltaria TODAS.
-    if (!ruta || !id || (foto.purgadaAt ?? null) !== null) continue;
-
-    const absoluta = join(env.STORAGE_ROOT, ruta);
-    try {
-      await access(absoluta);
-    } catch {
-      continue;
-    }
-
-    const nombre = `${carpeta}/${ruta.split("/").pop() ?? id}`;
-    zip.append(createReadStream(absoluta), { name: nombre });
-    entradas.push({ nombre, bytes: tamano, sha256: hash });
-    puestas += 1;
-  }
-
-  return puestas;
 }
 
 /**

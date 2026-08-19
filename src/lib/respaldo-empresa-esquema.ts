@@ -1,5 +1,6 @@
 import {
   TABLAS,
+  porElCaminoDeLaObra,
   type RefInterna,
   type TablaRespaldo,
 } from "@/lib/respaldo-esquema";
@@ -148,4 +149,34 @@ export const TABLAS_MIGRACION: readonly TablaRespaldo[] = [
 /** La tabla del catalogo de migracion, por su nombre. */
 export function tablaDeMigracion(nombre: string): TablaRespaldo | undefined {
   return TABLAS_MIGRACION.find((t) => t.tabla === nombre);
+}
+
+/// Las que llevan `companyId` en su propia fila. Son las de empresa y
+/// `projects`; todas las demas llegan a la empresa a traves de una obra.
+const CON_COMPANY_ID: ReadonlySet<string> = new Set([
+  ...TABLAS_EMPRESA.map((t) => t.tabla),
+  "projects",
+]);
+
+/**
+ * El filtro que acota una tabla a UNA empresa.
+ *
+ * Es `filtroPorObra` con la hoja cambiada: donde aquel dice «de esta obra»,
+ * este dice «de cualquier obra de esta empresa». El recorrido intermedio es
+ * el MISMO —sale de `porElCaminoDeLaObra`— para que anadir una tabla honda
+ * arregle las dos cosas a la vez o rompa las dos a la vez, que es preferible
+ * a que una de ellas lea de menos en silencio.
+ *
+ * `obraIds` se pasa ya resuelto y no se consulta aqui: son las obras de la
+ * empresa, se leen UNA vez al empezar la exportacion y valen para las
+ * cuarenta tablas. Con la lista vacia —una constructora que aun no ha abierto
+ * ninguna obra— el `in: []` no devuelve nada, que es exactamente lo correcto.
+ */
+export function filtroPorEmpresa(
+  tabla: string,
+  companyId: string,
+  obraIds: readonly string[],
+): Record<string, unknown> {
+  if (CON_COMPANY_ID.has(tabla)) return { companyId };
+  return porElCaminoDeLaObra(tabla, { projectId: { in: [...obraIds] } });
 }

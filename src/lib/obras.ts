@@ -182,6 +182,16 @@ export interface ObraParaEscribir {
   /// Con fecha, es una copia restaurada para auditoria. Opcional para que un
   /// `select` que no la pida siga compilando; ausente se lee como null.
   archivadaEn?: Date | null;
+  /**
+   * La EMPRESA esta congelada para exportarla. Opcional por lo mismo que
+   * `archivadaEn`: un `select` que no la pida sigue compilando.
+   *
+   * No es un estado de la obra pero se decide aqui, porque la pregunta que
+   * contesta esta funcion es «se puede cambiar algo» y la respuesta tambien
+   * depende de un piso mas arriba. Ponerlo en cada servicio seria repartir la
+   * misma comprobacion por setenta y seis escrituras.
+   */
+  empresaEnMigracion?: boolean;
 }
 
 /**
@@ -197,6 +207,11 @@ export interface ObraParaEscribir {
  * pasa es que estas mirando un respaldo confunde mas de lo que ayuda.
  */
 export function motivoNoAdmiteCambios(obra: ObraParaEscribir): string | null {
+  // La empresa entera congelada manda sobre el estado de la obra: da igual que
+  // esta este viva si lo que se esta haciendo es sacar una copia coherente de
+  // TODA la constructora. Va primero porque es el motivo mas general y el
+  // unico que explica por que una obra en ejecucion no admite cambios.
+  if (obra.empresaEnMigracion) return EMPRESA_EN_MIGRACION;
   if (obra.archivadaEn) return OBRA_ARCHIVADA;
   if (obra.estado === "CERRADA") return OBRA_CERRADA;
   return null;
@@ -211,6 +226,19 @@ export function motivoNoAdmiteCambios(obra: ObraParaEscribir): string | null {
 export const OBRA_CERRADA =
   "La obra esta cerrada y no admite cambios. El resultado de una obra " +
   "cerrada es historia: modificarlo falsearia lo que de verdad paso.";
+
+/**
+ * La empresa entera esta congelada porque se esta exportando.
+ *
+ * Dice que es temporal y quien lo levanta, que es lo que separa esto de un
+ * fallo: quien se topa con el mensaje tiene que saber que no ha roto nada y
+ * que hay alguien que puede devolverlo a la normalidad.
+ */
+export const EMPRESA_EN_MIGRACION =
+  "La constructora esta en migracion: se esta sacando una copia completa de " +
+  "sus datos y nadie puede escribir mientras dure, para que el archivo no " +
+  "salga con unas cifras de un momento y otras de otro. Lo levanta el " +
+  "administrador cuando la exportacion termine.";
 
 /**
  * Lo mismo, para una copia restaurada de un respaldo.

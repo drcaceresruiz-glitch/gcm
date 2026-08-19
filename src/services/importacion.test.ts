@@ -85,8 +85,15 @@ vi.mock("@/lib/prisma", () => {
     // Las dos consultas de guarda: la obra existe, es de la empresa de la
     // sesion y no esta cerrada.
     project: {
+      // `company` viaja en el mismo `select` que la guarda: sin ella aqui, el
+      // doble no se parece a lo que devuelve Prisma y la prueba fallaria por
+      // una razon que no es la que esta comprobando.
       findFirst: () =>
-        Promise.resolve({ id: "obra-1", estado: "EN_EJECUCION" }),
+        Promise.resolve({
+          id: "obra-1",
+          estado: "EN_EJECUCION",
+          company: { enMigracionAt: null },
+        }),
     },
     // Sin linea base aprobada: el presupuesto no esta congelado.
     baseline: { findFirst: () => Promise.resolve(null) },

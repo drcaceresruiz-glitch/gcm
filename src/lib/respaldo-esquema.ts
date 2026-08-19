@@ -543,6 +543,37 @@ export const RELACION_A_LA_OBRA: Readonly<
 };
 
 /**
+ * Los saltos que hay que dar desde una tabla hasta la que tiene `projectId`.
+ *
+ * Lista vacia = la tabla ya lo tiene. Se expone porque la MIGRACION de una
+ * empresa navega exactamente el mismo camino y solo cambia la hoja del final
+ * —«esta obra» pasa a ser «cualquier obra de esta empresa»—: si se copiara el
+ * recorrido en el otro modulo, anadir un salto aqui dejaria la migracion
+ * leyendo de menos sin dar error.
+ */
+export function caminoALaObra(tabla: string): readonly string[] {
+  const relacion = RELACION_A_LA_OBRA[tabla];
+  if (!relacion) return [];
+  return typeof relacion === "string" ? [relacion] : relacion;
+}
+
+/**
+ * Envuelve el filtro de la hoja en los saltos de esa tabla.
+ *
+ * De dentro hacia fuera: partiendo de la hoja, se va envolviendo en cada paso
+ * del camino, para que ["pago","encargo"] de `{ pago: { encargo: <hoja> } }`.
+ */
+export function porElCaminoDeLaObra(
+  tabla: string,
+  hoja: Record<string, unknown>,
+): Record<string, unknown> {
+  return caminoALaObra(tabla).reduceRight<Record<string, unknown>>(
+    (dentro, paso) => ({ [paso]: dentro }),
+    hoja,
+  );
+}
+
+/**
  * El filtro que acota una tabla a UNA obra.
  *
  * Se usa igual para leer el respaldo y para borrar, que es justo lo que evita
@@ -553,20 +584,7 @@ export function filtroPorObra(
   obraId: string,
 ): Record<string, unknown> {
   if (tabla === "projects") return { id: obraId };
-
-  const relacion = RELACION_A_LA_OBRA[tabla];
-  if (relacion) {
-    // De dentro hacia fuera: se parte del filtro de la obra y se va envolviendo
-    // en cada paso del camino, para que ["pago","encargo"] de
-    // `{ pago: { encargo: { projectId } } }`.
-    const camino = typeof relacion === "string" ? [relacion] : relacion;
-    return camino.reduceRight<Record<string, unknown>>(
-      (dentro, paso) => ({ [paso]: dentro }),
-      { projectId: obraId },
-    );
-  }
-
-  return { projectId: obraId };
+  return porElCaminoDeLaObra(tabla, { projectId: obraId });
 }
 
 /** Busca una tabla del catalogo por su nombre. */
