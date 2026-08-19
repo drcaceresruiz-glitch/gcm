@@ -59,15 +59,21 @@ interface Contenido {
  * El orden importa: PRIMERO la firma del manifiesto, DESPUES el hash de cada
  * entrada contra lo que el manifiesto declara. Al reves, se estaria confiando
  * en una lista de hashes que cualquiera pudo reescribir.
+ *
+ * Se lee desde un archivo en DISCO (`Open.file`) y no desde un Buffer, igual
+ * que la importacion de una empresa: el respaldo de una obra con fotos pesa
+ * decenas de MB y este hosting no los aguanta en memoria. Hasta el 19/08/2026
+ * llegaba como Buffer desde una accion de servidor, y eso le ponia un techo de
+ * 24 MB que la propia pantalla contradecia diciendo 40.
  */
 async function leerElZip(
-  bytes: Buffer,
+  rutaZip: string,
   companyId: string,
   secreto: string,
 ): Promise<Resultado<Contenido>> {
   let directorio;
   try {
-    directorio = await Open.buffer(bytes);
+    directorio = await Open.file(rutaZip);
   } catch {
     return { ok: false, error: "El archivo no es un zip que se pueda abrir." };
   }
@@ -149,7 +155,8 @@ interface DelegadoEscritura {
 
 export async function restaurarObra(
   sesion: SesionActiva,
-  bytes: Buffer,
+  /// Ruta del zip YA en disco. Lo deja ahi el route handler que lo recibe.
+  rutaZip: string,
 ): Promise<Resultado<InformeRestauracion>> {
   if (!puede(sesion, "obra:restaurar")) {
     return { ok: false, error: "No tienes permiso para restaurar respaldos." };
@@ -160,7 +167,7 @@ export async function restaurarObra(
     return { ok: false, error: "Falta APP_SECRET: no se puede comprobar la firma." };
   }
 
-  const lectura = await leerElZip(bytes, sesion.companyId, secreto);
+  const lectura = await leerElZip(rutaZip, sesion.companyId, secreto);
   if (!lectura.ok) return lectura;
 
   const { manifiesto, filas } = lectura.datos;

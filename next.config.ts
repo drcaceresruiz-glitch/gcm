@@ -46,6 +46,16 @@ const nextConfig: NextConfig = {
       // 20: un .mpp de 15 MB pasaba la validacion de la app y moria despues
       // contra el framework, con un error opaco en vez del mensaje que el
       // importador tenia preparado. Justo lo que este comentario decia evitar.
+      //
+      // Y VOLVIO A PASAR, con la subida que este inventario no conto: el
+      // respaldo de una obra admitia 40 MB y moria aqui a los 24. Se arreglo
+      // el 19/08/2026 sacandolo de las acciones (`empresa/archivo/restaurar`),
+      // no subiendo este numero: un zip con fotos no debe pasar por memoria.
+      //
+      // REGLA, entonces: lo que pueda pesar decenas de MB —respaldos,
+      // migraciones— va por RUTA con streaming a disco, y este techo solo
+      // gobierna formularios pequenos. Antes de subirlo, comprobar si lo que
+      // no cabe deberia estar aqui siquiera.
       bodySizeLimit: "24mb",
     },
   },
