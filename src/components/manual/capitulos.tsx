@@ -875,6 +875,387 @@ const LOOKAHEAD = (
 );
 
 // ---------------------------------------------------------------------------
+// Capitulo: el plan semanal
+// ---------------------------------------------------------------------------
+
+const PLAN_SEMANAL = (
+  <>
+    <Clave>
+      El plan semanal es la <strong>promesa</strong>: lo que el equipo se
+      compromete a terminar esta semana, elegido entre lo que ya está
+      liberado. Al cerrarla se cuenta qué se cumplió —el{" "}
+      <strong>PPC</strong>— y, sobre todo, <strong>por qué no</strong> se
+      cumplió el resto. Esa segunda pregunta es la que hace mejorar; la
+      primera sola solo puntúa.
+    </Clave>
+
+    <S titulo="El PPC cuenta promesas, no porcentajes">
+      <p>
+        El PPC es <strong>compromisos cumplidos entre compromisos
+        totales</strong>, sin medias tintas: una tarea al 90% no es media
+        promesa cumplida, es una promesa incumplida. Es duro a propósito —
+        así se aprende a prometer lo que se puede sostener.
+      </p>
+      <p>
+        El denominador es <strong>todo lo comprometido</strong>, no solo lo
+        que alguien se acordó de evaluar: un compromiso sin marcar cuenta
+        como no cumplido. Dicho de otra forma,{" "}
+        <strong>no cerrar la semana no sube el PPC</strong> — si pudiera
+        subirlo, el indicador premiaría el descuido.
+      </p>
+      <p>
+        Cuando el compromiso lleva <strong>cantidad</strong> (metrado
+        planificado y ejecutado), la cantidad manda sobre la casilla: si se
+        ejecutó lo previsto o más, cuenta cumplido aunque nadie tilde; si se
+        quedó corto, no lo salva un tilde. Las dos cosas juntas no pueden
+        contradecirse.
+      </p>
+    </S>
+
+    <S titulo="Las causas: el catálogo es fijo y por eso sirve">
+      <p>
+        Cada incumplimiento pide su <strong>causa</strong> de una lista
+        cerrada. Podría ser texto libre y sería peor: con texto libre,
+        «faltó material», «no llegó el fierro» y «proveedor» son tres cosas
+        distintas para el sistema y la misma en la obra, y no se puede
+        contar nada. Con catálogo fijo sale el <strong>Pareto</strong>: qué
+        causa frena más, semana tras semana. Eso es lo que se ataca.
+      </p>
+      <p>
+        Lo que no se cumplió no desaparece: GCM lo{" "}
+        <strong>arrastra</strong> y lo enseña al armar la semana siguiente,
+        porque un compromiso incumplido que nadie vuelve a mirar es trabajo
+        que se pierde entre semanas.
+      </p>
+    </S>
+
+    <S titulo="El recorrido de cada semana">
+      <Recorrido
+        pasos={[
+          <>
+            <strong>Crear la semana</strong> con su fecha de corte. GCM
+            numera correlativo por obra y avisa si el número choca con una
+            semana que ya existe.
+          </>,
+          <>
+            <strong>Comprometer</strong> desde el Lookahead: solo lo
+            liberado. Cada compromiso puede llevar su cantidad y su meta de
+            avance.
+          </>,
+          <>
+            Durante la semana, el avance real entra por el{" "}
+            <strong>parte del día</strong> — no hace falta esperar al
+            viernes.
+          </>,
+          <>
+            <strong>Cerrar la semana</strong>: marcar qué se cumplió, poner
+            la causa a lo que no, y con eso quedan el PPC y el Pareto. Al
+            cerrar también se registra el avance físico de cada compromiso.
+          </>,
+        ]}
+      />
+      <p>
+        Una semana cerrada se puede <strong>reabrir</strong> si hay que
+        corregirla — y hace falta hacerlo si se quiere comprometer algo más
+        en ella, porque desde el Lookahead solo se ofrecen semanas abiertas.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Marcar «cumplido» y dejar vacío el avance de la tarea",
+            pasa: (
+              <p>
+                Este fue un fallo real que <strong>falsificaba la curva
+                S</strong>: se daba por hecho que cumplido significaba
+                100%, cuando el caso normal del Last Planner es comprometer{" "}
+                <em>el tramo de esta semana</em> de una tarea que dura tres.
+                El residente marcaba cumplido —que era verdad— y la tarea
+                entera saltaba al 100%. Hoy el campo vacío no inventa nada;
+                si el tramo terminó la tarea, se escribe el 100 a mano.
+              </p>
+            ),
+          },
+          {
+            hace: "No cerrar la semana para que el PPC no baje",
+            pasa: (
+              <p>
+                No funciona: lo no evaluado cuenta como incumplido. Y aunque
+                funcionara, el PPC no es una nota — un PPC bajo con causas
+                bien puestas vale más que un 100% sin información, porque
+                dice dónde está el problema.
+              </p>
+            ),
+          },
+          {
+            hace: "Comprometer la tarea entera en vez del tramo de la semana",
+            pasa: (
+              <p>
+                Casi nunca se cumple, y el PPC castiga algo que en realidad
+                fue avance normal. El compromiso semanal es lo que se puede
+                terminar <em>esta</em> semana; lo demás es plan, no promesa.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: el parte del dia
+// ---------------------------------------------------------------------------
+
+const PARTE = (
+  <>
+    <Clave>
+      El parte del día es la pantalla donde se reporta el avance de{" "}
+      <strong>todas las tareas activas de una vez</strong>, con sus fotos. Y
+      su regla más importante es lo que <em>no</em> hace:{" "}
+      <strong>una casilla vacía no escribe nada</strong>. «De esta tarea no
+      sé nada hoy» es una respuesta legítima — un cero o un cien inventados
+      son una mentira que llega hasta la curva S.
+    </Clave>
+
+    <S titulo="Por qué existe: un envío en vez de cien">
+      <p>
+        GCM ya sabía registrar el avance de una tarea desde la tabla del
+        cronograma, de una en una. Reportar la semana entera así son unas
+        cien peticiones contra un servidor que aguanta unas pocas a la vez:
+        no es que fuera lento — es que no se hacía, y el avance se reportaba
+        tarde o no se reportaba. El parte no trae datos nuevos:{" "}
+        <strong>trae un solo envío</strong>.
+      </p>
+      <p>
+        De lo que se reporta aquí salen la curva S, el valor ganado, el
+        ritmo de avance y el informe semanal. Es la entrada de datos más
+        importante del día a día, y por eso está pensada para hacerse rápido
+        y sin mentir.
+      </p>
+    </S>
+
+    <S titulo="Las fotos van pegadas a la tarea">
+      <p>
+        Cada tarea admite sus fotos del día, ancladas a{" "}
+        <strong>la tarea y la fecha</strong>. Después aparecen en el informe
+        semanal y pueden pasar a la <strong>galería</strong>, que es el
+        escaparate que —si la obra lo comparte— <strong>ve el
+        cliente</strong>. Conviene saberlo antes de subir: lo que se sube es
+        evidencia de obra, no un archivo privado.
+      </p>
+    </S>
+
+    <S titulo="El recorrido de cada día">
+      <Recorrido
+        pasos={[
+          <>
+            Abrir <strong>Parte del día</strong> dentro de la obra: lista
+            las tareas vivas a esa fecha, no el cronograma entero.
+          </>,
+          <>
+            <strong>Escribir solo lo que se sabe</strong>: el porcentaje de
+            las tareas que se tocaron hoy. Lo demás se deja en blanco, a
+            conciencia.
+          </>,
+          <>
+            <strong>Adjuntar fotos</strong> donde aporten, con su tarea.
+          </>,
+          <>
+            <strong>Enviar</strong>. El avance queda con su fecha, su autor
+            y su nota; la curva y los indicadores se mueven solos.
+          </>,
+        ]}
+      />
+      <p>
+        Cada reporte es una fila nueva y nunca un borrado: la serie completa
+        es lo que permite ver el ritmo y saber quién reportó qué y cuándo.
+        Corregir es reportar de nuevo — la corrección del mismo día manda
+        sobre la anterior.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Rellenar todas las casillas «para que no queden vacías»",
+            pasa: (
+              <p>
+                Es exactamente lo que la pantalla evita. Un porcentaje
+                inventado entra en la curva S, en el valor ganado y en el
+                informe que se manda al cliente, y ya no hay forma de
+                distinguirlo del avance real. El vacío es información: dice
+                que hoy nadie miró esa tarea.
+              </p>
+            ),
+          },
+          {
+            hace: "Reportar el avance solo los viernes, al cerrar la semana",
+            pasa: (
+              <p>
+                El cierre semanal registra el avance de los compromisos,
+                pero la obra tiene más tareas que compromisos: lo que no se
+                reporta a diario aparece de golpe o no aparece. La curva se
+                lee a saltos y el ritmo semanal deja de significar nada.
+              </p>
+            ),
+          },
+          {
+            hace: "Bajar un porcentaje ya reportado sin explicarlo",
+            pasa: (
+              <p>
+                Se puede —a veces hay que corregir un error—, pero el
+                retroceso mueve hacia atrás la curva, el valor ganado y el
+                índice de plazo. La nota del reporte es el sitio para decir
+                por qué, y es lo que evita que alguien lo lea como un fallo
+                del sistema.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: valorizaciones y pagos
+// ---------------------------------------------------------------------------
+
+const VALORIZACIONES = (
+  <>
+    <Clave>
+      El contratista <strong>valoriza</strong> —dice a qué porcentaje
+      acumulado va su encargo— y contra eso se le <strong>paga</strong>, con
+      su constancia adjunta. GCM lleva la cuenta de{" "}
+      <strong>a quién le toca valorizar</strong> según la cadencia pactada y
+      de <strong>a quién se le debe</strong>, y avisa cuando algo se pasa de
+      fecha.
+    </Clave>
+
+    <S titulo="La cadencia: dos niveles con herencia">
+      <p>
+        La <strong>obra</strong> tiene su cadencia por defecto: semanal,
+        atada a su día de corte. Cada <strong>contratista</strong> puede
+        tener la suya —cada N días, o fechas pactadas como hitos de pago— y,
+        si no se le configura ninguna, <strong>hereda la de la obra</strong>.
+        Esa herencia es deliberada: obligar a configurar contratista por
+        contratista convertiría la función en una lista de pendientes que
+        nadie llena.
+      </p>
+      <p>
+        Las valorizaciones son <strong>acumuladas</strong>, no
+        incrementales: «vamos al 45%». Por eso una valorización tardía cubre
+        las fechas anteriores que nadie registró — un corte del 18 ya
+        contesta al hito del 10. Sin esa regla, un hito olvidado se
+        reclamaría eternamente.
+      </p>
+    </S>
+
+    <S titulo="El pago y su constancia">
+      <p>
+        El pago cuelga del <strong>encargo</strong>, y puede ir asociado a
+        una valorización o no —hay adelantos que no valorizan nada—. Lleva
+        monto, fecha, quién lo registró y su <strong>constancia en imagen o
+        PDF</strong>.
+      </p>
+      <p>
+        Esa constancia se guarda <strong>aparte de las fotos de obra</strong>,
+        y no por capricho técnico: las fotos de obra salen en la galería, y
+        la galería tiene un enlace que puede ver el cliente. Una constancia
+        de pago no puede acabar ahí por un descuido. Además, el archivo se
+        guarda <strong>dentro de la misma operación</strong> que el pago: si
+        falla el disco no queda la fila, para que el historial no diga que
+        hay respaldo cuando no lo hay.
+      </p>
+      <p>
+        Los pagos, como las valorizaciones, <strong>no se editan ni se
+        borran</strong>: son historia. Un «por pagar» en negativo no es un
+        error — significa que se pagó por adelantado, y la pantalla lo dice
+        con esas palabras en vez de dejar un número raro.
+      </p>
+    </S>
+
+    <S titulo="El recorrido de cada corte">
+      <Recorrido
+        pasos={[
+          <>
+            Abrir <strong>Valorizaciones</strong> dentro de la obra: enseña
+            a quién le toca, quién no tiene cadencia propia y qué pagos
+            faltan por reportar.
+          </>,
+          <>
+            <strong>Registrar la valorización</strong> del contratista: su
+            porcentaje acumulado a esa fecha.
+          </>,
+          <>
+            <strong>Registrar el pago</strong> con su constancia cuando se
+            haga.
+          </>,
+          <>
+            Dejar que el <strong>aviso</strong> recuerde lo que se pasa de
+            fecha: llega a la campanita de los residentes asignados a la
+            obra, una vez al día mientras la deuda siga.
+          </>,
+        ]}
+      />
+      <p>
+        Los contadores del panel se calculan sobre{" "}
+        <strong>todos los encargos vigentes</strong>, no sobre la página que
+        se está mirando: «3 pendientes» tiene que significar lo mismo en la
+        página 1 que en la 2. Los encargos cerrados o anulados no entran —
+        uno cerrado ya no valoriza, y llenar el panel de rojo que nadie
+        puede cerrar es la forma de que se deje de mirar.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Esperar los avisos con los avisos de la obra apagados",
+            pasa: (
+              <p>
+                <strong>Si la obra no tiene los avisos activados, no suena
+                nada</strong>: ni el de valorización, ni los hitos, ni los
+                recordatorios de restricciones. Es un solo interruptor por
+                obra, y está apagado hasta que alguien lo enciende — GCM no
+                empieza a insistir a quien no lo pidió. Se enciende en la
+                configuración de avisos de la obra.
+              </p>
+            ),
+          },
+          {
+            hace: "Registrar la valorización como si fuera el avance del período",
+            pasa: (
+              <p>
+                Es acumulada: si el contratista iba al 30% y esta quincena
+                hizo un 15% más, se registra <strong>45</strong>, no 15.
+                Poner el incremento hunde la cifra y hace parecer que el
+                frente retrocedió.
+              </p>
+            ),
+          },
+          {
+            hace: "Pagar sin adjuntar la constancia «para subirla luego»",
+            pasa: (
+              <p>
+                El pago sin respaldo es el que aparece en la discusión de
+                seis meses después. GCM la pide en el momento porque es
+                cuando existe: después hay que buscarla en un chat.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
 // El indice: los capitulos en el orden del trabajo real
 // ---------------------------------------------------------------------------
 
@@ -938,7 +1319,7 @@ export const CAPITULOS: CapituloManual[] = [
     resumen:
       "Comprometer solo lo liberado, cerrar la semana, y el PPC con sus " +
       "causas de no cumplimiento.",
-    contenido: null,
+    contenido: PLAN_SEMANAL,
   },
   {
     slug: "parte-del-dia",
@@ -947,8 +1328,9 @@ export const CAPITULOS: CapituloManual[] = [
     paraQuien: "Quien está en obra.",
     resumen:
       "Reportar avance por tarea con sus fotos: de aquí salen la curva S, " +
-      "el valor ganado y el informe semanal.",
-    contenido: null,
+      "el valor ganado y el informe semanal. Y por qué una casilla vacía " +
+      "no escribe nada.",
+    contenido: PARTE,
   },
   {
     slug: "dinero",
@@ -966,9 +1348,10 @@ export const CAPITULOS: CapituloManual[] = [
     pregunta: "a quién le toca y a quién se le debe",
     paraQuien: "Residencia y administración.",
     resumen:
-      "La cadencia de cada contratista, el panel de lo que toca esta " +
-      "semana, y el pago con su comprobante en PDF.",
-    contenido: null,
+      "La cadencia de cada contratista con su herencia, el panel de lo que " +
+      "toca, el pago con su constancia y el aviso que solo suena si la " +
+      "obra lo tiene encendido.",
+    contenido: VALORIZACIONES,
   },
   {
     slug: "indicadores",
