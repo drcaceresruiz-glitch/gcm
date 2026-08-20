@@ -109,7 +109,7 @@ export async function listarMetas(
  * recalculando el costo— y hasta que se congela no puede gobernar la bolsa
  * que se ensena en el tablero.
  */
-async function metaQueManda(companyId: string, obraId: string) {
+export async function metaQueManda(companyId: string, obraId: string) {
   const donde = { projectId: obraId, project: { companyId } };
 
   const aprobada = await prisma.presupuestoMeta.findFirst({
