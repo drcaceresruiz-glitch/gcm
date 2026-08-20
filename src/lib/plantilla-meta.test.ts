@@ -185,3 +185,32 @@ describe("tolerancia del analizador de gastos", () => {
     expect(r.total).toBe("0.00");
   });
 });
+
+describe("el recargo que genera el presupuesto contractual", () => {
+  it("llega al importador, y solo en los capitulos", async () => {
+    const r = await analizarExcel(await generarPlantillaMeta());
+    const porCodigo = new Map(r.filas.map((f) => [f.codigo, f]));
+
+    expect(porCodigo.get("1.0")?.porcentajeRecargo).toBe("18.00");
+    expect(porCodigo.get("2.0")?.porcentajeRecargo).toBe("15.00");
+    expect(porCodigo.get("3.0")?.porcentajeRecargo).toBe("22.00");
+
+    // El recargo es del capitulo entero: una partida no lo lleva.
+    expect(porCodigo.get("1.1")?.porcentajeRecargo).toBeNull();
+  });
+
+  it("no le roba la columna al parcial", async () => {
+    /**
+     * La columna se llama "Contractual" y no "Total contractual" por esto.
+     *
+     * El alias de `parcial` incluye "total", "monto" e "importe", y la
+     * deteccion admite prefijos: una cabecera que empezara por cualquiera de
+     * esos podria quedarse con la columna del importe real, y el presupuesto
+     * entraria inflado sin que nada avisara.
+     */
+    const r = await analizarExcel(await generarPlantillaMeta());
+
+    expect(r.columnasDetectadas["parcial"]).toBe("Parcial");
+    expect(r.montoTotal).toBe(TOTAL_COSTO_EJEMPLO);
+  });
+});

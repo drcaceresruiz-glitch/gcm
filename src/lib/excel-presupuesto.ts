@@ -33,6 +33,8 @@ export interface FilaImportada {
   metrado: string | null;
   precioUnitario: string | null;
   parcial: string | null;
+  /// Solo en capitulos: % de recargo con el que se genera el contractual.
+  porcentajeRecargo: string | null;
   /// Aviso no bloqueante: la fila se importa igual.
   aviso?: string;
 }
@@ -161,6 +163,12 @@ const ALIAS: Record<string, string[]> = {
   metrado: ["metrado", "cantidad", "cant", "cant.", "metrados"],
   precioUnitario: ["precio unitario", "p.u.", "pu", "precio", "unitario", "costo unitario"],
   parcial: ["parcial", "subtotal", "importe", "total", "monto"],
+  // Solo lo llevan los capitulos: cuanto se recarga ese capitulo del
+  // presupuesto real para llegar al contractual. El nombre esta escogido
+  // para no chocar con los alias de arriba: llamarla "Total contractual"
+  // habria hecho que se leyera como el parcial, e importar el presupuesto
+  // ya inflado.
+  recargo: ["% recargo", "recargo", "porcentaje recargo", "recargo %"],
 };
 
 /**
@@ -235,7 +243,7 @@ function detectarCabecera(hoja: ExcelJS.Worksheet): {
     // Se resuelven primero los campos mas especificos: "precio unitario"
     // antes que "precio", y "descripcion" antes que "partida", que aparece
     // como sinonimo en dos campos distintos.
-    const orden = ["metrado", "precioUnitario", "parcial", "unidad", "codigo", "descripcion"];
+    const orden = ["metrado", "precioUnitario", "parcial", "unidad", "codigo", "descripcion", "recargo"];
 
     for (const campo of orden) {
       const alias = ALIAS[campo] ?? [];
@@ -578,6 +586,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
     return {
       fila: n, codigo, tipo, modalidad: "PRECIOS_UNITARIOS", descripcion: desc, nivel,
       unidad: null, metrado: null, precioUnitario: null, parcial: null,
+      porcentajeRecargo: normalizarDecimal(leer("recargo"), 2),
     };
   }
 
@@ -594,6 +603,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
     return {
       fila: n, codigo, tipo, modalidad: "ALCANCE", descripcion: desc, nivel,
       unidad: null, metrado: null, precioUnitario: null, parcial: null,
+      porcentajeRecargo: null,
       aviso: `Comparte importe con las filas ${combinacion.maestra} a ${combinacion.ultima} (${cuantas} lineas a suma alzada).`,
     };
   }
@@ -681,6 +691,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
     descripcion: desc, nivel,
     unidad: unidadTexto || null,
     metrado, precioUnitario, parcial,
+    porcentajeRecargo: null,
     ...(avisos.length > 0 ? { aviso: avisos.join(" ") } : {}),
   };
 }

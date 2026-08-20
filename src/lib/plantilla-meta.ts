@@ -78,6 +78,59 @@ function formulaSubtotal(fila: number): string {
   return `IF($A${fila}="","",IF($B${fila}="VARIABLE",$C${fila}*$D${fila},$E${fila}))`;
 }
 
+/** Un codigo de capitulo: termina en ".0" o no lleva punto. */
+function esCapituloCodigo(f: FilaCosto): boolean {
+  return f.codigo.endsWith(".0") || !f.codigo.includes(".");
+}
+
+/** Subtotal real de un capitulo de ejemplo: lo que suman sus partidas. */
+function subtotalEjemplo(codigo: string): number {
+  const pfx = codigo.endsWith(".0") ? codigo.slice(0, -1) : `${codigo}.`;
+  return FILAS_COSTO.filter(
+    (h) => h.codigo.startsWith(pfx) && h.codigo !== codigo,
+  ).reduce(
+    (s, h) =>
+      s +
+      (h.metrado !== undefined && h.precioUnitario !== undefined
+        ? h.metrado * h.precioUnitario
+        : (h.parcial ?? 0)),
+    0,
+  );
+}
+
+/** Lo que costaria ese capitulo una vez recargado. */
+function contractualEjemplo(f: FilaCosto): number {
+  return subtotalEjemplo(f.codigo) * (1 + (f.recargo ?? 0) / 100);
+}
+
+/**
+ * Monto contractual de un capitulo: su subtotal real mas el recargo.
+ *
+ * La suma va por PREFIJO de codigo, no por rango de filas: asi sigue
+ * valiendo cuando se insertan partidas en medio, que es lo que hace todo el
+ * mundo. Los capitulos aportan cero (no llevan cifras propias), de modo que
+ * ninguna partida se cuenta dos veces.
+ *
+ * El prefijo se deduce DENTRO de la formula ("4.0" -> "4.", "4" -> "4.")
+ * porque en las filas preparadas aun no se sabe que codigo se escribira.
+ *
+ * Es para que se VEA en la hoja. Al importar, GCM recalcula el contractual
+ * por su cuenta: el archivo muestra, el importador manda.
+ */
+function formulaContractual(
+  fila: number,
+  primera: number,
+  ultima: number,
+): string {
+  const pfx =
+    `IF(RIGHT($A${fila},2)=".0",LEFT($A${fila},LEN($A${fila})-1),$A${fila}&".")`;
+  return (
+    `IF($G${fila}="","",` +
+    `SUMPRODUCT((LEFT($A$${primera}:$A$${ultima},LEN(${pfx}))=${pfx})` +
+    `*N($F$${primera}:$F$${ultima}))*(1+$G${fila}/100))`
+  );
+}
+
 const CABECERAS_COSTO = [
   "Ítem",
   "Descripción",
@@ -85,6 +138,8 @@ const CABECERAS_COSTO = [
   "Metrado",
   "Precio Unitario",
   "Parcial",
+  "% Recargo",
+  "Contractual",
 ] as const;
 
 const CABECERAS_GASTOS = [
@@ -103,6 +158,8 @@ interface FilaCosto {
   metrado?: number;
   precioUnitario?: number;
   parcial?: number;
+  /// Solo en capitulos: cuanto se recarga para llegar al contractual.
+  recargo?: number;
 }
 
 /**
@@ -118,7 +175,11 @@ interface FilaCosto {
  * plantilla tiene que analizar limpia.
  */
 export const FILAS_COSTO: readonly FilaCosto[] = [
-  { codigo: "1.0", descripcion: "OBRAS PROVISIONALES Y TRABAJOS PRELIMINARES" },
+  {
+    codigo: "1.0",
+    descripcion: "OBRAS PROVISIONALES Y TRABAJOS PRELIMINARES",
+    recargo: 18,
+  },
   {
     codigo: "1.1",
     descripcion: "Cartel de identificación de obra 3.60 × 2.40 m",
@@ -135,7 +196,11 @@ export const FILAS_COSTO: readonly FilaCosto[] = [
     precioUnitario: 28,
     parcial: 1260,
   },
-  { codigo: "2.0", descripcion: "ESTRUCTURAS" },
+  {
+    codigo: "2.0",
+    descripcion: "ESTRUCTURAS",
+    recargo: 15,
+  },
   {
     codigo: "2.1",
     descripcion: "Concreto premezclado f'c = 210 kg/cm² en columnas",
@@ -154,6 +219,7 @@ export const FILAS_COSTO: readonly FilaCosto[] = [
   },
   {
     codigo: "3.0",
+    recargo: 22,
     descripcion: "COSTOS PROPIOS DE LA META (el contrato no los desglosa)",
   },
   {
@@ -332,6 +398,7 @@ export async function generarPlantillaMeta(
   costo.columns = [
     { width: 10 }, { width: 56 }, { width: 8 },
     { width: 12 }, { width: 16 }, { width: 16 },
+    { width: 12 }, { width: 18 },
   ];
 
   costo.getCell("A1").value = "PRESUPUESTO META - COSTO DIRECTO";
@@ -341,6 +408,20 @@ export async function generarPlantillaMeta(
   costo.getCell("A2").font = { italic: true, color: { argb: "FF667788" } };
 
   pintarCabecera(costo.getRow(FILA_CABECERA), CABECERAS_COSTO);
+
+  // Se explica DONDE se usa: una nota en la cabecera se lee justo cuando
+  // hace falta, y la hoja de instrucciones se lee una vez y se olvida.
+  costo.getCell(`G${FILA_CABECERA}`).note =
+    "Solo en los capítulos. Escribe 15 para 15%: cuánto se recarga este " +
+    "capítulo del presupuesto real para llegar al contractual.";
+  costo.getCell(`H${FILA_CABECERA}`).note =
+    "Se calcula solo: el subtotal real del capítulo más su recargo. " +
+    "La suma de esta columna es el presupuesto contractual.";
+
+  // Se declaran aqui arriba porque la formula del contractual, que ya se
+  // escribe en las filas de ejemplo, necesita el rango completo.
+  const primeraFila = FILA_CABECERA + 1;
+  const ultimaFila = FILA_CABECERA + FILAS_PREPARADAS;
 
   let n = FILA_CABECERA;
   for (const f of FILAS_COSTO) {
@@ -378,9 +459,24 @@ export async function generarPlantillaMeta(
     fila.getCell(5).numFmt = "#,##0.00";
     fila.getCell(6).numFmt = "#,##0.00";
 
-    const esCapitulo = f.codigo.endsWith(".0") || !f.codigo.includes(".");
+    const esCapitulo = esCapituloCodigo(f);
     if (esCapitulo) {
-      for (let c = 1; c <= 6; c++) {
+      // El recargo es lo UNICO que se escribe en un capitulo: de ahi sale el
+      // presupuesto contractual. Las partidas no lo llevan.
+      if (f.recargo !== undefined) fila.getCell(7).value = f.recargo;
+      fila.getCell(8).value = {
+        formula: formulaContractual(n, primeraFila, ultimaFila),
+        result: contractualEjemplo(f),
+      };
+      fila.getCell(7).numFmt = "#,##0.00";
+      fila.getCell(8).numFmt = "#,##0.00";
+      marcarEditable(fila.getCell(7));
+      marcarCalculada(
+        fila.getCell(8),
+        "Se calcula solo: el subtotal real del capítulo más su recargo.",
+      );
+
+      for (let c = 1; c <= 8; c++) {
         fila.getCell(c).font = { bold: true };
         fila.getCell(c).fill = {
           type: "pattern",
@@ -399,9 +495,6 @@ export async function generarPlantillaMeta(
    * blanco para que se lea como pie y no como una linea mas.
    */
 
-  const primeraFila = FILA_CABECERA + 1;
-  const ultimaFila = FILA_CABECERA + FILAS_PREPARADAS;
-
   for (let f = n + 1; f <= ultimaFila; f++) {
     const fila = costo.getRow(f);
     fila.getCell(4).numFmt = "#,##0.0000";
@@ -410,6 +503,18 @@ export async function generarPlantillaMeta(
     // Sin descripcion el importador la salta, asi que la formula puede estar
     // puesta desde el principio: aparece sola en cuanto se escribe la linea.
     fila.getCell(6).value = { formula: `IF(B${f}="","",D${f}*E${f})`, result: "" };
+    // El recargo y su contractual: en blanco hasta que la fila sea capitulo.
+    fila.getCell(7).numFmt = "#,##0.00";
+    fila.getCell(8).numFmt = "#,##0.00";
+    fila.getCell(8).value = {
+      formula: formulaContractual(f, primeraFila, ultimaFila),
+      result: "",
+    };
+    marcarEditable(fila.getCell(7));
+    marcarCalculada(
+      fila.getCell(8),
+      "Se calcula solo: el subtotal real del capítulo más su recargo.",
+    );
     for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
     marcarCalculada(
       fila.getCell(6),
@@ -434,6 +539,19 @@ export async function generarPlantillaMeta(
       `SUMPRODUCT((RIGHT($A$${primeraFila}:$A$${ultimaFila},2)<>".0")*` +
       `($A$${primeraFila}:$A$${ultimaFila}<>"")*N($F$${primeraFila}:$F$${ultimaFila}))`,
   };
+
+  // El contractual total: la suma de los capitulos ya recargados. Solo los
+  // capitulos llevan cifra en esa columna, asi que sumarla entera no cuenta
+  // nada dos veces.
+  total.getCell(8).value = {
+    result: FILAS_COSTO.filter(esCapituloCodigo).reduce(
+      (s, f) => s + contractualEjemplo(f),
+      0,
+    ),
+    formula: `SUM($H$${primeraFila}:$H$${ultimaFila})`,
+  };
+  total.getCell(8).numFmt = "#,##0.00";
+  total.getCell(8).font = { bold: true };
   total.getCell(6).numFmt = "#,##0.00";
   total.getCell(6).font = { bold: true };
 
