@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ROLES, PERMISOS, esInnegociable, permisosDe } from "@/lib/rbac";
 import type { SesionActiva } from "@/services/sesion.service";
