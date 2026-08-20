@@ -129,18 +129,6 @@ export default async function ObraLayout({
           // `soloExacto` en MenuObra.tsx.
           soloExacto: true,
         },
-        puede(sesion, "cronograma:leer") && {
-          clave: "cronograma",
-          titulo: "Cronograma",
-          pregunta: "cuándo se hace",
-          href: `${raiz}/cronograma`,
-          hecho: hitos.cronograma,
-          ramas: [
-            { titulo: "Diagrama de Gantt", href: `${raiz}/cronograma/gantt` },
-            { titulo: "Informe semanal", href: `${raiz}/cronograma/informe` },
-            { titulo: "Enlazar con partidas", href: `${raiz}/cronograma/mapeo` },
-          ],
-        },
         puede(sesion, "linea_base:leer") && {
           clave: "revisiones",
           titulo: "Revisiones",
@@ -167,6 +155,25 @@ export default async function ObraLayout({
             pregunta: "cuánto le cobro al cliente",
             href: `${raiz}/propuesta`,
           },
+        /**
+         * El cronograma va AL FINAL del grupo, detras de todo el hilo del
+         * dinero: su EDT sale del presupuesto, asi que antes de que exista no
+         * hay nada que planificar. Estaba en medio -entre Presupuesto y
+         * Revisiones- y partia en dos la secuencia real, y bastante confusion
+         * hay ya con dos presupuestos.
+         */
+        puede(sesion, "cronograma:leer") && {
+          clave: "cronograma",
+          titulo: "Cronograma",
+          pregunta: "cuándo se hace",
+          href: `${raiz}/cronograma`,
+          hecho: hitos.cronograma,
+          ramas: [
+            { titulo: "Diagrama de Gantt", href: `${raiz}/cronograma/gantt` },
+            { titulo: "Informe semanal", href: `${raiz}/cronograma/informe` },
+            { titulo: "Enlazar con partidas", href: `${raiz}/cronograma/mapeo` },
+          ],
+        },
       ].filter(Boolean),
     },
     {
