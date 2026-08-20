@@ -18,7 +18,9 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "test": "vitest run",
-    "humo": "tsx scripts/humo.ts"
+    "humo": "tsx scripts/humo.ts",
+    "listo": "npm run typecheck && npm test && npm run build",
+    "ganchos": "git config core.hooksPath .githooks"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

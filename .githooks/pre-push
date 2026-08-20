@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# El criterio G6, delante del push.
+#
+# POR QUE EN pre-push Y NO EN pre-commit: en este repositorio **cada push a
+# `main` despliega a produccion**. El commit es barato y se rehace; el push no.
+# Y colgarlo del commit obligaria a esperar en cada guardado intermedio, que es
+# como se acaba usando `--no-verify` por costumbre —y entonces el gancho no
+# protege nada—.
+#
+# POR QUE `build` Y NO SOLO `typecheck` + `test`: es lo que corre el CI, y es
+# el unico que reproduce su fallo. El 19/08 el despliegue #344 se cayo con
+# typecheck y pruebas en verde, por una prueba escrita DESPUES del ultimo
+# `tsc`. Ver la memoria de pruebas de servicio: «lo ultimo que se hace antes de
+# `git push` es `npm run build`».
+#
+# Los tres, en orden, porque cada uno tapa el punto ciego del otro: vitest no
+# comprueba tipos, y `tsc` no ve las consultas de Prisma.
+#
+# Para saltarselo un dia concreto:  git push --no-verify
+
+set -e
+
+echo "→ typecheck"
+npm run typecheck
+
+echo "→ pruebas"
+npm test
+
+echo "→ build (lo que corre el CI)"
+npm run build
+
+echo "✓ G6: los tres pasan. Adelante."
