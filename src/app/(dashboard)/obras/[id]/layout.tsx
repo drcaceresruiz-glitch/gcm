@@ -98,6 +98,23 @@ export default async function ObraLayout({
       clave: "plan",
       titulo: "Plan",
       secciones: [
+        /**
+         * VA PRIMERA, y es el orden del trabajo: desde el 20/08 el
+         * presupuesto entra por aqui -el REAL- y de el se genera el
+         * contractual, inflando cada capitulo por su recargo.
+         *
+         * Antes iba detras de Revisiones, cuando la meta se fijaba contra una
+         * linea base aprobada. Eso dejo de ser cierto al hacer
+         * `baselineVersion` opcional, y el menu se quedo contando el orden
+         * viejo: el manual da por hecho que este riel ES su indice.
+         */
+        puede(sesion, "meta:leer") && {
+          clave: "meta",
+          titulo: "Meta",
+          pregunta: "cuánto queremos gastar",
+          href: `${raiz}/meta`,
+          hecho: hitos.meta,
+        },
         puede(sesion, "partida:leer") && {
           clave: "presupuesto",
           titulo: "Presupuesto",
@@ -150,22 +167,6 @@ export default async function ObraLayout({
             pregunta: "cuánto le cobro al cliente",
             href: `${raiz}/propuesta`,
           },
-        /**
-         * OJO al orden: desde el 20/08 la meta es el PRIMER tramo del
-         * presupuesto -el real entra aqui y de el se genera el contractual-,
-         * asi que este sitio ya no lo justifica lo que lo justificaba antes
-         * ("la meta se fija contra una linea base aprobada", que dejo de ser
-         * cierto al hacer `baselineVersion` opcional). Se deja donde estaba
-         * para no mover la navegacion de quien ya la tiene aprendida; si
-         * algun dia se reordena, va delante de Presupuesto.
-         */
-        puede(sesion, "meta:leer") && {
-          clave: "meta",
-          titulo: "Meta",
-          pregunta: "cuánto queremos gastar",
-          href: `${raiz}/meta`,
-          hecho: hitos.meta,
-        },
       ].filter(Boolean),
     },
     {

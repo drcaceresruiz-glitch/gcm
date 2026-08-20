@@ -700,10 +700,12 @@ const CRONOGRAMA = (
 const META = (
   <>
     <Clave>
-      El contractual dice lo que el cliente paga; la <strong>meta</strong>,
-      lo que tu empresa se compromete a gastar para ejecutarlo. La distancia
-      entre las dos es la <strong>bolsa operativa</strong>: el margen con el
-      que la obra respira. Sin meta, «vamos bien de plata» es una opinión.
+      Aquí entra el presupuesto <strong>real</strong>: lo que tu empresa se
+      compromete a gastar para ejecutar la obra. Es el primer paso, y de él
+      sale el <strong>contractual</strong> —lo que el cliente paga— inflando
+      cada capítulo por un porcentaje de recargo. La distancia entre los dos
+      es la <strong>bolsa operativa</strong>: el margen con el que la obra
+      respira. Sin meta, «vamos bien de plata» es una opinión.
     </Clave>
 
     <S titulo="Dos presupuestos con reglas distintas, a propósito">
@@ -2597,6 +2599,17 @@ export const CAPITULOS: CapituloManual[] = [
     contenido: EN_OBRA,
   },
   {
+    slug: "meta",
+    titulo: "El presupuesto meta",
+    pregunta: "cuánto queremos gastar",
+    paraQuien: "Gerencia y residencia.",
+    resumen:
+      "El presupuesto real y el contractual que sale de él: la bolsa " +
+      "operativa, el criterio de los gastos generales y por qué la meta sí " +
+      "se puede re-fijar.",
+    contenido: META,
+  },
+  {
     slug: "presupuesto",
     titulo: "La obra y su presupuesto",
     pregunta: "cuánto cuesta",
@@ -2606,6 +2619,17 @@ export const CAPITULOS: CapituloManual[] = [
       "desde el real, la regla que impide contar dinero dos veces y la " +
       "línea base.",
     contenido: PRESUPUESTO,
+  },
+  {
+    slug: "propuesta",
+    titulo: "La propuesta para el cliente",
+    pregunta: "cuánto le cobro al cliente",
+    paraQuien: "Gerencia y quien cotiza.",
+    resumen:
+      "De costo directo a precio de venta: la cascada completa, con IGV o " +
+      "con recibo por honorarios, en soles o en dólares, y con el detalle " +
+      "que se decida.",
+    contenido: PROPUESTA,
   },
   {
     slug: "movimientos",
@@ -2636,28 +2660,6 @@ export const CAPITULOS: CapituloManual[] = [
       "La cobertura que permite pesar el avance por dinero, y por qué GCM " +
       "propone pero no enlaza solo: enlazar por código se midió y falló.",
     contenido: MAPEO,
-  },
-  {
-    slug: "meta",
-    titulo: "El presupuesto meta",
-    pregunta: "cuánto queremos gastar",
-    paraQuien: "Gerencia y residencia.",
-    resumen:
-      "El presupuesto real y el contractual que sale de él: la bolsa " +
-      "operativa, el criterio de los gastos generales y por qué la meta sí " +
-      "se puede re-fijar.",
-    contenido: META,
-  },
-  {
-    slug: "propuesta",
-    titulo: "La propuesta para el cliente",
-    pregunta: "cuánto le cobro al cliente",
-    paraQuien: "Gerencia y quien cotiza.",
-    resumen:
-      "De costo directo a precio de venta: la cascada completa, con IGV o " +
-      "con recibo por honorarios, en soles o en dólares, y con el detalle " +
-      "que se decida.",
-    contenido: PROPUESTA,
   },
   {
     slug: "lookahead",
