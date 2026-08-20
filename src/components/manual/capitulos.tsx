@@ -280,7 +280,7 @@ const PRESUPUESTO = (
       El presupuesto es un <strong>árbol</strong>: los capítulos agrupan y
       las partidas llevan el dinero. Todas las cifras de GCM —el
       comprometido, el avance valorizado, las alertas— cuelgan de ese árbol,
-      así que importarlo bien es la media hora mejor invertida de toda la
+      así que cargarlo bien es la media hora mejor invertida de toda la
       obra.
     </Clave>
 
@@ -306,16 +306,32 @@ const PRESUPUESTO = (
       </p>
     </S>
 
+    <S titulo="El contractual sale del real, no al revés">
+      <p>
+        Desde agosto de 2026 el orden es este: primero entra el{" "}
+        <strong>presupuesto real</strong> —lo que de verdad cuesta ejecutar
+        la obra— y de él se <strong>genera</strong> el contractual, inflando
+        cada capítulo por un porcentaje de recargo. Antes se hacía al revés,
+        y obligaba a tener un contractual aprobado para poder empezar.
+      </p>
+      <p>
+        El recargo se escribe en la <strong>misma plantilla del real</strong>,
+        en su columna, capítulo por capítulo. Ahí es donde se decide el
+        margen: la bolsa operativa no es una cifra que se calcule después,
+        es la que se pone aquí.
+      </p>
+    </S>
+
     <S titulo="La plantilla oficial, SIEMPRE">
       <p>
         El presupuesto entra por un archivo de Excel, y{" "}
         <strong>casi todos los fallos del importador nacen del archivo, no
         del sistema</strong>: celdas combinadas, filas de subtotal que
-        repiten la suma de sus hijas, columnas movidas. Por eso cada pantalla
-        de importación ofrece su <strong>plantilla oficial</strong> para
-        descargar: úsala siempre, también cuando el presupuesto ya exista en
-        otro formato — copiar los datos a la plantilla cuesta minutos;
-        perseguir un total descuadrado, tardes.
+        repiten la suma de sus hijas, columnas movidas. Por eso la pantalla
+        de <strong>Meta</strong> ofrece la <strong>plantilla oficial</strong>
+        {" "}para descargar —y el cronograma la suya—: úsala siempre, también
+        cuando el presupuesto ya exista en otro formato. Copiar los datos a
+        la plantilla cuesta minutos; perseguir un total descuadrado, tardes.
       </p>
     </S>
 
@@ -326,13 +342,14 @@ const PRESUPUESTO = (
             <strong>Crear la obra</strong> con sus fechas y datos de ficha.
           </>,
           <>
-            <strong>Descargar la plantilla</strong> del presupuesto, en la
-            propia pantalla de importación.
+            <strong>Cargar el presupuesto real</strong> en Meta, con su
+            plantilla oficial. En esa misma hoja va el{" "}
+            <strong>% de recargo</strong> de cada capítulo.
           </>,
           <>
-            <strong>Llenarla y cargarla.</strong> El importador enseña lo que
-            entendió antes de guardar: es el momento de mirar el árbol, no
-            después.
+            <strong>Generar el contractual</strong> desde el real. La
+            pantalla enseña las tres cifras —real, contractual y bolsa— y
+            avisa de lo que no pudo recargar antes de escribir nada.
           </>,
           <>
             <strong>Revisar los totales</strong> contra el documento
@@ -702,9 +719,11 @@ const META = (
         exageraría sin remedio.
       </p>
       <p>
-        Cada versión de la meta recuerda contra qué contractual se fijó y
-        cuántos movimientos había entonces: si después entran más, la
-        pantalla avisa del desfase — es la señal de que toca re-fijar.
+        Cada versión de la meta recuerda, cuando lo hay, contra qué
+        contractual se fijó y cuántos movimientos había entonces: si después
+        entran más, la pantalla avisa del desfase — es la señal de que toca
+        re-fijar. Una meta puede nacer sin contractual: es lo normal ahora,
+        porque el contractual se genera a partir de ella.
       </p>
     </S>
 
@@ -730,9 +749,16 @@ const META = (
       <Recorrido
         pasos={[
           <>
-            <strong>Aprobar antes el contractual</strong> (la revisión):
-            la meta se fija contra él, y sin esa referencia no hay contra
-            qué comparar.
+            <strong>Cargar el presupuesto real</strong> con la plantilla
+            oficial, y revisar los totales: costo directo, gastos generales y
+            plazo en meses. Es el PRIMER paso de la obra: ya no hace falta
+            tener un contractual aprobado antes, porque el contractual sale
+            justo de aquí.
+          </>,
+          <>
+            <strong>Poner el % de recargo</strong> a cada capítulo, en la
+            columna que trae la misma plantilla. Es lo que separa el real del
+            contractual, y por tanto lo que fija la bolsa antes de que exista.
           </>,
           <>
             <strong>Decidir el criterio</strong> de los gastos generales
@@ -740,9 +766,11 @@ const META = (
             quita decidiendo.
           </>,
           <>
-            <strong>Cargar la meta</strong> — con su plantilla oficial, como
-            todo lo que se importa — y revisar los totales: costo directo,
-            gastos generales y plazo en meses.
+            <strong>Generar el contractual</strong> desde el real. GCM infla
+            cada capítulo por su recargo y arma con eso el árbol de partidas
+            contra el que se mide la obra. Antes de confirmar enseña las tres
+            cifras —real, contractual y bolsa— y avisa de lo que no pudo
+            recargar.
           </>,
           <>
             <strong>Aprobarla</strong> para congelarla. Desde ahí la bolsa
@@ -2406,6 +2434,143 @@ const INFORME = (
 );
 
 // ---------------------------------------------------------------------------
+// Capitulo: la propuesta para el cliente
+// ---------------------------------------------------------------------------
+
+const PROPUESTA = (
+  <>
+    <Clave>
+      La propuesta es el mismo presupuesto contractual, vestido para salir: con
+      el logo de la empresa y la cascada de precios en el orden que pide SUNAT.
+      Lo que se elige antes de emitirla es <strong>cómo se presenta</strong> —
+      cómo se factura, en qué moneda, cuánto detalle—, nunca cuánto cuesta: eso
+      ya lo fijó la revisión.
+    </Clave>
+
+    <S titulo="De costo directo a precio de venta">
+      <p>
+        La cascada tiene siempre los mismos escalones. Se parte del{" "}
+        <strong>costo directo</strong> —la suma de las partidas—; encima van
+        los <strong>gastos generales</strong> y la <strong>utilidad</strong>,
+        los dos como porcentaje del costo directo. Eso da el{" "}
+        <strong>subtotal</strong>.
+      </p>
+      <p>
+        Del subtotal se resta el <strong>descuento comercial</strong>, si lo
+        hay, y ahí aparece el <strong>valor de venta</strong>: la cifra que la
+        obra controla y la que se guarda en la revisión. Sumándole el IGV sale
+        el <strong>precio de venta</strong>, que es lo que el cliente paga.
+      </p>
+      <p>
+        El descuento se calcula sobre el subtotal y no sobre el costo{" "}
+        <em>a propósito</em>: es un descuento sobre el PRECIO, no un recorte
+        del costo. Rebajarlo antes de los gastos generales y la utilidad haría
+        que un descuento comercial se comiera también el margen, sin que nadie
+        lo hubiera decidido.
+      </p>
+    </S>
+
+    <S titulo="Con IGV, con recibo por honorarios, o sin impuesto">
+      <p>
+        Con <strong>IGV</strong> es lo normal cuando factura una constructora.
+        Con <strong>recibo por honorarios</strong> no hay IGV, pero el cliente
+        retiene el 8 % de renta de cuarta categoría, y eso se puede presentar
+        de dos formas: <strong>descontada</strong> —el precio pactado no cambia
+        y abajo se lee cuánto queda limpio, que es lo que ocurre de verdad— o{" "}
+        <strong>asumida</strong>, donde el precio sube justo lo necesario para
+        que, después de retener, quede limpio lo que se quería cobrar.
+      </p>
+      <p>
+        Cuidado con el nombre: esta retención es la que <strong>te hace el
+        cliente a ti</strong>. No es la misma que tú le practicas a un
+        contratista al pagarle una orden —esa está en el capítulo del dinero—,
+        aunque las dos se llamen igual.
+      </p>
+    </S>
+
+    <S titulo="Soles o dólares, y cuánto detalle">
+      <p>
+        En GCM todo el dinero se guarda en <strong>soles</strong>. La propuesta
+        se puede emitir en dólares, pero solo si la revisión trae{" "}
+        <strong>tipo de cambio</strong>: si no lo trae, la opción sale
+        bloqueada. Inventar la cotización del día sería poner un precio que
+        nadie pactó. El papel dice a qué cambio se convirtió.
+      </p>
+      <p>
+        El detalle se elige entre todo, hasta partidas, o solo capítulos.
+        Cambiarlo <strong>no mueve el total</strong>: cuando las partidas se
+        resumen, el capítulo pasa a llevar su subtotal, de modo que la columna
+        siempre suma la misma cifra. El Excel sale siempre con todo el detalle,
+        porque es el archivo con el que se trabaja.
+      </p>
+    </S>
+
+    <S titulo="El recorrido de la primera vez">
+      <Recorrido
+        pasos={[
+          <>
+            Entrar desde <strong>Revisiones</strong>, en «Ver la propuesta para
+            el cliente». No tiene sección propia en el menú de la obra: cuelga
+            de la revisión, que es de donde saca sus cifras.
+          </>,
+          <>
+            <strong>Elegir cómo se factura</strong> y, si hace falta, la moneda
+            y cuánto detalle. Las cifras se recalculan a la vista.
+          </>,
+          <>
+            Añadir la <strong>presentación</strong> y las{" "}
+            <strong>observaciones</strong> si el cliente las necesita. Las
+            condiciones de la revisión salen solas.
+          </>,
+          <>
+            <strong>Imprimir o guardar como PDF</strong> —lo hace el
+            navegador— o <strong>descargar el Excel</strong>. Los dos dicen lo
+            mismo: salen del mismo cálculo.
+          </>,
+        ]}
+      />
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Mandar una propuesta que todavía es borrador",
+            pasa: (
+              <p>
+                Sin revisión aprobada sale la última que haya, y el papel lo
+                dice con un sello que <strong>también se imprime</strong>. Está
+                puesto para eso, pero el sello avisa: no decide por ti.
+              </p>
+            ),
+          },
+          {
+            hace: "Buscar los dólares y encontrar la opción bloqueada",
+            pasa: (
+              <p>
+                Esa revisión se creó sin tipo de cambio. Se anota al crear la
+                revisión, no aquí: la propuesta no inventa cotizaciones.
+              </p>
+            ),
+          },
+          {
+            hace: "Querer cambiar la utilidad o el descuento desde la propuesta",
+            pasa: (
+              <p>
+                No se puede, y es deliberado. Esos porcentajes vienen de la
+                revisión aprobada, que es la referencia contra la que se mide la
+                obra: cambiarlos al emitir daría un papel que contradice a la
+                línea base. Para cambiarlos se crea una revisión nueva.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
 // El indice: los capitulos en el orden del trabajo real
 // ---------------------------------------------------------------------------
 
@@ -2437,9 +2602,9 @@ export const CAPITULOS: CapituloManual[] = [
     pregunta: "cuánto cuesta",
     paraQuien: "Quien crea la obra y carga su presupuesto.",
     resumen:
-      "El árbol de capítulos y partidas, la plantilla oficial de " +
-      "importación, la regla que impide contar dinero dos veces y la línea " +
-      "base.",
+      "El árbol de capítulos y partidas, cómo el contractual se genera " +
+      "desde el real, la regla que impide contar dinero dos veces y la " +
+      "línea base.",
     contenido: PRESUPUESTO,
   },
   {
@@ -2478,9 +2643,21 @@ export const CAPITULOS: CapituloManual[] = [
     pregunta: "cuánto queremos gastar",
     paraQuien: "Gerencia y residencia.",
     resumen:
-      "El contractual contra el meta: la bolsa operativa, el criterio de " +
-      "los gastos generales y por qué la meta sí se puede re-fijar.",
+      "El presupuesto real y el contractual que sale de él: la bolsa " +
+      "operativa, el criterio de los gastos generales y por qué la meta sí " +
+      "se puede re-fijar.",
     contenido: META,
+  },
+  {
+    slug: "propuesta",
+    titulo: "La propuesta para el cliente",
+    pregunta: "cuánto le cobro al cliente",
+    paraQuien: "Gerencia y quien cotiza.",
+    resumen:
+      "De costo directo a precio de venta: la cascada completa, con IGV o " +
+      "con recibo por honorarios, en soles o en dólares, y con el detalle " +
+      "que se decida.",
+    contenido: PROPUESTA,
   },
   {
     slug: "lookahead",
