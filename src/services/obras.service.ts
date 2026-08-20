@@ -833,6 +833,15 @@ export interface HitosObra {
   cronograma: boolean;
   /// Linea base del PRESUPUESTO aprobada (la referencia congelada).
   lineaBase: boolean;
+  /**
+   * Hay al menos UNA revision, aprobada o no.
+   *
+   * Distinto de `lineaBase`: la propuesta para el cliente se puede emitir
+   * desde un borrador -con su sello-, y de hecho verla en papel es parte de
+   * decidir si se aprueba. Sin ninguna revision esa pantalla no tiene nada
+   * que enseñar, y su entrada del menu no debe existir.
+   */
+  revision: boolean;
   /// Hay al menos una tarea ANALIZADA en el Lookahead. No basta con que la
   /// tarea este en la matriz: desde que las restricciones se eligen, traerla
   /// no analiza nada y el hito se encenderia sin que nadie hubiera mirado.
@@ -842,6 +851,15 @@ export interface HitosObra {
   /// Hay un presupuesto meta APROBADO. El borrador no cuenta: hasta que se
   /// congela no gobierna ninguna bolsa, igual que en `metaQueManda`.
   meta: boolean;
+  /**
+   * Hay un presupuesto meta, aunque siga en borrador.
+   *
+   * Lo usa el anclaje de continuidad, que pregunta otra cosa que la bolsa:
+   * no si la meta ya manda, sino si el primer tramo del alta esta dado. Con
+   * `meta` a secas, a quien cargo el real y aun no lo aprobo se le volvia a
+   * pedir que lo cargara.
+   */
+  metaCargada: boolean;
   /**
    * Hay alguien asignado a la obra.
    *
@@ -867,9 +885,11 @@ export const hitosDeObra = cache(async function hitosDeObra(
       presupuesto: false,
       cronograma: false,
       lineaBase: false,
+      revision: false,
       lookahead: false,
       planSemanal: false,
       meta: false,
+      metaCargada: false,
       equipo: false,
     };
   }
@@ -880,7 +900,17 @@ export const hitosDeObra = cache(async function hitosDeObra(
     project: { companyId: sesion.companyId },
   };
 
-  const [partida, cronograma, base, lookahead, plan, meta, miembro] =
+  const [
+    partida,
+    cronograma,
+    base,
+    revision,
+    lookahead,
+    plan,
+    meta,
+    metaCargada,
+    miembro,
+  ] =
     await Promise.all([
     prisma.wbsItem.findFirst({ where: deLaObra, select: { id: true } }),
     prisma.cronograma.findFirst({ where: deLaObra, select: { id: true } }),
@@ -888,6 +918,9 @@ export const hitosDeObra = cache(async function hitosDeObra(
       where: { ...deLaObra, aprobadaAt: { not: null } },
       select: { id: true },
     }),
+    // Cualquier revision, aprobada o no: la propuesta se puede emitir desde
+    // un borrador, con su sello.
+    prisma.baseline.findFirst({ where: deLaObra, select: { id: true } }),
     prisma.lookaheadTask.findFirst({
       where: { ...deLaObra, analizadaAt: { not: null } },
       select: { id: true },
@@ -897,6 +930,8 @@ export const hitosDeObra = cache(async function hitosDeObra(
       where: { ...deLaObra, aprobadaAt: { not: null } },
       select: { id: true },
     }),
+    // Sin exigir que este aprobada: para el anclaje, cargarla ya es el paso.
+    prisma.presupuestoMeta.findFirst({ where: deLaObra, select: { id: true } }),
     // La pertenencia NO lleva `project: { companyId }` como las demas: la
     // tabla cuelga de la obra, y la obra ya se comprobo de esta empresa en
     // `alcanzaObra` y en el `obtenerObra` del layout.
@@ -910,9 +945,11 @@ export const hitosDeObra = cache(async function hitosDeObra(
     presupuesto: partida !== null,
     cronograma: cronograma !== null,
     lineaBase: base !== null,
+    revision: revision !== null,
     lookahead: lookahead !== null,
     planSemanal: plan !== null,
     meta: meta !== null,
+    metaCargada: metaCargada !== null,
     equipo: miembro !== null,
   };
 });

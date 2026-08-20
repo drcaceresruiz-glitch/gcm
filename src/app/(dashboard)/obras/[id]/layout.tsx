@@ -131,8 +131,34 @@ export default async function ObraLayout({
           href: `${raiz}/revisiones`,
           hecho: hitos.lineaBase,
         },
-        /// Va DESPUES de Revisiones y no antes: la meta se fija contra una
-        /// linea base aprobada, asi que el orden del menu es el del trabajo.
+        /**
+         * La propuesta cuelga de la revision -de ahi saca sus cifras-, por
+         * eso va justo detras.
+         *
+         * Solo aparece si hay ALGUNA revision, aprobada o no. Sin ninguna, la
+         * pantalla no tiene nada que enseñar y contestaria 404: un enlace del
+         * menu que lleva a "Aqui no hay nada" es peor que no tenerlo, y hoy
+         * mismo ya paso una vez.
+         *
+         * No lleva `hecho`: no es un hito del alta. Emitir la propuesta es
+         * algo que se hace, no un paso que quede pendiente.
+         */
+        puede(sesion, "linea_base:leer") &&
+          hitos.revision && {
+            clave: "propuesta",
+            titulo: "Propuesta",
+            pregunta: "cuánto le cobro al cliente",
+            href: `${raiz}/propuesta`,
+          },
+        /**
+         * OJO al orden: desde el 20/08 la meta es el PRIMER tramo del
+         * presupuesto -el real entra aqui y de el se genera el contractual-,
+         * asi que este sitio ya no lo justifica lo que lo justificaba antes
+         * ("la meta se fija contra una linea base aprobada", que dejo de ser
+         * cierto al hacer `baselineVersion` opcional). Se deja donde estaba
+         * para no mover la navegacion de quien ya la tiene aprendida; si
+         * algun dia se reordena, va delante de Presupuesto.
+         */
         puede(sesion, "meta:leer") && {
           clave: "meta",
           titulo: "Meta",
@@ -279,7 +305,7 @@ export default async function ObraLayout({
       : siguientePaso(
           {
             presupuesto: hitos.presupuesto,
-            meta: hitos.meta,
+            meta: hitos.metaCargada,
             cronograma: hitos.cronograma,
             equipo: hitos.equipo,
             lineaBase: hitos.lineaBase,
