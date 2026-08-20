@@ -10,6 +10,7 @@ import {
   FILA_CABECERA,
   huecosQueRellenar,
   leerFila,
+  normalizarTitulo,
   type FilaExcel,
 } from "@/lib/proveedores-excel";
 import {
@@ -50,10 +51,10 @@ export async function generarPlantillaProveedores(): Promise<ArrayBuffer> {
   // La regla, ARRIBA DEL TODO y en el propio archivo. Quien rellena esto no
   // tiene por que acordarse de lo que decia la pantalla al descargarlo.
   hoja.getCell("A2").value =
-    "Solo hacen falta RUC y razon social. Lo demas puede ir vacio y se completa despues.";
+    "Solo hacen falta RUC y razón social. Lo demás puede ir vacío y se completa después.";
   hoja.getCell("A2").font = { italic: true, color: { argb: "FF667788" } };
   hoja.getCell("A3").value =
-    "Si vuelves a subir este archivo NO se duplica nada: se busca por RUC y solo se rellenan los campos vacios. Lo que ya tiene valor en GCM no se toca.";
+    "Si vuelves a subir este archivo NO se duplica nada: se busca por RUC y solo se rellenan los campos vacíos. Lo que ya tiene valor en GCM no se toca.";
   hoja.getCell("A3").font = { italic: true, color: { argb: "FF667788" } };
 
   const cabecera = hoja.getRow(FILA_CABECERA);
@@ -141,12 +142,12 @@ export async function importarProveedores(
   const cabecera = hoja.getRow(FILA_CABECERA);
 
   cabecera.eachCell((celda, n) => {
-    const titulo = String(celda.value ?? "")
-      .replace("*", "")
-      .trim()
-      .toUpperCase();
+    const titulo = normalizarTitulo(String(celda.value ?? ""));
 
-    const campo = CAMPOS_EXCEL.find((c) => c.titulo.toUpperCase() === titulo);
+    const campo = CAMPOS_EXCEL.find(
+      (c) => normalizarTitulo(c.titulo) === titulo,
+    );
+
     if (campo) columnas.set(n, campo.clave);
   });
 

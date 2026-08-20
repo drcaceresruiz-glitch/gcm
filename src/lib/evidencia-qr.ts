@@ -89,8 +89,19 @@ export function enPaginas<T>(codigos: readonly T[], porPagina: number): T[][] {
 
 /// Cuantos codigos entran en una A4 segun el modo. El de la obra va solo y
 /// grande: se pega en la caseta y tiene que leerse de lejos y con polvo.
+/**
+ * Bajaron de 12 y 20 a 9 y 16 porque la cuenta vieja NO CABIA en A4.
+ *
+ * Con margenes de 14 mm quedan unos 253 mm utiles despues de la cabecera, y a
+ * unos 70 mm por fila de tres columnas, 12 codigos son cuatro filas = 280 mm.
+ * La ultima fila desbordaba a la hoja siguiente, que es justo el QR partido
+ * que este reparto por paginas existe para evitar. Ahora son 3x3 y 4x4.
+ *
+ * Es una cuenta ESTIMADA: conviene confirmarla imprimiendo una vez de verdad.
+ * Por si acaso, cada tarjeta lleva ademas `break-inside-avoid`.
+ */
 export const POR_PAGINA: Record<ModoCodigo, number> = {
   obra: 1,
-  tarea: 12,
-  restriccion: 20,
+  tarea: 9,
+  restriccion: 16,
 };

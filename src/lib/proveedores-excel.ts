@@ -34,24 +34,24 @@ export const CAMPOS_EXCEL: readonly CampoExcel[] = [
   { clave: "ruc", titulo: "RUC", ancho: 14, ejemplo: "20552103816", obligatorio: true },
   {
     clave: "razonSocial",
-    titulo: "Razon social o nombre",
+    titulo: "Razón social o nombre",
     ancho: 42,
     ejemplo: "CONSTRUCTORA EJEMPLO S.A.C.",
     obligatorio: true,
   },
-  { clave: "contactoNombre", titulo: "Contacto", ancho: 24, ejemplo: "Juan Perez" },
-  { clave: "contactoTelefono", titulo: "Telefono", ancho: 14, ejemplo: "987654321" },
+  { clave: "contactoNombre", titulo: "Contacto", ancho: 24, ejemplo: "Juan Pérez" },
+  { clave: "contactoTelefono", titulo: "Teléfono", ancho: 14, ejemplo: "987654321" },
   { clave: "email", titulo: "Correo", ancho: 28, ejemplo: "ventas@ejemplo.com" },
   {
     clave: "rol",
-    titulo: "Que hace",
+    titulo: "Qué hace",
     ancho: 16,
     ejemplo: "CONTRATISTA",
     opciones: ["PROVEEDOR", "CONTRATISTA", "AMBOS"],
   },
   {
     clave: "tipoImpuesto",
-    titulo: "Que emite",
+    titulo: "Qué emite",
     ancho: 14,
     ejemplo: "IGV",
     opciones: ["IGV", "RENTA", "NINGUNO"],
@@ -71,11 +71,11 @@ export const CAMPOS_EXCEL: readonly CampoExcel[] = [
     ejemplo: "PEN",
     opciones: ["PEN", "USD"],
   },
-  { clave: "cuentaBancaria", titulo: "Numero de cuenta", ancho: 24, ejemplo: "194 2629150 0 70" },
+  { clave: "cuentaBancaria", titulo: "Número de cuenta", ancho: 24, ejemplo: "194 2629150 0 70" },
   { clave: "cci", titulo: "CCI", ancho: 26, ejemplo: "00219400262915007012" },
   {
     clave: "cuentaDetraccion",
-    titulo: "Cuenta de detraccion",
+    titulo: "Cuenta de detracción",
     ancho: 24,
     ejemplo: "00-123-456789",
   },
@@ -176,4 +176,26 @@ export function huecosQueRellenar(
   }
 
   return cambios;
+}
+
+/**
+ * El titulo de una columna, para emparejarlo con su campo.
+ *
+ * Sin tildes y sin los asteriscos de obligatorio. Es lo que permite corregir la
+ * ortografia de la plantilla SIN romper los archivos que ya estan repartidos:
+ * "TELEFONO" y "TELÉFONO" tienen que caer en la misma columna. Comparando el
+ * texto tal cual, esos archivos dejarian de importar esa columna EN SILENCIO
+ * -no da error, el dato simplemente no entra-.
+ *
+ * El asterisco se quita con expresion regular y no con replace de cadena:
+ * `"a * b *".replace("*", "")` solo se lleva el primero.
+ */
+export function normalizarTitulo(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/\*/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
 }

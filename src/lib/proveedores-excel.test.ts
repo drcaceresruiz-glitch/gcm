@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CAMPOS_EXCEL,
+  normalizarTitulo,
   huecosQueRellenar,
   leerFila,
 } from "./proveedores-excel";
@@ -159,5 +160,44 @@ describe("la plantilla y la lectura no se pueden separar", () => {
       if (campo.clave === "ruc") continue;
       expect(cambios).toHaveProperty(campo.clave);
     }
+  });
+});
+
+/**
+ * Que los archivos YA REPARTIDOS sigan importando.
+ *
+ * Se corrigio la ortografia de las cabeceras de la plantilla -"Telefono" paso
+ * a "Teléfono"-, y el emparejado compara por texto. Sin normalizar, todos los
+ * Excel que la gente ya tiene descargados dejarian de reconocer esas columnas,
+ * y lo peor: EN SILENCIO, porque una columna que no casa simplemente no entra.
+ */
+describe("el titulo de una columna", () => {
+  it("empareja con tilde y sin tilde", () => {
+    expect(normalizarTitulo("Telefono")).toBe(normalizarTitulo("Teléfono"));
+    expect(normalizarTitulo("Razon social o nombre")).toBe(
+      normalizarTitulo("Razón social o nombre"),
+    );
+    expect(normalizarTitulo("Cuenta de detraccion")).toBe(
+      normalizarTitulo("Cuenta de detracción"),
+    );
+  });
+
+  it("quita TODOS los asteriscos, no solo el primero", () => {
+    // `replace("*", "")` de cadena solo se lleva uno, y la cabecera de un
+    // campo obligatorio lo lleva al final.
+    expect(normalizarTitulo("RUC *")).toBe("RUC");
+    expect(normalizarTitulo("* Razón * social *")).toBe("RAZON SOCIAL");
+  });
+
+  it("no confunde dos columnas distintas", () => {
+    expect(normalizarTitulo("Qué hace")).not.toBe(normalizarTitulo("Qué emite"));
+  });
+
+  it("todas las cabeceras de la plantilla siguen siendo distintas", () => {
+    // Si al normalizar dos cayeran en el mismo texto, una pisaria a la otra
+    // al importar y nadie se enteraria.
+    const titulos = CAMPOS_EXCEL.map((c) => normalizarTitulo(c.titulo));
+
+    expect(new Set(titulos).size).toBe(titulos.length);
   });
 });
