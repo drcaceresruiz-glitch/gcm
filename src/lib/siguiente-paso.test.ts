@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   siguientePaso,
   type EstadoAlta,
@@ -176,3 +178,42 @@ describe("el paso siguiente de la obra", () => {
 });
 
 type PasoPosible = [EstadoAlta, boolean, AvisosVivos];
+
+/**
+ * Que cada camino sugerido lleve a una pantalla que existe.
+ *
+ * `camino` es TEXTO. Si se borra una pantalla, ni el typecheck ni el resto
+ * de las pruebas se enteran de que el boton quedo apuntando al vacio: el
+ * anclaje sigue compilando y sigue pintandose igual de bien.
+ *
+ * Paso de verdad. Al retirar la importacion vieja del contractual se borro
+ * /obras/[id]/importar, y el aviso "Cargar el presupuesto" siguio llevando
+ * alli: en produccion el boton principal de una obra sin presupuesto abria
+ * un "Aqui no hay nada".
+ *
+ * Se lee el fuente en vez de llamar a `siguientePaso` a proposito: las
+ * ramas dependen de permisos y de avisos, y enumerarlas a mano invita a
+ * olvidarse justo la que se acaba de anadir. Asi entra el fichero entero.
+ */
+describe("los caminos del anclaje existen como pantalla", () => {
+  const RAIZ = join(process.cwd(), "src/app/(dashboard)/obras/[id]");
+
+  const caminos = [
+    ...readFileSync(join(process.cwd(), "src/lib/siguiente-paso.ts"), "utf8")
+      .matchAll(/camino: "([^"]+)"/g),
+  ]
+    // El grupo existe siempre que el patron case: el filtro esta para que
+    // lo sepa TypeScript, no porque pueda faltar.
+    .flatMap((m) => (m[1] === undefined ? [] : [m[1]]));
+
+  // Sin esto, el dia que cambie la forma de escribir `camino` el `it.each`
+  // se quedaria sin casos y la bateria pasaria sin comprobar nada.
+  it("encuentra caminos que revisar", () => {
+    expect(caminos.length).toBeGreaterThan(4);
+  });
+
+  it.each(caminos)("%s tiene su pantalla", (camino) => {
+    const pagina = join(RAIZ, camino, "page.tsx");
+    expect(existsSync(pagina), `no existe ${pagina}`).toBe(true);
+  });
+});

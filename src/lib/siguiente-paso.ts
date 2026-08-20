@@ -134,7 +134,7 @@ export function siguientePaso(
       consecuencia:
         "Sin él no hay avance valorizado, ni comprometido, ni alertas, y se carga con la plantilla oficial que ofrece esa misma pantalla.",
       accion: "Cargar el presupuesto",
-      camino: "/importar",
+      camino: "/meta",
     };
   }
 
