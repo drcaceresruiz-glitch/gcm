@@ -9,6 +9,8 @@ import { PanelAyuda } from "@/components/ui/PanelAyuda";
 import { IlustracionDocumento } from "@/components/ui/IlustracionDocumento";
 import { EmisoresSms } from "@/components/empresa/EmisoresSms";
 import { RemitenteCorreo } from "@/components/empresa/RemitenteCorreo";
+import { PlantillasMensaje } from "@/components/empresa/PlantillasMensaje";
+import { listarPlantillas } from "@/services/plantillas-mensaje.service";
 import { leerRemitente } from "@/services/remitente-correo.service";
 import { hayBuzonCompartido } from "@/services/mailer.service";
 import { hayLlaveDeCifrado } from "@/lib/secreto";
@@ -32,9 +34,10 @@ export default async function ConfiguracionPage() {
 
   if (!puede(sesion, "configuracion:editar")) redirect("/panel");
 
-  const [emisores, remitente] = await Promise.all([
+  const [emisores, remitente, plantillas] = await Promise.all([
     listarEmisores(sesion),
     leerRemitente(sesion),
+    listarPlantillas(sesion),
   ]);
 
   return (
@@ -59,6 +62,10 @@ export default async function ConfiguracionPage() {
         hayLlave={hayLlaveDeCifrado()}
         hayCompartido={hayBuzonCompartido()}
       />
+
+      {/* Debajo del buzon y encima del emisor de SMS: es texto que se manda
+          por cualquiera de los tres canales, asi que no cuelga de ninguno. */}
+      <PlantillasMensaje plantillas={plantillas} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
         {/* La direccion se calcula, no se escribe: si algun dia GCM vive en

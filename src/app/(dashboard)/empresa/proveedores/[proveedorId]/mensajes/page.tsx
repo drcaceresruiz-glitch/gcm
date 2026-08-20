@@ -7,6 +7,7 @@ import {
   historialDeContratista,
   MAX_HISTORIAL,
 } from "@/services/mensajes-contratista.service";
+import { listarPlantillas } from "@/services/plantillas-mensaje.service";
 import { EscribirAlContratista } from "@/components/proveedores/EscribirAlContratista";
 import { HistorialMensajes } from "@/components/proveedores/HistorialMensajes";
 import { Volver } from "@/components/ui/Volver";
@@ -41,7 +42,12 @@ export default async function MensajesContratistaPage({
   const contratista = await datosParaEscribir(sesion, proveedorId, obra);
   if (!contratista) notFound();
 
-  const mensajes = await historialDeContratista(sesion, proveedorId);
+  const [mensajes, plantillas] = await Promise.all([
+    historialDeContratista(sesion, proveedorId),
+    // Los mensajes que la empresa repite. Quien escribe los USA aunque no
+    // pueda redactarlos: eso lo decide `listarPlantillas`.
+    listarPlantillas(sesion),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4">
@@ -64,7 +70,7 @@ export default async function MensajesContratistaPage({
         </p>
       </div>
 
-      <EscribirAlContratista contratista={contratista} />
+      <EscribirAlContratista contratista={contratista} plantillas={plantillas} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-bold">

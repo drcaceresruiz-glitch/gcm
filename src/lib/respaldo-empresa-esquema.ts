@@ -107,6 +107,14 @@ export const TABLAS_EMPRESA: readonly TablaRespaldo[] = [
     modelo: "formaPagoPlantilla",
     refs: [],
   },
+  {
+    /// Los mensajes reutilizables para contratistas. Viajan por lo mismo que
+    /// las formas de pago: son texto que la empresa escribio y que no depende
+    /// de nada de esta instalacion.
+    tabla: "plantillas_mensaje",
+    modelo: "plantillaMensaje",
+    refs: [],
+  },
 ];
 
 /**

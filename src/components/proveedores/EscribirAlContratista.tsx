@@ -12,6 +12,7 @@ import {
   textoWhatsAppAlContratista,
 } from "@/lib/mensaje-contratista";
 import { MAX_SMS } from "@/lib/texto-sms";
+import type { PlantillaEnPantalla } from "@/services/plantillas-mensaje.service";
 import { enlaceWhatsApp } from "@/lib/whatsapp";
 import {
   accionEscribirAlContratista,
@@ -47,9 +48,18 @@ export interface DatosContratista {
  * vez de ensenar un boton apagado: un boton muerto sin explicacion se lee como
  * una funcion rota. Es la misma regla del envio del informe por SMS.
  */
-export function EscribirAlContratista({ contratista }: { contratista: DatosContratista }) {
+export function EscribirAlContratista({
+  contratista,
+  plantillas,
+}: {
+  contratista: DatosContratista;
+  /// Los mensajes que la empresa repite. Vacio si no ha guardado ninguno, y
+  /// entonces el desplegable no se pinta.
+  plantillas: PlantillaEnPantalla[];
+}) {
   const [canal, setCanal] = useState<Canal>(contratista.email ? "CORREO" : "WHATSAPP");
   const [cuerpo, setCuerpo] = useState("");
+  const [asunto, setAsunto] = useState("");
   const [estado, enviar, enviando] = useActionState<RespuestaMensaje, FormData>(
     accionEscribirAlContratista,
     { ok: false },
@@ -135,6 +145,38 @@ export function EscribirAlContratista({ contratista }: { contratista: DatosContr
         </Nota>
       )}
 
+      {/* Las plantillas de la empresa. Solo se pinta si hay alguna: un
+          desplegable vacio es una promesa incumplida.
+
+          COPIA Y NO BLOQUEA: al elegir una, su texto entra en los campos y
+          sigue siendo editable. Lo que se manda es lo que la persona ve antes
+          de pulsar, no lo que diga la plantilla. */}
+      {plantillas.length > 0 && (
+        <label className="block text-xs">
+          <span className="block opacity-70">
+            Usar una plantilla <span className="opacity-60">(luego la puedes cambiar)</span>
+          </span>
+          <select
+            value=""
+            onChange={(e) => {
+              const p = plantillas.find((x) => x.id === e.target.value);
+              if (!p) return;
+              setCuerpo(p.cuerpo);
+              if (p.asunto) setAsunto(p.asunto);
+            }}
+            className="mt-1 w-full max-w-sm rounded-lg border px-2 py-1.5 text-sm"
+            style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+          >
+            <option value="">Escribir desde cero</option>
+            {plantillas.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       {canal === "CORREO" && (
         <label className="block text-xs">
           <span className="block opacity-70">Asunto</span>
@@ -143,6 +185,8 @@ export function EscribirAlContratista({ contratista }: { contratista: DatosContr
             type="text"
             maxLength={MAX_ASUNTO}
             required
+            value={asunto}
+            onChange={(e) => setAsunto(e.target.value)}
             placeholder="Falta el plano de la zona 1"
             className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
             style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}

@@ -171,6 +171,7 @@ model Company {
   proveedores Proveedor[]
   ordenes     OrdenCompra[]
   formasPago  FormaPagoPlantilla[]
+  plantillasMensaje PlantillaMensaje[]
   solicitudesPerfil SolicitudCambioPerfil[]
   emisoresSms       EmisorSms[]
   mensajesSms       MensajeSms[]
@@ -1293,6 +1294,44 @@ model FormaPagoPlantilla {
   @@unique([companyId, nombre])
   @@index([companyId])
   @@map("formas_pago_plantillas")
+}
+
+/// Un mensaje reutilizable para escribir a un contratista.
+///
+/// Hermana de `FormaPagoPlantilla`, y por el mismo motivo: los avisos que se
+/// le mandan a un contratista se repiten semana tras semana —«recordatorio de
+/// valorizacion», «manana no hay agua», «trae el SCTR»— y volver a teclearlos
+/// hace que cada uno acabe diciendo algo distinto.
+///
+/// ES UNA PLANTILLA DE TEXTO, no un envio programado. Se copia al formulario
+/// y **sigue siendo editable**: lo que se manda es lo que la persona ve antes
+/// de pulsar, no lo que diga esta fila. Programar envios seria otra cosa, y
+/// mucho mas delicada.
+///
+/// GCM no trae ninguna escrita: las palabras con las que una constructora le
+/// habla a sus contratistas son suyas.
+model PlantillaMensaje {
+  id        String @id @default(cuid())
+  companyId String
+
+  /// Como se elige en el desplegable: "Recordatorio de valorizacion".
+  nombre String @db.VarChar(100)
+
+  /// El asunto, solo para correo. Vacio en una pensada para SMS o WhatsApp,
+  /// que no tienen asunto.
+  asunto String? @db.VarChar(200)
+  /// El cuerpo, que vale para los tres canales.
+  cuerpo String  @db.Text
+
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, nombre])
+  @@index([companyId])
+  @@map("plantillas_mensaje")
 }
 
 model OrdenCompra {
