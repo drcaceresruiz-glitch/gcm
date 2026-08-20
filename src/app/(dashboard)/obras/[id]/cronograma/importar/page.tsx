@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { FileDown } from "lucide-react";
+import { FileDown, ListTree } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
-import { obtenerObra } from "@/services/obras.service";
+import { obtenerObra, listarPartidas } from "@/services/obras.service";
 import { historialCronogramas } from "@/services/cronograma.service";
 import { puedeConvertirMpp } from "@/services/mpp.service";
 import { puede } from "@/lib/rbac";
@@ -29,6 +30,19 @@ export default async function ImportarCronogramaPage({
 
   const historial = await historialCronogramas(sesion, id);
 
+  /**
+   * Si la obra YA tiene presupuesto, hay un camino mas corto que esta pantalla
+   * y hasta hoy no se decia aqui.
+   *
+   * El flujo empuja a «Cargar cronograma» y aqui solo habia una plantilla con
+   * ejemplos inventados, asi que quien acababa de cargar su presupuesto se
+   * ponia a teclear otra vez la misma estructura. El generador vive en la
+   * pantalla anterior y ademas hace algo que ningun viaje por Excel puede
+   * hacer: deja cada tarea ENLAZADA con su partida.
+   */
+  const { totalPartidas } = await listarPartidas(sesion, id);
+  const puedeGenerar = totalPartidas > 0 && puede(sesion, "cronograma:editar");
+
   return (
     <div className="space-y-6">
       <div>
@@ -44,6 +58,40 @@ export default async function ImportarCronogramaPage({
         </p>
       </div>
 
+      {/* EL CAMINO CORTO, delante de todo lo demas. Quien tiene presupuesto
+          cargado no deberia teclear su estructura por segunda vez. */}
+      {puedeGenerar && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
+          style={{
+            borderColor: "var(--color-marca)",
+            backgroundColor:
+              "color-mix(in oklab, var(--color-marca) 8%, transparent)",
+          }}
+        >
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold">
+              Esta obra ya tiene presupuesto: el cronograma puede salir de él
+            </h3>
+            <p className="mt-0.5 text-sm opacity-80">
+              El presupuesto ya es la EDT. Generarlo desde ahí crea las{" "}
+              {totalPartidas} partidas como capítulos, paquetes y tareas, y{" "}
+              <strong>deja cada tarea enlazada con su partida</strong> —el
+              trabajo que si no hay que casar a mano en «Enlazar con partidas»—.
+              Solo tendrás que poner las fechas.
+            </p>
+          </div>
+          <Link
+            href={`/obras/${id}/cronograma`}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold text-white"
+            style={{ backgroundColor: "var(--color-marca)" }}
+          >
+            <ListTree className="size-4" aria-hidden="true" />
+            Generar desde el presupuesto
+          </Link>
+        </div>
+      )}
+
       {/* La plantilla, antes del importador: quien llega sin MS Project
           necesita saber que existe ANTES de pelearse con su Excel. Es un <a>
           normal y no un Link: es una descarga, no una navegacion, y el
@@ -55,14 +103,33 @@ export default async function ImportarCronogramaPage({
         <div className="min-w-0">
           <h3 className="text-sm font-semibold">¿Sin MS Project? Descarga la plantilla</h3>
           <p className="mt-0.5 text-sm opacity-70">
-            Un Excel con la obra, sus capítulos y sus partidas de ejemplo, y las
-            instrucciones en la segunda hoja. Llénala, guarda y súbela aquí
-            mismo. No trae ruta crítica: para eso hace falta el archivo de MS
-            Project.
+            {totalPartidas > 0 ? (
+              <>
+                Viene con <strong>las {totalPartidas} partidas de tu
+                presupuesto ya escritas</strong> como capítulos y tareas. Las
+                fechas salen puestas al plazo de la obra, todas iguales: eso es
+                un marcador, no un plan, y es justo lo que tienes que ajustar.
+                Llénala, guarda y súbela aquí mismo. No trae ruta crítica: para
+                eso hace falta el archivo de MS Project.
+              </>
+            ) : (
+              <>
+                Un Excel con la obra, sus capítulos y sus partidas de ejemplo, y
+                las instrucciones en la segunda hoja. Llénala, guarda y súbela
+                aquí mismo. No trae ruta crítica: para eso hace falta el archivo
+                de MS Project.
+              </>
+            )}
           </p>
         </div>
         <a
-          href="/plantilla-cronograma"
+          // Con presupuesto, la de ESTA obra; sin el, la generica con
+          // ejemplos. Son la misma funcion con o sin argumento.
+          href={
+            totalPartidas > 0
+              ? `/obras/${id}/cronograma/plantilla`
+              : "/plantilla-cronograma"
+          }
           className="inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold text-white"
           style={{ backgroundColor: "var(--color-marca-600)" }}
         >

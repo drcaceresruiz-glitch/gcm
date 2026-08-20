@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 
 import { HOJA_CRONOGRAMA } from "@/lib/excel-cronograma";
+import type { FilaEdt } from "@/lib/edt-desde-presupuesto";
 
 /**
  * La plantilla del CRONOGRAMA, generada desde codigo.
@@ -86,6 +87,118 @@ export const FILAS_EJEMPLO: readonly FilaCronogramaEjemplo[] = [
     inicio: "2026-09-04", fin: "2026-09-04", dias: 0, planeado: 0, avance: 0, depende: "7" },
 ] as const;
 
+/**
+ * Una fila tal como se ESCRIBE en la hoja.
+ *
+ * Los ejemplos la llenan entera; la plantilla que sale del presupuesto deja en
+ * blanco todo lo que solo sabe el planificador. De ahi los nulos: una celda
+ * vacia y un cero no son lo mismo —un 0 en «Días» declara un hito— y escribir
+ * ceros por comodidad convertiria el presupuesto entero en hitos.
+ */
+export interface FilaPlantillaCronograma {
+  n: number;
+  id: number;
+  nivel: number;
+  codigo: string;
+  actividad: string;
+  inicio: string;
+  fin: string;
+  dias: number | null;
+  planeado: number | null;
+  avance: number | null;
+  depende: string;
+}
+
+/** Lo que hace falta para prellenar la plantilla con una obra de verdad. */
+export interface PlantillaDesdePresupuesto {
+  nombreObra: string;
+  /// AAAA-MM-DD. Se escribe ya puesta porque sin ella no se puede importar.
+  fechaCorte: string;
+  /// Plazo contractual de la obra, AAAA-MM-DD. Ver `filasDesdeEdt`.
+  inicioObra: string;
+  finObra: string;
+  /**
+   * Dias LABORABLES de ese plazo, segun el calendario de la obra.
+   *
+   * Viene calculado de fuera porque depende del calendario, que vive en la
+   * base. Y hace falta: el importador exige la duracion escrita y **no la
+   * deduce restando las fechas** —una partida de un dia puede abarcar tres
+   * naturales—, asi que sin esto el archivo no se puede importar.
+   */
+  diasPlazo: number;
+  /// La EDT ya aplanada. Sale de `lib/edt-desde-presupuesto`, no se recalcula.
+  filas: readonly FilaEdt[];
+}
+
+/**
+ * Convierte la EDT del presupuesto en filas de la plantilla.
+ *
+ * DOS COSAS QUE NO SON EVIDENTES:
+ *
+ * 1. **Se antepone la fila de la obra y todo baja un nivel.** La plantilla
+ *    declara en su instruccion 2 que el nivel 1 es la obra y va sola en la
+ *    primera fila; `FilaEdt.nivel` en cambio empieza en 1 para los capitulos.
+ *    Sin el desplazamiento, la plantilla generada contradiria a su propia hoja
+ *    de instrucciones y traeria varias filas de nivel 1.
+ *
+ * 2. **El ID se numera 1..N, correlativo.** Es el `uid` con el que se anclara
+ *    el avance a partir de la primera importacion. No se reservan los uid
+ *    negativos que usa `generarEdtDesdePresupuesto`: ese camino escribe en la
+ *    base y este produce un archivo que puede no volver nunca, o volver
+ *    editado a mano. Numerar desde 1 es lo que ya hace el ejemplo y lo que
+ *    espera cualquiera que abra el Excel.
+ *
+ * 3. **TODAS las filas salen con el plazo entero de la obra**, y no en blanco.
+ *    La primera version las dejaba vacias —«las fechas las pone el
+ *    planificador»— y la prueba de ida y vuelta la tumbo: el importador exige
+ *    inicio y fin en cada fila, resumenes incluidos, asi que el archivo no se
+ *    podia importar entero. Una plantilla que GCM no puede leer es peor que
+ *    ninguna.
+ *
+ *    Se rellena con el plazo de la obra y NO con una secuencia inventada
+ *    —tarea tras tarea, un dia cada una— a proposito: eso seria un plan que
+ *    nadie decidio, con pinta de plan. Que todo abarque la obra entera se ve
+ *    a la legua que es provisional, y ademas evita el otro accidente: si
+ *    inicio y fin coincidieran, la duracion seria cero y **cada partida
+ *    entraria como HITO**.
+ */
+export function filasDesdeEdt(
+  datos: PlantillaDesdePresupuesto,
+): FilaPlantillaCronograma[] {
+  /**
+   * El plazo de la obra, igual en todas. Es el marcador de posicion: lo que
+   * hay que ajustar, no un plan. Ver el punto 3 de arriba.
+   *
+   */
+  const provisional = {
+    inicio: datos.inicioObra,
+    fin: datos.finObra,
+    dias: datos.diasPlazo,
+    // El `% Planeado` y el `% Avance` SI se dejan vacios: el importador los
+    // deduce y avisa de que lo hizo, y eso es mejor que traerlos escritos como
+    // si alguien los hubiera pensado. Un plan sin ejecutar no tiene avance.
+    planeado: null,
+    avance: null,
+    depende: "",
+  };
+
+  const obra: FilaPlantillaCronograma = {
+    n: 1, id: 1, nivel: 1, codigo: "", actividad: datos.nombreObra,
+    ...provisional,
+  };
+
+  const resto = datos.filas.map((f, i) => ({
+    n: i + 2,
+    id: i + 2,
+    nivel: f.nivel + 1,
+    codigo: f.codigo,
+    actividad: f.nombre,
+    ...provisional,
+  }));
+
+  return [obra, ...resto];
+}
+
 const INSTRUCCIONES: readonly (readonly [string, string])[] = [
   ["Cómo llenar esta plantilla", ""],
   ["", ""],
@@ -153,7 +266,27 @@ function pintarCabecera(fila: ExcelJS.Row, titulos: readonly string[]) {
   });
 }
 
-export async function generarPlantillaCronograma(): Promise<ArrayBuffer> {
+/**
+ * La plantilla del cronograma.
+ *
+ * Sin argumento sale la GENERICA, con los ejemplos que ensenan las cuatro
+ * convenciones. Con `desdePresupuesto` sale la de una obra concreta: su EDT
+ * real, sin fechas, para que nadie teclee dos veces la misma estructura.
+ *
+ * Es la MISMA funcion a proposito. Dos generadores acabarian divergiendo, y el
+ * test de ida y vuelta que protege a la plantilla contra su propio importador
+ * dejaria de cubrir la mitad que mas se usa.
+ */
+export async function generarPlantillaCronograma(
+  desdePresupuesto?: PlantillaDesdePresupuesto,
+): Promise<ArrayBuffer> {
+  const filas: readonly FilaPlantillaCronograma[] = desdePresupuesto
+    ? filasDesdeEdt(desdePresupuesto)
+    : FILAS_EJEMPLO;
+
+  const nombreObra = desdePresupuesto?.nombreObra ?? OBRA_EJEMPLO;
+  const fechaCorte = desdePresupuesto?.fechaCorte ?? FECHA_CORTE_EJEMPLO;
+
   const libro = new ExcelJS.Workbook();
   libro.creator = "GCM";
 
@@ -175,17 +308,17 @@ export async function generarPlantillaCronograma(): Promise<ArrayBuffer> {
   // documento entero y repetirlos en cada fila invitaria a contradecirlos.
   hoja.getCell("A3").value = "Obra:";
   hoja.getCell("A3").font = { bold: true };
-  hoja.getCell("B3").value = OBRA_EJEMPLO;
+  hoja.getCell("B3").value = nombreObra;
   hoja.getCell("A4").value = "Fecha de corte:";
   hoja.getCell("A4").font = { bold: true };
-  hoja.getCell("B4").value = FECHA_CORTE_EJEMPLO;
+  hoja.getCell("B4").value = fechaCorte;
   hoja.getCell("A5").value = "Minutos por día:";
   hoja.getCell("A5").font = { bold: true };
   hoja.getCell("B5").value = MINUTOS_POR_DIA_EJEMPLO;
 
   pintarCabecera(hoja.getRow(FILA_CABECERA), CABECERAS);
 
-  FILAS_EJEMPLO.forEach((f, i) => {
+  filas.forEach((f, i) => {
     const fila = hoja.getRow(FILA_CABECERA + 1 + i);
     fila.getCell(1).value = f.n;
     fila.getCell(2).value = f.id;
@@ -194,6 +327,8 @@ export async function generarPlantillaCronograma(): Promise<ArrayBuffer> {
     fila.getCell(5).value = f.actividad;
     fila.getCell(6).value = f.inicio;
     fila.getCell(7).value = f.fin;
+    // `null` deja la celda VACIA; un 0 aqui declararia un hito. Ver
+    // `FilaPlantillaCronograma`.
     fila.getCell(8).value = f.dias;
     fila.getCell(9).value = f.planeado;
     fila.getCell(10).value = f.avance;
