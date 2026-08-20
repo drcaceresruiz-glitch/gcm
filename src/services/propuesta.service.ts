@@ -10,6 +10,7 @@ import {
 } from "@/lib/presupuesto";
 import { logoDeEmpresa, type LogoEmpresa } from "@/services/logo.service";
 import type { SesionActiva } from "@/services/sesion.service";
+import type { LineaPropuesta } from "@/lib/propuesta-detalle";
 
 /**
  * La propuesta economica: el presupuesto contractual tal como se entrega al
@@ -23,17 +24,9 @@ import type { SesionActiva } from "@/services/sesion.service";
  * Solo lee: todo lo que hace falta se decidio al crear la revision.
  */
 
-export interface LineaPropuesta {
-  codigo: string;
-  descripcion: string;
-  unidad: string | null;
-  metrado: string | null;
-  precioUnitario: string | null;
-  parcial: string | null;
-  nivel: number;
-  /// Los capitulos son titulos: no llevan cifra propia y no se suman.
-  esCapitulo: boolean;
-}
+// El tipo vive en la libreria pura porque es ella la que decide que se ve
+// a cada profundidad; aqui solo se rellena desde la base.
+export type { LineaPropuesta };
 
 export interface EmisorPropuesta {
   razonSocial: string;
@@ -72,6 +65,10 @@ export interface Propuesta {
     };
   };
   lineas: LineaPropuesta[];
+  /// El costo directo con las partidas negativas ya restadas. Se devuelve
+  /// para que la pantalla pueda RECALCULAR la cascada cuando se cambia la
+  /// forma de facturar, sin volver a preguntar a la base.
+  costoDirectoNeto: string;
   cascada: CascadaComercial;
 }
 
@@ -248,5 +245,6 @@ export async function obtenerPropuesta(
       esCapitulo: l.tipo !== "PARTIDA",
     })),
     cascada,
+    costoDirectoNeto,
   };
 }

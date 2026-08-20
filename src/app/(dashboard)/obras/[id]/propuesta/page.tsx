@@ -2,18 +2,22 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerPropuesta } from "@/services/propuesta.service";
-import { DocumentoPropuesta } from "@/components/propuesta/DocumentoPropuesta";
-import { BarraImpresion } from "@/components/ui/BarraImpresion";
+import { PanelPropuesta } from "@/components/propuesta/PanelPropuesta";
+import { Volver } from "@/components/ui/Volver";
 
 export const metadata: Metadata = { title: "Propuesta" };
 
 /**
- * La propuesta economica de la obra, lista para imprimir o guardar como PDF.
+ * La propuesta economica de la obra, lista para imprimir, guardar como PDF o
+ * descargar en Excel.
  *
  * Sin `?rev=` sale la revision APROBADA, que es la que compromete. Si todavia
  * no hay ninguna aprobada sale la ultima que haya, con su sello de borrador:
  * poder verla en papel antes de aprobarla es justo lo que hace falta para
  * decidir si se aprueba.
+ *
+ * La pagina solo LEE y entrega los datos: que se enseña y como se factura lo
+ * decide el panel, ya en el navegador, para que se vea al momento.
  */
 export default async function PropuestaPage({
   params,
@@ -36,12 +40,11 @@ export default async function PropuestaPage({
   if (!propuesta) notFound();
 
   return (
-    <div className="py-2 print:py-0">
-      <BarraImpresion
-        volverA={`/obras/${id}/revisiones`}
-        volverTexto="Volver a las revisiones"
-      />
-      <DocumentoPropuesta propuesta={propuesta} />
+    <div>
+      <div className="mx-auto mb-4 w-full max-w-[210mm]">
+        <Volver href={`/obras/${id}/revisiones`}>Volver a las revisiones</Volver>
+      </div>
+      <PanelPropuesta propuesta={propuesta} />
     </div>
   );
 }

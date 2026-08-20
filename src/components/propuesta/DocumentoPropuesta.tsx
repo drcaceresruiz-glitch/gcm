@@ -1,5 +1,7 @@
 import { decimal, metrado, porcentaje, precio } from "@/utils/formato";
-import type { EmisorPropuesta, LineaPropuesta, Propuesta } from "@/services/propuesta.service";
+import type { CascadaComercial, TipoImpuestoContractual } from "@/lib/presupuesto";
+import type { LineaDetalle } from "@/lib/propuesta-detalle";
+import type { EmisorPropuesta, Propuesta } from "@/services/propuesta.service";
 
 /**
  * La propuesta economica tal como se le entrega al cliente.
@@ -12,15 +14,37 @@ import type { EmisorPropuesta, LineaPropuesta, Propuesta } from "@/services/prop
  * NO usa las variables del tema. Un papel que sale a un tercero tiene que
  * imprimirse igual siempre; con `var(--fondo)` saldria en gris sobre negro
  * para quien tenga el modo oscuro puesto.
+ *
+ * No decide nada: recibe ya resueltas las lineas (al detalle elegido) y la
+ * cascada (a la forma de facturar elegida). Asi lo que se ve en pantalla, lo
+ * que se imprime y lo que se descarga en Excel salen del mismo calculo.
  */
+
+export interface VistaPropuesta {
+  lineas: LineaDetalle[];
+  cascada: CascadaComercial;
+  impuesto: TipoImpuestoContractual;
+  porcentajeIgv: string;
+  porcentajeRetencion: string;
+  /// Texto libre bajo los datos del cliente. Vacio = no se pinta.
+  presentacion: string;
+  /// Texto libre antes de la firma. Vacio = no se pinta.
+  observaciones: string;
+}
 
 /** Las fracciones de la base (0.18) se leen como porcentaje (18.00%). */
 function pct(fraccion: string): string {
   return porcentaje(Number(fraccion) * 100, 2);
 }
 
-export function DocumentoPropuesta({ propuesta }: { propuesta: Propuesta }) {
-  const { obra, emisor, logo, revision, lineas, cascada } = propuesta;
+export function DocumentoPropuesta({
+  propuesta,
+  vista,
+}: {
+  propuesta: Propuesta;
+  vista: VistaPropuesta;
+}) {
+  const { obra, emisor, logo, revision } = propuesta;
 
   const fecha = revision.fechaRevision.toLocaleDateString("es-PE", {
     day: "2-digit",
@@ -61,14 +85,23 @@ export function DocumentoPropuesta({ propuesta }: { propuesta: Propuesta }) {
         {obra.ubicacion && <Dato etiqueta="UBICACIÓN">{obra.ubicacion}</Dato>}
       </section>
 
-      <TablaPartidas lineas={lineas} />
-      <Resumen cascada={cascada} revision={revision} />
-
-      {revision.clausulas && (
+      {vista.presentacion.trim() !== "" && (
         <section className="mt-5 break-inside-avoid">
-          <Parrafo titulo="CONDICIONES">{revision.clausulas}</Parrafo>
+          <p className="whitespace-pre-line">{vista.presentacion}</p>
         </section>
       )}
+
+      <TablaPartidas lineas={vista.lineas} />
+      <Resumen vista={vista} porcentajes={revision.porcentajes} />
+
+      <section className="mt-5 space-y-3 break-inside-avoid">
+        {vista.observaciones.trim() !== "" && (
+          <Parrafo titulo="OBSERVACIONES">{vista.observaciones}</Parrafo>
+        )}
+        {revision.clausulas && (
+          <Parrafo titulo="CONDICIONES">{revision.clausulas}</Parrafo>
+        )}
+      </section>
 
       <Firma emisor={emisor} />
     </article>
@@ -136,12 +169,14 @@ function Dato({
 /**
  * El detalle de partidas.
  *
- * Los capitulos salen con fondo gris y SIN cifras. Llevan el importe del
- * bloque que viene debajo, y pintarlos igual que las partidas invita a sumar
- * la columna y contar el mismo dinero dos veces: el tropiezo clasico del
- * Excel del presupuesto.
+ * Cada fila lleva cifra solo si no tiene ninguna fila visible por debajo; lo
+ * decide `aplicarDetalle`. Aqui solo se pinta. Un capitulo con sus partidas a
+ * la vista sale sin importe -pintarlo igual invita a sumar la columna y contar
+ * el mismo dinero dos veces, el tropiezo clasico del Excel del presupuesto-, y
+ * en cambio SI lo lleva cuando sus partidas se han resumido: entonces es el
+ * unico sitio donde aparece ese dinero.
  */
-function TablaPartidas({ lineas }: { lineas: LineaPropuesta[] }) {
+function TablaPartidas({ lineas }: { lineas: LineaDetalle[] }) {
   return (
     <table className="mt-5 w-full border-collapse border border-black">
       <thead>
@@ -158,22 +193,16 @@ function TablaPartidas({ lineas }: { lineas: LineaPropuesta[] }) {
         {lineas.map((l) => (
           <tr
             key={l.codigo}
-            className={`break-inside-avoid ${l.esCapitulo ? "bg-neutral-100 font-bold" : ""}`}
+            className={`break-inside-avoid ${l.esCapitulo || l.esSubtotal ? "bg-neutral-100 font-bold" : ""}`}
           >
             <Td className="font-mono">{l.codigo}</Td>
             <Td style={{ paddingLeft: `${0.5 + l.nivel * 0.9}rem` }}>
               {l.descripcion}
             </Td>
-            <Td>{l.esCapitulo ? "" : (l.unidad ?? "")}</Td>
-            <Td className="text-right">
-              {l.esCapitulo ? "" : metrado(l.metrado, "")}
-            </Td>
-            <Td className="text-right">
-              {l.esCapitulo ? "" : precio(l.precioUnitario, "")}
-            </Td>
-            <Td className="text-right">
-              {l.esCapitulo ? "" : decimal(l.parcial, "")}
-            </Td>
+            <Td>{l.unidad ?? ""}</Td>
+            <Td className="text-right">{metrado(l.metrado, "")}</Td>
+            <Td className="text-right">{precio(l.precioUnitario, "")}</Td>
+            <Td className="text-right">{decimal(l.importe, "")}</Td>
           </tr>
         ))}
       </tbody>
@@ -222,25 +251,25 @@ function Td({
  * comercial da el VALOR DE VENTA; mas el IGV, el PRECIO DE VENTA.
  *
  * Las lineas que valen cero no se pintan. Un "DESCUENTO 0.00" hace dudar de
- * si se olvido aplicarlo, y un "IGV 0.00" parece una averia cuando en
- * realidad es un recibo por honorarios, que no lo lleva.
+ * si se olvido aplicarlo, y un "IGV 0.00" parece una averia cuando en realidad
+ * es un recibo por honorarios, que no lo lleva.
  *
  * PRECIO DE VENTA solo aparece si de verdad difiere del valor de venta: sin
  * IGV y sin retencion asumida son la misma cifra, y repetirla dos veces
  * seguidas con dos nombres distintos solo confunde a quien la lee.
  */
 function Resumen({
-  cascada,
-  revision,
+  vista,
+  porcentajes,
 }: {
-  cascada: Propuesta["cascada"];
-  revision: Propuesta["revision"];
+  vista: VistaPropuesta;
+  porcentajes: Propuesta["revision"]["porcentajes"];
 }) {
-  const { porcentajes, tipoImpuesto } = revision;
+  const { cascada, impuesto } = vista;
 
   const hayDescuento = Number(cascada.descuento) !== 0;
-  const hayIgv = tipoImpuesto === "IGV";
-  const hayRetencion = tipoImpuesto === "RENTA";
+  const hayIgv = impuesto === "IGV";
+  const hayRetencion = impuesto === "RENTA";
   const precioDistinto =
     Number(cascada.precioVenta) !== Number(cascada.valorVenta);
 
@@ -272,7 +301,7 @@ function Resumen({
             />
             {hayIgv && (
               <Fila
-                etiqueta={`IGV (${pct(porcentajes.igv)})`}
+                etiqueta={`IGV (${pct(vista.porcentajeIgv)})`}
                 importe={cascada.igv}
               />
             )}
@@ -285,7 +314,7 @@ function Resumen({
             )}
             {hayRetencion && (
               <Fila
-                etiqueta={`RETENCIÓN DE RENTA (${pct(porcentajes.retencion)})`}
+                etiqueta={`RETENCIÓN DE RENTA (${pct(vista.porcentajeRetencion)})`}
                 importe={cascada.retencionRenta}
               />
             )}
