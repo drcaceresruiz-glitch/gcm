@@ -126,6 +126,8 @@ export const TABLAS: readonly TablaRespaldo[] = [
       porcentajeGastosGenerales: 4,
       porcentajeUtilidad: 4,
       porcentajeIgv: 4,
+      porcentajeDescuento: 4,
+      porcentajeRetencion: 4,
       montoTotal: 2,
       tipoCambio: 4,
     },
