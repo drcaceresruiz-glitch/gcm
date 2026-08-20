@@ -100,7 +100,8 @@ export const FILAS_EJEMPLO: readonly FilaEjemplo[] = [
     codigo: "3.2",
     descripcion: "Tablero eléctrico general, incluye llaves termomagnéticas",
     unidad: "und",
-    parcial: 3200,
+    metrado: 2,
+    precioUnitario: 1600,
   },
 ] as const;
 
@@ -124,7 +125,7 @@ const INSTRUCCIONES: readonly (readonly [string, string])[] = [
   ],
   [
     "4. Partida a suma alzada",
-    "Precio cerrado por el conjunto: escribe el parcial y deja metrado y precio unitario vacíos (fila 3.2), o usa la unidad global glb (fila 3.1). El importe pactado no cambia aunque cambie la cantidad.",
+    "Precio cerrado por el conjunto: escribe el parcial y deja metrado y precio unitario vacíos, o usa la unidad global glb con metrado 1 (fila 3.1). El importe pactado no cambia aunque cambie la cantidad.",
   ],
   [
     "5. El parcial manda",
