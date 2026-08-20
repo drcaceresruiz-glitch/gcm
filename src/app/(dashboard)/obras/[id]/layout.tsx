@@ -279,6 +279,7 @@ export default async function ObraLayout({
       : siguientePaso(
           {
             presupuesto: hitos.presupuesto,
+            meta: hitos.meta,
             cronograma: hitos.cronograma,
             equipo: hitos.equipo,
             lineaBase: hitos.lineaBase,

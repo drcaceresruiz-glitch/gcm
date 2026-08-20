@@ -19,6 +19,7 @@ import {
 
 const ALTA_COMPLETA: EstadoAlta = {
   presupuesto: true,
+  meta: true,
   cronograma: true,
   equipo: true,
   lineaBase: true,
@@ -52,6 +53,7 @@ describe("el paso siguiente de la obra", () => {
   it("el criterio bloqueante va por delante de todo el alta", () => {
     const sinNada: EstadoAlta = {
       presupuesto: false,
+      meta: false,
       cronograma: false,
       equipo: false,
       lineaBase: false,
@@ -74,6 +76,7 @@ describe("el paso siguiente de la obra", () => {
   it("recorre el alta en el orden del trabajo real", () => {
     const estado: EstadoAlta = {
       presupuesto: false,
+      meta: false,
       cronograma: false,
       equipo: false,
       lineaBase: false,
@@ -99,6 +102,7 @@ describe("el paso siguiente de la obra", () => {
   it("no propone un paso a quien no puede darlo", () => {
     const sinNada: EstadoAlta = {
       presupuesto: false,
+      meta: false,
       cronograma: false,
       equipo: false,
       lineaBase: false,
@@ -114,6 +118,7 @@ describe("el paso siguiente de la obra", () => {
   it("salta los pasos que no puede dar y ofrece el que si", () => {
     const sinNada: EstadoAlta = {
       presupuesto: false,
+      meta: false,
       cronograma: false,
       equipo: false,
       lineaBase: false,
@@ -215,5 +220,38 @@ describe("los caminos del anclaje existen como pantalla", () => {
   it.each(caminos)("%s tiene su pantalla", (camino) => {
     const pagina = join(RAIZ, camino, "page.tsx");
     expect(existsSync(pagina), `no existe ${pagina}`).toBe(true);
+  });
+});
+
+/**
+ * El presupuesto entra en DOS tramos.
+ *
+ * Primero el real, con la plantilla, y de el se genera el contractual. Antes
+ * el aviso era un solo boton y llevaba a una pantalla que ya no existe; al
+ * repuntarlo, con un solo tramo quien cargaba la meta veia desaparecer el
+ * aviso y se quedaba sin saber que el contractual seguia sin existir.
+ */
+describe("el alta del presupuesto, en dos tramos", () => {
+  const sinNada: EstadoAlta = { ...ALTA_COMPLETA, presupuesto: false, meta: false };
+  const conMeta: EstadoAlta = { ...ALTA_COMPLETA, presupuesto: false, meta: true };
+
+  it("sin nada, manda al real y ANUNCIA el segundo tramo", () => {
+    const paso = siguientePaso(sinNada, false, TODO, EN_PAZ);
+
+    expect(paso?.camino).toBe("/meta");
+    expect(paso?.despues?.camino).toBe("/contractual");
+  });
+
+  it("con el real ya cargado, pide solo el contractual", () => {
+    // Y sin `despues`: no queda ningun tramo por anunciar.
+    const paso = siguientePaso(conMeta, false, TODO, EN_PAZ);
+
+    expect(paso?.camino).toBe("/contractual");
+    expect(paso?.despues).toBeUndefined();
+  });
+
+  it("a quien no puede cargarlo no se le propone ninguno de los dos", () => {
+    expect(siguientePaso(sinNada, false, NADA, EN_PAZ)).toBeNull();
+    expect(siguientePaso(conMeta, false, NADA, EN_PAZ)).toBeNull();
   });
 });

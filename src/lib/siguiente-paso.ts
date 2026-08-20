@@ -62,11 +62,27 @@ export interface PasoSiguiente {
   /// Ruta relativa a la obra. Nunca vacia: el anclaje se esconde cuando ya
   /// estas en ella, y una cadena vacia haria de prefijo de todas.
   camino: string;
+  /**
+   * El SEGUNDO tramo, cuando el camino tiene dos y enseñar solo el primero
+   * deja a medias.
+   *
+   * Existe por el presupuesto: desde el 20/08 entra en dos pasos -primero el
+   * real, y de el se genera el contractual-. Con un solo boton, quien llega
+   * nuevo carga la meta y se queda sin saber que aun falta un tramo.
+   */
+  despues?: {
+    accion: string;
+    camino: string;
+  };
 }
 
 /** Que pasos del alta estan dados. Salen de `hitosDeObra`. */
 export interface EstadoAlta {
+  /// El contractual: el arbol de partidas contra el que se mide la obra.
   presupuesto: boolean;
+  /// El real u operativo. Es de donde sale el contractual, asi que decide
+  /// cual de los dos tramos toca sugerir.
+  meta: boolean;
   cronograma: boolean;
   equipo: boolean;
   lineaBase: boolean;
@@ -126,15 +142,34 @@ export function siguientePaso(
   }
 
   // 2. El alta, en el orden en que se hace.
+  // El presupuesto entra en DOS tramos: primero el REAL, con la plantilla, y
+  // de el se genera el contractual inflando cada capitulo. Enseñar solo el
+  // primero deja a medias a quien llega nuevo: carga la meta, ve desaparecer
+  // el aviso y no se entera de que el contractual sigue sin existir.
   if (!alta.presupuesto && puede.presupuesto) {
+    if (!alta.meta) {
+      return {
+        clave: "alta-presupuesto",
+        gravedad: "sugerencia",
+        titulo: "Esta obra todavía no tiene presupuesto",
+        consecuencia:
+          "Son dos pasos: primero entra el presupuesto real con la plantilla, y de él se genera el contractual.",
+        accion: "Cargar el presupuesto real",
+        camino: "/meta",
+        despues: { accion: "Generar el contractual", camino: "/contractual" },
+      };
+    }
+
+    // El real ya esta: el tramo que falta es el otro, y pedir el primero otra
+    // vez seria mandar a una pantalla donde no queda nada por hacer.
     return {
-      clave: "alta-presupuesto",
+      clave: "alta-contractual",
       gravedad: "sugerencia",
-      titulo: "Esta obra todavía no tiene presupuesto",
+      titulo: "Falta generar el contractual",
       consecuencia:
-        "Sin él no hay avance valorizado, ni comprometido, ni alertas, y se carga con la plantilla oficial que ofrece esa misma pantalla.",
-      accion: "Cargar el presupuesto",
-      camino: "/meta",
+        "Sale del real inflando cada capítulo, y es contra él contra lo que se miden el avance y la desviación.",
+      accion: "Generar el contractual",
+      camino: "/contractual",
     };
   }
 

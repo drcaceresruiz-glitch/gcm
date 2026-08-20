@@ -149,6 +149,18 @@ export function PasoSiguiente({
           </button>
         )}
 
+        {/* El segundo tramo, en tono menor. El boton principal es el que
+            toca AHORA, pero el otro se enseña igual: sin el, quien carga el
+            real ve desaparecer el aviso y cree que ya termino. */}
+        {paso.despues && (
+          <Link
+            href={`/obras/${obraId}${paso.despues.camino}`}
+            className="rounded-lg px-3 py-2 text-sm underline opacity-70 hover:opacity-100"
+          >
+            después: {paso.despues.accion}
+          </Link>
+        )}
+
         <Link
           href={destino}
           className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
