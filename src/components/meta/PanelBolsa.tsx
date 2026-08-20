@@ -364,7 +364,7 @@ export function PanelBolsa({
         >
           Se aprobaron {desfase.movimientos} movimiento(s) después de fijar
           esta meta (v{meta.version} se fijó contra la línea base v
-          {meta.baselineVersion}). El contrato subió y la meta no incluye lo
+          {meta.baselineVersion ?? "—"}). El contrato subió y la meta no incluye lo
           que cuesta construir ese trabajo. Crea una versión nueva de la meta
           para volver a comparar de verdad.
         </Aviso>

@@ -3506,7 +3506,7 @@ model PresupuestoMeta {
   // Estos dos campos son lo que permite detectarlo y decir CUANTO.
 
   /// Version de la linea base contra la que se fijo esta meta.
-  baselineVersion Int
+  baselineVersion Int?
 
   /// Cuantos movimientos aprobados habia en la obra al fijarla. Si despues hay
   /// mas, la meta esta desfasada y la bolsa exagera: ver `desfaseDeMeta`.

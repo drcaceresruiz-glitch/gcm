@@ -56,7 +56,8 @@ export interface MetaResumen {
   gastosGenerales: string;
   costoTotal: string;
   mesesPlazo: string;
-  baselineVersion: number;
+  /// null si la meta nacio antes que el contractual: no se fijo contra nada.
+  baselineVersion: number | null;
   movimientosAlFijar: number;
   aprobada: boolean;
   aprobadaAt: Date | null;
@@ -470,22 +471,23 @@ export async function crearMeta(
     return { ok: false, error: "La meta no tiene ni una linea." };
   }
 
-  // Sin linea base aprobada no hay `baselineVersion` que anotar, y sobre todo
-  // no hay contra que comparar: una meta sin contractual no es una meta, es
-  // una lista de deseos.
+  /**
+   * La linea base ya NO es obligatoria para fijar la meta.
+   *
+   * Antes lo era: sin contractual no habia contra que comparar. Pero desde
+   * que el contractual SE GENERA a partir del real, exigir un contractual
+   * para poder crear el real era pescadilla que se muerde la cola.
+   *
+   * Se anota la version si la hay y null si no. Null es la verdad: esta meta
+   * no se fijo contra ningun contractual porque nacio antes que el. Un cero
+   * mentiria, y `desfaseDeMeta` no tiene nada que medir mientras no exista
+   * el otro presupuesto.
+   */
   const base = await prisma.baseline.findFirst({
     where: { projectId: obraId, aprobadaAt: { not: null } },
     orderBy: { version: "desc" },
     select: { version: true },
   });
-  if (!base) {
-    return {
-      ok: false,
-      error:
-        "La obra no tiene linea base aprobada. Aprueba el presupuesto " +
-        "contractual antes de fijar la meta.",
-    };
-  }
 
   const mesesPlazo = normalizarDecimal(datos.mesesPlazo, 2);
   if (mesesPlazo === null || !esPositivo(mesesPlazo)) {
@@ -559,7 +561,7 @@ export async function crearMeta(
         gastosGenerales: resumenGG.total,
         costoTotal,
         mesesPlazo,
-        baselineVersion: base.version,
+        baselineVersion: base?.version ?? null,
         movimientosAlFijar: movimientos,
         creadaPor,
       },
@@ -617,7 +619,7 @@ export async function crearMeta(
           gastosGenerales: resumenGG.total,
           costoTotal,
           mesesPlazo,
-          baselineVersion: base.version,
+          baselineVersion: base?.version ?? null,
           lineas: datos.items.length,
         },
       },
