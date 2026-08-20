@@ -17,15 +17,16 @@ interface Props {
   /// Fechas de corte ya cargadas, en texto "YYYY-MM-DD". Sirven para avisar
   /// antes de subir de que ese corte ya estaba.
   cortesCargados: string[];
-  /// El servidor tiene Java y MPXJ, y puede convertir el .mpp por su cuenta.
-  /// En desarrollo no los hay, y entonces solo se acepta el .xml.
-  admiteMpp: boolean;
+  /// El servidor tiene Java y MPXJ, y puede convertir por su cuenta los dos
+  /// binarios: el `.mpp` de MS Project y el `.pod` de ProjectLibre. En
+  /// desarrollo no los hay, y entonces solo se acepta el `.xml`.
+  admiteProject: boolean;
 }
 
 export function ImportadorCronograma({
   obraId,
   cortesCargados,
-  admiteMpp,
+  admiteProject,
 }: Props) {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [analisis, setAnalisis] = useState<ResultadoAnalisisCronograma | null>(null);
@@ -122,16 +123,18 @@ export function ImportadorCronograma({
     <div className="space-y-6">
       <Seccion titulo="1. Elige el archivo">
         <p className="mt-1 text-sm opacity-70">
-          {admiteMpp ? (
+          {admiteProject ? (
             <>
-              El <strong>.mpp</strong> de MS Project directamente, o su
-              exportación a <strong>.xml</strong>. El .mpp lo convierte el
-              servidor: el de esta obra tarda unos cinco segundos.
+              El <strong>.mpp</strong> de MS Project o el <strong>.pod</strong>{" "}
+              de ProjectLibre directamente, o su exportación a{" "}
+              <strong>.xml</strong>. Los dos primeros los convierte el servidor:
+              el .mpp de esta obra tarda unos cinco segundos.
             </>
           ) : (
             <>
-              El XML que exporta MS Project (Archivo &gt; Guardar como &gt;
-              XML). Este servidor no puede convertir archivos .mpp.
+              El XML que exportan MS Project (Archivo &gt; Guardar como &gt;
+              XML) y ProjectLibre (Archivo &gt; Exportar). Este servidor no
+              puede convertir .mpp ni .pod.
             </>
           )}{" "}
           También se acepta el <strong>Excel de la plantilla</strong>, para las
@@ -158,7 +161,9 @@ export function ImportadorCronograma({
             id="archivo"
             name="archivo"
             type="file"
-            accept={admiteMpp ? ".mpp,.xml,.xlsx,.xlsm" : ".xml,.xlsx,.xlsm"}
+            accept={
+              admiteProject ? ".mpp,.pod,.xml,.xlsx,.xlsm" : ".xml,.xlsx,.xlsm"
+            }
             onChange={alElegirArchivo}
             className="sr-only"
           />

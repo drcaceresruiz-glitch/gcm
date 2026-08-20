@@ -14,7 +14,12 @@ import {
   reemplazarCronograma,
   type EnRiesgoPorReemplazoCronograma,
 } from "@/services/cronograma.service";
-import { convertirMppAXml, puedeConvertirMpp } from "@/services/mpp.service";
+import {
+  convertirAXml,
+  esConvertible,
+  puedeConvertirProject,
+  SIN_CONVERSOR,
+} from "@/services/mpp.service";
 
 /**
  * Flujo en dos pasos: analizar y luego confirmar.
@@ -42,7 +47,9 @@ const TAMANO_MAXIMO = 20 * 1024 * 1024;
  */
 const TAMANO_MAXIMO_EXCEL = 8 * 1024 * 1024;
 
-const EXTENSIONES_PROJECT = [".xml", ".mpp"];
+// `.pod` es ProjectLibre: el planificador que no tiene licencia de MS Project
+// guarda en el, y el servidor ya sabe convertirlo (ver `mpp.service`).
+const EXTENSIONES_PROJECT = [".xml", ".mpp", ".pod"];
 const EXTENSIONES_EXCEL = [".xlsx", ".xlsm"];
 const EXTENSIONES = [...EXTENSIONES_PROJECT, ...EXTENSIONES_EXCEL];
 
@@ -63,11 +70,12 @@ async function comoXml(
 ): Promise<{ ok: true; xml: ArrayBuffer } | { ok: false; error: string }> {
   const contenido = await archivo.arrayBuffer();
 
-  if (!archivo.name.toLowerCase().endsWith(".mpp")) {
+  // El `.xml` ya viene listo; los binarios —`.mpp` y `.pod`— pasan por MPXJ.
+  if (!esConvertible(archivo.name)) {
     return { ok: true, xml: contenido };
   }
 
-  const convertido = await convertirMppAXml(contenido, archivo.name);
+  const convertido = await convertirAXml(contenido, archivo.name);
   return convertido.ok
     ? { ok: true, xml: convertido.xml }
     : { ok: false, error: convertido.error };
@@ -131,20 +139,15 @@ function validarArchivo(archivo: unknown): Validacion {
     return {
       ok: false,
       error:
-        "Formato no admitido. Sube el .mpp de MS Project, su exportacion a .xml, " +
-        "o el Excel de la plantilla (.xlsx).",
+        "Formato no admitido. Sube el .mpp de MS Project, el .pod de " +
+        "ProjectLibre, su exportacion a .xml, o el Excel de la plantilla (.xlsx).",
     };
   }
 
   // Se rechaza aqui y no despues de subirlo: decirle a alguien que su archivo
   // no vale cuando ya ha esperado a que suban 8 MB es peor que no aceptarlo.
-  if (nombre.endsWith(".mpp") && !puedeConvertirMpp()) {
-    return {
-      ok: false,
-      error:
-        "Este servidor no puede convertir archivos .mpp. Exporta el cronograma " +
-        "a XML desde MS Project (Archivo > Guardar como > XML) y sube ese archivo.",
-    };
+  if (esConvertible(nombre) && !puedeConvertirProject()) {
+    return { ok: false, error: SIN_CONVERSOR };
   }
 
   const tope = esExcel(nombre) ? TAMANO_MAXIMO_EXCEL : TAMANO_MAXIMO;

@@ -5,7 +5,7 @@ import { FileDown, ListTree } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, listarPartidas } from "@/services/obras.service";
 import { historialCronogramas } from "@/services/cronograma.service";
-import { puedeConvertirMpp } from "@/services/mpp.service";
+import { puedeConvertirProject } from "@/services/mpp.service";
 import { puede } from "@/lib/rbac";
 import { Volver } from "@/components/ui/Volver";
 import { ImportadorCronograma } from "@/components/cronograma/ImportadorCronograma";
@@ -140,7 +140,7 @@ export default async function ImportarCronogramaPage({
 
       <ImportadorCronograma
         obraId={obra.id}
-        admiteMpp={puedeConvertirMpp()}
+        admiteProject={puedeConvertirProject()}
         // Las fechas de corte se guardan como fecha de calendario a
         // medianoche UTC, asi que el trozo ISO es el dia correcto sin pasar
         // por la zona horaria del navegador.

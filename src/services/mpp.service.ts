@@ -54,29 +54,51 @@ const MEMORIA = "-Xmx256m";
  */
 const CLASE = "org.mpxj.sample.MpxjConvert";
 
-/** true si el servidor puede convertir .mpp. */
-export function puedeConvertirMpp(): boolean {
+/**
+ * Las extensiones binarias que MPXJ convierte a XML.
+ *
+ * `.pod` es ProjectLibre, que es gratis y es lo que usa una obra sin licencia
+ * de MS Project. No costo casi nada anadirlo: `MpxjConvert` va por
+ * `UniversalProjectReader`, que ya leia treinta formatos —el nuestro solo
+ * llamaba a la puerta con uno—.
+ */
+export const EXTENSIONES_CONVERTIBLES = [".mpp", ".pod"] as const;
+
+/**
+ * Lo que se dice cuando el servidor no puede convertir.
+ *
+ * En UN sitio porque se decia en dos —aqui y en la validacion del importador—
+ * y solo uno nombraba los dos formatos. Un mensaje duplicado es un mensaje
+ * que un dia dira la mitad de la verdad.
+ */
+export const SIN_CONVERSOR =
+  "Este servidor no puede convertir archivos .mpp ni .pod. Exportalo a XML " +
+  "—en MS Project, Archivo > Guardar como > XML; en ProjectLibre, " +
+  "Archivo > Exportar— y sube ese archivo, que funciona igual.";
+
+export function esConvertible(nombre: string): boolean {
+  const n = nombre.toLowerCase();
+  return EXTENSIONES_CONVERTIBLES.some((e) => n.endsWith(e));
+}
+
+/** true si el servidor puede convertir los formatos binarios de arriba. */
+export function puedeConvertirProject(): boolean {
   return Boolean(env.MPXJ_JAVA && env.MPXJ_HOME);
 }
 
-export async function convertirMppAXml(
+export async function convertirAXml(
   contenido: ArrayBuffer,
   nombre: string,
 ): Promise<ResultadoConversion> {
   if (!env.MPXJ_JAVA || !env.MPXJ_HOME) {
-    return {
-      ok: false,
-      error:
-        "Este servidor no puede convertir archivos .mpp. Exporta el cronograma " +
-        "a XML desde MS Project (Archivo > Guardar como > XML) y sube ese archivo.",
-    };
+    return { ok: false, error: SIN_CONVERSOR };
   }
 
   const classpath = await construirClasspath(env.MPXJ_HOME);
   if (classpath === null) {
     return {
       ok: false,
-      error: "La conversion de .mpp no esta bien configurada en el servidor.",
+      error: "La conversion de archivos de Project no esta bien configurada en el servidor.",
     };
   }
 
@@ -84,9 +106,20 @@ export async function convertirMppAXml(
   // pisarse el archivo, y borrar la carpeta entera al final no deja restos.
   const trabajo = await mkdtemp(join(tmpdir(), "gcm-mpp-"));
 
-  // Nombres fijos: el del usuario no toca el sistema de archivos ni siquiera
-  // como nombre de un temporal.
-  const entrada = join(trabajo, "entrada.mpp");
+  /**
+   * Nombres fijos: el del usuario no toca el sistema de archivos ni siquiera
+   * como nombre de un temporal.
+   *
+   * La EXTENSION si se conserva, elegida de la lista blanca de arriba y nunca
+   * copiada del nombre que subio nadie. `UniversalProjectReader` reconoce el
+   * formato por el contenido, asi que probablemente daria igual; pero hacer
+   * depender un `.pod` de que la deteccion acierte llamandose `.mpp` es
+   * apoyarse en algo que no controlamos y que no avisaria al cambiar.
+   */
+  const extension = esConvertible(nombre)
+    ? EXTENSIONES_CONVERTIBLES.find((e) => nombre.toLowerCase().endsWith(e))!
+    : ".mpp";
+  const entrada = join(trabajo, `entrada${extension}`);
   const salida = join(trabajo, "salida.xml");
 
   try {
