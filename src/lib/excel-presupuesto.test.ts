@@ -178,7 +178,7 @@ describe("analizarExcel", () => {
 
     expect(r.errores).toHaveLength(0);
     expect(r.montoTotal).toBe("13109.04");
-    expect(r.filas[1]?.metrado).toBe("42.0000");
+    expect(r.filas[1]?.metrado).toBe("42.00");
     expect(r.filas[1]?.parcial).toBeNull();
     expect(r.filas[1]?.aviso).toContain("suma alzada");
   });

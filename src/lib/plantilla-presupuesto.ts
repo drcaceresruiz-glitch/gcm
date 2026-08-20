@@ -203,7 +203,7 @@ export async function generarPlantillaPresupuesto(): Promise<ArrayBuffer> {
     }
 
     fila.getCell(3).alignment = { horizontal: "center" };
-    fila.getCell(4).numFmt = "#,##0.0000";
+    fila.getCell(4).numFmt = "#,##0.00";
     fila.getCell(5).numFmt = "#,##0.00";
     fila.getCell(6).numFmt = "#,##0.00";
 
@@ -234,7 +234,7 @@ export async function generarPlantillaPresupuesto(): Promise<ArrayBuffer> {
 
   for (let f = n + 1; f <= ultima; f++) {
     const fila = hoja.getRow(f);
-    fila.getCell(4).numFmt = "#,##0.0000";
+    fila.getCell(4).numFmt = "#,##0.00";
     fila.getCell(5).numFmt = "#,##0.00";
     fila.getCell(6).numFmt = "#,##0.00";
     fila.getCell(6).value = {

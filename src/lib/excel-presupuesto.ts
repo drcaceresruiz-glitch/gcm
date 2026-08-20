@@ -549,8 +549,23 @@ interface ArgsFila {
   combinacion: Combinacion | null;
 }
 
+/**
+ * Normaliza la descripcion al importar, segun el tipo de fila.
+ *
+ * Capitulo: TODO en mayuscula, porque es un titulo. Partida: mayuscula
+ * SOLO la primera letra, respetando el resto tal cual para no destrozar
+ * siglas ni unidades legitimas de construccion (PVC, SAP, m2, kg).
+ */
+function normalizarDescripcion(texto: string, tipo: TipoFila): string {
+  const limpio = texto.trim();
+  if (!limpio) return limpio;
+  if (tipo === "CAPITULO") return limpio.toLocaleUpperCase("es");
+  return limpio.charAt(0).toLocaleUpperCase("es") + limpio.slice(1);
+}
+
 function construirFila(args: ArgsFila): FilaImportada | null {
   const { fila, n, mapa, codigo, descripcion, tipo, nivel, combinacion } = args;
+  const desc = normalizarDescripcion(descripcion, tipo);
 
   const leer = (campo: string) => {
     const col = mapa.get(campo);
@@ -561,7 +576,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
   // se toma del Excel, donde suele venir como subtotal ya calculado.
   if (tipo === "CAPITULO") {
     return {
-      fila: n, codigo, tipo, modalidad: "PRECIOS_UNITARIOS", descripcion, nivel,
+      fila: n, codigo, tipo, modalidad: "PRECIOS_UNITARIOS", descripcion: desc, nivel,
       unidad: null, metrado: null, precioUnitario: null, parcial: null,
     };
   }
@@ -577,7 +592,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
   if (combinacion && n !== combinacion.maestra) {
     const cuantas = combinacion.ultima - combinacion.maestra + 1;
     return {
-      fila: n, codigo, tipo, modalidad: "ALCANCE", descripcion, nivel,
+      fila: n, codigo, tipo, modalidad: "ALCANCE", descripcion: desc, nivel,
       unidad: null, metrado: null, precioUnitario: null, parcial: null,
       aviso: `Comparte importe con las filas ${combinacion.maestra} a ${combinacion.ultima} (${cuantas} lineas a suma alzada).`,
     };
@@ -588,8 +603,8 @@ function construirFila(args: ArgsFila): FilaImportada | null {
   // abajo deja constancia de que se toco.
   const unidadEntera = String(leer("unidad") ?? "").trim();
   const unidadTexto = unidadEntera.slice(0, MAX_UNIDAD);
-  const metrado = normalizarDecimal(leer("metrado"), 4);
-  const precioUnitario = normalizarDecimal(leer("precioUnitario"), 4);
+  const metrado = normalizarDecimal(leer("metrado"), 2);
+  const precioUnitario = normalizarDecimal(leer("precioUnitario"), 2);
   const parcialArchivo = normalizarDecimal(leer("parcial"), 2);
 
   const avisos: string[] = [];
@@ -663,7 +678,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
     modalidad: combinacion
       ? "SUMA_ALZADA"
       : deducirModalidad({ metrado, precioUnitario, parcial, unidad: unidadTexto }),
-    descripcion, nivel,
+    descripcion: desc, nivel,
     unidad: unidadTexto || null,
     metrado, precioUnitario, parcial,
     ...(avisos.length > 0 ? { aviso: avisos.join(" ") } : {}),
