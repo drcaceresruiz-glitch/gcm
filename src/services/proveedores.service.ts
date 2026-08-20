@@ -2,7 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { motivoSiEmpresaEnMigracion } from "@/services/empresa-migracion.service";
-import { alcanzaObra } from "@/lib/alcance-obras";
+import { alcanzaObra, filtroDeProjectId } from "@/lib/alcance-obras";
+import { sumar } from "@/lib/decimal";
 import {
   contarPaginas,
   normalizarPagina,
@@ -37,6 +38,131 @@ import {
 
 /** 11 digitos. Los de empresa empiezan por 20 y los de persona natural por 10. */
 const RUC = /^\d{11}$/;
+
+export interface ContratoDelProveedor {
+  encargoId: string;
+  numero: number;
+  descripcion: string;
+  estado: string;
+  montoContratado: string;
+  fechaInicio: Date | null;
+  fechaFin: Date | null;
+  /// El ultimo corte de avance, si lo hay. Acumulado sobre su contrato.
+  avance: string | null;
+  obraId: string;
+  obraNombre: string;
+  obraCorrelativo: string | null;
+}
+
+export interface HistorialProveedor {
+  proveedor: { id: string; razonSocial: string; ruc: string; activo: boolean };
+  contratos: ContratoDelProveedor[];
+  /// Lo contratado con el, sumado con `lib/decimal` y NO por la base.
+  totalContratado: string;
+  /// En cuantas obras distintas ha trabajado, de las que quien mira puede ver.
+  obras: number;
+}
+
+/**
+ * Todo lo que se le ha encargado a un contratista, CRUZANDO OBRAS.
+ *
+ * Es la unica vista del sistema que mira los encargos por proveedor y no por
+ * obra, y responde a la pregunta que antes no tenia respuesta: «¿que le hemos
+ * dado a esta ferreteria, y como fue?». Hasta el 19/08 habia que entrar obra
+ * por obra.
+ *
+ * EL ALCANCE POR OBRA MANDA TAMBIEN AQUI, y es lo unico delicado: cruzar obras
+ * es exactamente la forma de ensenar de rebote una obra que no te toca. Un
+ * residente ve en esta pantalla los contratos de SUS obras y nada mas, y por
+ * eso el filtro va en el `where` de los encargos —`filtroDeProjectId`— y no en
+ * un repaso posterior. Ver `lib/alcance-obras`.
+ *
+ * El dinero se suma con `lib/decimal`, fila a fila, y no con un `_sum` de la
+ * base: es la regla de la casa y la sostiene `dinero-desde-la-base.test.ts`.
+ */
+export async function historialDeProveedor(
+  sesion: SesionActiva,
+  proveedorId: string,
+): Promise<HistorialProveedor | null> {
+  if (!puede(sesion, "proveedor:leer")) return null;
+
+  const proveedor = await prisma.proveedor.findFirst({
+    where: { id: proveedorId, companyId: sesion.companyId },
+    select: { id: true, razonSocial: true, ruc: true, activo: true },
+  });
+  if (!proveedor) return null;
+
+  /**
+   * Los encargos NO se piden si no se pueden leer.
+   *
+   * `proveedor:leer` abre la ficha; los contratos son otra cosa —dinero
+   * pactado por obra— y piden `encargo:leer`. Sin el, la ficha se ve vacia en
+   * vez de negarse: quien no puede ver contratos sigue pudiendo mirar los
+   * datos de contacto del proveedor.
+   */
+  if (!puede(sesion, "encargo:leer")) {
+    return { proveedor, contratos: [], totalContratado: "0.00", obras: 0 };
+  }
+
+  const filas = await prisma.encargoProveedor.findMany({
+    where: {
+      proveedorId,
+      // El alcance, dentro de la consulta. Y la empresa por el camino de la
+      // obra, que es lo que impide que un id ajeno traiga nada.
+      ...filtroDeProjectId(sesion),
+      project: { companyId: sesion.companyId },
+    },
+    orderBy: [{ project: { createdAt: "desc" } }, { numero: "desc" }],
+    select: {
+      id: true,
+      numero: true,
+      descripcion: true,
+      estado: true,
+      montoContratado: true,
+      fechaInicio: true,
+      fechaFin: true,
+      project: { select: { id: true, nombreObra: true, correlativo: true } },
+      // Solo el ultimo corte: el historial completo vive en la obra.
+      valorizaciones: {
+        orderBy: { fecha: "desc" },
+        take: 1,
+        select: { porcentaje: true },
+      },
+    },
+  });
+
+  const contratos = filas.map((f) => ({
+    encargoId: f.id,
+    numero: f.numero,
+    descripcion: f.descripcion,
+    estado: f.estado,
+    montoContratado: f.montoContratado.toString(),
+    fechaInicio: f.fechaInicio,
+    fechaFin: f.fechaFin,
+    avance: f.valorizaciones[0]?.porcentaje.toString() ?? null,
+    obraId: f.project.id,
+    obraNombre: f.project.nombreObra,
+    obraCorrelativo: f.project.correlativo,
+  }));
+
+  /**
+   * El total NO cuenta los ANULADOS.
+   *
+   * Un encargo anulado nunca comprometio nada, y sumarlo diria que a este
+   * contratista se le dio mas trabajo del que se le dio. Los CERRADOS si
+   * cuentan: se ejecutaron.
+   */
+  const totalContratado = sumar(
+    contratos.filter((c) => c.estado !== "ANULADO").map((c) => c.montoContratado),
+  );
+
+  return {
+    proveedor,
+    contratos,
+    totalContratado,
+    obras: new Set(contratos.map((c) => c.obraId)).size,
+  };
+}
 
 export interface ProveedorResumen {
   id: string;

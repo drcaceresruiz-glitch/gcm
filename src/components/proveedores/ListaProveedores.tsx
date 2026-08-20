@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Building2, Mail, Pencil, Phone, Plus, Send, Users } from "lucide-react";
+import {
+  Building2,
+  FileText,
+  Mail,
+  Pencil,
+  Phone,
+  Plus,
+  Send,
+  Users,
+} from "lucide-react";
 import type { ProveedorResumen } from "@/services/proveedores.service";
 import {
   ROTULO_CONTRATO,
@@ -272,8 +281,22 @@ function Fila({
           puede escribirle a un contratista pero no tocar su ficha, asi que
           colgar el boton de `puedeEditar` se lo habria escondido justo a
           quien mas lo necesita —el que esta en obra—. */}
-      {(puedeEditar || puedeContactar) && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {/* Sus contratos, cruzando obras. Sin permiso de escribir ni de
+            editar: mirar que se le ha encargado es lectura, y quien ve el
+            catalogo ya llego hasta aqui. La pantalla acota por alcance lo
+            que ensena. */}
+        <Link
+          href={`/empresa/proveedores/${p.id}/contratos`}
+          className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <FileText className="size-3.5" aria-hidden="true" />
+          Contratos
+        </Link>
+
+        {(puedeEditar || puedeContactar) && (
+          <>
           {puedeContactar && (
             <Link
               href={`/empresa/proveedores/${p.id}/mensajes`}
@@ -305,8 +328,9 @@ function Fila({
               totalOrdenes={p.totalOrdenes}
             />
           )}
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
