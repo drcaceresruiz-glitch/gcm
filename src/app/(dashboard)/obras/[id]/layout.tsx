@@ -104,7 +104,7 @@ export default async function ObraLayout({
           pregunta: "cuánto cuesta",
           href: raiz,
           // El importador de partidas es presupuesto aunque cuelgue aparte.
-          prefijos: [`${raiz}/importar`],
+          prefijos: [`${raiz}/contractual`],
           hecho: hitos.presupuesto,
           // OBLIGATORIO: `href` es la raiz de la obra, y sin esto seria
           // prefijo de CUALQUIER subruta —encendia «Presupuesto» al editar la

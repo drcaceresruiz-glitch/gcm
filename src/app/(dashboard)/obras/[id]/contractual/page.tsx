@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import { previsualizarContractual } from "@/services/contractual.service";
+import { analizarRiesgoDeReemplazo } from "@/services/importacion.service";
 import { puede } from "@/lib/rbac";
 import { soles } from "@/utils/formato";
 import { ConfirmarContractual } from "@/components/contractual/ConfirmarContractual";
@@ -51,6 +52,11 @@ export default async function ContractualPage({
   const { metaVersion, metaAprobada, resultado } = previa.previa;
   const partidas = resultado.lineas.filter((l) => l.tipo === "PARTIDA");
 
+  // Que se llevaria por delante un reemplazo. Decirlo en numeros, y separando
+  // las escritas a mano, es la diferencia entre "se borraran 360 partidas" y
+  // saber que dentro van doce que costaron una tarde teclear.
+  const riesgo = await analizarRiesgoDeReemplazo(sesion, id);
+
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-6">
@@ -94,7 +100,7 @@ export default async function ContractualPage({
         </section>
       )}
 
-      <ConfirmarContractual obraId={id} partidas={partidas.length} />
+      <ConfirmarContractual obraId={id} partidas={partidas.length} riesgo={riesgo} />
 
       <section>
         <h2 className="mb-2 text-sm font-semibold uppercase text-slate-500">

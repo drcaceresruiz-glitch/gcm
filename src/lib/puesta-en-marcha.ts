@@ -152,12 +152,12 @@ const PASOS: readonly Definicion[] = [
     consecuencia:
       "Es el paso donde GCM empieza a servir: todas las cifras —avance valorizado, comprometido, alertas— cuelgan de ese árbol.",
     queNecesitas:
-      "El presupuesto en la plantilla oficial. Cópialo aunque ya lo tengas en otro Excel: casi todos los fallos del importador nacen del archivo, y copiarlo cuesta minutos frente a perseguir un total descuadrado.",
+      "El presupuesto REAL en la plantilla oficial: lo que de verdad cuadraste con los contratistas. El contractual se genera despues a partir de el, recargando cada capitulo. Cópialo aunque ya lo tengas en otro Excel: casi todos los fallos del importador nacen del archivo.",
     accion: "Abrir las obras",
     camino: "/obras",
     plantilla: {
-      titulo: "Plantilla de presupuesto",
-      href: "/plantilla-presupuesto",
+      titulo: "Plantilla del presupuesto real",
+      href: "/plantilla-meta",
     },
   },
 ];

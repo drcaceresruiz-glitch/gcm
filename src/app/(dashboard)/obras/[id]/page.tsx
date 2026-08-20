@@ -118,7 +118,7 @@ export default async function ObraPage({
       {puedeImportar && obra.lineaBaseVersion === null && (
         <div className="flex justify-end">
           <Link
-            href={`/obras/${id}/importar`}
+            href={`/obras/${id}/meta`}
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
             style={{ backgroundColor: "var(--color-marca-600)" }}
           >
@@ -193,7 +193,7 @@ export default async function ObraPage({
               <div className="mt-5 flex flex-col items-center gap-3">
                 {puedeImportar && (
                   <Link
-                    href={`/obras/${id}/importar`}
+                    href={`/obras/${id}/meta`}
                     className="inline-flex items-center gap-2 text-sm font-medium underline"
                   >
                     Cargar el presupuesto desde Excel

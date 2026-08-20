@@ -37,7 +37,7 @@ const FASES: FaseMenu[] = [
         titulo: "Presupuesto",
         pregunta: "",
         href: RAIZ,
-        prefijos: [`${RAIZ}/importar`],
+        prefijos: [`${RAIZ}/contractual`],
         soloExacto: true,
       },
       {
@@ -75,7 +75,7 @@ describe("el bug de verdad: la raiz de la obra ya no reclama todo", () => {
   });
 
   it("importar sigue siendo Presupuesto: va en `prefijos`", () => {
-    expect(seccionActiva(`${RAIZ}/importar`, FASES)).toBe("presupuesto");
+    expect(seccionActiva(`${RAIZ}/contractual`, FASES)).toBe("presupuesto");
   });
 });
 
