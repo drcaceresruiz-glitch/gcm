@@ -1,3 +1,4 @@
+import "server-only";
 import { prisma } from "@/lib/prisma";
 import { componerInforme } from "./informe.service";
 import { enviarSms, hayCanalSms } from "./sms.service";

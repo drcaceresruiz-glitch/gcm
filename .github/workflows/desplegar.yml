@@ -43,7 +43,7 @@ jobs:
     # FTP consume las 6 horas por defecto antes de que nadie se entere.
     #
     # No se sube, y esto va medido, no supuesto. Un despliegue sano tarda
-    # 1,8 min y el reparto es: pruebas 0,2 (las 1507 enteras), compilar 0,7,
+    # 1,8 min y el reparto es: pruebas 0,2 (las 2139 enteras), compilar 0,7,
     # subir 0,4. Lo demas es ruido. El run #324 (2026-08-17) murio a los
     # 20m14s y NO fue por crecimiento: fue el paso de FTP colgado 18m52s sin
     # imprimir una sola linea. Subir este numero no habria desplegado nada;
@@ -52,9 +52,17 @@ jobs:
     # Por eso el freno de verdad esta EN CADA PASO que puede colgarse (ver
     # "Subir por FTPS"). Este de aqui solo cubre lo que no tenga tope propio.
     #
-    # Cuando toque subirlo sera por las pruebas, y se vera venir: a 12
-    # segundos las 1507, harian falta unas cincuenta veces mas para que
+    # Cuando toque subirlo sera por las pruebas, y se vera venir: a 15
+    # segundos las 2139, harian falta unas cuarenta veces mas para que
     # asomen por aqui.
+    #
+    # EL 2026-08-20 ENTRARON DOS PASOS y el reparto cambia, asi que se recalcula
+    # aqui en vez de dejar el numero de antes fingiendo que sigue valiendo:
+    # lint (~0,5 min) y la comprobacion de `/api/health`, que en un despliegue
+    # sano contesta a la primera o segunda pasada —menos de un minuto— pero
+    # espera hasta 7 antes de rendirse. Peor caso del camino que LLEGA aqui:
+    # ~9 min. Los 8 del tope de FTP no se suman, porque si ese salta el job
+    # termina ahi y la comprobacion no llega a correr. Sigue sobrando margen.
     timeout-minutes: 20
 
     steps:
@@ -67,6 +75,18 @@ jobs:
 
       - name: Instalar dependencias
         run: npm ci
+
+      # El README dice que la regla «los componentes no importan Prisma» esta
+      # «impuesta por ESLint, no solo por convencion». Hasta hoy eso no era
+      # cierto AQUI: el CI corria pruebas y build, y el gancho de pre-push
+      # typecheck, pruebas y build. Lint no lo ejecutaba nada automaticamente,
+      # asi que la regla de arquitectura dependia de que alguien se acordara.
+      #
+      # `next build` si comprueba los tipos, de modo que typecheck esta cubierto
+      # de hecho; ESLint no lo estaba. Va ANTES de las pruebas porque tarda medio
+      # minuto y un import prohibido no merece esperar a la bateria entera.
+      - name: Lint
+        run: npm run lint
 
       # Un presupuesto mal calculado no debe llegar a produccion.
       - name: Pruebas
@@ -497,3 +517,87 @@ jobs:
           fi
 
           echo "Subido. El cron del servidor aplicara el paquete en menos de un minuto."
+
+      # LO QUE FALTABA: comprobar que se desplegó.
+      #
+      # Hasta hoy el workflow terminaba en el `echo` de arriba. Y sin embargo
+      # `/api/health` ya publicaba TODO lo necesario para saberlo —`version`
+      # (el SHA del paquete que de verdad corre), `coherencia` y `despliegue`—
+      # justamente porque el 2026-08-15 se perdio media hora sin poder saber
+      # que version estaba viva. El conocimiento estaba; lo que faltaba era que
+      # alguien preguntara sin que se lo pidieran.
+      #
+      # La regla que esto convierte en garantia: **el color del run NO dice si
+      # se desplegó, lo dice `/api/health`.** Subir no es desplegar. Entre una
+      # cosa y otra estan el cron, la descompresion, las migraciones y el
+      # reinicio, y cualquiera de los tres ultimos incidentes cabe justo ahi.
+      #
+      # POR QUE NO FALLA EN ROJO A LA PRIMERA: el cron pasa cada minuto y el
+      # intercambio no es instantaneo. Se pregunta cada 15 s hasta 7 minutos,
+      # que es veinte veces lo que tarda un despliegue sano.
+      #
+      # SI ESTO FALLA, la version anterior sigue sirviendo (el paquete se aplica
+      # entero o no se aplica). Lo que dice el fallo es «no llego», no «se
+      # rompio»: el sitio esta vivo con el codigo de antes.
+      - name: Comprobar que la version nueva esta viva
+        timeout-minutes: 10
+        env:
+          # El dominio es publico y ya figura en el README, asi que no es un
+          # secreto; se admite `APP_URL` por si algun dia hay otro entorno.
+          BASE: ${{ secrets.APP_URL || 'https://gcm.drcaceresruiz.com' }}
+        run: |
+          esperado="${GITHUB_SHA}"
+          echo "Se espera que /api/health cante la version ${esperado}."
+
+          # SIN `jq`, Y ESTO NO ES PUREZA: la primera version leia el JSON con
+          # `jq` y se probo en una maquina que no lo tenia. No dijo «falta jq»
+          # —dijo `version='sin respuesta'`, se comio los 7 minutos de espera y
+          # acabo senalando al cron del servidor, que estaba perfectamente—.
+          # Una comprobacion que al fallar acusa al sitio equivocado es peor que
+          # no tenerla, y aqui la herramienta que falta y el despliegue que no
+          # llega se veian exactamente igual.
+          #
+          # `jq` esta en ubuntu-latest, asi que en el CI habria funcionado. Pero
+          # la respuesta es una linea de JSON plano con claves que salen una
+          # sola vez: `sed` la lee sin depender de nada que pueda no estar.
+          leer_campo() {
+            printf '%s' "$1" \
+              | sed -n 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
+          }
+
+          cuerpo=""
+          for intento in $(seq 1 28); do
+            # `|| true` para que un corte de red no mate el paso: lo que manda
+            # es el veredicto de abajo, no una peticion suelta.
+            cuerpo="$(curl -fsS --max-time 20 "$BASE/api/health" 2>/dev/null || true)"
+
+            version="$(leer_campo "$cuerpo" version)"
+            despliegue="$(leer_campo "$cuerpo" despliegue)"
+
+            if [ "$version" = "$esperado" ] && [ "$despliegue" = "al dia" ]; then
+              echo "Desplegado y vivo: version ${version}, despliegue ${despliegue}."
+              printf '%s\n' "$cuerpo"
+              exit 0
+            fi
+
+            echo "Intento ${intento}/28: version='${version:-sin respuesta}'" \
+                 "despliegue='${despliegue:-?}'. Se reintenta en 15 s."
+            sleep 15
+          done
+
+          echo ""
+          echo "NO se pudo confirmar el despliegue en 7 minutos."
+          echo "Ultima respuesta de ${BASE}/api/health:"
+          printf '%s\n' "${cuerpo:-(sin respuesta)}"
+          echo ""
+          echo "Como se lee esto:"
+          echo "  - version distinta del SHA y despliegue 'pendiente' -> el paquete"
+          echo "    llego pero el CRON no lo aplico. Mirar la linea del cron de"
+          echo "    desplegar.sh en cPanel y tmp/despliegue.log."
+          echo "  - sin respuesta o estado 'error' -> el sitio no contesta o perdio"
+          echo "    la base. Eso NO lo causa una subida a medias; mirar el servidor."
+          echo "  - coherencia 'desfasado' -> el FTP dejo app.js de la version nueva"
+          echo "    y el paquete sigue sin aplicarse. Mismo sitio: el cron."
+          echo ""
+          echo "La version anterior sigue sirviendo: el paquete se aplica entero o no se aplica."
+          exit 1

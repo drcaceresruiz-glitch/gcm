@@ -24,6 +24,19 @@ export default defineConfig({
       DATABASE_URL: "mysql://prueba:prueba@localhost:3306/prueba",
       APP_SECRET: "secreto-de-prueba-sin-ningun-valor-0123456789abcdef",
     },
-    include: ["src/**/*.test.ts"],
+    /**
+     * `.tsx` TAMBIEN, aunque hoy no exista ninguna.
+     *
+     * Estaba solo `.test.ts`, y eso convertia una prueba de componente en algo
+     * peor que no tenerla: quien escribiera `Boton.test.tsx` la veria pasar en
+     * verde sin que se hubiera ejecutado nada. Es el mismo modo de fallo que el
+     * `select` de Prisma que `tsc` no mira —una comprobacion que no puede
+     * fallar— y por eso se cierra ahora y no cuando haga falta.
+     *
+     * OJO: `environment` es `node`, asi que una prueba que toque el DOM fallara
+     * pidiendo jsdom. Eso es lo correcto: fallar diciendo que falta el entorno,
+     * no callarse. El dia que se prueben componentes, jsdom entra aqui.
+     */
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });

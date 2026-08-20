@@ -78,6 +78,53 @@ const eslintConfig = [
 
   {
     /**
+     * Segunda mitad de la regla de arriba: los componentes tampoco importan
+     * un SERVICIO como valor.
+     *
+     * La regla anterior cierra la puerta directa —`@/lib/prisma`— pero deja
+     * abierta la de al lado: un componente que importe `@/services/algo`
+     * arrastra Prisma igual, solo que a traves del servicio. Lo unico que lo
+     * impedia era `import "server-only"` dentro de cada servicio, y el
+     * 19/08/2026 faltaba en cinco de los ochenta y uno —entre ellos
+     * `meta.service`, que es el margen de la obra—. Una puerta que esta en
+     * setenta y seis sitios y falta en cinco no es una puerta.
+     *
+     * `allowTypeImports` porque los tipos SI: una veintena de componentes
+     * importan `ResumenOrden`, `ComparacionMeta` y demas con `import type`,
+     * que TypeScript borra al compilar y nunca llega al navegador. Es la
+     * forma correcta de compartir la forma del dato sin arrastrar el codigo
+     * que lo lee. Lo que esta regla persigue es justo el dia que a alguien se
+     * le caiga la palabra `type`.
+     *
+     * Va DESPUES del bloque general a proposito: pisa su `no-restricted-imports`
+     * y por eso repite aqui el veto a Prisma, que si no se perderia.
+     */
+    files: ["src/components/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": "off",
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/generated/prisma/client", "@/lib/prisma"],
+              message:
+                "No importes Prisma directamente. Usa un servicio de src/services/.",
+            },
+            {
+              group: ["@/services/*", "@/services/**"],
+              allowTypeImports: true,
+              message:
+                "Un componente no ejecuta un servicio: recibe sus datos ya resueltos desde la pagina. Solo se admite `import type`.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
+    /**
      * Scripts que se ejecutan EN EL SERVIDOR, con el Node de cPanel y sin
      * dependencias de desarrollo. Van en JavaScript plano y CommonJS a
      * proposito: alli no hay `tsx` que compile TypeScript, y el paquete

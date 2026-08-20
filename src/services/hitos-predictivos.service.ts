@@ -1,3 +1,4 @@
+import "server-only";
 import { puede } from "@/lib/rbac";
 import {
   predecirHitos,
