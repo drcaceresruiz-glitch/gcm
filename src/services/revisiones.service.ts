@@ -7,6 +7,8 @@ import {
   calcularCascada,
   calcularCascadaComercial,
   compararRevisiones,
+  parametrosDeImpuesto,
+  TASA_RETENCION_RENTA,
   type Cascada,
 } from "@/lib/presupuesto";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
@@ -218,9 +220,6 @@ export async function crearRevision(
   const tipoImpuesto = datos.tipoImpuesto ?? "IGV";
   const retencionAsumida = datos.retencionAsumida ?? false;
 
-  /// Tasa de la retencion de cuarta categoria en Peru.
-  const TASA_RETENCION = "0.0800";
-
   /**
    * El costo directo NETO: con las partidas negativas del propio presupuesto
    * ya restadas.
@@ -233,23 +232,25 @@ export async function crearRevision(
    */
   const costoDirectoNeto = sumar([costoDirecto, descuentos], 2);
 
-  // Sin IGV cuando no se factura con el: un recibo por honorarios no lo lleva.
-  const igvEfectivo =
-    tipoImpuesto === "IGV" ? porcentajes.porcentajeIgv! : "0.0000";
+  // La traduccion de tipoImpuesto y retencionAsumida a lo que entiende la
+  // cascada vive en UNA sola funcion, compartida con el formulario y con la
+  // propuesta imprimible: si divergieran, cada pantalla diria otra cifra.
+  const impuesto = parametrosDeImpuesto(
+    tipoImpuesto,
+    porcentajes.porcentajeIgv!,
+    retencionAsumida,
+  );
+
+  // Lo que se guarda es el IGV EFECTIVO, no el que se tecleo: un recibo por
+  // honorarios no lo lleva, y dejar el 18% escrito lo resucitaria al releer.
+  const igvEfectivo = impuesto.porcentajeIgv;
 
   const cascada = calcularCascadaComercial({
     costoDirecto: costoDirectoNeto,
     porcentajeGastosGenerales: porcentajes.porcentajeGastosGenerales!,
     porcentajeUtilidad: porcentajes.porcentajeUtilidad!,
     porcentajeDescuento: porcentajes.porcentajeDescuento!,
-    porcentajeIgv: igvEfectivo,
-    retencion:
-      tipoImpuesto === "RENTA"
-        ? {
-            modo: retencionAsumida ? "SUMADA" : "DESCONTADA",
-            porcentaje: TASA_RETENCION,
-          }
-        : undefined,
+    ...impuesto,
   });
 
   const ultima = await prisma.baseline.findFirst({
@@ -276,7 +277,7 @@ export async function crearRevision(
         porcentajeIgv: igvEfectivo,
         porcentajeDescuento: porcentajes.porcentajeDescuento!,
         tipoImpuesto,
-        porcentajeRetencion: TASA_RETENCION,
+        porcentajeRetencion: TASA_RETENCION_RENTA,
         retencionAsumida,
         // Las revisiones nuevas se calculan con la cascada 2. Las que ya
         // estaban se quedan en 1 y siguen dando su total guardado.

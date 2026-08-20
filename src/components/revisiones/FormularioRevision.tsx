@@ -7,7 +7,11 @@ import {
   accionCrearRevision,
   type EstadoRevision,
 } from "@/app/(dashboard)/obras/[id]/revisiones/acciones";
-import { calcularCascadaComercial, porcentajeAFraccion } from "@/lib/presupuesto";
+import {
+  calcularCascadaComercial,
+  parametrosDeImpuesto,
+  porcentajeAFraccion,
+} from "@/lib/presupuesto";
 import { sumar } from "@/lib/decimal";
 import { CampoTexto } from "@/components/auth/CampoTexto";
 import { CuadroCascadaComercial } from "@/components/revisiones/CuadroCascadaComercial";
@@ -80,15 +84,14 @@ export function FormularioRevision({
         porcentajeGastosGenerales: porcentajeAFraccion(gastosGenerales) ?? "0",
         porcentajeUtilidad: porcentajeAFraccion(utilidad) ?? "0",
         porcentajeDescuento: porcentajeAFraccion(descuento) ?? "0",
-        porcentajeIgv:
-          tipoImpuesto === "IGV" ? (porcentajeAFraccion(igv) ?? "0") : "0",
-        retencion:
-          tipoImpuesto === "RENTA"
-            ? {
-                modo: retencionAsumida ? "SUMADA" : "DESCONTADA",
-                porcentaje: "0.08",
-              }
-            : undefined,
+        // La traduccion de tipoImpuesto y retencionAsumida vive en UNA sola
+        // funcion: si aqui difiriera del servidor, la vista previa mentiria
+        // sobre la cifra que se va a guardar.
+        ...parametrosDeImpuesto(
+          tipoImpuesto,
+          porcentajeAFraccion(igv) ?? "0",
+          retencionAsumida,
+        ),
       }),
     [
       costoDirecto,

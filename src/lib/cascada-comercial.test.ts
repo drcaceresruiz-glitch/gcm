@@ -129,3 +129,66 @@ describe("la retencion de renta del 8%", () => {
     expect(c.retencionRenta).toBe("1132.80");
   });
 });
+
+/**
+ * Que una revision VIEJA se pueda imprimir sin que cambie de cifra.
+ *
+ * Las revisiones anteriores al 20/08 se guardaron con `calcularCascada` (v1)
+ * y llevan `versionCascada: 1`. La propuesta imprimible las pasa por la
+ * cascada comercial, que es la unica que sabe de descuento y de retencion.
+ *
+ * Eso solo vale si, con descuento cero y sin retencion, las dos dan lo mismo
+ * hasta el centimo. Hoy coinciden porque las dos calculan GG y utilidad sobre
+ * el costo directo NETO -el que ya lleva restadas las partidas negativas-.
+ * Si algun dia una de las dos cambia de base, el papel que se le entrega al
+ * cliente diria una cifra y la pantalla de revisiones otra, las dos sin dar
+ * ningun error. De ahi esta prueba.
+ */
+describe("la cascada vieja y la comercial coinciden", () => {
+  // Con decimales sucios a proposito: si alguna redondea en un paso
+  // intermedio distinto, la diferencia aparece justo aqui.
+  const COSTO = "850000.55";
+  const DESCUENTOS = "-12345.67";
+  const NETO = "837654.88";
+
+  const vieja = calcularCascada({
+    costoDirecto: COSTO,
+    descuentos: DESCUENTOS,
+    porcentajeGastosGenerales: "0.1000",
+    porcentajeUtilidad: "0.0800",
+    porcentajeIgv: "0.1800",
+  });
+
+  const nueva = calcularCascadaComercial({
+    costoDirecto: NETO,
+    porcentajeGastosGenerales: "0.1000",
+    porcentajeUtilidad: "0.0800",
+    porcentajeDescuento: "0",
+    porcentajeIgv: "0.1800",
+  });
+
+  it("parte del mismo costo directo neto", () => {
+    expect(vieja.subtotal).toBe(NETO);
+    expect(nueva.costoDirecto).toBe(NETO);
+  });
+
+  it("da los mismos gastos generales y la misma utilidad", () => {
+    expect(nueva.gastosGenerales).toBe(vieja.gastosGenerales);
+    expect(nueva.utilidad).toBe(vieja.utilidad);
+  });
+
+  it("da el mismo presupuesto sin IGV", () => {
+    // Es la cifra de control: la que se guarda en `montoTotal`.
+    expect(nueva.valorVenta).toBe(vieja.presupuesto);
+  });
+
+  it("da el mismo IGV y el mismo total", () => {
+    expect(nueva.igv).toBe(vieja.igv);
+    expect(nueva.precioVenta).toBe(vieja.totalGeneral);
+  });
+
+  it("sin retencion, el neto a recibir es el total", () => {
+    expect(nueva.netoARecibir).toBe(vieja.totalGeneral);
+    expect(nueva.retencionRenta).toBe("0.00");
+  });
+});

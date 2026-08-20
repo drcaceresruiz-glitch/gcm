@@ -66,6 +66,7 @@ const TABLA: readonly Entrada[] = [
   { patron: "/obras/:obra/editar", texto: "Editar datos" },
   { patron: "/obras/:obra/contractual", texto: "Generar contractual" },
   { patron: "/obras/:obra/revisiones", texto: "Revisiones" },
+  { patron: "/obras/:obra/propuesta", texto: "Propuesta" },
   { patron: "/obras/:obra/meta", texto: "Presupuesto meta" },
   { patron: "/obras/:obra/movimientos", texto: "Movimientos" },
   { patron: "/obras/:obra/movimientos/nuevo", texto: "Nuevo movimiento" },

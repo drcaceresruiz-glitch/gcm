@@ -341,3 +341,45 @@ export function calcularCascadaComercial(
     netoARecibir: sumar([restar(precio, retencion, PRECISION_TRABAJO) ?? precio], PRECISION_MONEDA),
   };
 }
+
+/// Tasa de la retencion de cuarta categoria en Peru (recibo por honorarios).
+export const TASA_RETENCION_RENTA = "0.0800";
+
+/// Los tres regimenes con los que se puede emitir el contractual.
+export type TipoImpuestoContractual = "IGV" | "RENTA" | "NINGUNO";
+
+/**
+ * Traduce lo que se guarda en la revision a lo que entiende la cascada.
+ *
+ * En la base viven `tipoImpuesto` y `retencionAsumida`; la cascada quiere un
+ * IGV efectivo y un modo de retencion. La traduccion no es obvia en dos
+ * puntos, y por eso vive aqui una sola vez:
+ *
+ * - Sin IGV cuando no se factura con el: un recibo por honorarios no lo
+ *   lleva, asi que el porcentaje guardado se ignora y entra un cero. Dejarlo
+ *   pasar cobraria un 18% que nadie va a declarar.
+ * - `retencionAsumida` decide QUIEN carga con la retencion, no si existe:
+ *   asumida = el precio se infla para que quede limpio lo pactado (SUMADA);
+ *   no asumida = el precio no cambia y abajo se lee cuanto queda (DESCONTADA).
+ *
+ * Estaba escrito a mano en el servicio y en el formulario, y tenian que dar
+ * lo mismo o la vista previa mentiria respecto de lo que se iba a guardar.
+ * Al aparecer un tercer sitio -la propuesta imprimible- se saco aqui.
+ */
+export function parametrosDeImpuesto(
+  tipoImpuesto: TipoImpuestoContractual,
+  porcentajeIgv: string,
+  retencionAsumida: boolean,
+  porcentajeRetencion: string = TASA_RETENCION_RENTA,
+): Pick<ParametrosComercial, "porcentajeIgv" | "retencion"> {
+  return {
+    porcentajeIgv: tipoImpuesto === "IGV" ? porcentajeIgv : "0.0000",
+    retencion:
+      tipoImpuesto === "RENTA"
+        ? {
+            modo: retencionAsumida ? "SUMADA" : "DESCONTADA",
+            porcentaje: porcentajeRetencion,
+          }
+        : undefined,
+  };
+}

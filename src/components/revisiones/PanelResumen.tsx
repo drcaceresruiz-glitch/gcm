@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FileText, Lock, PenLine, TrendingDown, TrendingUp } from "lucide-react";
 import type {
   ResumenPresupuesto,
@@ -91,6 +92,22 @@ export function PanelResumen({ resumen, obraId, puedeAprobar }: PanelProps) {
           />
         </div>
 
+        {/* La propuesta sale de esta misma revision: es el papel que ve
+            el cliente, con el logo de la empresa y la cascada en el orden
+            que pide SUNAT. Tambien en borrador: verla es parte de decidir
+            si se aprueba. */}
+        <div
+          className="border-t px-4 py-3"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <Link
+            href={`/obras/${obraId}/propuesta?rev=${vigente.id}`}
+            className="inline-flex items-center gap-1.5 text-sm font-medium underline"
+          >
+            <FileText className="size-4" aria-hidden="true" />
+            Ver la propuesta para el cliente
+          </Link>
+        </div>
         {vigente.aprobada ? (
           <p
             className="border-t px-4 py-3 text-xs opacity-70"

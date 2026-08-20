@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerOrdenParaImpresion } from "@/services/ordenes.service";
 import { DocumentoOrden } from "@/components/ordenes/DocumentoOrden";
-import { BarraImpresion } from "@/components/ordenes/BarraImpresion";
+import { BarraImpresion } from "@/components/ui/BarraImpresion";
 
 export const metadata: Metadata = { title: "Orden" };
 
@@ -33,7 +33,10 @@ export default async function ImprimirOrdenPage({
 
   return (
     <div className="py-2 print:py-0">
-      <BarraImpresion obraId={id} />
+      <BarraImpresion
+        volverA={`/obras/${id}/ordenes`}
+        volverTexto="Volver a las órdenes"
+      />
       <DocumentoOrden orden={orden} />
     </div>
   );
