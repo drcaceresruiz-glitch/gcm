@@ -396,7 +396,8 @@ model User {
   numDoc    String  @db.VarChar(20)
   cargo     String? @db.VarChar(100)
   celular   String? @db.VarChar(30)
-  email     String  @unique @db.VarChar(150)
+  /// UNICO POR EMPRESA, no en toda la instalacion. Ver `@@unique` al final.
+  email     String  @db.VarChar(150)
 
   /// Foto de perfil, opcional. Se guarda como imagen embebida (data URL) y no
   /// como ruta a un archivo: todavia no hay infraestructura de subida
@@ -463,8 +464,25 @@ model User {
   /// para llevar nombre de relacion.
   analisisACargo AnalisisCausa[] @relation("AnalisisResponsable")
 
+  /**
+   * EL CORREO ES UNICO POR EMPRESA, no en toda la instalacion.
+   *
+   * Lo era globalmente hasta el 20/08/2026, y no por descuido: el login
+   * identificaba a la persona SOLO por su correo. Se cambio por decision del
+   * usuario —«que las cuentas sean independientes para cada constructora,
+   * porque son dueños diferentes»—: la misma persona puede trabajar para dos
+   * clientes de GCM, y un supervisor externo para varios.
+   *
+   * LO QUE HAY QUE SABER: el login ya no puede resolver a quien pertenece un
+   * correo mirando esta tabla. Prueba la clave contra las cuentas que lo
+   * compartan y, si casan varias, pregunta en cual entrar. Ver
+   * `auth.service.iniciarSesion`.
+   */
+  @@unique([companyId, email])
   @@unique([companyId, numDoc])
   @@index([companyId, estado])
+  /// Para buscar los candidatos del login, que ya no van por clave unica.
+  @@index([email])
   @@map("users")
 }
 

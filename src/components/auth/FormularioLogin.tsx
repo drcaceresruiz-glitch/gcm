@@ -112,7 +112,45 @@ export function FormularioLogin({
         required
       />
 
-      <BotonEnviar />
+      {/**
+        * ESE CORREO ABRE CUENTA EN VARIAS CONSTRUCTORAS.
+        *
+        * Solo se pinta cuando pasa, que es raro: hace falta la misma persona
+        * con la MISMA clave en dos clientes de GCM. Quien tiene una sola
+        * cuenta no ve esto nunca y entra en un paso, como siempre.
+        *
+        * Cada constructora es un boton de envio con `name="companyId"`: el
+        * navegador manda el valor del boton pulsado, asi que el formulario se
+        * reenvia con el correo y la clave que ya estan escritos —los campos no
+        * se remontan— y sin una linea de estado propio. Funciona igual con
+        * JavaScript desactivado.
+        */}
+      {estado.elegirEmpresa ? (
+        <div
+          className="space-y-2 rounded-lg border p-3"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <p className="text-sm font-medium">¿En cuál entras?</p>
+          <p className="text-sm opacity-70">
+            Ese correo tiene cuenta en más de una constructora.
+          </p>
+
+          {estado.elegirEmpresa.map((e) => (
+            <button
+              key={e.companyId}
+              type="submit"
+              name="companyId"
+              value={e.companyId}
+              className="flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-medium"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              {e.razonSocial}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <BotonEnviar />
+      )}
 
       <p className="text-center">
         <Link

@@ -164,18 +164,18 @@ export async function crearUsuario(
   if (!validacion.ok) return { ok: false, error: validacion.error };
   const d = validacion.datos;
 
-  // El correo es unico global: se comprueba aqui para dar un mensaje claro en
-  // vez del error crudo de la clave unica. Se traen la empresa y el nombre
-  // porque de eso depende QUE se puede contar: ver `mensajeCorreoEnUso`.
+  // El correo es unico DENTRO DE LA EMPRESA. Se comprueba aqui para dar un
+  // mensaje con nombre y apellidos en vez del error crudo de la clave unica.
+  //
+  // Desde que dejo de ser unico global (20/08/2026) esta consulta ya no puede
+  // encontrar a nadie de otra constructora, y con eso desaparecio tambien el
+  // mensaje que tenia que callarse de quien era.
   const correoEnUso = await prisma.user.findUnique({
-    where: { email: d.email },
-    select: { id: true, companyId: true, nombres: true, apellidos: true },
+    where: { companyId_email: { companyId: sesion.companyId, email: d.email } },
+    select: { nombres: true, apellidos: true },
   });
   if (correoEnUso) {
-    return {
-      ok: false,
-      error: mensajeCorreoEnUso(correoEnUso, sesion.companyId),
-    };
+    return { ok: false, error: mensajeCorreoEnUso(correoEnUso) };
   }
 
   // El documento es unico por empresa.
@@ -362,20 +362,19 @@ export async function editarUsuario(
     }
 
     /**
-     * El correo es unico en TODA la instalacion, no por empresa: es el
-     * identificador de acceso. Se comprueba aqui para poder decirlo con
-     * palabras en vez de dejar que reviente la clave unica.
+     * El correo es unico DENTRO DE LA EMPRESA. Se comprueba aqui para poder
+     * decirlo con palabras en vez de dejar que reviente la clave unica.
      *
-     * NO se dice de quien es cuando pertenece a otra empresa: seria contar
-     * que esa persona existe en esta instalacion.
+     * Que la misma persona lo tenga tambien en otra constructora ya no es un
+     * choque: es el caso que esto vino a permitir.
      */
     const enUso = await prisma.user.findUnique({
-      where: { email },
-      select: { id: true, companyId: true, nombres: true, apellidos: true },
+      where: { companyId_email: { companyId: sesion.companyId, email } },
+      select: { id: true, nombres: true, apellidos: true },
     });
 
     if (enUso && enUso.id !== userId) {
-      return { ok: false, error: mensajeCorreoEnUso(enUso, sesion.companyId) };
+      return { ok: false, error: mensajeCorreoEnUso(enUso) };
     }
   }
 

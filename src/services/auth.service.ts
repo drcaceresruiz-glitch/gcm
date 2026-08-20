@@ -67,8 +67,20 @@ const BLOQUEO_MINUTOS = 15;
 const MAX_FALLOS_POR_IP = 20;
 const VENTANA_IP_MINUTOS = 15;
 
+/**
+ * Las constructoras donde ese correo y esa clave abren cuenta.
+ *
+ * Solo aparece cuando hay MAS DE UNA: es la unica pregunta que el acceso hace
+ * de mas, y no se hace nunca a quien tiene una sola.
+ */
+export interface EmpresaParaElegir {
+  companyId: string;
+  razonSocial: string;
+}
+
 export type ResultadoLogin =
   | { ok: true; requiere2FA: true }
+  | { ok: true; elegirEmpresa: EmpresaParaElegir[] }
   | { ok: true; requiere2FA?: false; mustChangePassword: boolean }
   | { ok: false; error: string };
 
@@ -108,6 +120,14 @@ export async function iniciarSesion(
   email: string,
   clave: string,
   meta: MetadatosPeticion = {},
+  /**
+   * La constructora que la persona eligio, cuando su correo abria varias.
+   *
+   * Viene de la peticion, y por eso NO se confia en ella: solo acota la
+   * busqueda. La clave se vuelve a comprobar contra esa cuenta, asi que
+   * mandar el identificador de una empresa ajena no abre nada.
+   */
+  companyIdElegida?: string,
 ): Promise<ResultadoLogin> {
   const ERROR_GENERICO = "Correo o contrasena incorrectos.";
 
@@ -139,8 +159,93 @@ export async function iniciarSesion(
     }
   }
 
-  const usuario = await prisma.user.findUnique({
-    where: { email: email.trim().toLowerCase() },
+  const candidatos = await buscarCandidatos(email, companyIdElegida);
+
+  if (candidatos.length === 0) {
+    // Se verifica una clave ficticia igualmente para que el tiempo de
+    // respuesta no delate si el correo existe o no.
+    await verifyPassword(clave, "scrypt$16384$8$1$AAAA$AAAA");
+    return { ok: false, error: ERROR_GENERICO };
+  }
+
+  /**
+   * EL CASO NORMAL, y el de siempre: un correo, una cuenta.
+   *
+   * Se atiende aparte para que conserve EXACTAMENTE los mensajes de antes
+   * —«esta cuenta esta desactivada», «bloqueada por intentos fallidos»—. Con
+   * varias cuentas esos mensajes no se pueden dar sin decir de cual se habla,
+   * que es contar donde tiene cuenta alguien.
+   */
+  if (candidatos.length === 1) {
+    return entrarConCuenta(candidatos[0]!, clave, meta);
+  }
+
+  /**
+   * VARIAS CUENTAS CON EL MISMO CORREO. Decide la clave, no una lista.
+   *
+   * Se prueba contra las que hoy podrian entrar. Las desactivadas y las
+   * bloqueadas se saltan sin decirlo: aqui todo error es el generico.
+   */
+  const ahora = new Date();
+  const casan: typeof candidatos = [];
+
+  for (const c of candidatos) {
+    if (c.estado !== "ACTIVO") continue;
+    if (c.lockedUntil && c.lockedUntil > ahora) continue;
+    if (await verifyPassword(clave, c.passwordHash)) casan.push(c);
+  }
+
+  if (casan.length === 0) {
+    // El castigo cae sobre TODAS las candidatas, y es deliberado: quien
+    // prueba claves ataca al correo, no a una constructora, y dejar sin
+    // contador a las demas convertiria el numero de cuentas en el numero de
+    // intentos. El precio es que un ataque contra una puede bloquear a la
+    // otra; delante esta el freno por IP, que corta antes.
+    for (const c of candidatos) await anotarFallo(c, meta);
+    return { ok: false, error: ERROR_GENERICO };
+  }
+
+  if (casan.length === 1) return entrarConCuenta(casan[0]!, clave, meta);
+
+  /**
+   * La misma clave en dos constructoras. Ahora SI hay que preguntar.
+   *
+   * No se abre ninguna sesion ni se guarda nada a medias: la pantalla
+   * reenvia correo y clave junto con la empresa elegida, y todo esto se
+   * vuelve a comprobar. Un estado pendiente en el servidor seria una segunda
+   * cosa que caduca, que revocar y que auditar, para ahorrar un `scrypt`.
+   */
+  return {
+    ok: true,
+    elegirEmpresa: casan.map((c) => ({
+      companyId: c.companyId,
+      razonSocial: c.company.razonSocial,
+    })),
+  };
+}
+
+/**
+ * Las cuentas que ese correo puede abrir.
+ *
+ * Con `companyIdElegida` se acota a una, que es lo que manda la pantalla
+ * cuando ya se pregunto en cual entrar.
+ *
+ * El tope no es decorativo: sin el, un correo repetido en muchas empresas
+ * convertiria cada intento de acceso en otras tantas verificaciones `scrypt`,
+ * que cuestan 16 MB y ~100 ms cada una. Con veinte cuentas eso son dos
+ * segundos de CPU por intento, servidos a quien quiera pedirlos.
+ */
+const MAX_CANDIDATOS = 5;
+
+function buscarCandidatos(email: string, companyId?: string) {
+  return prisma.user.findMany({
+    where: {
+      email: email.trim().toLowerCase(),
+      ...(companyId ? { companyId } : {}),
+    },
+    // Orden estable para que dos intentos iguales hagan lo mismo.
+    orderBy: { createdAt: "asc" },
+    take: MAX_CANDIDATOS,
     select: {
       id: true,
       companyId: true,
@@ -155,16 +260,77 @@ export async function iniciarSesion(
       celularVerificadoAt: true,
       nombres: true,
       email: true,
-      company: { select: { activa: true } },
+      company: { select: { activa: true, razonSocial: true } },
+    },
+  });
+}
+
+type Candidato = Awaited<ReturnType<typeof buscarCandidatos>>[number];
+
+/**
+ * Suma un fallo a la cuenta y la bloquea si toca.
+ *
+ * EL CASTIGO SE CUMPLE Y SE ACABA. El contador solo se ponia a cero al
+ * acertar, y de ahi salia el peor comportamiento de todo esto: una cuenta que
+ * llegara a cinco fallos quedaba a merced de cualquiera para siempre, porque
+ * a partir de ahi CADA fallo suelto volvia a bloquearla otro cuarto de hora.
+ * Cinco intentos una vez, y despues uno cada quince minutos, era suficiente
+ * para que el administrador de una constructora no volviera a entrar.
+ *
+ * Si habia un bloqueo y ya vencio, se empieza de cero: quien quiera repetirlo
+ * tiene que volver a fallar cinco veces seguidas, no una.
+ *
+ * Vive aparte desde que el correo puede abrir varias cuentas: cuando ninguna
+ * casa hay que anotarselo a todas, y dos copias de esta cuenta acabarian
+ * bloqueando distinto segun por donde se entrara.
+ */
+async function anotarFallo(
+  usuario: Candidato,
+  meta: MetadatosPeticion,
+): Promise<void> {
+  const bloqueoVencido =
+    usuario.lockedUntil !== null && usuario.lockedUntil <= new Date();
+  const previos = bloqueoVencido ? 0 : usuario.failedLoginCount;
+  const intentos = previos + 1;
+
+  await prisma.user.update({
+    where: { id: usuario.id },
+    data: {
+      failedLoginCount: intentos,
+      lockedUntil:
+        intentos >= MAX_INTENTOS
+          ? new Date(Date.now() + BLOQUEO_MINUTOS * 60000)
+          : null,
     },
   });
 
-  if (!usuario) {
-    // Se verifica una clave ficticia igualmente para que el tiempo de
-    // respuesta no delate si el correo existe o no.
-    await verifyPassword(clave, "scrypt$16384$8$1$AAAA$AAAA");
-    return { ok: false, error: ERROR_GENERICO };
-  }
+  await auditar({
+    companyId: usuario.companyId,
+    userId: usuario.id,
+    accion: "LOGIN_FAILED",
+    entidad: "User",
+    entidadId: usuario.id,
+    meta,
+  });
+}
+
+/**
+ * El acceso con UNA cuenta ya elegida.
+ *
+ * Es el login de siempre, tal cual: estado, bloqueo, clave, empresa
+ * suspendida, dos factores y sesion. Lo unico que cambio es quien decide a que
+ * cuenta se aplica.
+ *
+ * Vuelve a verificar la clave aunque el camino de varias cuentas ya la haya
+ * comprobado. Es un `scrypt` de mas en un caso raro, y a cambio las reglas del
+ * acceso viven en un solo sitio en vez de en dos que se pueden separar.
+ */
+async function entrarConCuenta(
+  usuario: Candidato,
+  clave: string,
+  meta: MetadatosPeticion,
+): Promise<ResultadoLogin> {
+  const ERROR_GENERICO = "Correo o contrasena incorrectos.";
 
   if (usuario.estado !== "ACTIVO") {
     return { ok: false, error: "Esta cuenta esta desactivada." };
@@ -193,31 +359,7 @@ export async function iniciarSesion(
     //
     // Si habia un bloqueo y ya vencio, se empieza de cero: quien quiera
     // repetirlo tiene que volver a acertar cinco veces seguidas, no una.
-    const bloqueoVencido =
-      usuario.lockedUntil !== null && usuario.lockedUntil <= new Date();
-    const previos = bloqueoVencido ? 0 : usuario.failedLoginCount;
-    const intentos = previos + 1;
-
-    await prisma.user.update({
-      where: { id: usuario.id },
-      data: {
-        failedLoginCount: intentos,
-        lockedUntil:
-          intentos >= MAX_INTENTOS
-            ? new Date(Date.now() + BLOQUEO_MINUTOS * 60000)
-            : null,
-      },
-    });
-
-    await auditar({
-      companyId: usuario.companyId,
-      userId: usuario.id,
-      accion: "LOGIN_FAILED",
-      entidad: "User",
-      entidadId: usuario.id,
-      meta,
-    });
-
+    await anotarFallo(usuario, meta);
     return { ok: false, error: ERROR_GENERICO };
   }
 

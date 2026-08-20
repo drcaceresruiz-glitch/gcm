@@ -41,7 +41,6 @@ export function correoValido(email: string): boolean {
 
 /// Quien ya tiene un correo, para poder explicar el choque.
 export interface DuennoDelCorreo {
-  companyId: string;
   nombres: string;
   apellidos: string;
 }
@@ -49,46 +48,29 @@ export interface DuennoDelCorreo {
 /**
  * Que se le dice a quien intenta usar un correo que ya existe.
  *
- * EL CORREO ES UNICO EN TODA LA INSTALACION, no por empresa, y no es un
- * descuido: el login identifica a la persona SOLO por su correo, sin preguntar
- * de que constructora es (`auth.service`, `findUnique({ where: { email } })`).
- * Si dos empresas pudieran repetirlo, al entrar no habria forma de saber cual
- * de las dos cuentas es.
+ * El correo es unico DENTRO DE LA EMPRESA, asi que un choque siempre es con
+ * alguien de casa y siempre se puede decir de quien.
  *
- * POR QUE ESTA REGLA VIVE AQUI Y NO EN EL SERVICIO. Estaba escrita dos veces:
- * `editarUsuario` distinguia los dos casos y lo decia bien, y `crearUsuario`
- * soltaba un «Ya existe un usuario con ese correo» a secas. El 20/08/2026 eso
- * costo una hora: al dar de alta a alguien en una constructora nueva, el
- * administrador leyo que el usuario «ya existe», fue a su lista, no lo
- * encontro —porque estaba en OTRA empresa— y penso que GCM le estaba
- * ensenando los usuarios de todos sus clientes a la vez. No era verdad, pero
- * el mensaje daba pie a creerlo, que en un producto multiempresa es lo peor
- * que puede insinuar una pantalla.
+ * ESTO ERA MAS COMPLICADO ESTA MISMA MANANA, y merece quedar escrito porque
+ * explica por que la funcion es tan corta. El correo era unico en TODA la
+ * instalacion, de modo que el choque podia ser con alguien de otra
+ * constructora; entonces no se podia decir de quien —seria contar que esa
+ * persona existe aqui— y habia que explicar por que no aparecia en su lista.
+ * El 20/08/2026 eso costo una hora a un administrador, que leyo «ya existe un
+ * usuario con ese correo», fue a su lista, no lo encontro y penso que GCM le
+ * ensenaba los usuarios de todos sus clientes a la vez.
  *
- * QUE SE CUENTA Y QUE NO:
+ * Ese mensaje se arreglo por la manana y por la tarde dejo de hacer falta: al
+ * volverse el correo unico POR EMPRESA, el caso que obligaba a callar
+ * desaparecio, y con el la unica frase de GCM que admitia algo de otra
+ * constructora. Ver [[correo-por-empresa]].
  *
- * - Mismo empresa: se dice DE QUIEN es. Es lo util y es gente suya.
- * - Otra empresa: NO se dice de quien —seria contar que esa persona existe
- *   aqui— pero SI se dice que esta fuera de su constructora. Esto ultimo no
- *   revela nada nuevo: el mensaje ya admitia que el correo esta en uso en GCM,
- *   y que no sea de su empresa lo comprueba el administrador mirando su propia
- *   lista, que las ensena todas. Lo que anade es la unica frase que evita la
- *   busqueda inutil y la sospecha.
+ * La funcion se queda igualmente. La regla —que un choque se explica con
+ * nombre y apellidos— la comparten crear y editar, y estuvo escrita dos veces
+ * con una de las dos mal.
  */
-export function mensajeCorreoEnUso(
-  duenno: DuennoDelCorreo,
-  companyIdDeLaSesion: string,
-): string {
-  if (duenno.companyId === companyIdDeLaSesion) {
-    return `Ese correo ya es de ${`${duenno.nombres} ${duenno.apellidos}`.trim()}.`;
-  }
-
-  return (
-    "Ese correo ya esta en uso en GCM, en otra constructora, y por eso no " +
-    "aparece en tu lista de usuarios. El correo es la llave de acceso y es " +
-    "unica en toda la instalacion: una misma persona no puede tener cuenta " +
-    "en dos constructoras. Usa otro correo."
-  );
+export function mensajeCorreoEnUso(duenno: DuennoDelCorreo): string {
+  return `Ese correo ya es de ${`${duenno.nombres} ${duenno.apellidos}`.trim()}.`;
 }
 
 export interface DatosAltaUsuario {

@@ -31,42 +31,65 @@ const VIGENCIA_MINUTOS = 60;
  * traza. Anadir el valor exige migracion; cuando toque, este es su sitio.
  */
 export async function solicitarRecuperacion(email: string): Promise<void> {
-  const usuario = await prisma.user.findUnique({
+  /**
+   * UN CORREO PUEDE ABRIR VARIAS CUENTAS desde el 20/08/2026: la misma persona
+   * en dos constructoras. Se manda UN ENLACE POR CUENTA, cada uno con su token.
+   *
+   * No se pregunta cual, y es a proposito: preguntar obligaria a decir en que
+   * constructoras tiene cuenta ese correo ANTES de comprobar que quien lo pide
+   * es su dueno, y el formulario de recuperacion se convertiria en el detector
+   * de cuentas que esta misma cabecera dice que no puede ser. Quien controla
+   * el buzon recibe los enlaces y ya sabe cuales son suyos; quien no lo
+   * controla no recibe nada.
+   *
+   * Cada correo dice de que constructora es. Sin eso, dos mensajes identicos
+   * en la bandeja son una moneda al aire.
+   */
+  const cuentas = await prisma.user.findMany({
     where: { email: email.trim().toLowerCase() },
-    select: { id: true, nombres: true, email: true, estado: true },
-  });
-
-  // Silencio deliberado: sin cuenta, o desactivada, no se manda nada y quien
-  // lo pidio ve el mismo mensaje que si existiera.
-  if (!usuario || usuario.estado !== "ACTIVO") return;
-
-  // Los enlaces anteriores mueren al pedir uno nuevo. Si no, pedir el enlace
-  // tres veces dejaria tres llaves vivas y bastaria con que se filtrara la
-  // primera —la mas antigua y la que mas tiempo lleva en la bandeja—.
-  await prisma.passwordResetToken.deleteMany({
-    where: { userId: usuario.id, usedAt: null },
-  });
-
-  const token = generateToken();
-
-  await prisma.passwordResetToken.create({
-    data: {
-      userId: usuario.id,
-      tokenHash: hashToken(token),
-      expiresAt: new Date(Date.now() + VIGENCIA_MINUTOS * 60_000),
+    select: {
+      id: true,
+      nombres: true,
+      email: true,
+      estado: true,
+      company: { select: { razonSocial: true } },
     },
   });
 
-  const enlace = `${env.APP_URL.replace(/\/$/, "")}/recuperar-clave/${token}`;
+  for (const usuario of cuentas) {
+    // Silencio deliberado: una cuenta desactivada no recibe enlace, y quien lo
+    // pidio ve el mismo mensaje que si existiera.
+    if (usuario.estado !== "ACTIVO") continue;
 
-  await enviarCorreo({
-    para: usuario.email,
-    ...correoRecuperacion({
-      nombre: usuario.nombres,
-      enlace,
-      minutos: VIGENCIA_MINUTOS,
-    }),
-  });
+    // Los enlaces anteriores mueren al pedir uno nuevo. Si no, pedir el enlace
+    // tres veces dejaria tres llaves vivas y bastaria con que se filtrara la
+    // primera —la mas antigua y la que mas tiempo lleva en la bandeja—.
+    await prisma.passwordResetToken.deleteMany({
+      where: { userId: usuario.id, usedAt: null },
+    });
+
+    const token = generateToken();
+
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: usuario.id,
+        tokenHash: hashToken(token),
+        expiresAt: new Date(Date.now() + VIGENCIA_MINUTOS * 60_000),
+      },
+    });
+
+    const enlace = `${env.APP_URL.replace(/\/$/, "")}/recuperar-clave/${token}`;
+
+    await enviarCorreo({
+      para: usuario.email,
+      ...correoRecuperacion({
+        nombre: usuario.nombres,
+        enlace,
+        minutos: VIGENCIA_MINUTOS,
+        constructora: usuario.company.razonSocial,
+      }),
+    });
+  }
 }
 
 /**

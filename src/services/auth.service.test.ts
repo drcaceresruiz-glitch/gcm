@@ -39,12 +39,23 @@ type UsuarioEnBase = {
   celularVerificadoAt: Date | null;
   nombres: string;
   email: string;
-  company: { activa: boolean };
+  company: { activa: boolean; razonSocial: string };
 };
 
 let usuarioEnBase: UsuarioEnBase | null = null;
 let claveCorrecta = false;
 let fallosDeLaIp = 0;
+
+/**
+ * VARIAS cuentas con el mismo correo, para el camino nuevo.
+ *
+ * Cuando esta puesta manda sobre `usuarioEnBase`. Y con ella se usa
+ * `hashesQueCasan` en vez de `claveCorrecta`: lo que se prueba es justamente
+ * que la clave decide CUAL de las cuentas, asi que no puede valer para todas
+ * por igual.
+ */
+let cuentasEnBase: UsuarioEnBase[] | null = null;
+let hashesQueCasan: string[] | null = null;
 
 vi.mock("@/lib/prisma", () => {
   const apuntar = (metodo: string, valor: () => unknown) => (args?: unknown) => {
@@ -55,6 +66,13 @@ vi.mock("@/lib/prisma", () => {
   return {
     prisma: {
       user: {
+        // El login busca CANDIDATOS desde que el correo puede repetirse entre
+        // constructoras. Con una cuenta —el caso de estas pruebas— la lista
+        // trae una, o ninguna si no hay usuario.
+        findMany: apuntar(
+          "user.findMany",
+          () => cuentasEnBase ?? (usuarioEnBase ? [usuarioEnBase] : []),
+        ),
         findUnique: apuntar("user.findUnique", () => usuarioEnBase),
         update: apuntar("user.update", () => ({})),
       },
@@ -67,7 +85,12 @@ vi.mock("@/lib/prisma", () => {
 });
 
 vi.mock("@/lib/password", () => ({
-  verifyPassword: () => Promise.resolve(claveCorrecta),
+  // Con `hashesQueCasan` la clave acierta solo contra esos hashes, que es lo
+  // que permite probar «casa una de las dos cuentas».
+  verifyPassword: (_clave: string, hash: string) =>
+    Promise.resolve(
+      hashesQueCasan ? hashesQueCasan.includes(hash) : claveCorrecta,
+    ),
   hashPassword: () => Promise.resolve("hash"),
 }));
 
@@ -97,7 +120,7 @@ function usuario(parcial: Partial<UsuarioEnBase> = {}): UsuarioEnBase {
     celularVerificadoAt: null,
     nombres: "Ana",
     email: "ana@ejemplo.pe",
-    company: { activa: true },
+    company: { activa: true, razonSocial: "Constructora A" },
     ...parcial,
   };
 }
@@ -114,6 +137,8 @@ beforeEach(() => {
   usuarioEnBase = usuario();
   claveCorrecta = false;
   fallosDeLaIp = 0;
+  cuentasEnBase = null;
+  hashesQueCasan = null;
 });
 
 describe("limite por conexion", () => {
@@ -130,7 +155,7 @@ describe("limite por conexion", () => {
     // usuario. Si la comprobacion viviera despues, cada intento seguiria
     // costando una consulta y, peor, seguiria sumando fallos a la cuenta
     // atacada.
-    expect(llamadas.some((l) => l.metodo === "user.findUnique")).toBe(false);
+    expect(llamadas.some((l) => l.metodo === "user.findMany")).toBe(false);
   });
 
   it("habla de la conexion, no de las credenciales", async () => {
@@ -162,7 +187,7 @@ describe("limite por conexion", () => {
 
     await iniciarSesion("ana@ejemplo.pe", "x", { ip: "203.0.113.7" });
 
-    expect(llamadas.some((l) => l.metodo === "user.findUnique")).toBe(true);
+    expect(llamadas.some((l) => l.metodo === "user.findMany")).toBe(true);
   });
 
   it("sin IP no comprueba nada, en vez de cerrarle la puerta a todos", async () => {
@@ -171,7 +196,7 @@ describe("limite por conexion", () => {
     // Falta de cabecera = no se puede atribuir. Cortar aqui convertiria un
     // proxy mal configurado en una caida de acceso general.
     expect(llamadas.some((l) => l.metodo === "auditLog.count")).toBe(false);
-    expect(llamadas.some((l) => l.metodo === "user.findUnique")).toBe(true);
+    expect(llamadas.some((l) => l.metodo === "user.findMany")).toBe(true);
   });
 });
 
@@ -224,5 +249,154 @@ describe("el bloqueo de cuenta caduca", () => {
 
     expect(datosDelUpdate()["failedLoginCount"]).toBe(0);
     expect(datosDelUpdate()["lockedUntil"]).toBeNull();
+  });
+});
+
+/**
+ * ---------------------------------------------------------------------------
+ * EL MISMO CORREO EN VARIAS CONSTRUCTORAS (20/08/2026).
+ *
+ * Desde que el correo es unico POR EMPRESA, el login ya no puede resolverlo a
+ * un usuario mirando la tabla. Recoge candidatos y deja que decida la CLAVE.
+ *
+ * Lo que se fija aqui es que esa decision no afloje nada de lo de arriba: que
+ * la clave siga siendo lo unico que abre, que una cuenta ajena no se cuele por
+ * mandar su `companyId`, y que fallar cueste en todas.
+ * ---------------------------------------------------------------------------
+ */
+describe("un correo con cuenta en dos constructoras", () => {
+  const EN_A = "hash-de-la-A";
+  const EN_B = "hash-de-la-B";
+
+  function dosCuentas() {
+    cuentasEnBase = [
+      usuario({
+        id: "u-a",
+        companyId: "empresa-a",
+        passwordHash: EN_A,
+        company: { activa: true, razonSocial: "Constructora A" },
+      }),
+      usuario({
+        id: "u-b",
+        companyId: "empresa-b",
+        passwordHash: EN_B,
+        company: { activa: true, razonSocial: "Constructora B" },
+      }),
+    ];
+  }
+
+  it("con claves distintas, entra en la que casa y no pregunta nada", async () => {
+    dosCuentas();
+    hashesQueCasan = [EN_B];
+
+    const r = await iniciarSesion("ana@ejemplo.pe", "la-de-la-B");
+
+    expect(r).toEqual({ ok: true, mustChangePassword: false });
+  });
+
+  /**
+   * La misma clave en las dos: es el UNICO caso en que el acceso pregunta.
+   * No se abre sesion ni se guarda nada a medias.
+   */
+  it("con la misma clave en las dos, pregunta en cual entrar", async () => {
+    dosCuentas();
+    hashesQueCasan = [EN_A, EN_B];
+
+    const r = await iniciarSesion("ana@ejemplo.pe", "la-misma");
+
+    expect(r).toEqual({
+      ok: true,
+      elegirEmpresa: [
+        { companyId: "empresa-a", razonSocial: "Constructora A" },
+        { companyId: "empresa-b", razonSocial: "Constructora B" },
+      ],
+    });
+  });
+
+  it("y al elegir una, la busqueda va acotada a esa empresa", async () => {
+    dosCuentas();
+    hashesQueCasan = [EN_A, EN_B];
+
+    await iniciarSesion("ana@ejemplo.pe", "la-misma", {}, "empresa-b");
+
+    const consulta = llamadas.find((l) => l.metodo === "user.findMany");
+    expect((consulta?.args as { where: unknown }).where).toEqual({
+      email: "ana@ejemplo.pe",
+      companyId: "empresa-b",
+    });
+  });
+
+  /**
+   * LA EMPRESA ELEGIDA NO ES UNA CREDENCIAL. Llega de la peticion, asi que
+   * mandar la de otra constructora no puede abrir nada: la clave se vuelve a
+   * comprobar contra las cuentas de ESA empresa, y si no casa ninguna, no
+   * entra nadie.
+   */
+  it("mandar una empresa ajena no abre nada", async () => {
+    cuentasEnBase = [];
+    hashesQueCasan = [EN_A];
+
+    const r = await iniciarSesion("ana@ejemplo.pe", "la-de-la-A", {}, "empresa-de-otro");
+
+    expect(r).toEqual({ ok: false, error: "Correo o contrasena incorrectos." });
+  });
+
+  it("si no casa ninguna, el fallo se anota en TODAS", async () => {
+    dosCuentas();
+    hashesQueCasan = [];
+
+    const r = await iniciarSesion("ana@ejemplo.pe", "ninguna");
+
+    expect(r.ok).toBe(false);
+
+    const castigadas = llamadas
+      .filter((l) => l.metodo === "user.update")
+      .map((l) => (l.args as { where: { id: string } }).where.id);
+
+    expect(castigadas).toEqual(["u-a", "u-b"]);
+  });
+
+  /**
+   * Una cuenta desactivada no entra ni compite, y no se dice que lo esta: con
+   * varias cuentas, decirlo seria contar donde tiene cuenta alguien.
+   */
+  it("una cuenta desactivada no gana aunque su clave case", async () => {
+    cuentasEnBase = [
+      usuario({ id: "u-a", companyId: "empresa-a", passwordHash: EN_A, estado: "INACTIVO" }),
+      usuario({
+        id: "u-b",
+        companyId: "empresa-b",
+        passwordHash: EN_B,
+        company: { activa: true, razonSocial: "Constructora B" },
+      }),
+    ];
+    hashesQueCasan = [EN_A];
+
+    const r = await iniciarSesion("ana@ejemplo.pe", "la-de-la-A");
+
+    expect(r).toEqual({ ok: false, error: "Correo o contrasena incorrectos." });
+  });
+
+  it("y una bloqueada tampoco, aunque la otra siga abierta", async () => {
+    cuentasEnBase = [
+      usuario({
+        id: "u-a",
+        companyId: "empresa-a",
+        passwordHash: EN_A,
+        lockedUntil: new Date(Date.now() + 60_000),
+      }),
+      usuario({
+        id: "u-b",
+        companyId: "empresa-b",
+        passwordHash: EN_B,
+        company: { activa: true, razonSocial: "Constructora B" },
+      }),
+    ];
+    hashesQueCasan = [EN_A, EN_B];
+
+    const r = await iniciarSesion("ana@ejemplo.pe", "la-misma");
+
+    // Solo la B queda en pie, asi que entra directo y no pregunta.
+    expect(r).toEqual({ ok: true, mustChangePassword: false });
   });
 });

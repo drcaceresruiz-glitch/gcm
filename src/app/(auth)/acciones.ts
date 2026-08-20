@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { EmpresaParaElegir } from "@/services/auth.service";
 import {
   iniciarSesion,
   cambiarClave,
@@ -23,6 +24,14 @@ import { ipDeLaPeticion } from "@/lib/ip-peticion";
 
 export interface EstadoFormulario {
   error?: string;
+  /**
+   * Las constructoras entre las que hay que elegir.
+   *
+   * Solo aparece cuando el correo y la clave abren cuenta en varias. La
+   * pantalla las pinta y reenvia el formulario con `companyId`; aqui no hay
+   * nada abierto todavia.
+   */
+  elegirEmpresa?: EmpresaParaElegir[];
 }
 
 const esquemaLogin = z.object({
@@ -53,13 +62,30 @@ export async function accionIniciarSesion(
     return { error: validacion.error.issues[0]?.message ?? "Datos invalidos." };
   }
 
+  /**
+   * La constructora, solo cuando ya se pregunto.
+   *
+   * Viaja en el mismo formulario para no guardar nada a medias en el servidor.
+   * No es una credencial: el servicio la usa para acotar la busqueda y vuelve
+   * a comprobar la clave contra esa cuenta.
+   */
+  const empresa = String(datos.get("companyId") ?? "").trim();
+
   const resultado = await iniciarSesion(
     validacion.data.email,
     validacion.data.clave,
     await metadatosPeticion(),
+    empresa === "" ? undefined : empresa,
   );
 
   if (!resultado.ok) return { error: resultado.error };
+
+  // Ese correo y esa clave abren cuenta en mas de una constructora. Es la
+  // unica vez que el acceso pregunta algo de mas, y no llega a quien tiene
+  // una sola cuenta.
+  if ("elegirEmpresa" in resultado) {
+    return { elegirEmpresa: resultado.elegirEmpresa };
+  }
 
   // Con dos pasos, la clave correcta solo abre la pantalla del codigo.
   if (resultado.requiere2FA) redirect("/verificar-codigo");

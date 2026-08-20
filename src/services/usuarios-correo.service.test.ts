@@ -26,12 +26,16 @@ const estado: {
   usuario: Record<string, unknown> | null;
   /// Lo que devuelve el `findUnique` por correo: quien ya lo tiene, si alguien.
   correoEnUso: { id: string; companyId: string; nombres: string; apellidos: string } | null;
+  /// Con que `where` se busco ese correo. Es lo que delata si la consulta
+  /// sale de la empresa de la sesion.
+  dondeBuscoElCorreo: unknown;
   /// Ids cuyas sesiones se cerraron.
   sesionesCerradas: string[];
   escrito: Record<string, unknown> | null;
 } = {
   usuario: null,
   correoEnUso: null,
+  dondeBuscoElCorreo: null,
   sesionesCerradas: [],
   escrito: null,
 };
@@ -40,7 +44,10 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
       findFirst: () => Promise.resolve(estado.usuario),
-      findUnique: () => Promise.resolve(estado.correoEnUso),
+      findUnique: (args: { where: unknown }) => {
+        estado.dondeBuscoElCorreo = args.where;
+        return Promise.resolve(estado.correoEnUso);
+      },
       count: () => Promise.resolve(2),
     },
     company: { findUnique: () => Promise.resolve({ enMigracionAt: null }) },
@@ -160,21 +167,27 @@ describe("cambiar el correo", () => {
     expect(estado.escrito).toBeNull();
   });
 
-  it("tampoco el de otra empresa, y ahi NO dice de quien", async () => {
-    estado.correoEnUso = {
-      id: "u-9",
-      companyId: "OTRA-empresa",
-      nombres: "Rosa",
-      apellidos: "Diaz",
-    };
+  /**
+   * EL MISMO CORREO EN OTRA CONSTRUCTORA YA NO CHOCA.
+   *
+   * Hasta el 20/08/2026 el correo era unico en toda la instalacion y aqui
+   * habia una prueba de que, en ese caso, el mensaje NO decia de quien era.
+   * Ahora es unico por empresa: la consulta va acotada con
+   * `companyId_email`, asi que una cuenta de otra constructora no puede
+   * siquiera aparecer, y cambiar el correo a uno que exista fuera es
+   * exactamente lo que se vino a permitir.
+   *
+   * Lo que se comprueba es que la consulta LLEVA la empresa de la sesion. Sin
+   * eso volveria el choque que ya no debe existir.
+   */
+  it("no mira fuera de la empresa: la consulta va acotada", async () => {
+    estado.correoEnUso = null;
 
-    const r = await editarUsuario(ADMIN, "u-2", cambios({ email: "rosa@otra.pe" }));
+    await editarUsuario(ADMIN, "u-2", cambios({ email: "rosa@otra.pe" }));
 
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.error).not.toContain("Rosa");
-      expect(r.error).toContain("ya esta en uso");
-    }
+    expect(estado.dondeBuscoElCorreo).toEqual({
+      companyId_email: { companyId: "empresa-1", email: "rosa@otra.pe" },
+    });
   });
 
   it("que el correo ya sea suyo no lo bloquea", async () => {

@@ -121,7 +121,11 @@ async function main() {
   // repositorio publico.
   const emailAdmin =
     process.env["SEED_ADMIN_EMAIL"]?.trim().toLowerCase() ?? "admin@gcm.local";
-  const yaExiste = await prisma.user.findUnique({ where: { email: emailAdmin } });
+  // Por (empresa, correo): desde el 20/08/2026 el correo se puede repetir
+  // entre constructoras, asi que buscarlo suelto ya no identifica a nadie.
+  const yaExiste = await prisma.user.findUnique({
+    where: { companyId_email: { companyId: empresa.id, email: emailAdmin } },
+  });
 
   let claveTemporal: string | null = null;
   if (!yaExiste) {

@@ -380,11 +380,20 @@ export function correoRecuperacion(datos: {
   nombre: string;
   enlace: string;
   minutos: number;
+  /**
+   * De que constructora es la cuenta que este enlace restablece.
+   *
+   * Va SIEMPRE, tenga la persona una cuenta o cinco. Desde que el correo puede
+   * repetirse entre constructoras, quien tenga dos recibe dos mensajes: sin
+   * decir cual es cual, son una moneda al aire, y elegir mal deja sin
+   * restablecer la clave que hacia falta.
+   */
+  constructora: string;
 }): Omit<Correo, "para"> {
   const texto = [
     `Hola ${datos.nombre},`,
     ``,
-    `Alguien pidio restablecer la clave de tu cuenta en ${MARCA}.`,
+    `Alguien pidio restablecer la clave de tu cuenta de ${datos.constructora} en ${MARCA}.`,
     ``,
     `Abre este enlace para elegir una nueva:`,
     datos.enlace,
@@ -398,7 +407,7 @@ export function correoRecuperacion(datos: {
   const html = plantilla(
     "Restablece tu clave",
     `<p>Hola <strong>${esc(datos.nombre)}</strong>,</p>
-     <p>Alguien pidio restablecer la clave de tu cuenta. Si fuiste tu, elige una nueva aqui:</p>
+     <p>Alguien pidio restablecer la clave de tu cuenta de <strong>${esc(datos.constructora)}</strong>. Si fuiste tu, elige una nueva aqui:</p>
      <p style="margin:20px 0;">
        <a href="${esc(datos.enlace)}" style="background:#0f7186;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:bold;">Elegir clave nueva</a>
      </p>
@@ -407,7 +416,11 @@ export function correoRecuperacion(datos: {
      <p style="color:#6b7a82;font-size:12px;word-break:break-all;">Si el boton no funciona, copia esta direccion: ${esc(datos.enlace)}</p>`,
   );
 
-  return { asunto: `Restablece tu clave — ${MARCA}`, texto, html };
+  return {
+    asunto: `Restablece tu clave de ${datos.constructora} — ${MARCA}`,
+    texto,
+    html,
+  };
 }
 
 /**

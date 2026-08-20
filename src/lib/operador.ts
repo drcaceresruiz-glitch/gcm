@@ -43,6 +43,18 @@ export function parsearOperadores(bruto: string | undefined | null): string[] {
  * Comparacion EXACTA sobre el correo normalizado, nunca por subcadena: con
  * `includes`, "a@x.pe" casaria con "mala@x.pe" y con "a@x.pe.dominio-falso.com",
  * y cualquiera que registrara ese correo se volveria operador.
+ *
+ * DESDE EL 20/08/2026 UN CORREO PUEDE ABRIR VARIAS CUENTAS —una por
+ * constructora— y esto las alcanza a TODAS. Es lo correcto y esta decidido:
+ * operar GCM es una condicion de la PERSONA, no de una de sus cuentas. Lo dice
+ * la lista del servidor, no ninguna fila de la base, y el area de operador no
+ * concede ni un permiso del dominio: dentro de cada empresa sigue siendo un
+ * usuario corriente y manda `puede()`.
+ *
+ * Si alguna vez hiciera falta que alguien opere GCM y ademas tenga una cuenta
+ * de cliente SIN esos poderes, la respuesta no es tocar esto: es usar dos
+ * correos distintos, que es justo lo que el cambio a correo por empresa hizo
+ * posible.
  */
 export function esCorreoOperador(
   email: string | undefined | null,
