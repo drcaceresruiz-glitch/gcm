@@ -96,6 +96,32 @@ export interface AltaUsuarioLimpia {
   role: Role;
 }
 
+/**
+ * Lo que aguanta cada columna de texto en `User`. Si cambian en el esquema,
+ * cambian aqui.
+ */
+export const MAX_NOMBRES = 100;
+export const MAX_APELLIDOS = 100;
+export const MAX_EMAIL = 150;
+
+/** El primero que se pasa, con su limite dicho. `null` si caben todos. */
+export function demasiadoLargo(d: {
+  nombres: string;
+  apellidos: string;
+  email: string;
+}): string | null {
+  if (d.nombres.length > MAX_NOMBRES) {
+    return `Los nombres no pueden pasar de ${MAX_NOMBRES} caracteres.`;
+  }
+  if (d.apellidos.length > MAX_APELLIDOS) {
+    return `Los apellidos no pueden pasar de ${MAX_APELLIDOS} caracteres.`;
+  }
+  if (d.email.length > MAX_EMAIL) {
+    return `El correo no puede pasar de ${MAX_EMAIL} caracteres.`;
+  }
+  return null;
+}
+
 export type ValidacionAlta =
   | { ok: true; datos: AltaUsuarioLimpia }
   | { ok: false; error: string };
@@ -115,6 +141,22 @@ export function validarAltaUsuario(d: DatosAltaUsuario): ValidacionAlta {
   if (!nombres) return { ok: false, error: "Indica los nombres." };
   if (!apellidos) return { ok: false, error: "Indica los apellidos." };
   if (!correoValido(email)) return { ok: false, error: "El correo no es valido." };
+
+  /**
+   * Los topes de las columnas, comprobados AQUI.
+   *
+   * `cargo` y `celular` se recortaban desde el principio; `nombres`,
+   * `apellidos` y `email` no se miraban, y contra un `VarChar(100)` eso es un
+   * «Data too long» que subia sin capturar hasta la pantalla de error. Es el
+   * mismo hueco que tenia el importador de presupuesto con la unidad.
+   *
+   * Aqui NO se recorta, se rechaza: un cargo acortado sigue describiendo el
+   * puesto, pero el nombre de una persona y su correo son su identidad —el
+   * correo es ademas con lo que entra— y guardarlos a medias en silencio es
+   * peor que pedir que se corrijan.
+   */
+  const largo = demasiadoLargo({ nombres, apellidos, email });
+  if (largo) return { ok: false, error: largo };
 
   const doc = validarDocumento(tipoDoc, numDoc);
   if (!doc.ok) return doc;

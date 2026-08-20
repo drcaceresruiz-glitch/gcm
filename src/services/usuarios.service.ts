@@ -1,5 +1,6 @@
 import "server-only";
 import { SinPermisoError } from "@/lib/errores";
+import { codigoDeFallo, motivoSiFalla } from "@/lib/fallo-de-base";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { motivoSiEmpresaEnMigracion } from "@/services/empresa-migracion.service";
@@ -44,6 +45,44 @@ import type { Role } from "@/generated/prisma/enums";
  */
 
 export type Resultado = { ok: true } | { ok: false; error: string };
+
+/**
+ * Lo que se dice cuando la base rechaza escribir un usuario.
+ *
+ * EXISTE POR EL MISMO HUECO QUE TENIA EL IMPORTADOR: la escritura se llamaba
+ * sin capturar, asi que un rechazo de MariaDB subia hasta el limite de Next y
+ * el administrador veia «Esta pantalla no se pudo cargar» en vez de que
+ * corregir. Se cerro el 20/08/2026, el mismo dia que el del presupuesto.
+ *
+ * Casi todo lo que puede fallar se comprueba ANTES y con mejor mensaje —el
+ * correo repetido dice de quien es, el documento tambien—. Esto es la red por
+ * debajo: la carrera de dos administradores dando de alta a la vez, y lo que
+ * no se nos haya ocurrido.
+ */
+export function motivoDeFalloConUsuario(e: unknown): string {
+  const codigo = codigoDeFallo(e);
+
+  // Comun a todos: la escritura va en transaccion, asi que o entro entera o
+  // no entro nada. Decirlo importa tanto como el motivo.
+  const intacto = "No se guardo nada: la operacion se deshace entera si algo falla.";
+
+  switch (codigo) {
+    case "P2002":
+      return (
+        "Ese correo o ese documento acaban de darse de alta desde otra " +
+        `pantalla. Recarga la lista de usuarios y comprueba antes de repetir. ${intacto}`
+      );
+    case "P2000":
+      return (
+        "Algun dato es mas largo de lo que admite el sistema: los nombres y " +
+        `los apellidos llegan a 100 caracteres y el correo a 150. ${intacto}`
+      );
+    case "P2003":
+      return `La empresa de la sesion ya no existe. Vuelve a entrar. ${intacto}`;
+    default:
+      return `No se pudo guardar el usuario. ${intacto}`;
+  }
+}
 
 /**
  * El alta y el reseteo devuelven la clave temporal para mostrarla UNA vez, y
@@ -193,7 +232,7 @@ export async function crearUsuario(
   const claveTemporal = generateTemporaryPassword();
   const passwordHash = await hashPassword(claveTemporal);
 
-  await prisma.$transaction(async (tx) => {
+  const fallo = await motivoSiFalla(prisma.$transaction(async (tx) => {
     const creado = await tx.user.create({
       data: {
         companyId: sesion.companyId,
@@ -226,7 +265,9 @@ export async function crearUsuario(
         },
       },
     });
-  });
+  }), motivoDeFalloConUsuario);
+
+  if (fallo) return { ok: false, error: fallo };
 
   // Correo de bienvenida, best-effort: si el SMTP no esta configurado o falla,
   // el alta ya ocurrio y la clave se muestra igual en pantalla.
@@ -404,7 +445,9 @@ export async function editarUsuario(
     role,
   };
 
-  await prisma.$transaction(async (tx) => {
+  // Misma red que en el alta: aqui tambien entra texto de un formulario, y el
+  // correo puede chocar con el de un companero por una carrera.
+  const fallo = await motivoSiFalla(prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id: userId }, data: datosNuevos });
     await tx.auditLog.create({
       data: {
@@ -417,7 +460,9 @@ export async function editarUsuario(
         despues: datosNuevos,
       },
     });
-  });
+  }), motivoDeFalloConUsuario);
+
+  if (fallo) return { ok: false, error: fallo };
 
   /**
    * Cambiar el correo cierra las sesiones de esa persona.

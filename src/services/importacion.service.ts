@@ -1,4 +1,5 @@
 import "server-only";
+import { codigoDeFallo, motivoSiFalla } from "@/lib/fallo-de-base";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import {
@@ -93,16 +94,13 @@ export async function analizarRiesgoDeReemplazo(
  * unica pista era un codigo interno. Una pantalla rota no dice que arreglar
  * en el Excel; un mensaje si.
  *
- * Se mira `code` por forma y no con `instanceof PrismaClientKnownRequestError`:
- * con el adaptador de MariaDB el error puede venir envuelto, y un `instanceof`
- * que falla no da error —elige la rama equivocada—, que es justo lo que este
- * proyecto ya se comio una vez con `SinPermisoError`.
+ * La lectura del codigo vive en `lib/fallo-de-base` desde que el alta de
+ * usuarios resulto tener el mismo hueco. Los MENSAJES se quedan aqui: un
+ * catalogo compartido acabaria diciendo «hay un valor duplicado» donde este
+ * puede decir en que columna del Excel mirar.
  */
 export function motivoDeFalloAlGuardar(e: unknown): string {
-  const codigo =
-    typeof e === "object" && e !== null && "code" in e
-      ? String((e as { code: unknown }).code)
-      : null;
+  const codigo = codigoDeFallo(e);
 
   // Comun a todos: la importacion es UNA transaccion. Decirlo importa tanto
   // como el motivo, porque lo primero que teme quien ve un error es haber
@@ -132,23 +130,6 @@ export function motivoDeFalloAlGuardar(e: unknown): string {
       );
     default:
       return `No se pudo guardar el presupuesto. ${intacto}`;
-  }
-}
-
-/**
- * Espera a la escritura y devuelve el motivo si fallo, o null si fue bien.
- *
- * Recibe la promesa YA CREADA en vez de envolver la transaccion en un
- * `try` a proposito: asi el cuerpo de la transaccion —que son mas de cien
- * lineas— no cambia ni una sangria, y este arreglo se puede leer entero en
- * el diff en vez de quedar sepultado bajo un reindentado.
- */
-async function motivoSiFallo(promesa: Promise<unknown>): Promise<string | null> {
-  try {
-    await promesa;
-    return null;
-  } catch (e) {
-    return motivoDeFalloAlGuardar(e);
   }
 }
 
@@ -247,7 +228,7 @@ export async function aplicarImportacion(
 
   const profundidades = calcularProfundidades([...codigos]);
 
-  const fallo = await motivoSiFallo(prisma.$transaction(async (tx) => {
+  const fallo = await motivoSiFalla(prisma.$transaction(async (tx) => {
     if (existentes > 0) {
       /**
        * Se borra de fuera hacia dentro: en cada vuelta se eliminan las
@@ -372,7 +353,7 @@ export async function aplicarImportacion(
     // empezar a contar el tiempo de arriba. Bajo carga, sin este margen la
     // importacion falla antes de haber hecho nada.
     maxWait: 15_000,
-  }));
+  }), motivoDeFalloAlGuardar);
 
   if (fallo) return { ok: false, error: fallo };
 
