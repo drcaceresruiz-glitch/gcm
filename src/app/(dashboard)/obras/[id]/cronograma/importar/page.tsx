@@ -138,6 +138,37 @@ export default async function ImportarCronogramaPage({
         </a>
       </div>
 
+      {/* EL CAMINO DE PROJECTLIBRE. Va aparte del Excel y no como una segunda
+          opcion del mismo bloque porque no es el mismo publico: aqui esta
+          quien planifica con precedencias y ruta critica, y ProjectLibre no
+          abre el Excel de al lado. */}
+      {totalPartidas > 0 && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4"
+          style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
+        >
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold">
+              ¿Planificas en ProjectLibre o MS Project?
+            </h3>
+            <p className="mt-0.5 text-sm opacity-70">
+              Descarga tu EDT en <strong>XML de MS Project</strong>: ProjectLibre
+              lo abre —es gratis— y ahí pones fechas, precedencias y ruta
+              crítica. Cuando termines, sube aquí mismo el resultado: se admite
+              el <strong>.pod</strong> de ProjectLibre, el .mpp y el .xml.
+            </p>
+          </div>
+          <a
+            href={`/obras/${id}/cronograma/exportar-xml`}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-semibold"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <FileDown className="size-4" aria-hidden="true" />
+            Descargar XML
+          </a>
+        </div>
+      )}
+
       <ImportadorCronograma
         obraId={obra.id}
         admiteProject={puedeConvertirProject()}
