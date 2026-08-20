@@ -93,3 +93,30 @@ describe("repartirColumnas", () => {
     expect(anchos[1]).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Las unidades de obra.
+ *
+ * Estaba mal y salia impreso: "m²" se conservaba pero "m³" se convertia en
+ * "m3", asi que en la misma columna de un informe convivian dos grafias del
+ * mismo tipo de unidad. Los dos caracteres estan en WinAnsi -Helvetica sabe
+ * pintarlos- y ninguno hacia falta convertir.
+ *
+ * Los de UNA sola letra (㎡, ㎥) no estan, y esos si se cambian, pero por su
+ * forma normal con superindice, no por "m2".
+ */
+describe("las unidades de obra", () => {
+  it("conserva el cuadrado y el cubo", () => {
+    expect(aWinAnsi("Concreto f'c=210 kg/cm²")).toBe("Concreto f'c=210 kg/cm²");
+    expect(aWinAnsi("Excavacion 12.50 m³")).toBe("Excavacion 12.50 m³");
+  });
+
+  it("los escribe igual: m² y m³, no m² y m3", () => {
+    // Es el fallo concreto que se corrigio. Si vuelve, esta prueba lo dice.
+    expect(aWinAnsi("m² m³")).toBe("m² m³");
+  });
+
+  it("desarma las unidades de un solo caracter", () => {
+    expect(aWinAnsi("Area ㎡ y volumen ㎥")).toBe("Area m² y volumen m³");
+  });
+});

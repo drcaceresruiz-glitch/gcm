@@ -1,6 +1,6 @@
 import { decimal, metrado, porcentaje, precio } from "@/utils/formato";
 import type { CascadaComercial, TipoImpuestoContractual } from "@/lib/presupuesto";
-import type { LineaDetalle } from "@/lib/propuesta-detalle";
+import { SIMBOLO, type LineaDetalle, type Moneda } from "@/lib/propuesta-detalle";
 import type { EmisorPropuesta, Propuesta } from "@/services/propuesta.service";
 
 /**
@@ -30,6 +30,10 @@ export interface VistaPropuesta {
   presentacion: string;
   /// Texto libre antes de la firma. Vacio = no se pinta.
   observaciones: string;
+  moneda: Moneda;
+  /// El tipo de cambio usado. Solo se imprime al emitir en dolares: un precio
+  /// convertido sin decir a que cambio no hay forma de comprobarlo.
+  tipoCambio: string | null;
 }
 
 /** Las fracciones de la base (0.18) se leen como porcentaje (18.00%). */
@@ -91,7 +95,7 @@ export function DocumentoPropuesta({
         </section>
       )}
 
-      <TablaPartidas lineas={vista.lineas} />
+      <TablaPartidas lineas={vista.lineas} moneda={vista.moneda} />
       <Resumen vista={vista} porcentajes={revision.porcentajes} />
 
       <section className="mt-5 space-y-3 break-inside-avoid">
@@ -176,7 +180,13 @@ function Dato({
  * en cambio SI lo lleva cuando sus partidas se han resumido: entonces es el
  * unico sitio donde aparece ese dinero.
  */
-function TablaPartidas({ lineas }: { lineas: LineaDetalle[] }) {
+function TablaPartidas({
+  lineas,
+  moneda,
+}: {
+  lineas: LineaDetalle[];
+  moneda: Moneda;
+}) {
   return (
     <table className="mt-5 w-full border-collapse border border-black">
       <thead>
@@ -185,8 +195,8 @@ function TablaPartidas({ lineas }: { lineas: LineaDetalle[] }) {
           <Th>DESCRIPCIÓN</Th>
           <Th className="w-14">UND.</Th>
           <Th className="w-20 text-right">METRADO</Th>
-          <Th className="w-24 text-right">P. UNIT.</Th>
-          <Th className="w-28 text-right">PARCIAL S/</Th>
+          <Th className="w-24 text-right">P. UNIT. {SIMBOLO[moneda]}</Th>
+          <Th className="w-28 text-right">PARCIAL {SIMBOLO[moneda]}</Th>
         </tr>
       </thead>
       <tbody>
@@ -266,6 +276,12 @@ function Resumen({
   porcentajes: Propuesta["revision"]["porcentajes"];
 }) {
   const { cascada, impuesto } = vista;
+  const simbolo = SIMBOLO[vista.moneda];
+
+  // El simbolo va en CADA cifra, no solo en la cabecera de una columna. Es
+  // un papel que se entrega a un tercero: el precio que va a pagar no puede
+  // salir sin decir en que moneda esta.
+  const dinero = (valor: string) => `${simbolo} ${decimal(valor)}`;
 
   const hayDescuento = Number(cascada.descuento) !== 0;
   const hayIgv = impuesto === "IGV";
@@ -278,52 +294,61 @@ function Resumen({
       <div className="flex justify-end">
         <table className="w-96 border-collapse border border-black">
           <tbody>
-            <Fila etiqueta="COSTO DIRECTO" importe={cascada.costoDirecto} />
+            <Fila etiqueta="COSTO DIRECTO" importe={dinero(cascada.costoDirecto)} />
             <Fila
               etiqueta={`GASTOS GENERALES (${pct(porcentajes.gastosGenerales)})`}
-              importe={cascada.gastosGenerales}
+              importe={dinero(cascada.gastosGenerales)}
             />
             <Fila
               etiqueta={`UTILIDAD (${pct(porcentajes.utilidad)})`}
-              importe={cascada.utilidad}
+              importe={dinero(cascada.utilidad)}
             />
-            <Fila etiqueta="SUBTOTAL" importe={cascada.subtotal} />
+            <Fila etiqueta="SUBTOTAL" importe={dinero(cascada.subtotal)} />
             {hayDescuento && (
               <Fila
                 etiqueta={`DESCUENTO COMERCIAL (${pct(porcentajes.descuento)})`}
-                importe={cascada.descuento}
+                importe={dinero(cascada.descuento)}
               />
             )}
             <Fila
               etiqueta="VALOR DE VENTA"
-              importe={cascada.valorVenta}
+              importe={dinero(cascada.valorVenta)}
               destacado={!precioDistinto}
             />
             {hayIgv && (
               <Fila
                 etiqueta={`IGV (${pct(vista.porcentajeIgv)})`}
-                importe={cascada.igv}
+                importe={dinero(cascada.igv)}
               />
             )}
             {precioDistinto && (
               <Fila
                 etiqueta="PRECIO DE VENTA"
-                importe={cascada.precioVenta}
+                importe={dinero(cascada.precioVenta)}
                 destacado
               />
             )}
             {hayRetencion && (
               <Fila
                 etiqueta={`RETENCIÓN DE RENTA (${pct(vista.porcentajeRetencion)})`}
-                importe={cascada.retencionRenta}
+                importe={dinero(cascada.retencionRenta)}
               />
             )}
             {hayRetencion && (
-              <Fila etiqueta="NETO A RECIBIR" importe={cascada.netoARecibir} />
+              <Fila etiqueta="NETO A RECIBIR" importe={dinero(cascada.netoARecibir)} />
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Un precio convertido sin decir a que cambio no hay forma de
+          comprobarlo, y el cliente no puede cerrar el trato sobre el. */}
+      {vista.moneda === "USD" && vista.tipoCambio !== null && (
+        <p className="mt-2 text-right text-[10px]">
+          Importes convertidos desde soles al tipo de cambio{" "}
+          {vista.tipoCambio}.
+        </p>
+      )}
 
       {/* Por que no hay IGV. Sin esta linea, un cliente que compara dos
           propuestas piensa que falta un impuesto. */}
@@ -353,7 +378,7 @@ function Fila({
       <td
         className={`border border-black px-2 py-1 text-right font-mono ${destacado ? "text-sm font-bold" : ""}`}
       >
-        {decimal(importe)}
+        {importe}
       </td>
     </tr>
   );

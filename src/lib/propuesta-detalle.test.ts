@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { aplicarDetalle, type LineaPropuesta, type NivelDetalle } from "./propuesta-detalle";
+import {
+  aplicarDetalle,
+  convertirLineas,
+  costoDirectoDeLineas,
+  type LineaPropuesta,
+  type NivelDetalle,
+} from "./propuesta-detalle";
 import { sumar } from "./decimal";
 
 /**
@@ -41,7 +47,19 @@ const PRESUPUESTO: LineaPropuesta[] = [
   fila("3.01.02", "Corte de losa", "450.00"),
 ];
 
+// Suma alzada con hijas DESCRIPTIVAS: el importe esta en el padre y las hijas
+// solo explican que incluye. Es la forma que hizo perder 9.711,05 de la
+// columna en el presupuesto real, y la que la regla vieja no sabia tratar.
+const CON_ALZADA: LineaPropuesta[] = [
+  ...PRESUPUESTO,
+  fila("4", "CAPITULO IV: INSTALACIONES", null, true),
+  fila("4.01", "Sistema contra incendios (suma alzada)", "9711.05"),
+  fila("4.01.01", "Incluye: rociadores y gabinetes", null),
+  fila("4.01.02", "Incluye: pruebas hidrostaticas", null),
+];
+
 const TOTAL = "12175.00";
+const TOTAL_CON_ALZADA = "21886.05";
 
 /// Lo que de verdad se suma en el papel: las filas que llevan cifra.
 function totalVisible(nivel: NivelDetalle): string {
@@ -124,5 +142,85 @@ describe("el detalle de la propuesta", () => {
 
     expect(vacio.importe).toBeNull();
     expect(vacio.esSubtotal).toBe(false);
+  });
+});
+
+/**
+ * Emitir en dolares.
+ *
+ * Se convierten las LINEAS y el costo directo sale de sumarlas, no al reves.
+ * Con este tipo de cambio se ve por que: 12.175,00 / 3,80 da 3.203,95, pero la
+ * suma de las seis lineas ya convertidas da 3.203,94. Un centimo. En el papel
+ * que firma el cliente, la columna tiene que sumar la cifra que hay debajo.
+ */
+describe("la propuesta en dolares", () => {
+  const TC = "3.80";
+  const EN_DOLARES = convertirLineas(PRESUPUESTO, TC);
+
+  it("convierte cada linea, no el total", () => {
+    const residente = EN_DOLARES.find((l) => l.codigo === "1.01")!;
+    expect(residente.parcial).toBe("2026.32");
+  });
+
+  it("el costo directo es lo que suma la columna", () => {
+    expect(costoDirectoDeLineas(EN_DOLARES)).toBe("3203.94");
+  });
+
+  it.each(["capitulos", "partidas", "todo"] as const)(
+    "con detalle %s el total en dolares tampoco cambia",
+    (nivel) => {
+      const importes = aplicarDetalle(EN_DOLARES, nivel)
+        .map((l) => l.importe)
+        .filter((i): i is string => i !== null);
+
+      expect(sumar(importes, 2)).toBe("3203.94");
+    },
+  );
+
+  it("no toca el metrado: lo que cambia es el dinero", () => {
+    const residente = EN_DOLARES.find((l) => l.codigo === "1.01")!;
+    const original = PRESUPUESTO.find((l) => l.codigo === "1.01")!;
+
+    expect(residente.metrado).toBe(original.metrado);
+    expect(residente.unidad).toBe(original.unidad);
+  });
+});
+
+/**
+ * El dinero de una partida a suma alzada con hijas que no cuestan.
+ *
+ * El importe vive en el padre; las hijas solo describen que incluye. La regla
+ * vieja -"lleva cifra el que no tenga ninguna visible debajo"- dejaba al padre
+ * sin cifra porque sus hijas se veian, y las hijas no tenian nada que enseñar:
+ * ese dinero se caia de la columna sin dar ningun error. Lo destapo un
+ * presupuesto real de 347 partidas, no esta bateria.
+ */
+describe("una partida a suma alzada con hijas descriptivas", () => {
+  it.each(["capitulos", "partidas", "todo"] as const)(
+    "con detalle %s su dinero sigue en la columna",
+    (nivel) => {
+      const importes = aplicarDetalle(CON_ALZADA, nivel)
+        .map((l) => l.importe)
+        .filter((i): i is string => i !== null);
+
+      expect(sumar(importes, 2)).toBe(TOTAL_CON_ALZADA);
+    },
+  );
+
+  it("con todo el detalle, la cifra la lleva el padre", () => {
+    const filas = aplicarDetalle(CON_ALZADA, "todo");
+
+    expect(filas.find((f) => f.codigo === "4.01")!.importe).toBe("9711.05");
+    expect(filas.find((f) => f.codigo === "4.01.01")!.importe).toBeNull();
+  });
+
+  it("y no es un subtotal: es su propio importe", () => {
+    // Por eso conserva su unidad y su precio unitario.
+    const alzada = aplicarDetalle(CON_ALZADA, "todo").find(
+      (f) => f.codigo === "4.01",
+    )!;
+
+    expect(alzada.esSubtotal).toBe(false);
+    expect(alzada.unidad).toBe("glb");
   });
 });

@@ -455,7 +455,7 @@ export async function generarPlantillaMeta(
     );
 
     fila.getCell(3).alignment = { horizontal: "center" };
-    fila.getCell(4).numFmt = "#,##0.0000";
+    fila.getCell(4).numFmt = "#,##0.00";
     fila.getCell(5).numFmt = "#,##0.00";
     fila.getCell(6).numFmt = "#,##0.00";
 
@@ -497,7 +497,7 @@ export async function generarPlantillaMeta(
 
   for (let f = n + 1; f <= ultimaFila; f++) {
     const fila = costo.getRow(f);
-    fila.getCell(4).numFmt = "#,##0.0000";
+    fila.getCell(4).numFmt = "#,##0.00";
     fila.getCell(5).numFmt = "#,##0.00";
     fila.getCell(6).numFmt = "#,##0.00";
     // Sin descripcion el importador la salta, asi que la formula puede estar
@@ -570,6 +570,14 @@ export async function generarPlantillaMeta(
   pintarCabecera(gastos.getRow(FILA_CABECERA), CABECERAS_GASTOS);
 
   let g = FILA_CABECERA;
+  // Los tres totales del pie se acumulan con los MISMOS numeros que van en
+  // las filas. ExcelJS no calcula: una formula sin `result` se lee como celda
+  // vacia si el archivo no se abre en Excel antes de subirlo, y el pie de la
+  // hoja saldria en blanco justo en las tres cifras que se miran primero.
+  let totalGG = 0;
+  let totalVariable = 0;
+  let totalFijo = 0;
+
   for (const f of ajustarMeses(FILAS_GASTOS, mesesObra)) {
     g++;
     const fila = gastos.getRow(g);
@@ -586,13 +594,16 @@ export async function generarPlantillaMeta(
     // El subtotal de la linea, calculado: un VARIABLE es mensual x meses y un
     // FIJO es su importe. Antes habia que multiplicarlo a mano y nada avisaba
     // si el resultado no cuadraba con lo tecleado.
-    fila.getCell(6).value = {
-      formula: formulaSubtotal(g),
-      result:
-        f.tipo === "VARIABLE"
-          ? (f.montoMensual ?? 0) * (f.meses ?? 0)
-          : (f.montoFijo ?? 0),
-    };
+    const subtotal =
+      f.tipo === "VARIABLE"
+        ? (f.montoMensual ?? 0) * (f.meses ?? 0)
+        : (f.montoFijo ?? 0);
+
+    totalGG += subtotal;
+    if (f.tipo === "VARIABLE") totalVariable += subtotal;
+    else totalFijo += subtotal;
+
+    fila.getCell(6).value = { formula: formulaSubtotal(g), result: subtotal };
     fila.getCell(6).numFmt = "#,##0.00";
     for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
     marcarCalculada(
@@ -625,17 +636,23 @@ export async function generarPlantillaMeta(
   const rango = `$F$${primerGasto}:$F$${ultimoGasto}`;
   const tipos = `$B$${primerGasto}:$B$${ultimoGasto}`;
 
-  const pie: readonly [string, string][] = [
-    ["TOTAL GASTOS GENERALES", `SUM(${rango})`],
-    ["GG Variables (crecen con el plazo)", `SUMIF(${tipos},"VARIABLE",${rango})`],
-    ["GG Fijos (no dependen del plazo)", `SUMIF(${tipos},"FIJO",${rango})`],
+  const pie: readonly [string, string, number][] = [
+    ["TOTAL GASTOS GENERALES", `SUM(${rango})`, totalGG],
+    [
+      "GG Variables (crecen con el plazo)",
+      `SUMIF(${tipos},"VARIABLE",${rango})`,
+      totalVariable,
+    ],
+    ["GG Fijos (no dependen del plazo)", `SUMIF(${tipos},"FIJO",${rango})`, totalFijo],
   ];
 
-  pie.forEach(([etiqueta, formula], i) => {
+  pie.forEach(([etiqueta, formula, resultado], i) => {
     const fila = gastos.getRow(filaTotalGG + i);
     fila.getCell(1).value = etiqueta;
     fila.getCell(1).font = { bold: i === 0 };
-    fila.getCell(6).value = { formula };
+    // Redondeado a centimos: sumar decimales en coma flotante deja colas como
+    // 0.30000000000000004, y eso se escribiria tal cual en la celda.
+    fila.getCell(6).value = { formula, result: Math.round(resultado * 100) / 100 };
     fila.getCell(6).numFmt = "#,##0.00";
     fila.getCell(6).font = { bold: i === 0 };
   });

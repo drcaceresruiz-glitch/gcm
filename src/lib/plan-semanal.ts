@@ -22,10 +22,10 @@ export const ETIQUETA_CNC: Record<CausaNoCumplimiento, string> = {
   MATERIALES: "Materiales",
   MANO_OBRA: "Mano de obra",
   EQUIPOS: "Equipos",
-  INFORMACION: "Informacion / RFI",
+  INFORMACION: "Información / RFI",
   CLIENTE_TERCEROS: "Cliente / terceros",
   CLIMA: "Clima",
-  REPROGRAMACION: "Reprogramacion",
+  REPROGRAMACION: "Reprogramación",
   OTRA: "Otra",
 };
 

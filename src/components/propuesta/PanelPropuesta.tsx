@@ -9,7 +9,13 @@ import {
   porcentajeAFraccion,
   type TipoImpuestoContractual,
 } from "@/lib/presupuesto";
-import { aplicarDetalle, type NivelDetalle } from "@/lib/propuesta-detalle";
+import {
+  aplicarDetalle,
+  convertirLineas,
+  costoDirectoDeLineas,
+  type Moneda,
+  type NivelDetalle,
+} from "@/lib/propuesta-detalle";
 import type { Propuesta } from "@/services/propuesta.service";
 import { DocumentoPropuesta } from "@/components/propuesta/DocumentoPropuesta";
 
@@ -61,24 +67,49 @@ export function PanelPropuesta({ propuesta }: { propuesta: Propuesta }) {
     Number(porcentajes.igv) > 0 ? porcentajes.igv : IGV_POR_DEFECTO,
   );
   const [detalle, setDetalle] = useState<NivelDetalle>("todo");
+  const [moneda, setMoneda] = useState<Moneda>("PEN");
+
+  const tipoCambio = propuesta.revision.tipoCambio;
+
+  /**
+   * Se convierten las LINEAS, no el total.
+   *
+   * En la base todo el dinero esta en soles; emitir en dolares es una decision
+   * de presentacion, como el impuesto. Al convertir linea a linea la columna
+   * del papel sigue sumando exactamente el costo directo que se lee abajo:
+   * convertir el total por separado dejaria un descuadre de centimos entre la
+   * columna y el resumen, en un documento que firma un cliente.
+   */
+  const enMoneda = useMemo(
+    () =>
+      moneda === "USD" && tipoCambio !== null
+        ? convertirLineas(propuesta.lineas, tipoCambio)
+        : propuesta.lineas,
+    [propuesta.lineas, tipoCambio, moneda],
+  );
+
+  const costoDirecto =
+    moneda === "USD" && tipoCambio !== null
+      ? costoDirectoDeLineas(enMoneda)
+      : propuesta.costoDirectoNeto;
   const [presentacion, setPresentacion] = useState("");
   const [observaciones, setObservaciones] = useState("");
 
   const lineas = useMemo(
-    () => aplicarDetalle(propuesta.lineas, detalle),
-    [propuesta.lineas, detalle],
+    () => aplicarDetalle(enMoneda, detalle),
+    [enMoneda, detalle],
   );
 
   const cascada = useMemo(
     () =>
       calcularCascadaComercial({
-        costoDirecto: propuesta.costoDirectoNeto,
+        costoDirecto,
         porcentajeGastosGenerales: porcentajes.gastosGenerales,
         porcentajeUtilidad: porcentajes.utilidad,
         porcentajeDescuento: porcentajes.descuento,
         ...parametrosDeImpuesto(impuesto, igv, asumida, porcentajes.retencion),
       }),
-    [propuesta.costoDirectoNeto, porcentajes, impuesto, igv, asumida],
+    [costoDirecto, porcentajes, impuesto, igv, asumida],
   );
 
   const vista = {
@@ -89,6 +120,8 @@ export function PanelPropuesta({ propuesta }: { propuesta: Propuesta }) {
     porcentajeRetencion: porcentajes.retencion,
     presentacion,
     observaciones,
+    moneda,
+    tipoCambio,
   };
 
   return (
@@ -102,6 +135,9 @@ export function PanelPropuesta({ propuesta }: { propuesta: Propuesta }) {
         onIgv={setIgv}
         asumida={asumida}
         onAsumida={setAsumida}
+        moneda={moneda}
+        onMoneda={setMoneda}
+        tipoCambio={tipoCambio}
         detalle={detalle}
         onDetalle={setDetalle}
         presentacion={presentacion}
@@ -132,6 +168,9 @@ function Controles(p: {
   onIgv: (v: string) => void;
   asumida: boolean;
   onAsumida: (v: boolean) => void;
+  moneda: Moneda;
+  onMoneda: (v: Moneda) => void;
+  tipoCambio: string | null;
   detalle: NivelDetalle;
   onDetalle: (v: NivelDetalle) => void;
   presentacion: string;
@@ -168,6 +207,28 @@ function Controles(p: {
               <option value="RENTA">Recibo por honorarios (sin IGV)</option>
               <option value="NINGUNO">Sin impuesto</option>
             </select>
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium">Moneda</span>
+            <select
+              value={p.moneda}
+              onChange={(e) => p.onMoneda(e.target.value as Moneda)}
+              className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <option value="PEN">Soles (S/)</option>
+              {/* Sin tipo de cambio en la revision no se puede: inventar una
+                  cotizacion del dia seria poner un precio que nadie pacto. */}
+              <option value="USD" disabled={p.tipoCambio === null}>
+                {"Dólares (US$)"}
+              </option>
+            </select>
+            <span className="mt-1 block text-xs opacity-70">
+              {p.tipoCambio === null
+                ? "Para emitir en dólares, anota el tipo de cambio en la revisión."
+                : `Tipo de cambio de la revisión: ${p.tipoCambio}`}
+            </span>
           </label>
 
           <label className="block">
@@ -256,6 +317,7 @@ function Controles(p: {
         <form method="POST" action={`/obras/${p.obraId}/propuesta/excel`}>
           <input type="hidden" name="revisionId" value={p.revisionId} />
           <input type="hidden" name="impuesto" value={p.impuesto} />
+          <input type="hidden" name="moneda" value={p.moneda} />
           <input type="hidden" name="igv" value={p.igv} />
           <input type="hidden" name="asumida" value={String(p.asumida)} />
           <input type="hidden" name="presentacion" value={p.presentacion} />

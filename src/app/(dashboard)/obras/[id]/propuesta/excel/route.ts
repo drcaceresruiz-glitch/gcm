@@ -1,7 +1,13 @@
 import ExcelJS from "exceljs";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerPropuesta } from "@/services/propuesta.service";
-import { aplicarDetalle } from "@/lib/propuesta-detalle";
+import {
+  aplicarDetalle,
+  convertirLineas,
+  costoDirectoDeLineas,
+  SIMBOLO,
+  type Moneda,
+} from "@/lib/propuesta-detalle";
 import { normalizarDecimal } from "@/lib/decimal";
 import {
   calcularCascadaComercial,
@@ -28,7 +34,14 @@ const MAX_TEXTO = 2000;
 
 const IMPUESTOS = new Set<string>(["IGV", "RENTA", "NINGUNO"]);
 
-const DINERO = "#,##0.00";
+const METRADO = "#,##0.00";
+
+/// El simbolo va DENTRO del formato: la celda sigue siendo un numero y suma,
+/// pero se lee con su moneda. Una columna de dinero sin moneda, en un papel
+/// que se entrega a un cliente, es un error.
+function formatoDinero(moneda: Moneda): string {
+  return `"${SIMBOLO[moneda]}" #,##0.00`;
+}
 const VERDE = "FF0D5C56";
 
 function texto(datos: FormData, clave: string): string {
@@ -67,10 +80,25 @@ export async function POST(
     normalizarDecimal(String(datos.get("igv") ?? ""), 4) ??
     propuesta.revision.porcentajes.igv;
 
-  const { porcentajes } = propuesta.revision;
+  const { porcentajes, tipoCambio } = propuesta.revision;
+
+  // Solo se emite en dolares si la revision trae tipo de cambio. Sin el, se
+  // cae a soles en silencio en vez de inventar una cotizacion.
+  const moneda: Moneda =
+    datos.get("moneda") === "USD" && tipoCambio !== null ? "USD" : "PEN";
+
+  // Se convierten las LINEAS y el costo directo sale de sumarlas: asi la
+  // columna del Excel suma exactamente la cifra del resumen.
+  const lineas =
+    moneda === "USD" && tipoCambio !== null
+      ? convertirLineas(propuesta.lineas, tipoCambio)
+      : propuesta.lineas;
+
+  const costoDirecto =
+    moneda === "USD" ? costoDirectoDeLineas(lineas) : propuesta.costoDirectoNeto;
 
   const cascada = calcularCascadaComercial({
-    costoDirecto: propuesta.costoDirectoNeto,
+    costoDirecto,
     porcentajeGastosGenerales: porcentajes.gastosGenerales,
     porcentajeUtilidad: porcentajes.utilidad,
     porcentajeDescuento: porcentajes.descuento,
@@ -87,7 +115,8 @@ export async function POST(
     cascada,
     impuesto,
     igv,
-    aplicarDetalle(propuesta.lineas, "todo"),
+    moneda,
+    aplicarDetalle(lineas, "todo"),
     texto(datos, "presentacion"),
     texto(datos, "observaciones"),
   );
@@ -133,10 +162,13 @@ async function componer(
   cascada: Cascada,
   impuesto: TipoImpuestoContractual,
   igv: string,
+  moneda: Moneda,
   lineas: Lineas,
   presentacion: string,
   observaciones: string,
 ): Promise<ArrayBuffer> {
+  const DINERO = formatoDinero(moneda);
+
   const libro = new ExcelJS.Workbook();
   libro.creator = "GCM";
 
@@ -195,8 +227,8 @@ async function componer(
     "Descripción",
     "Und.",
     "Metrado",
-    "P. Unit. S/",
-    "Parcial S/",
+    "P. Unit. " + SIMBOLO[moneda],
+    "Parcial " + SIMBOLO[moneda],
   ]);
 
   cabecera.eachCell((celda) => {
@@ -229,12 +261,20 @@ async function componer(
       });
     }
 
-    fila.getCell(4).numFmt = DINERO;
+    fila.getCell(4).numFmt = METRADO;
     fila.getCell(5).numFmt = DINERO;
     fila.getCell(6).numFmt = DINERO;
   }
 
-  resumenDeCascada(hoja, cascada, impuesto, igv, revision.porcentajes);
+  resumenDeCascada(
+    hoja,
+    cascada,
+    impuesto,
+    igv,
+    moneda,
+    revision.tipoCambio,
+    revision.porcentajes,
+  );
 
   bloque(hoja, "OBSERVACIONES", observaciones);
   bloque(hoja, "CONDICIONES", revision.clausulas ?? "");
@@ -259,6 +299,8 @@ function resumenDeCascada(
   cascada: Cascada,
   impuesto: TipoImpuestoContractual,
   igv: string,
+  moneda: Moneda,
+  tipoCambioUsado: string | null,
   porcentajes: Propuesta["revision"]["porcentajes"],
 ): void {
   const filas: [string, string][] = [
@@ -298,6 +340,8 @@ function resumenDeCascada(
     filas.push(["NETO A RECIBIR", cascada.netoARecibir]);
   }
 
+  const DINERO = formatoDinero(moneda);
+
   hoja.addRow([]);
 
   for (const [etiqueta, importe] of filas) {
@@ -305,6 +349,13 @@ function resumenDeCascada(
     fila.getCell(5).font = { bold: true };
     fila.getCell(6).font = { bold: true };
     fila.getCell(6).numFmt = DINERO;
+  }
+
+  if (moneda === "USD" && tipoCambioUsado !== null) {
+    hoja.addRow([]);
+    hoja.addRow([
+      "Importes convertidos desde soles al tipo de cambio " + tipoCambioUsado + ".",
+    ]);
   }
 
   if (impuesto !== "IGV") {

@@ -4,6 +4,7 @@ import {
   codigoPadre,
   sumarHojas,
 } from "@/lib/jerarquia-partidas";
+import { dividir, sumar } from "@/lib/decimal";
 
 /**
  * Cuanto detalle se enseña en la propuesta.
@@ -61,41 +62,57 @@ export function aplicarDetalle(
 
   const seVe = (codigo: string) => (profundidad.get(codigo) ?? 0) <= tope;
 
-  // El subarbol de cada codigo, incluido el mismo. Se construye subiendo por
-  // la cadena de padres una sola vez por linea; el `vistos` protege de un
-  // codigo autorreferente por datos corruptos.
-  const subarbol = new Map<string, LineaPropuesta[]>();
+  // Los que de verdad ponen dinero. Es el MISMO criterio con el que se calcula
+  // el costo directo de la obra, asi que la columna no puede sumar otra cosa.
+  const aporta = aportantes(
+    lineas.map((l) => ({ codigo: l.codigo, parcial: l.parcial })),
+  );
 
-  for (const linea of lineas) {
-    let actual: string | null = linea.codigo;
+  const esAportante = new Set(aporta.map((a) => a.codigo));
+
+  /**
+   * Cada aportante se cuelga de su ancestro VISIBLE mas profundo.
+   *
+   * Asi cada importe se cuenta una vez y solo una, se enseñe el detalle que se
+   * enseñe.
+   *
+   * La regla anterior era "una fila lleva cifra si no tiene ninguna visible
+   * debajo", y PERDIA DINERO: una partida a suma alzada con hijas descriptivas
+   * -que no llevan importe propio- se quedaba sin cifra porque sus hijas se
+   * veian, y las hijas no tenian nada que enseñar. En el presupuesto real de
+   * 347 partidas eso escondia 9.711,05 de la columna sin dar ningun error.
+   */
+  const reparto = new Map<string, string[]>();
+
+  for (const a of aporta) {
+    let destino = a.codigo;
     const vistos = new Set<string>();
 
-    while (actual !== null && !vistos.has(actual)) {
-      vistos.add(actual);
-      const rama = subarbol.get(actual);
-      if (rama) rama.push(linea);
-      else subarbol.set(actual, [linea]);
-      actual = codigoPadre(actual, existentes);
+    while (!seVe(destino) && !vistos.has(destino)) {
+      vistos.add(destino);
+      const padre = codigoPadre(destino, existentes);
+      if (padre === null) break;
+      destino = padre;
     }
+
+    const lista = reparto.get(destino);
+    if (lista) lista.push(a.parcial!);
+    else reparto.set(destino, [a.parcial!]);
   }
 
   return lineas
     .filter((l) => seVe(l.codigo))
     .map((l) => {
-      const rama = subarbol.get(l.codigo) ?? [l];
-      const hayVisibleDebajo = rama.some(
-        (o) => o.codigo !== l.codigo && seVe(o.codigo),
-      );
+      const suyos = reparto.get(l.codigo) ?? [];
 
-      const nodos = rama.map((n) => ({ codigo: n.codigo, parcial: n.parcial }));
-      const aporta = aportantes(nodos);
+      // Sin nada colgado no se inventa un "0.00": un capitulo vacio se deja en
+      // blanco, que es lo que dice la verdad.
+      const importe = suyos.length === 0 ? null : sumar(suyos, 2);
 
-      // Sin nada costeado debajo no se inventa un "0.00": un capitulo vacio se
-      // deja en blanco, igual que ahora.
-      const importe =
-        hayVisibleDebajo || aporta.length === 0 ? null : sumarHojas(nodos);
-
-      const esSubtotal = importe !== null && rama.length > 1;
+      // Es subtotal salvo que lo unico que lleve sea su propio importe.
+      const esSubtotal =
+        importe !== null &&
+        !(suyos.length === 1 && esAportante.has(l.codigo));
 
       return {
         ...l,
@@ -108,4 +125,54 @@ export function aplicarDetalle(
         unidad: esSubtotal ? null : l.unidad,
       };
     });
+}
+
+/**
+ * La moneda en la que se emite.
+ *
+ * En la base TODO el dinero esta en soles: no hay campo de moneda en ninguna
+ * parte. Lo que si hay es el `tipoCambio` de la revision, cuyo comentario en
+ * el esquema dice exactamente para que existe -"para expresar el presupuesto
+ * en dolares"-, asi que la moneda es una decision de PRESENTACION, como el
+ * impuesto: no cambia lo guardado.
+ *
+ * Sin tipo de cambio en la revision NO se puede emitir en dolares. Inventar
+ * una cotizacion del dia seria poner un precio que nadie ha pactado.
+ */
+export type Moneda = "PEN" | "USD";
+
+export const SIMBOLO: Record<Moneda, string> = {
+  PEN: "S/",
+  USD: "US$",
+};
+
+/**
+ * Pasa las lineas a dolares dividiendo por el tipo de cambio.
+ *
+ * Se convierten las LINEAS, no el total: asi la columna sigue sumando
+ * exactamente el costo directo que se imprime abajo. Convertir el total por
+ * separado dejaria una diferencia de centimos entre la suma de la columna y
+ * la cifra del resumen, que en un papel que firma un cliente es un error.
+ *
+ * El precio unitario va a 4 decimales y el parcial a 2, la misma regla que en
+ * soles: redondear el unitario a centimos desvia el parcial en cuanto el
+ * metrado es grande.
+ */
+export function convertirLineas(
+ lineas: readonly LineaPropuesta[],
+  tipoCambio: string,
+): LineaPropuesta[] {
+  const enMoneda = (valor: string | null, escala: number) =>
+    valor === null ? null : dividir(valor, tipoCambio, escala);
+
+  return lineas.map((l) => ({
+    ...l,
+    precioUnitario: enMoneda(l.precioUnitario, 4),
+    parcial: enMoneda(l.parcial, 2),
+  }));
+}
+
+/// El costo directo que de verdad suma la columna, en la moneda que sea.
+export function costoDirectoDeLineas(lineas: readonly LineaPropuesta[]): string {
+  return sumarHojas(lineas.map((l) => ({ codigo: l.codigo, parcial: l.parcial })));
 }

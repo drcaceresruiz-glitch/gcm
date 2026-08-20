@@ -53,6 +53,8 @@ export interface Propuesta {
     version: number;
     fechaRevision: Date;
     aprobada: boolean;
+    /// Para poder emitirla en dolares. null = solo se puede en soles.
+    tipoCambio: string | null;
     clausulas: string | null;
     tipoImpuesto: TipoImpuestoContractual;
     retencionAsumida: boolean;
@@ -139,6 +141,7 @@ export async function obtenerPropuesta(
       fechaRevision: true,
       aprobadaAt: true,
       clausulas: true,
+      tipoCambio: true,
       costoDirecto: true,
       descuentos: true,
       porcentajeGastosGenerales: true,
@@ -223,6 +226,7 @@ export async function obtenerPropuesta(
       version: revision.version,
       fechaRevision: revision.fechaRevision,
       aprobada: revision.aprobadaAt !== null,
+      tipoCambio: revision.tipoCambio?.toString() ?? null,
       clausulas: revision.clausulas,
       tipoImpuesto,
       retencionAsumida: revision.retencionAsumida,

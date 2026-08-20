@@ -37,8 +37,14 @@ const EQUIVALENTES: Record<string, string> = {
   "​": "", // espacio de ancho cero
   "•": "-", // •
   "●": "-", // ●
-  "㎡": "m2", // ㎡
-  "³": "3", // ³ (si, WinAnsi lo tiene; se normaliza igual por claridad)
+  // Los de una sola letra: WinAnsi no los tiene, pero si tiene el cuadrado y
+  // el cubo sueltos, asi que se cambian por su forma normal en vez de por
+  // "m2". El superindice se conserva.
+  "㎡": "m²", // ㎡
+  "㎥": "m³", // ㎥
+  // OJO: ² y ³ (0xB2 y 0xB3) SI estan en WinAnsi y pasan tal cual. Aqui hubo
+  // una entrada que convertia ³ en "3" y no la habia para ²: en la misma
+  // columna salia "m²" al lado de "m3", con dos criterios tipograficos.
 };
 
 /**
