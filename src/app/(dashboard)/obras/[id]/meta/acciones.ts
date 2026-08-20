@@ -146,6 +146,10 @@ export async function accionImportarMeta(
     precioUnitario: f.precioUnitario,
     // Un capitulo es un titulo: no lleva importe propio y no suma.
     parcial: f.tipo === "CAPITULO" ? null : f.parcial,
+    // El recargo solo lo llevan los capitulos, y es de donde saldra el
+    // presupuesto contractual. Se perdia justo aqui: el importador ya lo
+    // leia, pero este mapeo no lo copiaba y nunca llegaba a la base.
+    porcentajeRecargo: f.porcentajeRecargo,
   }));
 
   const gastosGenerales: EntradaGastoMeta[] = gastos.filas.map((g) => ({

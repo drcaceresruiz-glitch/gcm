@@ -194,7 +194,7 @@ export const TABLAS: readonly TablaRespaldo[] = [
     tabla: "presupuesto_meta_items",
     modelo: "presupuestoMetaItem",
     refs: [{ campo: "presupuestoMetaId", a: "presupuestos_meta" }],
-    decimales: { metrado: 4, precioUnitario: 4, parcial: 2 },
+    decimales: { metrado: 4, precioUnitario: 4, parcial: 2, porcentajeRecargo: 3 },
   },
   {
     /// El ORDEN de estas dos referencias importa, y no es capricho: se llega a

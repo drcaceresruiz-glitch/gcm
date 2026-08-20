@@ -3564,6 +3564,14 @@ model PresupuestoMetaItem {
   precioUnitario Decimal? @db.Decimal(14, 4)
   parcial        Decimal? @db.Decimal(14, 2)
 
+  /// Solo en CAPITULOS: cuanto se recarga este capitulo del presupuesto real
+  /// para llegar al presupuesto contractual.
+  ///
+  /// Se guarda COMO PORCENTAJE, no como fraccion: 18.000 son 18%. Es lo que
+  /// se escribe en la plantilla y lo que ensena la hoja, y guardarlo igual
+  /// evita el error de cien veces, que en un presupuesto no da error: da una
+  /// cifra creible y equivocada. Para calcular, `porcentajeAFraccion`.
+  porcentajeRecargo Decimal? @db.Decimal(6, 3)
   meta    PresupuestoMeta   @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
   reparto MetaItemPartida[]
 

@@ -414,6 +414,13 @@ export interface EntradaItemMeta {
   /// contractual, aqui no hay jerarquia que resolver: cada fila lleva lo suyo
   /// y el costo directo es la suma llana de las que tienen importe.
   parcial: string | null;
+  /// Solo en capitulos: % de recargo con el que se genera el contractual.
+  ///
+  /// OBLIGATORIO a proposito, aunque casi siempre sea null: este dato ya se
+  /// perdio una vez en silencio (el importador lo leia y el mapeo de la
+  /// accion no lo copiaba). Siendo obligatorio, quien construya la entrada
+  /// tiene que decidir, y `tsc` senala el sitio si alguien lo olvida.
+  porcentajeRecargo: string | null;
 }
 
 export interface EntradaGastoMeta {
@@ -571,6 +578,7 @@ export async function crearMeta(
         metrado: i.metrado ?? null,
         precioUnitario: i.precioUnitario ?? null,
         parcial: i.parcial,
+        porcentajeRecargo: i.porcentajeRecargo ?? null,
       })),
     });
 
