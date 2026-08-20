@@ -59,7 +59,7 @@ export const SEMANAS_MINIMAS = 3;
 /// Hasta aqui, lo prometido cabe segun el propio historial.
 export const UMBRAL_AMBICIOSO = 1.0;
 /// A partir de aqui, es sobrecarga probable.
-export const UMBRAL_SOBRECARGA = 1.3;
+export const UMBRAL_SOBRECARGA = 1.4;
 
 function nivelDe(indice: number): NivelAmbicion {
   if (indice <= UMBRAL_AMBICIOSO) return "cabe";

@@ -156,3 +156,17 @@ describe("ambicionDelPlan", () => {
     expect(ambicionDelPlan(irregular, 4)?.rendimiento).toBe(3.3);
   });
 });
+
+describe("umbral de sobrecarga en 1.4", () => {
+  it("prometer un 40% mas (indice 1,4 exacto) es la ultima franja ambar, no rojo", () => {
+    // Rinde 10; promete 14 -> indice 1,4 justo en el limite. Con el umbral
+    // viejo (1,3) esto salia en rojo; ahora es ambicioso (ambar).
+    const a = ambicionDelPlan(semanas(3, 10), 14);
+    expect(a?.indice).toBe(1.4);
+    expect(a?.nivel).toBe("ambicioso");
+  });
+
+  it("pasado 1.4 ya es sobrecarga (indice 1,5)", () => {
+    expect(ambicionDelPlan(semanas(3, 10), 15)?.nivel).toBe("sobrecarga");
+  });
+});
