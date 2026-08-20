@@ -284,6 +284,50 @@ describe("analizarExcel", () => {
     expect(r.filas[0]?.aviso).toContain("Sin unidad");
   });
 
+  /**
+   * Los topes de las columnas de texto, que el 20/08/2026 tumbaron una
+   * importacion entera con la pantalla de error generica.
+   *
+   * La unidad se RECORTA y la partida sobrevive: si se descartara la fila, el
+   * presupuesto perderia su importe por una etiqueta. El codigo NO se recorta
+   * y la fila se rechaza: es la identidad de la partida, y acortarlo la ataria
+   * en silencio a otra.
+   */
+  it("recorta la unidad demasiado larga y avisa, sin perder la partida", async () => {
+    const libro = await construirLibro([
+      ["4.1", "Muro", "m2 de muro tarrajeado y pintado", 10, 5, null],
+    ]);
+
+    const r = await analizarExcel(libro);
+
+    expect(r.filas).toHaveLength(1);
+    expect(r.filas[0]?.unidad).toBe("m2 de muro tarrajead");
+    expect(r.filas[0]?.unidad!.length).toBeLessThanOrEqual(20);
+    expect(r.filas[0]?.aviso).toContain("caracteres");
+    // Lo que importa de verdad: el dinero de la partida sigue ahi.
+    expect(r.filas[0]?.parcial).toBe("50.00");
+  });
+
+  it("una unidad normal no se toca ni genera aviso de recorte", async () => {
+    const libro = await construirLibro([["4.2", "Piso", "m2", 10, 5, null]]);
+
+    const r = await analizarExcel(libro);
+
+    expect(r.filas[0]?.unidad).toBe("m2");
+    expect(r.filas[0]?.aviso ?? "").not.toContain("caracteres");
+  });
+
+  it("rechaza el codigo que no cabe, y dice cual es", async () => {
+    const largo = "1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1.1";
+    const libro = await construirLibro([[largo, "Imposible", "m2", 1, 1, null]]);
+
+    const r = await analizarExcel(libro);
+
+    expect(r.filas).toHaveLength(0);
+    expect(r.errores[0]?.mensaje).toContain("32");
+    expect(r.errores[0]?.columna).toBe("codigo");
+  });
+
   it("ignora filas totalmente vacias", async () => {
     const libro = await construirLibro([
       ["1.1", "Valida", "m2", 10, 5, null],

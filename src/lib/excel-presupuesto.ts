@@ -66,6 +66,25 @@ export interface ResultadoAnalisis {
 /** Numeros separados por punto: "4", "4.3", "01.02.01". */
 const CODIGO_VALIDO = /^\d+(\.\d+)*$/;
 
+/**
+ * Lo que aguanta cada columna de texto en la base, copiado de `WbsItem`.
+ *
+ * ESTAN AQUI PORQUE EL EXCEL LO ESCRIBE UNA PERSONA. El 20/08/2026 una
+ * importacion desde la plantilla oficial murio con la pantalla de error
+ * generica: `descripcion` se recortaba antes de guardar, pero `unidad` y
+ * `codigoPartida` viajaban enteros contra un VarChar(20) y un VarChar(32).
+ * Una unidad tecleada de mas —"m2 de muro tarrajeado"— y MariaDB responde
+ * «Data too long», que nadie capturaba.
+ *
+ * Se comprueba AQUI, al analizar, y no solo al guardar: en la vista previa
+ * todavia se puede decir QUE fila es. Un fallo en la insercion solo puede
+ * decir que algo salio mal.
+ *
+ * Si cambian en `prisma/schema.prisma`, cambian aqui.
+ */
+const MAX_UNIDAD = 20;
+const MAX_CODIGO = 32;
+
 export interface Combinacion {
   /// Fila que posee el valor; el resto lo comparten.
   maestra: number;
@@ -443,6 +462,17 @@ export async function analizarExcel(
       continue;
     }
 
+    // El codigo NO se recorta: es la identidad de la partida —lo que la une
+    // al cronograma, a las ordenes y a la linea base— y acortarlo la ataria
+    // en silencio a otra. Se rechaza la fila y se dice cual.
+    if (codigo.length > MAX_CODIGO) {
+      errores.push({
+        fila: n, columna: "codigo",
+        mensaje: `El codigo "${codigo}" tiene ${codigo.length} caracteres y el maximo son ${MAX_CODIGO}.`,
+      });
+      continue;
+    }
+
     const duplicado = codigosVistos.get(codigo);
     if (duplicado !== undefined) {
       errores.push({
@@ -553,7 +583,11 @@ function construirFila(args: ArgsFila): FilaImportada | null {
     };
   }
 
-  const unidadTexto = String(leer("unidad") ?? "").trim();
+  // La unidad se RECORTA, no descarta la fila: es una etiqueta, y perder la
+  // partida entera por ella se llevaria por delante su importe. El aviso de
+  // abajo deja constancia de que se toco.
+  const unidadEntera = String(leer("unidad") ?? "").trim();
+  const unidadTexto = unidadEntera.slice(0, MAX_UNIDAD);
   const metrado = normalizarDecimal(leer("metrado"), 4);
   const precioUnitario = normalizarDecimal(leer("precioUnitario"), 4);
   const parcialArchivo = normalizarDecimal(leer("parcial"), 2);
@@ -606,6 +640,13 @@ function construirFila(args: ArgsFila): FilaImportada | null {
 
   if (!unidadTexto && metrado !== null) {
     avisos.push("Sin unidad de medida. Conviene completarla.");
+  }
+
+  if (unidadEntera.length > MAX_UNIDAD) {
+    avisos.push(
+      `La unidad "${unidadEntera}" pasa de ${MAX_UNIDAD} caracteres y se guardo como "${unidadTexto}". ` +
+        `La unidad es una abreviatura (m2, kg, glb); si ahi va alcance, su sitio es la descripcion.`,
+    );
   }
 
   if (combinacion) {

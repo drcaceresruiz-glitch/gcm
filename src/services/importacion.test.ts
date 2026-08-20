@@ -46,6 +46,13 @@ const tandas: string[][] = [];
 let opciones: OpcionesTransaccion | undefined;
 /** Cuantas veces se creo una fila suelta. Debe quedarse en cero. */
 let sueltas = 0;
+/**
+ * Con que revienta `createMany`, si es que revienta.
+ *
+ * Lo pide el arreglo del 20/08/2026: hasta entonces un fallo de la base subia
+ * sin capturar hasta Next y el usuario veia «Esta pantalla no se pudo cargar».
+ */
+let fallaAlCrear: unknown = null;
 
 vi.mock("@/lib/prisma", () => {
   let secuencia = 0;
@@ -60,6 +67,7 @@ vi.mock("@/lib/prisma", () => {
     },
 
     createMany: (args: { data: FilaGuardada[] }) => {
+      if (fallaAlCrear !== null) return Promise.reject(fallaAlCrear);
       tandas.push(args.data.map((f) => f.codigoPartida));
       for (const f of args.data) {
         guardadas.push({
@@ -111,7 +119,9 @@ vi.mock("@/lib/prisma", () => {
   return { prisma };
 });
 
-const { aplicarImportacion } = await import("@/services/importacion.service");
+const { aplicarImportacion, motivoDeFalloAlGuardar } = await import(
+  "@/services/importacion.service"
+);
 
 function sesion(permisos: Permiso[] = ["partida:importar"]): SesionActiva {
   return {
@@ -192,6 +202,7 @@ beforeEach(() => {
   tandas.length = 0;
   opciones = undefined;
   sueltas = 0;
+  fallaAlCrear = null;
 });
 
 describe("aplicarImportacion: como entran las partidas", () => {
@@ -293,5 +304,91 @@ describe("aplicarImportacion: las guardas siguen en pie", () => {
     const r = await aplicarImportacion(sesion(), "obra-1", ARBOL, false);
 
     expect(r).toMatchObject({ ok: true, capitulos: 3, partidas: 3 });
+  });
+});
+
+/**
+ * ---------------------------------------------------------------------------
+ * QUE UN FALLO DE LA BASE NO SALGA COMO PANTALLA ROTA.
+ *
+ * El 20/08/2026, importando desde la plantilla oficial, el usuario vio «Esta
+ * pantalla no se pudo cargar». El motivo no era el Excel: era que la escritura
+ * se llamaba SIN capturar, asi que cualquier error de MariaDB subia hasta el
+ * limite de error de Next. Una pantalla rota no dice que corregir en el
+ * archivo, y ademas deja la duda de si el presupuesto quedo a medias.
+ *
+ * Lo que se fija aqui es la propiedad, no el texto: `aplicarImportacion`
+ * DEVUELVE el fallo, nunca lo lanza.
+ * ---------------------------------------------------------------------------
+ */
+describe("aplicarImportacion: un fallo de la base se devuelve, no se lanza", () => {
+  it("no lanza cuando la insercion revienta", async () => {
+    fallaAlCrear = Object.assign(new Error("Data too long for column 'unidad'"), {
+      code: "P2000",
+    });
+
+    // `rejects` seria lo que fallaba antes: la promesa se rechazaba y el
+    // error llegaba a la interfaz sin traducir.
+    await expect(
+      aplicarImportacion(sesion(), "obra-1", ARBOL, false),
+    ).resolves.toMatchObject({ ok: false });
+  });
+
+  it("y explica que el presupuesto quedo intacto", async () => {
+    fallaAlCrear = Object.assign(new Error("cualquiera"), { code: "P2000" });
+
+    const r = await aplicarImportacion(sesion(), "obra-1", ARBOL, false);
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("No se cargo ninguna partida");
+  });
+
+  it("un error sin codigo tampoco se escapa", async () => {
+    // Lo que llega cuando se cae la conexion: ni `code` ni nada que mirar.
+    fallaAlCrear = new Error("socket hang up");
+
+    const r = await aplicarImportacion(sesion(), "obra-1", ARBOL, false);
+    expect(r.ok).toBe(false);
+  });
+});
+
+/**
+ * La traduccion de cada codigo. Es una funcion pura, asi que se prueba sola.
+ *
+ * Importa que cada caso diga QUE HACER con el archivo: un mensaje que solo
+ * dice «error al guardar» deja al usuario en el mismo sitio que la pantalla
+ * rota que esto vino a sustituir.
+ */
+describe("motivoDeFalloAlGuardar", () => {
+  it("P2000 apunta a la columna de unidad, que es la que suele pasarse", () => {
+    const m = motivoDeFalloAlGuardar({ code: "P2000" });
+    expect(m).toContain("unidad");
+    expect(m).toContain("20");
+  });
+
+  it("P2002 habla de codigo repetido", () => {
+    expect(motivoDeFalloAlGuardar({ code: "P2002" })).toContain("repetido");
+  });
+
+  it("P2003 explica que falta el capitulo padre", () => {
+    expect(motivoDeFalloAlGuardar({ code: "P2003" })).toContain("padre");
+  });
+
+  it("P2028 propone reintentar y partir el archivo", () => {
+    expect(motivoDeFalloAlGuardar({ code: "P2028" })).toContain("intentarlo");
+  });
+
+  it("lo desconocido no se queda sin mensaje", () => {
+    for (const e of [null, undefined, "texto", 42, {}, new Error("x")]) {
+      expect(motivoDeFalloAlGuardar(e)).toContain("No se pudo guardar");
+    }
+  });
+
+  it("todos, digan lo que digan, prometen que no se cargo nada a medias", () => {
+    for (const code of ["P2000", "P2002", "P2003", "P2028", "PXXXX"]) {
+      expect(motivoDeFalloAlGuardar({ code })).toContain(
+        "No se cargo ninguna partida",
+      );
+    }
   });
 });
