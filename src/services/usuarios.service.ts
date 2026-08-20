@@ -15,6 +15,7 @@ import {
   correoValido,
   validarAltaUsuario,
   rolValido,
+  mensajeCorreoEnUso,
   type DatosAltaUsuario,
 } from "@/lib/usuarios";
 import { esCorreoOperador, parsearOperadores } from "@/lib/operador";
@@ -164,13 +165,17 @@ export async function crearUsuario(
   const d = validacion.datos;
 
   // El correo es unico global: se comprueba aqui para dar un mensaje claro en
-  // vez del error crudo de la clave unica.
+  // vez del error crudo de la clave unica. Se traen la empresa y el nombre
+  // porque de eso depende QUE se puede contar: ver `mensajeCorreoEnUso`.
   const correoEnUso = await prisma.user.findUnique({
     where: { email: d.email },
-    select: { id: true },
+    select: { id: true, companyId: true, nombres: true, apellidos: true },
   });
   if (correoEnUso) {
-    return { ok: false, error: "Ya existe un usuario con ese correo." };
+    return {
+      ok: false,
+      error: mensajeCorreoEnUso(correoEnUso, sesion.companyId),
+    };
   }
 
   // El documento es unico por empresa.
@@ -370,13 +375,7 @@ export async function editarUsuario(
     });
 
     if (enUso && enUso.id !== userId) {
-      return {
-        ok: false,
-        error:
-          enUso.companyId === sesion.companyId
-            ? `Ese correo ya es de ${`${enUso.nombres} ${enUso.apellidos}`.trim()}.`
-            : "Ese correo ya esta en uso en GCM. Cada persona necesita el suyo.",
-      };
+      return { ok: false, error: mensajeCorreoEnUso(enUso, sesion.companyId) };
     }
   }
 

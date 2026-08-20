@@ -3,6 +3,7 @@ import {
   correoValido,
   rolValido,
   validarAltaUsuario,
+  mensajeCorreoEnUso,
   type DatosAltaUsuario,
 } from "@/lib/usuarios";
 
@@ -81,5 +82,48 @@ describe("validarAltaUsuario", () => {
       expect(r.datos.cargo).toBeNull();
       expect(r.datos.celular).toBeNull();
     }
+  });
+});
+
+/**
+ * El choque de correos, que es lo que se leyo mal el 20/08/2026.
+ *
+ * Las dos propiedades que importan y que se pueden romper por separado:
+ * de la gente de casa se dice el nombre, y de la de fuera NO —pero si se dice
+ * que esta fuera, que es justo la frase que faltaba—.
+ */
+describe("mensajeCorreoEnUso", () => {
+  const MIA = "empresa-mia";
+  const rosa = { companyId: MIA, nombres: "Rosa", apellidos: "Diaz" };
+  const ajena = { companyId: "OTRA", nombres: "Rosa", apellidos: "Diaz" };
+
+  it("de alguien de mi empresa dice de quien es", () => {
+    expect(mensajeCorreoEnUso(rosa, MIA)).toBe("Ese correo ya es de Rosa Diaz.");
+  });
+
+  it("de otra constructora NO dice de quien es", () => {
+    const m = mensajeCorreoEnUso(ajena, MIA);
+    expect(m).not.toContain("Rosa");
+    expect(m).not.toContain("Diaz");
+  });
+
+  /**
+   * La frase que evita la hora perdida. Sin ella el administrador lee «ya
+   * existe», va a su lista, no lo encuentra y concluye que GCM le esta
+   * ensenando los usuarios de otros clientes.
+   */
+  it("de otra constructora explica por que no aparece en la lista", () => {
+    const m = mensajeCorreoEnUso(ajena, MIA);
+    expect(m).toContain("otra constructora");
+    expect(m).toContain("no aparece en tu lista");
+  });
+
+  it("y mantiene el «ya esta en uso» del que dependen otras pruebas", () => {
+    expect(mensajeCorreoEnUso(ajena, MIA)).toContain("ya esta en uso");
+  });
+
+  it("un nombre con espacios de sobra no deja el punto suelto", () => {
+    const conEspacios = { companyId: MIA, nombres: "Rosa", apellidos: "" };
+    expect(mensajeCorreoEnUso(conEspacios, MIA)).toBe("Ese correo ya es de Rosa.");
   });
 });
