@@ -479,6 +479,123 @@ describe("valorizarEncargo: el rango del avance", () => {
   });
 });
 
+/**
+ * Los DOS correlativos del corte, que es lo que la migracion
+ * `20260821040000_dos_correlativos_de_valorizacion` vino a sostener.
+ *
+ * Son series INDEPENDIENTES y con alcances distintos: la de OBRA cuenta todas
+ * las valorizaciones de la obra —es EL numero del papel, porque el documento lo
+ * emite la obra— y la de ENCARGO cuenta las de ese contrato. Cruzar los
+ * alcances no rompe nada visible: da numeros que PARECEN correlativos y no lo
+ * son, y eso solo se ve el dia que hay que reclamar un documento por su numero.
+ */
+describe("valorizarEncargo: las dos series de correlativos", () => {
+  const QUIEN = sesion(["encargo:valorizar"]);
+
+  it("las dos series avanzan por separado", async () => {
+    // Dos encargos de la MISMA obra, que es donde las series se separan: la de
+    // obra sigue contando, la del encargo vuelve a empezar.
+    await valorizarEncargo(QUIEN, "obra-1", "enc-1", corte());
+    await valorizarEncargo(QUIEN, "obra-1", "enc-1", corte());
+    await valorizarEncargo(QUIEN, "obra-1", "enc-2", corte());
+
+    expect(
+      estado.valorizaciones.map((v) => [v["numeroObra"], v["numeroEncargo"]]),
+    ).toEqual([
+      [1, 1],
+      [2, 2],
+      // La tercera de la obra, pero la PRIMERA de su contrato. Si alguien
+      // cruzara los alcances saldria [1, 3], que es el fallo entero.
+      [3, 1],
+    ]);
+  });
+
+  it("cada serie mira su alcance: ni la obra ajena ni el encargo ajeno cuentan", async () => {
+    // Cortes que ya existen y que NO son de esta obra ni de este encargo. Si
+    // alguna de las dos consultas se dejara el filtro, el correlativo nuevo
+    // saldria del 7 en vez del 1.
+    estado.valorizaciones = [
+      {
+        projectId: "obra-2",
+        encargoId: "enc-9",
+        numeroObra: 7,
+        numeroEncargo: 7,
+      },
+    ];
+
+    await valorizarEncargo(QUIEN, "obra-1", "enc-1", corte());
+
+    expect(estado.valorizaciones[1]).toMatchObject({
+      projectId: "obra-1",
+      numeroObra: 1,
+      numeroEncargo: 1,
+    });
+  });
+
+  it("el corte guarda la obra del encargo, no la que le manden", async () => {
+    // `projectId` esta DESNORMALIZADO en la valorizacion, y solo por eso puede
+    // existir la unicidad de la serie de obra. Se copia de la obra ya validada
+    // al buscar el encargo: si se dejara de escribir, la unicidad amontonaria
+    // todas las valorizaciones bajo el mismo hueco.
+    await valorizarEncargo(QUIEN, "obra-1", "enc-1", corte());
+    expect(estado.valorizaciones[0]).toMatchObject({ projectId: "obra-1" });
+  });
+
+  it("si otro se lleva el numero, se pide repetir y no se pierde el corte", async () => {
+    // La carrera de verdad: dos personas valorizando en la misma obra al mismo
+    // tiempo leen el mismo maximo y las dos van a por el mismo numero. La
+    // `puerta` las retiene hasta que las dos han LEIDO, que es la unica forma
+    // de provocarla sin depender del reloj.
+    let abrir!: () => void;
+    estado.puerta = new Promise<void>((resolver) => {
+      abrir = resolver;
+    });
+
+    const a = valorizarEncargo(QUIEN, "obra-1", "enc-1", corte({ porcentaje: "30" }));
+    const b = valorizarEncargo(QUIEN, "obra-1", "enc-2", corte({ porcentaje: "40" }));
+
+    // Un turno de macrotarea: para cuando vuelve, las dos estan esperando en
+    // la puerta y ninguna ha escrito.
+    await new Promise((resolver) => setTimeout(resolver, 0));
+    abrir();
+
+    const salidas = await Promise.all([a, b]);
+    const guardadas = salidas.filter((r) => r.ok);
+    const rechazadas = salidas.filter((r) => !r.ok);
+
+    // Una entra y la otra no. Cual de las dos depende de quien llegue antes al
+    // create, y eso da igual: lo que importa es que no entren las dos con el
+    // mismo numero y que a la rechazada se le diga que repita.
+    expect(guardadas).toHaveLength(1);
+    expect(rechazadas).toHaveLength(1);
+    expect(estado.valorizaciones).toHaveLength(1);
+    expect(rechazadas[0]).toMatchObject({ ok: false });
+    expect(!rechazadas[0]!.ok && rechazadas[0]!.error).toContain(
+      "Vuelve a guardar",
+    );
+  });
+
+  it("el choque de numero no se cuenta como dato malo", async () => {
+    // Un P2002 es TRANSITORIO: al reintentar, el maximo ya es otro y el
+    // siguiente numero esta libre. Si el mensaje sonara a error de datos, quien
+    // valoriza se pondria a revisar la fecha y el porcentaje, que estan bien.
+    let abrir!: () => void;
+    estado.puerta = new Promise<void>((resolver) => {
+      abrir = resolver;
+    });
+
+    const a = valorizarEncargo(QUIEN, "obra-1", "enc-1", corte());
+    const b = valorizarEncargo(QUIEN, "obra-1", "enc-1", corte());
+    await new Promise((resolver) => setTimeout(resolver, 0));
+    abrir();
+
+    const rechazada = (await Promise.all([a, b])).find((r) => !r.ok);
+    const texto = rechazada && !rechazada.ok ? rechazada.error : "";
+    expect(texto).toContain("el corte no se ha perdido");
+    expect(texto).not.toContain("Vuelve a intentarlo en unos segundos");
+  });
+});
+
 describe("valorizarEncargo: quien puede y sobre que", () => {
   it("valorizar pide su propio permiso, no el de gestionar encargos", async () => {
     // Son dos cosas distintas: repartir el trabajo es de oficina, reconocer

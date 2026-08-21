@@ -194,7 +194,17 @@ export function TarjetaEncargo({
           </div>
           {encargo.ultimaValorizacion && (
             <p className="mt-1 text-xs opacity-60">
-              Última valorización: {fechaCorta(encargo.ultimaValorizacion)}
+              Última valorización
+              {/* El numero del papel, para poder casar la tarjeta con el
+                  documento archivado. Es el de OBRA porque es la obra quien
+                  lo emite; el del encargo va detras y nunca solo. */}
+              {encargo.numeroObra !== null && (
+                <> N.º {encargo.numeroObra}</>
+              )}
+              : {fechaCorta(encargo.ultimaValorizacion)}
+              {encargo.numeroEncargo !== null && (
+                <> · {encargo.numeroEncargo}.ª de este encargo</>
+              )}
             </p>
           )}
         </div>

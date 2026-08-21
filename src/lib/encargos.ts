@@ -64,10 +64,16 @@ export interface Valorizacion {
  * Se compara por fecha de corte, y a igualdad de fecha por el momento de
  * registro: si en un mismo dia se corrige la cifra, vale la ultima que se
  * escribio. Null si el proveedor no tiene ninguna valorizacion todavia.
+ *
+ * Generica sobre la fila para DEVOLVER LA MISMA que entro, con todo lo que
+ * lleve encima. Fijado el tipo en `Valorizacion` a secas, quien la llama con
+ * filas que ademas traen sus correlativos recuperaba un objeto sin ellos y
+ * tenia que volver a buscar la fila por fecha —dos veces la misma eleccion,
+ * que es como acaban discrepando—.
  */
-export function avanceVigente(
-  valorizaciones: readonly Valorizacion[],
-): Valorizacion | null {
+export function avanceVigente<T extends Valorizacion>(
+  valorizaciones: readonly T[],
+): T | null {
   if (valorizaciones.length === 0) return null;
 
   return valorizaciones.reduce((vigente, v) => {

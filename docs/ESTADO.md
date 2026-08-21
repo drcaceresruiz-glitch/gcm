@@ -372,6 +372,19 @@ como una obra mas atrasada de lo que esta.
   valorizacion como enlace opcional, y **comprobante en tabla propia** — la
   evidencia de obra se ensena en la galeria y la galeria tiene un enlace que ve
   el CLIENTE. Un encargo con avance reconocido ya no se anula: se cierra.
+- **Cada valorizacion lleva DOS numeros** (21 de agosto,
+  `20260821040000_dos_correlativos_de_valorizacion`): el de la OBRA, que es EL
+  numero del papel porque el documento lo emite la obra, y el del ENCARGO —«la
+  3.ª de este contratista»—, que es por encargo y no por proveedor, porque el
+  mismo contratista puede llevar dos frentes en la misma obra. Los dos se
+  asignan dentro de la transaccion sobre el maximo de SU alcance, y las dos
+  unicidades del esquema son lo que impide que dos personas valorizando a la
+  vez se lleven el mismo numero: a la segunda se le pide repetir, diciendo que
+  el corte no se ha perdido. La migracion **rellena** las que ya existian
+  ordenando por `fecha`, `createdAt` e `id` —sin un criterio total, `ROW_NUMBER`
+  podria dar dos ordenes distintos en dos ejecuciones—. Se ven en la tabla del
+  historial y en la tarjeta del encargo: un numero que no se puede leer no
+  sirve para reclamar nada.
 - **Mensajeria**: correo (con `replyTo`, y por eso su pie ya no dice «no
   respondas a este mensaje»), SMS y WhatsApp, con historial por contratista.
   Los adjuntos no se guardan, solo su nombre y tamano; la lista de tipos es

@@ -24,12 +24,11 @@ Dos avisos antes de leer nada de mas abajo:
 
 ### Lo que hay que mirar primero
 
-1. **`835d988 WIP antes de reinstalar Claude` quedo a medias.** Es lo unico
-   del repositorio que esta sin terminar, y no lo delata nada: typecheck,
-   lint y las 27 pruebas de `encargos.service` pasan, y la migracion
-   `20260821040000_dos_correlativos_de_valorizacion` esta aplicada.
+1. ~~**`835d988 WIP antes de reinstalar Claude` quedo a medias.**~~ **CERRADO
+   el 21 de agosto de 2026.** Ya no queda nada sin terminar en el
+   repositorio.
 
-   Lo que hizo: `ValorizacionEncargo` gana `projectId`, `numeroObra` y
+   Lo que hizo el WIP: `ValorizacionEncargo` gana `projectId`, `numeroObra` y
    `numeroEncargo`. **Dos series independientes**: la de la OBRA —que es EL
    numero del papel, porque el documento lo emite la obra— y la del ENCARGO,
    que es por encargo y no por proveedor, porque el mismo contratista puede
@@ -40,27 +39,41 @@ Dos avisos antes de leer nada de mas abajo:
    `valorizarEncargo` asigna los dos dentro de la transaccion y captura el
    P2002 con un mensaje que invita a repetir.
 
-   **Lo que falta, y es lo que hay que hacer antes de seguir:**
+   **Lo que faltaba y ya esta:**
 
-   - **No hay ni una prueba del comportamiento nuevo.** El doble de Prisma
-     del archivo de pruebas se reescribio entero para esto —implementa de
-     verdad `aggregate` y las DOS unicidades, y gana una `puerta` para
-     forzar que dos altas lean el maximo antes de que ninguna escriba— pero
-     **`estado.puerta` no la usa ningun test y `choqueDeUnicidad` no la
-     afirma ninguno**. El andamio esta montado y las pruebas sin escribir.
-     Hacen falta al menos tres: que las dos series avancen por separado, que
-     no se crucen los alcances (`projectId` para una, `encargoId` para la
-     otra) y que el choque de unicidad devuelva el mensaje de reintentar.
-   - **Nadie lee los dos numeros.** `obtenerEncargo` y `listarEncargos` no
-     los piden en su `select`, `EncargoDetalle.valorizaciones` no los lleva
-     y la tabla «Historial de valorizaciones» sigue teniendo cuatro columnas
-     —corte, % acumulado, registrado por, nota— sin ninguna de numero. Todo
-     el motivo del cambio («es EL numero del papel») no se ve por ningun
-     lado.
+   - **Las pruebas del comportamiento nuevo**, cinco, sobre el andamio que el
+     WIP dejo montado y sin usar (`estado.puerta` y `choqueDeUnicidad`): que
+     las dos series avanzan por separado, que cada una mira SU alcance
+     —`projectId` una, `encargoId` la otra—, que el corte guarda la obra del
+     encargo, y dos del choque de unicidad, una por cada carrera real (dos
+     personas en la misma obra, dos en el mismo contrato). **La del cruce de
+     alcances se comprobo mutando el servicio a proposito**: cambiar el
+     `where` de la serie de obra por `encargoId` la hace fallar, que es la
+     unica forma de saber que una prueba muerde.
+   - **Los dos numeros se leen y se ven.** `obtenerEncargo` y
+     `listarEncargos` los piden, `EncargoDetalle.valorizaciones` los lleva, la
+     tabla «Historial de valorizaciones» abre con una columna «N.º» —el de
+     obra grande, el del encargo entre parentesis, con una linea que explica
+     cual es cual— y la tarjeta del encargo dice «Última valorización N.º 12 …
+     · 3.ª de este encargo» en vez de solo la fecha.
+   - `avanceVigente` (`@/lib/encargos`) pasa a ser **generica sobre la fila**,
+     para devolver la MISMA que entro con los correlativos encima. Fijada en
+     `Valorizacion` a secas obligaba a volver a buscar la fila por fecha, que
+     es como dos elecciones de «la vigente» acaban discrepando.
    - De paso, ese commit arrastra un `prisma format` que reflujo
      `schema.prisma` entero y **quito las lineas en blanco de los comentarios
      largos**. Es ruido, no un fallo, pero explica por que el diff del
-     esquema son 220 lineas.
+     esquema son 220 lineas. Se deja como esta: revertir el reflujo seria
+     otro diff de 220 lineas por nada.
+
+   > **NO EDITAR ARCHIVOS DEL PROYECTO CON `Get-Content`/`Set-Content` DE
+   > POWERSHELL.** Cerrando esto se hizo para una prueba de mutacion y
+   > destrozo `encargos.service.ts` entero: PowerShell 5.1 lee sin BOM como
+   > ANSI y `Set-Content -Encoding utf8` escribe CON BOM, asi que cada tilde,
+   > cada comilla angular y cada raya larga salio recodificada —incluido un
+   > mensaje que ve el usuario—. `tsc`, `eslint` y las 2384 pruebas pasaron
+   > igual: **esto no lo caza ninguna herramienta**, solo `git diff`. Se
+   > recupero con `git checkout --` y rehaciendo las ediciones.
 
 2. **Rotar la contrasena del FTP de produccion.** Hasta el 12 de agosto viajo
    en cada despliegue contra un extremo sin verificar. La verificacion ya

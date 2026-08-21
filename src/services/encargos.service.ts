@@ -68,6 +68,16 @@ export interface EncargoResumen {
   partidas: number;
   /// Fecha de la ultima valorizacion, si hay.
   ultimaValorizacion: Date | null;
+  /**
+   * Los dos correlativos de esa ultima valorizacion, o null si no hay ninguna.
+   *
+   * Van juntos y nunca uno solo: el de OBRA es el numero del papel y el del
+   * ENCARGO dice por cuantas va este contratista. Sin ellos la tarjeta decia
+   * solo la fecha, y nadie podia casar lo que ve en pantalla con el documento
+   * que tiene en la mano.
+   */
+  numeroObra: number | null;
+  numeroEncargo: number | null;
   cuentas: ResumenEncargo;
 }
 
@@ -127,7 +137,13 @@ export async function listarEncargos(
         },
         valorizaciones: {
           orderBy: { fecha: "desc" },
-          select: { fecha: true, porcentaje: true, createdAt: true },
+          select: {
+            fecha: true,
+            porcentaje: true,
+            createdAt: true,
+            numeroObra: true,
+            numeroEncargo: true,
+          },
         },
       },
     }),
@@ -181,6 +197,8 @@ export async function listarEncargos(
         fecha: v.fecha,
         porcentaje: v.porcentaje.toString(),
         createdAt: v.createdAt,
+        numeroObra: v.numeroObra,
+        numeroEncargo: v.numeroEncargo,
       })),
     );
 
@@ -202,6 +220,8 @@ export async function listarEncargos(
       fechaFin: e.fechaFin,
       partidas: e.partidas.length,
       ultimaValorizacion: vigente ? vigente.fecha : null,
+      numeroObra: vigente ? vigente.numeroObra : null,
+      numeroEncargo: vigente ? vigente.numeroEncargo : null,
       cuentas,
     };
   });
@@ -241,6 +261,11 @@ export interface EncargoDetalle {
     porcentaje: string;
     nota: string | null;
     registradoPor: string;
+    /// EL numero del documento: la valorizacion N.o X de esta OBRA.
+    numeroObra: number;
+    /// Por cuantas va este contratista en este encargo. Se ensena al lado del
+    /// de obra, nunca solo: por si mismo no identifica ningun papel.
+    numeroEncargo: number;
   }[];
 }
 
@@ -286,6 +311,8 @@ export async function obtenerEncargo(
           porcentaje: true,
           nota: true,
           registradoPor: true,
+          numeroObra: true,
+          numeroEncargo: true,
         },
       },
     },
@@ -319,6 +346,8 @@ export async function obtenerEncargo(
       porcentaje: v.porcentaje.toString(),
       nota: v.nota,
       registradoPor: v.registradoPor,
+      numeroObra: v.numeroObra,
+      numeroEncargo: v.numeroEncargo,
     })),
   };
 }

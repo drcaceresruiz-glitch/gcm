@@ -1,4 +1,4 @@
-> **Respaldo:** estos siete archivos estan copiados en `docs/memoria/` del
+> **Respaldo:** estos archivos estan copiados en `docs/memoria/` del
 > repositorio GCM. Esta carpeta del perfil se vacio ENTERA al reinstalar
 > Claude el 20 de agosto de 2026, y por eso la copia versionada es la que de
 > verdad sobrevive. **Si editas o anades una memoria aqui, copia el cambio
@@ -10,4 +10,4 @@
 - [Git va por delante de los docs](git-esta-mas-al-dia-que-los-docs.md) — comprobar el reflog antes de fiarse de la fecha de un documento
 - [Avisar si faltan herramientas](avisar-si-faltan-herramientas.md) — decirlo en la primera respuesta, no despues de trabajar
 - [Estilo de escritura del proyecto](estilo-de-escritura-del-proyecto.md) — espanol sin tildes, commits que describen el efecto visible
-- [Estado pendiente al 21 de agosto de 2026](estado-pendiente-21-agosto-2026.md) — lo abierto vive en PENDIENTES.md; lo encabeza el WIP 835d988, que compila y esta a medias
+- [PowerShell corrompe la codificacion](powershell-corrompe-la-codificacion.md) — no reescribir archivos con Get-Content/Set-Content; la bateria verde no lo caza, solo git diff

@@ -97,6 +97,13 @@ export default async function EditarEncargoPage({
       {encargo.valorizaciones.length > 0 && (
         <Tarjeta>
           <h3 className="text-sm font-semibold">Historial de valorizaciones</h3>
+          {/* El numero grande es el del PAPEL, y es de la obra: el documento
+              lo emite la obra, no el contratista. El pequeño dice por cuantas
+              va este encargo, que es otra serie y por eso no coinciden. */}
+          <p className="mt-0.5 text-xs opacity-60">
+            El N.º grande es el de la obra —el del documento—; entre paréntesis,
+            por cuántas va este encargo.
+          </p>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -104,6 +111,7 @@ export default async function EditarEncargoPage({
                   className="border-b text-left"
                   style={{ borderColor: "var(--borde)" }}
                 >
+                  <th className="pb-1.5 font-normal opacity-60">N.º</th>
                   <th className="pb-1.5 font-normal opacity-60">Corte</th>
                   <th className="pb-1.5 text-right font-normal opacity-60">
                     % acumulado
@@ -119,6 +127,12 @@ export default async function EditarEncargoPage({
                     className="border-b last:border-b-0"
                     style={{ borderColor: "var(--borde)" }}
                   >
+                    <td className="py-1.5 whitespace-nowrap tabular-nums">
+                      <span className="font-medium">{v.numeroObra}</span>
+                      <span className="ml-1 text-xs opacity-60">
+                        ({v.numeroEncargo})
+                      </span>
+                    </td>
                     <td className="py-1.5 tabular-nums">{fechaCorta(v.fecha)}</td>
                     <td className="py-1.5 text-right font-medium tabular-nums">
                       {Number(v.porcentaje).toFixed(1)}%
