@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { sumar, esNegativo, normalizarDecimal } from "@/lib/decimal";
+import { codigoDeFallo } from "@/lib/fallo-de-base";
 import {
   importeDeFrente,
   avanceVigente,
@@ -118,7 +119,11 @@ export async function listarEncargos(
         fechaFin: true,
         proveedor: { select: { id: true, razonSocial: true, ruc: true } },
         partidas: {
-          select: { wbsItemId: true, fraccion: true, partida: { select: { parcial: true } } },
+          select: {
+            wbsItemId: true,
+            fraccion: true,
+            partida: { select: { parcial: true } },
+          },
         },
         valorizaciones: {
           orderBy: { fecha: "desc" },
@@ -205,7 +210,10 @@ export async function listarEncargos(
 
   return {
     encargos: filas,
-    cobertura: coberturaObra(normalizarDecimal(total, 2) ?? "0.00", asignadoTotal),
+    cobertura: coberturaObra(
+      normalizarDecimal(total, 2) ?? "0.00",
+      asignadoTotal,
+    ),
   };
 }
 
@@ -366,7 +374,9 @@ export async function partidasAsignables(
       descripcion: p.descripcion,
       parcial: p.parcial?.toString() ?? "0.00",
       asignadoPorcentaje: asignado,
-      proveedores: [...new Set(vivos.map((e) => e.encargo.proveedor.razonSocial))],
+      proveedores: [
+        ...new Set(vivos.map((e) => e.encargo.proveedor.razonSocial)),
+      ],
       ...(fechas.get(p.codigoPartida) ?? { inicio: null, fin: null }),
     };
   });
@@ -430,7 +440,8 @@ async function fechasDelCronograma(
 
     const previo = salida.get(t.codigo);
     salida.set(t.codigo, {
-      inicio: !previo?.inicio || t.inicio < previo.inicio ? t.inicio : previo.inicio,
+      inicio:
+        !previo?.inicio || t.inicio < previo.inicio ? t.inicio : previo.inicio,
       fin: !previo?.fin || t.fin > previo.fin ? t.fin : previo.fin,
     });
   }
@@ -497,18 +508,20 @@ export async function capitulosConPartidas(
     return salida;
   }
 
-  return items
-    .filter((i) => i.tipo === "CAPITULO")
-    .map((c) => ({
-      id: c.id,
-      codigoPartida: c.codigoPartida,
-      descripcion: c.descripcion,
-      nivel: c.nivel,
-      partidaIds: partidasDe(c.id),
-    }))
-    // Sin partidas medibles no hay nada que asignar: un capitulo de puros
-    // subtitulos no es un frente.
-    .filter((c) => c.partidaIds.length > 0);
+  return (
+    items
+      .filter((i) => i.tipo === "CAPITULO")
+      .map((c) => ({
+        id: c.id,
+        codigoPartida: c.codigoPartida,
+        descripcion: c.descripcion,
+        nivel: c.nivel,
+        partidaIds: partidasDe(c.id),
+      }))
+      // Sin partidas medibles no hay nada que asignar: un capitulo de puros
+      // subtitulos no es un frente.
+      .filter((c) => c.partidaIds.length > 0)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -516,8 +529,7 @@ export async function capitulosConPartidas(
 // ---------------------------------------------------------------------------
 
 export type ResultadoEncargo =
-  | { ok: true; id: string }
-  | { ok: false; error: string };
+  { ok: true; id: string } | { ok: false; error: string };
 
 export interface LineaFrente {
   wbsItemId: string;
@@ -650,7 +662,8 @@ export async function crearEncargo(
   ]);
 
   if (!obra) return { ok: false, error: "Obra no encontrada." };
-  if (!proveedor) return { ok: false, error: "Ese proveedor no es de tu empresa." };
+  if (!proveedor)
+    return { ok: false, error: "Ese proveedor no es de tu empresa." };
 
   const frenteMal = await verificarFrente(
     obraId,
@@ -721,7 +734,8 @@ export async function crearEncargo(
   } catch {
     return {
       ok: false,
-      error: "No se pudo crear el encargo. Vuelve a intentarlo en unos segundos.",
+      error:
+        "No se pudo crear el encargo. Vuelve a intentarlo en unos segundos.",
     };
   }
 }
@@ -809,7 +823,8 @@ export async function editarEncargo(
   } catch {
     return {
       ok: false,
-      error: "No se pudo guardar el encargo. Vuelve a intentarlo en unos segundos.",
+      error:
+        "No se pudo guardar el encargo. Vuelve a intentarlo en unos segundos.",
     };
   }
 }
@@ -934,30 +949,92 @@ export async function valorizarEncargo(
     return { ok: false, error: "Un encargo anulado no se valoriza." };
   }
 
-  await prisma.$transaction(async (tx) => {
-    const v = await tx.valorizacionEncargo.create({
-      data: {
-        encargoId,
-        fecha: new Date(`${datos.fecha}T00:00:00Z`),
-        porcentaje: normalizarDecimal(datos.porcentaje, 3) ?? "0",
-        nota: datos.nota?.trim() || null,
-        registradoPor: quien(sesion),
-      },
-      select: { id: true },
-    });
+  // La escritura va CAPTURADA. Hasta ahora no podia fallar por datos y se
+  // llamaba a pelo; con los correlativos si puede: dos personas valorizando en
+  // la misma obra al mismo segundo leen el mismo maximo y una de las dos choca
+  // contra la unicidad. Sin este `try`, ese choque sube hasta Next y sale como
+  // «esta pantalla no se pudo cargar» —el fallo que ya se comieron la
+  // importacion de presupuesto y el alta de usuarios—.
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Los DOS correlativos, dentro de la transaccion y sobre el maximo actual
+      // de cada serie. Mismo patron que `crearEncargo`: dos altas a la vez no
+      // pueden llevarse el mismo numero porque las unicidades del esquema
+      // —(projectId, numeroObra) y (encargoId, numeroEncargo)— rechazan a la
+      // segunda y la transaccion entera se deshace.
+      //
+      // LO UNICO QUE HAY QUE MIRAR DOS VECES son los alcances, porque son
+      // distintos y el codigo se parece: el maximo de la serie de OBRA se busca
+      // por `projectId` —todos los encargos de la obra comparten esa serie— y el
+      // de la serie del ENCARGO, por `encargoId`. Cruzarlos daria numeros que
+      // parecen correlativos sin serlo: la segunda valorizacion de la obra
+      // saldria con el numero 1 si es la primera de su contratista.
+      const enLaObra = await tx.valorizacionEncargo.aggregate({
+        where: { projectId: obraId },
+        _max: { numeroObra: true },
+      });
+      const enElEncargo = await tx.valorizacionEncargo.aggregate({
+        where: { encargoId },
+        _max: { numeroEncargo: true },
+      });
 
-    await tx.auditLog.create({
-      data: {
-        companyId: sesion.companyId,
-        userId: sesion.userId,
-        projectId: obraId,
-        entidad: "ValorizacionEncargo",
-        entidadId: v.id.slice(0, 40),
-        accion: "CREATE",
-        despues: { encargoId, fecha: datos.fecha, porcentaje: datos.porcentaje },
-      },
+      const numeroObra = (enLaObra._max.numeroObra ?? 0) + 1;
+      const numeroEncargo = (enElEncargo._max.numeroEncargo ?? 0) + 1;
+
+      const v = await tx.valorizacionEncargo.create({
+        data: {
+          encargoId,
+          // Copia de la obra del encargo. No se toma de `datos`: la obra ya
+          // quedo comprobada arriba al buscar el encargo con `projectId: obraId`
+          // y `project.companyId`, asi que este es el mismo valor ya validado.
+          projectId: obraId,
+          numeroObra,
+          numeroEncargo,
+          fecha: new Date(`${datos.fecha}T00:00:00Z`),
+          porcentaje: normalizarDecimal(datos.porcentaje, 3) ?? "0",
+          nota: datos.nota?.trim() || null,
+          registradoPor: quien(sesion),
+        },
+        select: { id: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          companyId: sesion.companyId,
+          userId: sesion.userId,
+          projectId: obraId,
+          entidad: "ValorizacionEncargo",
+          entidadId: v.id.slice(0, 40),
+          accion: "CREATE",
+          despues: {
+            encargoId,
+            fecha: datos.fecha,
+            porcentaje: datos.porcentaje,
+            numeroObra,
+            numeroEncargo,
+          },
+        },
+      });
     });
-  });
+  } catch (e) {
+    // P2002 es la unicidad del correlativo: el numero se lo llevo otro. Es
+    // TRANSITORIO —al reintentar, el maximo ya es el nuevo y el siguiente
+    // numero esta libre—, asi que el mensaje invita a repetir en vez de
+    // sugerir que el dato esta mal.
+    if (codigoDeFallo(e) === "P2002") {
+      return {
+        ok: false,
+        error:
+          "Otra persona acaba de valorizar en esta obra y se llevo el numero. " +
+          "Vuelve a guardar: el corte no se ha perdido.",
+      };
+    }
+    return {
+      ok: false,
+      error:
+        "No se pudo guardar la valorizacion. Vuelve a intentarlo en unos segundos.",
+    };
+  }
 
   return { ok: true, id: encargoId };
 }

@@ -37,6 +37,10 @@ const estado: {
   encargo: { id: string; estado: string } | null;
   /// Los cortes escritos. Append-only: aqui solo se puede acumular.
   valorizaciones: Record<string, unknown>[];
+  /// Freno para provocar el solape: si esta puesta, el calculo del correlativo
+  /// espera aqui. Asi dos altas pueden LEER el maximo antes de que ninguna
+  /// escriba, que es exactamente la carrera que la unicidad tiene que atrapar.
+  puerta: Promise<void> | null;
 } = {
   obra: { id: "obra-1" },
   proveedor: { id: "prov-1", tipoImpuesto: "IGV" },
@@ -46,7 +50,20 @@ const estado: {
   filtroEncargos: null,
   encargo: { id: "enc-1", estado: "VIGENTE" },
   valorizaciones: [],
+  puerta: null,
 };
+
+/**
+ * Un rechazo con la FORMA del de Prisma al violar una unicidad.
+ *
+ * Se le pone `code` y nada mas: el servicio lo mira por forma, no con
+ * `instanceof`, porque con el adaptador de MariaDB el error viene envuelto.
+ */
+function choqueDeUnicidad(indice: string): Error {
+  return Object.assign(new Error(`Unique constraint failed on ${indice}`), {
+    code: "P2002",
+  });
+}
 
 vi.mock("@/services/obra-abierta", () => ({
   motivoSiObraCerrada: () => Promise.resolve(estado.cerrada),
@@ -61,12 +78,65 @@ vi.mock("@/lib/prisma", () => {
         return Promise.resolve({ id: "encargo-nuevo" });
       },
     },
-    // Solo `create`: si algun dia alguien cambiara el corte por un `update`
-    // sobre el anterior, esto reventaria en vez de sobrescribir en silencio.
+    // Sin `update` a proposito: si algun dia alguien cambiara el corte por un
+    // `update` sobre el anterior, esto reventaria en vez de sobrescribir en
+    // silencio.
+    //
+    // `aggregate` y `create` NO devuelven una respuesta fija: implementan de
+    // verdad el filtro y las dos unicidades sobre `estado.valorizaciones`. Un
+    // doble que contestara siempre lo mismo daria por buenos los dos fallos
+    // que estas pruebas existen para cazar —cruzar los alcances de las series
+    // y el numero repetido—, porque ninguno de los dos se ve en el argumento:
+    // se ven en el RESULTADO.
     valorizacionEncargo: {
+      aggregate: async (args: {
+        where: Record<string, unknown>;
+        _max: Record<string, boolean>;
+      }) => {
+        if (estado.puerta) await estado.puerta;
+
+        // El `where` se aplica tal cual llega: si el servicio filtrara por el
+        // campo equivocado, aqui saldrian otras filas y el numero cambiaria.
+        const dentro = estado.valorizaciones.filter((v) =>
+          Object.entries(args.where).every(([campo, valor]) => v[campo] === valor),
+        );
+        const campo = Object.keys(args._max)[0]!;
+        const numeros = dentro
+          .map((v) => Number(v[campo]))
+          .filter((n) => Number.isFinite(n));
+
+        return {
+          _max: { [campo]: numeros.length > 0 ? Math.max(...numeros) : null },
+        };
+      },
       create: (args: { data: Record<string, unknown> }) => {
-        estado.valorizaciones.push(args.data);
-        return Promise.resolve({ id: "val-nueva" });
+        const d = args.data;
+
+        // Las dos unicidades del esquema, por separado: importa CUAL choca.
+        if (
+          estado.valorizaciones.some(
+            (v) =>
+              v["projectId"] === d["projectId"] && v["numeroObra"] === d["numeroObra"],
+          )
+        ) {
+          return Promise.reject(
+            choqueDeUnicidad("valorizaciones_encargo_projectId_numeroObra_key"),
+          );
+        }
+        if (
+          estado.valorizaciones.some(
+            (v) =>
+              v["encargoId"] === d["encargoId"] &&
+              v["numeroEncargo"] === d["numeroEncargo"],
+          )
+        ) {
+          return Promise.reject(
+            choqueDeUnicidad("valorizaciones_encargo_encargoId_numeroEncargo_key"),
+          );
+        }
+
+        estado.valorizaciones.push(d);
+        return Promise.resolve({ id: `val-${estado.valorizaciones.length}` });
       },
     },
     auditLog: { create: () => Promise.resolve({}) },
@@ -75,7 +145,15 @@ vi.mock("@/lib/prisma", () => {
   return {
     prisma: {
       project: { findFirst: () => Promise.resolve(estado.obra) },
-      encargoProveedor: { findFirst: () => Promise.resolve(estado.encargo) },
+      // Devuelve el encargo PEDIDO, no siempre el mismo: hace falta para
+      // valorizar dos encargos distintos de la misma obra. `estado.encargo` a
+      // null sigue significando "no es de esta obra o de esta empresa".
+      encargoProveedor: {
+        findFirst: (args: { where: { id: string } }) =>
+          Promise.resolve(
+            estado.encargo ? { ...estado.encargo, id: args.where.id } : null,
+          ),
+      },
       proveedor: { findFirst: () => Promise.resolve(estado.proveedor) },
       wbsItem: {
         findMany: (args: {
@@ -138,6 +216,7 @@ beforeEach(() => {
   estado.filtroEncargos = null;
   estado.encargo = { id: "enc-1", estado: "VIGENTE" };
   estado.valorizaciones = [];
+  estado.puerta = null;
 });
 
 function seNego(r: { ok: boolean; error?: string }, trozo: string) {

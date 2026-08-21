@@ -37,13 +37,11 @@ enum UserState {
 
 /**
  * Que hace para la empresa quien esta en el catalogo.
- *
  * NO son dos tablas, y esa es la decision: quien ejecuta una partida y quien
  * vende el cemento tienen la misma identidad —un RUC—, la misma cuenta y la
  * misma consulta a SUNAT. Ademas, en GCM el que se compromete en el plan
  * semanal y el que carga tareas del Lookahead YA es el proveedor: separarlos
  * habria partido en dos el catalogo del que dependen esas pantallas.
- *
  * Lo que si hacia falta era poder DISTINGUIRLOS al mirar la lista, que es lo
  * unico que este campo resuelve.
  */
@@ -113,12 +111,12 @@ enum AuditAction {
 // ---------------------------------------------------------------------------
 
 model Company {
-  id          String   @id @default(cuid())
-  razonSocial String   @db.VarChar(200)
-  ruc         String   @unique @db.VarChar(11)
-  direccion   String?  @db.VarChar(255)
-  telefono    String?  @db.VarChar(30)
-  email       String?  @db.VarChar(150)
+  id          String  @id @default(cuid())
+  razonSocial String  @db.VarChar(200)
+  ruc         String  @unique @db.VarChar(11)
+  direccion   String? @db.VarChar(255)
+  telefono    String? @db.VarChar(30)
+  email       String? @db.VarChar(150)
 
   /// Quien firma las ordenes. Sale en el pie del documento que se le manda
   /// al proveedor, sobre la linea de firma.
@@ -161,16 +159,16 @@ model Company {
   /// una obra NO recicle su numero: un correlativo de auditoria no se repite.
   siguienteCorrelativoObra Int @default(1)
 
-  activa Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  activa    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  users       User[]
-  projects    Project[]
-  permisos    CompanyPermission[]
-  proveedores Proveedor[]
-  ordenes     OrdenCompra[]
-  formasPago  FormaPagoPlantilla[]
+  users             User[]
+  projects          Project[]
+  permisos          CompanyPermission[]
+  proveedores       Proveedor[]
+  ordenes           OrdenCompra[]
+  formasPago        FormaPagoPlantilla[]
   plantillasMensaje PlantillaMensaje[]
   solicitudesPerfil SolicitudCambioPerfil[]
   emisoresSms       EmisorSms[]
@@ -183,16 +181,13 @@ model Company {
 
   /**
    * Desde cuando la empresa esta EN MIGRACION. Null = opera normal.
-   *
    * NO es lo mismo que suspenderla, y la diferencia es justo el motivo de que
    * exista: una empresa suspendida no deja entrar a NADIE suyo
    * (`auth.service`), asi que su ADMIN no podria lanzar la exportacion de sus
    * propios datos. En migracion si entra, pero **no puede escribir**.
-   *
    * Es la doctrina de «obra cerrada» un piso mas arriba: lo que hace coherente
    * al archivo exportado es que nadie escriba mientras se lee, y el respaldo
    * de obra ya se apoya en eso mismo.
-   *
    * Se guarda la FECHA y no un booleano, como `analizadaAt` o `verificadoAt`:
    * asi el manifiesto del archivo puede decir desde cuando estaba congelada, y
    * una empresa que lleva tres semanas «migrando» se ve de un vistazo.
@@ -275,11 +270,9 @@ model RemitenteCorreo {
 
   /**
    * La contrasena, CIFRADA. Ver `src/lib/secreto.ts`.
-   *
    * Es el unico secreto de GCM que no se hashea, y no por descuido: hay que
    * presentarsela al servidor SMTP en cada envio, asi que un hash no serviria.
    * La llave de cifrado vive en el entorno, nunca aqui.
-   *
    * NUNCA sale hacia la pantalla. La interfaz solo dice si esta puesta.
    */
   claveCifrada String @db.Text
@@ -294,15 +287,12 @@ model RemitenteCorreo {
 
   /**
    * Que GCM MIRE este buzon para recoger las respuestas de los contratistas.
-   *
    * Apagado por defecto y se enciende a mano: leer el buzon de alguien no se
    * da por supuesto por haber configurado el envio. Son dos permisos morales
    * distintos aunque sea la misma contrasena.
-   *
    * Lo que se lee es SOLO lo que responde a un mensaje de GCM —se reconoce por
    * el `Message-ID` que GCM puso al enviar—. El resto del buzon se ignora y no
    * llega nunca a la base: esto no es un cliente de correo.
-   *
    * IMAP reutiliza `host`, `usuario` y `claveCifrada` con el puerto 993, que
    * es lo correcto en cPanel y en la mayoria de proveedores. Si alguno lo
    * tiene distinto se anadiran campos propios; hoy seria adivinar cuales.
@@ -318,12 +308,10 @@ model RemitenteCorreo {
 
   /**
    * Que fallo la ultima vez que se intento LEER el buzon, y cuando.
-   *
    * Va aparte de `ultimoError` —el del envio— porque las dos cosas fallan por
    * causas distintas: el envio muere en el 465 y la lectura en el 993, y una
    * puede llevar semanas rota con la otra perfecta. Con un solo campo, la
    * ultima en fallar borraria la senal de la otra.
-   *
    * Existe porque sin el, un buzon que no se puede leer se ve EXACTAMENTE
    * igual que un buzon donde nadie ha contestado: la pasada se apuntaba el
    * fallo en la consola del servidor y seguia, asi que la pantalla decia
@@ -336,7 +324,7 @@ model RemitenteCorreo {
   /// Ultimo envio de prueba que SALIO. Es lo unico que distingue «configurado»
   /// de «configurado y funciona», y sin esa distincion el primer correo que
   /// falla es el que iba al cliente.
-  verificadoAt DateTime?
+  verificadoAt  DateTime?
   /// Que dijo el servidor la ultima vez que fallo, para poder arreglarlo sin
   /// adivinar. Se guarda el mensaje, nunca la contrasena.
   ultimoError   String?   @db.VarChar(300)
@@ -447,32 +435,30 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company     Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  memberships ProjectMembership[]
-  sessions    Session[]
-  resetTokens PasswordResetToken[]
-  solicitudesPerfil SolicitudCambioPerfil[]
-  codigosAcceso CodigoAcceso[]
-  suscripcionesAviso SuscripcionAviso[]
-  avisos             Aviso[]
+  company             Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  memberships         ProjectMembership[]
+  sessions            Session[]
+  resetTokens         PasswordResetToken[]
+  solicitudesPerfil   SolicitudCambioPerfil[]
+  codigosAcceso       CodigoAcceso[]
+  suscripcionesAviso  SuscripcionAviso[]
+  avisos              Aviso[]
   /// Restricciones del Lookahead de las que se hizo cargo. Lleva nombre de
   /// relacion porque el dia que haya un segundo vinculo entre las dos tablas
   /// —quien la resolvio, por ejemplo— Prisma no sabria cual es cual.
-  restriccionesACargo Restriccion[] @relation("RestriccionesResponsable")
-  hitosACargo         HitoObra[]    @relation("HitosResponsable")
+  restriccionesACargo Restriccion[]           @relation("RestriccionesResponsable")
+  hitosACargo         HitoObra[]              @relation("HitosResponsable")
   /// Analisis de causa raiz de los que se hizo cargo. Mismo motivo que arriba
   /// para llevar nombre de relacion.
-  analisisACargo AnalisisCausa[] @relation("AnalisisResponsable")
+  analisisACargo      AnalisisCausa[]         @relation("AnalisisResponsable")
 
   /**
    * EL CORREO ES UNICO POR EMPRESA, no en toda la instalacion.
-   *
    * Lo era globalmente hasta el 20/08/2026, y no por descuido: el login
    * identificaba a la persona SOLO por su correo. Se cambio por decision del
    * usuario —«que las cuentas sean independientes para cada constructora,
    * porque son dueños diferentes»—: la misma persona puede trabajar para dos
    * clientes de GCM, y un supervisor externo para varios.
-   *
    * LO QUE HAY QUE SABER: el login ya no puede resolver a quien pertenece un
    * correo mirando esta tabla. Prueba la clave contra las cuentas que lo
    * compartan y, si casan varias, pregunta en cual entrar. Ver
@@ -511,8 +497,8 @@ model SolicitudCambioPerfil {
 
   estado        EstadoSolicitud @default(PENDIENTE)
   resueltaAt    DateTime?
-  resueltaPor   String?  @db.VarChar(150)
-  motivoRechazo String?  @db.Text
+  resueltaPor   String?         @db.VarChar(150)
+  motivoRechazo String?         @db.Text
 
   /// Vale `userId` mientras esta PENDIENTE y NULL en cuanto se resuelve.
   /// Es lo que garantiza EN LA BASE «una sola pendiente por usuario»: MySQL
@@ -646,8 +632,8 @@ model Project {
   id        String @id @default(cuid())
   companyId String
 
-  nombreObra  String  @db.VarChar(255)
-  codigoObra  String? @db.VarChar(40)
+  nombreObra String  @db.VarChar(255)
+  codigoObra String? @db.VarChar(40)
 
   /// Correlativo interno que asigna el SISTEMA, ascendente por empresa
   /// ("OB-000001"). Distinto de `codigoObra`, que lo pone la persona y puede
@@ -656,7 +642,7 @@ model Project {
   /// existian antes de introducirlo; las nuevas siempre lo llevan.
   correlativo String? @db.VarChar(20)
 
-  ubicacion   String? @db.VarChar(255)
+  ubicacion String? @db.VarChar(255)
 
   /// Si los gastos generales de la meta cuentan en la BOLSA OPERATIVA.
   ///
@@ -679,8 +665,8 @@ model Project {
   /// contractual cargado, que es el momento en que la pregunta tiene sentido
   /// (antes no se sabe contra que se compara).
   metaIncluyeGastosGenerales Boolean?
-  cliente     String? @db.VarChar(200)
-  descripcion String? @db.Text
+  cliente                    String?  @db.VarChar(200)
+  descripcion                String?  @db.Text
 
   fechaInicio        DateTime @db.Date
   fechaFinProgramada DateTime @db.Date
@@ -728,18 +714,18 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company     Company                  @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  memberships ProjectMembership[]
-  wbsItems    WbsItem[]
-  baselines   Baseline[]
-  movimientos MovimientoPresupuestal[]
-  ordenes     OrdenCompra[]
-  cronogramas Cronograma[]
-  avances     AvanceTarea[]
-  mapeos      MapeoTareaPartida[]
-  hitos       HitoObra[]
-  encargos    EncargoProveedor[]
-  planesSemanales PlanSemanal[]
+  company              Company                  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  memberships          ProjectMembership[]
+  wbsItems             WbsItem[]
+  baselines            Baseline[]
+  movimientos          MovimientoPresupuestal[]
+  ordenes              OrdenCompra[]
+  cronogramas          Cronograma[]
+  avances              AvanceTarea[]
+  mapeos               MapeoTareaPartida[]
+  hitos                HitoObra[]
+  encargos             EncargoProveedor[]
+  planesSemanales      PlanSemanal[]
   calendariosLaborales WorkCalendar[]
   lookaheadTareas      LookaheadTask[]
   fotosEvidencia       FotoEvidencia[]
@@ -752,6 +738,7 @@ model Project {
   avisos               Aviso[]
   ajustesAvisos        AjustesAvisosObra?
   presupuestosMeta     PresupuestoMeta[]
+  valorizaciones       ValorizacionEncargo[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -1126,7 +1113,7 @@ model MovimientoPresupuestal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   /// Cascade, y no Restrict como parecia prudente al principio.
   ///
@@ -1243,7 +1230,6 @@ model Proveedor {
 
   /**
    * La cuenta de detraccion del Banco de la Nacion.
-   *
    * Va con las demas cuentas por el mismo motivo que ellas: es del proveedor y
    * no del pedido. Y va APARTE de `cuentaBancaria` porque no es la misma
    * cuenta ni sirve para lo mismo: a esta se deposita el porcentaje detraido, y
@@ -1277,10 +1263,10 @@ model Proveedor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company   Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  ordenes   OrdenCompra[]
-  habituales ProveedorPartida[]
-  encargos  EncargoProveedor[]
+  company         Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  ordenes         OrdenCompra[]
+  habituales      ProveedorPartida[]
+  encargos        EncargoProveedor[]
   lookaheadTareas LookaheadTask[]
   compromisos     CompromisoSemanal[]
   mensajes        MensajeContratista[]
@@ -1466,12 +1452,12 @@ model OrdenCompra {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company      Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  project      Project            @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  proveedor    Proveedor          @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  company      Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  proveedor    Proveedor         @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
   /// Restrict: un encargo con ordenes emitidas no desaparece en silencio;
   /// primero se decide que pasa con sus ordenes.
-  encargo      EncargoProveedor?  @relation(fields: [encargoId], references: [id], onDelete: Restrict)
+  encargo      EncargoProveedor? @relation(fields: [encargoId], references: [id], onDelete: Restrict)
   lineas       OrdenLinea[]
   imputaciones OrdenImputacion[]
 
@@ -1495,7 +1481,7 @@ model OrdenLinea {
   /// Posicion en el documento. El orden del papel es informacion: agrupa.
   orden Int
   /// Profundidad. SIV AIRE llega a tres niveles.
-  nivel Int    @default(0)
+  nivel Int @default(0)
 
   /// LA MARCA QUE EVITA CONTAR EL DINERO DOS VECES.
   ///
@@ -1687,7 +1673,7 @@ model TareaCronograma {
   /// Holgura total en dias. MSPDI omite el campo cuando vale cero, asi que la
   /// ausencia se guarda como 0 y se marca, para no confundir "sin holgura" con
   /// "no informado" al auditar.
-  holguraDias     Decimal @db.Decimal(8, 2) @default(0)
+  holguraDias     Decimal @default(0) @db.Decimal(8, 2)
   holguraInferida Boolean @default(false)
 
   /// De donde salio esta fila. `IMPORTADO` es lo que trajo un archivo;
@@ -1728,7 +1714,7 @@ model DependenciaTarea {
   tipo String @db.VarChar(2)
 
   /// Desfase en dias, con signo. El archivo lo trae en decimas de minuto.
-  desfaseDias Decimal @db.Decimal(8, 2) @default(0)
+  desfaseDias Decimal @default(0) @db.Decimal(8, 2)
 
   cronograma Cronograma @relation(fields: [cronogramaId], references: [id], onDelete: Cascade)
 
@@ -1953,7 +1939,6 @@ model RespaldoObra {
   /**
    * SIN clave foranea a `companies` desde el 19/08/2026, y por el mismo motivo
    * por el que `projectId` nunca la tuvo.
-   *
    * Era `Cascade`, asi que borrar la constructora se llevaba por delante TODOS
    * los recibos de respaldo de sus obras: justo la prueba de que a esa empresa
    * se le entrego su informacion antes de destruirla. La tabla existe porque
@@ -2153,14 +2138,14 @@ model EncargoProveedor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project             Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  proveedor           Proveedor             @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
-  partidas            EncargoPartida[]
-  valorizaciones      ValorizacionEncargo[]
-  fechasValorizacion  FechaValorizacion[]
-  pagos               PagoEncargo[]
+  project            Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  proveedor          Proveedor             @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  partidas           EncargoPartida[]
+  valorizaciones     ValorizacionEncargo[]
+  fechasValorizacion FechaValorizacion[]
+  pagos              PagoEncargo[]
   /// Las ordenes emitidas CONTRA este encargo, que lo formalizan por partes.
-  ordenes             OrdenCompra[]
+  ordenes            OrdenCompra[]
 
   @@unique([projectId, numero])
   @@index([projectId, estado])
@@ -2188,7 +2173,7 @@ model EncargoPartida {
   /// Restrict y no Cascade: una partida con encargo no se borra a la ligera
   /// —hay un compromiso con un proveedor colgando—; primero se quita del
   /// encargo. La linea base ya bloquea el borrado de partidas por su lado.
-  partida WbsItem @relation(fields: [wbsItemId], references: [id], onDelete: Restrict)
+  partida WbsItem          @relation(fields: [wbsItemId], references: [id], onDelete: Restrict)
 
   @@unique([encargoId, wbsItemId])
   @@index([wbsItemId])
@@ -2205,8 +2190,37 @@ model ValorizacionEncargo {
   id        String @id @default(cuid())
   encargoId String
 
+  /// La obra, DESNORMALIZADA: se llega igual por el encargo.
+  ///
+  /// No esta por comodidad de lectura sino porque sin columna no hay indice:
+  /// el correlativo de obra necesita `@@unique([projectId, numeroObra])`, y
+  /// una unicidad no se puede declarar sobre una columna de OTRA tabla. Sin
+  /// ella, dos valorizaciones simultaneas en encargos distintos de la misma
+  /// obra cogerian el mismo numero y nada lo rechazaria. Es el mismo motivo
+  /// por el que `OrdenCompra` lleva `projectId` teniendo ya `encargoId`.
+  ///
+  /// El dueno del dato sigue siendo el encargo: esta columna se escribe una
+  /// vez, al crear, y no se toca despues. Una valorizacion no cambia de obra.
+  projectId String
+
   /// Fecha del corte de la valorizacion (calendario).
   fecha DateTime @db.Date
+
+  /// EL numero del documento: "Valorizacion N.o 12" de esta OBRA. Correlativo
+  /// por obra y ascendente, sin huecos mientras no se anule ninguna.
+  ///
+  /// Es el que manda en el papel, porque el papel lo emite la obra: quien lo
+  /// archiva y quien lo reclama piensan en la obra, no en el contratista.
+  numeroObra Int
+
+  /// El correlativo dentro del ENCARGO: "la 3.a de este contratista".
+  ///
+  /// Por ENCARGO y no por proveedor, que es decision del usuario: el mismo
+  /// contratista puede tener dos encargos en la misma obra —dos frentes con
+  /// dos montos contratados y dos avances— y una serie compartida haria
+  /// imposible leer "vamos por la tercera de la partida de acabados". Va al
+  /// lado del de obra, nunca solo: por si mismo no identifica el documento.
+  numeroEncargo Int
 
   /// Avance ACUMULADO del proveedor, 0..100, sobre su monto contratado.
   /// Acumulado y no incremental: es como se lee una valorizacion ("vamos al
@@ -2219,8 +2233,18 @@ model ValorizacionEncargo {
   createdAt     DateTime @default(now())
 
   encargo EncargoProveedor @relation(fields: [encargoId], references: [id], onDelete: Cascade)
+  /// Cascade y no Restrict: la valorizacion ya moria con su encargo, y el
+  /// encargo muere con la obra. Con Restrict aqui, borrar una obra chocaria
+  /// contra esta clave y el borrado —que es reversible y esta probado— dejaria
+  /// de funcionar por una columna que solo existe para numerar.
+  project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   pagos   PagoEncargo[]
 
+  /// Las dos series. Son tambien lo que impide el numero repetido: el numero
+  /// se calcula dentro de la transaccion sobre el maximo actual, y si dos
+  /// altas simultaneas leen el mismo maximo, la segunda choca aqui.
+  @@unique([projectId, numeroObra])
+  @@unique([encargoId, numeroEncargo])
   @@index([encargoId, fecha])
   @@map("valorizaciones_encargo")
 }
@@ -2461,8 +2485,8 @@ model CompromisoSemanal {
   diaInicio Int?
   diaFin    Int?
 
-  plan      PlanSemanal @relation(fields: [planSemanalId], references: [id], onDelete: Cascade)
-  proveedor Proveedor?  @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  plan      PlanSemanal     @relation(fields: [planSemanalId], references: [id], onDelete: Cascade)
+  proveedor Proveedor?      @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
   fotos     FotoEvidencia[]
 
   @@index([planSemanalId])
@@ -2514,7 +2538,7 @@ model WorkCalendar {
   laborable Boolean @default(true)
 
   /// Horas del dia (8 de L a V, 5 el sabado de CRIOCORD, 0 si descanso).
-  horas Decimal @db.Decimal(4, 2) @default(8)
+  horas Decimal @default(8) @db.Decimal(4, 2)
 
   turno TipoTurno @default(NORMAL)
 
@@ -2594,7 +2618,7 @@ model Restriccion {
   lookaheadTaskId String
 
   tipo    TipoRestriccion
-  detalle String? @db.VarChar(300)
+  detalle String?         @db.VarChar(300)
 
   /// Si exige un documento aprobado para resolverse (MATERIALES -> guia,
   /// INFORMACION -> RFI/plano). La validacion automatica es logica de backend.
@@ -2892,7 +2916,7 @@ model CodigoPase {
   /// Identifica el desafio; su token viaja en una cookie. No se guarda el
   /// id del pase en la cookie: si se guardara, cualquiera podria escribir el
   /// de otro y ponerse a probar seis cifras contra quien quisiera.
-  tokenHash String @unique @db.Char(64)
+  tokenHash  String @unique @db.Char(64)
   /// SHA-256 del codigo de seis cifras. Nunca en claro.
   codigoHash String @db.Char(64)
 
@@ -3051,7 +3075,7 @@ enum DireccionMensaje {
 /// mismo motivo: el mensaje es del CONTRATISTA, no de la obra. Al borrar una
 /// obra se pone a null y la ficha del contratista conserva su historial.
 model MensajeContratista {
-  id          String  @id @default(cuid())
+  id          String @id @default(cuid())
   companyId   String
   proveedorId String
 
@@ -3098,12 +3122,10 @@ model MensajeContratista {
 
   /**
    * El identificador del hilo, en los SALIENTES por correo.
-   *
    * Viaja dentro del `Message-ID` que GCM fija al enviar
    * (`<gcm.TOKEN@dominio>`). Cuando el contratista pulsa «Responder», su
    * cliente lo devuelve en `In-Reply-To`, y eso es lo que ata la respuesta a
    * ESTA conversacion: mismo contratista y misma obra, sin adivinar.
-   *
    * Aleatorio y no el `id` de la fila: un identificador adivinable dejaria
    * inyectar respuestas falsas mandando un correo al buzon.
    */
@@ -3116,7 +3138,6 @@ model MensajeContratista {
 
   /**
    * Quien lo escribio, para poder AVISARLE cuando llegue la respuesta.
-   *
    * `enviadoPor` es un nombre para mostrar y no sirve para eso. Sin clave
    * ajena a proposito: el mensaje es historia y tiene que sobrevivir a que su
    * autor se dé de baja, igual que sobrevive a que se borre la obra.
@@ -3125,7 +3146,6 @@ model MensajeContratista {
 
   /**
    * El `Message-ID` del correo ENTRANTE. Es la clave de la idempotencia.
-   *
    * El buzon no se marca ni se vacia —es de la constructora y lo usa gente—,
    * asi que la misma pasada puede volver a ver el mismo correo. Lo que impide
    * duplicarlo es este indice unico, no el estado del buzon. Es la misma
@@ -3135,18 +3155,17 @@ model MensajeContratista {
 
   proveedor Proveedor @relation(fields: [proveedorId], references: [id], onDelete: Cascade)
 
+  /// Que el mismo correo no entre dos veces. Por empresa: dos constructoras
+  /// pueden recibir copia del mismo correo y cada una guarda el suyo.
+  @@unique([companyId, messageIdEntrante])
   /// El historial de la ficha del contratista.
   @@index([proveedorId, createdAt])
   /// Para poder ver lo escrito desde una obra.
   @@index([projectId, createdAt])
   /// Para encontrar la conversacion a la que responde un correo entrante.
   @@index([companyId, token])
-  /// Que el mismo correo no entre dos veces. Por empresa: dos constructoras
-  /// pueden recibir copia del mismo correo y cada una guarda el suyo.
-  @@unique([companyId, messageIdEntrante])
   @@map("mensajes_contratista")
 }
-
 
 // ---------------------------------------------------------------------------
 // Avisos: que lo que GCM ya sabe llegue a quien puede resolverlo
@@ -3368,7 +3387,7 @@ model EnvioAviso {
   enviado Boolean
   /// "sin-canal", "tope-persona", "tope-empresa", "smtp"... Para la pantalla
   /// del que configura, no para el destinatario.
-  motivo String? @db.VarChar(60)
+  motivo  String? @db.VarChar(60)
 
   createdAt DateTime @default(now())
 
@@ -3405,6 +3424,7 @@ model AjustesAvisosObra {
   updatedAt DateTime @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   @@map("ajustes_avisos_obra")
 }
 
@@ -3620,9 +3640,9 @@ model PresupuestoMetaItem {
   /// se escribe en la plantilla y lo que ensena la hoja, y guardarlo igual
   /// evita el error de cien veces, que en un presupuesto no da error: da una
   /// cifra creible y equivocada. Para calcular, `porcentajeAFraccion`.
-  porcentajeRecargo Decimal? @db.Decimal(6, 3)
-  meta    PresupuestoMeta   @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
-  reparto MetaItemPartida[]
+  porcentajeRecargo Decimal?          @db.Decimal(6, 3)
+  meta              PresupuestoMeta   @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
+  reparto           MetaItemPartida[]
 
   @@index([presupuestoMetaId, orden])
   @@index([presupuestoMetaId, codigoRef])

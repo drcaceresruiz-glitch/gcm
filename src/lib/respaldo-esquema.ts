@@ -371,9 +371,19 @@ export const TABLAS: readonly TablaRespaldo[] = [
     decimales: { fraccion: 3 },
   },
   {
+    /**
+     * `projectId` viaja aunque la obra ya se alcance por el encargo: es una
+     * columna DESNORMALIZADA (existe para poder declarar la unicidad del
+     * correlativo de obra) y, como todo id, hay que remapearla. Sin esta
+     * linea la fila restaurada conservaria el id de la obra ORIGINAL, que en
+     * el caso normal —restaurar una obra borrada— ya no existe.
+     */
     tabla: "valorizaciones_encargo",
     modelo: "valorizacionEncargo",
-    refs: [{ campo: "encargoId", a: "encargos_proveedor" }],
+    refs: [
+      { campo: "encargoId", a: "encargos_proveedor" },
+      { campo: "projectId", a: "projects" },
+    ],
     decimales: { porcentaje: 3 },
     fechas: ["fecha"],
   },
