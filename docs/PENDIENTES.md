@@ -24,6 +24,40 @@ Dos avisos antes de leer nada de mas abajo:
 
 ### Lo que hay que mirar primero
 
+> **LO MAS URGENTE, del 21 de agosto: un parpadeo de la base deja la
+> aplicacion sin desplegar, y nadie vuelve a intentarlo.** El run #471
+> (`cc57486`) subio bien y no se aplico: `migrate deploy` se encontro MariaDB
+> inalcanzable —`Error: P1001: Can't reach database server at localhost:3306`,
+> 05:40 en `tmp/despliegue.log`— y el script **descarto el paquete**. El cron
+> sigue pasando cada minuto, pero ya no queda nada que aplicar, asi que
+> **produccion se queda atras hasta que una persona empuje otro commit**. Al
+> escribir esto sirve `835d988`.
+>
+> No es un caso raro: **el mismo P1001 aparecio el 20 de agosto a las 20:39**,
+> y de aquel se salio solo. Son dos en nueve horas.
+>
+> **Lo que hay que hacer**: que `desplegar.sh` distinga un fallo de MIGRACION
+> POR BASE INALCANZABLE —transitorio— de un fallo de migracion de verdad, y en
+> el primer caso **deje el paquete donde esta para el siguiente pase del cron**
+> en vez de descartarlo. Con un tope de intentos, para que una base caida de
+> verdad no reintente para siempre en silencio. Lo que NO se puede hacer es
+> aplicar el paquete sin migrar: el codigo nuevo consultando tablas viejas tira
+> la aplicacion entera, que es el fallo que la seccion 0 y la receta de cambio
+> de esquema llevan meses evitando.
+>
+> **Y una correccion de metodo que vale mas que el arreglo**: desde fuera esto
+> es INDISTINGUIBLE de un cron que no corre. `/api/health` da `version` vieja,
+> `despliegue: pendiente` y `coherencia: desfasado` en los dos casos, y el
+> texto que el workflow imprime al fallar dice «el paquete llego pero el CRON
+> no lo aplico», que aqui era falso —el cron habia aplicado `835d988` a las
+> 04:42 de ese mismo dia, y cientos antes—. **La unica fuente que lo distingue
+> es `tmp/despliegue.log`.** Este documento llego a afirmar lo contrario antes
+> de abrirlo. Conviene ademas arreglar ese texto del workflow: hoy nombra una
+> sola causa como si fuera la unica.
+>
+> Nota, por si alguien la busca: **el aviso de la seccion 0 —«vigilar que el
+> cron exista»— NO se ha cumplido todavia**. El cron existe y funciona.
+
 1. ~~**`835d988 WIP antes de reinstalar Claude` quedo a medias.**~~ **CERRADO
    el 21 de agosto de 2026.** Ya no queda nada sin terminar en el
    repositorio.

@@ -592,6 +592,41 @@ cerrada se llevaba por delante lo que se le pago a cada contratista.
 - El paso de FTP tiene tope propio y `apt` reintenta en vez de tirar el
   despliegue.
 
+> **EL 21 DE AGOSTO UN PAQUETE SE QUEDO SIN APLICAR PORQUE LA BASE PARPADEO.**
+> El run **#471** (`cc57486`) subio bien y no llego a servirse: el paso
+> «Comprobar que la version nueva esta viva» agoto sus 28 intentos en 7 minutos
+> y tumbo el despliegue. `/api/health` seguia cantando `835d988` horas despues.
+>
+> **La causa esta en `tmp/despliegue.log` y es una sola linea**, a las 05:40:
+>
+> ```
+> Error: P1001: Can't reach database server at localhost:3306
+> ```
+>
+> `migrate deploy` no alcanzo a MariaDB, el script **descarto el paquete** y
+> produccion se quedo en la version anterior. **No es el segundo P1001**: el
+> 20 de agosto a las 20:39 hubo otro, y de aquel se salio solo.
+>
+> **EL CRON NO TIENE NADA QUE VER, y conviene decirlo porque es lo primero que
+> uno piensa mirando `/api/health`.** El cron existe, corre y ha aplicado
+> cientos de paquetes sin fallar, el ultimo `835d988` a las 04:42 de ESE MISMO
+> dia, hora y media antes. Desde fuera el sintoma es identico al del cron
+> ausente —`version` vieja, `despliegue: pendiente`, `coherencia: desfasado`— y
+> por eso la lectura que el workflow imprime al fallar (**«el paquete llego pero
+> el CRON no lo aplico»**) lleva a la conclusion equivocada. **La unica fuente
+> que distingue las dos cosas es `tmp/despliegue.log`**; sin abrirlo no se puede
+> afirmar cual de las dos fue. Aqui se afirmo y era la otra.
+>
+> **El punto debil de verdad**, que es lo que hay que arreglar: un
+> `migrate deploy` que topa con la base caida **descarta el paquete y no lo
+> reintenta hasta el siguiente push**. El cron vuelve a pasar cada minuto, pero
+> ya no hay nada que aplicar. Un parpadeo de segundos en MariaDB deja la
+> aplicacion sin desplegar hasta que una PERSONA empuja otro commit. Ver
+> `PENDIENTES.md`.
+>
+> Y el efecto de este en concreto tiene guasa: dejo a produccion sirviendo
+> `835d988` —el WIP a medias— justo el dia en que se cerro.
+
 ### 18. La red de pruebas: lo que TypeScript no ve
 
 De ~500 pruebas se paso a **mas de 2.400**. Lo importante no es el numero sino
