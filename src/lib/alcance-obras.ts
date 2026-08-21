@@ -20,9 +20,11 @@ import type { Role } from "@/generated/prisma/enums";
 /**
  * Los roles que ven TODA la cartera de su empresa.
  *
- * Solo ADMIN, que es el gerente general: en GCM no existe un rol
- * `GERENTE_GENERAL`, el control total sobre la empresa es justo lo que
- * define a ADMIN (`MATRIZ.ADMIN = PERMISOS`).
+ * ADMIN, que tiene el control total (`MATRIZ.ADMIN = PERMISOS`), y GERENTE,
+ * que ve el negocio entero pero no administra ni aprueba nada —es la unica
+ * forma en que "toda la cartera" tiene sentido para un rol asi: un gerente
+ * que solo viera las obras que alguien le asignara una a una no podria
+ * responder de la empresa completa, que es justo su trabajo.
  *
  * Todos los demas —residente, administrador de obra, almacenero y
  * consultor— ven SOLO lo que se les asigne. Es denegar por defecto, el mismo
@@ -34,7 +36,7 @@ import type { Role } from "@/generated/prisma/enums";
  * el presupuesto y el comprometido de las obras de los demas clientes de la
  * constructora.
  */
-export const VE_TODAS_LAS_OBRAS: readonly Role[] = ["ADMIN"];
+export const VE_TODAS_LAS_OBRAS: readonly Role[] = ["ADMIN", "GERENTE"];
 
 export function veTodasLasObras(role: Role): boolean {
   return VE_TODAS_LAS_OBRAS.includes(role);

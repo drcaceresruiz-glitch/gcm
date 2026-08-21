@@ -1,0 +1,14 @@
+-- AlterTable
+ALTER TABLE `companies` ADD COLUMN `permitirVistaPreviaRoles` BOOLEAN NOT NULL DEFAULT false;
+
+-- AlterTable
+ALTER TABLE `company_permissions` MODIFY `role` ENUM('ADMIN', 'RESIDENTE', 'ADMIN_OBRA', 'ALMACENERO', 'CONSULTOR', 'GERENTE') NOT NULL;
+
+-- AlterTable
+ALTER TABLE `project_memberships` MODIFY `role` ENUM('ADMIN', 'RESIDENTE', 'ADMIN_OBRA', 'ALMACENERO', 'CONSULTOR', 'GERENTE') NOT NULL;
+
+-- AlterTable
+ALTER TABLE `suscripciones_aviso` MODIFY `rol` ENUM('ADMIN', 'RESIDENTE', 'ADMIN_OBRA', 'ALMACENERO', 'CONSULTOR', 'GERENTE') NULL;
+
+-- AlterTable
+ALTER TABLE `users` MODIFY `role` ENUM('ADMIN', 'RESIDENTE', 'ADMIN_OBRA', 'ALMACENERO', 'CONSULTOR', 'GERENTE') NOT NULL;

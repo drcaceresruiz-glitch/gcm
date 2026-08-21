@@ -10,6 +10,7 @@ import { IlustracionDocumento } from "@/components/ui/IlustracionDocumento";
 import { EmisoresSms } from "@/components/empresa/EmisoresSms";
 import { RemitenteCorreo } from "@/components/empresa/RemitenteCorreo";
 import { PlantillasMensaje } from "@/components/empresa/PlantillasMensaje";
+import { VistaPreviaRoles } from "@/components/empresa/VistaPreviaRoles";
 import { listarPlantillas } from "@/services/plantillas-mensaje.service";
 import { leerRemitente } from "@/services/remitente-correo.service";
 import { hayBuzonCompartido } from "@/services/mailer.service";
@@ -102,6 +103,10 @@ export default async function ConfiguracionPage() {
           ]}
         />
       </div>
+
+      {/* Al final: es la unica seccion de esta pagina que no hace falta
+          tocar el primer dia, y la mas facil de dejar tal como esta. */}
+      <VistaPreviaRoles activa={sesion.previsualizacionHabilitada} />
     </div>
   );
 }

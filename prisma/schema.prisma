@@ -28,6 +28,9 @@ enum Role {
   ADMIN_OBRA
   ALMACENERO
   CONSULTOR
+  /// Ve el negocio entero -toda la cartera, todo lo que se lee- pero no
+  /// administra ni aprueba nada. Ver `TODO_LO_QUE_SE_LEE` en `src/lib/rbac.ts`.
+  GERENTE
 }
 
 enum UserState {
@@ -159,9 +162,16 @@ model Company {
   /// una obra NO recicle su numero: un correlativo de auditoria no se repite.
   siguienteCorrelativoObra Int @default(1)
 
-  activa    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  activa                   Boolean  @default(true)
+  /// Si el admin puede "ver como" otro rol sin salir de su cuenta. Apagado
+  /// por defecto: es una herramienta para empezar con un equipo chico o para
+  /// que el admin pruebe la app por rol, no algo que toda empresa necesite
+  /// encendido. Ver `src/lib/vista-rol.ts`: la interseccion de permisos hace
+  /// que esto sea inofensivo aunque se manipule, este ajuste solo decide si
+  /// el control aparece.
+  permitirVistaPreviaRoles Boolean  @default(false)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   users             User[]
   projects          Project[]

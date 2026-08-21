@@ -212,6 +212,21 @@ const SOLO_LECTURA: Permiso[] = [
   "movimiento:leer",
 ];
 
+/**
+ * Todo lo que termina en ":leer", salvo lo innegociable (`permiso:leer`,
+ * que es exclusivo de ADMIN). Es la base de GERENTE: un gerente ve el
+ * negocio entero —incluidos `meta:leer`, `nota:leer` y `galeria:leer`, que
+ * CONSULTOR no tiene porque esa lista es del cliente, no de la empresa—
+ * pero no administra ni aprueba nada.
+ *
+ * Se DERIVA de `PERMISOS` a proposito, en vez de enumerarse a mano: un
+ * permiso de lectura nuevo entra aqui solo con anadirse a `PERMISOS`, sin
+ * que nadie tenga que acordarse de tocar esta lista tambien.
+ */
+const TODO_LO_QUE_SE_LEE: readonly Permiso[] = PERMISOS.filter(
+  (p) => p.endsWith(":leer") && !INNEGOCIABLES.includes(p),
+);
+
 const MATRIZ: Record<Role, readonly Permiso[]> = {
   /// Control total sobre su empresa. Unico rol que aprueba la linea base:
   /// congelar el presupuesto es un acto contractual, no operativo.
@@ -343,6 +358,13 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
 
   /// Consulta externa (cliente, supervision): estrictamente lectura.
   CONSULTOR: SOLO_LECTURA,
+
+  /// Ve el negocio entero, no una obra ni un cliente: toda la cartera y
+  /// todo lo que se lee, sin administrar ni aprobar nada. Es el rol que
+  /// tambien se puede PREVISUALIZAR desde una cuenta ADMIN —ver
+  /// `@/lib/vista-rol`— para quien es gerente y administrador general a la
+  /// vez con una sola cuenta.
+  GERENTE: TODO_LO_QUE_SE_LEE,
 };
 
 /**
@@ -367,6 +389,7 @@ export const ETIQUETA_ROL: Record<Role, string> = {
   ADMIN_OBRA: "Administrador de obra",
   ALMACENERO: "Almacenero",
   CONSULTOR: "Consultor",
+  GERENTE: "Gerente",
 };
 
 /** Lo que la plantilla del rol concede, antes de excepciones. */

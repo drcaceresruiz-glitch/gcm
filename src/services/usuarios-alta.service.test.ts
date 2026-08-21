@@ -72,6 +72,8 @@ function sesion(permisos: Permiso[] = ["usuario:crear"]): SesionActiva {
     email: "ana@ejemplo.pe",
     mustChangePassword: false,
     esOperador: false,
+    rolReal: "ADMIN",
+    previsualizacionHabilitada: false,
   };
 }
 

@@ -88,3 +88,27 @@ export async function actualizarEmpresa(
 
   return { ok: true };
 }
+
+/**
+ * Enciende o apaga la vista previa de roles para toda la empresa.
+ *
+ * Misma frontera que el resto de `/empresa/configuracion`: es
+ * `configuracion:editar`, innegociable, ADMIN siempre. No es la frontera de
+ * seguridad de la vista previa en si —esa la pone la interseccion de
+ * `@/lib/vista-rol`—, solo decide si el control existe.
+ */
+export async function cambiarVistaPreviaRoles(
+  sesion: SesionActiva,
+  activar: boolean,
+): Promise<Resultado> {
+  if (!puede(sesion, "configuracion:editar")) {
+    return { ok: false, error: "No tienes permiso para cambiar esto." };
+  }
+
+  await prisma.company.update({
+    where: { id: sesion.companyId },
+    data: { permitirVistaPreviaRoles: activar },
+  });
+
+  return { ok: true };
+}

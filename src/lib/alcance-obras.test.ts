@@ -18,18 +18,21 @@ import { ROLES } from "@/lib/rbac";
  */
 
 describe("veTodasLasObras", () => {
-  it("solo el ADMIN ve la cartera completa", () => {
+  it("ADMIN y GERENTE ven la cartera completa", () => {
     expect(veTodasLasObras("ADMIN")).toBe(true);
+    expect(veTodasLasObras("GERENTE")).toBe(true);
   });
 
   /**
    * Denegar por defecto, y que se note al anadir un rol: si manana entra un
    * rol nuevo en el enum, esta prueba falla y obliga a decidir su alcance en
-   * vez de heredarlo sin querer.
+   * vez de heredarlo sin querer. GERENTE se sumo aqui el 21 de agosto de
+   * 2026 a proposito -ve el negocio entero, no una obra a la vez-, y por
+   * eso esta en la lista y no es un caso que la prueba deba rechazar.
    */
-  it("ningun otro rol la ve, hoy por hoy", () => {
+  it("solo ADMIN y GERENTE la ven, hoy por hoy", () => {
     const conTodas = ROLES.filter((r) => veTodasLasObras(r));
-    expect(conTodas).toEqual(["ADMIN"]);
+    expect(conTodas.sort()).toEqual(["ADMIN", "GERENTE"]);
   });
 });
 

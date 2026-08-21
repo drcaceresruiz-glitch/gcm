@@ -22,6 +22,7 @@ export const DESCRIPCION_ROL: Record<Role, string> = {
   ADMIN_OBRA: "Lleva proveedores y ordenes; redacta movimientos.",
   ALMACENERO: "Solo consulta obras y partidas.",
   CONSULTOR: "Consulta externa: estrictamente lectura.",
+  GERENTE: "Ve toda la cartera y todo lo que se lee; no administra ni aprueba.",
 };
 
 export function rolValido(valor: string | null | undefined): valor is Role {

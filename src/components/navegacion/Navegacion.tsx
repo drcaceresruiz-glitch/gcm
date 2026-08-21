@@ -7,6 +7,7 @@ import {
   BookOpen,
   Building2,
   ClipboardCheck,
+  Eye,
   Landmark,
   KeyRound,
   LogOut,
@@ -23,6 +24,8 @@ import { MenuDesplegable } from "@/components/ui/MenuDesplegable";
 import { SelectorApariencia } from "@/components/ui/SelectorApariencia";
 import { Avatar } from "@/components/ui/Avatar";
 import { accionCerrarSesion } from "@/app/(auth)/acciones";
+import { accionVerComo } from "@/app/(dashboard)/acciones";
+import type { Role } from "@/generated/prisma/enums";
 
 /**
  * La navegacion de la cabecera.
@@ -83,6 +86,18 @@ export interface EnlaceEmpresa {
   badge?: number;
 }
 
+/**
+ * Null para casi todo el mundo: solo una cuenta ADMIN, y solo si su empresa
+ * encendio el ajuste en Configuracion, puede "ver como" otro rol.
+ * `usuario.rol` ya trae la etiqueta del rol EFECTIVO —el simulado, si hay
+ * uno activo—, asi que esto solo necesita saber si hay una vista previa
+ * puesta ahora mismo y que otras opciones existen.
+ */
+export interface VistaRolInfo {
+  opciones: { valor: Role; etiqueta: string }[];
+  activa: boolean;
+}
+
 interface Props {
   empresa: EnlaceEmpresa[];
   /// Alta de constructoras. Null salvo para quien opera GCM.
@@ -91,6 +106,7 @@ interface Props {
   /// que en `EnlaceMenu`: un badge en cero solo distrae.
   avisos: { href: string; sinLeer: number };
   usuario: { nombre: string; rol: string; foto: string | null };
+  vistaRol: VistaRolInfo | null;
 }
 
 /**
@@ -134,7 +150,7 @@ function OpcionesAgrupadas({ empresa }: { empresa: EnlaceEmpresa[] }) {
   );
 }
 
-export function Navegacion({ empresa, operador, avisos, usuario }: Props) {
+export function Navegacion({ empresa, operador, avisos, usuario, vistaRol }: Props) {
   const [cajonAbierto, setCajonAbierto] = useState(false);
 
   return (
@@ -190,7 +206,11 @@ export function Navegacion({ empresa, operador, avisos, usuario }: Props) {
             />
           }
         >
-          <p className="px-3 py-2 text-xs opacity-60">{usuario.rol}</p>
+          {vistaRol ? (
+            <VistaRolControl rol={usuario.rol} info={vistaRol} />
+          ) : (
+            <p className="px-3 py-2 text-xs opacity-60">{usuario.rol}</p>
+          )}
           <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
           <SelectorApariencia />
           <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
@@ -249,6 +269,12 @@ export function Navegacion({ empresa, operador, avisos, usuario }: Props) {
                 </span>
               </p>
             </div>
+
+            {vistaRol && (
+              <div className="px-3 pb-2">
+                <VistaRolControl rol={usuario.rol} info={vistaRol} />
+              </div>
+            )}
 
             <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
 
@@ -322,6 +348,78 @@ function Campana({ href, sinLeer }: { href: string; sinLeer: number }) {
         </span>
       )}
     </Link>
+  );
+}
+
+/**
+ * "Ver como": solo para quien puede activarla (ver `Props.vistaRol`).
+ *
+ * Cada opcion es su propio `<form>` porque `accionVerComo` es un Server
+ * Action que recibe el rol elegido -mismo patron que `accionEditarObra`
+ * o `accionSalirDelPase` con `.bind(null, ...)`-, no un desplegable con
+ * estado propio: el envio recarga la sesion entera, asi que no hace falta
+ * ni JavaScript en el cliente para que funcione.
+ */
+function VistaRolControl({
+  rol,
+  info,
+}: {
+  rol: string;
+  info: VistaRolInfo;
+}) {
+  if (info.activa) {
+    return (
+      <div className="px-3 py-2">
+        <p
+          className="flex items-center gap-1.5 text-xs font-medium"
+          style={{ color: "var(--color-alerta)" }}
+        >
+          <Eye className="size-3.5 shrink-0" aria-hidden="true" />
+          Viendo como: {rol}
+        </p>
+        {/* `stopPropagation`: mismo motivo que `BotonSalir` mas abajo. Sin
+            esto el clic burbujea al contenedor del menu, que se cierra
+            -y desmonta este formulario- antes de que su envio llegue a
+            ejecutarse, y "volver a mi vista" no hacia nada. */}
+        <form
+          action={accionVerComo.bind(null, null)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="submit"
+            className="mt-1 text-xs underline opacity-70 hover:opacity-100"
+          >
+            Volver a mi vista
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-3 py-2">
+      <p className="text-xs opacity-60">{rol}</p>
+      <p className="mt-2 mb-1 text-[11px] font-medium tracking-wide uppercase opacity-50">
+        Ver como
+      </p>
+      <div className="space-y-0.5">
+        {info.opciones.map((o) => (
+          <form
+            key={o.valor}
+            action={accionVerComo.bind(null, o.valor)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="submit"
+              role="menuitem"
+              className="w-full rounded-lg px-1.5 py-1 text-left text-xs hover:bg-[color-mix(in_oklab,var(--borde)_50%,transparent)]"
+            >
+              {o.etiqueta}
+            </button>
+          </form>
+        ))}
+      </div>
+    </div>
   );
 }
 

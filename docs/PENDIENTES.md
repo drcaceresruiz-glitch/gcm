@@ -12,17 +12,40 @@ varado, `?siguiente=` del correo, plan de skills, Notas E1) y de paso el
 usuario fue navegando la app en vivo, encontrando cosas que no estaban en
 ningun documento. Queda una cola clara, en el orden acordado con el usuario:
 
-1. **Rol GERENTE de verdad, con interruptor de "ver como"** — EMPEZANDO
-   ahora. Hoy "gerencia" no es un rol: la pantalla `/gerencia` la ve
-   cualquiera con alcance total de la cartera (en la practica, solo ADMIN).
-   El usuario quiere: (a) un rol `GERENTE` propio en la matriz de permisos;
-   (b) que la MISMA persona pueda ser gerente y administrador general a la
-   vez, sin dos cuentas; (c) un interruptor para ver la app "como" ese rol,
-   pensado para poder configurar y probar el sistema con un equipo chico al
-   empezar. Toca el enum `Role` de Prisma (nueva migracion), `rbac.ts`,
-   `alcance-obras.ts`, y probablemente la pantalla `/gerencia` misma —ver el
-   punto 7 de aqui abajo, esta delgada para lo que un gerente esperaria—.
-   Se plantea con su propio ciclo de plan, como Notas E1.
+1. ~~**Rol GERENTE de verdad, con interruptor de "ver como".**~~ **HECHO el
+   21 de agosto de 2026.** `GERENTE` es ahora un rol propio del enum `Role`
+   (migracion `rol_gerente_y_vista_previa`), con permisos derivados —no
+   enumerados a mano— de `TODO_LO_QUE_SE_LEE` en `rbac.ts`: todo permiso que
+   termina en `:leer` salvo el innegociable `permiso:leer`. Ve toda la
+   cartera (se sumo a `VE_TODAS_LAS_OBRAS` en `alcance-obras.ts`, junto a
+   ADMIN), no administra ni aprueba nada.
+
+   El interruptor de "ver como" vive en `src/lib/vista-rol.ts`
+   (`vistaEfectiva`, funcion pura y probada con 10 casos): los permisos de la
+   simulacion son la INTERSECCION entre el rol simulado y los reales de la
+   cuenta, nunca una sustitucion, asi que no hay forma de ganar privilegio
+   manipulando la cookie a mano —eso se verifico en pruebas, no solo se
+   afirma—. Solo una cuenta ADMIN puede activarlo, y solo si la empresa lo
+   enciende en `/empresa/configuracion` (`permitirVistaPreviaRoles`, apagado
+   por defecto). El control esta en el menu de la cuenta, y una franja fija
+   avisa mientras la vista previa esta activa.
+
+   **Un bug real que se encontro probandolo en vivo, no en las pruebas
+   automatizadas**: los dos formularios de "Ver como" y "Volver a mi vista"
+   viven dentro del desplegable del menu de cuenta, que se cierra al primer
+   clic dentro de si mismo —exactamente el mismo problema que el propio
+   codigo ya documentaba junto a `BotonSalir` ("Salir"), y que se me olvido
+   replicar al escribir el componente nuevo—. El clic burbujeaba, cerraba y
+   desmontaba el formulario antes de que el envio llegara a ejecutarse: el
+   boton no hacia nada, en silencio, y typecheck/lint/2450 pruebas seguian en
+   verde porque nada de eso ejercita un clic real de mouse. Se arreglo con el
+   mismo `onClick={(e) => e.stopPropagation()}` que `BotonSalir` ya usaba.
+   **Leccion:** una funcionalidad que depende de un evento de clic dentro de
+   un menu desplegable hay que probarla con un clic de verdad, no solo con
+   las pruebas automatizadas —esas prueban la logica, no la interaccion—.
+
+   Queda fuera a proposito, para otra entrega: rehacer `/gerencia` a fondo
+   (sigue con el mismo contenido delgado, ver el punto 7 de aqui abajo).
 
 2. **Auditoria del tablero de la obra — ENTREGADA.** Agente de exploracion
    completo sobre `tablero.service.ts`, `pendientes.ts`, `modulos.tsx` y los

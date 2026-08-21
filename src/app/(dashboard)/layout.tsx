@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { HardHat } from "lucide-react";
+import { Eye, HardHat } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
   contarSolicitudesPendientes,
@@ -8,11 +8,12 @@ import {
 } from "@/services/perfil.service";
 import { contarAvisosSinLeer } from "@/services/avisos-bandeja";
 import { logoDeEmpresa } from "@/services/logo.service";
-import { puede } from "@/lib/rbac";
+import { puede, ROLES, ETIQUETA_ROL } from "@/lib/rbac";
 import {
   Navegacion,
   type EnlaceEmpresa,
 } from "@/components/navegacion/Navegacion";
+import { accionVerComo } from "@/app/(dashboard)/acciones";
 import { RelojPeru } from "@/components/ui/RelojPeru";
 import { ProveedorEtiquetas } from "@/components/navegacion/EtiquetasContexto";
 import { Migas } from "@/components/navegacion/Migas";
@@ -189,12 +190,51 @@ export default async function DashboardLayout({
             avisos={{ href: "/avisos", sinLeer: avisosSinLeer }}
             usuario={{
               nombre: `${sesion.nombres} ${sesion.apellidos}`,
-              rol: sesion.role,
+              // La etiqueta, no el enum crudo: esto pintaba literalmente
+              // "ADMIN" en vez de "Administrador" hasta que se toco esta
+              // linea para cablear la vista previa.
+              rol: ETIQUETA_ROL[sesion.role],
               foto,
             }}
+            vistaRol={
+              sesion.rolReal === "ADMIN" && sesion.previsualizacionHabilitada
+                ? {
+                    opciones: ROLES.filter((r) => r !== sesion.rolReal).map(
+                      (r) => ({ valor: r, etiqueta: ETIQUETA_ROL[r] }),
+                    ),
+                    activa: sesion.role !== sesion.rolReal,
+                  }
+                : null
+            }
           />
         </div>
       </header>
+
+      {/* La franja de vista previa: fija, visible en cualquier pantalla del
+          area privada mientras dure. Un modo que cambia lo que se puede
+          hacer y no se anuncia es el tipo de sorpresa que hace perder
+          confianza en la herramienta entera. */}
+      {sesion.role !== sesion.rolReal && (
+        <div
+          className="flex flex-wrap items-center justify-center gap-2 px-4 py-2 text-center text-sm"
+          style={{
+            backgroundColor: "color-mix(in oklab, var(--color-alerta) 15%, transparent)",
+            color: "var(--color-alerta)",
+          }}
+        >
+          <Eye className="size-4 shrink-0" aria-hidden="true" />
+          <span>
+            Vista previa: estás viendo GCM como lo vería un(a){" "}
+            <strong>{ETIQUETA_ROL[sesion.role]}</strong>. Las obras que ves
+            siguen siendo las que tu cuenta ya tiene asignadas.
+          </span>
+          <form action={accionVerComo.bind(null, null)}>
+            <button type="submit" className="font-medium underline">
+              Volver a tu vista
+            </button>
+          </form>
+        </div>
+      )}
 
       <Migas />
 

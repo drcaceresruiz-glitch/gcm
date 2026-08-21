@@ -93,6 +93,58 @@ describe("los innegociables no se pueden reconfigurar", () => {
   });
 });
 
+/**
+ * GERENTE se DERIVA de PERMISOS (`TODO_LO_QUE_SE_LEE`), no se enumera a
+ * mano. Esta prueba fija la regla en si, no una lista: si algun dia se anade
+ * un permiso de lectura nuevo, tiene que seguir cumpliendola sin que nadie
+ * toque `MATRIZ.GERENTE`.
+ */
+describe("GERENTE: ve todo lo que se lee, administra y aprueba nada", () => {
+  const permisos = permisosDe("GERENTE");
+
+  it("tiene todo permiso que termina en :leer, salvo el innegociable", () => {
+    for (const p of PERMISOS) {
+      if (!p.endsWith(":leer")) continue;
+      const debeTenerlo = !INNEGOCIABLES.includes(p);
+      expect(permisos.includes(p), p).toBe(debeTenerlo);
+    }
+  });
+
+  it("no tiene ningun permiso de crear, gestionar, aprobar, editar ni eliminar", () => {
+    const sufijosDeEscritura = [
+      ":crear",
+      ":gestionar",
+      ":aprobar",
+      ":editar",
+      ":eliminar",
+      ":importar",
+      ":publicar",
+      ":registrar",
+      ":valorizar",
+      ":contactar",
+      ":anular",
+      ":restaurar",
+      ":migrar",
+      ":desactivar",
+      ":resetear_clave",
+      ":asignar_equipo",
+      ":eliminar_cerrada",
+      ":linea_base",
+    ];
+    for (const p of permisos) {
+      const esEscritura = sufijosDeEscritura.some((s) => p.endsWith(s));
+      expect(esEscritura, p).toBe(false);
+    }
+  });
+
+  it("ve lo que CONSULTOR no ve, porque es interno y no el cliente", () => {
+    for (const p of ["meta:leer", "nota:leer", "galeria:leer", "encargo:leer"]) {
+      expect(permisosDe("CONSULTOR")).not.toContain(p);
+      expect(permisos).toContain(p);
+    }
+  });
+});
+
 describe("filas que la base puede traer y el codigo ya no reconoce", () => {
   it("ignora un permiso que no existe, sin romper", () => {
     const permisos = resolverPermisos("RESIDENTE", [

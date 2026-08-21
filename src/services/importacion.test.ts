@@ -138,6 +138,8 @@ function sesion(permisos: Permiso[] = ["partida:importar"]): SesionActiva {
     email: "ana@ejemplo.pe",
     mustChangePassword: false,
     esOperador: false,
+    rolReal: "RESIDENTE",
+    previsualizacionHabilitada: false,
   };
 }
 

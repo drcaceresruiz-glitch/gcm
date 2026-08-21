@@ -7,6 +7,8 @@ import { env, isProduction } from "@/lib/env";
 import { resolverPermisos, type Permiso } from "@/lib/rbac";
 import { veTodasLasObras } from "@/lib/alcance-obras";
 import { parsearOperadores, esCorreoOperador } from "@/lib/operador";
+import { rolValido } from "@/lib/usuarios";
+import { COOKIE_VISTA_ROL, vistaEfectiva } from "@/lib/vista-rol";
 import type { Role } from "@/generated/prisma/enums";
 
 /**
@@ -79,6 +81,22 @@ export interface SesionActiva {
    * un usuario corriente y `puede()` sigue mandando.
    */
   esOperador: boolean;
+  /**
+   * El rol de la cuenta EN LA BASE, siempre — nunca el simulado.
+   *
+   * `role` puede cambiar durante una vista previa (ver `@/lib/vista-rol`);
+   * `rolReal` no cambia jamas y es lo que hay que mirar para decidir si esta
+   * cuenta PUEDE activar una vista previa, o para cualquier otra pregunta
+   * sobre quien es de verdad quien esta al otro lado de la peticion.
+   */
+  rolReal: Role;
+  /**
+   * Si la empresa tiene encendido el ajuste de vista previa de roles.
+   *
+   * Viaja aqui, resuelto en la misma consulta, para que la interfaz no
+   * necesite otra ida a la base solo para saber si dibuja el control.
+   */
+  previsualizacionHabilitada: boolean;
 }
 
 export async function crearSesion(
@@ -164,6 +182,9 @@ export const obtenerSesion = cache(async function obtenerSesion(): Promise<Sesio
               permisos: {
                 select: { role: true, permiso: true, concedido: true },
               },
+              // Si esta empresa dejo encender la vista previa de roles. La
+              // misma consulta decide tambien si HAY que aplicarla.
+              permitirVistaPreviaRoles: true,
             },
           },
         },
@@ -215,23 +236,56 @@ export const obtenerSesion = cache(async function obtenerSesion(): Promise<Sesio
     (p) => p.role === sesion.user.role,
   );
 
+  const permisosReales = resolverPermisos(sesion.user.role, excepciones);
+  // `null` = sin restriccion, y solo para el rol que ve toda la cartera.
+  // Para los demas, EXACTAMENTE lo asignado: si no tienen ninguna obra la
+  // lista sale vacia, que es lo correcto y no lo mismo que `null`.
+  const obrasAsignadasReales = veTodasLasObras(sesion.user.role)
+    ? null
+    : sesion.user.memberships.map((m) => m.projectId);
+
+  const previsualizacionHabilitada = sesion.user.company.permitirVistaPreviaRoles;
+
+  // Quien puede ACTIVAR una vista previa: ninguna de estas dos comprobaciones
+  // es la frontera de seguridad —esa la pone `vistaEfectiva` con la
+  // interseccion, mas abajo—, son la decision de PRODUCTO de para quien
+  // tiene sentido el control. Solo ADMIN, y solo si la empresa lo encendio.
+  let rolSimulado: Role | null = null;
+  if (sesion.user.role === "ADMIN" && previsualizacionHabilitada) {
+    const cookieVista = almacen.get(COOKIE_VISTA_ROL)?.value;
+    if (cookieVista && rolValido(cookieVista)) rolSimulado = cookieVista;
+  }
+
+  const vista = vistaEfectiva(
+    {
+      rol: sesion.user.role,
+      permisos: permisosReales,
+      obrasAsignadas: obrasAsignadasReales,
+    },
+    rolSimulado,
+    (rol) =>
+      resolverPermisos(
+        rol,
+        sesion.user.company.permisos.filter((p) => p.role === rol),
+      ),
+    veTodasLasObras,
+    sesion.user.memberships.map((m) => m.projectId),
+  );
+
   return {
     sesionId: sesion.id,
     userId: sesion.user.id,
     companyId: sesion.user.companyId,
-    role: sesion.user.role,
-    permisos: resolverPermisos(sesion.user.role, excepciones),
-    // `null` = sin restriccion, y solo para el rol que ve toda la cartera.
-    // Para los demas, EXACTAMENTE lo asignado: si no tienen ninguna obra la
-    // lista sale vacia, que es lo correcto y no lo mismo que `null`.
-    obrasAsignadas: veTodasLasObras(sesion.user.role)
-      ? null
-      : sesion.user.memberships.map((m) => m.projectId),
+    role: vista.rol,
+    permisos: vista.permisos,
+    obrasAsignadas: vista.obrasAsignadas,
     nombres: sesion.user.nombres,
     apellidos: sesion.user.apellidos,
     email: sesion.user.email,
     mustChangePassword: sesion.user.mustChangePassword,
     esOperador,
+    rolReal: sesion.user.role,
+    previsualizacionHabilitada,
   };
 });
 

@@ -81,6 +81,8 @@ function sesion(
     email: "ana@ejemplo.pe",
     mustChangePassword: false,
     esOperador: false,
+    rolReal: obrasAsignadas === null ? "ADMIN" : "RESIDENTE",
+    previsualizacionHabilitada: false,
   };
 }
 
