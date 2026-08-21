@@ -196,9 +196,7 @@ const EMPEZAR = (
         se deja de leer a la tercera.
       </p>
       <p>
-        El orden no es caprichoso. Primero lo que{" "}
-        <strong>bloquea una lectura correcta del dinero</strong>: hoy, la
-        decisión de si los gastos generales cuentan en la bolsa. Después el{" "}
+        El orden no es caprichoso. Primero el{" "}
         <strong>alta de la obra</strong> —presupuesto, cronograma, equipo y
         línea base—, que es el único tramo donde encadenar pasos aporta de
         verdad: son cuatro y tienen final. Y por último lo que quedó a medias
@@ -729,21 +727,19 @@ const META = (
       </p>
     </S>
 
-    <S titulo="La decisión previa: los gastos generales">
+    <S titulo="Los gastos generales no son de la obra">
       <p>
-        Antes de leer ninguna bolsa, la obra pregunta{" "}
-        <strong>una sola vez</strong> si los gastos generales cuentan dentro
-        de ella o quedan fuera. No trae valor por defecto porque es una
-        decisión de cada constructora y de cada contrato: hay empresas donde
-        los gastos generales y la utilidad no son de la obra, y solo se
-        tocan con permiso del gerente general. Mientras nadie decida, GCM no
-        enseña margen — una cifra calculada con un criterio que nadie
-        confirmó es peor que ninguna.
+        La meta de la obra es <strong>costo directo</strong>: las partidas que
+        se ejecutan. Los <strong>gastos generales</strong> y la
+        <strong>utilidad</strong> no entran en ella —los reconoce el contrato
+        como un porcentaje y los gestiona la empresa—, así que la obra
+        gestiona <strong>una sola bolsa</strong>: lo que se gana ejecutando
+        por debajo de la meta.
       </p>
       <p>
-        El criterio es de <strong>presentación, no de datos</strong>: los
-        gastos se cargan y se guardan igual, decida lo que se decida, y por
-        eso se puede cambiar después sin migrar nada.
+        Por eso la plantilla del real ya no trae hoja de gastos generales. Si
+        cargas un Excel antiguo que la traiga, GCM lo dice al importar en vez
+        de guardarla por su cuenta.
       </p>
     </S>
 
@@ -763,11 +759,6 @@ const META = (
             contractual, y por tanto lo que fija la bolsa antes de que exista.
           </>,
           <>
-            <strong>Decidir el criterio</strong> de los gastos generales
-            cuando la obra lo pregunte. Es un aviso que no se quita solo: se
-            quita decidiendo.
-          </>,
-          <>
             <strong>Generar el contractual</strong> desde el real. GCM infla
             cada capítulo por su recargo y arma con eso el árbol de partidas
             contra el que se mide la obra. Antes de confirmar enseña las tres
@@ -776,8 +767,7 @@ const META = (
           </>,
           <>
             <strong>Aprobarla</strong> para congelarla. Desde ahí la bolsa
-            se lee sola: contractual vigente contra meta, con el criterio
-            que se decidió.
+            se lee sola: contractual vigente contra meta.
           </>,
         ]}
       />
@@ -786,16 +776,6 @@ const META = (
     <S titulo="Lo que sale mal">
       <SaleMal
         casos={[
-          {
-            hace: "Leer la bolsa sin haber decidido el criterio de gastos generales",
-            pasa: (
-              <p>
-                GCM no lo permite, y ese es el punto: dos criterios dan dos
-                márgenes distintos con los mismos números, y una obra puede
-                parecer holgada o ahogada según cuál se asuma sin decir.
-              </p>
-            ),
-          },
           {
             hace: "Dejar la meta congelada mientras entran adicionales",
             pasa: (
@@ -2605,7 +2585,7 @@ export const CAPITULOS: CapituloManual[] = [
     paraQuien: "Gerencia y residencia.",
     resumen:
       "El presupuesto real y el contractual que sale de él: la bolsa " +
-      "operativa, el criterio de los gastos generales y por qué la meta sí " +
+      "operativa, por qué los gastos generales no son de la obra y por qué la meta sí " +
       "se puede re-fijar.",
     contenido: META,
   },
