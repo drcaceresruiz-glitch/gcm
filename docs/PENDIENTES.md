@@ -5,6 +5,106 @@ son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
 Ultima revision: 21 de agosto de 2026.
 
+## Lo que dejo la tarde del 21 de agosto: auditoria del tablero y la cola que sigue
+
+Una sesion larga cerro cuatro pendientes de la lista de abajo (despliegue
+varado, `?siguiente=` del correo, plan de skills, Notas E1) y de paso el
+usuario fue navegando la app en vivo, encontrando cosas que no estaban en
+ningun documento. Queda una cola clara, en el orden acordado con el usuario:
+
+1. **Rol GERENTE de verdad, con interruptor de "ver como"** — EMPEZANDO
+   ahora. Hoy "gerencia" no es un rol: la pantalla `/gerencia` la ve
+   cualquiera con alcance total de la cartera (en la practica, solo ADMIN).
+   El usuario quiere: (a) un rol `GERENTE` propio en la matriz de permisos;
+   (b) que la MISMA persona pueda ser gerente y administrador general a la
+   vez, sin dos cuentas; (c) un interruptor para ver la app "como" ese rol,
+   pensado para poder configurar y probar el sistema con un equipo chico al
+   empezar. Toca el enum `Role` de Prisma (nueva migracion), `rbac.ts`,
+   `alcance-obras.ts`, y probablemente la pantalla `/gerencia` misma —ver el
+   punto 7 de aqui abajo, esta delgada para lo que un gerente esperaria—.
+   Se plantea con su propio ciclo de plan, como Notas E1.
+
+2. **Auditoria del tablero de la obra — ENTREGADA.** Agente de exploracion
+   completo sobre `tablero.service.ts`, `pendientes.ts`, `modulos.tsx` y los
+   servicios de dominio que alimentan cada modulo. Hallazgos confirmados, de
+   mas a menos impacto:
+   - El modulo "Valor ganado (EVM)" del tablero usa `presupuesto.total` como
+     BAC en vez de `bacDeObra()` (que SI suma los adicionales aprobados de
+     la linea base vigente). Es el mismo bug que se dio por arreglado el 10
+     de agosto, pero el arreglo (`bacDeObra`) solo se conecto en
+     `evm.service.ts`, no en `tablero.service.ts:357-358`. En una obra con
+     adicionales aprobados, el tablero puede mostrar SPI/CPI peor que la
+     pantalla EVM real de la misma obra el mismo dia.
+   - La "ponderacion por dinero" que el manual y los comentarios prometen
+     para cuando el mapeo tarea-partida pase del 60 % **nunca se
+     implemento**: `ponderarPorDuracion` es la unica funcion de ponderacion
+     que se llama en todo el repo. Avance fisico, curva y capitulos siempre
+     pesan por duracion, nunca por dinero, con o sin mapeo completo.
+   - `calendario.ts` (`diaIso`, `diasLaborablesEntre`) sigue usando hora
+     LOCAL en vez de UTC —el mismo defecto que `docs/PENDIENTES.md` ya tenia
+     anotado en la seccion 7 sin arreglar—, y el modulo "Plazo" del tablero
+     es uno de sus consumidores: puede contar mal los dias laborables
+     restantes en el servidor de Lima.
+   - Solo el modulo "Que falta" enlaza a la vista EXACTA (`?semanas=`,
+     `?estado=`, `#pareto`); los otros 13 modulos del catalogo enlazan
+     generico a la pantalla, sin el parametro que aterrizaria justo en lo
+     que la tarjeta esta mostrando.
+   - EAC y VAC (cuanto va a costar la obra al final, si sigue asi) ya estan
+     calculados en `metricasEvm()` y nunca se muestran en el tablero — la
+     cifra mas predictiva del sistema, sin coste de consulta extra.
+   - No hay ningun aviso de sobregiro PROYECTADO (comparando % comprometido
+     vs % de avance fisico por partida), solo del que ya ocurrio.
+   - Menor: `pendientesDeLaObra` en `tablero.service.ts:848-855` no filtra
+     `restriccion` por `companyId` (si por `projectId`, y `obraId` ya viene
+     validado antes, asi que no es explotable hoy, pero rompe el estandar
+     del resto del archivo).
+
+3. **Auditoria de "todo lo demas"** — pedida, no empezada: dashboards,
+   curvas, calculos, plantillas preconfiguradas, pantallas, menus,
+   configuraciones. La del tablero (punto 2) es el molde: hallazgos
+   concretos con archivo:linea, verificados leyendo el codigo, no una
+   puntuacion generica.
+
+4. **Estado de la obra (Planificacion/Ejecucion/Paralizada/Cerrada)** —
+   pedida, no empezada. Verificar que cada estado permite y prohibe lo que
+   debe, que las transiciones son las correctas, y arreglar lo que no lo
+   sea. Relacionado con `motivoNoAdmiteCambios` en `src/lib/obras.ts` y con
+   el hallazgo ya documentado del 10 de agosto sobre `CERRADA` (ver la
+   seccion "Incidente del 10 de agosto" de `ESTADO.md`).
+
+5. **Prueba de extremo a extremo real** — pedida, no empezada. Crear una
+   obra, usuarios de cada rol, ejercitar permisos y flujos completos desde
+   cero. Se hace DESPUES del rol Gerente (punto 1) a proposito: probar
+   contra un modelo de permisos que esta a punto de cambiar seria repetir
+   el trabajo.
+
+6. **Manual completo** — pedido: actualizado, intuitivo, paginado, con
+   hipervinculos entre capitulos (hoy los capitulos se nombran unos a otros
+   en prosa, nunca con un enlace — séria un cambio de estilo del manual
+   entero, no algo que meter en un solo capitulo sin criterio), con
+   ejemplos, con video si es viable. Notas ya tiene su primer capitulo
+   (`src/components/manual/capitulos.tsx`, slug `notas`); el resto del
+   manual sigue con el estilo de antes.
+
+7. **Dos hallazgos sueltos de UX, vistos en vivo con el usuario**:
+   - El panel (`/panel`) pone "5" en grande en la tarjeta "Obras" justo al
+     lado de las tarjetas de dinero, que en realidad solo cuentan la obra
+     "en ejecucion" (dice "1 en ejecución", pero en gris y pequeño debajo
+     del numero grande). No es un bug de calculo —`ResumenEmpresaPanel.tsx`
+     lo hace a proposito, y lo explica en su comentario— pero la jerarquia
+     visual induce a leer las cifras de dinero como si fueran de las 5.
+   - `/gerencia` (`src/app/(dashboard)/gerencia/page.tsx`) solo trae dos
+     bloques (semaforo de partidas criticas por SPI, adicionales sin
+     aprobar). El usuario lo considera insuficiente para lo que un gerente
+     de una constructora esperaria. Ligado al punto 1: si "Gerencia" pasa a
+     ser un rol propio, esta pantalla probablemente se rehace de fondo.
+
+**Avisado, no pedido todavia**: pagina de marketing y venta, exponer la app
+web y la autoinstalable (`docs/instalable.md` ya documenta esta ultima),
+creacion de usuarios/reportes de cara al negocio, y migracion a otro hosting
+y dominio. El usuario dijo explicitamente que por ahora es aviso de lo que
+se viene, no trabajo de esta sesion.
+
 ## Lo ultimo: 297 commits que este documento no habia visto (21 de agosto)
 
 Entre el 12 y el 21 de agosto entraron **297 commits** y este documento se
@@ -192,8 +292,12 @@ Dos avisos antes de leer nada de mas abajo:
    quien recibe un aviso de obra por correo; ampliarla exigia tocar tambien
    `cambiar-clave` y no parecio que pagara su complejidad para ese cruce.
 
-7. **Notas y Recordatorios (seccion 5) no se empezo.** No hay modelo, ni
-   permisos `nota:*`, ni pantalla.
+7. ~~**Notas y Recordatorios (seccion 5) no se empezo.**~~ **Notas E1
+   entregada el 21 de agosto de 2026**: modelo, migracion, permisos
+   `nota:leer/crear/gestionar`, servicio, pestana en la obra y widget de
+   "Proximos recordatorios" en el tablero. Sin adjuntos ni notificaciones
+   todavia —esas siguen siendo entregas aparte, en el orden que fija la
+   seccion 5—. Detalle completo, ahi mismo.
 
 8. ~~**Skills propias de GCM**: sigue sin plan escrito.~~ **Plan escrito el
    21 de agosto de 2026**, en [`skills-gcm.md`](skills-gcm.md): tres skills,
@@ -761,7 +865,7 @@ Restricciones tecnicas que NO se pueden olvidar:
 3. Respaldo: las fotos no estan en repo ni tar; sumarlas a las copias del
    servidor junto al volcado de la base.
 
-## 5. Notas y Recordatorios (propuesta aceptada a falta de "adelante")
+## 5. Notas y Recordatorios — Notas E1 HECHA el 21 de agosto de 2026
 
 Bitacora libre de obra con recordatorios. Adaptaciones a GCM ya decididas:
 permisos en la matriz (nota:leer/crear/gestionar), NO tabla de auditoria
@@ -777,8 +881,22 @@ websockets en este hosting) + resumen diario por correo via cron (el SMTP de
 recuperar clave ya existe) + preferencias por usuario en Perfil.
 
 Orden de entregas acordado: plantilla Excel → infraestructura de archivos
-(hash+purga) + Evidencia Fase A con QR → Notas E1 (CRUD + pestana + widget
-de proximos recordatorios) → Notas con adjuntos → Notificaciones.
+(hash+purga) + Evidencia Fase A con QR → ~~Notas E1 (CRUD + pestana + widget
+de proximos recordatorios)~~ **HECHA** → Notas con adjuntos → Notificaciones.
+
+**Lo entregado en Notas E1**: modelo `Nota` + `CategoriaNota`
+(`prisma/schema.prisma`), migracion `20260821192925_notas_y_recordatorios`,
+permisos en `rbac.ts` (RESIDENTE: leer+crear; ADMIN_OBRA: los tres;
+CONSULTOR y ALMACENERO sin `nota:leer`, mismo motivo que `galeria:leer`),
+`src/services/notas.service.ts` + `src/lib/notas.ts` (`esVencida`, nunca
+guardada), pestana `/obras/[id]/notas` entre "Parte del día" y "Kanban",
+widget "Proximos recordatorios" en el tablero (`src/lib/tablero.ts`,
+`tablero.service.ts`, `modulos.tsx`), capitulo nuevo del manual
+(`src/components/manual/capitulos.tsx`, slug `notas`). Tres guardas de
+consistencia que ya existian atraparon huecos reales: `Nota` no estaba
+clasificada ni en `respaldo-esquema.ts` (respaldo de obra) ni en el catalogo
+de migracion de empresa, y la pestana no tenia capitulo en el manual —los
+tres quedaron resueltos en el mismo commit.
 
 ## 6. Importacion de presupuesto (Excel) — SUPERADA el 20 de agosto
 
