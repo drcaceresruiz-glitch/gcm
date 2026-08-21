@@ -563,7 +563,7 @@ const DINERO = (
 const CRONOGRAMA = (
   <>
     <Clave>
-      El plan lo manda MS Project; el avance real, GCM. El cronograma entra
+      El plan lo fija el cronograma; el avance real lo pone GCM. El cronograma entra
       por <strong>cortes</strong> —cada semana se carga el archivo con el
       plan al día— y el avance que se reporta en obra{" "}
       <strong>vive aparte y sobrevive</strong> a cada corte nuevo. De ese

@@ -86,6 +86,14 @@ export interface EstadoAlta {
   cronograma: boolean;
   equipo: boolean;
   lineaBase: boolean;
+  /**
+   * Hay alguien a quien asignar: al menos un usuario ACTIVO cuyo rol NO ve
+   * ya todas las obras (un ADMIN las ve sin asignacion). NO es un paso dado,
+   * es la precondicion del paso equipo: en una empresa de solo ADMIN nadie
+   * es asignable, la pantalla no tiene boton que ofrecer, y sugerir «asigna
+   * el equipo» seria empujar a un callejon sin salida.
+   */
+  equipoAsignable: boolean;
 }
 
 /**
@@ -185,7 +193,7 @@ export function siguientePaso(
     };
   }
 
-  if (!alta.equipo && puede.equipo) {
+  if (!alta.equipo && alta.equipoAsignable && puede.equipo) {
     return {
       clave: "alta-equipo",
       gravedad: "sugerencia",

@@ -5,7 +5,7 @@ import { verificarSalud } from "@/services/salud.service";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { alcanzaObra, filtroDeObras } from "@/lib/alcance-obras";
+import { alcanzaObra, filtroDeObras, VE_TODAS_LAS_OBRAS } from "@/lib/alcance-obras";
 import { esPositivo, restar, sumar } from "@/lib/decimal";
 import {
   comprometidoPorPartida,
@@ -869,6 +869,12 @@ export interface HitosObra {
    * («entro y no veo ninguna obra»), asi que quien lo omite no lo nota.
    */
   equipo: boolean;
+  /**
+   * Hay alguien a quien asignar: un usuario ACTIVO cuyo rol NO ve ya toda la
+   * cartera. Alimenta el paso «asignar equipo» del anclaje: sin nadie
+   * asignable no hay boton que ofrecer y proponerlo seria un callejon.
+   */
+  equipoAsignable: boolean;
 }
 
 export const hitosDeObra = cache(async function hitosDeObra(
@@ -891,6 +897,7 @@ export const hitosDeObra = cache(async function hitosDeObra(
       meta: false,
       metaCargada: false,
       equipo: false,
+      equipoAsignable: false,
     };
   }
 
@@ -910,6 +917,7 @@ export const hitosDeObra = cache(async function hitosDeObra(
     meta,
     metaCargada,
     miembro,
+    asignables,
   ] =
     await Promise.all([
     prisma.wbsItem.findFirst({ where: deLaObra, select: { id: true } }),
@@ -939,6 +947,16 @@ export const hitosDeObra = cache(async function hitosDeObra(
       where: { projectId: obraId },
       select: { userId: true },
     }),
+    // Cuenta barata (companyId + estado + role, indexados) de quien PODRIA
+    // asignarse: activo y con rol que no ve ya toda la cartera. Un ADMIN no
+    // cuenta porque ya la ve sin asignacion.
+    prisma.user.count({
+      where: {
+        companyId: sesion.companyId,
+        estado: "ACTIVO",
+        role: { notIn: [...VE_TODAS_LAS_OBRAS] },
+      },
+    }),
   ]);
 
   return {
@@ -951,6 +969,7 @@ export const hitosDeObra = cache(async function hitosDeObra(
     meta: meta !== null,
     metaCargada: metaCargada !== null,
     equipo: miembro !== null,
+    equipoAsignable: asignables > 0,
   };
 });
 

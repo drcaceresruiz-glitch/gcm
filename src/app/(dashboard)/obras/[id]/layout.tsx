@@ -316,6 +316,7 @@ export default async function ObraLayout({
             meta: hitos.metaCargada,
             cronograma: hitos.cronograma,
             equipo: hitos.equipo,
+            equipoAsignable: hitos.equipoAsignable,
             lineaBase: hitos.lineaBase,
           },
           criterio?.faltaDecidir ?? false,

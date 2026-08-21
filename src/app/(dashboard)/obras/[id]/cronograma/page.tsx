@@ -145,7 +145,7 @@ export default async function CronogramaPage({
         <div>
           <h2 className="text-lg font-semibold">Cronograma</h2>
           <p className="mt-0.5 text-sm opacity-70">
-            El plan lo manda MS Project; el avance real, GCM.
+            El plan lo fija el cronograma; el avance real lo pone GCM.
           </p>
         </div>
 

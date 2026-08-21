@@ -23,6 +23,7 @@ const ALTA_COMPLETA: EstadoAlta = {
   cronograma: true,
   equipo: true,
   lineaBase: true,
+  equipoAsignable: true,
 };
 
 const TODO: PuedeHacer = {
@@ -57,6 +58,7 @@ describe("el paso siguiente de la obra", () => {
       cronograma: false,
       equipo: false,
       lineaBase: false,
+      equipoAsignable: true,
     };
 
     const paso = siguientePaso(sinNada, true, TODO, {
@@ -80,6 +82,7 @@ describe("el paso siguiente de la obra", () => {
       cronograma: false,
       equipo: false,
       lineaBase: false,
+      equipoAsignable: true,
     };
     const vistos: string[] = [];
 
@@ -106,6 +109,7 @@ describe("el paso siguiente de la obra", () => {
       cronograma: false,
       equipo: false,
       lineaBase: false,
+      equipoAsignable: true,
     };
 
     expect(siguientePaso(sinNada, false, NADA, EN_PAZ)).toBeNull();
@@ -122,6 +126,7 @@ describe("el paso siguiente de la obra", () => {
       cronograma: false,
       equipo: false,
       lineaBase: false,
+      equipoAsignable: true,
     };
 
     const paso = siguientePaso(
@@ -132,6 +137,18 @@ describe("el paso siguiente de la obra", () => {
     );
 
     expect(paso?.clave).toBe("alta-equipo");
+  });
+
+  it("no propone asignar equipo si no hay a quien asignar", () => {
+    // Empresa de solo administradores: nadie asignable, porque un ADMIN ya ve
+    // todas las obras. Empujar a «asignar equipo» seria pedir un paso que la
+    // pantalla no puede completar.
+    const sinAsignables: EstadoAlta = {
+      ...ALTA_COMPLETA,
+      equipo: false,
+      equipoAsignable: false,
+    };
+    expect(siguientePaso(sinAsignables, false, TODO, EN_PAZ)).toBeNull();
   });
 
   it("con el alta hecha, recuerda lo que vencio", () => {
