@@ -13,6 +13,7 @@ import { obtenerSesion, cerrarSesion } from "@/services/sesion.service";
 import { verificarCodigo, olvidarDesafio } from "@/services/dosFactores.service";
 import { codigoBienFormado, LONGITUD_CODIGO } from "@/lib/dosFactores";
 import { ipDeLaPeticion } from "@/lib/ip-peticion";
+import { rutaConSiguiente, rutaSiguienteSegura } from "@/lib/siguiente";
 
 /**
  * Acciones de servidor del flujo de acceso.
@@ -87,10 +88,21 @@ export async function accionIniciarSesion(
     return { elegirEmpresa: resultado.elegirEmpresa };
   }
 
-  // Con dos pasos, la clave correcta solo abre la pantalla del codigo.
-  if (resultado.requiere2FA) redirect("/verificar-codigo");
+  // Adonde volver tras entrar. Viene del campo oculto que puso el login, que
+  // a su vez lo copio de la URL: se vuelve a validar aqui porque un campo de
+  // formulario lo escribe quien envia la peticion, no la aplicacion.
+  const siguiente = rutaSiguienteSegura(datos.get("siguiente"));
 
-  redirect(resultado.mustChangePassword ? "/cambiar-clave" : "/panel");
+  // Con dos pasos, la clave correcta solo abre la pantalla del codigo. El
+  // destino tiene que cruzar tambien esa pantalla, o se perderia entre los
+  // dos pasos igual que se perdia antes de que existiera `siguiente`.
+  if (resultado.requiere2FA) {
+    redirect(rutaConSiguiente("/verificar-codigo", siguiente));
+  }
+
+  redirect(
+    resultado.mustChangePassword ? "/cambiar-clave" : (siguiente ?? "/panel"),
+  );
 }
 
 /**
@@ -108,9 +120,12 @@ export async function accionVerificarCodigo(
   }
 
   const resultado = await verificarCodigo(codigo);
+  const siguiente = rutaSiguienteSegura(datos.get("siguiente"));
 
   if (!resultado.ok) {
-    if (resultado.volverAlLogin) redirect("/login?codigo=expirado");
+    if (resultado.volverAlLogin) {
+      redirect(rutaConSiguiente("/login?codigo=expirado", siguiente));
+    }
     return { error: resultado.error };
   }
 
@@ -121,7 +136,9 @@ export async function accionVerificarCodigo(
 
   if (!acceso) redirect("/login");
 
-  redirect(acceso.mustChangePassword ? "/cambiar-clave" : "/panel");
+  redirect(
+    acceso.mustChangePassword ? "/cambiar-clave" : (siguiente ?? "/panel"),
+  );
 }
 
 const esquemaCambio = z

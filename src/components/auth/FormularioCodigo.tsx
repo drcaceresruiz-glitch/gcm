@@ -32,11 +32,15 @@ export function FormularioCodigo({
   minutos,
   canal,
   destino,
+  siguiente,
 }: {
   minutos: number;
   canal: Canal2FA;
   /// Ya enmascarado por el servidor. Aqui no llega el dato entero.
   destino: string;
+  /// Adonde volver tras entrar. Ver el comentario del mismo campo en
+  /// `FormularioLogin`: viaja oculto porque el envio es un Server Action.
+  siguiente?: string;
 }) {
   const [estado, accion] = useActionState<EstadoFormulario, FormData>(
     accionVerificarCodigo,
@@ -65,6 +69,8 @@ export function FormularioCodigo({
       </div>
 
       <form action={accion} className="space-y-4" noValidate>
+        {siguiente && <input type="hidden" name="siguiente" value={siguiente} />}
+
         {estado.error && (
           <p
             role="alert"

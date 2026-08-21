@@ -31,10 +31,15 @@ export function FormularioLogin({
   avisoCambio,
   avisoRecuperada,
   avisoCodigo,
+  siguiente,
 }: {
   avisoCambio?: boolean;
   avisoRecuperada?: boolean;
   avisoCodigo?: boolean;
+  /// Adonde volver tras entrar. Viaja como campo oculto porque el envio es un
+  /// Server Action, no una navegacion: un parametro en la URL del formulario
+  /// no llegaria a `accionIniciarSesion`.
+  siguiente?: string;
 }) {
   const [estado, accion] = useActionState<EstadoFormulario, FormData>(
     accionIniciarSesion,
@@ -43,6 +48,8 @@ export function FormularioLogin({
 
   return (
     <form action={accion} className="space-y-4" noValidate>
+      {siguiente && <input type="hidden" name="siguiente" value={siguiente} />}
+
       {avisoCodigo && (
         <p
           role="status"

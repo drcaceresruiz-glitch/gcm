@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { conSiguiente, rutaActual } from "@/lib/siguiente";
 
 /**
  * Proteccion de rutas por denegacion: todo requiere sesion salvo lo que
@@ -74,7 +75,16 @@ export default function proxy(peticion: NextRequest) {
 
   if (peticion.cookies.has(COOKIE_SESION)) return NextResponse.next();
 
-  return NextResponse.redirect(new URL("/login", peticion.url));
+  // Adonde volver tras entrar. Sin esto, un enlace de correo a una obra
+  // concreta aterrizaba en /login y de ahi SIEMPRE a /panel: quien lo abria
+  // tenia que volver a navegar a mano hasta donde el correo lo mandaba.
+  const destino = new URL("/login", peticion.url);
+  conSiguiente(
+    destino,
+    rutaActual(peticion.nextUrl.pathname, peticion.nextUrl.search),
+  );
+
+  return NextResponse.redirect(destino);
 }
 
 export const config = {

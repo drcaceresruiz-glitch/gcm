@@ -171,8 +171,26 @@ Dos avisos antes de leer nada de mas abajo:
    al denominador del PPC— se comprobo el 21 de agosto y sigue: `esHito` no
    aparece en `plan-semanal.ts` y `TareaProgramada` sigue sin declararlo.
 
-6. **El enlace del correo sigue aterrizando en el login y no vuelve a la
-   obra.** No existe ningun `?siguiente=` en el proyecto.
+6. ~~**El enlace del correo sigue aterrizando en el login y no vuelve a la
+   obra.**~~ **HECHO el 21 de agosto de 2026.** `proxy.ts` ahora manda a
+   `/login?siguiente=<ruta>` en vez de a `/login` a secas, y ese destino cruza
+   el formulario (campo oculto, porque el envio es un Server Action) y el
+   paso de 2FA si lo hay, hasta terminar en `redirect(siguiente ?? "/panel")`.
+
+   La validacion vive en `src/lib/siguiente.ts` (`rutaSiguienteSegura`) y es
+   la unica frontera de seguridad del mecanismo: `siguiente` viaja en una URL
+   de correo y vuelve como dato de formulario, asi que lo escribe quien
+   visita el enlace, no la aplicacion. Sin exigir que empiece por una UNICA
+   barra —rechazando `//host` y `/\host`, que el navegador lee como
+   protocolo-relativos— seria una redireccion abierta: cualquiera podria
+   mandar `.../login?siguiente=https://otro-sitio` y usar el dominio de
+   confianza de GCM como trampolin de phishing.
+
+   **Lo que queda fuera, a proposito:** el cambio de clave obligatorio
+   (`mustChangePassword`) sigue sin cargar `siguiente` —cae siempre a
+   `/panel`—. Es la rama de quien recien se dio de alta, que raramente es
+   quien recibe un aviso de obra por correo; ampliarla exigia tocar tambien
+   `cambiar-clave` y no parecio que pagara su complejidad para ese cruce.
 
 7. **Notas y Recordatorios (seccion 5) no se empezo.** No hay modelo, ni
    permisos `nota:*`, ni pantalla.
