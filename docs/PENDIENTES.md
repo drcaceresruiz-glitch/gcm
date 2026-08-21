@@ -24,52 +24,70 @@ Dos avisos antes de leer nada de mas abajo:
 
 ### Lo que hay que mirar primero
 
-> **LO MAS URGENTE, del 21 de agosto: `localhost` dejo el despliegue dos horas
-> sin poder aplicarse, y el arreglo SIGUE SIN HACER.** El incidente remitio
-> solo a eso de las 07:33 —produccion quedo en `31479b2` con `coherencia: ok`—,
-> pero **el mecanismo esta intacto y volvera**. El relato completo esta en la
-> seccion 17 de [`ESTADO.md`](ESTADO.md); aqui va lo que hay que HACER.
+> **Del 21 de agosto: el despliegue estuvo dos horas sin poder aplicarse y la
+> culpa era de la palabra `localhost`. La base NUNCA se cayo** —el diagnostico
+> de «parpadeo transitorio de MariaDB» que estuvo escrito aqui era falso—. El
+> relato con las medidas esta en la seccion 17 de [`ESTADO.md`](ESTADO.md).
 >
-> **1. Cambiar `localhost` por `127.0.0.1` en el `DATABASE_URL` de la app**, en
-> *cPanel > Setup Node.js App*. Es de una linea y es lo unico que cierra el
-> caso.
+> ~~Cambiar `localhost` por `127.0.0.1` en el `DATABASE_URL` de la app.~~
+> **HECHO**, en *cPanel > Setup Node.js App*. `getent hosts localhost` en ese
+> servidor devuelve **solo `::1`**, y MariaDB no atiende por IPv6. De regalo, la
+> latencia de `/api/health` **paso de 273 ms a 1 ms**: la aplicacion llevaba
+> meses pagando el intento IPv6 fallido en cada conexion sin que nadie lo
+> relacionara.
 >
-> - En este servidor **`localhost` resuelve SOLO a `::1`** (comprobado con
->   `getent hosts localhost`) **y MariaDB no siempre atiende en IPv6**. Mientras
->   no atienda, todo lo que diga `localhost` falla de forma continua: eso fueron
->   las dos horas.
-> - **Se cambia en cPanel y en ningun otro sitio**, porque el selector de Node
->   de CloudLinux **inyecta las variables de la app en todo proceso `node` y
->   pisa las del shell**. Comprobado: exportar `DATABASE_URL=MARCADOR` y lanzar
->   `node -e` sigue viendo la URL de cPanel. **Corolario que ahorra horas: el
->   `DATABASE_URL` de `~/.gcm-despliegue.env` NO llega nunca a Prisma.**
-> - **Corregir el comentario de `desplegar.sh`**, que da a entender lo
->   contrario. Mientras lo diga, el siguiente que mire esto intentara arreglar
->   el despliegue tocando un archivo que no pinta nada.
-> - Arreglarlo en cPanel protege ademas a la APLICACION, no solo al despliegue.
->   Que durante la ventana `/api/health` siguiera diciendo `baseDatos:
->   conectada` no la deja a salvo: **lee el mismo `DATABASE_URL`**, con el mismo
->   `localhost`. Por que ella aguanto y `migrate deploy` no, no se comprobo.
+> > **REGLA: NUNCA `localhost` en una URL de base en este hosting. Siempre
+> > `127.0.0.1`.**
 >
-> **2. Que un `migrate deploy` fallido no deje el paquete tirado.** Es el punto
-> debil de siempre y hoy se cobro su pieza: al fallar la migracion, el paquete
-> se queda como **`.desplegando`** y **nadie lo reintenta**; hubo que
-> **renombrarlo a mano** para que entrara. El cron sigue pasando cada minuto,
-> pero ya no ve nada que aplicar. Lo que NO se puede hacer es aplicar el paquete
-> sin migrar: codigo nuevo contra tablas viejas tira la aplicacion entera, que
-> es el fallo que la receta de cambio de esquema lleva meses evitando.
+> ~~Corregir el comentario de `desplegar.sh`.~~ **HECHO**: afirmaba que el
+> `DATABASE_URL` salia de `~/.gcm-despliegue.env`, y no es cierto —el selector
+> de Node de CloudLinux pisa el entorno del shell en todo proceso `node`, asi
+> que esa linea es decorativa y Prisma lee siempre la de cPanel—. Buscar el
+> fallo en ese archivo costo horas.
+>
+> **LO QUE SIGUE ABIERTO, y es lo unico de este incidente que queda:**
+>
+> **Que `desplegar.sh` DEVUELVA el paquete a `gcm.tar.gz` cuando
+> `migrate deploy` falle**, en vez de dejarlo como `gcm.tar.gz.desplegando`
+> esperando a que una persona lo renombre. Hoy hubo que hacerlo a mano.
+>
+> El script renombra el paquete nada mas cogerlo —para que un pase posterior no
+> reintente sobre un archivo a medias, que esta bien— pero en la rama de fallo
+> de migracion hace `rm -rf "$NUEVO"; exit 1` **sin deshacer ese renombrado**.
+> El cron sigue pasando cada minuto y ya no ve ningun `gcm.tar.gz` que aplicar,
+> asi que **el despliegue se queda parado hasta que alguien entra al servidor**.
+> Con la causa de hoy arreglada esto es menos probable, pero sigue siendo la
+> diferencia entre «se aplica en cuanto la base vuelva» y «no se aplica nunca».
+>
+> Lo que NO se puede hacer es aplicar el paquete sin migrar: codigo nuevo contra
+> tablas viejas tira la aplicacion entera, que es el fallo que la receta de
+> cambio de esquema lleva meses evitando.
 >
 > ---
 >
-> **Correcciones de metodo, que aqui valieron mas que el arreglo:**
+> **Reglas nuevas para tocar el despliegue a mano** (hallazgo 3 de ese dia):
 >
-> - **Este documento se equivoco TRES veces antes de acertar**: «falla el cron»
->   (sin abrir el log), «parpadeo transitorio» (con una linea del log; se
->   relanzo el despliegue y volvio a fallar igual) y «cron y app apuntan a
->   bases distintas» (con dos lineas). Lo que cerro el caso no fue leer mas log,
->   sino **dos comprobaciones en el SERVIDOR que nadie habia hecho**:
->   `getent hosts localhost` y el experimento del `MARCADOR`. Las dos
->   contradijeron lo que el codigo y sus comentarios daban por sentado.
+> - **No encadenar intentos manuales de `desplegar.sh`.** Cada intento fallido
+>   deja zombis —`bash`, `npm exec`, `node`, el schema-engine de Prisma— y con
+>   varios acumulados se agota el **`nproc` de LVE**: `node` deja de poder crear
+>   hilos y muere con `pthread_create: Resource temporarily unavailable` /
+>   `Aborted (core dumped)`, codigo 134, en 0,4 s. **No es memoria** —habia
+>   86 GB libres—, y por eso engana.
+> - **Lanzarlo con `nohup`**: sin el, muere con la sesion (SIGHUP) y deja mas
+>   restos.
+> - **Limpiar con `pkill -f prisma` antes de reintentar. NUNCA `pkill node` a
+>   secas: ahi vive la aplicacion.**
+> - **Ante la duda, dejar que lo haga el cron solo.**
+>
+> **Correcciones de metodo, que valieron mas que el arreglo:**
+>
+> - **Se dieron por buenas TRES causas falsas antes de la correcta**: cron roto,
+>   desajuste de host entre cron y app, y parpadeo de la base. **Lo que las
+>   descarto fue MEDIR, no razonar**: `getent hosts localhost` tumbo la caida de
+>   la base, el `MARCADOR` en `node -e` tumbo que `~/.gcm-despliegue.env`
+>   pintara algo, y `ps -u` con `etime` tumbo que los intentos manuales fueran
+>   inocuos. Cuando un sintoma sobrevive a dos diagnosticos, deja de pensar y ve
+>   a medir en la maquina.
 > - **No relanzar un despliegue «por si acaso»** sin saber la causa: se hizo, y
 >   fallo exactamente igual.
 > - **El texto que el workflow imprime al fallar induce al error**: dice «el

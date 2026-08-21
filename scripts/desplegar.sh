@@ -129,16 +129,38 @@ fi
 # segundos de riesgo acotado, y se prefiere; una migracion destructiva sigue
 # pidiendo el despliegue en dos pasos de siempre.
 #
-# EL ENTORNO NO SE HEREDA. Este cron no es la aplicacion: no tiene DATABASE_URL
-# —que vive en la configuracion Node de cPanel— ni `npx` en el PATH. Ambos
-# vienen de `~/.gcm-despliegue.env`, que solo puede leer su dueno, igual que
+# EL ENTORNO NO SE HEREDA, pero OJO: el `DATABASE_URL` de aqui NO gobierna
+# nada. Este cron no es la aplicacion y no trae `npx` en el PATH; eso si lo
+# arregla `~/.gcm-despliegue.env`, que solo puede leer su dueno, igual que
 # `~/.gcm-avisos.curl` hace con el token del reloj:
 #
 #   cat > ~/.gcm-despliegue.env <<'FIN'
-#   DATABASE_URL="mysql://USUARIO:CLAVE@localhost:3306/BASE"
+#   DATABASE_URL="mysql://USUARIO:CLAVE@127.0.0.1:3306/BASE"
 #   NODEVENV_ACTIVATE="/home/USUARIO/nodevenv/RUTA_DE_LA_APP/22/bin/activate"
 #   FIN
 #   chmod 600 ~/.gcm-despliegue.env
+#
+# LO QUE ESTE BLOQUE DECIA ANTES ERA FALSO Y COSTO HORAS EL 21/08/2026:
+# afirmaba que el `DATABASE_URL` de Prisma venia de este archivo. No viene. El
+# selector de Node de CloudLinux INYECTA las variables de la aplicacion en TODO
+# proceso `node` y PISA las del shell. Se comprueba en dos lineas:
+#
+#   export DATABASE_URL=MARCADOR
+#   node -e 'console.log(process.env.DATABASE_URL)'   # imprime la de cPanel
+#
+# Asi que esa linea del archivo es DECORATIVA: sirve para que la comprobacion
+# de mas abajo no aborte, y para nada mas. Prisma lee SIEMPRE la de
+# *cPanel > Setup Node.js App*, que es el unico sitio donde cambiarla. Quien
+# intente arreglar un fallo de conexion del despliegue editando este archivo no
+# vera efecto ninguno por mucho que lo edite.
+#
+# `NODEVENV_ACTIVATE` SI sirve: es lo que pone `npx` en el PATH.
+#
+# Y EN CUALQUIER URL DE BASE, `127.0.0.1` Y NUNCA `localhost`. En este servidor
+# `localhost` resuelve SOLO a `::1` —`getent hosts localhost` no devuelve
+# 127.0.0.1— y MariaDB no atiende por IPv6, asi que Prisma da
+# `P1001: Can't reach database server`. El cliente `mysql` no lo delata, porque
+# `-h localhost` se va por el socket Unix y conecta tan ricamente.
 #
 # SIN ESE ARCHIVO NO SE ABORTA: se despliega igual y se grita en la bitacora.
 # Que falte deja las cosas exactamente como estaban antes de este bloque (las

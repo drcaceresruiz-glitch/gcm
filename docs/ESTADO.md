@@ -592,8 +592,8 @@ cerrada se llevaba por delante lo que se le pago a cada contratista.
 - El paso de FTP tiene tope propio y `apt` reintenta en vez de tirar el
   despliegue.
 
-> **EL 21 DE AGOSTO EL DESPLIEGUE ESTUVO DOS HORAS SIN PODER APLICARSE, POR
-> `localhost`. REMITIO SOLO; NO ESTA ARREGLADO.**
+> **EL 21 DE AGOSTO EL DESPLIEGUE ESTUVO DOS HORAS SIN PODER APLICARSE, Y LA
+> CULPA ERA DE LA PALABRA `localhost`. LA BASE NUNCA SE CAYO.**
 >
 > Ventana: **05:40 a ~07:33**. Dentro de ella, los runs **#471** (`cc57486`) y
 > **#472** (`31479b2`) subieron bien y ninguno llego a servirse; el paso
@@ -605,33 +605,75 @@ cerrada se llevaba por delante lo que se le pago a cada contratista.
 > ```
 >
 > Al cerrarse la ventana el paquete entro y produccion quedo en `31479b2` con
-> `coherencia: ok`. **Que se arreglara solo es lo peligroso de esto**: el
-> mecanismo sigue entero y volvera.
+> `coherencia: ok`.
 >
-> **LAS DOS PIEZAS, y ninguna es la que parecia:**
+> **HALLAZGO 1: `localhost` resuelve SOLO a `::1`. ARREGLADO.**
 >
-> 1. **En este servidor `localhost` resuelve SOLO a `::1`** (IPv6), comprobado
->    con `getent hosts localhost`. **MariaDB no siempre atiende ahi.** Cuando no
->    atiende, todo lo que diga `localhost` en su cadena de conexion falla, y
->    falla de forma continua mientras dure.
-> 2. **El selector de Node de CloudLinux INYECTA las variables de la app en todo
->    proceso `node`, pisando las del shell.** Comprobado: se exporta
->    `DATABASE_URL=MARCADOR`, se lanza `node -e`, y sigue viendo la URL de
->    cPanel. Consecuencia que hay que tener muy presente: **el `DATABASE_URL` de
->    `~/.gcm-despliegue.env` NO llega nunca a Prisma.** El comentario de
->    `desplegar.sh` da a entender lo contrario y hay que corregirlo: mientras
->    diga eso, cualquiera intentara arreglar el despliegue tocando un archivo
->    que no pinta nada.
+> ```
+> $ getent hosts localhost
+> ::1     localhost ip6-localhost ip6-loopback
+> ```
 >
-> Juntas explican por que el sintoma desconcertaba: `migrate deploy` moria por
-> `localhost` mientras `/api/health` respondia `baseDatos: conectada` con
-> `latenciaMs: 1`. Parecia que cron y app hablaban con bases distintas, y se
-> llego a escribir aqui. **No lo eran**: leen el MISMO entorno, el de cPanel.
+> **Sin `127.0.0.1`.** MariaDB no atiende por IPv6, asi que Prisma resuelve
+> `localhost` a `::1` y da `P1001`. **La base nunca se cayo**: estaba ahi, y el
+> cliente de linea de ordenes conectaba sin problema —por eso no se cazo antes:
+> `mysql -h localhost` se va por el **socket Unix** y ni pasa por la resolucion
+> de nombres—.
 >
-> **EL ARREGLO, y esta pendiente**: poner **`127.0.0.1` en vez de `localhost`**
-> en el `DATABASE_URL` de la app, en *cPanel > Setup Node.js App*. Es el unico
-> sitio que manda —por el punto 2— y ademas protege a la aplicacion, no solo al
-> despliegue. Ver `PENDIENTES.md`.
+> **Y LA APLICACION LO SUFRIA TAMBIEN, sin que nadie lo viera**: pagaba el
+> intento IPv6 fallido en CADA conexion. Se ve en el numero, que es lo que
+> convierte esto en un hallazgo y no en una teoria: la latencia de
+> `/api/health` **paso de 273 ms a 1 ms** al cambiar a `127.0.0.1`. Meses de
+> lentitud que todo el mundo daba por el hosting.
+>
+> **ARREGLADO**: el `DATABASE_URL` de la app, en *cPanel > Setup Node.js App*,
+> usa ya `127.0.0.1:3306`.
+>
+> > **REGLA DE LA CASA: NUNCA `localhost` en una URL de base en este hosting.**
+> > Siempre `127.0.0.1`.
+>
+> **HALLAZGO 2: el selector de Node de CloudLinux PISA el entorno.**
+>
+> Inyecta las variables de la aplicacion en **todo** proceso `node`, por encima
+> de lo que traiga el shell. Se comprueba en dos lineas:
+>
+> ```
+> $ export DATABASE_URL=MARCADOR
+> $ node -e 'console.log(process.env.DATABASE_URL)'
+> mysql://...   # la de cPanel, no MARCADOR
+> ```
+>
+> **Consecuencia: el `DATABASE_URL` de `~/.gcm-despliegue.env` NUNCA llega a
+> Prisma. Es decorativo.** El comentario largo de `desplegar.sh` afirmaba lo
+> contrario y costo horas —se busco el fallo en el archivo equivocado—, asi que
+> **se corrigio en el script mismo**, no solo aqui. `NODEVENV_ACTIVATE` de ese
+> archivo si sirve: aporta `npx` al PATH.
+>
+> El unico sitio que gobierna la URL es cPanel.
+>
+> **HALLAZGO 3: lanzar `desplegar.sh` a mano agota el cupo de procesos.**
+>
+> Cada intento fallido deja zombis —`bash`, `npm exec`, `node` y el
+> **schema-engine** de Prisma—. Con varios acumulados, `node` ya no puede crear
+> hilos:
+>
+> ```
+> pthread_create: Resource temporarily unavailable
+> Aborted (core dumped)        # codigo 134, a los 0,4 s
+> ```
+>
+> **No es memoria: habia 86 GB libres.** Es el limite **`nproc` de LVE**, y
+> engana porque el sintoma parece un fallo del programa. Ademas el script
+> **muere con la sesion si se lanza sin `nohup`** (SIGHUP), lo que deja aun mas
+> restos.
+>
+> Reglas, todas aprendidas hoy:
+>
+> - **No encadenar intentos manuales.**
+> - Lanzarlo con **`nohup`**.
+> - Limpiar con **`pkill -f prisma`** antes de reintentar. **NUNCA `pkill node`
+>   a secas: ahi vive la aplicacion.**
+> - Ante la duda, **dejar que lo haga el cron solo**.
 >
 > **EL CRON NO TIENE NADA QUE VER.** Existe, corre y habia aplicado `835d988` a
 > las 04:42 de ese mismo dia. Desde fuera el sintoma es identico al del cron
@@ -640,20 +682,31 @@ cerrada se llevaba por delante lo que se le pago a cada contratista.
 > no lo aplico»**) lleva derecho a la conclusion equivocada. Conviene arreglar
 > ese texto: nombra una causa como si fuera la unica.
 >
-> **TRES DIAGNOSTICOS EQUIVOCADOS ANTES DEL BUENO**, y merece la pena la lista
-> porque cada uno fallo por una razon distinta:
+> **TRES CAUSAS FALSAS SE DIERON POR BUENAS ANTES DE LA CORRECTA**, y la lista
+> vale mas que el arreglo porque cada una fallo distinto:
 >
-> 1. «Falla el cron» — afirmado **sin abrir el log**, solo desde `/api/health`.
-> 2. «Parpadeo transitorio de MariaDB» — con UNA linea del log delante. El
->    arreglo que se propuso era reintentar. Se relanzo el despliegue y **volvio
->    a fallar igual**, como tenia que pasar.
-> 3. «El cron y la app apuntan a bases distintas» — con DOS lineas y la
->    distancia entre ellas. Descartaba bien el parpadeo y erraba el mecanismo.
+> 1. **«Se rompio el cron»** — afirmado **sin abrir el log**, solo mirando
+>    `/api/health`. El cron iba: habia aplicado `835d988` a las 04:42.
+> 2. **«Parpadeo transitorio de MariaDB»** — con UNA linea del log delante. El
+>    arreglo que se propuso era REINTENTAR; se relanzo el despliegue y volvio a
+>    fallar igual. **Este era el mas falso de los tres: la base nunca se cayo.**
+> 3. **«El cron y la app apuntan a bases distintas»** — con DOS lineas y la
+>    distancia entre ellas. Descartaba bien el parpadeo y erraba el mecanismo:
+>    leen el MISMO entorno, y las dos sufrian el mismo `localhost`.
 >
-> **La leccion no es «mirar el log».** Es que ni una linea ni dos bastan: lo que
-> cerro el caso fueron dos comprobaciones EN EL SERVIDOR que nadie habia hecho
-> —`getent hosts localhost` y el experimento del `MARCADOR`—, y las dos
-> contradijeron lo que el codigo y sus comentarios daban por sentado.
+> **Lo que las descarto fue MEDIR, no razonar.** Las tres eran explicaciones
+> plausibles construidas sobre lo que ya se sabia; ninguna cayo por pensarla
+> mejor. Cayeron con tres comprobaciones en el servidor, y cada una tumbo una:
+>
+> | Medida | Que tumbo |
+> |---|---|
+> | `getent hosts localhost` | que la base estuviera caida |
+> | el `MARCADOR` en `node -e` | que `~/.gcm-despliegue.env` pintara algo |
+> | `ps -u` con `etime` | que los intentos manuales fueran inocuos |
+>
+> Las tres contradijeron lo que el codigo y sus propios comentarios daban por
+> sentado. **Cuando un sintoma sobrevive a dos diagnosticos, deja de tocar el
+> razonamiento y ve a medir en la maquina.**
 >
 > Detalle util para leer `/api/health` mientras algo asi pasa: **`arranque` SI
 > se actualiza** —el `app.js` viaja por FTP, fuera del comprimido—. Ver
