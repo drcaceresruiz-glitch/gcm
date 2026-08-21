@@ -10,6 +10,7 @@ import {
 } from "@/services/obras.service";
 import { listarActividad } from "@/services/actividad.service";
 import { avanceFisicoPorObra } from "@/services/cronograma.service";
+import { semaforoDeCartera } from "@/services/gerencia.service";
 import { puede } from "@/lib/rbac";
 import {
   ETIQUETA_ESTADO_OBRA,
@@ -26,6 +27,7 @@ import { Bienvenida } from "@/components/obras/Bienvenida";
 import { FiltrosObras } from "@/components/obras/FiltrosObras";
 import { FranjaObra, type AlertaObra } from "@/components/obras/FranjaObra";
 import { ResumenEmpresaPanel } from "@/components/obras/ResumenEmpresaPanel";
+import { SemaforoCarteraPanel } from "@/components/obras/SemaforoCarteraPanel";
 import { ActividadReciente } from "@/components/obras/ActividadReciente";
 import { FranjaSemana } from "@/components/obras/FranjaSemana";
 // El MISMO menu que dentro de una obra, con otro mapa: un solo vocabulario
@@ -62,6 +64,7 @@ export default async function PanelPage({
     preliminares,
     solicitudes,
     semanas,
+    semaforo,
   ] = await Promise.all([
     listarObras(sesion, {
       pagina: consulta.p,
@@ -83,6 +86,10 @@ export default async function PanelPage({
     // misma razon que las alertas, porque la semana que se pasa es la de la
     // obra que no estas mirando.
     semanaDeLaEmpresa(sesion),
+    // El mismo semaforo de `/gerencia`, en version compacta: null para quien
+    // no ve toda la cartera, sin consulta extra -la puerta la pone el propio
+    // servicio-.
+    semaforoDeCartera(sesion),
   ]);
 
   // El avance fisico se pide DESPUES y solo para las obras de esta pagina:
@@ -279,6 +286,14 @@ export default async function PanelPage({
           empresa vacia no se pintan: cuatro ceros no informan de nada. */}
       {!vacioDeVerdad && (
         <ResumenEmpresaPanel resumen={resumen} alertas={alertasEmpresa} />
+      )}
+
+      {/* El semaforo de plazo por obra, para quien ve toda la cartera. Es
+          independiente de las cifras de dinero de arriba -que se ocultan con
+          mas de una obra en ejecucion-: un semaforo por obra SI tiene sentido
+          aunque haya varias, porque no mezcla ninguna escala entre ellas. */}
+      {!vacioDeVerdad && semaforo && (
+        <SemaforoCarteraPanel semaforo={semaforo} />
       )}
 
       {/* Que toca ESTA semana, obra por obra. Debajo de las cifras porque
