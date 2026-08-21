@@ -299,7 +299,7 @@ export const TABLAS: readonly TablaRespaldo[] = [
     tabla: "planes_semanales",
     modelo: "planSemanal",
     refs: [{ campo: "projectId", a: "projects" }],
-    fechas: ["fechaCorte"],
+    fechas: ["fechaCorte", "fechaInicio"],
   },
   {
     tabla: "compromisos_semanales",

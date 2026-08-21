@@ -2344,6 +2344,16 @@ model PlanSemanal {
   /// La semana que cubre, anclada a su dia de corte (la cadencia de la obra).
   fechaCorte DateTime @db.Date
 
+  /// Cuando EMPIEZA la semana. Null = los siete dias hacia atras desde el
+  /// corte, que es la cadencia normal y lo que valen todas las semanas
+  /// existentes.
+  ///
+  /// Solo la PRIMERA semana de la obra puede arrancar antes: una obra que
+  /// empieza un miercoles con corte en viernes dejaria sus dos primeros dias
+  /// fuera de toda semana, y ese trabajo existe. Las demas semanas siguen
+  /// siendo de siete dias para que el PPC se pueda comparar entre ellas.
+  fechaInicio DateTime? @db.Date
+
   estado EstadoPlanSemanal @default(ABIERTO)
 
   notas String? @db.Text

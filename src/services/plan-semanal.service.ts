@@ -10,6 +10,7 @@ import {
   porcentajeARegistrar,
   tendenciaPpc,
   rangoSemana,
+  semanaQueSePisa,
   proximoCorte,
   corteSiguiente,
   tareasDeLaSemana,
@@ -357,7 +358,7 @@ export async function obtenerPlanSemanal(
   const plan = await prisma.planSemanal.findFirst({
     where: { id: planId, projectId: obraId, project: { companyId: sesion.companyId } },
     select: {
-      id: true, numero: true, fechaCorte: true, estado: true, notas: true,
+      id: true, numero: true, fechaCorte: true, fechaInicio: true, estado: true, notas: true,
       creadoPor: true, cerradoPor: true, cerradoAt: true,
       compromisos: {
         orderBy: { createdAt: "asc" },
@@ -452,7 +453,7 @@ export async function obtenerPlanSemanal(
     })),
     ultimos,
   );
-  const { inicio: iniSemana, fin: finSemana } = rangoSemana(plan.fechaCorte);
+  const { inicio: iniSemana, fin: finSemana } = rangoSemana(plan.fechaCorte, plan.fechaInicio);
   const enSemanaUids = new Set(
     tareasDeLaSemana(tareasCron, iniSemana, finSemana, terminadasUids).map((t) => t.uid),
   );
@@ -667,7 +668,7 @@ export type ResultadoCrearPlan =
 export async function crearPlanSemanal(
   sesion: SesionActiva,
   obraId: string,
-  datos: { fechaCorte: string; confirmado?: boolean },
+  datos: { fechaCorte: string; fechaInicio?: string; confirmado?: boolean },
 ): Promise<ResultadoCrearPlan> {
   if (!puede(sesion, "plan_semanal:gestionar")) {
     return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
@@ -687,6 +688,52 @@ export async function crearPlanSemanal(
   if (!obra) return { ok: false, error: "Obra no encontrada." };
 
   const fechaCorte = fechaDeObra(datos.fechaCorte);
+
+  // Todas las semanas de la obra: hacen falta para saber si esta es la
+  // primera y para comprobar que el rango no pisa a ninguna.
+  const existentes = await prisma.planSemanal.findMany({
+    where: { projectId: obraId },
+    select: { numero: true, fechaCorte: true, fechaInicio: true },
+  });
+
+  /**
+   * La fecha de inicio propia, SOLO en la primera semana de la obra.
+   *
+   * Es la que cubre el arranque: una obra que empieza el jueves con corte en
+   * viernes dejaria sus dos primeros dias fuera de toda semana. En las demas
+   * se ignora en silencio no, se rechaza: pedirla y no aplicarla seria peor
+   * que no ofrecerla.
+   */
+  let fechaInicio: Date | null = null;
+  if (datos.fechaInicio) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(datos.fechaInicio)) {
+      return { ok: false, error: "La fecha de inicio de la semana no es valida." };
+    }
+    if (existentes.length > 0) {
+      return {
+        ok: false,
+        error:
+          "Solo la primera semana de la obra puede empezar antes de su corte. " +
+          "Las demas cubren los siete dias que terminan en el.",
+      };
+    }
+    fechaInicio = fechaDeObra(datos.fechaInicio);
+    if (fechaInicio.getTime() > fechaCorte.getTime()) {
+      return { ok: false, error: "La semana no puede empezar despues de su corte." };
+    }
+  }
+
+  // Dos semanas que comparten un dia cuentan dos veces el mismo trabajo: el
+  // mismo compromiso podria evaluarse en dos cierres y el PPC dejaria de
+  // significar nada. Se rechaza diciendo CUAL estorba.
+  const rango = rangoSemana(fechaCorte, fechaInicio);
+  const pisa = semanaQueSePisa(rango.inicio, rango.fin, existentes);
+  if (pisa !== null) {
+    return {
+      ok: false,
+      error: `Esas fechas se cruzan con la Semana ${pisa}. Un dia de obra solo puede estar en una semana.`,
+    };
+  }
 
   const yaExiste = await prisma.planSemanal.findFirst({
     where: { projectId: obraId, fechaCorte },
@@ -728,6 +775,7 @@ export async function crearPlanSemanal(
           projectId: obraId,
           numero,
           fechaCorte,
+          fechaInicio,
           creadoPor: quien(sesion),
         },
         select: { id: true },
@@ -741,7 +789,11 @@ export async function crearPlanSemanal(
           entidad: "PlanSemanal",
           entidadId: plan.id,
           accion: "CREATE",
-          despues: { numero, fechaCorte: datos.fechaCorte },
+          despues: {
+            numero,
+            fechaCorte: datos.fechaCorte,
+            fechaInicio: datos.fechaInicio ?? null,
+          },
         },
       });
 
