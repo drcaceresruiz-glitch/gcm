@@ -195,7 +195,12 @@ Dos avisos antes de leer nada de mas abajo:
 7. **Notas y Recordatorios (seccion 5) no se empezo.** No hay modelo, ni
    permisos `nota:*`, ni pantalla.
 
-8. **Skills propias de GCM**: sigue sin plan escrito. `.claude/skills` solo
+8. ~~**Skills propias de GCM**: sigue sin plan escrito.~~ **Plan escrito el
+   21 de agosto de 2026**, en [`skills-gcm.md`](skills-gcm.md): tres skills,
+   en orden —limites de capas (Decimal, permisos en dos capas, filtro de
+   empresa desde la sesion), despliegue (el runbook de los incidentes de
+   agosto) y el patron de pantalla+servicio nuevo—. Sigue sin ESCRIBIRSE
+   ninguno; `.claude/skills` solo
    tiene las de Prisma.
 
 ---
@@ -320,8 +325,9 @@ abajo.
 
 9. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
    worktree. Investigacion hecha el 11 de agosto, plan sin escribir.
-   **Comprobado el 21 de agosto: sigue sin empezar**, `.claude/skills` solo
-   tiene las de Prisma.
+   **El plan se escribio el 21 de agosto**, ver el punto 8 de arriba y
+   [`skills-gcm.md`](skills-gcm.md). Sigue sin escribirse ningun `SKILL.md`;
+   `.claude/skills` solo tiene las de Prisma.
 
 ~~Y sigue sin existir el **parte diario**~~ **HECHO el 11 de agosto de 2026**
 y muy crecido desde entonces: todas las partidas en un envio agrupadas por
