@@ -712,6 +712,17 @@ cerrada se llevaba por delante lo que se le pago a cada contratista.
 > se actualiza** —el `app.js` viaja por FTP, fuera del comprimido—. Ver
 > `arranque` nuevo con `version` vieja no es un FTP a medias; es exactamente
 > esto: subio todo y el paquete no se aplico.
+>
+> **CIERRE, 21 de agosto:** los dos puntos que quedaron abiertos de este
+> incidente ya estan hechos. `desplegar.sh` ahora **devuelve el paquete a
+> `gcm.tar.gz` solo** cuando `migrate deploy` falla —antes se quedaba como
+> `gcm.tar.gz.desplegando` esperando a que alguien entrara al servidor—,
+> reintenta hasta 30 veces (una por minuto de cron) y si se agotan lo deja
+> quieto y lo dice en la bitacora, para no encadenar arranques de Prisma sin
+> fin. Y el mensaje de fallo del workflow, que antes decia «el paquete llego
+> pero el CRON no lo aplico» como lectura unica, ahora manda primero a
+> `tail -40 tmp/despliegue.log` y distingue las causas que esa bitacora puede
+> decir de lo que solo dice `/api/health`.
 
 ### 18. La red de pruebas: lo que TypeScript no ve
 

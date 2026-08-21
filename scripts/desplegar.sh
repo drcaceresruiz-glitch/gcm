@@ -54,6 +54,13 @@ NUEVO="$RAIZ/.siguiente"
 VIEJO="$RAIZ/.anterior"
 CANDADO="$RAIZ/tmp/candado-despliegue"
 BITACORA="$RAIZ/tmp/despliegue.log"
+CUENTA_INTENTOS="$RAIZ/tmp/intentos-migracion"
+
+# Cuantas veces se reintenta un paquete cuya migracion falla. El cron pasa cada
+# minuto, asi que son ~30 minutos de reintentos: de sobra para un reinicio de
+# MariaDB o un mantenimiento corto, y poco para que una causa que no se va sola
+# llene la bitacora y encadene arranques de Prisma sin fin.
+INTENTOS_MAXIMOS=30
 
 # Sin paquete no hay nada que hacer. Es el caso normal: el cron corre cada
 # minuto y despliegues hay pocos.
@@ -63,6 +70,54 @@ mkdir -p "$RAIZ/tmp"
 
 registrar() {
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*" >> "$BITACORA"
+}
+
+# DEVOLVER EL PAQUETE PARA QUE EL CRON LO REINTENTE SOLO
+#
+# El paquete se reserva renombrandolo a `.desplegando` nada mas cogerlo, y eso
+# esta bien: si el proceso muere a mitad, el pase siguiente no reintenta sobre
+# un archivo a medias. Pero hasta el 21/08/2026 la rama de fallo de migracion
+# NO deshacia ese renombrado, y ahi el razonamiento se rompia: el paquete esta
+# entero, lo que fallo es la BASE. El cron seguia pasando cada minuto sin ver
+# ningun `gcm.tar.gz` que aplicar, asi que el despliegue se quedaba parado
+# hasta que una persona entraba al servidor a renombrarlo a mano. Es la
+# diferencia entre «se aplica en cuanto la base vuelva» y «no se aplica nunca».
+#
+# NO se devuelve cuando lo que falla es el PAQUETE —descomprimir, o que no
+# traiga server.js—: eso no lo arregla esperar, y reintentarlo cada minuto solo
+# llenaria la bitacora del mismo error para siempre.
+#
+# Y NO se reintenta indefinidamente: cada intento arranca `npx`, `node` y el
+# schema-engine de Prisma, y encadenar arranques sin fin es como se agoto el
+# `nproc` de LVE el 21/08. Al llegar al tope se deja como `.desplegando` y se
+# dice en la bitacora que hay que mirarlo, que es exactamente lo que significa.
+devolver_paquete() {
+  # Clave del paquete CONCRETO, para no arrastrar la cuenta de un paquete a
+  # otro: `mv` conserva tamano y fecha, asi que un reintento del mismo archivo
+  # trae la misma clave y una subida nueva trae otra y empieza de cero.
+  local clave previa intentos
+  clave="$(stat -c '%s-%Y' "$EN_CURSO" 2>/dev/null || echo desconocido)"
+  previa="$(cut -d' ' -f1 "$CUENTA_INTENTOS" 2>/dev/null)"
+  intentos="$(cut -d' ' -f2 "$CUENTA_INTENTOS" 2>/dev/null)"
+  [ "$previa" = "$clave" ] || intentos=0
+  case "${intentos:-}" in "" | *[!0-9]*) intentos=0 ;; esac
+  intentos=$((intentos + 1))
+  printf '%s %s\n' "$clave" "$intentos" > "$CUENTA_INTENTOS"
+
+  if [ "$intentos" -ge "$INTENTOS_MAXIMOS" ]; then
+    registrar "ERROR: $intentos intentos fallidos con este paquete; se DEJA de" \
+              "reintentar. Resuelta la causa, para retomarlo:" \
+              "mv gcm.tar.gz.desplegando gcm.tar.gz"
+    return
+  fi
+
+  if mv -f "$EN_CURSO" "$PAQUETE"; then
+    registrar "El paquete vuelve a ser gcm.tar.gz: el cron lo reintentara dentro" \
+              "de un minuto (intento $intentos de $INTENTOS_MAXIMOS)."
+  else
+    registrar "ERROR: no se pudo devolver el paquete a gcm.tar.gz. Hay que" \
+              "renombrarlo a mano: mv gcm.tar.gz.desplegando gcm.tar.gz"
+  fi
 }
 
 # Candado: mkdir es atomico, o lo gana uno o lo gana otro. Si el dueno murio a
@@ -92,7 +147,7 @@ registrar "Paquete detectado; se empieza a aplicar."
 mv -f "$PAQUETE" "$EN_CURSO" || { registrar "ERROR: no se pudo reservar el paquete."; exit 1; }
 
 rm -rf "$NUEVO"
-mkdir -p "$NUEVO" || { registrar "ERROR: no se pudo crear $NUEVO."; exit 1; }
+mkdir -p "$NUEVO" || { registrar "ERROR: no se pudo crear $NUEVO."; devolver_paquete; exit 1; }
 
 if ! tar -xzf "$EN_CURSO" -C "$NUEVO" 2>>"$BITACORA"; then
   registrar "ERROR: fallo al descomprimir. El arbol anterior sigue intacto."
@@ -218,6 +273,9 @@ else
     registrar "ERROR: 'migrate deploy' fallo. NO se aplica el paquete;" \
               "la version anterior sigue sirviendo. Detalle justo arriba."
     rm -rf "$NUEVO"
+    # El paquete esta entero: lo que fallo es la base. Vuelve a su nombre para
+    # que el cron lo aplique solo en cuanto la causa se resuelva.
+    devolver_paquete
     exit 1
   fi
 fi
@@ -240,6 +298,7 @@ done
 
 rmdir "$NUEVO" 2>/dev/null
 rm -f "$EN_CURSO"
+rm -f "$CUENTA_INTENTOS"
 
 # El reinicio, al final y solo si todo salio bien.
 date -u +%Y-%m-%dT%H:%M:%SZ > "$RAIZ/tmp/restart.txt"

@@ -45,23 +45,27 @@ Dos avisos antes de leer nada de mas abajo:
 > que esa linea es decorativa y Prisma lee siempre la de cPanel—. Buscar el
 > fallo en ese archivo costo horas.
 >
-> **LO QUE SIGUE ABIERTO, y es lo unico de este incidente que queda:**
+> ~~**Que `desplegar.sh` DEVUELVA el paquete a `gcm.tar.gz` cuando
+> `migrate deploy` falle**~~ **HECHO el 21 de agosto de 2026.** Antes dejaba
+> `gcm.tar.gz.desplegando` esperando a que una persona entrara al servidor a
+> renombrarlo; ahora `devolver_paquete()` lo hace sola en cuanto la migracion
+> falla (y tambien si no se puede crear `.siguiente`). Reintenta hasta 30 veces
+> —una por minuto de cron, ~media hora— y si se agotan **deja de tocarlo y lo
+> dice en la bitacora**, para no encadenar arranques de Prisma sin fin como el
+> `nproc` que se agoto el 21. La cuenta vive en `tmp/intentos-migracion`, va
+> ligada al paquete concreto (tamano+fecha) para no arrastrarla a una subida
+> nueva, y se borra sola al aplicar bien.
 >
-> **Que `desplegar.sh` DEVUELVA el paquete a `gcm.tar.gz` cuando
-> `migrate deploy` falle**, en vez de dejarlo como `gcm.tar.gz.desplegando`
-> esperando a que una persona lo renombre. Hoy hubo que hacerlo a mano.
+> Lo que NO se puede hacer sigue igual: aplicar el paquete sin migrar. Codigo
+> nuevo contra tablas viejas tira la aplicacion entera, que es el fallo que la
+> receta de cambio de esquema lleva meses evitando.
 >
-> El script renombra el paquete nada mas cogerlo —para que un pase posterior no
-> reintente sobre un archivo a medias, que esta bien— pero en la rama de fallo
-> de migracion hace `rm -rf "$NUEVO"; exit 1` **sin deshacer ese renombrado**.
-> El cron sigue pasando cada minuto y ya no ve ningun `gcm.tar.gz` que aplicar,
-> asi que **el despliegue se queda parado hasta que alguien entra al servidor**.
-> Con la causa de hoy arreglada esto es menos probable, pero sigue siendo la
-> diferencia entre «se aplica en cuanto la base vuelva» y «no se aplica nunca».
->
-> Lo que NO se puede hacer es aplicar el paquete sin migrar: codigo nuevo contra
-> tablas viejas tira la aplicacion entera, que es el fallo que la receta de
-> cambio de esquema lleva meses evitando.
+> ~~**El texto que el workflow imprime al fallar induce al error.**~~ **HECHO
+> el 21 de agosto de 2026.** Decia «el paquete llego pero el CRON no lo
+> aplico» como lectura unica; ahora manda a `tail -40 tmp/despliegue.log`
+> primero y distingue las causas que esa bitacora puede decir (cron parado,
+> migracion fallida, paquete roto, Node sin rehacer) de lo que solo dice
+> `/api/health` (que hay algo pendiente, no por que).
 >
 > ---
 >
