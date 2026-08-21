@@ -237,13 +237,13 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
       `<meta http-equiv="refresh">` embebido. Verificar con el codigo de
       estado a secas da falsos "todos entran"; hay que mirar el cuerpo.
 
-    **Un hallazgo de producto, no un bug**: el rol **ALMACENERO** hoy solo
-    tiene `["obra:leer", "partida:leer"]` en la matriz — ni siquiera
-    `proveedor:leer`. No puede ver contratistas, encargos ni ordenes de
-    compra, que es lo que el nombre del rol sugeriria que hace. Puede ser
-    intencional (un rol minimo, todavia sin desarrollar del todo) o un
-    hueco real. **Pendiente de confirmar con el usuario que permisos
-    deberia tener ALMACENERO de verdad.**
+    **Hallazgo de producto, confirmado y CERRADO**: el rol **ALMACENERO**
+    hoy solo tiene `["obra:leer", "partida:leer"]` en la matriz — ni
+    siquiera `proveedor:leer`, nada de contratistas, encargos ni ordenes de
+    compra. El usuario confirmo el 21 de agosto de 2026 que es
+    DELIBERADO: un rol minimo dejado para una fase futura, no un hueco que
+    arreglar ahora. No tocar `rbac.ts` en este punto sin que el usuario
+    pida ampliarlo primero.
 
     Falta para completar esta prueba: los flujos de ESCRITURA completos
     (crear una obra desde cero con el usuario, cargar presupuesto,
