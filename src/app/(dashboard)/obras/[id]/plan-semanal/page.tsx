@@ -56,7 +56,17 @@ export default async function PlanSemanalPage({
             se cumple (PPC). Las causas de lo no cumplido alimentan la mejora.
           </p>
         </div>
-        {puedeGestionar && <NuevaSemana obraId={id} fechaSugerida={fechaSugerida} />}
+        {puedeGestionar && (
+          <NuevaSemana
+            obraId={id}
+            fechaSugerida={fechaSugerida}
+            inicioObra={
+              datos.semanas.length === 0
+                ? obra.fechaInicio.toISOString().slice(0, 10)
+                : null
+            }
+          />
+        )}
       </div>
 
       {/* El numero de una semana es el correlativo de creacion y no mira la
