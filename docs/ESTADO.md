@@ -592,40 +592,73 @@ cerrada se llevaba por delante lo que se le pago a cada contratista.
 - El paso de FTP tiene tope propio y `apt` reintenta en vez de tirar el
   despliegue.
 
-> **EL 21 DE AGOSTO UN PAQUETE SE QUEDO SIN APLICAR PORQUE LA BASE PARPADEO.**
-> El run **#471** (`cc57486`) subio bien y no llego a servirse: el paso
-> «Comprobar que la version nueva esta viva» agoto sus 28 intentos en 7 minutos
-> y tumbo el despliegue. `/api/health` seguia cantando `835d988` horas despues.
+> **EL 21 DE AGOSTO EL DESPLIEGUE ESTUVO DOS HORAS SIN PODER APLICARSE, POR
+> `localhost`. REMITIO SOLO; NO ESTA ARREGLADO.**
 >
-> **La causa esta en `tmp/despliegue.log` y es una sola linea**, a las 05:40:
+> Ventana: **05:40 a ~07:33**. Dentro de ella, los runs **#471** (`cc57486`) y
+> **#472** (`31479b2`) subieron bien y ninguno llego a servirse; el paso
+> «Comprobar que la version nueva esta viva» agoto sus 28 intentos en los dos.
+> `tmp/despliegue.log` daba P1001 continuo:
 >
 > ```
 > Error: P1001: Can't reach database server at localhost:3306
 > ```
 >
-> `migrate deploy` no alcanzo a MariaDB, el script **descarto el paquete** y
-> produccion se quedo en la version anterior. **No es el segundo P1001**: el
-> 20 de agosto a las 20:39 hubo otro, y de aquel se salio solo.
+> Al cerrarse la ventana el paquete entro y produccion quedo en `31479b2` con
+> `coherencia: ok`. **Que se arreglara solo es lo peligroso de esto**: el
+> mecanismo sigue entero y volvera.
 >
-> **EL CRON NO TIENE NADA QUE VER, y conviene decirlo porque es lo primero que
-> uno piensa mirando `/api/health`.** El cron existe, corre y ha aplicado
-> cientos de paquetes sin fallar, el ultimo `835d988` a las 04:42 de ESE MISMO
-> dia, hora y media antes. Desde fuera el sintoma es identico al del cron
+> **LAS DOS PIEZAS, y ninguna es la que parecia:**
+>
+> 1. **En este servidor `localhost` resuelve SOLO a `::1`** (IPv6), comprobado
+>    con `getent hosts localhost`. **MariaDB no siempre atiende ahi.** Cuando no
+>    atiende, todo lo que diga `localhost` en su cadena de conexion falla, y
+>    falla de forma continua mientras dure.
+> 2. **El selector de Node de CloudLinux INYECTA las variables de la app en todo
+>    proceso `node`, pisando las del shell.** Comprobado: se exporta
+>    `DATABASE_URL=MARCADOR`, se lanza `node -e`, y sigue viendo la URL de
+>    cPanel. Consecuencia que hay que tener muy presente: **el `DATABASE_URL` de
+>    `~/.gcm-despliegue.env` NO llega nunca a Prisma.** El comentario de
+>    `desplegar.sh` da a entender lo contrario y hay que corregirlo: mientras
+>    diga eso, cualquiera intentara arreglar el despliegue tocando un archivo
+>    que no pinta nada.
+>
+> Juntas explican por que el sintoma desconcertaba: `migrate deploy` moria por
+> `localhost` mientras `/api/health` respondia `baseDatos: conectada` con
+> `latenciaMs: 1`. Parecia que cron y app hablaban con bases distintas, y se
+> llego a escribir aqui. **No lo eran**: leen el MISMO entorno, el de cPanel.
+>
+> **EL ARREGLO, y esta pendiente**: poner **`127.0.0.1` en vez de `localhost`**
+> en el `DATABASE_URL` de la app, en *cPanel > Setup Node.js App*. Es el unico
+> sitio que manda —por el punto 2— y ademas protege a la aplicacion, no solo al
+> despliegue. Ver `PENDIENTES.md`.
+>
+> **EL CRON NO TIENE NADA QUE VER.** Existe, corre y habia aplicado `835d988` a
+> las 04:42 de ese mismo dia. Desde fuera el sintoma es identico al del cron
 > ausente —`version` vieja, `despliegue: pendiente`, `coherencia: desfasado`— y
-> por eso la lectura que el workflow imprime al fallar (**«el paquete llego pero
-> el CRON no lo aplico»**) lleva a la conclusion equivocada. **La unica fuente
-> que distingue las dos cosas es `tmp/despliegue.log`**; sin abrirlo no se puede
-> afirmar cual de las dos fue. Aqui se afirmo y era la otra.
+> la lectura que el workflow imprime al fallar (**«el paquete llego pero el CRON
+> no lo aplico»**) lleva derecho a la conclusion equivocada. Conviene arreglar
+> ese texto: nombra una causa como si fuera la unica.
 >
-> **El punto debil de verdad**, que es lo que hay que arreglar: un
-> `migrate deploy` que topa con la base caida **descarta el paquete y no lo
-> reintenta hasta el siguiente push**. El cron vuelve a pasar cada minuto, pero
-> ya no hay nada que aplicar. Un parpadeo de segundos en MariaDB deja la
-> aplicacion sin desplegar hasta que una PERSONA empuja otro commit. Ver
-> `PENDIENTES.md`.
+> **TRES DIAGNOSTICOS EQUIVOCADOS ANTES DEL BUENO**, y merece la pena la lista
+> porque cada uno fallo por una razon distinta:
 >
-> Y el efecto de este en concreto tiene guasa: dejo a produccion sirviendo
-> `835d988` —el WIP a medias— justo el dia en que se cerro.
+> 1. «Falla el cron» — afirmado **sin abrir el log**, solo desde `/api/health`.
+> 2. «Parpadeo transitorio de MariaDB» — con UNA linea del log delante. El
+>    arreglo que se propuso era reintentar. Se relanzo el despliegue y **volvio
+>    a fallar igual**, como tenia que pasar.
+> 3. «El cron y la app apuntan a bases distintas» — con DOS lineas y la
+>    distancia entre ellas. Descartaba bien el parpadeo y erraba el mecanismo.
+>
+> **La leccion no es «mirar el log».** Es que ni una linea ni dos bastan: lo que
+> cerro el caso fueron dos comprobaciones EN EL SERVIDOR que nadie habia hecho
+> —`getent hosts localhost` y el experimento del `MARCADOR`—, y las dos
+> contradijeron lo que el codigo y sus comentarios daban por sentado.
+>
+> Detalle util para leer `/api/health` mientras algo asi pasa: **`arranque` SI
+> se actualiza** —el `app.js` viaja por FTP, fuera del comprimido—. Ver
+> `arranque` nuevo con `version` vieja no es un FTP a medias; es exactamente
+> esto: subio todo y el paquete no se aplico.
 
 ### 18. La red de pruebas: lo que TypeScript no ve
 

@@ -24,39 +24,59 @@ Dos avisos antes de leer nada de mas abajo:
 
 ### Lo que hay que mirar primero
 
-> **LO MAS URGENTE, del 21 de agosto: un parpadeo de la base deja la
-> aplicacion sin desplegar, y nadie vuelve a intentarlo.** El run #471
-> (`cc57486`) subio bien y no se aplico: `migrate deploy` se encontro MariaDB
-> inalcanzable —`Error: P1001: Can't reach database server at localhost:3306`,
-> 05:40 en `tmp/despliegue.log`— y el script **descarto el paquete**. El cron
-> sigue pasando cada minuto, pero ya no queda nada que aplicar, asi que
-> **produccion se queda atras hasta que una persona empuje otro commit**. Al
-> escribir esto sirve `835d988`.
+> **LO MAS URGENTE, del 21 de agosto: `localhost` dejo el despliegue dos horas
+> sin poder aplicarse, y el arreglo SIGUE SIN HACER.** El incidente remitio
+> solo a eso de las 07:33 —produccion quedo en `31479b2` con `coherencia: ok`—,
+> pero **el mecanismo esta intacto y volvera**. El relato completo esta en la
+> seccion 17 de [`ESTADO.md`](ESTADO.md); aqui va lo que hay que HACER.
 >
-> No es un caso raro: **el mismo P1001 aparecio el 20 de agosto a las 20:39**,
-> y de aquel se salio solo. Son dos en nueve horas.
+> **1. Cambiar `localhost` por `127.0.0.1` en el `DATABASE_URL` de la app**, en
+> *cPanel > Setup Node.js App*. Es de una linea y es lo unico que cierra el
+> caso.
 >
-> **Lo que hay que hacer**: que `desplegar.sh` distinga un fallo de MIGRACION
-> POR BASE INALCANZABLE —transitorio— de un fallo de migracion de verdad, y en
-> el primer caso **deje el paquete donde esta para el siguiente pase del cron**
-> en vez de descartarlo. Con un tope de intentos, para que una base caida de
-> verdad no reintente para siempre en silencio. Lo que NO se puede hacer es
-> aplicar el paquete sin migrar: el codigo nuevo consultando tablas viejas tira
-> la aplicacion entera, que es el fallo que la seccion 0 y la receta de cambio
-> de esquema llevan meses evitando.
+> - En este servidor **`localhost` resuelve SOLO a `::1`** (comprobado con
+>   `getent hosts localhost`) **y MariaDB no siempre atiende en IPv6**. Mientras
+>   no atienda, todo lo que diga `localhost` falla de forma continua: eso fueron
+>   las dos horas.
+> - **Se cambia en cPanel y en ningun otro sitio**, porque el selector de Node
+>   de CloudLinux **inyecta las variables de la app en todo proceso `node` y
+>   pisa las del shell**. Comprobado: exportar `DATABASE_URL=MARCADOR` y lanzar
+>   `node -e` sigue viendo la URL de cPanel. **Corolario que ahorra horas: el
+>   `DATABASE_URL` de `~/.gcm-despliegue.env` NO llega nunca a Prisma.**
+> - **Corregir el comentario de `desplegar.sh`**, que da a entender lo
+>   contrario. Mientras lo diga, el siguiente que mire esto intentara arreglar
+>   el despliegue tocando un archivo que no pinta nada.
+> - Arreglarlo en cPanel protege ademas a la APLICACION, no solo al despliegue.
+>   Que durante la ventana `/api/health` siguiera diciendo `baseDatos:
+>   conectada` no la deja a salvo: **lee el mismo `DATABASE_URL`**, con el mismo
+>   `localhost`. Por que ella aguanto y `migrate deploy` no, no se comprobo.
 >
-> **Y una correccion de metodo que vale mas que el arreglo**: desde fuera esto
-> es INDISTINGUIBLE de un cron que no corre. `/api/health` da `version` vieja,
-> `despliegue: pendiente` y `coherencia: desfasado` en los dos casos, y el
-> texto que el workflow imprime al fallar dice «el paquete llego pero el CRON
-> no lo aplico», que aqui era falso —el cron habia aplicado `835d988` a las
-> 04:42 de ese mismo dia, y cientos antes—. **La unica fuente que lo distingue
-> es `tmp/despliegue.log`.** Este documento llego a afirmar lo contrario antes
-> de abrirlo. Conviene ademas arreglar ese texto del workflow: hoy nombra una
-> sola causa como si fuera la unica.
+> **2. Que un `migrate deploy` fallido no deje el paquete tirado.** Es el punto
+> debil de siempre y hoy se cobro su pieza: al fallar la migracion, el paquete
+> se queda como **`.desplegando`** y **nadie lo reintenta**; hubo que
+> **renombrarlo a mano** para que entrara. El cron sigue pasando cada minuto,
+> pero ya no ve nada que aplicar. Lo que NO se puede hacer es aplicar el paquete
+> sin migrar: codigo nuevo contra tablas viejas tira la aplicacion entera, que
+> es el fallo que la receta de cambio de esquema lleva meses evitando.
 >
-> Nota, por si alguien la busca: **el aviso de la seccion 0 —«vigilar que el
-> cron exista»— NO se ha cumplido todavia**. El cron existe y funciona.
+> ---
+>
+> **Correcciones de metodo, que aqui valieron mas que el arreglo:**
+>
+> - **Este documento se equivoco TRES veces antes de acertar**: «falla el cron»
+>   (sin abrir el log), «parpadeo transitorio» (con una linea del log; se
+>   relanzo el despliegue y volvio a fallar igual) y «cron y app apuntan a
+>   bases distintas» (con dos lineas). Lo que cerro el caso no fue leer mas log,
+>   sino **dos comprobaciones en el SERVIDOR que nadie habia hecho**:
+>   `getent hosts localhost` y el experimento del `MARCADOR`. Las dos
+>   contradijeron lo que el codigo y sus comentarios daban por sentado.
+> - **No relanzar un despliegue «por si acaso»** sin saber la causa: se hizo, y
+>   fallo exactamente igual.
+> - **El texto que el workflow imprime al fallar induce al error**: dice «el
+>   paquete llego pero el CRON no lo aplico» como unica lectura de un sintoma
+>   que tiene varias causas. Conviene arreglarlo.
+> - Por si alguien la busca: **el aviso de la seccion 0 —«vigilar que el cron
+>   exista»— NO se ha cumplido**. El cron existe y funciona.
 
 1. ~~**`835d988 WIP antes de reinstalar Claude` quedo a medias.**~~ **CERRADO
    el 21 de agosto de 2026.** Ya no queda nada sin terminar en el
