@@ -30,6 +30,18 @@ export function ResumenEmpresaPanel({
 }) {
   const saldoNegativo = resumen.saldo.trimStart().startsWith("-");
 
+  /**
+   * Presupuesto, Comprometido y Saldo son la SUMA de todas las obras en
+   * ejecucion, no de una sola -"obtenerResumenEmpresa" en obras.service.ts
+   * las agrega con `estado: EN_EJECUCION`, sin distinguir de cual obra viene
+   * cada sol-. Con una sola obra en ejecucion eso no se nota: la suma y esa
+   * obra son la misma cifra. Con varias, un usuario pregunto exactamente
+   * esto -"a quien corresponden estas cifras"- viendo el panel en vivo, asi
+   * que se dice explicitamente en vez de dejar que se adivine.
+   */
+  const sumaDeVarias =
+    resumen.obrasEnEjecucion > 1 ? `Suma de ${resumen.obrasEnEjecucion} obras en ejecución` : null;
+
   return (
     // `relative z-20`: crea un contexto de apilamiento para TODO el panel de
     // cifras, por encima de la fila de filtros que viene despues en el DOM.
@@ -56,7 +68,7 @@ export function ResumenEmpresaPanel({
         numero={Number(resumen.presupuestoTotal)}
         moneda
         acento="var(--color-exito)"
-        detalle="Obras en ejecución, sin IGV"
+        detalle={sumaDeVarias ? `${sumaDeVarias}, sin IGV` : "Obras en ejecución, sin IGV"}
       />
 
       <Cifra
@@ -66,7 +78,11 @@ export function ResumenEmpresaPanel({
         numero={Number(resumen.comprometido)}
         moneda
         acento="var(--color-alerta)"
-        detalle="En ejecución: encargos vigentes + órdenes sueltas"
+        detalle={
+          sumaDeVarias
+            ? `${sumaDeVarias}: encargos vigentes + órdenes sueltas`
+            : "En ejecución: encargos vigentes + órdenes sueltas"
+        }
       />
 
       <Cifra
@@ -80,7 +96,12 @@ export function ResumenEmpresaPanel({
         // dice, no solo el numero.
         tono={saldoNegativo ? "peligro" : undefined}
         acento={saldoNegativo ? "var(--color-peligro)" : "var(--color-exito)"}
-        detalle={<AlertasEmpresa alertas={alertas} />}
+        detalle={
+          <>
+            {sumaDeVarias && <>{sumaDeVarias} · </>}
+            <AlertasEmpresa alertas={alertas} />
+          </>
+        }
         detalleTono={alertas.length > 0 ? "peligro" : undefined}
       />
     </dl>
