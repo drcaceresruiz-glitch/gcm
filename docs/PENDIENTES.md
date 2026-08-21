@@ -208,6 +208,50 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
     `/gerencia` en si sigue igual — su rediseno de fondo (punto 1 del
     anexo anterior) sigue pendiente.
 
+13. **Prueba de extremo a extremo — primera pasada, permisos por rol vía
+    HTTP real.** Empezada el 21 de agosto de 2026, no terminada: cubre solo
+    el ACCESO A PANTALLAS por rol, no los flujos de escritura completos
+    (crear obra desde cero, ciclo completo de un encargo, etc.), que siguen
+    pendientes. Metodo: sesiones fabricadas (mismo `hashToken` que usa el
+    login real) para los 4 roles de prueba +RESIDENTE, contra
+    "OBRA DE PRUEBAS (local)" y contra CRIOCORD (para probar aislamiento
+    entre obras), pidiendo las paginas por HTTP y comparando con lo que
+    `rbac.ts` dice que cada rol deberia ver. Sesiones borradas al terminar.
+
+    **Resultado: CERO permisos rotos encontrados.** Cada caso que parecia
+    sospechoso a primera vista resulto ser correcto al verificarlo:
+    - El aislamiento entre obras funciona: los 4 roles con
+      `obrasAsignadas` limitado a la obra de pruebas NUNCA vieron un dato
+      real de CRIOCORD, ni en `/obras/[id]` ni en `/obras/[id]/movimientos`
+      —siempre `notFound()`, nunca la pantalla con contenido ajeno—.
+    - RESIDENTE y ADMIN_OBRA SI ven `/empresa/usuarios` (tienen
+      `usuario:leer` en la matriz) y ALMACENERO/CONSULTOR no: la primera
+      vez pareció un error, pero es exactamente lo que dice `rbac.ts`.
+    - ADMIN_OBRA parecia bloqueado de `/obras/[id]/movimientos/nuevo` pese
+      a tener `movimiento:crear`: no es permiso, es que la obra de pruebas
+      no tiene linea base fijada todavia y esa pantalla redirige a
+      cualquiera sin ella (`SinLineaBaseError`), sin mirar el rol.
+    - Aviso de metodo para la proxima vez que alguien pruebe asi: en
+      Next.js 16 dev, un `redirect()` llamado DESPUES de un `await` no
+      manda un 307 limpio — manda HTTP 200 con un
+      `<meta http-equiv="refresh">` embebido. Verificar con el codigo de
+      estado a secas da falsos "todos entran"; hay que mirar el cuerpo.
+
+    **Un hallazgo de producto, no un bug**: el rol **ALMACENERO** hoy solo
+    tiene `["obra:leer", "partida:leer"]` en la matriz — ni siquiera
+    `proveedor:leer`. No puede ver contratistas, encargos ni ordenes de
+    compra, que es lo que el nombre del rol sugeriria que hace. Puede ser
+    intencional (un rol minimo, todavia sin desarrollar del todo) o un
+    hueco real. **Pendiente de confirmar con el usuario que permisos
+    deberia tener ALMACENERO de verdad.**
+
+    Falta para completar esta prueba: los flujos de ESCRITURA completos
+    (crear una obra desde cero con el usuario, cargar presupuesto,
+    aprobar movimientos, ciclo de un encargo/orden, cerrar una semana de
+    Last Planner) — la capa de permisos de SERVICIO para eso ya la cubren
+    2461 pruebas automatizadas, pero el FLUJO de pantallas encadenadas,
+    completo, con clics reales, todavia no se ha recorrido.
+
 **Avisado, no pedido todavia**: pagina de marketing y venta, exponer la app
 web y la autoinstalable (`docs/instalable.md` ya documenta esta ultima),
 creacion de usuarios/reportes de cara al negocio, y migracion a otro hosting
