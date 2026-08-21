@@ -16,6 +16,8 @@ function edt(...filas: [string, string, number, boolean][]): FilaEdt[] {
     nivel,
     fila: i + 1,
     esResumen,
+    inicio: null,
+    fin: null,
   }));
 }
 

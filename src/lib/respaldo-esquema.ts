@@ -161,6 +161,7 @@ export const TABLAS: readonly TablaRespaldo[] = [
       { campo: "origenMovimientoId", a: "movimientos_presupuestales" },
     ],
     decimales: { metrado: 4, precioUnitario: 4, parcial: 2 },
+    fechas: ["fechaInicioPlan", "fechaFinPlan"],
   },
   {
     tabla: "movimiento_lineas",
@@ -197,6 +198,7 @@ export const TABLAS: readonly TablaRespaldo[] = [
     modelo: "presupuestoMetaItem",
     refs: [{ campo: "presupuestoMetaId", a: "presupuestos_meta" }],
     decimales: { metrado: 4, precioUnitario: 4, parcial: 2, porcentajeRecargo: 3 },
+    fechas: ["fechaInicioPlan", "fechaFinPlan"],
   },
   {
     /// El ORDEN de estas dos referencias importa, y no es capricho: se llega a

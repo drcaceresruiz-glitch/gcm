@@ -145,6 +145,79 @@ describe("tolerancia del analizador de gastos", () => {
   });
 });
 
+describe("las fechas opcionales de la plantilla meta", () => {
+  /**
+   * La plantilla no trae fechas de ejemplo a proposito (demuestra que son
+   * opcionales), asi que aqui se escribe una a mano sobre el libro ya
+   * generado -mismo mecanismo que usa `generarPlantillaMeta`, ExcelJS
+   * escribiendo un `Date`- y se vuelve a analizar. Esto es lo que certifica
+   * que la fecha sobrevive el viaje sin correrse un dia por la zona horaria
+   * de Peru: si `leerFecha` usara getters locales en vez de UTC, esta prueba
+   * fallaria.
+   */
+  async function conFechaEnLaPartida(
+    codigo: string,
+    fechaInicio: Date,
+    fechaFin: Date,
+  ): Promise<ArrayBuffer> {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const hoja = libro.worksheets[0]!;
+
+    let filaPartida: ExcelJS.Row | null = null;
+    hoja.eachRow((fila) => {
+      if (fila.getCell(1).value === codigo) filaPartida = fila;
+    });
+    if (!filaPartida) throw new Error(`No se encontro la partida ${codigo} en la plantilla.`);
+
+    (filaPartida as ExcelJS.Row).getCell(9).value = fechaInicio;
+    (filaPartida as ExcelJS.Row).getCell(10).value = fechaFin;
+
+    return (await libro.xlsx.writeBuffer()) as ArrayBuffer;
+  }
+
+  it("una partida con fecha sale con esa fecha, sin correrse un dia", async () => {
+    const r = await analizarExcel(
+      await conFechaEnLaPartida(
+        "1.1",
+        new Date("2026-09-01T00:00:00.000Z"),
+        new Date("2026-09-15T00:00:00.000Z"),
+      ),
+    );
+
+    expect(r.errores).toEqual([]);
+    const porCodigo = new Map(r.filas.map((f) => [f.codigo, f]));
+    expect(porCodigo.get("1.1")?.fechaInicio).toBe("2026-09-01");
+    expect(porCodigo.get("1.1")?.fechaFin).toBe("2026-09-15");
+  });
+
+  it("una partida sin fecha (el ejemplo tal cual) sale con null, no con error", async () => {
+    const r = await analizarExcel(await generarPlantillaMeta());
+    const porCodigo = new Map(r.filas.map((f) => [f.codigo, f]));
+
+    expect(r.errores).toEqual([]);
+    expect(porCodigo.get("2.1")?.fechaInicio).toBeNull();
+    expect(porCodigo.get("2.1")?.fechaFin).toBeNull();
+  });
+
+  it("solo una de las dos fechas es un error bloqueante", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const hoja = libro.worksheets[0]!;
+    let filaPartida: ExcelJS.Row | null = null;
+    hoja.eachRow((fila) => {
+      if (fila.getCell(1).value === "1.1") filaPartida = fila;
+    });
+    (filaPartida as unknown as ExcelJS.Row).getCell(9).value = new Date("2026-09-01T00:00:00.000Z");
+    // Fecha fin se deja en blanco a proposito.
+
+    const r = await analizarExcel((await libro.xlsx.writeBuffer()) as ArrayBuffer);
+
+    expect(r.errores).toHaveLength(1);
+    expect(r.errores[0]!.mensaje).toContain("no la otra");
+  });
+});
+
 describe("el recargo que genera el presupuesto contractual", () => {
   it("llega al importador, y solo en los capitulos", async () => {
     const r = await analizarExcel(await generarPlantillaMeta());

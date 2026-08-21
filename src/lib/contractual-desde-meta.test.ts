@@ -6,6 +6,7 @@ function cap(codigo: string, recargo: string | null, orden: number): LineaReal {
     codigo, descripcion: `Capitulo ${codigo}`, tipo: "CAPITULO",
     nivel: 0, orden, unidad: null, metrado: null, precioUnitario: null,
     parcial: null, porcentajeRecargo: recargo,
+    fechaInicio: null, fechaFin: null,
   };
 }
 
@@ -20,6 +21,7 @@ function par(
     precioUnitario: d.pu ?? null,
     parcial: d.parcial ?? null,
     porcentajeRecargo: null,
+    fechaInicio: null, fechaFin: null,
   };
 }
 
@@ -125,6 +127,7 @@ describe("lo que NO se puede recargar se avisa, no se inventa", () => {
       codigo: null, descripcion: "Sobrestante de obra", tipo: "PARTIDA",
       nivel: 0, orden: 9, unidad: null, metrado: null, precioUnitario: null,
       parcial: "800.00", porcentajeRecargo: null,
+      fechaInicio: null, fechaFin: null,
     };
     const r = generarContractual([
       cap("1.0", "20.000", 0),

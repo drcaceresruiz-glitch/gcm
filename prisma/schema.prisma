@@ -829,6 +829,14 @@ model WbsItem {
   /// el arbol completo en cada consulta de tablero.
   parcial        Decimal? @db.Decimal(14, 2)
 
+  /// Fecha opcional que trajo el presupuesto (plantilla meta o contractual),
+  /// no una fecha real de ejecucion -este modelo no tiene ninguna-. Solo
+  /// aplica a las HOJAS (aportantes): "generarEdtDesdePresupuesto" las usa
+  /// para programar la tarea de una vez en vez de dejarla `sinProgramar`.
+  /// Las dos van juntas: una partida no puede traer una sin la otra.
+  fechaInicioPlan DateTime? @db.Date
+  fechaFinPlan    DateTime? @db.Date
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3643,6 +3651,13 @@ model PresupuestoMetaItem {
   metrado        Decimal? @db.Decimal(14, 4)
   precioUnitario Decimal? @db.Decimal(14, 4)
   parcial        Decimal? @db.Decimal(14, 2)
+
+  /// Fecha opcional escrita en la plantilla. Viaja sin tocar hasta el
+  /// contractual (`generarContractual` en `contractual-desde-meta.ts`) y de
+  /// ahi a `WbsItem.fechaInicioPlan/fechaFinPlan` -aqui no se USA, solo se
+  /// guarda lo que trajo el Excel para que el contractual pueda copiarla.
+  fechaInicioPlan DateTime? @db.Date
+  fechaFinPlan    DateTime? @db.Date
 
   /// Solo en CAPITULOS: cuanto se recarga este capitulo del presupuesto real
   /// para llegar al presupuesto contractual.

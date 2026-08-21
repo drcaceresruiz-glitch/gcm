@@ -8,7 +8,7 @@ import { analizarExcel } from "./excel-presupuesto";
  * intercalados entre las partidas.
  */
 async function construirLibro(
-  filas: (string | number | null)[][],
+  filas: (string | number | Date | null)[][],
   opciones: { cabecera?: string[]; titulos?: boolean } = {},
 ): Promise<ArrayBuffer> {
   const libro = new ExcelJS.Workbook();
@@ -365,5 +365,78 @@ describe("analizarExcel", () => {
     expect(r.filas[2]?.tipo).toBe("PARTIDA");
     expect(r.filas[2]?.nivel).toBe(2);
     expect(r.filas[2]?.parcial).toBe("4750.00");
+  });
+});
+
+describe("fechas opcionales de inicio y fin", () => {
+  const CABECERA_CON_FECHAS = [
+    "Item", "Descripción", "Und.", "Metrado", "Precio Unitario", "Parcial",
+    "Fecha Inicio", "Fecha Fin",
+  ];
+
+  it("reconoce las columnas por alias y no corre el dia (UTC, no local)", async () => {
+    const libro = await construirLibro(
+      [
+        ["4.0", "CAPITULO IV", null, null, null, null, null, null],
+        [
+          "4.1", "Excavacion", "m3", 4.25, 95, null,
+          new Date("2026-09-01T00:00:00.000Z"),
+          new Date("2026-09-10T00:00:00.000Z"),
+        ],
+      ],
+      { cabecera: CABECERA_CON_FECHAS },
+    );
+
+    const r = await analizarExcel(libro);
+
+    expect(r.errores).toEqual([]);
+    expect(r.columnasDetectadas["fechaInicio"]).toBe("Fecha Inicio");
+    expect(r.filas.find((f) => f.codigo === "4.1")?.fechaInicio).toBe("2026-09-01");
+    expect(r.filas.find((f) => f.codigo === "4.1")?.fechaFin).toBe("2026-09-10");
+  });
+
+  it("una partida sin ninguna de las dos no es error: se importa igual, sin fecha", async () => {
+    const libro = await construirLibro(
+      [["4.1", "Excavacion", "m3", 4.25, 95, null, null, null]],
+      { cabecera: CABECERA_CON_FECHAS },
+    );
+
+    const r = await analizarExcel(libro);
+
+    expect(r.errores).toEqual([]);
+    expect(r.filas[0]?.fechaInicio).toBeNull();
+    expect(r.filas[0]?.fechaFin).toBeNull();
+  });
+
+  it("solo una de las dos fechas es un error bloqueante", async () => {
+    const libro = await construirLibro(
+      [[
+        "4.1", "Excavacion", "m3", 4.25, 95, null,
+        new Date("2026-09-01T00:00:00.000Z"), null,
+      ]],
+      { cabecera: CABECERA_CON_FECHAS },
+    );
+
+    const r = await analizarExcel(libro);
+
+    expect(r.filas).toEqual([]);
+    expect(r.errores).toHaveLength(1);
+    expect(r.errores[0]!.mensaje).toContain("no la otra");
+  });
+
+  it("terminar antes de empezar es un error bloqueante", async () => {
+    const libro = await construirLibro(
+      [[
+        "4.1", "Excavacion", "m3", 4.25, 95, null,
+        new Date("2026-09-10T00:00:00.000Z"),
+        new Date("2026-09-01T00:00:00.000Z"),
+      ]],
+      { cabecera: CABECERA_CON_FECHAS },
+    );
+
+    const r = await analizarExcel(libro);
+
+    expect(r.errores).toHaveLength(1);
+    expect(r.errores[0]!.mensaje).toContain("antes de empezar");
   });
 });

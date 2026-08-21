@@ -42,6 +42,14 @@ export interface FilaPresupuesto {
   orden: number;
   /// El importe de la fila. Es lo que decide si es hoja: sin el no se puede.
   parcial: string | null;
+  /// Opcional, "YYYY-MM-DD". Solo se usan en las HOJAS: ver `recorrer` mas
+  /// abajo y `subirFechas`, que las propaga a los resumenes. Opcionales en
+  /// el TIPO (no solo en el valor) para que los otros dos llamantes de esta
+  /// funcion -`edt-sincronizar.ts` y `plantilla-cronograma.service.ts`, que
+  /// no leen fecha del presupuesto y no la necesitan- no tengan que pasar
+  /// nada nuevo.
+  fechaInicioPlan?: string | null;
+  fechaFinPlan?: string | null;
 }
 
 export interface FilaEdt {
@@ -59,6 +67,16 @@ export interface FilaEdt {
    * Aqui es exactamente lo contrario de "aporta al costo directo".
    */
   esResumen: boolean;
+  /**
+   * "YYYY-MM-DD", o null si esta hoja no trajo fecha del presupuesto.
+   *
+   * Solo las hojas la traen del presupuesto; en los resumenes la rellena
+   * `subirFechas` mas abajo, ANTES de devolver `edtDesdePresupuesto`. Quien
+   * llama (`generarEdtDesdePresupuesto`) decide con esto si programa la
+   * tarea de una vez o la deja `sinProgramar` como hoy.
+   */
+  inicio: string | null;
+  fin: string | null;
 }
 
 /**
@@ -166,6 +184,11 @@ export function edtDesdePresupuesto(
         nivel,
         fila: salida.length + 1,
         esResumen: !esHoja,
+        // Solo las hojas traen fecha del presupuesto, y las dos juntas o
+        // ninguna (ya lo garantiza la validacion de `analizarExcel`, pero
+        // se comprueba otra vez aqui por si la fila viene de otro origen).
+        inicio: esHoja && fila.fechaInicioPlan && fila.fechaFinPlan ? fila.fechaInicioPlan : null,
+        fin: esHoja && fila.fechaInicioPlan && fila.fechaFinPlan ? fila.fechaFinPlan : null,
       });
 
       // Una hoja no se abre: sus descendientes ya subieron a hermanas.
@@ -175,7 +198,11 @@ export function edtDesdePresupuesto(
 
   recorrer(hijasDe.get(null) ?? [], 1);
 
-  return salida;
+  // Sube las fechas de las hojas a sus resumenes: un capitulo empieza
+  // cuando empieza su primera hoja programada y termina cuando acaba la
+  // ultima. Un resumen sin ninguna hoja programada se queda en null -no se
+  // le inventa un plan que no existe.
+  return subirFechas(salida);
 }
 
 export interface Programada {

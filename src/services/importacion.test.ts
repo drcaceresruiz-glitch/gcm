@@ -156,6 +156,8 @@ function capitulo(codigo: string, descripcion: string): FilaImportada {
     precioUnitario: null,
     parcial: null,
     porcentajeRecargo: null,
+    fechaInicio: null,
+    fechaFin: null,
   };
 }
 
@@ -172,6 +174,8 @@ function partida(codigo: string, parcial: string): FilaImportada {
     precioUnitario: "25.0000",
     parcial,
     porcentajeRecargo: null,
+    fechaInicio: null,
+    fechaFin: null,
   };
 }
 

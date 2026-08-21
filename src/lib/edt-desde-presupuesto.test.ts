@@ -25,8 +25,13 @@ function fila(
   parentId: string | null,
   orden: number,
   parcial: string | null = null,
+  fechas: [string, string] | null = null,
 ): FilaPresupuesto {
-  return { id, codigoPartida, descripcion, parentId, orden, parcial };
+  return {
+    id, codigoPartida, descripcion, parentId, orden, parcial,
+    fechaInicioPlan: fechas?.[0] ?? null,
+    fechaFinPlan: fechas?.[1] ?? null,
+  };
 }
 
 const PRESUPUESTO = [
@@ -81,6 +86,57 @@ describe("edtDesdePresupuesto", () => {
     ];
 
     expect(() => edtDesdePresupuesto(ciclo)).not.toThrow();
+  });
+
+  /**
+   * `edtDesdePresupuesto` ya sube las fechas ella sola (llama a `subirFechas`
+   * por dentro): quien la llama no tiene que acordarse de hacerlo aparte.
+   */
+  describe("fechas que trae el presupuesto", () => {
+    const CON_FECHAS = [
+      fila("c4", "4.0", "CAPITULO IV", null, 1),
+      fila("p1", "4.1", "Concreto en zapatas", "c4", 2),
+      fila("t1", "4.1.1", "Encofrado", "p1", 3, "100.00", ["2026-08-10", "2026-08-12"]),
+      fila("t2", "4.1.2", "Acero", "p1", 4, "200.00"),
+      fila("t3", "4.1.3", "Vaciado", "p1", 5, "300.00", ["2026-08-16", "2026-08-20"]),
+      fila("p2", "4.2", "Solado", "c4", 6, "400.00"),
+    ];
+
+    it("una hoja con las dos fechas nace programada", () => {
+      const edt = edtDesdePresupuesto(CON_FECHAS);
+      const t1 = edt.find((f) => f.codigo === "4.1.1");
+
+      expect(t1?.inicio).toBe("2026-08-10");
+      expect(t1?.fin).toBe("2026-08-12");
+    });
+
+    it("una hoja sin fecha se queda en null, no hereda nada", () => {
+      const edt = edtDesdePresupuesto(CON_FECHAS);
+      const t2 = edt.find((f) => f.codigo === "4.1.2");
+
+      expect(t2?.inicio).toBeNull();
+      expect(t2?.fin).toBeNull();
+    });
+
+    it("el resumen sube la fecha de sus hojas SOLA, sin que quien llame haga nada aparte", () => {
+      const edt = edtDesdePresupuesto(CON_FECHAS);
+      const p1 = edt.find((f) => f.codigo === "4.1");
+
+      // 4.1.1 y 4.1.3 tienen fecha, 4.1.2 no: el paquete abarca las dos que
+      // si tiene, ignorando la que esta en null.
+      expect(p1?.inicio).toBe("2026-08-10");
+      expect(p1?.fin).toBe("2026-08-20");
+    });
+
+    it("un paquete sin ninguna hoja programada se queda en null", () => {
+      const edt = edtDesdePresupuesto(CON_FECHAS);
+      const p2 = edt.find((f) => f.codigo === "4.2");
+
+      // 4.2 no tiene subpartidas -es hoja y paquete a la vez- y no trajo
+      // fecha propia, asi que no hay nada que subir.
+      expect(p2?.inicio).toBeNull();
+      expect(p2?.fin).toBeNull();
+    });
   });
 });
 

@@ -44,6 +44,10 @@ export interface LineaReal {
   parcial: string | null;
   /// Solo en capitulos, y COMO PORCENTAJE: 18.000 son 18%.
   porcentajeRecargo: string | null;
+  /// Opcional, "YYYY-MM-DD". Viaja SIN TOCAR hasta el contractual: no hay
+  /// "recargo" de fecha.
+  fechaInicio: string | null;
+  fechaFin: string | null;
 }
 
 export interface LineaContractual {
@@ -62,6 +66,8 @@ export interface LineaContractual {
   codigoDelRecargo: string | null;
   /// Lo que costaba en el real, para poder comparar linea a linea.
   parcialReal: string | null;
+  fechaInicio: string | null;
+  fechaFin: string | null;
 }
 
 export type MotivoAviso = "SIN_CODIGO" | "SIN_RECARGO" | "SIN_IMPORTE";
@@ -185,6 +191,8 @@ export function generarContractual(
       unidad: l.unidad,
       metrado: l.metrado,
       parcialReal: l.parcial,
+      fechaInicio: l.fechaInicio,
+      fechaFin: l.fechaFin,
     };
 
     // Un capitulo es un titulo: ni lleva cifras ni se recarga. Su importe es

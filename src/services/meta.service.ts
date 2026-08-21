@@ -400,6 +400,10 @@ export interface EntradaItemMeta {
   /// accion no lo copiaba). Siendo obligatorio, quien construya la entrada
   /// tiene que decidir, y `tsc` senala el sitio si alguien lo olvida.
   porcentajeRecargo: string | null;
+  /// Opcional, "YYYY-MM-DD". Van juntas o ninguna -ya validado por quien
+  /// arma la entrada, aqui solo se guardan.
+  fechaInicio?: string | null;
+  fechaFin?: string | null;
 }
 
 export interface EntradaGastoMeta {
@@ -560,6 +564,11 @@ export async function crearMeta(
         precioUnitario: i.precioUnitario ?? null,
         parcial: i.parcial,
         porcentajeRecargo: i.porcentajeRecargo ?? null,
+        // "YYYY-MM-DD" a medianoche UTC, no `new Date(iso)` local: es una
+        // columna `@db.Date` y el dia no debe correrse por la zona horaria
+        // de Peru. Mismo patron que `cronograma-manual.service.ts`.
+        fechaInicioPlan: i.fechaInicio ? new Date(`${i.fechaInicio}T00:00:00.000Z`) : null,
+        fechaFinPlan: i.fechaFin ? new Date(`${i.fechaFin}T00:00:00.000Z`) : null,
       })),
     });
 

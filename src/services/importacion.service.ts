@@ -304,6 +304,11 @@ export async function aplicarImportacion(
             metrado: f.metrado,
             precioUnitario: f.precioUnitario,
             parcial: f.parcial,
+            // "YYYY-MM-DD" a medianoche UTC: es una columna `@db.Date` y el
+            // dia no debe correrse por la zona horaria de Peru (mismo
+            // patron que `cronograma-manual.service.ts`).
+            fechaInicioPlan: f.fechaInicio ? new Date(`${f.fechaInicio}T00:00:00.000Z`) : null,
+            fechaFinPlan: f.fechaFin ? new Date(`${f.fechaFin}T00:00:00.000Z`) : null,
           };
         }),
       });

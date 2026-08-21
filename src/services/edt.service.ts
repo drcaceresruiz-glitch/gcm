@@ -4,6 +4,7 @@ import { puede } from "@/lib/rbac";
 import { hoy as hoyCalendario } from "@/utils/fechas";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { diasLaborablesEntre, type DiaLaboral } from "@/lib/calendario";
+import { obtenerCalendario } from "@/services/calendario.service";
 import {
   edtDesdePresupuesto,
   resumenesPorOrden,
@@ -232,6 +233,10 @@ export async function generarEdtDesdePresupuesto(
   });
   if (!obra) return { ok: false, error: "Obra no encontrada." };
 
+  // Solo hace falta si el presupuesto trae fechas propias: `diasEntre` la
+  // usa para calcular la duracion de esas tareas en dias laborables.
+  const calendario = await obtenerCalendario(sesion, obraId);
+
   const partidas = await prisma.wbsItem.findMany({
     where: { projectId: obraId },
     select: {
@@ -242,6 +247,11 @@ export async function generarEdtDesdePresupuesto(
       orden: true,
       // Sin el importe no se puede saber quien es hoja: lo decide el dinero.
       parcial: true,
+      // Si el presupuesto ya trajo fecha, la tarea nace programada de una
+      // vez en vez de `sinProgramar`. Opcionales: la mayoria de las obras no
+      // las traera.
+      fechaInicioPlan: true,
+      fechaFinPlan: true,
     },
   });
 
@@ -296,7 +306,14 @@ export async function generarEdtDesdePresupuesto(
   }
 
   const edt = edtDesdePresupuesto(
-    partidas.map((p) => ({ ...p, parcial: p.parcial?.toString() ?? null })),
+    partidas.map((p) => ({
+      ...p,
+      parcial: p.parcial?.toString() ?? null,
+      // Mismo criterio que el resto del proyecto para leer un `@db.Date` de
+      // vuelta como "YYYY-MM-DD" (ver `diasEntre` mas abajo en este archivo).
+      fechaInicioPlan: p.fechaInicioPlan?.toISOString().slice(0, 10) ?? null,
+      fechaFinPlan: p.fechaFinPlan?.toISOString().slice(0, 10) ?? null,
+    })),
   );
 
   if (edt.length === 0) {
@@ -399,20 +416,34 @@ export async function generarEdtDesdePresupuesto(
           holguraDias: "0.00",
           holguraInferida: true,
           /**
-           * Nacen SIN PROGRAMAR, y hay que decirlo con una marca.
+           * Programada de una vez si el presupuesto trajo fecha; si no,
+           * NACE SIN PROGRAMAR, y hay que decirlo con una marca.
            *
-           * El presupuesto no tiene fechas y no se las inventa. Pero las
-           * columnas no admiten nulo, asi que se rellenan con el inicio de
-           * obra —y eso, sin la marca, el sistema lo lee como "programada para
-           * el primer dia y ya vencida": generar la EDT publicaba al instante
-           * cientos de alertas rojas en el tablero y en el informe al cliente,
-           * senalando como cuello de botella una partida que nadie habia
-           * programado todavia.
+           * Sin fecha, el presupuesto no tiene con que y no se inventa
+           * ninguna. Pero las columnas no admiten nulo, asi que se rellenan
+           * con el inicio de obra —y eso, sin la marca, el sistema lo lee
+           * como "programada para el primer dia y ya vencida": generar la
+           * EDT publicaba al instante cientos de alertas rojas en el
+           * tablero y en el informe al cliente, senalando como cuello de
+           * botella una partida que nadie habia programado todavia.
+           *
+           * `f.inicio`/`f.fin` ya vienen de `edtDesdePresupuesto` -solo en
+           * las hojas que trajeron las dos fechas, y en los resumenes cuyo
+           * subarbol tiene al menos una hoja programada, via `subirFechas`.
            */
-          sinProgramar: true,
-          inicio: obra.fechaInicio,
-          fin: obra.fechaInicio,
-          duracionDias: "0.00",
+          ...(f.inicio !== null && f.fin !== null
+            ? {
+                sinProgramar: false,
+                inicio: new Date(`${f.inicio}T00:00:00.000Z`),
+                fin: new Date(`${f.fin}T00:00:00.000Z`),
+                duracionDias: diasEntre(f.inicio, f.fin, calendario),
+              }
+            : {
+                sinProgramar: true,
+                inicio: obra.fechaInicio,
+                fin: obra.fechaInicio,
+                duracionDias: "0.00",
+              }),
           porcentajePlaneado: "0.00",
           porcentajeArchivo: "0.00",
           origen: "MANUAL" as const,

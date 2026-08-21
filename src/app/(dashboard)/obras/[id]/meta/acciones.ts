@@ -162,6 +162,8 @@ export async function accionImportarMeta(
     // presupuesto contractual. Se perdia justo aqui: el importador ya lo
     // leia, pero este mapeo no lo copiaba y nunca llegaba a la base.
     porcentajeRecargo: f.porcentajeRecargo,
+    fechaInicio: f.fechaInicio,
+    fechaFin: f.fechaFin,
   }));
 
   const gastosGenerales: EntradaGastoMeta[] = gastos.filas.map((g) => ({

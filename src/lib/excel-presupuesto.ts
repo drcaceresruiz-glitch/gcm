@@ -35,6 +35,12 @@ export interface FilaImportada {
   parcial: string | null;
   /// Solo en capitulos: % de recargo con el que se genera el contractual.
   porcentajeRecargo: string | null;
+  /// Fecha opcional de la plantilla, "YYYY-MM-DD". Van juntas o ninguna: ver
+  /// la validacion en `analizarExcel`. Sin ellas, la EDT sale `sinProgramar`
+  /// como hoy; con ellas, `generarEdtDesdePresupuesto` programa la tarea de
+  /// una vez.
+  fechaInicio: string | null;
+  fechaFin: string | null;
   /// Aviso no bloqueante: la fila se importa igual.
   aviso?: string;
 }
@@ -169,6 +175,11 @@ const ALIAS: Record<string, string[]> = {
   // habria hecho que se leyera como el parcial, e importar el presupuesto
   // ya inflado.
   recargo: ["% recargo", "recargo", "porcentaje recargo", "recargo %"],
+  // Opcionales: si no aparecen, la EDT se genera igual que hoy (sin
+  // programar). Van al final de la plantilla, nunca en medio, porque
+  // `formulaContractual` referencia columnas por letra fija.
+  fechaInicio: ["fecha inicio", "f. inicio", "f inicio", "inicio"],
+  fechaFin: ["fecha fin", "f. fin", "f fin", "fin", "termino", "término"],
 };
 
 /**
@@ -224,6 +235,26 @@ function valorCelda(celda: ExcelJS.Cell | undefined): unknown {
 }
 
 /**
+ * Lee una celda de fecha como "YYYY-MM-DD", o null si esta vacia o no es
+ * una fecha.
+ *
+ * ExcelJS decodifica la fecha serial de Excel como un `Date` en UTC —no
+ * lleva zona horaria propia, el numero de serie es solo un dia de
+ * calendario—, asi que se formatea con los getters UTC. Usar los locales
+ * aqui repetiria el mismo desfase que ya documenta `diaLocal` en
+ * `cronograma-manual.service.ts`: en Peru (UTC-5) un `Date` a medianoche
+ * UTC cae en las 19:00 del dia anterior, y `getDate()` devolveria ese dia
+ * de menos.
+ */
+function leerFecha(valor: unknown): string | null {
+  if (!(valor instanceof Date) || Number.isNaN(valor.getTime())) return null;
+  const anio = valor.getUTCFullYear();
+  const mes = String(valor.getUTCMonth() + 1).padStart(2, "0");
+  const dia = String(valor.getUTCDate()).padStart(2, "0");
+  return `${anio}-${mes}-${dia}`;
+}
+
+/**
  * Localiza la fila de cabecera y a que campo corresponde cada columna.
  *
  * No se asume que la cabecera este en la fila 1: las exportaciones de S10
@@ -243,7 +274,10 @@ function detectarCabecera(hoja: ExcelJS.Worksheet): {
     // Se resuelven primero los campos mas especificos: "precio unitario"
     // antes que "precio", y "descripcion" antes que "partida", que aparece
     // como sinonimo en dos campos distintos.
-    const orden = ["metrado", "precioUnitario", "parcial", "unidad", "codigo", "descripcion", "recargo"];
+    const orden = [
+      "metrado", "precioUnitario", "parcial", "unidad", "codigo", "descripcion",
+      "recargo", "fechaInicio", "fechaFin",
+    ];
 
     for (const campo of orden) {
       const alias = ALIAS[campo] ?? [];
@@ -491,6 +525,37 @@ export async function analizarExcel(
     }
     codigosVistos.set(codigo, n);
 
+    /**
+     * Fechas opcionales de la plantilla. Van juntas o no van: un rango a
+     * medias no tiene con que escribirse en el cronograma (ni inicio ni fin
+     * admiten nulo alla), a diferencia de metrado/precio, que si son
+     * independientes.
+     */
+    const colInicio = mapa.get("fechaInicio");
+    const colFin = mapa.get("fechaFin");
+    const fechaInicio = colInicio ? leerFecha(valorCelda(fila.getCell(colInicio))) : null;
+    const fechaFin = colFin ? leerFecha(valorCelda(fila.getCell(colFin))) : null;
+
+    if ((fechaInicio === null) !== (fechaFin === null)) {
+      errores.push({
+        fila: n,
+        columna: fechaInicio === null ? "fecha inicio" : "fecha fin",
+        mensaje:
+          `La partida ${codigo} trae ${fechaInicio === null ? "fecha fin" : "fecha inicio"} ` +
+          `pero no la otra. Las dos fechas van juntas, o se dejan las dos en blanco.`,
+      });
+      continue;
+    }
+
+    if (fechaInicio !== null && fechaFin !== null && fechaFin < fechaInicio) {
+      errores.push({
+        fila: n,
+        columna: "fecha fin",
+        mensaje: `La partida ${codigo} termina (${fechaFin}) antes de empezar (${fechaInicio}).`,
+      });
+      continue;
+    }
+
     const { tipo, nivel } = clasificarCodigo(
       codigo,
       tieneDatosEconomicos,
@@ -499,6 +564,7 @@ export async function analizarExcel(
     const registro = construirFila({
       hoja, fila, n, mapa, codigo, descripcion, tipo, nivel,
       combinacion: combinaciones.get(n) ?? null,
+      fechaInicio, fechaFin,
     });
 
     if (registro) {
@@ -555,6 +621,9 @@ interface ArgsFila {
   nivel: number;
   /// Si la fila comparte importe con otras por estar combinada en el Excel.
   combinacion: Combinacion | null;
+  /// Ya leidas y validadas por quien llama (van juntas o ninguna).
+  fechaInicio: string | null;
+  fechaFin: string | null;
 }
 
 /**
@@ -572,7 +641,7 @@ function normalizarDescripcion(texto: string, tipo: TipoFila): string {
 }
 
 function construirFila(args: ArgsFila): FilaImportada | null {
-  const { fila, n, mapa, codigo, descripcion, tipo, nivel, combinacion } = args;
+  const { fila, n, mapa, codigo, descripcion, tipo, nivel, combinacion, fechaInicio, fechaFin } = args;
   const desc = normalizarDescripcion(descripcion, tipo);
 
   const leer = (campo: string) => {
@@ -581,12 +650,15 @@ function construirFila(args: ArgsFila): FilaImportada | null {
   };
 
   // Los capitulos solo agrupan: su importe es la suma de sus partidas y no
-  // se toma del Excel, donde suele venir como subtotal ya calculado.
+  // se toma del Excel, donde suele venir como subtotal ya calculado. Una
+  // fecha en un capitulo se guarda igual (no se prohibe) pero no se usa mas
+  // adelante: solo las hojas llegan a tener tarea propia en la EDT.
   if (tipo === "CAPITULO") {
     return {
       fila: n, codigo, tipo, modalidad: "PRECIOS_UNITARIOS", descripcion: desc, nivel,
       unidad: null, metrado: null, precioUnitario: null, parcial: null,
       porcentajeRecargo: normalizarDecimal(leer("recargo"), 2),
+      fechaInicio, fechaFin,
     };
   }
 
@@ -604,6 +676,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
       fila: n, codigo, tipo, modalidad: "ALCANCE", descripcion: desc, nivel,
       unidad: null, metrado: null, precioUnitario: null, parcial: null,
       porcentajeRecargo: null,
+      fechaInicio, fechaFin,
       aviso: `Comparte importe con las filas ${combinacion.maestra} a ${combinacion.ultima} (${cuantas} lineas a suma alzada).`,
     };
   }
@@ -692,6 +765,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
     unidad: unidadTexto || null,
     metrado, precioUnitario, parcial,
     porcentajeRecargo: null,
+    fechaInicio, fechaFin,
     ...(avisos.length > 0 ? { aviso: avisos.join(" ") } : {}),
   };
 }

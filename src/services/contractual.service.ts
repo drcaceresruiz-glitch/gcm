@@ -84,6 +84,10 @@ export async function previsualizarContractual(
     precioUnitario: i.precioUnitario?.toString() ?? null,
     parcial: i.parcial?.toString() ?? null,
     porcentajeRecargo: i.porcentajeRecargo?.toString() ?? null,
+    // Mismo criterio que el resto del proyecto para leer un `@db.Date` de
+    // vuelta como "YYYY-MM-DD" (`edt.service.ts`, `cronograma-manual.service.ts`).
+    fechaInicio: i.fechaInicioPlan?.toISOString().slice(0, 10) ?? null,
+    fechaFin: i.fechaFinPlan?.toISOString().slice(0, 10) ?? null,
   }));
 
   return {
@@ -149,6 +153,8 @@ export async function generarContractualDesdeReal(
     // El recargo es del presupuesto real y ya se aplico: en el contractual no
     // queda nada que recargar, y arrastrarlo invitaria a aplicarlo dos veces.
     porcentajeRecargo: null,
+    fechaInicio: l.fechaInicio,
+    fechaFin: l.fechaFin,
   }));
 
   return aplicarImportacion(sesion, obraId, filas, reemplazar);

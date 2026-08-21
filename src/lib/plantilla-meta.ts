@@ -134,6 +134,11 @@ const CABECERAS_COSTO = [
   "Parcial",
   "% Recargo",
   "Contractual",
+  // Las dos siguientes van AL FINAL a proposito: `formulaContractual`
+  // referencia columnas por letra fija ($A, $F, $G), e insertar en medio
+  // correria esas referencias y romperia la plantilla.
+  "Fecha Inicio",
+  "Fecha Fin",
 ] as const;
 
 
@@ -146,6 +151,10 @@ interface FilaCosto {
   parcial?: number;
   /// Solo en capitulos: cuanto se recarga para llegar al contractual.
   recargo?: number;
+  /// Opcionales, y los ejemplos de FILAS_COSTO se dejan sin ellas a
+  /// proposito: el propio ejemplo demuestra que no hacen falta.
+  fechaInicio?: string;
+  fechaFin?: string;
 }
 
 /**
@@ -289,6 +298,10 @@ const INSTRUCCIONES: readonly (readonly [string, string])[] = [
     "4. Lo que NO pongas se nota",
     "Si dejas una partida del contrato sin línea aquí, el sistema NO la cuenta como ahorro: te la marca como «sin meta» y te dice cuánto suma. Una meta incompleta parece un margen excelente, y no lo es.",
   ],
+  [
+    "5. Fecha Inicio / Fecha Fin (opcional)",
+    "Si las pones, esa partida sale de generar la EDT ya programada con esas fechas en vez de pendiente. Si las dejas en blanco, todo sigue funcionando igual que hoy: la EDT se genera igual y programas las fechas después, en la tabla del cronograma. Van juntas: si pones una, hace falta la otra.",
+  ],
 ];
 
 
@@ -323,6 +336,7 @@ export async function generarPlantillaMeta(
     { width: 10 }, { width: 56 }, { width: 8 },
     { width: 12 }, { width: 16 }, { width: 16 },
     { width: 12 }, { width: 18 },
+    { width: 14 }, { width: 14 },
   ];
 
   costo.getCell("A1").value = "PRESUPUESTO META - COSTO DIRECTO";
@@ -341,6 +355,13 @@ export async function generarPlantillaMeta(
   costo.getCell(`H${FILA_CABECERA}`).note =
     "Se calcula solo: el subtotal real del capítulo más su recargo. " +
     "La suma de esta columna es el presupuesto contractual.";
+  costo.getCell(`I${FILA_CABECERA}`).note =
+    "Opcional. Si la pones, la EDT sale con esta partida ya programada en " +
+    "vez de pendiente. Si la dejas en blanco, todo sigue igual que hoy: se " +
+    "programa después, en la tabla del cronograma.";
+  costo.getCell(`J${FILA_CABECERA}`).note =
+    "Opcional, pero si pones la fecha de inicio también hace falta esta: " +
+    "las dos van juntas o ninguna.";
 
   // Se declaran aqui arriba porque la formula del contractual, que ya se
   // escribe en las filas de ejemplo, necesita el rango completo.
@@ -372,7 +393,12 @@ export async function generarPlantillaMeta(
       // perdia entera, y el presupuesto salia 3.200 mas barato.
       fila.getCell(6).value = f.parcial;
     }
-    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
+    // Opcionales: los ejemplos de FILAS_COSTO no las traen a proposito, para
+    // que la plantilla misma demuestre que no hacen falta.
+    if (f.fechaInicio) fila.getCell(9).value = new Date(`${f.fechaInicio}T00:00:00.000Z`);
+    if (f.fechaFin) fila.getCell(10).value = new Date(`${f.fechaFin}T00:00:00.000Z`);
+
+    for (const col of [1, 2, 3, 4, 5, 9, 10]) marcarEditable(fila.getCell(col));
     marcarCalculada(
       fila.getCell(6),
       "Se calcula solo: metrado x precio unitario. No escribas aquí.",
@@ -382,6 +408,8 @@ export async function generarPlantillaMeta(
     fila.getCell(4).numFmt = "#,##0.00";
     fila.getCell(5).numFmt = "#,##0.00";
     fila.getCell(6).numFmt = "#,##0.00";
+    fila.getCell(9).numFmt = "dd/mm/yyyy";
+    fila.getCell(10).numFmt = "dd/mm/yyyy";
 
     const esCapitulo = esCapituloCodigo(f);
     if (esCapitulo) {
@@ -400,7 +428,7 @@ export async function generarPlantillaMeta(
         "Se calcula solo: el subtotal real del capítulo más su recargo.",
       );
 
-      for (let c = 1; c <= 8; c++) {
+      for (let c = 1; c <= 10; c++) {
         fila.getCell(c).font = { bold: true };
         fila.getCell(c).fill = {
           type: "pattern",
@@ -439,7 +467,9 @@ export async function generarPlantillaMeta(
       fila.getCell(8),
       "Se calcula solo: el subtotal real del capítulo más su recargo.",
     );
-    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
+    fila.getCell(9).numFmt = "dd/mm/yyyy";
+    fila.getCell(10).numFmt = "dd/mm/yyyy";
+    for (const col of [1, 2, 3, 4, 5, 9, 10]) marcarEditable(fila.getCell(col));
     marcarCalculada(
       fila.getCell(6),
       "Se calcula solo: metrado x precio unitario. No escribas aquí.",
