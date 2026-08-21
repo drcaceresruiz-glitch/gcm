@@ -113,7 +113,10 @@ export default async function EditarEncargoPage({
                 >
                   <th className="pb-1.5 font-normal opacity-60">N.º</th>
                   <th className="pb-1.5 font-normal opacity-60">Corte</th>
-                  <th className="pb-1.5 text-right font-normal opacity-60">
+                  {/* `pr-4`: la cifra va alineada a la derecha y la columna de
+                      al lado empieza sin margen, asi que sin esto el numero y
+                      el nombre se tocan —«70.0%Administrador GCM»—. */}
+                  <th className="pb-1.5 pr-4 text-right font-normal opacity-60">
                     % acumulado
                   </th>
                   <th className="pb-1.5 font-normal opacity-60">Registrado por</th>
@@ -134,7 +137,7 @@ export default async function EditarEncargoPage({
                       </span>
                     </td>
                     <td className="py-1.5 tabular-nums">{fechaCorta(v.fecha)}</td>
-                    <td className="py-1.5 text-right font-medium tabular-nums">
+                    <td className="py-1.5 pr-4 text-right font-medium tabular-nums">
                       {Number(v.porcentaje).toFixed(1)}%
                     </td>
                     <td className="py-1.5 opacity-70">{v.registradoPor}</td>
