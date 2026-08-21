@@ -3,7 +3,95 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 11 de agosto de 2026.
+Ultima revision: 21 de agosto de 2026.
+
+## Lo ultimo: 297 commits que este documento no habia visto (21 de agosto)
+
+Entre el 12 y el 21 de agosto entraron **297 commits** y este documento se
+quedo en el 12. **Lo construido esta en el anexo «del 11 al 21 de agosto» de
+[`ESTADO.md`](ESTADO.md)**; aqui solo va lo que sigue abierto.
+
+Dos avisos antes de leer nada de mas abajo:
+
+> **El presupuesto cambio de sentido el 20 de agosto.** Ya no se importa el
+> contractual: se carga el REAL y el contractual se genera desde el. La
+> pantalla `/obras/[id]/importar` **ya no existe**, asi que todo lo que la
+> seccion 6 dice sobre el importador describe un flujo retirado.
+
+> **Los gastos generales dejaron de ser de la obra el 21 de agosto.** Con
+> ellos se retiraron la pantalla del criterio, `criterio-obra.service`,
+> `bolsa-gastos-generales` y `deficit-estructura`. Nada de eso existe ya.
+
+### Lo que hay que mirar primero
+
+1. **`835d988 WIP antes de reinstalar Claude` quedo a medias.** Es lo unico
+   del repositorio que esta sin terminar, y no lo delata nada: typecheck,
+   lint y las 27 pruebas de `encargos.service` pasan, y la migracion
+   `20260821040000_dos_correlativos_de_valorizacion` esta aplicada.
+
+   Lo que hizo: `ValorizacionEncargo` gana `projectId`, `numeroObra` y
+   `numeroEncargo`. **Dos series independientes**: la de la OBRA —que es EL
+   numero del papel, porque el documento lo emite la obra— y la del ENCARGO,
+   que es por encargo y no por proveedor, porque el mismo contratista puede
+   llevar dos frentes en la misma obra. La migracion esta escrita a mano
+   porque ademas RELLENA las que ya existian, ordenando por `fecha`,
+   `createdAt` e `id` —el tercer desempate no es adorno: sin un criterio
+   total, `ROW_NUMBER` podria dar dos ordenes distintos en dos ejecuciones—.
+   `valorizarEncargo` asigna los dos dentro de la transaccion y captura el
+   P2002 con un mensaje que invita a repetir.
+
+   **Lo que falta, y es lo que hay que hacer antes de seguir:**
+
+   - **No hay ni una prueba del comportamiento nuevo.** El doble de Prisma
+     del archivo de pruebas se reescribio entero para esto —implementa de
+     verdad `aggregate` y las DOS unicidades, y gana una `puerta` para
+     forzar que dos altas lean el maximo antes de que ninguna escriba— pero
+     **`estado.puerta` no la usa ningun test y `choqueDeUnicidad` no la
+     afirma ninguno**. El andamio esta montado y las pruebas sin escribir.
+     Hacen falta al menos tres: que las dos series avancen por separado, que
+     no se crucen los alcances (`projectId` para una, `encargoId` para la
+     otra) y que el choque de unicidad devuelva el mensaje de reintentar.
+   - **Nadie lee los dos numeros.** `obtenerEncargo` y `listarEncargos` no
+     los piden en su `select`, `EncargoDetalle.valorizaciones` no los lleva
+     y la tabla «Historial de valorizaciones» sigue teniendo cuatro columnas
+     —corte, % acumulado, registrado por, nota— sin ninguna de numero. Todo
+     el motivo del cambio («es EL numero del papel») no se ve por ningun
+     lado.
+   - De paso, ese commit arrastra un `prisma format` que reflujo
+     `schema.prisma` entero y **quito las lineas en blanco de los comentarios
+     largos**. Es ruido, no un fallo, pero explica por que el diff del
+     esquema son 220 lineas.
+
+2. **Rotar la contrasena del FTP de produccion.** Hasta el 12 de agosto viajo
+   en cada despliegue contra un extremo sin verificar. La verificacion ya
+   esta puesta; la credencial sigue sin cambiar.
+
+3. **Los umbrales de `lib/capacidad.ts` siguen sin contrastar con datos.** El
+   20 de agosto la sobrecarga se movio de 1,3 a 1,4 por criterio, no por
+   medicion. `storage/contrastar-umbrales.ts` responde cuando haya suficientes
+   semanas cerradas.
+
+4. **GCM no calcula ruta critica ni holgura.** Es lo que sigue faltando de la
+   opcion B de la seccion 3: las tareas que entran por Excel o por teclado
+   nacen `esCritico: false` y `holguraInferida: true`. Sin red de
+   precedencias propia, la regla de convergencia de los hitos predictivos
+   tambien seguira muda.
+
+5. **Lo que quedo abierto de la auditoria del 10 de agosto** (seccion 6c):
+   los puntos 3, 4, 5, 6, 10, 11 y 12 siguen en pie. El 6 —los hitos entran
+   al denominador del PPC— se comprobo el 21 de agosto y sigue: `esHito` no
+   aparece en `plan-semanal.ts` y `TareaProgramada` sigue sin declararlo.
+
+6. **El enlace del correo sigue aterrizando en el login y no vuelve a la
+   obra.** No existe ningun `?siguiente=` en el proyecto.
+
+7. **Notas y Recordatorios (seccion 5) no se empezo.** No hay modelo, ni
+   permisos `nota:*`, ni pantalla.
+
+8. **Skills propias de GCM**: sigue sin plan escrito. `.claude/skills` solo
+   tiene las de Prisma.
+
+---
 
 ## Lo ultimo: el pase de obra ya se puede usar (11 de agosto)
 
@@ -105,23 +193,35 @@ abajo.
      Personal lo dice de una mirada: si hay una fila `correo` y ninguna `GCM`,
      el suscrito es un contacto externo y el comportamiento era correcto —los
      de fuera no tienen bandeja donde ensenarselo—.
-   - **El enlace del correo aterriza en el login y no vuelve a la obra.** No
-     existe ningun `?siguiente=` en el proyecto ni funcion que valide rutas
-     internas; habria que escribirla (rechazar `//host`, esquema absoluto) y
+   - **El enlace del correo aterriza en el login y no vuelve a la obra.**
+     **Comprobado el 21 de agosto: sigue igual.** No existe ningun
+     `?siguiente=` en el proyecto ni funcion que valide rutas internas; habria que escribirla (rechazar `//host`, esquema absoluto) y
      propagar el destino tambien por el paso de 2FA, que hoy solo lleva la
      cookie del desafio.
-   - **Fase B: que el proveedor responda desde el correo.** Decidido con el
-     usuario: **enlace de un solo uso sin clave** (patron de
-     `PasswordResetToken`, no el pase con codigo, porque un proveedor que solo
-     tiene que decir "llega el jueves" no va a entrar a ningun portal). Ojo:
-     `MIMES_PERMITIDOS` en `evidencia.service` es CERRADO a imagenes, asi que
-     un PDF no entra hoy y hay que decidirlo antes.
+   - ~~**Fase B: que el proveedor responda desde el correo.**~~ **HECHO el 19
+     de agosto de 2026, y por otro camino.** No hizo falta enlace de un solo
+     uso: `correo-entrante.service` LEE el buzon de la empresa por IMAP y ata
+     la respuesta a su conversacion por el `Message-ID` que GCM puso al
+     enviar. Se descarto la direccion marcada (`obras+TOKEN@`) porque depende
+     de que el proveedor de correo acepte subdirecciones, y el que no las
+     acepte rebota en silencio. **Si el token no aparece, la respuesta se
+     guarda en la ficha del contratista SIN obra**: meterla en la obra
+     equivocada es peor que no meterla.
+     - Sigue en pie lo del PDF: `MIMES_PERMITIDOS` en `evidencia.service`
+       sigue CERRADO a imagenes. Los PDF entran solo como constancia de pago,
+       que tiene tabla y almacen propios.
 
 9. **Skills propias de GCM** con `/batch`: una por dominio, cada una en su
    worktree. Investigacion hecha el 11 de agosto, plan sin escribir.
+   **Comprobado el 21 de agosto: sigue sin empezar**, `.claude/skills` solo
+   tiene las de Prisma.
 
-Y sigue sin existir el **parte diario**, que es el Bloque 1 entero de la
-matriz de control y lo que le falta a GCM frente a Foco en Obra.
+~~Y sigue sin existir el **parte diario**~~ **HECHO el 11 de agosto de 2026**
+y muy crecido desde entonces: todas las partidas en un envio agrupadas por
+capitulo (`lib/parte-diario.ts`), la regla de que una casilla vacia no escribe
+nada, `+10` para sumar frente a `80` para dejar al 80%, aviso de avance fuera
+del plan y fotos por partida y dia. Ver el anexo del 21 de agosto en
+`ESTADO.md`.
 
 > **DESPLEGAR CON LA APP ABIERTA ROMPE LA PESTANA** (visto el 11 de agosto).
 > Sintoma: «This page couldn't load» al pulsar cualquier boton —le paso al
@@ -407,25 +507,54 @@ Lo que falta:
 - **Requisitos de cierre**: no permitir cerrar con valorizaciones, pagos o
   tareas pendientes; listar lo que falta igual que al arrancar.
 - **Acta de cierre** con lecciones aprendidas (auditoria y aprendizaje).
-- **Repositorio de obras cerradas**: listar, buscar y revisar en solo
-  lectura, con estadisticas comparadas.
+- **Repositorio de obras cerradas**: sigue sin existir como pantalla. Lo que
+  SI hay desde el 16 de agosto es la **restauracion**: un respaldo se vuelve a
+  cargar y la obra entra como COPIA DE AUDITORIA (`archivadaEn` puesto), que
+  no admite un solo cambio. Falta listar, buscar y comparar.
 - **¿Reabrir?** Hoy una obra cerrada por error no tiene salida. Propuesta:
   permitirlo con permiso propio y quedando en la auditoria. Sin decidir.
-- **Eliminar obra**: el usuario borro su obra de prueba por SQL; en la app no
-  debe existir el borrado cuando este en produccion real.
+- ~~**Eliminar obra**~~ **HECHO el 12 de agosto de 2026, y se decidio al
+  reves de lo anotado aqui**: si existe el borrado en la app, con cinco
+  puertas —permiso innegociable, obra CERRADA, nombre tecleado, contrasena de
+  quien borra, y un respaldo de las ultimas 24 horas que incluya los
+  archivos—. Se borra por `ORDEN_BORRADO`, el inverso exacto del orden del
+  respaldo, con prueba que lo fija. Sobreviven `audit_logs` y
+  `respaldos_obra`, que son la constancia de que la obra existio.
 
-## 3. Cronograma: opcion B (decidida el 10 de agosto)
+## 3. Cronograma: opcion B (decidida el 10 de agosto) — CASI CERRADA
+
+> **Al 21 de agosto queda UNA cosa de esta lista: la ruta critica y la
+> holgura.** Todo lo demas se hizo entre el 15 y el 20 de agosto, y ademas por
+> una via que este apartado no preveia: **la EDT se genera desde el
+> presupuesto** y se sincroniza sola detras de las cinco operaciones que lo
+> cambian. Hay tres puertas de entrada (MS Project/ProjectLibre, Excel y
+> teclado), motor de fechas contra el calendario laboral de la obra, duracion
+> en dias de trabajo, y la EDT sale en XML para planificarla en ProjectLibre y
+> volver. Ver el anexo del 21 de agosto en `ESTADO.md`.
 
 Project **solo siembra** el plan una vez; despues se edita y se corta siempre
 desde la app. Para que eso sea posible GCM tiene que calcular por si mismo lo
 que hoy lee del archivo:
 
-- `porcentajePlaneado` por tarea a una fecha dada.
-- Camino critico (`esCritico`) y holgura.
-- Motor de fechas que respete el calendario laboral de la obra
-  (`calendario.service` ya guarda los dias laborables).
-- Editor manual con dependencias y recalculo automatico (ya decidido:
-  arrastrar y soltar llega despues, el motor es lo primero).
+- ~~`porcentajePlaneado` por tarea a una fecha dada.~~ HECHO:
+  `planeadoEnFecha`, y lo usan la curva, el panel y el informe, para que no
+  puedan discrepar.
+- **Camino critico (`esCritico`) y holgura. LO UNICO QUE SIGUE ABIERTO.** Las
+  tareas que entran por Excel o por teclado nacen `esCritico: false` y
+  `holguraInferida: true`, igual que se niega a deducirla el lector de
+  Project. Sin esto tampoco puede sonar la regla de convergencia de los hitos
+  predictivos, que hoy calla diciendo que el cronograma vigente tiene 0
+  enlaces.
+- ~~Motor de fechas que respete el calendario laboral de la obra.~~ HECHO: la
+  duracion se calcula desde las fechas en dias de TRABAJO con el calendario de
+  la obra, y la cifra la calcula el SERVIDOR para no depender del reloj del
+  navegador.
+- ~~Editor manual con dependencias y recalculo automatico.~~ HECHO a medias y
+  a proposito: `cronograma-manual.service` deja crear, editar y borrar tareas
+  con niveles y con recalculo de resumenes, con uid del contador monotono de
+  la obra. **No hay editor de dependencias** —sin el no hay red de
+  precedencias, que es lo que bloquea el punto anterior— y sigue sin haber
+  arrastrar y soltar, que era lo ultimo de la lista.
 
 ## 4. Evidencia fotografica con QR (plan aprobado el 10 de agosto)
 
@@ -500,7 +629,13 @@ primero ortografia tanda 2 y plantilla Excel, luego esto.
   - **AL RETOMAR**: probar en obra el ciclo del QR —imprimir el codigo de la
     obra, escanearlo con el telefono y subir una foto desde el menu—. Es lo
     unico que no se puede verificar desde aqui.
-- **Fase B**: pestana Evidencia de la obra: vista agregada con filtros.
+- **Fase B**: pestana Evidencia de la obra, vista agregada con filtros.
+  **Sigue abierta**, y conviene no confundirla con la **galeria** que si entro
+  el 15 de agosto: son mundos aparte por decision del dueno —la evidencia es
+  registro probatorio inmutable; la galeria es el escaparate, se describe, se
+  publica foto a foto y se borra si salio mal, y tiene un enlace publico que
+  ve el CLIENTE—. Curar el escaparate no puede tocar el archivo probatorio, y
+  por eso **no existe camino de una a otra**.
 - **Fase C**: estandares visuales (quality gates), dentro de Fase 2 documental.
 - **Fase D**: rol cliente solo lectura + reconocimiento de cuadrillas.
 
@@ -532,7 +667,15 @@ Orden de entregas acordado: plantilla Excel → infraestructura de archivos
 (hash+purga) + Evidencia Fase A con QR → Notas E1 (CRUD + pestana + widget
 de proximos recordatorios) → Notas con adjuntos → Notificaciones.
 
-## 6. Importacion de presupuesto (Excel)
+## 6. Importacion de presupuesto (Excel) — SUPERADA el 20 de agosto
+
+> **Este apartado describe un flujo retirado.** Desde el 20 de agosto el
+> presupuesto contractual **no se importa**: se carga el REAL con su plantilla
+> en `/obras/[id]/meta` y el contractual se GENERA desde el, recargando cada
+> capitulo. `/obras/[id]/importar`, `ImportadorPresupuesto` y `VistaPrevia`
+> estan borrados. Lo que sigue vivo es `analizarExcel`, que es quien lee el
+> Excel del real, y su plantilla, que ahora trae formulas con su resultado, 60
+> filas preparadas y las celdas calculadas bloqueadas.
 
 - ~~Plantilla ideal descargable~~ HECHA el 10 de agosto: se genera desde
   codigo (`src/lib/plantilla-presupuesto.ts`), con test de ida y vuelta
@@ -559,8 +702,11 @@ Ollama en backend) y se DESCARTO con el usuario de acuerdo:
 Lo que SI se hara, en este orden:
 1. Seguir extendiendo la asistencia determinista (componente `Explicacion`,
    riel de ubicacion, textos tipo `textoSinCosto`) a cada concepto delicado.
-2. **Busqueda en el manual dentro de la app**: panel de ayuda que busca
-   sobre MANUAL.md. Entra despues de la evidencia con QR.
+2. ~~**El manual dentro de la app**~~ **HECHO el 18 de agosto de 2026**:
+   `/manual`, 23 capitulos, sin puerta de permisos —quien menos permisos tiene
+   es quien mas lo necesita—, y una prueba que exige que cada seccion del menu
+   diga en que capitulo se explica. **Falta la BUSQUEDA**: hoy se navega por
+   el indice, y no hay panel que busque sobre el texto.
 3. IA conversacional solo si algun dia es requisito de venta, y entonces
    via API de pago (p. ej. Claude Haiku) anclada a los datos de la obra
    —decision de producto para ese momento—.
@@ -627,7 +773,10 @@ estaba armado pero no se habia disparado.
    *El defecto era*: las partidas de adicional nacen con `parcial: null` a
    proposito, pero el AC si contaba sus ordenes, asi que **el CPI se degradaba
    solo** conforme se aprobaban adicionales legitimos.
-3. **Reabrir + reguardar borra cumplido/causa/notaCierre** (ALTO):
+3. **Reabrir + reguardar borra cumplido/causa/notaCierre** (ALTO) — **sigue
+   abierto al 21 de agosto, pero medio cerrado**: `CamposPreservables` rescata
+   ya `cantidadEjec`, que se anota al CERRAR; siguen sin rescatarse
+   `cumplido`, la causa y la nota de cierre.
    `mapaPreservablePorUid` rescata los campos operativos pero no los del
    cierre. PPC a 0 y Pareto sin causas, mientras el avance escrito se queda.
 4. **Eliminar una semana deja avances huerfanos** (ALTO): `onDelete: SetNull`
@@ -635,7 +784,13 @@ estaba armado pero no se habia disparado.
    **nadie los puede reemplazar nunca** (la limpieza filtra por plan).
 5. **Curva S / EVM leen otro conjunto de tareas** que la pantalla de avance
    (base vs vigente): dos cifras con el mismo nombre en la misma pantalla.
-6. **Los hitos entran al Lookahead y al PPC**: `tareasDeLaSemana` filtra
+6. **Los hitos entran al Lookahead y al PPC** — **comprobado el 21 de agosto:
+   SIGUE ABIERTO.** `esHito` no aparece en `lib/plan-semanal.ts` y
+   `TareaProgramada` sigue sin declarar el campo. Lo que si se cerro por el
+   camino es el hermano de este defecto: **un RESUMEN ya no puede entrar en el
+   Lookahead ni pidiendolo** (`65e175d`), porque `analizar` comprueba en el
+   servicio —no en la pantalla— que los uid que manda el navegador no sean
+   resumen. El original decia: `tareasDeLaSemana` filtra
    `esResumen` pero no `esHito`, y `TareaProgramada` ni declara el campo. Entra
    al denominador del PPC. Otros modulos (`mapeo.service`, `control-avance`) SI
    lo excluyen, con el razonamiento escrito.
@@ -643,14 +798,31 @@ estaba armado pero no se habia disparado.
    > siembran 7 restricciones a un evento de duracion cero, porque no se
    > siembra ninguna. Lo que sigue abierto es que el hito entre al denominador
    > del PPC y a la ventana del Lookahead.
-7. **Celda de importe editable en filas ALCANCE** (`TablaPartidas.tsx`):
-   `parcialCalculado` solo es true para PRECIOS_UNITARIOS, y
-   `actualizarPartida` no comprueba `tipo` ni `modalidad`. Un ALCANCE con
-   importe suma por encima del dinero de su partida padre.
-8. **El avance puede retroceder** sin aviso (no hay control de monotonia).
-9. **`cantidadEjec` no alimenta nada**: es la medicion mas precisa que hay
-   —m2 reales contra comprometidos— y muere ahi. Se puede cerrar con 60 de
-   120 y marcar cumplido.
+7. ~~**Celda de importe editable en filas ALCANCE**~~ **ARREGLADO el 15 de
+   agosto de 2026** (`ac717e6`), y en el SERVICIO, no en la pantalla: se
+   rechazan importe, metrado y precio en filas de alcance, y al convertir a
+   ALCANCE se limpian las tres cifras y no solo el importe —antes bastaba
+   volver a precios unitarios para que el recalculo resucitara un importe que
+   la fila no debe tener—. Un capitulo tampoco acepta ya modalidad. El efecto
+   era peor de lo anotado aqui: no sumaba de mas, **borraba** del costo
+   directo el precio cerrado de su partida padre, porque `aportantes` hace que
+   cualquier importe positivo cubra a sus ancestros.
+8. ~~**El avance puede retroceder** sin aviso~~ **ARREGLADO el 18 de agosto
+   de 2026.** En el parte del dia, si alguna partida va a quedar POR DEBAJO de
+   donde estaba se listan una a una con su antes y su despues, y el boton no
+   se activa hasta marcar «es una correccion». Y el cierre de la semana
+   **nunca propone un valor por debajo del que ya tiene la tarea**: un
+   retroceso arrastraria la curva S hacia atras y eso lo decide una persona.
+   Se avisa y no se impide, como el resto de GCM.
+9. ~~**`cantidadEjec` no alimenta nada**~~ **ARREGLADO el 12 y el 18 de
+   agosto de 2026.** Primero, **la cantidad manda sobre la casilla** al
+   cerrar, con corte EXACTO —119 de 120 no esta cumplido, la misma dureza que
+   ya rige el PPC—, y la deduccion vive en el SERVICIO para que ninguna otra
+   via de cierre pueda volver a escribir la contradiccion. Despues, de la
+   cantidad se deduce el **% alcanzado**, pero SOLO cuando hay META pactada,
+   que ya viene en porcentaje: convertir metrados en porcentajes parecia
+   exacto y habria escrito un 100 en la curva S en cuanto el compromiso fuera
+   de otra tarea o cubriera dos partidas.
 10. **`MapeoTareaPartida` no tiene `fraccion`** (su hermano `EncargoPartida`
     si). Hoy `importePorTarea` cuenta la partida entera en cada tarea que la
     mapea y la pantalla de mapeo ya suma de mas. **Bloqueante antes de
@@ -1377,9 +1549,13 @@ reglas solo se han visto en pruebas.
 
 ## 8. Documentacion
 
-- **`MANUAL.md` quedo atras el 10 de agosto.** Describe el panel como si
-  cargara los once modulos siempre, y no menciona las pestanas en dos niveles
-  (Plan / Ejecucion / Compras) ni el menu de empresa agrupado.
+- **`docs/MANUAL.md` esta desfasado y ahora ademas compite con otro manual.**
+  Desde el 18 de agosto el manual de verdad vive DENTRO de la app (`/manual`,
+  23 capitulos) y tiene una prueba que lo ata al menu. El `MANUAL.md` de
+  `docs/` describe un panel y unas pestanas que ya no existen. **Hay que
+  decidir si se retira o se convierte en otra cosa**; dos manuales que se
+  contradicen es exactamente la grieta que el proyecto se ha pasado el mes
+  cerrando en otros sitios.
 - **Faltan capturas y videos.** Se pidio que el manual fuera «el super
   tutorial para dummies»; hoy es solo texto.
 
@@ -1389,14 +1565,41 @@ reglas solo se han visto en pruebas.
 
 Anotado antes del 10 de agosto, sin tocar:
 
-- **Limite de intentos por IP en el login.**
-- **Limite de peticiones a SUNAT.**
-- **Cinco consultas sin filtro por empresa**: `obras.service` (lineas 196,
-  233, 402), `tablero.service` (427) y `actividad.service` (76).
-- **Fuga por el texto del error de correo duplicado** en el alta NORMAL de
-  usuarios. En el alta de constructoras ya esta resuelta con
-  `CORREO_NO_DISPONIBLE`: el mensaje no debe permitir averiguar si una persona
-  ya es usuaria de otra empresa.
+- ~~**Limite de intentos por IP en el login.**~~ **HECHO el 12 de agosto de
+  2026**, contado sobre los `LOGIN_FAILED` que la auditoria ya guardaba, asi
+  que no hizo falta migracion. **Y arreglado el 17**: leia la PRIMERA entrada
+  de `x-forwarded-for`, que es justo la que escribe quien llama, asi que el
+  limite estaba puesto y no protegia de nada. Se lee la ULTIMA, y se arreglo
+  en los tres sitios (acceso, recuperacion y pase de obra). De paso se cerro
+  algo peor que no estaba anotado: el bloqueo por cuenta **no caducaba**, asi
+  que una cuenta con cinco fallos quedaba a merced de cualquiera para siempre.
+- ~~**Limite de peticiones a SUNAT.**~~ **HECHO el 19 de agosto de 2026**
+  (`lib/limitador.ts`): las consultas de RUC ya no pueden tumbar la IP de
+  todos.
+- ~~**Cinco consultas sin filtro por empresa**~~ **CERRADO el 12 de agosto de
+  2026** con el barrido de `aislamiento.test.ts`, que dobla Prisma con un
+  `Proxy` y comprueba la propiedad de verdad —toda consulta lleva el
+  `companyId` DE LA SESION— sobre las diez familias de servicios. Encontro una
+  fuga que no estaba en esta lista (`obtenerLookahead`).
+  - **Pero el 19 de agosto aparecio otra que SI estaba, y en produccion**:
+    `actividad.service` resolvia los NOMBRES de usuario sin filtrar, y el
+    panel de una constructora recien dada de alta ensenaba el nombre de
+    alguien de otra. Las pruebas no lo vieron porque el doble tenia una sola
+    empresa dentro. **La prueba nueva tiene DOS y afirma sobre el `where`, no
+    sobre lo que devuelve.**
+- ~~**Fuga por el texto del error de correo duplicado**~~ **HECHO el 20 de
+  agosto de 2026**: un correo que ya es de otra constructora lo dice sin
+  revelar de quien, en vez de parecer una fuga. Ojo al contexto: desde el
+  20/08 el correo es unico POR EMPRESA, no en toda la instalacion, asi que la
+  misma persona puede tener cuenta en dos constructoras.
+
+Nuevo, y sigue abierto:
+
+- **Rotar la contrasena del FTP de produccion.** Hasta el 12 de agosto viajo
+  en cada despliegue contra un extremo sin verificar. La verificacion ya esta
+  puesta; la credencial no se ha cambiado.
+- **`x-forwarded-for` sigue siendo un supuesto.** Que el proxy la escriba en
+  vez de dejar pasar la del cliente no lo puede garantizar la aplicacion.
 
 ---
 
@@ -1407,10 +1610,10 @@ Anotado antes del 10 de agosto, sin tocar:
 | — | Ventana del Lookahead **por obra** (hoy solo en la URL) | Si, una columna |
 | — | Empresa de demostracion para el tutorial | No: identificarla por variable de entorno |
 | — | Sombrear el area entre plan y real en la curva S | No |
-| — | Exportar tablas a Excel (presupuesto y órdenes) —pedido del 10 de agosto al revisar una lista de librerías de R: es lo único de esa lista que GCM no cubre aún— | No |
+| — | Exportar tablas a Excel (presupuesto y órdenes) —pedido del 10 de agosto—. **Parcial al 21 de agosto**: la propuesta al cliente sale en Excel y el informe semanal en CSV; el presupuesto y las órdenes siguen sin exportarse | No |
 | **Fase 2** | Documental: planos, protocolos y guias, con validacion automatica de restricciones | Si |
 | **Fase 3** | Sectores de color en el PTS y aviso cuando dos cuadrillas coinciden en el mismo sitio | Si |
-| **Fase 4** | «Cumplio» calculado desde la cantidad ejecutada, linea de meta, causa raiz | No |
+| ~~**Fase 4**~~ | ~~«Cumplio» calculado desde la cantidad ejecutada, linea de meta, causa raiz~~ **HECHA el 12 y el 18 de agosto** | No |
 | **Fase 5** | Motor de reglas | Por definir |
 
 ---
@@ -1419,9 +1622,13 @@ Anotado antes del 10 de agosto, sin tocar:
 
 Para que ninguna sesion futura pierda tiempo redescubriendolas:
 
-- **No hay acceso de escritura fuera de la carpeta del proyecto.** Los
-  archivos de memoria del perfil (`~/.claude/.../memory/`) no se pueden
-  actualizar desde aqui. Por eso la continuidad vive en `docs/`.
+- ~~**No hay acceso de escritura fuera de la carpeta del proyecto.**~~
+  **Falso desde el 21 de agosto de 2026**: los archivos de memoria del perfil
+  (`~/.claude/projects/.../memory/`) si se pueden escribir. Aun asi **la
+  continuidad sigue viviendo en `docs/`**, y a proposito: la memoria del
+  perfil se perdio entera al reinstalar Claude el 20 de agosto, y `docs/` no.
+  La memoria sirve para lo que no se deduce del repositorio; el estado del
+  proyecto va aqui.
 - ~~No se pueden ejecutar `tsc`, `vitest` ni `lint`.~~ **RESUELTO el 10 de
   agosto: SI se pueden.** La causa nunca fue que faltaran las herramientas,
   sino la directiva de ejecucion de PowerShell, que bloquea los envoltorios

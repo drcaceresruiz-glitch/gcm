@@ -6,11 +6,17 @@ qué está construido así.
 **Lo que FALTA vive en [`PENDIENTES.md`](PENDIENTES.md)**, aparte, para poder
 tacharlo sin reescribir esto.
 
-Última actualización: 10 de agosto de 2026.
+Última actualización: 21 de agosto de 2026.
 
-> **Las secciones 3 y 6 de abajo se escribieron el 8 de agosto.** Lo ocurrido
-> desde entonces está en el anexo que sigue; ante una contradicción, manda el
-> anexo.
+> **Este documento se escribió por capas y las más nuevas van arriba.** Las
+> secciones numeradas del final son del 8 de agosto; los anexos recogen lo
+> ocurrido después. **Ante una contradicción, manda siempre el anexo más
+> reciente**, que es el del 11 al 21 de agosto.
+>
+> Entre el 12 y el 21 de agosto entraron 297 commits y el sistema cambió de
+> forma en cosas de fondo —el contractual ahora se genera desde el presupuesto
+> real, y los gastos generales dejaron de ser de la obra—. Si algo de más
+> abajo te suena raro, comprueba primero si el anexo lo desmiente.
 
 ---
 
@@ -77,6 +83,532 @@ cuota de disco y un bug de Prisma inexistente.
 Para la proxima: **mirar la pantalla** (captura o `.animate-pulse`) antes de
 teorizar, y comprobar `document.hidden` antes de creerse nada de lo que diga
 un navegador automatizado.
+
+---
+
+## Anexo — del 11 al 21 de agosto de 2026
+
+**Este anexo manda sobre todo lo que sigue.** Entre el 11 y el 21 de agosto
+entraron **297 commits**, 403 archivos nuevos y 35 migraciones. Las secciones
+3 y 6 de abajo describen el sistema del 8 de agosto y se conservan porque
+cuentan por que se decidio lo que se decidio, no lo que hay hoy.
+
+Lo mas importante que hay que saber antes de tocar nada:
+
+1. **El presupuesto cambio de sentido.** Ya no se importa el contractual: se
+   carga el REAL y el contractual se GENERA desde el, recargando cada capitulo.
+2. **Los gastos generales dejaron de ser de la obra** (21 de agosto). La obra
+   gestiona UNA bolsa y nada mas.
+3. **Una constructora entera se puede sacar en un archivo y meter en otra
+   instalacion.** Es el puente hacia la version instalable.
+4. **Cada empresa tiene su correo, su logo y su marca.** GCM se queda en el pie.
+5. **Cada quien ve solo sus obras.** `ProjectMembership` dejo de ser una tabla
+   vacia.
+
+---
+
+### 1. El dinero: el contractual sale del real, no al reves
+
+Hasta el 20 de agosto se importaba un Excel con el presupuesto que ve el
+cliente y la meta se cargaba aparte. Ahora el orden es el del trabajo real:
+
+    presupuesto REAL (lo que cuesta)  ->  % de recargo por capitulo
+                                      ->  presupuesto CONTRACTUAL (lo que paga
+                                          el cliente)  ->  linea base aprobada
+
+- `src/lib/contractual-desde-meta.ts` hace la conversion, puro y sin base.
+  **Tres reglas que se sostienen entre si**: el recargo se aplica a las
+  PARTIDAS y nunca al capitulo (un capitulo es un titulo, su importe es la suma
+  de lo que cuelga; recargarlo aparte contaria el dinero dos veces); cada
+  partida hereda el recargo del ancestro MAS CERCANO que tenga uno; y lo que no
+  se puede recargar se pasa tal cual y **se avisa** — una partida que entra al
+  contrato a precio de costo es una decision, no un accidente.
+- `PresupuestoMetaItem.porcentajeRecargo` guarda el recargo por capitulo
+  (migracion `20260820190000_recargo_del_capitulo`).
+- `contractual.service.ts` y `/obras/[id]/contractual` generan con vista previa.
+- **Se borro `/obras/[id]/importar`** con su importador y su vista previa (848
+  lineas menos). Ojo: el aviso de siguiente paso siguio apuntando ahi y dejo en
+  produccion un boton principal que abria un «Aqui no hay nada». Desde entonces
+  hay un guardian que lee el fuente y comprueba que **cada camino sugerido
+  tenga su `page.tsx`**.
+- `baselineVersion` de la meta pasa a OPCIONAL: el real ya puede existir sin
+  contractual (`20260820200000_meta_puede_nacer_sin_contractual`).
+
+### 2. La cascada comercial y la propuesta al cliente
+
+`calcularCascadaComercial` (`src/lib/presupuesto.ts`) **convive** con
+`calcularCascada` en vez de sustituirla, para que una revision anterior al
+20/08 siga imprimiendo la misma cifra. Hay una prueba que fija que con
+descuento cero y sin retencion las dos dan lo mismo al centimo.
+
+El orden es el que pide SUNAT: costo directo + gastos generales + utilidad =
+subtotal, menos descuento = **valor de venta**, mas IGV = **precio de venta**.
+La revision guarda ahora **como tributa** —IGV, retencion de renta y
+descuento— (`20260820210000_cascada_comercial`).
+
+**`/obras/[id]/propuesta`**: el contractual como documento corporativo, con el
+logo de la empresa, el membrete con RUC, los datos del cliente y la cascada.
+Sale de la LINEA BASE, no del arbol vivo: el papel que se le mando al cliente
+no puede cambiar cuando la obra avanza.
+
+- Se elige **como se presenta**, nunca cuanto cuesta: forma de facturar (IGV,
+  recibo por honorarios con retencion descontada o asumida, o sin impuesto),
+  nivel de detalle, moneda y dos textos libres.
+- El nivel de detalle es la parte delicada: **cada aportante se reparte a su
+  ancestro VISIBLE mas profundo**, asi el total es el mismo a cualquier
+  profundidad. La primera version decia «lleva cifra quien no tiene ninguna
+  fila visible debajo» y **escondia 9.711,05 soles** en el presupuesto real de
+  347 partidas, sin dar ningun error.
+- Tambien sale en Excel, por POST (las observaciones no caben en una URL).
+- Dolares es una opcion de PRESENTACION: no hay campo de moneda en la base y
+  sin `tipoCambio` en la revision la opcion sale bloqueada. Inventar una
+  cotizacion seria poner un precio que nadie pacto.
+
+### 3. El presupuesto meta y la bolsa — y su rectificacion del 21 de agosto
+
+El 15 de agosto entro el presupuesto meta con cuatro tablas propias
+(`20260815070851_presupuesto_meta`) y `lib/bolsa.ts`. Decisiones que siguen
+vigentes:
+
+- **La utilidad NUNCA entra en la bolsa.** Viaja y se ensena, pero aparte: no
+  es un ahorro gastable, es el resultado. Hay prueba dedicada.
+- **Lo que la meta no cubre NO es margen**: una partida del contrato sin linea
+  en la meta es gasto que nadie presupuesto, y se marca `sin_meta` linea a
+  linea en vez de contarse como ahorro.
+- `mesesPlazo` se guarda congelado y no se deriva del cronograma: si se
+  derivara, atrasar la obra reescribiria la meta hacia atras y la desviacion de
+  plazo desapareceria de la pantalla.
+- `meta:aprobar` esta en INNEGOCIABLES por **separacion de funciones** —quien
+  ejecuta contra la meta no puede fijarla—, motivo distinto del de los otros
+  dos `*:aprobar`, que son actos contractuales.
+
+**El 21 de agosto se retiro la mitad del modulo.** Los gastos generales SALEN
+del presupuesto meta: la obra gestiona una sola bolsa y punto (`3f203a2`,
+`eef29a1`, `34c883c`). Con ello desaparecen la pantalla `/obras/[id]/criterio`,
+`criterio-obra.service`, `bolsa-gastos-generales`, `deficit-estructura` y la
+hoja de gastos generales de la plantilla — unas 1.300 lineas. Un Excel viejo
+que todavia los traiga **lo dice al cargarlo**.
+
+> Todo lo que este documento o el manual digan sobre «el criterio de gastos
+> generales de la obra», el «resultado de estructura» o la «bolsa de plazo»
+> describe el sistema del 18 al 20 de agosto y **ya no existe**.
+
+### 4. EDT y cronograma: tres puertas, y el presupuesto manda
+
+El cronograma tiene ahora **tres entradas** —MS Project/ProjectLibre, Excel y
+teclado— y encima una cuarta que no es entrada sino derivacion: **la EDT se
+genera desde el presupuesto**.
+
+- **El presupuesto YA es la EDT**: capitulo -> rama, partida -> paquete de
+  trabajo, subpartidas -> tareas. Lo unico que se anade encima son las FECHAS,
+  y solo en las hojas.
+- **Quien lleva el dinero lo decide `aportantes`, no la forma del arbol.** Una
+  revision adversaria tumbo la primera version: decidia por «tiene hijas
+  colgando», y en el presupuesto real eso enlazaba las filas vacias de un
+  capitulo a suma alzada y dejaba el importe sin ninguna tarea que lo cubriera;
+  con un descuento comercial colgando, la rama pesaba -100 en vez de +679 y el
+  avance de la obra BAJABA al ejecutar trabajo. La invariante que lo cierra
+  vive en `edt-dinero.test.ts`: **la suma de lo enlazado ES el costo directo**.
+- **La sincronizacion corre sola** detras de las cinco operaciones que cambian
+  el presupuesto (crear, editar, borrar, renumerar y agrupar). No borra nada
+  —avance, lookahead, fotos y compromisos cuelgan del `uid` sin clave ajena—,
+  no toca fechas y no toca lo tecleado a mano; lo que sobra se lleva al final y
+  se nombra en pantalla. Tres guardas antes de escribir: linea base, partidas
+  en ejecucion que ya no estan en el presupuesto, y la invariante del dinero.
+- **Nada de esto se puede borrar si esta en ejecucion.** Correccion expresa del
+  dueno del producto: si se esta ejecutando hay que pagarle al contratista, y
+  ese pago sale del presupuesto. `partidas-en-ejecucion.ts` lo comprueba en dos
+  saltos (el avance se ancla al uid; lo que lo une a la partida es el mapeo POR
+  CODIGO) y lo llaman las tres puertas.
+- `Project.ultimoUidManual`: contador **monotono** por obra. Reciclar un uid
+  hacia que la tarea nueva heredara el avance de una borrada Y apagaba la
+  alarma de huerfanos a la vez.
+- `TareaCronograma.sinProgramar`: las columnas de fecha no admiten nulo, asi
+  que una EDT recien generada nacia «programada para el primer dia y ya pasada»
+  y publicaba una alerta roja por partida en el tablero y en el informe al
+  cliente.
+- **Reimportar el mismo corte ya no se pierde en silencio**: se compara una
+  HUELLA del plan leido (`cronograma-huella.ts`), no la fecha a secas, y el
+  reemplazo reescribe la version EN SU SITIO para no poner dos puntos en el
+  mismo dia de la curva.
+- **El Gantt dibuja dependencias** y la barra de linea base. Al dibujarlas
+  aparecio que **el lector de MS Project tenia cambiados dos tipos de enlace**
+  (`2->CF` y `3->CC`, al reves) y que **habia una prueba que fijaba el error**.
+  Los cronogramas ya importados conservan el tipo cambiado; se corrige
+  reimportando.
+- **ProjectLibre entra sin pasar por MS Project**, y la EDT sale en XML para
+  planificarla alli y volver (`msproject-xml-escribir.ts`).
+- La duracion se calcula desde las fechas en dias de TRABAJO, con el calendario
+  laboral de la obra.
+
+**Lo que sigue sin existir**: GCM no calcula ruta critica ni holgura. Las
+tareas que entran por Excel o por teclado nacen con `esCritico: false` y
+`holguraInferida: true`, igual que se niega a deducirla el lector de Project.
+
+### 5. Hitos de obra
+
+`HitoObra` (`20260817065131_hitos_de_obra`) es tabla propia y no columnas en la
+tarea: las versiones del cronograma se sustituyen enteras al importar, y un
+responsable escrito dentro de la tarea se perderia el jueves siguiente. Se
+ancla en `(projectId, uid)` sin clave ajena, y a la partida por CODIGO.
+
+- **Un hito se ANADE como fila nueva, nunca se convierte una partida en hito**:
+  `esHito` saca la fila de la valorizacion en nueve sitios y su importe se
+  quedaria sin ninguna tarea que lo cubra. Ese mismo agujero entro dos veces
+  mas por otras puertas —el importador de Excel deduce hito de una duracion
+  cero, y la casilla «Es un hito» del alta manual— y las dos avisan ahora en
+  rojo cuando la fila lleva codigo de partida.
+- La sincronizacion **intercala** el hito detras de TODA la rama de su partida
+  y AL MISMO NIVEL: mas adentro convertiria en resumen a la fila de delante.
+- Avisos propios (`HITO_CERCA` suena una sola vez, `HITO_VENCIDO` insiste con
+  el dia dentro de la clave). Para que llegaran hubo que abrir dos puertas del
+  motor de avisos que daban por hecho que todo aviso pertenece a un flujo de
+  restricciones.
+- **Hitos predictivos** (`hitos-predictivos.service.ts`): seis reglas que
+  PROPONEN, ninguna inserta. Tres estan mudas hoy y **eso es la mitad del
+  valor**: el CPI calla porque la cobertura del mapeo real es del 1,4% y la
+  compuerta pide 60%; la convergencia, porque el cronograma vigente tiene 0
+  enlaces; y los recursos, porque GCM no guarda dotacion ni rendimiento. Cada
+  regla muda explica su hueco **con el numero real**.
+
+### 6. Last Planner, completo
+
+- **Tablero semanal** (`/plan-semanal/[planId]/tablero`): una fila por
+  contratista, una columna por dia habil. `CompromisoSemanal` gana `diaInicio`
+  y `diaFin` (ISO 1-7, no fechas). Sin arrastrar y soltar a proposito: tiene
+  que funcionar en el movil del residente, con guantes y a pleno sol.
+- **Kanban** (`/obras/[id]/kanban`), SEIS columnas: sin analizar -> con
+  restricciones -> lista -> comprometida -> en ejecucion -> cerrada. Es otra
+  DISPOSICION de lo que ya pintan el Lookahead y el tablero, no una fuente
+  nueva. De lectura, con una sola excepcion: «empezo en obra»
+  (`enEjecucionAt`), que es el unico paso del flujo que no tenia otra pantalla.
+- **Capacidad** (`lib/capacidad.ts`): avisa si se promete mas de lo que la obra
+  viene cumpliendo. Se OBSERVA en el historial, no se calcula con rendimientos
+  que no se guardan. **Los umbrales no estan contrastados con datos** y eso
+  esta escrito donde se lee; el 20 de agosto la sobrecarga se movio de 1,3 a
+  1,4. Una semana cerrada VACIA ya no ensucia el denominador —hundia la media y
+  pintaba de rojo a un equipo que no habia cambiado—, pero una semana donde SI
+  se prometio y no se cumplio nada sigue contando: es la peor evidencia que hay
+  y borrarla seria mentir.
+- **Analisis de causa raiz** (`causa-raiz.service.ts`): se pide cuando la causa
+  demuestra ser un PATRON —dos semanas distintas de las ultimas cuatro y al
+  menos tres incumplimientos—, no en cada fallo. Un formulario rellenado por
+  tramite es peor que ninguno. `OTRA` no se analiza nunca: no es una causa, es
+  la ausencia de una.
+- **La cantidad manda sobre la casilla** al cerrar, con corte EXACTO: 119 de
+  120 no esta cumplido. Y el «% alcanzado» se deduce **solo cuando hay META
+  pactada**, que ya viene en porcentaje. La meta en % es obligatoria al
+  comprometer una tarea del cronograma, y solo se exige a los compromisos
+  NUEVOS —decidido por uid contra la base, no por una bandera del formulario—.
+- **SWI, tasa de liberacion y demora por flujo**: los tres salieron del dato
+  que ya estaba. Ninguno mide productividad; miden si el sistema de
+  planificacion funciona. Sin casos devuelven `null`, nunca cero.
+- **La primera semana puede empezar el dia que arranca la obra**
+  (`20260821030000_semana_con_fecha_de_inicio`), y ninguna semana pisa a otra.
+- El Lookahead admite ventanas de **1 y 2 semanas**: una obra corta no tiene
+  tres que mirar.
+
+### 7. El parte del dia
+
+Reportar avance costaba una peticion por tarea; con ~107 tareas, **no es que
+fuera lento: es que no se hacia**, y lo que no se reporta sale en la curva S
+como una obra mas atrasada de lo que esta.
+
+- Todas las partidas en un envio, agrupadas por capitulo
+  (`lib/parte-diario.ts`).
+- **Una casilla vacia no escribe nada.** El peor defecto que ha tenido este
+  sistema fue escribir 100% donde nadie escribio nada.
+- `+10` suma diez puntos; `80` deja la partida al 80%. Antes escribir 10 sobre
+  una partida al 70% la dejaba EN 10, y esa cifra alimenta la curva S, el EV y
+  el SPI: la obra retrocedia en silencio. Si algo va a quedar por debajo, se
+  lista una a una y hay que marcar «es una correccion».
+- Avisa cuando la obra avanza **fuera del plan** («sin comprometer», «N
+  restricciones»), para que el PPC de esa semana se lea sabiendo lo que no
+  cubre.
+- **Fotos por partida y por dia**: `FotoEvidencia` gana un tercer ancla
+  `(uid, fecha)` (`20260818173445_fotos_por_tarea`). Salen en la pantalla del
+  informe y en su impresion; **no** en el PDF, ni en el CSV, ni en el correo.
+
+### 8. El informe semanal
+
+- **Se emite a cualquier fecha**, no solo a un corte, y mide la obra A ESA
+  FECHA: cruza los reportes de fecha menor o igual, asi que el informe de una
+  semana pasada ensena lo que se sabia ESA semana.
+- **Dice que paso en el periodo**, no solo acumulados: puntos ganados, de donde
+  a donde fue la obra y que partidas se movieron. Si ninguna se movio lo dice
+  en ambar — es la noticia mas importante que puede dar un informe semanal.
+- Lleva el bloque de **Last Planner** (PPC, media, Pareto y lo prometido con su
+  visto o su cruz). Va al final: el cliente busca primero el avance.
+- Sale en **PDF** (`pdf-lib`, JavaScript puro: lo imposible en este hosting es
+  Chromium sin ventana, no un PDF), en **CSV**, por **correo** con los dos
+  adjuntos, por **WhatsApp** (enlace `wa.me`, lo manda la persona) y por
+  **SMS**. El eje vertical de la curva va SIEMPRE de 0 a 100: reescalarla a su
+  propio rango convierte dos puntos de diferencia en un abismo, y este
+  documento se le manda al cliente.
+- En SMS la trampa no es la longitud sino el ALFABETO: una sola tilde pasa el
+  mensaje a UCS-2 y el limite cae de 160 a 70. Se transcribe a ASCII antes de
+  medir (`lib/texto-sms`). Cuando no cabe todo se sacrifican partidas, luego el
+  PPC, y lo ultimo el nombre de la obra. **Nunca una cifra**: un «45.2»
+  recortado de «45.20» se sigue leyendo como un numero, y seria falso.
+- **Los nombres de tarea se escapan en los siete correos**: un `<a>` dentro de
+  un nombre se convertia en un enlace de verdad dentro de un correo con el
+  membrete de la empresa.
+
+### 9. Contratistas: del catalogo al pago
+
+- **Catalogo**: rol (proveedor / contratista / ambos), cuenta de **detraccion**
+  aparte de la corriente, busqueda, semaforo de contrato contra UNA obra —GCM
+  no tiene «obra activa»— y **carga por Excel** que rellena huecos y **nunca
+  pisa** lo que ya tiene valor.
+- **Encargos**: el encargo es el contrato marco y las ordenes se emiten CONTRA
+  el. **Comprometido = encargos vigentes + ordenes sueltas aprobadas**; una
+  orden contra un encargo no suma, solo formaliza. El AC del EVM se queda en
+  ordenes aprobadas a proposito: el monto de un encargo es promesa de costo, y
+  meterlo hundiria el CPI el dia de la firma. El encargo propone sus fechas
+  desde el cronograma y el contratista se da de alta sin salir de la pantalla.
+- **Valorizaciones y pagos** (`20260818210348_valorizaciones_y_pagos`):
+  cadencia en dos niveles con herencia (fechas pactadas > `cadenciaDias` del
+  encargo > corte semanal de la obra), pago colgando del encargo con la
+  valorizacion como enlace opcional, y **comprobante en tabla propia** — la
+  evidencia de obra se ensena en la galeria y la galeria tiene un enlace que ve
+  el CLIENTE. Un encargo con avance reconocido ya no se anula: se cierra.
+- **Mensajeria**: correo (con `replyTo`, y por eso su pie ya no dice «no
+  respondas a este mensaje»), SMS y WhatsApp, con historial por contratista.
+  Los adjuntos no se guardan, solo su nombre y tamano; la lista de tipos es
+  CERRADA. Plantillas de mensaje reutilizables por empresa.
+- **Y el contratista puede responder**: `correo-entrante.service.ts` lee el
+  buzon por IMAP y ata la respuesta a su conversacion por el `Message-ID` que
+  GCM puso al enviar. Solo eso; el resto del buzon se ignora y no llega nunca a
+  la base. **Si el token no aparece, la respuesta se guarda sin obra**: meterla
+  en la obra equivocada es peor que no meterla. Un buzon que no se puede leer
+  lo dice la pantalla, no la consola.
+
+### 10. Gerencia y avance contra gasto
+
+- **`/gerencia`**: la cartera de una mirada. La puerta es el ALCANCE
+  (`obrasAsignadas === null`), no un permiso nuevo. Ensena los **adicionales en
+  borrador** —dinero pedido que no cuenta en ningun presupuesto— y el semaforo
+  de partidas criticas. **Dos consultas, sean dos obras o cuarenta**, con
+  prueba que falla si alguien anade una por obra.
+- **Avance contra gasto por capitulo** (`fisico-economico.service.ts`): la
+  pregunta «voy al 40% de obra, por que llevo gastado el 60%». Una partida SIN
+  tarea enlazada no cuenta como 0%: queda fuera de la base y se declara en
+  pantalla. La cobertura del mapeo se dice siempre debajo de la tabla.
+- **Ritmo de avance** (`ritmo.service.ts`): cuanto se gano cada semana y que
+  capitulo lo puso. Distingue `ganado` (cuanto se movio EL capitulo) de
+  `aporte` (cuanto de la OBRA se debe a el).
+- El indice de gerencia se rotula **siempre «SPI por duracion»**, nunca «SPI» a
+  secas.
+
+### 11. El ciclo de vida del dato: respaldo, borrado, restauracion, migracion
+
+Cuatro piezas que se sostienen sobre **un solo catalogo**
+(`lib/respaldo-esquema.ts`), con una prueba que lo compara contra
+`schema.prisma` y exige que **toda tabla del esquema o viaje o este excluida
+CON SU MOTIVO**. Esa prueba ya cazo un fallo que estaba en produccion: el
+respaldo **no llevaba los pagos ni sus constancias**, asi que borrar una obra
+cerrada se llevaba por delante lo que se le pago a cada contratista.
+
+- **Respaldo de obra**: zip con NDJSON por tabla, fotos, LEEME y resumen CSV.
+  Los importes viajan como CADENA con su escala —nunca como numero de JSON, que
+  es un float y aqui es dinero— y las columnas de dia como `YYYY-MM-DD`.
+  Manifiesto firmado con HMAC derivado del `APP_SECRET` con el `companyId` como
+  sal. Solo obras CERRADAS: se lee SIN transaccion y lo unico que impide que
+  salga desgarrado es que nadie pueda escribir.
+- **Borrado de obra**: cuatro puertas —permiso innegociable, obra CERRADA,
+  nombre tecleado y contrasena— mas la quinta, que es un respaldo de las
+  ultimas 24 horas que incluya los archivos. Se borra hoja a raiz por
+  `ORDEN_BORRADO`, el inverso EXACTO del orden del respaldo, con prueba.
+  Sobreviven `audit_logs`, `respaldos_obra` y los SMS anulados: la fila es lo
+  que la empresa gasto y eso se paga.
+- **Restauracion**: la obra vuelve como COPIA DE AUDITORIA (`archivadaEn`
+  puesto) y no admite un solo cambio. Los usuarios **nunca se recrean**
+  —fabricaria un acceso para alguien dado de baja—, los avisos se fuerzan a
+  apagados, y `audit_logs` no se restaura: un libro al que un archivo puede
+  inyectarle filas deja de ser prueba.
+- **Migracion de empresa entera** (`20260819143413_empresa_en_migracion`): la
+  constructora completa en un archivo que **cruza de instalacion**. Se CONGELA
+  primero —no se suspende, porque una empresa suspendida no deja entrar ni a su
+  propio ADMIN— y la guarda entra en las trece escrituras de empresa, con una
+  prueba que lee el codigo como texto y se pone en rojo si alguien anade la
+  catorceava sin ella. La firma es una **FRASE** que elige quien exporta y
+  teclea quien importa, con scrypt y sal por archivo: es lo unico verificable
+  en una maquina que no comparte nada con el origen y **sin que GCM opere un
+  servicio de firma**, que es la condicion para el dia que el producto sea un
+  programa instalado. El **tipo entra dentro de lo firmado**, o una migracion
+  podria presentarse como respaldo «de la casa».
+  - El destino tiene que estar VACIO. Es lo unico que impide mezclar dos
+    constructoras en una.
+  - Los correos: si el correo ya es de OTRA empresa se rechaza la importacion
+    entera. Renombrarlo en silencio fabricaria un acceso que su dueno no sabe
+    que tiene.
+  - Tres fallos que solo aparecieron probando: rutas con barras de Windows
+    dentro del zip, `wbs_items.parentId` autorreferente insertado antes que su
+    padre —**el mismo agujero estaba en la restauracion de UNA obra**, donde
+    funcionaba por suerte— y un `deshacer` que habria fallado en silencio.
+- **Y una constructora se puede eliminar del todo**: congelada, exportada,
+  frase y clave (`empresa-borrado.service.ts`).
+
+### 12. La marca es de la constructora, no de GCM
+
+- **Logo por empresa** (`20260818010707_logo_de_empresa`). Solo PNG y JPG,
+  porque el informe lo dibuja `pdf-lib` y aceptar SVG daria un logo que se ve
+  en la web y no en el papel del cliente. Se lee de los BYTES, no de
+  `archivo.type`. En el correo viaja como adjunto incrustado (`cid:`).
+- **Buzon propio por empresa** (`RemitenteCorreo`,
+  `20260819130159_remitente_correo_por_empresa`). La contrasena se **cifra**
+  (`lib/secreto.ts`, AES-256-GCM con la llave en el entorno): es el unico
+  secreto de GCM que no se hashea, y no por descuido — al SMTP hay que
+  PRESENTARSELA. Sin llave de cifrado no se guarda NADA, en vez de guardar en
+  claro. **Configurado no es funciona**: hay `verificadoAt` y un envio de
+  prueba de verdad.
+- **En los correos manda la constructora** y GCM baja a un «Con tecnologia de
+  GCM» al pie. Los correos que no son de una empresa concreta —codigo de
+  acceso, recuperacion— siguen firmando GCM.
+- **Ningun texto puede dar por hecho que hay alguien operando detras.** En la
+  version instalable no habra buzon compartido, y decir «sale por el buzon
+  compartido de GCM» prometeria un servicio que no existe. `docs/instalable.md`
+  inventaria lo que se rompe, clasificado por LA RAZON: lo que bloquea de
+  verdad no es el SMS, son las tres cosas que suponen que GCM es alcanzable
+  DESDE fuera (cola de SMS, galeria del cliente y pase de obra).
+
+### 13. Aislamiento entre empresas y alcance por obra
+
+- **`aislamiento.test.ts`**: un doble de Prisma hecho con `Proxy` que apunta con
+  que argumentos se llama a la base, y comprueba la propiedad de verdad —toda
+  consulta lleva el `companyId` DE LA SESION—. Cubre las diez familias de
+  servicios. Encontro una fuga real en `obtenerLookahead` y, mas tarde, **una
+  que ya estaba en produccion**: `actividad.service` resolvia nombres de
+  usuario sin filtrar y el panel de un cliente ensenaba el nombre de alguien de
+  otra constructora.
+- **Cada quien ve solo sus obras.** `ProjectMembership` estaba en el esquema
+  desde el principio, sin una sola fila y sin codigo que la leyera. El alcance
+  viaja en la SESION (`obrasAsignadas`: `null` = todas, lista vacia = ninguna),
+  asi que preguntarlo es sincrono; se pone en los dos embudos que cubren la
+  aplicacion —`obtenerObra` y `motivoSiObraCerrada`— y a mano en los servicios
+  que resuelven la obra por su cuenta. Solo el ADMIN ve la cartera completa.
+  Pantalla **Equipo** por obra y un guion que congela el acceso actual ANTES de
+  cerrar.
+- **El correo es unico POR EMPRESA, no en toda la instalacion** (20/08,
+  `20260820180000_correo_unico_por_empresa`). La misma persona puede trabajar
+  para dos constructoras. El login ya no puede resolver a quien pertenece un
+  correo mirando la tabla: prueba la clave contra las cuentas que lo compartan
+  y, si casan varias, pregunta en cual entrar.
+
+### 14. La puerta de acceso
+
+- **El bloqueo por cuenta se cumple y se acaba.** `failedLoginCount` solo
+  volvia a cero al ACERTAR, asi que una cuenta que llegara a cinco fallos
+  quedaba a merced de cualquiera para siempre: un fallo cada quince minutos la
+  dejaba bloqueada indefinidamente. Contra un cliente de pago eso no es una
+  molestia, es un incidente.
+- **Limite por conexion** contra el rociado, contado sobre los `LOGIN_FAILED`
+  que la auditoria ya guardaba: cero esquema nuevo. Y se lee la **ULTIMA**
+  entrada de `x-forwarded-for`, no la primera —la primera la escribe quien
+  llama, asi que el limite estaba puesto y no protegia de nada—.
+- **`SMS_COLA_TOKEN` retirado.** Servia a TODA empresa sin emisor propio a la
+  vez, y por esa cola viajan los codigos del pase y del segundo factor EN
+  CLARO.
+- **Las consultas de RUC ya no pueden tumbar la IP de todos**
+  (`lib/limitador.ts`).
+
+### 15. El manual dentro de la app, y el anclaje de continuidad
+
+- **`/manual`, 23 capitulos.** Vive DENTRO de GCM y sin puerta de permisos:
+  quien menos permisos tiene es quien mas lo necesita. La plantilla de cada
+  capitulo es doctrina —la PREGUNTA que contesta con las palabras del menu,
+  para quien es, la IDEA antes que los pasos, el RECORRIDO de la primera vez y
+  LO QUE SALE MAL—.
+- **Una prueba vigila que el manual siga contando el sistema que hay.** Lee el
+  fuente del layout y exige que cada seccion del menu diga en que capitulo se
+  explica; un `null` significa «no lleva capitulo a proposito» y va con su
+  razon. Nacio porque la propuesta al cliente existio como pantalla del menu
+  sin capitulo y dos recorridos siguieron mandando a una pantalla borrada
+  mientras 2.373 pruebas pasaban en verde. **No cubre la prosa.**
+- **Anclaje de continuidad** (`lib/siguiente-paso.ts`): UN paso, nunca una
+  lista. No auto-navega —aprobar una revision es irreversible y encadenar
+  ensena a pulsar sin leer—, no propone lo que quien mira no puede hacer, se
+  esconde en la pantalla del paso, y las sugerencias se aplazan pero la
+  decision bloqueante no. **No lee `lib/pendientes`**: esa lista carga el
+  cronograma entero y esto corre en CADA navegacion.
+- **Guia de puesta en marcha** (`/empresa/puesta-en-marcha`): los cinco pasos
+  del primer dia. No es una pantalla de bienvenida, no se autoabre y no se
+  puede «terminar».
+
+### 16. Navegacion
+
+- **Un solo mapa de la obra.** Habia DOS navegaciones a la vez —el riel del
+  ciclo Last Planner y unas pestanas— agrupando las mismas secciones de forma
+  distinta, y ninguna conocia media aplicacion. Ahora hay tres niveles (fase ->
+  seccion -> rama) y las ramas solo se despliegan en la seccion abierta. Las
+  insignias cuentan **solo lo que se puede contar barato**: dos `count` con
+  indice, porque esto corre en cada navegacion y cargar el cronograma en una
+  pantalla ya tumbo produccion dos veces.
+- **Migas de pan** con tabla EXPLICITA: `plan-semanal` no se lee «Plan semanal»
+  al capitalizarlo, y un id no se lee de ninguna manera.
+- **El tablero de supervision se mudo dentro de la obra**; la pagina de inicio
+  gano el mismo mapa, con el de empresa.
+- **PLAN queda: Meta -> Presupuesto -> Revisiones -> Propuesta -> Cronograma**,
+  que es el orden real del trabajo desde que el contractual sale del real.
+- **Cuatro fronteras de error** (`error.tsx` de obra, de dashboard, de app y
+  `global-error`) mas `not-found`. No habia ninguna en 52 pantallas.
+
+### 17. Despliegue: lo que fallo y como se cerro
+
+- **Las migraciones se aplican solas**, con el paquete desempacado y ANTES del
+  intercambio. Hubo que arreglarlo dos veces: el workflow **sobrescribia
+  `desplegar.sh` en el sitio mientras un cron lo ejecuta** —bash lee por
+  posicion, asi que el proceso siguio leyendo desplazado y se salto el bloque
+  entero— y el `activate` de CloudLinux **moria bajo `set -u`**.
+- **FTPS verificado**, y falla cerrado. Dos causas encadenadas: ProFTPD no
+  manda su intermedio (se aporta como ancla en `FTP_CA_PEM`) y el certificado
+  esta a nombre de `server0808.cloudhostservers.com`, no de
+  `ftp.drcaceresruiz.com`. **La respuesta nunca es volver a apagar la
+  comprobacion.** Queda pendiente ROTAR la contrasena del FTP.
+- **`/api/health` dice tres cosas**: `version` (el SHA del PAQUETE, que viaja
+  DENTRO del `gcm.tar.gz`), `arranque` y `coherencia` — mas `reloj`,
+  `operadores` y si hay llave de cifrado. «Desconocida» existe a proposito: no
+  saberlo y estar al dia no son lo mismo.
+- **El pie dice la version de verdad**: sale de `package.json` inyectado al
+  compilar mas el SHA del paquete. Antes decia `v0.1.0`, el valor por defecto
+  del andamio, con la aplicacion meses en produccion. **Un dato que hay que
+  acordarse de actualizar es un recordatorio disfrazado de hecho.** El producto
+  declara **0.9.0**: el 1.0 queda reservado para el lanzamiento comercial.
+- **Subir dejo de ser lo mismo que desplegar**, y el gancho G6 corre tambien
+  lint — el cuarto gate que faltaba y que tumbo varios despliegues.
+- El paso de FTP tiene tope propio y `apt` reintenta en vez de tirar el
+  despliegue.
+
+### 18. La red de pruebas: lo que TypeScript no ve
+
+De ~500 pruebas se paso a **mas de 2.400**. Lo importante no es el numero sino
+que cubren lo que ninguna otra cosa ve:
+
+- **`npm run humo`** abre las ~76 pantallas contra la base local, descubriendo
+  las rutas del arbol de `src/app`. Y **no basta con el codigo de estado**: una
+  pantalla rota devuelve HTTP 200 con el error viajando dentro del stream, asi
+  que se busca la fila de error del payload de React.
+- **`select-contra-esquema.test.ts`**: Prisma no valida los `select` ni los
+  `where` en tipos. `Project.nombre` en vez de `nombreObra`,
+  `Cronograma.vigente` que no existe, `lineaBaseVersion` que es un derivado y
+  `planSemanal` en vez de `plan` llegaron a produccion compilando limpio. Uno
+  de ellos dejo **un dia entero sin poder crear un encargo**.
+- **`dinero-desde-la-base.test.ts`**: vigila que todo `_sum` pase por
+  `lib/decimal`.
+- **Los cuatro servicios donde vive el dinero** —movimientos, ordenes, encargos
+  y valorizaciones, mas los dos puntos de no retorno (aprobar movimiento y
+  aprobar orden)— tienen pruebas propias con Prisma doblado. Ninguno tenia
+  ninguna. Las que importan son las que protegen del fallo que **no da error**:
+  un capitulo con importe propio que borra el costo directo, un reparto con IGV
+  que infla el comprometido un 18%, un deductivo que cruza a positivo y pasa a
+  CUBRIR a su capitulo.
+- **`terceros.ts`** convierte las licencias de codigo ajeno en algo comprobable
+  y la prueba exige que no devuelva nada: asi no entra codigo AGPL ni se copia
+  sin acreditar sin que la suite se ponga en rojo.
+- Y la leccion que se repite: **`vitest` no comprueba tipos y `tsc` no ve las
+  consultas de Prisma**. Hay que pasar `npm test`, `npm run typecheck` **y**
+  `npm run build`. Verde no significa sano hasta que se ha visto rojo por el
+  motivo correcto.
 
 ---
 
