@@ -276,7 +276,8 @@ export async function compararConContractual(
 
   const modo = meta.modo as ModoMeta;
 
-  const [items, gastos] = await Promise.all([
+  // La tabla de gastos generales quedo DORMIDA: ni se escribe ni se lee.
+  const [items] = await Promise.all([
     prisma.presupuestoMetaItem.findMany({
       where: { presupuestoMetaId: meta.id },
       orderBy: { orden: "asc" },
@@ -284,10 +285,6 @@ export async function compararConContractual(
       // `unknown` y obliga a castear. Fuera de FRENTE la tabla de reparto
       // esta vacia para esta meta, asi que la union no cuesta nada.
       include: { reparto: true },
-    }),
-    prisma.gastoGeneralMeta.findMany({
-      where: { presupuestoMetaId: meta.id },
-      orderBy: { orden: "asc" },
     }),
   ]);
 
@@ -312,13 +309,7 @@ export async function compararConContractual(
     modo,
     contractual: await lineasContractuales(modo, obraId, vigente.partidas),
     meta: lineasMeta,
-    gastosGeneralesContractual: vigente.cascadaVigente.gastosGenerales,
-    gastosGeneralesMeta: meta.gastosGenerales.toString(),
     utilidadContractual: vigente.cascadaVigente.utilidad,
-    // El criterio lo decide la OBRA, no la meta: por eso se puede cambiar en
-    // cualquier momento sin tocar ninguna version guardada. Sin decidir aun,
-    // se calcula como siempre; la obra ya bloquea el paso en ese caso.
-    incluyeGastosGenerales: obra.metaIncluyeGastosGenerales ?? true,
   });
 
   // Los movimientos aprobados DESPUES de fijar la meta. Se ordenan por numero
@@ -331,14 +322,7 @@ export async function compararConContractual(
     select: { importeNeto: true },
   });
 
-  const resumenGG = resumenGastosGenerales(
-    gastos.map((g) => ({
-      tipo: g.tipo,
-      montoMensual: g.montoMensual?.toString() ?? null,
-      meses: g.meses?.toString() ?? null,
-      montoFijo: g.tipo === "FIJO" ? g.montoTotal.toString() : null,
-    })),
-  );
+  const resumenGG = resumenGastosGenerales([]);
 
   const mesesMeta = meta.mesesPlazo.toString();
   const mesesProgramados = mesesEntre(obra.fechaInicio, obra.fechaFinProgramada);
@@ -361,14 +345,9 @@ export async function compararConContractual(
    * `mesesMeta`: si alguien presupuesto ocho meses en una obra de trece dias,
    * comparar contra su propio ocho no delataria nada.
    */
-  const lineasLargas = lineasMasLargasQueLaObra(
-    gastos.map((g) => ({
-      concepto: g.concepto,
-      tipo: g.tipo,
-      meses: g.meses?.toString() ?? null,
-    })),
-    mesesProgramados,
-  );
+  // Sin gastos generales en la meta no hay lineas que puedan pasarse del
+  // plazo: la lista se retiro con ellos.
+  const lineasLargas = lineasMasLargasQueLaObra([], mesesProgramados);
 
   return {
     ok: true,
@@ -509,12 +488,13 @@ export async function crearMeta(
     };
   }
 
-  const entradasGasto: EntradaGasto[] = datos.gastosGenerales.map((g) => ({
-    tipo: g.tipo,
-    montoMensual: g.montoMensual ?? null,
-    meses: g.meses ?? null,
-    montoFijo: g.montoFijo ?? null,
-  }));
+  // LOS GASTOS GENERALES YA NO SON DE LA META (20/08/2026).
+  //
+  // La lista se sigue leyendo del Excel para poder AVISAR de que viene, pero
+  // no entra en la meta ni en la bolsa: los gastos generales los reconoce el
+  // contrato como un porcentaje y los gestiona la empresa. La tabla queda
+  // dormida en el esquema para no perder lo que ya cargaron las metas viejas.
+  const entradasGasto: EntradaGasto[] = [];
 
   const resumenGG = resumenGastosGenerales(entradasGasto);
   if (resumenGG.invalidas > 0) {
@@ -584,25 +564,6 @@ export async function crearMeta(
       })),
     });
 
-    await tx.gastoGeneralMeta.createMany({
-      data: datos.gastosGenerales.map((g, orden) => ({
-        presupuestoMetaId: meta.id,
-        concepto: g.concepto,
-        tipo: g.tipo,
-        montoMensual: g.tipo === "VARIABLE" ? g.montoMensual : null,
-        meses: g.tipo === "VARIABLE" ? g.meses : null,
-        // Ya validado arriba: `resumenGastosGenerales` no dejo pasar ninguna
-        // fila incompleta, asi que aqui `totalDeGasto` no puede ser null.
-        montoTotal:
-          totalDeGasto({
-            tipo: g.tipo,
-            montoMensual: g.montoMensual ?? null,
-            meses: g.meses ?? null,
-            montoFijo: g.montoFijo ?? null,
-          }) ?? "0.00",
-        orden,
-      })),
-    });
 
     await tx.auditLog.create({
       data: {

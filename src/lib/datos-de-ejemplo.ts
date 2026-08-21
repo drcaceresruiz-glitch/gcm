@@ -1,8 +1,5 @@
 import { TOTAL_EJEMPLO } from "@/lib/plantilla-presupuesto";
-import {
-  TOTAL_COSTO_EJEMPLO,
-  TOTAL_GASTOS_EJEMPLO,
-} from "@/lib/plantilla-meta";
+import { TOTAL_COSTO_EJEMPLO } from "@/lib/plantilla-meta";
 
 /**
  * Reconoce las cifras que trae la PLANTILLA como ejemplo.
@@ -38,12 +35,8 @@ export function pareceContractualDeEjemplo(costoDirecto: string): boolean {
 /** La meta son las filas de ejemplo de su plantilla. */
 export function pareceMetaDeEjemplo(datos: {
   costoDirectoMeta: string;
-  gastosGeneralesMeta: string;
 }): boolean {
-  return (
-    datos.costoDirectoMeta === TOTAL_COSTO_EJEMPLO ||
-    datos.gastosGeneralesMeta === TOTAL_GASTOS_EJEMPLO
-  );
+  return datos.costoDirectoMeta === TOTAL_COSTO_EJEMPLO;
 }
 
 /**
@@ -63,7 +56,6 @@ export interface OrigenDeEjemplo {
 export function origenDeEjemplo(datos: {
   costoDirectoContractual: string;
   costoDirectoMeta: string;
-  gastosGeneralesMeta: string;
 }): OrigenDeEjemplo {
   const contractual = pareceContractualDeEjemplo(datos.costoDirectoContractual);
   const meta = pareceMetaDeEjemplo(datos);
