@@ -4,10 +4,7 @@ import ExcelJS from "exceljs";
 import {
   generarPlantillaMeta,
   FILAS_COSTO,
-  FILAS_GASTOS,
   TOTAL_COSTO_EJEMPLO,
-  TOTAL_GASTOS_EJEMPLO,
-  COSTE_MENSUAL_EJEMPLO,
 } from "./plantilla-meta";
 import { analizarExcel } from "./excel-presupuesto";
 import { analizarGastosGenerales, HOJA_GASTOS } from "./excel-meta";
@@ -71,44 +68,6 @@ describe("la hoja de costo directo de la plantilla meta", () => {
     expect(r.gruposRepetidos).toEqual([]);
     expect(r.filasOcultas).toBe(0);
     expect(r.filasTextoOmitidas).toBe(0);
-  });
-});
-
-describe("la hoja de gastos generales de la plantilla meta", () => {
-  it("se analiza sin errores y encuentra sus filas", async () => {
-    const r = await analizarGastosGenerales(await generarPlantillaMeta());
-
-    expect(r.errores).toEqual([]);
-    expect(r.filaCabecera).not.toBeNull();
-    expect(r.filas).toHaveLength(FILAS_GASTOS.length);
-  });
-
-  it("suma el total y el precio de cada mes de atraso", async () => {
-    const r = await analizarGastosGenerales(await generarPlantillaMeta());
-
-    expect(r.total).toBe(TOTAL_GASTOS_EJEMPLO);
-    // Solo los variables: las cartas fianza y la poliza no suben porque la
-    // obra se estire.
-    expect(r.costeMensualDelAtraso).toBe(COSTE_MENSUAL_EJEMPLO);
-  });
-
-  it("respeta los meses de CADA linea, no un plazo global", async () => {
-    // El almacenero esta 6 meses de los 8. Si el importador impusiera el
-    // plazo de la obra, este gasto saldria un tercio mas caro.
-    const r = await analizarGastosGenerales(await generarPlantillaMeta());
-    const almacenero = r.filas.find((f) => f.concepto === "Almacenero")!;
-
-    expect(almacenero.meses).toBe("6.00");
-    expect(almacenero.montoMensual).toBe("2000.00");
-  });
-
-  it("los fijos no llevan mensual ni meses", async () => {
-    const r = await analizarGastosGenerales(await generarPlantillaMeta());
-    const fianza = r.filas.find((f) => f.tipo === "FIJO")!;
-
-    expect(fianza.montoMensual).toBeNull();
-    expect(fianza.meses).toBeNull();
-    expect(fianza.montoFijo).not.toBeNull();
   });
 });
 

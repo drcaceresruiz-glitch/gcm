@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { AlertTriangle, CalendarClock, Info, Lock } from "lucide-react";
 
 import { soles } from "@/utils/formato";
@@ -81,7 +80,7 @@ export function PanelBolsa({
   c: ComparacionMeta;
   obraId: string;
 }) {
-  const { bolsa, meta, desfase, plazo } = c;
+  const { bolsa, meta, desfase } = c;
   const negativa = esNegativo(bolsa.bolsaTotal);
   const ejemplo = origenDeEjemplo(bolsa);
 

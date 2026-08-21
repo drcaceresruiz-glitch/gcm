@@ -1,7 +1,5 @@
 import ExcelJS from "exceljs";
 
-import { HOJA_GASTOS } from "@/lib/excel-meta";
-import { mesesAjustadosAlPlazo } from "@/lib/gastos-contra-plazo";
 
 /**
  * La plantilla del PRESUPUESTO META, generada desde codigo.
@@ -74,10 +72,6 @@ function marcarEditable(celda: ExcelJS.Cell): void {
   celda.protection = { locked: false };
 }
 
-function formulaSubtotal(fila: number): string {
-  return `IF($A${fila}="","",IF($B${fila}="VARIABLE",$C${fila}*$D${fila},$E${fila}))`;
-}
-
 /** Un codigo de capitulo: termina en ".0" o no lleva punto. */
 function esCapituloCodigo(f: FilaCosto): boolean {
   return f.codigo.endsWith(".0") || !f.codigo.includes(".");
@@ -142,14 +136,6 @@ const CABECERAS_COSTO = [
   "Contractual",
 ] as const;
 
-const CABECERAS_GASTOS = [
-  "Concepto",
-  "Tipo",
-  "Monto mensual",
-  "Meses",
-  "Importe fijo",
-  "Subtotal",
-] as const;
 
 interface FilaCosto {
   codigo: string;
@@ -305,34 +291,6 @@ const INSTRUCCIONES: readonly (readonly [string, string])[] = [
   ],
 ];
 
-const INSTRUCCIONES_GASTOS: readonly (readonly [string, string])[] = [
-  ["", ""],
-  [
-    "5. Hoja «Gastos Generales»",
-    "Aquí NO se pide un porcentaje, se pide una lista. Los gastos generales no crecen con la producción: crecen con los MESES. Un porcentaje sobre el costo directo esconde el sobrecosto más caro que tiene una obra, que es la que se estira con todas sus partidas en meta.",
-  ],
-  [
-    "6. VARIABLE contra FIJO",
-    "VARIABLE es lo que se paga por mes (residente, maestro, camioneta, oficina): llena «Monto mensual» y «Meses», y deja «Importe fijo» vacío. FIJO es lo que no se mueve aunque la obra se alargue (cartas fianza, pólizas, licencias): llena solo «Importe fijo».",
-  ],
-  [
-    "7. Los meses son por línea",
-    "El almacenero del ejemplo está 6 meses de los 8 del plazo. Nadie está en obra todo el plazo, y con un único número global el gasto saldría siempre de más.",
-  ],
-  [
-    "8. Para qué sirve separarlos",
-    "De los VARIABLES sale lo que cuesta cada mes de atraso. En el ejemplo son S/ 14 500 al mes: eso es lo que pierdes por cada mes de más, y no se recupera trabajando mejor, solo terminando antes.",
-  ],
-  ["", ""],
-  [
-    "¿Y la utilidad?",
-    "No aparece por ninguna parte, y es a propósito. La utilidad NO es un costo que puedas gastar: es el resultado. Si entra en la meta se vuelve presupuesto, la obra se la gasta y nadie lo nota hasta la liquidación. GCM la muestra aparte, al lado de la bolsa, etiquetada como lo que es.",
-  ],
-  [
-    "Antes de importar",
-    "Borra las filas de ejemplo de las dos hojas y escribe lo tuyo. Al importar verás una vista previa con totales y avisos ANTES de confirmar: nada se guarda sin que lo revises.",
-  ],
-];
 
 const VERDE = "FF0D5C56";
 const VERDE_SUAVE = "FFE8F0EF";
@@ -347,40 +305,6 @@ function pintarCabecera(fila: ExcelJS.Row, titulos: readonly string[]) {
   });
 }
 
-/**
- * Ajusta los meses de los ejemplos al plazo REAL de la obra.
- *
- * Los ejemplos traian 8 meses escritos a mano, pensados para una obra de ese
- * tamano. Descargada para una obra de trece dias, quien no cambiara esa
- * columna presupuestaba ocho meses de residente: de ahi salieron 125.700 de
- * gastos generales sobre un costo directo de 15.478.
- *
- * Se conserva la PROPORCION entre lineas —el almacenero entra mas tarde y
- * lleva 6 de los 8 meses, que es la leccion que enseña la plantilla— en vez
- * de poner el mismo numero en todas.
- */
-function ajustarMeses(
-  filas: readonly FilaGasto[],
-  mesesObra: number | null,
-): FilaGasto[] {
-  if (mesesObra === null || mesesObra <= 0) return [...filas];
-
-  // La MISMA regla que corrige la pantalla, no una copia: lo que propone el
-  // Excel y lo que arregla el boton tienen que dar el mismo numero.
-  const ajustes = mesesAjustadosAlPlazo(
-    filas.map((f) => ({
-      concepto: f.concepto,
-      tipo: f.tipo,
-      meses: f.meses?.toFixed(2) ?? null,
-    })),
-    String(mesesObra),
-  );
-
-  const porIndice = new Map(ajustes.map((a) => [a.indice, Number(a.despues)]));
-  return filas.map((f, i) =>
-    porIndice.has(i) ? { ...f, meses: porIndice.get(i)! } : f,
-  );
-}
 
 /**
  * @param mesesObra Plazo real de la obra. Si viene, los ejemplos se ajustan a
@@ -388,7 +312,7 @@ function ajustarMeses(
  *   sigue fijando los mismos totales).
  */
 export async function generarPlantillaMeta(
-  mesesObra: number | null = null,
+  _mesesObra: number | null = null,
 ): Promise<ArrayBuffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = "GCM";
@@ -555,107 +479,6 @@ export async function generarPlantillaMeta(
   total.getCell(6).numFmt = "#,##0.00";
   total.getCell(6).font = { bold: true };
 
-  const gastos = libro.addWorksheet(HOJA_GASTOS);
-  gastos.columns = [
-    { width: 44 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 16 },
-    { width: 16 },
-  ];
-
-  gastos.getCell("A1").value = "PRESUPUESTO META - GASTOS GENERALES";
-  gastos.getCell("A1").font = { bold: true, size: 14 };
-  gastos.getCell("A2").value =
-    "No es un porcentaje: es una lista con plazo. Crecen con los MESES, no con la producción.";
-  gastos.getCell("A2").font = { italic: true, color: { argb: "FF667788" } };
-
-  pintarCabecera(gastos.getRow(FILA_CABECERA), CABECERAS_GASTOS);
-
-  let g = FILA_CABECERA;
-  // Los tres totales del pie se acumulan con los MISMOS numeros que van en
-  // las filas. ExcelJS no calcula: una formula sin `result` se lee como celda
-  // vacia si el archivo no se abre en Excel antes de subirlo, y el pie de la
-  // hoja saldria en blanco justo en las tres cifras que se miran primero.
-  let totalGG = 0;
-  let totalVariable = 0;
-  let totalFijo = 0;
-
-  for (const f of ajustarMeses(FILAS_GASTOS, mesesObra)) {
-    g++;
-    const fila = gastos.getRow(g);
-    fila.getCell(1).value = f.concepto;
-    fila.getCell(2).value = f.tipo;
-    if (f.montoMensual !== undefined) fila.getCell(3).value = f.montoMensual;
-    if (f.meses !== undefined) fila.getCell(4).value = f.meses;
-    if (f.montoFijo !== undefined) fila.getCell(5).value = f.montoFijo;
-
-    fila.getCell(2).alignment = { horizontal: "center" };
-    fila.getCell(3).numFmt = "#,##0.00";
-    fila.getCell(4).alignment = { horizontal: "center" };
-    fila.getCell(5).numFmt = "#,##0.00";
-    // El subtotal de la linea, calculado: un VARIABLE es mensual x meses y un
-    // FIJO es su importe. Antes habia que multiplicarlo a mano y nada avisaba
-    // si el resultado no cuadraba con lo tecleado.
-    const subtotal =
-      f.tipo === "VARIABLE"
-        ? (f.montoMensual ?? 0) * (f.meses ?? 0)
-        : (f.montoFijo ?? 0);
-
-    totalGG += subtotal;
-    if (f.tipo === "VARIABLE") totalVariable += subtotal;
-    else totalFijo += subtotal;
-
-    fila.getCell(6).value = { formula: formulaSubtotal(g), result: subtotal };
-    fila.getCell(6).numFmt = "#,##0.00";
-    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
-    marcarCalculada(
-      fila.getCell(6),
-      "Se calcula solo: mensual x meses si es VARIABLE, o el importe fijo.",
-    );
-  }
-
-  // Igual que en el costo directo: filas preparadas para las que cada obra
-  // necesite, y totales que abarcan todo el bloque.
-  const primerGasto = FILA_CABECERA + 1;
-  const ultimoGasto = FILA_CABECERA + FILAS_PREPARADAS;
-
-  for (let f = g + 1; f <= ultimoGasto; f++) {
-    const fila = gastos.getRow(f);
-    fila.getCell(2).alignment = { horizontal: "center" };
-    fila.getCell(3).numFmt = "#,##0.00";
-    fila.getCell(4).alignment = { horizontal: "center" };
-    fila.getCell(5).numFmt = "#,##0.00";
-    fila.getCell(6).value = { formula: formulaSubtotal(f), result: "" };
-    fila.getCell(6).numFmt = "#,##0.00";
-    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
-    marcarCalculada(
-      fila.getCell(6),
-      "Se calcula solo: mensual x meses si es VARIABLE, o el importe fijo.",
-    );
-  }
-
-  const filaTotalGG = ultimoGasto + 2;
-  const rango = `$F$${primerGasto}:$F$${ultimoGasto}`;
-  const tipos = `$B$${primerGasto}:$B$${ultimoGasto}`;
-
-  const pie: readonly [string, string, number][] = [
-    ["TOTAL GASTOS GENERALES", `SUM(${rango})`, totalGG],
-    [
-      "GG Variables (crecen con el plazo)",
-      `SUMIF(${tipos},"VARIABLE",${rango})`,
-      totalVariable,
-    ],
-    ["GG Fijos (no dependen del plazo)", `SUMIF(${tipos},"FIJO",${rango})`, totalFijo],
-  ];
-
-  pie.forEach(([etiqueta, formula, resultado], i) => {
-    const fila = gastos.getRow(filaTotalGG + i);
-    fila.getCell(1).value = etiqueta;
-    fila.getCell(1).font = { bold: i === 0 };
-    // Redondeado a centimos: sumar decimales en coma flotante deja colas como
-    // 0.30000000000000004, y eso se escribiria tal cual en la celda.
-    fila.getCell(6).value = { formula, result: Math.round(resultado * 100) / 100 };
-    fila.getCell(6).numFmt = "#,##0.00";
-    fila.getCell(6).font = { bold: i === 0 };
-  });
 
   /**
    * La leyenda, arriba del todo y en las dos hojas.
@@ -663,7 +486,7 @@ export async function generarPlantillaMeta(
    * El gris no significa nada por si solo: hay que decir que quiere decir, y
    * decirlo DONDE se ve, no en la hoja de instrucciones que se lee una vez.
    */
-  for (const hoja of [costo, gastos]) {
+  for (const hoja of [costo]) {
     const leyenda = hoja.getCell("A3");
     leyenda.value =
       "Las celdas en gris se calculan solas y están bloqueadas. Escribe solo en las blancas. " +
@@ -696,7 +519,7 @@ export async function generarPlantillaMeta(
   const instrucciones = libro.addWorksheet("Instrucciones");
   instrucciones.columns = [{ width: 30 }, { width: 100 }];
 
-  [...INSTRUCCIONES, ...INSTRUCCIONES_GASTOS].forEach(([titulo, cuerpo], i) => {
+  [...INSTRUCCIONES].forEach(([titulo, cuerpo], i) => {
     const fila = instrucciones.getRow(i + 1);
     fila.getCell(1).value = titulo;
     fila.getCell(1).font = { bold: true };

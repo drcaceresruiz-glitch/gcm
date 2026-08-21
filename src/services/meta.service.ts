@@ -13,7 +13,6 @@ import {
   calcularBolsa,
   desfaseDeMeta,
   resumenGastosGenerales,
-  totalDeGasto,
   type Bolsa,
   type Desfase,
   type EntradaGasto,
