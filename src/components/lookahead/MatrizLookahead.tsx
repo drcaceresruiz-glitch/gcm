@@ -286,7 +286,7 @@ export function MatrizLookahead({
           : [...SEMANAS_SUGERIDAS, semanas].sort((a, b) => a - b)
         ).map((s) => (
           <option key={s} value={s}>
-            {s} semanas
+            {s === 1 ? "1 semana" : `${s} semanas`}
           </option>
         ))}
       </select>
@@ -298,7 +298,7 @@ export function MatrizLookahead({
       <div className="space-y-3">
         {selectorSemanas}
         <p className="text-sm opacity-60">
-          No hay tareas del cronograma en las próximas {semanas} semanas. Amplía
+          No hay tareas del cronograma en {semanas === 1 ? "la próxima semana" : `las próximas ${semanas} semanas`}. Amplía
           la ventana o espera a que el cronograma programe trabajo en ese rango.
         </p>
       </div>
@@ -313,7 +313,7 @@ export function MatrizLookahead({
           style={{ borderColor: "var(--color-alerta)" }}
         >
           El código que escaneaste apunta a una tarea que <strong>no está en
-          esta ventana</strong> de {semanas} semanas. Amplíala arriba para
+          esta ventana</strong> de {semanas === 1 ? "una semana" : `${semanas} semanas`}. Amplíala arriba para
           encontrarla: puede que ese trabajo ya haya pasado o que aún quede
           lejos.
         </p>

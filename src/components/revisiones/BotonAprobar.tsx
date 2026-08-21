@@ -93,7 +93,7 @@ export function BotonAprobar({
         </li>
         <li>
           La obra dejará de permitir <strong>editar partidas</strong> y de
-          ofrecer el <strong>importador de Excel</strong>.
+          <strong>regenerar el contractual</strong> desde el real.
         </li>
         <li>
           Los cambios posteriores se registran como{" "}

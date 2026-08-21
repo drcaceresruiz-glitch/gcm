@@ -62,14 +62,38 @@ export interface PasoSiguiente {
   /// Ruta relativa a la obra. Nunca vacia: el anclaje se esconde cuando ya
   /// estas en ella, y una cadena vacia haria de prefijo de todas.
   camino: string;
+  /**
+   * El SEGUNDO tramo, cuando el camino tiene dos y enseñar solo el primero
+   * deja a medias.
+   *
+   * Existe por el presupuesto: desde el 20/08 entra en dos pasos -primero el
+   * real, y de el se genera el contractual-. Con un solo boton, quien llega
+   * nuevo carga la meta y se queda sin saber que aun falta un tramo.
+   */
+  despues?: {
+    accion: string;
+    camino: string;
+  };
 }
 
 /** Que pasos del alta estan dados. Salen de `hitosDeObra`. */
 export interface EstadoAlta {
+  /// El contractual: el arbol de partidas contra el que se mide la obra.
   presupuesto: boolean;
+  /// El real u operativo. Es de donde sale el contractual, asi que decide
+  /// cual de los dos tramos toca sugerir.
+  meta: boolean;
   cronograma: boolean;
   equipo: boolean;
   lineaBase: boolean;
+  /**
+   * Hay alguien a quien asignar: al menos un usuario ACTIVO cuyo rol NO ve
+   * ya todas las obras (un ADMIN las ve sin asignacion). NO es un paso dado,
+   * es la precondicion del paso equipo: en una empresa de solo ADMIN nadie
+   * es asignable, la pantalla no tiene boton que ofrecer, y sugerir «asigna
+   * el equipo» seria empujar a un callejon sin salida.
+   */
+  equipoAsignable: boolean;
 }
 
 /**
@@ -107,34 +131,38 @@ function plural(n: number, singular: string, plural: string): string {
 
 export function siguientePaso(
   alta: EstadoAlta,
-  faltaCriterio: boolean,
   puede: PuedeHacer,
   avisos: AvisosVivos,
 ): PasoSiguiente | null {
-  // 1. Lo unico bloqueante. Va delante incluso del alta: mientras no se
-  // decida, ninguna cifra de margen de esta obra significa nada.
-  if (faltaCriterio) {
-    return {
-      clave: "criterio",
-      gravedad: "bloqueante",
-      titulo: "Falta decidir una cosa antes de seguir",
-      consecuencia:
-        "Hasta que elijas si los gastos generales cuentan en la bolsa, el margen que se calcule no sería fiable.",
-      accion: "Decidir ahora",
-      camino: "/criterio",
-    };
-  }
-
-  // 2. El alta, en el orden en que se hace.
+  // 1. El alta, en el orden en que se hace.
+  // El presupuesto entra en DOS tramos: primero el REAL, con la plantilla, y
+  // de el se genera el contractual inflando cada capitulo. Enseñar solo el
+  // primero deja a medias a quien llega nuevo: carga la meta, ve desaparecer
+  // el aviso y no se entera de que el contractual sigue sin existir.
   if (!alta.presupuesto && puede.presupuesto) {
+    if (!alta.meta) {
+      return {
+        clave: "alta-presupuesto",
+        gravedad: "sugerencia",
+        titulo: "Esta obra todavía no tiene presupuesto",
+        consecuencia:
+          "Son dos pasos: primero entra el presupuesto real con la plantilla, y de él se genera el contractual.",
+        accion: "Cargar el presupuesto real",
+        camino: "/meta",
+        despues: { accion: "Generar el contractual", camino: "/contractual" },
+      };
+    }
+
+    // El real ya esta: el tramo que falta es el otro, y pedir el primero otra
+    // vez seria mandar a una pantalla donde no queda nada por hacer.
     return {
-      clave: "alta-presupuesto",
+      clave: "alta-contractual",
       gravedad: "sugerencia",
-      titulo: "Esta obra todavía no tiene presupuesto",
+      titulo: "Falta generar el contractual",
       consecuencia:
-        "Sin él no hay avance valorizado, ni comprometido, ni alertas, y se carga con la plantilla oficial que ofrece esa misma pantalla.",
-      accion: "Cargar el presupuesto",
-      camino: "/importar",
+        "Sale del real inflando cada capítulo, y es contra él contra lo que se miden el avance y la desviación.",
+      accion: "Generar el contractual",
+      camino: "/contractual",
     };
   }
 
@@ -150,7 +178,7 @@ export function siguientePaso(
     };
   }
 
-  if (!alta.equipo && puede.equipo) {
+  if (!alta.equipo && alta.equipoAsignable && puede.equipo) {
     return {
       clave: "alta-equipo",
       gravedad: "sugerencia",

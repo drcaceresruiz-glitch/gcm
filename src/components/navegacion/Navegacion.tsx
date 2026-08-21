@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Bell,
+  BookOpen,
   Building2,
   ClipboardCheck,
   Landmark,
@@ -140,6 +141,21 @@ export function Navegacion({ empresa, operador, avisos, usuario }: Props) {
     <>
       <div className="hidden items-center gap-3 sm:flex">
         <Campana href={avisos.href} sinLeer={avisos.sinLeer} />
+        {/* El manual, SIEMPRE a la vista.
+
+            Estaba solo dentro del menu de empresa, que es justo donde no se
+            busca ayuda: quien se atasca en una pantalla de obra no piensa en
+            entrar a la configuracion de su constructora. Es un icono, sin
+            texto, porque no compite con el trabajo: espera. */}
+        <Link
+          href="/manual"
+          title="Manual de GCM"
+          aria-label="Abrir el manual"
+          className="inline-flex size-9 items-center justify-center rounded-lg border"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <BookOpen className="size-4 opacity-70" aria-hidden="true" />
+        </Link>
         {/* Fuera del menu de empresa y a su izquierda: se opera GCM o se
             trabaja en una obra, y quien hace lo primero no deberia tener que
             entrar en «Empresa» —la suya— para dar de alta otra distinta. */}

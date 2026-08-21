@@ -102,7 +102,7 @@ describe("la puesta en marcha de una constructora", () => {
       "/empresa/proveedores/plantilla",
     );
     expect(porClave.get("puesta-presupuesto")?.plantilla?.href).toBe(
-      "/plantilla-presupuesto",
+      "/plantilla-meta",
     );
     expect(porClave.get("puesta-equipo")?.plantilla).toBeNull();
   });

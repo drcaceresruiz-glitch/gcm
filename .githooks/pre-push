@@ -8,26 +8,27 @@
 # como se acaba usando `--no-verify` por costumbre —y entonces el gancho no
 # protege nada—.
 #
-# POR QUE `build` Y NO SOLO `typecheck` + `test`: es lo que corre el CI, y es
-# el unico que reproduce su fallo. El 19/08 el despliegue #344 se cayo con
-# typecheck y pruebas en verde, por una prueba escrita DESPUES del ultimo
-# `tsc`. Ver la memoria de pruebas de servicio: «lo ultimo que se hace antes de
-# `git push` es `npm run build`».
-#
-# Los tres, en orden, porque cada uno tapa el punto ciego del otro: vitest no
-# comprueba tipos, y `tsc` no ve las consultas de Prisma.
+# SON CUATRO, en el mismo orden que el CI, porque cada uno tapa el punto ciego
+# del otro: el LINT rechaza lo que el resto tolera (el 20/08 los deploys #435 y
+# #436 murieron en el Lint del CI por `any` en los dobles de test, y G6 no lo
+# miraba); vitest no comprueba tipos; `tsc` no ve las consultas de Prisma; y
+# `build` es lo unico que reproduce el fallo del CI (el #344 se cayo con
+# typecheck y test en verde). Ver la memoria de pruebas de servicio.
 #
 # Para saltarselo un dia concreto:  git push --no-verify
 
 set -e
 
-echo "→ typecheck"
+echo "-> typecheck"
 npm run typecheck
 
-echo "→ pruebas"
+echo "-> lint (lo que tumbo los deploys #435/#436)"
+npm run lint
+
+echo "-> pruebas"
 npm test
 
-echo "→ build (lo que corre el CI)"
+echo "-> build (lo que corre el CI)"
 npm run build
 
-echo "✓ G6: los tres pasan. Adelante."
+echo "OK G6: los cuatro pasan. Adelante."

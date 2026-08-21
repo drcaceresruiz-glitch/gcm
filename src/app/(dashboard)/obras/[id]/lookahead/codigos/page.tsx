@@ -145,12 +145,18 @@ export default async function CodigosEvidenciaPage({
             // se deja a `break-inside` de cada tarjeta, que cada navegador
             // interpreta a su manera: un QR partido por la mitad no lo lee
             // ningun telefono.
-            className="mx-auto mb-8 w-full max-w-[210mm] print:mb-0"
-            style={{ breakAfter: i < paginas.length - 1 ? "page" : "auto" }}
+            className="mx-auto mb-8 w-full max-w-[210mm] bg-white text-black print:mb-0"
+            style={{
+              breakAfter: i < paginas.length - 1 ? "page" : "auto",
+              // Esta hoja se RECORTA con tijera. Con las variables del tema,
+              // el borde sale casi blanco sobre papel blanco -y en modo
+              // oscuro, gris sobre negro-. Se blinda como los otros dos
+              // documentos que salen de la app en papel.
+              colorScheme: "light",
+            }}
           >
             <header
-              className="mb-4 flex items-baseline justify-between gap-3 border-b pb-2"
-              style={{ borderColor: "var(--borde)" }}
+              className="mb-4 flex items-baseline justify-between gap-3 border-b border-black pb-2"
             >
               <div>
                 <h1 className="text-base font-semibold">{obra.nombreObra}</h1>
@@ -167,12 +173,11 @@ export default async function CodigosEvidenciaPage({
               {pagina.map((c) => (
                 <li
                   key={c.clave}
-                  className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-center ${
+                  className={`flex break-inside-avoid flex-col items-center gap-1 rounded-lg border border-black p-2 text-center ${
                     // El de la obra va solo en la hoja, grande y centrado: se
                     // pega en la caseta y hay que poder escanearlo de lejos.
                     modo === "obra" ? "mx-auto max-w-[120mm] gap-3 p-6" : ""
                   }`}
-                  style={{ borderColor: "var(--borde)" }}
                 >
                   {/* SVG generado aqui a partir de nuestra propia URL, no de
                       texto de nadie: no hay nada que inyectar. */}

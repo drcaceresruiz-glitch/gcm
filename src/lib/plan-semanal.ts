@@ -22,10 +22,10 @@ export const ETIQUETA_CNC: Record<CausaNoCumplimiento, string> = {
   MATERIALES: "Materiales",
   MANO_OBRA: "Mano de obra",
   EQUIPOS: "Equipos",
-  INFORMACION: "Informacion / RFI",
+  INFORMACION: "Información / RFI",
   CLIENTE_TERCEROS: "Cliente / terceros",
   CLIMA: "Clima",
-  REPROGRAMACION: "Reprogramacion",
+  REPROGRAMACION: "Reprogramación",
   OTRA: "Otra",
 };
 
@@ -708,12 +708,59 @@ export interface RangoSemana {
 }
 
 /**
- * La semana que representa un plan: los 7 dias que TERMINAN en el corte, es
- * decir [corte - 6 dias, corte]. El corte es el dia en que se cierra y mide la
- * semana; el trabajo comprometido es el de esos siete dias.
+ * La semana que representa un plan.
+ *
+ * Por defecto son los 7 dias que TERMINAN en el corte —[corte - 6, corte]—:
+ * el corte es el dia en que se cierra y mide la semana.
+ *
+ * echaInicio la alarga hacia atras, y existe por el arranque de obra: una
+ * obra que empieza el jueves con corte en viernes dejaria sus dos primeros
+ * dias fuera de toda semana, y ese trabajo existe igual. Solo la primera
+ * semana de una obra puede traerla; las demas siguen siendo de siete dias
+ * para que el PPC se pueda comparar entre semanas.
  */
-export function rangoSemana(fechaCorte: Date): RangoSemana {
-  return { inicio: new Date(fechaCorte.getTime() - 6 * DIA_MS), fin: fechaCorte };
+export function rangoSemana(
+  fechaCorte: Date,
+  fechaInicio?: Date | null,
+): RangoSemana {
+  const porDefecto = new Date(fechaCorte.getTime() - 6 * DIA_MS);
+  // Una fecha de inicio POSTERIOR al defecto se ignora: acortar la semana no
+  // es lo que resuelve esto, y una semana de dos dias haria incomparable su
+  // PPC con el resto sin que nadie lo hubiera pedido.
+  if (fechaInicio && fechaInicio.getTime() < porDefecto.getTime()) {
+    return { inicio: fechaInicio, fin: fechaCorte };
+  }
+  return { inicio: porDefecto, fin: fechaCorte };
+}
+
+export interface SemanaExistente {
+  numero: number;
+  fechaCorte: Date;
+  fechaInicio?: Date | null;
+}
+
+/**
+ * La semana que se pisa con el rango [inicio, fin], si hay alguna.
+ *
+ * Dos semanas que comparten un dia cuentan dos veces el mismo trabajo, y el
+ * PPC deja de significar nada: el mismo compromiso podria evaluarse en dos
+ * cierres. Por eso se rechaza en vez de avisar.
+ *
+ * Devuelve el NUMERO de la semana que estorba —no un booleano— porque lo que
+ * hay que decirle a quien la crea es cual es, no que existe.
+ */
+export function semanaQueSePisa(
+  inicio: Date,
+  fin: Date,
+  otras: readonly SemanaExistente[],
+): number | null {
+  for (const s of otras) {
+    const r = rangoSemana(s.fechaCorte, s.fechaInicio ?? null);
+    if (inicio.getTime() <= r.fin.getTime() && r.inicio.getTime() <= fin.getTime()) {
+      return s.numero;
+    }
+  }
+  return null;
 }
 
 export interface TareaProgramada {

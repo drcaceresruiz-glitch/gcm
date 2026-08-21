@@ -107,6 +107,18 @@ export async function accionImportarMeta(
     return { error: "No se pudo leer el archivo. Comprueba que sea un Excel valido." };
   }
 
+  // Un Excel de la plantilla vieja. Los gastos generales YA NO son de la
+  // meta: los reconoce el contrato y los gestiona la empresa. Se rechaza en
+  // vez de ignorarlos en silencio, que dejaria al usuario creyendo que se
+  // guardaron.
+  if (gastos.filas.length > 0) {
+    return {
+      error:
+        "Este archivo trae la hoja «Gastos Generales», que ya no forma parte del " +
+        "presupuesto meta: los gastos generales los reconoce el contrato y los " +
+        "gestiona la empresa. Descarga la plantilla nueva y vuelve a cargarlo.",
+    };
+  }
   if (costo.errores.length > 0) {
     const primero = costo.errores[0]!;
     return {
@@ -146,6 +158,10 @@ export async function accionImportarMeta(
     precioUnitario: f.precioUnitario,
     // Un capitulo es un titulo: no lleva importe propio y no suma.
     parcial: f.tipo === "CAPITULO" ? null : f.parcial,
+    // El recargo solo lo llevan los capitulos, y es de donde saldra el
+    // presupuesto contractual. Se perdia justo aqui: el importador ya lo
+    // leia, pero este mapeo no lo copiaba y nunca llegaba a la base.
+    porcentajeRecargo: f.porcentajeRecargo,
   }));
 
   const gastosGenerales: EntradaGastoMeta[] = gastos.filas.map((g) => ({

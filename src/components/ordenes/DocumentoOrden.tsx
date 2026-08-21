@@ -1,6 +1,7 @@
 import { decimal, precio, metrado } from "@/utils/formato";
 import { etiquetaImpuesto } from "@/lib/ordenes";
 import type { OrdenImpresa } from "@/services/ordenes.service";
+import type { LogoEmpresa } from "@/services/logo.service";
 
 /**
  * La orden tal como se le manda al proveedor.
@@ -18,6 +19,9 @@ import type { OrdenImpresa } from "@/services/ordenes.service";
 
 interface Props {
   orden: OrdenImpresa;
+  /// null si la empresa no ha subido ninguno. Sin logo se imprime igual: es
+  /// el membrete de texto el que identifica a quien pide.
+  logo: LogoEmpresa | null;
 }
 
 const TITULO: Record<string, string> = {
@@ -32,7 +36,7 @@ const CUENTA: Record<string, string> = {
 
 const MONEDA: Record<string, string> = { PEN: "Soles", USD: "Dólares" };
 
-export function DocumentoOrden({ orden }: Props) {
+export function DocumentoOrden({ orden, logo }: Props) {
   const { emisor, proveedor } = orden;
 
   const fecha = orden.fecha.toLocaleDateString("es-PE", {
@@ -57,6 +61,7 @@ export function DocumentoOrden({ orden }: Props) {
     >
       <Sello estado={orden.estado} />
       <Cabecera
+        logo={logo}
         emisor={emisor}
         titulo={TITULO[orden.tipo] ?? "ORDEN"}
         numero={orden.numero}
@@ -154,11 +159,13 @@ function Sello({ estado }: { estado: string }) {
 
 function Cabecera({
   emisor,
+  logo,
   titulo,
   numero,
   fecha,
 }: {
   emisor: OrdenImpresa["emisor"];
+  logo: LogoEmpresa | null;
   titulo: string;
   numero: string;
   fecha: string;
@@ -168,6 +175,16 @@ function Cabecera({
   return (
     <header className="flex items-start justify-between gap-8 border-b-2 border-black pb-4">
       <div>
+        {logo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logo.src}
+            alt={logo.alt}
+            width={logo.ancho}
+            height={logo.alto}
+            className="mb-2 h-12 w-auto max-w-52 object-contain"
+          />
+        )}
         <p className="text-base font-bold tracking-tight uppercase">
           {emisor.razonSocial}
         </p>
@@ -218,8 +235,8 @@ function TablaLineas({ lineas }: { lineas: OrdenImpresa["lineas"] }) {
           <Th className="w-16 text-right">CANT.</Th>
           <Th className="w-14">UND.</Th>
           <Th>DESCRIPCIÓN</Th>
-          <Th className="w-24 text-right">P. UNIT.</Th>
-          <Th className="w-28 text-right">IMPORTE</Th>
+          <Th className="w-24 text-right">P. UNIT. S/</Th>
+          <Th className="w-28 text-right">IMPORTE S/</Th>
         </tr>
       </thead>
       <tbody>
@@ -238,7 +255,9 @@ function TablaLineas({ lineas }: { lineas: OrdenImpresa["lineas"] }) {
             <Td className="text-right">
               {linea.esAgrupador ? "" : precio(linea.precioUnitario, "")}
             </Td>
-            <Td className="text-right">{decimal(linea.importe, "")}</Td>
+            <Td className="text-right">
+              {linea.esAgrupador ? "" : decimal(linea.importe, "")}
+            </Td>
           </tr>
         ))}
       </tbody>
@@ -294,14 +313,16 @@ function Totales({ orden }: { orden: OrdenImpresa }) {
     <section className="mt-4 flex justify-end break-inside-avoid">
       <table className="w-72 border-collapse border border-black">
         <tbody>
-          <Total etiqueta="SUB-TOTAL" importe={orden.subtotal} />
+          <Total etiqueta="SUBTOTAL" importe={orden.subtotal} />
           {hayDescuento && (
             <Total
               etiqueta="DESCUENTO COMERCIAL"
               importe={orden.descuentoComercial}
             />
           )}
-          {hayDescuento && <Total etiqueta="SUB-TOTAL" importe={orden.neto} />}
+          {hayDescuento && (
+            <Total etiqueta="SUBTOTAL NETO" importe={orden.neto} />
+          )}
           {orden.tipoImpuesto !== "NINGUNO" && (
             <Total
               etiqueta={etiquetaImpuesto(orden.tipoImpuesto, orden)}
@@ -330,7 +351,7 @@ function Total({
       <td
         className={`border border-black px-2 py-1 text-right font-mono ${destacado ? "text-sm font-bold" : ""}`}
       >
-        {decimal(importe)}
+        {`S/ ${decimal(importe)}`}
       </td>
     </tr>
   );

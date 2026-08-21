@@ -1,7 +1,5 @@
 import ExcelJS from "exceljs";
 
-import { HOJA_GASTOS } from "@/lib/excel-meta";
-import { mesesAjustadosAlPlazo } from "@/lib/gastos-contra-plazo";
 
 /**
  * La plantilla del PRESUPUESTO META, generada desde codigo.
@@ -74,8 +72,57 @@ function marcarEditable(celda: ExcelJS.Cell): void {
   celda.protection = { locked: false };
 }
 
-function formulaSubtotal(fila: number): string {
-  return `IF($A${fila}="","",IF($B${fila}="VARIABLE",$C${fila}*$D${fila},$E${fila}))`;
+/** Un codigo de capitulo: termina en ".0" o no lleva punto. */
+function esCapituloCodigo(f: FilaCosto): boolean {
+  return f.codigo.endsWith(".0") || !f.codigo.includes(".");
+}
+
+/** Subtotal real de un capitulo de ejemplo: lo que suman sus partidas. */
+function subtotalEjemplo(codigo: string): number {
+  const pfx = codigo.endsWith(".0") ? codigo.slice(0, -1) : `${codigo}.`;
+  return FILAS_COSTO.filter(
+    (h) => h.codigo.startsWith(pfx) && h.codigo !== codigo,
+  ).reduce(
+    (s, h) =>
+      s +
+      (h.metrado !== undefined && h.precioUnitario !== undefined
+        ? h.metrado * h.precioUnitario
+        : (h.parcial ?? 0)),
+    0,
+  );
+}
+
+/** Lo que costaria ese capitulo una vez recargado. */
+function contractualEjemplo(f: FilaCosto): number {
+  return subtotalEjemplo(f.codigo) * (1 + (f.recargo ?? 0) / 100);
+}
+
+/**
+ * Monto contractual de un capitulo: su subtotal real mas el recargo.
+ *
+ * La suma va por PREFIJO de codigo, no por rango de filas: asi sigue
+ * valiendo cuando se insertan partidas en medio, que es lo que hace todo el
+ * mundo. Los capitulos aportan cero (no llevan cifras propias), de modo que
+ * ninguna partida se cuenta dos veces.
+ *
+ * El prefijo se deduce DENTRO de la formula ("4.0" -> "4.", "4" -> "4.")
+ * porque en las filas preparadas aun no se sabe que codigo se escribira.
+ *
+ * Es para que se VEA en la hoja. Al importar, GCM recalcula el contractual
+ * por su cuenta: el archivo muestra, el importador manda.
+ */
+function formulaContractual(
+  fila: number,
+  primera: number,
+  ultima: number,
+): string {
+  const pfx =
+    `IF(RIGHT($A${fila},2)=".0",LEFT($A${fila},LEN($A${fila})-1),$A${fila}&".")`;
+  return (
+    `IF($G${fila}="","",` +
+    `SUMPRODUCT((LEFT($A$${primera}:$A$${ultima},LEN(${pfx}))=${pfx})` +
+    `*N($F$${primera}:$F$${ultima}))*(1+$G${fila}/100))`
+  );
 }
 
 const CABECERAS_COSTO = [
@@ -85,16 +132,10 @@ const CABECERAS_COSTO = [
   "Metrado",
   "Precio Unitario",
   "Parcial",
+  "% Recargo",
+  "Contractual",
 ] as const;
 
-const CABECERAS_GASTOS = [
-  "Concepto",
-  "Tipo",
-  "Monto mensual",
-  "Meses",
-  "Importe fijo",
-  "Subtotal",
-] as const;
 
 interface FilaCosto {
   codigo: string;
@@ -103,6 +144,8 @@ interface FilaCosto {
   metrado?: number;
   precioUnitario?: number;
   parcial?: number;
+  /// Solo en capitulos: cuanto se recarga para llegar al contractual.
+  recargo?: number;
 }
 
 /**
@@ -118,7 +161,11 @@ interface FilaCosto {
  * plantilla tiene que analizar limpia.
  */
 export const FILAS_COSTO: readonly FilaCosto[] = [
-  { codigo: "1.0", descripcion: "OBRAS PROVISIONALES Y TRABAJOS PRELIMINARES" },
+  {
+    codigo: "1.0",
+    descripcion: "OBRAS PROVISIONALES Y TRABAJOS PRELIMINARES",
+    recargo: 18,
+  },
   {
     codigo: "1.1",
     descripcion: "Cartel de identificación de obra 3.60 × 2.40 m",
@@ -135,7 +182,11 @@ export const FILAS_COSTO: readonly FilaCosto[] = [
     precioUnitario: 28,
     parcial: 1260,
   },
-  { codigo: "2.0", descripcion: "ESTRUCTURAS" },
+  {
+    codigo: "2.0",
+    descripcion: "ESTRUCTURAS",
+    recargo: 15,
+  },
   {
     codigo: "2.1",
     descripcion: "Concreto premezclado f'c = 210 kg/cm² en columnas",
@@ -154,6 +205,7 @@ export const FILAS_COSTO: readonly FilaCosto[] = [
   },
   {
     codigo: "3.0",
+    recargo: 22,
     descripcion: "COSTOS PROPIOS DE LA META (el contrato no los desglosa)",
   },
   {
@@ -239,34 +291,6 @@ const INSTRUCCIONES: readonly (readonly [string, string])[] = [
   ],
 ];
 
-const INSTRUCCIONES_GASTOS: readonly (readonly [string, string])[] = [
-  ["", ""],
-  [
-    "5. Hoja «Gastos Generales»",
-    "Aquí NO se pide un porcentaje, se pide una lista. Los gastos generales no crecen con la producción: crecen con los MESES. Un porcentaje sobre el costo directo esconde el sobrecosto más caro que tiene una obra, que es la que se estira con todas sus partidas en meta.",
-  ],
-  [
-    "6. VARIABLE contra FIJO",
-    "VARIABLE es lo que se paga por mes (residente, maestro, camioneta, oficina): llena «Monto mensual» y «Meses», y deja «Importe fijo» vacío. FIJO es lo que no se mueve aunque la obra se alargue (cartas fianza, pólizas, licencias): llena solo «Importe fijo».",
-  ],
-  [
-    "7. Los meses son por línea",
-    "El almacenero del ejemplo está 6 meses de los 8 del plazo. Nadie está en obra todo el plazo, y con un único número global el gasto saldría siempre de más.",
-  ],
-  [
-    "8. Para qué sirve separarlos",
-    "De los VARIABLES sale lo que cuesta cada mes de atraso. En el ejemplo son S/ 14 500 al mes: eso es lo que pierdes por cada mes de más, y no se recupera trabajando mejor, solo terminando antes.",
-  ],
-  ["", ""],
-  [
-    "¿Y la utilidad?",
-    "No aparece por ninguna parte, y es a propósito. La utilidad NO es un costo que puedas gastar: es el resultado. Si entra en la meta se vuelve presupuesto, la obra se la gasta y nadie lo nota hasta la liquidación. GCM la muestra aparte, al lado de la bolsa, etiquetada como lo que es.",
-  ],
-  [
-    "Antes de importar",
-    "Borra las filas de ejemplo de las dos hojas y escribe lo tuyo. Al importar verás una vista previa con totales y avisos ANTES de confirmar: nada se guarda sin que lo revises.",
-  ],
-];
 
 const VERDE = "FF0D5C56";
 const VERDE_SUAVE = "FFE8F0EF";
@@ -281,40 +305,6 @@ function pintarCabecera(fila: ExcelJS.Row, titulos: readonly string[]) {
   });
 }
 
-/**
- * Ajusta los meses de los ejemplos al plazo REAL de la obra.
- *
- * Los ejemplos traian 8 meses escritos a mano, pensados para una obra de ese
- * tamano. Descargada para una obra de trece dias, quien no cambiara esa
- * columna presupuestaba ocho meses de residente: de ahi salieron 125.700 de
- * gastos generales sobre un costo directo de 15.478.
- *
- * Se conserva la PROPORCION entre lineas —el almacenero entra mas tarde y
- * lleva 6 de los 8 meses, que es la leccion que enseña la plantilla— en vez
- * de poner el mismo numero en todas.
- */
-function ajustarMeses(
-  filas: readonly FilaGasto[],
-  mesesObra: number | null,
-): FilaGasto[] {
-  if (mesesObra === null || mesesObra <= 0) return [...filas];
-
-  // La MISMA regla que corrige la pantalla, no una copia: lo que propone el
-  // Excel y lo que arregla el boton tienen que dar el mismo numero.
-  const ajustes = mesesAjustadosAlPlazo(
-    filas.map((f) => ({
-      concepto: f.concepto,
-      tipo: f.tipo,
-      meses: f.meses?.toFixed(2) ?? null,
-    })),
-    String(mesesObra),
-  );
-
-  const porIndice = new Map(ajustes.map((a) => [a.indice, Number(a.despues)]));
-  return filas.map((f, i) =>
-    porIndice.has(i) ? { ...f, meses: porIndice.get(i)! } : f,
-  );
-}
 
 /**
  * @param mesesObra Plazo real de la obra. Si viene, los ejemplos se ajustan a
@@ -322,7 +312,7 @@ function ajustarMeses(
  *   sigue fijando los mismos totales).
  */
 export async function generarPlantillaMeta(
-  mesesObra: number | null = null,
+  _mesesObra: number | null = null,
 ): Promise<ArrayBuffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = "GCM";
@@ -332,6 +322,7 @@ export async function generarPlantillaMeta(
   costo.columns = [
     { width: 10 }, { width: 56 }, { width: 8 },
     { width: 12 }, { width: 16 }, { width: 16 },
+    { width: 12 }, { width: 18 },
   ];
 
   costo.getCell("A1").value = "PRESUPUESTO META - COSTO DIRECTO";
@@ -341,6 +332,20 @@ export async function generarPlantillaMeta(
   costo.getCell("A2").font = { italic: true, color: { argb: "FF667788" } };
 
   pintarCabecera(costo.getRow(FILA_CABECERA), CABECERAS_COSTO);
+
+  // Se explica DONDE se usa: una nota en la cabecera se lee justo cuando
+  // hace falta, y la hoja de instrucciones se lee una vez y se olvida.
+  costo.getCell(`G${FILA_CABECERA}`).note =
+    "Solo en los capítulos. Escribe 15 para 15%: cuánto se recarga este " +
+    "capítulo del presupuesto real para llegar al contractual.";
+  costo.getCell(`H${FILA_CABECERA}`).note =
+    "Se calcula solo: el subtotal real del capítulo más su recargo. " +
+    "La suma de esta columna es el presupuesto contractual.";
+
+  // Se declaran aqui arriba porque la formula del contractual, que ya se
+  // escribe en las filas de ejemplo, necesita el rango completo.
+  const primeraFila = FILA_CABECERA + 1;
+  const ultimaFila = FILA_CABECERA + FILAS_PREPARADAS;
 
   let n = FILA_CABECERA;
   for (const f of FILAS_COSTO) {
@@ -374,13 +379,28 @@ export async function generarPlantillaMeta(
     );
 
     fila.getCell(3).alignment = { horizontal: "center" };
-    fila.getCell(4).numFmt = "#,##0.0000";
+    fila.getCell(4).numFmt = "#,##0.00";
     fila.getCell(5).numFmt = "#,##0.00";
     fila.getCell(6).numFmt = "#,##0.00";
 
-    const esCapitulo = f.codigo.endsWith(".0") || !f.codigo.includes(".");
+    const esCapitulo = esCapituloCodigo(f);
     if (esCapitulo) {
-      for (let c = 1; c <= 6; c++) {
+      // El recargo es lo UNICO que se escribe en un capitulo: de ahi sale el
+      // presupuesto contractual. Las partidas no lo llevan.
+      if (f.recargo !== undefined) fila.getCell(7).value = f.recargo;
+      fila.getCell(8).value = {
+        formula: formulaContractual(n, primeraFila, ultimaFila),
+        result: contractualEjemplo(f),
+      };
+      fila.getCell(7).numFmt = "#,##0.00";
+      fila.getCell(8).numFmt = "#,##0.00";
+      marcarEditable(fila.getCell(7));
+      marcarCalculada(
+        fila.getCell(8),
+        "Se calcula solo: el subtotal real del capítulo más su recargo.",
+      );
+
+      for (let c = 1; c <= 8; c++) {
         fila.getCell(c).font = { bold: true };
         fila.getCell(c).fill = {
           type: "pattern",
@@ -399,17 +419,26 @@ export async function generarPlantillaMeta(
    * blanco para que se lea como pie y no como una linea mas.
    */
 
-  const primeraFila = FILA_CABECERA + 1;
-  const ultimaFila = FILA_CABECERA + FILAS_PREPARADAS;
-
   for (let f = n + 1; f <= ultimaFila; f++) {
     const fila = costo.getRow(f);
-    fila.getCell(4).numFmt = "#,##0.0000";
+    fila.getCell(4).numFmt = "#,##0.00";
     fila.getCell(5).numFmt = "#,##0.00";
     fila.getCell(6).numFmt = "#,##0.00";
     // Sin descripcion el importador la salta, asi que la formula puede estar
     // puesta desde el principio: aparece sola en cuanto se escribe la linea.
     fila.getCell(6).value = { formula: `IF(B${f}="","",D${f}*E${f})`, result: "" };
+    // El recargo y su contractual: en blanco hasta que la fila sea capitulo.
+    fila.getCell(7).numFmt = "#,##0.00";
+    fila.getCell(8).numFmt = "#,##0.00";
+    fila.getCell(8).value = {
+      formula: formulaContractual(f, primeraFila, ultimaFila),
+      result: "",
+    };
+    marcarEditable(fila.getCell(7));
+    marcarCalculada(
+      fila.getCell(8),
+      "Se calcula solo: el subtotal real del capítulo más su recargo.",
+    );
     for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
     marcarCalculada(
       fila.getCell(6),
@@ -434,93 +463,22 @@ export async function generarPlantillaMeta(
       `SUMPRODUCT((RIGHT($A$${primeraFila}:$A$${ultimaFila},2)<>".0")*` +
       `($A$${primeraFila}:$A$${ultimaFila}<>"")*N($F$${primeraFila}:$F$${ultimaFila}))`,
   };
+
+  // El contractual total: la suma de los capitulos ya recargados. Solo los
+  // capitulos llevan cifra en esa columna, asi que sumarla entera no cuenta
+  // nada dos veces.
+  total.getCell(8).value = {
+    result: FILAS_COSTO.filter(esCapituloCodigo).reduce(
+      (s, f) => s + contractualEjemplo(f),
+      0,
+    ),
+    formula: `SUM($H$${primeraFila}:$H$${ultimaFila})`,
+  };
+  total.getCell(8).numFmt = "#,##0.00";
+  total.getCell(8).font = { bold: true };
   total.getCell(6).numFmt = "#,##0.00";
   total.getCell(6).font = { bold: true };
 
-  const gastos = libro.addWorksheet(HOJA_GASTOS);
-  gastos.columns = [
-    { width: 44 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 16 },
-    { width: 16 },
-  ];
-
-  gastos.getCell("A1").value = "PRESUPUESTO META - GASTOS GENERALES";
-  gastos.getCell("A1").font = { bold: true, size: 14 };
-  gastos.getCell("A2").value =
-    "No es un porcentaje: es una lista con plazo. Crecen con los MESES, no con la producción.";
-  gastos.getCell("A2").font = { italic: true, color: { argb: "FF667788" } };
-
-  pintarCabecera(gastos.getRow(FILA_CABECERA), CABECERAS_GASTOS);
-
-  let g = FILA_CABECERA;
-  for (const f of ajustarMeses(FILAS_GASTOS, mesesObra)) {
-    g++;
-    const fila = gastos.getRow(g);
-    fila.getCell(1).value = f.concepto;
-    fila.getCell(2).value = f.tipo;
-    if (f.montoMensual !== undefined) fila.getCell(3).value = f.montoMensual;
-    if (f.meses !== undefined) fila.getCell(4).value = f.meses;
-    if (f.montoFijo !== undefined) fila.getCell(5).value = f.montoFijo;
-
-    fila.getCell(2).alignment = { horizontal: "center" };
-    fila.getCell(3).numFmt = "#,##0.00";
-    fila.getCell(4).alignment = { horizontal: "center" };
-    fila.getCell(5).numFmt = "#,##0.00";
-    // El subtotal de la linea, calculado: un VARIABLE es mensual x meses y un
-    // FIJO es su importe. Antes habia que multiplicarlo a mano y nada avisaba
-    // si el resultado no cuadraba con lo tecleado.
-    fila.getCell(6).value = {
-      formula: formulaSubtotal(g),
-      result:
-        f.tipo === "VARIABLE"
-          ? (f.montoMensual ?? 0) * (f.meses ?? 0)
-          : (f.montoFijo ?? 0),
-    };
-    fila.getCell(6).numFmt = "#,##0.00";
-    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
-    marcarCalculada(
-      fila.getCell(6),
-      "Se calcula solo: mensual x meses si es VARIABLE, o el importe fijo.",
-    );
-  }
-
-  // Igual que en el costo directo: filas preparadas para las que cada obra
-  // necesite, y totales que abarcan todo el bloque.
-  const primerGasto = FILA_CABECERA + 1;
-  const ultimoGasto = FILA_CABECERA + FILAS_PREPARADAS;
-
-  for (let f = g + 1; f <= ultimoGasto; f++) {
-    const fila = gastos.getRow(f);
-    fila.getCell(2).alignment = { horizontal: "center" };
-    fila.getCell(3).numFmt = "#,##0.00";
-    fila.getCell(4).alignment = { horizontal: "center" };
-    fila.getCell(5).numFmt = "#,##0.00";
-    fila.getCell(6).value = { formula: formulaSubtotal(f), result: "" };
-    fila.getCell(6).numFmt = "#,##0.00";
-    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
-    marcarCalculada(
-      fila.getCell(6),
-      "Se calcula solo: mensual x meses si es VARIABLE, o el importe fijo.",
-    );
-  }
-
-  const filaTotalGG = ultimoGasto + 2;
-  const rango = `$F$${primerGasto}:$F$${ultimoGasto}`;
-  const tipos = `$B$${primerGasto}:$B$${ultimoGasto}`;
-
-  const pie: readonly [string, string][] = [
-    ["TOTAL GASTOS GENERALES", `SUM(${rango})`],
-    ["GG Variables (crecen con el plazo)", `SUMIF(${tipos},"VARIABLE",${rango})`],
-    ["GG Fijos (no dependen del plazo)", `SUMIF(${tipos},"FIJO",${rango})`],
-  ];
-
-  pie.forEach(([etiqueta, formula], i) => {
-    const fila = gastos.getRow(filaTotalGG + i);
-    fila.getCell(1).value = etiqueta;
-    fila.getCell(1).font = { bold: i === 0 };
-    fila.getCell(6).value = { formula };
-    fila.getCell(6).numFmt = "#,##0.00";
-    fila.getCell(6).font = { bold: i === 0 };
-  });
 
   /**
    * La leyenda, arriba del todo y en las dos hojas.
@@ -528,7 +486,7 @@ export async function generarPlantillaMeta(
    * El gris no significa nada por si solo: hay que decir que quiere decir, y
    * decirlo DONDE se ve, no en la hoja de instrucciones que se lee una vez.
    */
-  for (const hoja of [costo, gastos]) {
+  for (const hoja of [costo]) {
     const leyenda = hoja.getCell("A3");
     leyenda.value =
       "Las celdas en gris se calculan solas y están bloqueadas. Escribe solo en las blancas. " +
@@ -561,7 +519,7 @@ export async function generarPlantillaMeta(
   const instrucciones = libro.addWorksheet("Instrucciones");
   instrucciones.columns = [{ width: 30 }, { width: 100 }];
 
-  [...INSTRUCCIONES, ...INSTRUCCIONES_GASTOS].forEach(([titulo, cuerpo], i) => {
+  [...INSTRUCCIONES].forEach(([titulo, cuerpo], i) => {
     const fila = instrucciones.getRow(i + 1);
     fila.getCell(1).value = titulo;
     fila.getCell(1).font = { bold: true };

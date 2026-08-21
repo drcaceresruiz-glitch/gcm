@@ -35,8 +35,6 @@ const BASE: DatosBolsa = {
   modo: "PARTIDA",
   contractual: CONTRACTUAL,
   meta: META,
-  gastosGeneralesContractual: "10000.00",
-  gastosGeneralesMeta: "7000.00",
   utilidadContractual: "8000.00",
 };
 
@@ -47,13 +45,13 @@ describe("la utilidad no es bolsa", () => {
     const b = calcularBolsa(BASE);
 
     // produccion 21.000 + plazo 3.000. La utilidad son 8.000 mas, y no estan.
-    expect(b.bolsaTotal).toBe("24000.00");
+    expect(b.bolsaTotal).toBe("21000.00");
     expect(b.utilidadContractual).toBe("8000.00");
   });
 
   it("y el margen esperado la suma aparte, con nombre propio", () => {
     const b = calcularBolsa(BASE);
-    expect(b.margenEsperado).toBe("32000.00");
+    expect(b.margenEsperado).toBe("29000.00");
   });
 
   it("cambiar la utilidad no mueve la bolsa", () => {
@@ -65,30 +63,26 @@ describe("la utilidad no es bolsa", () => {
   });
 });
 
-describe("las dos bolsas van separadas", () => {
-  it("produccion sale del costo directo y plazo de los gastos generales", () => {
+describe("la bolsa sale del costo directo", () => {
+  it("la bolsa es la diferencia de costo directo", () => {
     const b = calcularBolsa(BASE);
 
     expect(b.costoDirectoContractual).toBe("100000.00");
     expect(b.costoDirectoMeta).toBe("79000.00");
     expect(b.bolsaProduccion).toBe("21000.00");
-    expect(b.bolsaPlazo).toBe("3000.00");
   });
 
-  it("un ahorro de plazo no tapa un sobrecosto de produccion", () => {
+  it("un sobrecosto de produccion se ve entero, sin nada que lo tape", () => {
     // La meta se pasa en produccion (-5.000) pero ahorra en plazo (+8.000).
     // El total queda positivo, y por eso las dos cifras tienen que verse.
     const b = calcularBolsa({
       ...BASE,
       meta: [{ codigoRef: "1.1", descripcion: "Concreto", importe: "55000.00" }],
       contractual: [CONTRACTUAL[0]!],
-      gastosGeneralesContractual: "10000.00",
-      gastosGeneralesMeta: "2000.00",
     });
 
     expect(b.bolsaProduccion).toBe("-5000.00");
-    expect(b.bolsaPlazo).toBe("8000.00");
-    expect(b.bolsaTotal).toBe("3000.00");
+    expect(b.bolsaTotal).toBe("-5000.00");
   });
 });
 

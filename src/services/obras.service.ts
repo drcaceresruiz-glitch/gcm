@@ -5,7 +5,7 @@ import { verificarSalud } from "@/services/salud.service";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { alcanzaObra, filtroDeObras } from "@/lib/alcance-obras";
+import { alcanzaObra, filtroDeObras, VE_TODAS_LAS_OBRAS } from "@/lib/alcance-obras";
 import { esPositivo, restar, sumar } from "@/lib/decimal";
 import {
   comprometidoPorPartida,
@@ -833,6 +833,15 @@ export interface HitosObra {
   cronograma: boolean;
   /// Linea base del PRESUPUESTO aprobada (la referencia congelada).
   lineaBase: boolean;
+  /**
+   * Hay al menos UNA revision, aprobada o no.
+   *
+   * Distinto de `lineaBase`: la propuesta para el cliente se puede emitir
+   * desde un borrador -con su sello-, y de hecho verla en papel es parte de
+   * decidir si se aprueba. Sin ninguna revision esa pantalla no tiene nada
+   * que enseñar, y su entrada del menu no debe existir.
+   */
+  revision: boolean;
   /// Hay al menos una tarea ANALIZADA en el Lookahead. No basta con que la
   /// tarea este en la matriz: desde que las restricciones se eligen, traerla
   /// no analiza nada y el hito se encenderia sin que nadie hubiera mirado.
@@ -843,6 +852,15 @@ export interface HitosObra {
   /// congela no gobierna ninguna bolsa, igual que en `metaQueManda`.
   meta: boolean;
   /**
+   * Hay un presupuesto meta, aunque siga en borrador.
+   *
+   * Lo usa el anclaje de continuidad, que pregunta otra cosa que la bolsa:
+   * no si la meta ya manda, sino si el primer tramo del alta esta dado. Con
+   * `meta` a secas, a quien cargo el real y aun no lo aprobo se le volvia a
+   * pedir que lo cargara.
+   */
+  metaCargada: boolean;
+  /**
    * Hay alguien asignado a la obra.
    *
    * NO alimenta el riel del menu —no hay seccion «Equipo» en las fases del
@@ -851,6 +869,12 @@ export interface HitosObra {
    * («entro y no veo ninguna obra»), asi que quien lo omite no lo nota.
    */
   equipo: boolean;
+  /**
+   * Hay alguien a quien asignar: un usuario ACTIVO cuyo rol NO ve ya toda la
+   * cartera. Alimenta el paso «asignar equipo» del anclaje: sin nadie
+   * asignable no hay boton que ofrecer y proponerlo seria un callejon.
+   */
+  equipoAsignable: boolean;
 }
 
 export const hitosDeObra = cache(async function hitosDeObra(
@@ -867,10 +891,13 @@ export const hitosDeObra = cache(async function hitosDeObra(
       presupuesto: false,
       cronograma: false,
       lineaBase: false,
+      revision: false,
       lookahead: false,
       planSemanal: false,
       meta: false,
+      metaCargada: false,
       equipo: false,
+      equipoAsignable: false,
     };
   }
 
@@ -880,7 +907,18 @@ export const hitosDeObra = cache(async function hitosDeObra(
     project: { companyId: sesion.companyId },
   };
 
-  const [partida, cronograma, base, lookahead, plan, meta, miembro] =
+  const [
+    partida,
+    cronograma,
+    base,
+    revision,
+    lookahead,
+    plan,
+    meta,
+    metaCargada,
+    miembro,
+    asignables,
+  ] =
     await Promise.all([
     prisma.wbsItem.findFirst({ where: deLaObra, select: { id: true } }),
     prisma.cronograma.findFirst({ where: deLaObra, select: { id: true } }),
@@ -888,6 +926,9 @@ export const hitosDeObra = cache(async function hitosDeObra(
       where: { ...deLaObra, aprobadaAt: { not: null } },
       select: { id: true },
     }),
+    // Cualquier revision, aprobada o no: la propuesta se puede emitir desde
+    // un borrador, con su sello.
+    prisma.baseline.findFirst({ where: deLaObra, select: { id: true } }),
     prisma.lookaheadTask.findFirst({
       where: { ...deLaObra, analizadaAt: { not: null } },
       select: { id: true },
@@ -897,6 +938,8 @@ export const hitosDeObra = cache(async function hitosDeObra(
       where: { ...deLaObra, aprobadaAt: { not: null } },
       select: { id: true },
     }),
+    // Sin exigir que este aprobada: para el anclaje, cargarla ya es el paso.
+    prisma.presupuestoMeta.findFirst({ where: deLaObra, select: { id: true } }),
     // La pertenencia NO lleva `project: { companyId }` como las demas: la
     // tabla cuelga de la obra, y la obra ya se comprobo de esta empresa en
     // `alcanzaObra` y en el `obtenerObra` del layout.
@@ -904,16 +947,29 @@ export const hitosDeObra = cache(async function hitosDeObra(
       where: { projectId: obraId },
       select: { userId: true },
     }),
+    // Cuenta barata (companyId + estado + role, indexados) de quien PODRIA
+    // asignarse: activo y con rol que no ve ya toda la cartera. Un ADMIN no
+    // cuenta porque ya la ve sin asignacion.
+    prisma.user.count({
+      where: {
+        companyId: sesion.companyId,
+        estado: "ACTIVO",
+        role: { notIn: [...VE_TODAS_LAS_OBRAS] },
+      },
+    }),
   ]);
 
   return {
     presupuesto: partida !== null,
     cronograma: cronograma !== null,
     lineaBase: base !== null,
+    revision: revision !== null,
     lookahead: lookahead !== null,
     planSemanal: plan !== null,
     meta: meta !== null,
+    metaCargada: metaCargada !== null,
     equipo: miembro !== null,
+    equipoAsignable: asignables > 0,
   };
 });
 

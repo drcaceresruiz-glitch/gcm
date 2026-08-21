@@ -153,6 +153,7 @@ function capitulo(codigo: string, descripcion: string): FilaImportada {
     metrado: null,
     precioUnitario: null,
     parcial: null,
+    porcentajeRecargo: null,
   };
 }
 
@@ -168,6 +169,7 @@ function partida(codigo: string, parcial: string): FilaImportada {
     metrado: "10.0000",
     precioUnitario: "25.0000",
     parcial,
+    porcentajeRecargo: null,
   };
 }
 

@@ -696,6 +696,7 @@ describe("presupuesto meta", () => {
         descripcion: "Concreto",
         tipo: "PARTIDA" as const,
         parcial: "45000.00",
+        porcentajeRecargo: null,
       },
     ],
     gastosGenerales: [],

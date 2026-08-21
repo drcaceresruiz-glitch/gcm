@@ -8,6 +8,7 @@ import {
   proximoCorte,
   corteSiguiente,
   rangoSemana,
+  semanaQueSePisa,
   tareasDeLaSemana,
   restriccionDeTarea,
   sugerirCantidad,
@@ -718,6 +719,35 @@ describe("arrastreDeIncumplidos", () => {
   });
 });
 
+describe("la semana de arranque", () => {
+  it("empieza donde diga fechaInicio, no siete dias antes", () => {
+    const r = rangoSemana(dc("2026-08-28"), dc("2026-08-20"));
+    expect(r.inicio.toISOString().slice(0, 10)).toBe("2026-08-20");
+    expect(r.fin.toISOString().slice(0, 10)).toBe("2026-08-28");
+  });
+
+  it("sin fechaInicio sigue siendo la semana de siete dias", () => {
+    const r = rangoSemana(dc("2026-08-28"));
+    expect(r.inicio.toISOString().slice(0, 10)).toBe("2026-08-22");
+  });
+
+  it("una fechaInicio que ACORTA la semana se ignora", () => {
+    const r = rangoSemana(dc("2026-08-28"), dc("2026-08-26"));
+    expect(r.inicio.toISOString().slice(0, 10)).toBe("2026-08-22");
+  });
+});
+
+describe("semanaQueSePisa", () => {
+  const s1 = [{ numero: 1, fechaCorte: dc("2026-08-28"), fechaInicio: dc("2026-08-20") }];
+
+  it("caza la semana que comparte algun dia, y dice cual", () => {
+    expect(semanaQueSePisa(dc("2026-08-24"), dc("2026-08-30"), s1)).toBe(1);
+  });
+
+  it("una semana que empieza justo despues no se pisa", () => {
+    expect(semanaQueSePisa(dc("2026-08-29"), dc("2026-09-04"), s1)).toBeNull();
+  });
+});
 describe("rangoSemana", () => {
   it("los 7 dias que terminan en el corte", () => {
     const { inicio, fin } = rangoSemana(dc("2026-08-07"));

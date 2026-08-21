@@ -7,9 +7,14 @@ import {
   accionCrearRevision,
   type EstadoRevision,
 } from "@/app/(dashboard)/obras/[id]/revisiones/acciones";
-import { calcularCascada, porcentajeAFraccion } from "@/lib/presupuesto";
+import {
+  calcularCascadaComercial,
+  parametrosDeImpuesto,
+  porcentajeAFraccion,
+} from "@/lib/presupuesto";
+import { sumar } from "@/lib/decimal";
 import { CampoTexto } from "@/components/auth/CampoTexto";
-import { CuadroCascada } from "@/components/revisiones/CuadroCascada";
+import { CuadroCascadaComercial } from "@/components/revisiones/CuadroCascadaComercial";
 
 /**
  * Alta de una revision del presupuesto.
@@ -61,24 +66,49 @@ export function FormularioRevision({
   const [gastosGenerales, setGastosGenerales] = useState(iniciales.gastosGenerales);
   const [utilidad, setUtilidad] = useState(iniciales.utilidad);
   const [igv, setIgv] = useState(iniciales.igv);
+  const [descuento, setDescuento] = useState("0");
+  const [tipoImpuesto, setTipoImpuesto] = useState<"IGV" | "RENTA" | "NINGUNO">(
+    "IGV",
+  );
+  const [retencionAsumida, setRetencionAsumida] = useState(false);
 
   // Un porcentaje a medio escribir vale cero en la vista previa: la cifra
   // se corrige sola en cuanto el numero esta completo.
   const cascada = useMemo(
     () =>
-      calcularCascada({
-        costoDirecto,
-        descuentos,
+      calcularCascadaComercial({
+        // El MISMO neto que calcula el servidor: las partidas negativas del
+        // presupuesto son costo directo, no descuento comercial. Si aqui se
+        // usara el bruto, la vista previa mentiria sobre lo que se guarda.
+        costoDirecto: sumar([costoDirecto, descuentos], 2),
         porcentajeGastosGenerales: porcentajeAFraccion(gastosGenerales) ?? "0",
         porcentajeUtilidad: porcentajeAFraccion(utilidad) ?? "0",
-        porcentajeIgv: porcentajeAFraccion(igv) ?? "0",
+        porcentajeDescuento: porcentajeAFraccion(descuento) ?? "0",
+        // La traduccion de tipoImpuesto y retencionAsumida vive en UNA sola
+        // funcion: si aqui difiriera del servidor, la vista previa mentiria
+        // sobre la cifra que se va a guardar.
+        ...parametrosDeImpuesto(
+          tipoImpuesto,
+          porcentajeAFraccion(igv) ?? "0",
+          retencionAsumida,
+        ),
       }),
-    [costoDirecto, descuentos, gastosGenerales, utilidad, igv],
+    [
+      costoDirecto,
+      descuentos,
+      gastosGenerales,
+      utilidad,
+      igv,
+      descuento,
+      tipoImpuesto,
+      retencionAsumida,
+    ],
   );
 
   const etiquetas = {
     gastosGenerales: gastosGenerales.trim() || "0",
     utilidad: utilidad.trim() || "0",
+    descuento: descuento.trim() || "0",
     igv: igv.trim() || "0",
   };
 
@@ -161,6 +191,55 @@ export function FormularioRevision({
           />
         </div>
 
+        <div className="grid gap-4 sm:grid-cols-2">
+          <CampoTexto
+            id="porcentajeDescuento"
+            name="porcentajeDescuento"
+            type="text"
+            inputMode="decimal"
+            etiqueta="Descuento comercial %"
+            value={descuento}
+            onChange={(e) => setDescuento(e.target.value)}
+            ayuda="Se resta del subtotal, después de gastos generales y utilidad."
+          />
+
+          <div>
+            <label className="block text-sm font-medium" htmlFor="tipoImpuesto">
+              Cómo se factura
+            </label>
+            <select
+              id="tipoImpuesto"
+              name="tipoImpuesto"
+              className="mt-1 w-full rounded border p-2 text-sm"
+              value={tipoImpuesto}
+              onChange={(e) =>
+                setTipoImpuesto(e.target.value as "IGV" | "RENTA" | "NINGUNO")
+              }
+            >
+              <option value="IGV">Con IGV (factura)</option>
+              <option value="RENTA">Recibo por honorarios (sin IGV)</option>
+              <option value="NINGUNO">Sin impuesto</option>
+            </select>
+          </div>
+        </div>
+
+        {tipoImpuesto === "RENTA" && (
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="retencionAsumida"
+              className="mt-1"
+              checked={retencionAsumida}
+              onChange={(e) => setRetencionAsumida(e.target.checked)}
+            />
+            <span>
+              Asumir la retención del 8 %: el precio sube para que, después de
+              que el cliente retenga, quede limpio lo pactado. Sin marcar, el
+              precio no cambia y abajo se lee cuánto queda.
+            </span>
+          </label>
+        )}
+
         <CampoTexto
           id="tipoCambio"
           name="tipoCambio"
@@ -207,7 +286,7 @@ export function FormularioRevision({
             backgroundColor: "var(--superficie)",
           }}
         >
-          <CuadroCascada cascada={cascada} porcentajes={etiquetas} />
+          <CuadroCascadaComercial cascada={cascada} porcentajes={etiquetas} />
         </div>
 
         <BotonCrear />

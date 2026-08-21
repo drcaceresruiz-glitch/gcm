@@ -34,11 +34,18 @@ export async function accionCrearPlanSemanal(
   fechaCorte: string,
   /// Segunda pasada: el residente ya vio el aviso de numeracion y sigue.
   confirmado = false,
+  /// Solo la PRIMERA semana de la obra: el dia en que empieza, si arranca
+  /// antes de los siete dias que terminan en el corte.
+  fechaInicio?: string,
 ): Promise<ResultadoCrearPlan> {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
 
-  const r = await crearPlanSemanal(sesion, obraId, { fechaCorte, confirmado });
+  const r = await crearPlanSemanal(sesion, obraId, {
+    fechaCorte,
+    confirmado,
+    fechaInicio,
+  });
   if (r.ok) revalidatePath(`/obras/${obraId}/plan-semanal`);
   return r;
 }

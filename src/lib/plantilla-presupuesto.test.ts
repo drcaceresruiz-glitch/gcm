@@ -40,8 +40,8 @@ describe("plantilla de presupuesto", () => {
     expect(porCodigo.get("2.1")?.modalidad).toBe("PRECIOS_UNITARIOS");
     // Unidad global: precio cerrado aunque metrado x precio cuadre.
     expect(porCodigo.get("3.1")?.modalidad).toBe("SUMA_ALZADA");
-    // Parcial sin metrado ni precio unitario: suma alzada pura.
-    expect(porCodigo.get("3.2")?.modalidad).toBe("SUMA_ALZADA");
+    // 3.2 es una partida normal: metrado x precio con formula.
+    expect(porCodigo.get("3.2")?.modalidad).toBe("PRECIOS_UNITARIOS");
   });
 
   it("suma el total esperado y no dispara el aviso de repetidos", async () => {

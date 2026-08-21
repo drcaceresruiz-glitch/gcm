@@ -41,8 +41,16 @@ export const SEMANAS_MINIMO = 1;
 /// Mas alla de esto el cronograma deja de ser fiable y el analisis es humo.
 export const SEMANAS_MAXIMO = 12;
 
-/// Las opciones del selector. Se puede pedir cualquier numero por la URL.
-export const SEMANAS_SUGERIDAS: readonly number[] = [3, 4, 6, 8, 12];
+/**
+ * Las opciones del selector. Se puede pedir cualquier numero por la URL.
+ *
+ * UNA y DOS semanas estan aqui aunque el Last Planner hable de tres: una obra
+ * de dos semanas no tiene tres que mirar, y ofrecerle solo ventanas mas largas
+ * que la obra entera llena la matriz de trabajo que no existe. El minimo util
+ * del metodo sigue siendo 3 —y por eso es el defecto—, pero el tamano de la
+ * obra manda sobre la doctrina.
+ */
+export const SEMANAS_SUGERIDAS: readonly number[] = [1, 2, 3, 4, 6, 8, 12];
 
 /**
  * El numero de semanas que pide la pantalla, acotado.

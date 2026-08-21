@@ -12,12 +12,24 @@ import { accionCrearPlanSemanal } from "@/app/(dashboard)/obras/[id]/plan-semana
 export function NuevaSemana({
   obraId,
   fechaSugerida,
+  inicioObra,
 }: {
   obraId: string;
   fechaSugerida: string;
+  /**
+   * El dia en que arranca la obra, SOLO cuando todavia no hay ninguna semana.
+   *
+   * Con el se ofrece elegir desde cuando cuenta la primera: una obra que
+   * empieza el jueves con corte en viernes dejaria sus dos primeros dias
+   * fuera de toda semana, y ese trabajo existe igual. A partir de la segunda
+   * no se ofrece, porque las demas son de siete dias para que el PPC se
+   * pueda comparar entre semanas.
+   */
+  inicioObra?: string | null;
 }) {
   const router = useRouter();
   const [fecha, setFecha] = useState(fechaSugerida);
+  const [inicio, setInicio] = useState(inicioObra ?? "");
   const [error, setError] = useState<string | null>(null);
   /// El aviso de numeracion, cuando la fecha deja el correlativo a contramano.
   const [aviso, setAviso] = useState<string | null>(null);
@@ -28,7 +40,12 @@ export function NuevaSemana({
     if (!confirmado) setAviso(null);
 
     iniciar(async () => {
-      const r = await accionCrearPlanSemanal(obraId, fecha, confirmado);
+      const r = await accionCrearPlanSemanal(
+        obraId,
+        fecha,
+        confirmado,
+        inicioObra ? inicio || undefined : undefined,
+      );
       if (r.ok) {
         router.push(`/obras/${obraId}/plan-semanal/${r.id}`);
         return;
@@ -50,6 +67,19 @@ export function NuevaSemana({
 
   return (
     <div className="flex flex-wrap items-end gap-2">
+      {/* Solo en la primera semana de la obra: ver inicioObra. */}
+      {inicioObra && (
+        <label className="text-xs">
+          <span className="block opacity-70">Empieza el</span>
+          <input
+            type="date"
+            value={inicio}
+            onChange={(e) => setInicio(e.target.value)}
+            className="mt-1 rounded-lg border px-2 py-1.5 text-sm"
+            style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+          />
+        </label>
+      )}
       <label className="text-xs">
         <span className="block opacity-70">Semana que cierra el</span>
         <input

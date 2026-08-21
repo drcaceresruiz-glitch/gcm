@@ -21,11 +21,11 @@ import { importeDeFrente, type PartidaDeFrente } from "@/lib/encargos";
  *    etiquetada. No es un ahorro que se pueda gastar: es el resultado.
  *    Sumarla a la bolsa la convierte en presupuesto, y entonces se gasta.
  *
- * 2. HAY DOS BOLSAS, NO UNA. La de PRODUCCION se gana ejecutando por debajo
- *    de la meta; la de PLAZO, terminando antes. Se pierden por motivos
- *    distintos, asi que se informan por separado: tapar un sobrecosto de
- *    produccion con un ahorro de plazo que todavia no has ganado es
- *    exactamente el vicio que esta separacion impide.
+ * 2. LOS GASTOS GENERALES NO SON DE LA OBRA. Salieron de la meta por
+ *    decision del usuario (20/08/2026): la empresa los gestiona y el
+ *    contrato los reconoce como un porcentaje del costo directo. Aqui
+ *    queda UNA sola bolsa, la de PRODUCCION. Volver a meterlos mezclaria
+ *    el margen de la obra con el resultado de la estructura.
  *
  * 3. LO QUE NO TIENE META NO ES MARGEN. Una partida del contrato sin linea en
  *    la meta sale como bolsa integra, y es justo lo contrario: es gasto que
@@ -207,23 +207,9 @@ export interface DatosBolsa {
   modo: ModoMeta;
   contractual: readonly LineaContractual[];
   meta: readonly LineaMeta[];
-  /// Importe de gastos generales del CONTRACTUAL, ya calculado por la cascada
-  /// de la linea base (es un % sobre el costo directo).
-  gastosGeneralesContractual: string;
-  /// Suma de la lista de gastos generales de la META. Aqui NO es un
-  /// porcentaje: es lo que cuesta sostener la obra durante su plazo.
-  gastosGeneralesMeta: string;
   /// Utilidad del contractual. Viaja para poder ensenarla al lado de la
   /// bolsa; NUNCA se suma a ella.
   utilidadContractual: string;
-  /**
-   * Si los gastos generales cuentan en la bolsa. Lo decide la obra.
-   *
-   * Opcional y por defecto true para no cambiar el resultado de quien no lo
-   * pase: cambiar una cifra de dinero por omision es justo lo que no puede
-   * pasar aqui.
-   */
-  incluyeGastosGenerales?: boolean;
 }
 
 export interface Bolsa {
@@ -234,30 +220,8 @@ export interface Bolsa {
   /// Costo directo contractual - costo directo meta.
   bolsaProduccion: string;
 
-  gastosGeneralesContractual: string;
-  gastosGeneralesMeta: string;
-  /// Gastos generales contractuales - gastos generales meta. "0.00" cuando la
-  /// obra decidio que los gastos generales NO entran en la bolsa.
-  bolsaPlazo: string;
-  /// El criterio con el que se calculo, para que la pantalla no lo adivine.
-  incluyeGastosGenerales: boolean;
-  /**
-   * Gastos generales contratados menos los presupuestados. SIEMPRE, entre o
-   * no entre en la bolsa.
-   *
-   * NO es bolsa aunque salga positivo, y por eso tiene nombre propio: es el
-   * resultado de la ESTRUCTURA, y lo gestiona la empresa, no el residente.
-   * Negativo significa que los gastos generales cuestan mas de lo que el
-   * contrato reconoce y esa diferencia sale del bolsillo de la empresa.
-   *
-   * Se calcula siempre porque esconderlo era el agujero del diseño anterior:
-   * al sacar los gastos generales de la bolsa, simplemente desaparecian, y
-   * una obra podia ir perfecta en costo directo y perder dinero sin que nada
-   * lo dijera.
-   */
-  resultadoGastosGenerales: string;
-
-  /// Produccion + plazo. SIN utilidad.
+  /// La bolsa que gestiona la obra. Hoy es exactamente la de produccion:
+  /// los gastos generales salieron de la meta y ya no son de la obra.
   bolsaTotal: string;
 
   /// Aparte y etiquetada. No es bolsa: es el margen ofertado.
@@ -296,37 +260,13 @@ export function calcularBolsa(datos: DatosBolsa): Bolsa {
 
   const bolsaProduccion =
     restar(costoDirectoContractual, costoDirectoMeta) ?? "0.00";
-  /**
-   * La bolsa de plazo solo existe si la obra decidio que los gastos
-   * generales entran. Cuando no entran es "0.00" y no null: sigue siendo una
-   * cifra sumable, y quien la pinte decide si la enseña. Los gastos
-   * generales se devuelven igual —se cargaron y se guardaron—, para que la
-   * pantalla los pueda mostrar aparte con su aviso de sobrecosto.
-   */
-  const incluyeGG = datos.incluyeGastosGenerales ?? true;
-  // El resultado de estructura se calcula SIEMPRE. La bolsa lo usa o no,
-  // segun el criterio de la obra, pero la cifra existe en los dos casos.
-  const resultadoGastosGenerales =
-    restar(datos.gastosGeneralesContractual, datos.gastosGeneralesMeta) ??
-    "0.00";
-
-  const bolsaPlazo = incluyeGG
-    ? restar(datos.gastosGeneralesContractual, datos.gastosGeneralesMeta) ??
-      "0.00"
-    : "0.00";
-
-  const bolsaTotal = sumar([bolsaProduccion, bolsaPlazo]);
+  const bolsaTotal = bolsaProduccion;
 
   return {
     porLinea: union.filas,
     costoDirectoContractual,
     costoDirectoMeta,
     bolsaProduccion,
-    gastosGeneralesContractual: datos.gastosGeneralesContractual,
-    gastosGeneralesMeta: datos.gastosGeneralesMeta,
-    bolsaPlazo,
-    incluyeGastosGenerales: incluyeGG,
-    resultadoGastosGenerales,
     bolsaTotal,
     utilidadContractual: datos.utilidadContractual,
     margenEsperado: sumar([bolsaTotal, datos.utilidadContractual]),
@@ -429,116 +369,5 @@ export function resumenGastosGenerales(
         .map((g) => g.montoMensual!),
     ),
     invalidas: totales.length - validos.length,
-  };
-}
-
-
-/**
- * Los gastos generales de la meta son inverosimiles.
- *
- * En una obra, los gastos generales son una fraccion del costo directo —del
- * orden del 8 % al 20 %—. Que SUPEREN al costo directo no es una obra cara:
- * es una lista mal cargada, casi siempre por multiplicar un monto mensual por
- * un numero de meses equivocado (`totalDeGasto` hace `mensual x meses`, y un
- * plazo en dias donde iban meses infla el total treinta veces).
- *
- * Existe porque la `bolsaPlazo` se calcula contra esa cifra sin mirarla, y un
- * gasto general disparado sale por pantalla como una bolsa operativa
- * negativa enorme, indistinguible de una obra que de verdad va a perder
- * dinero. La diferencia importa: una se arregla corrigiendo una fila, la otra
- * cambiando como se construye.
- *
- * NO se bloquea nada por esto: es un aviso. Puede haber casos raros
- * —una obra casi toda de supervision— y el sistema no esta para decidir por
- * el jefe de obra.
- */
-export function gastosGeneralesInverosimiles(datos: {
-  gastosGeneralesMeta: string;
-  costoDirectoMeta: string;
-}): boolean {
-  // Con costo directo cero no hay proporcion que juzgar: una meta a medio
-  // cargar no tiene por que gritar.
-  if (!esPositivo(datos.costoDirectoMeta)) return false;
-
-  return esPositivo(
-    restar(datos.gastosGeneralesMeta, datos.costoDirectoMeta) ?? "0.00",
-  );
-}
-
-/**
- * El resultado de gastos generales es un DEFICIT: cuestan mas de lo que el
- * contrato reconoce.
- *
- * Es la situacion que el usuario describe como la corriente en obra pequena,
- * y no es un detalle contable: una obra no puede perder dinero, no puede
- * tocar su utilidad, y una vez firmado no puede volver a presupuestar de cara
- * al cliente. Solo hay tres salidas, y las tres son decisiones de personas:
- *
- *   1. Meter los gastos generales en la bolsa, si se habian dejado fuera, y
- *      cubrirlos con el margen de produccion.
- *   2. Quitar o recortar lineas de gasto general hasta que quepan.
- *   3. Gestionar un ADICIONAL al contrato y que se apruebe. Sube el costo
- *      directo vigente y, con el mismo porcentaje, los gastos generales que
- *      el contrato reconoce.
- *
- * Por eso esto devuelve un booleano y no arregla nada: el sistema señala, la
- * decision es de gerencia.
- */
-export function hayDeficitDeEstructura(bolsa: {
-  resultadoGastosGenerales: string;
-}): boolean {
-  return esNegativo(bolsa.resultadoGastosGenerales);
-}
-
-export interface SalidasDelDeficit {
-  /// Lo que falta, en positivo, para poder escribirlo sin el signo.
-  falta: string;
-  /// true si la bolsa de produccion da para cubrirlo.
-  laCubreLaProduccion: boolean;
-  /// Lo que quedaria de bolsa despues de cubrirlo con produccion.
-  bolsaDespues: string;
-  /**
-   * De cuanto tendria que ser el ADICIONAL de costo directo para que los
-   * gastos generales que reconoce el contrato suban lo que falta.
-   *
-   * El contrato reconoce gastos generales como un PORCENTAJE del costo
-   * directo, asi que para subirlos en X hay que ampliar el contrato en
-   * X / porcentaje. Con un porcentaje bajo la cifra se dispara, y eso es
-   * justo lo que hay que ver antes de ir a pedirlo: dice si esa via es
-   * realista o si toca recortar.
-   *
-   * null cuando no se puede calcular (sin gastos generales contractuales no
-   * hay porcentaje del que tirar).
-   */
-  adicionalNecesario: string | null;
-}
-
-/**
- * Las tres salidas del deficit de estructura, con su numero.
- *
- * Avisar sin cuantificar deja al usuario con la misma pregunta: «¿y cuanto
- * recorto?». Aqui cada salida viene con la cifra que la hace decidible.
- */
-export function salidasDelDeficit(bolsa: {
-  resultadoGastosGenerales: string;
-  bolsaProduccion: string;
-  costoDirectoContractual: string;
-  gastosGeneralesContractual: string;
-}): SalidasDelDeficit {
-  const falta = multiplicar(bolsa.resultadoGastosGenerales, "-1", 2) ?? "0.00";
-  const bolsaDespues = sumar([bolsa.bolsaProduccion, bolsa.resultadoGastosGenerales]);
-
-  const gg = Number(bolsa.gastosGeneralesContractual);
-  const cd = Number(bolsa.costoDirectoContractual);
-  const adicionalNecesario =
-    gg > 0 && cd > 0
-      ? multiplicar(falta, (cd / gg).toFixed(6), 2)
-      : null;
-
-  return {
-    falta,
-    laCubreLaProduccion: !esNegativo(bolsaDespues),
-    bolsaDespues,
-    adicionalNecesario,
   };
 }

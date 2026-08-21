@@ -13,7 +13,6 @@ import {
   calcularBolsa,
   desfaseDeMeta,
   resumenGastosGenerales,
-  totalDeGasto,
   type Bolsa,
   type Desfase,
   type EntradaGasto,
@@ -56,7 +55,8 @@ export interface MetaResumen {
   gastosGenerales: string;
   costoTotal: string;
   mesesPlazo: string;
-  baselineVersion: number;
+  /// null si la meta nacio antes que el contractual: no se fijo contra nada.
+  baselineVersion: number | null;
   movimientosAlFijar: number;
   aprobada: boolean;
   aprobadaAt: Date | null;
@@ -108,7 +108,7 @@ export async function listarMetas(
  * recalculando el costo— y hasta que se congela no puede gobernar la bolsa
  * que se ensena en el tablero.
  */
-async function metaQueManda(companyId: string, obraId: string) {
+export async function metaQueManda(companyId: string, obraId: string) {
   const donde = { projectId: obraId, project: { companyId } };
 
   const aprobada = await prisma.presupuestoMeta.findFirst({
@@ -275,7 +275,8 @@ export async function compararConContractual(
 
   const modo = meta.modo as ModoMeta;
 
-  const [items, gastos] = await Promise.all([
+  // La tabla de gastos generales quedo DORMIDA: ni se escribe ni se lee.
+  const [items] = await Promise.all([
     prisma.presupuestoMetaItem.findMany({
       where: { presupuestoMetaId: meta.id },
       orderBy: { orden: "asc" },
@@ -283,10 +284,6 @@ export async function compararConContractual(
       // `unknown` y obliga a castear. Fuera de FRENTE la tabla de reparto
       // esta vacia para esta meta, asi que la union no cuesta nada.
       include: { reparto: true },
-    }),
-    prisma.gastoGeneralMeta.findMany({
-      where: { presupuestoMetaId: meta.id },
-      orderBy: { orden: "asc" },
     }),
   ]);
 
@@ -311,13 +308,7 @@ export async function compararConContractual(
     modo,
     contractual: await lineasContractuales(modo, obraId, vigente.partidas),
     meta: lineasMeta,
-    gastosGeneralesContractual: vigente.cascadaVigente.gastosGenerales,
-    gastosGeneralesMeta: meta.gastosGenerales.toString(),
     utilidadContractual: vigente.cascadaVigente.utilidad,
-    // El criterio lo decide la OBRA, no la meta: por eso se puede cambiar en
-    // cualquier momento sin tocar ninguna version guardada. Sin decidir aun,
-    // se calcula como siempre; la obra ya bloquea el paso en ese caso.
-    incluyeGastosGenerales: obra.metaIncluyeGastosGenerales ?? true,
   });
 
   // Los movimientos aprobados DESPUES de fijar la meta. Se ordenan por numero
@@ -330,14 +321,7 @@ export async function compararConContractual(
     select: { importeNeto: true },
   });
 
-  const resumenGG = resumenGastosGenerales(
-    gastos.map((g) => ({
-      tipo: g.tipo,
-      montoMensual: g.montoMensual?.toString() ?? null,
-      meses: g.meses?.toString() ?? null,
-      montoFijo: g.tipo === "FIJO" ? g.montoTotal.toString() : null,
-    })),
-  );
+  const resumenGG = resumenGastosGenerales([]);
 
   const mesesMeta = meta.mesesPlazo.toString();
   const mesesProgramados = mesesEntre(obra.fechaInicio, obra.fechaFinProgramada);
@@ -360,14 +344,9 @@ export async function compararConContractual(
    * `mesesMeta`: si alguien presupuesto ocho meses en una obra de trece dias,
    * comparar contra su propio ocho no delataria nada.
    */
-  const lineasLargas = lineasMasLargasQueLaObra(
-    gastos.map((g) => ({
-      concepto: g.concepto,
-      tipo: g.tipo,
-      meses: g.meses?.toString() ?? null,
-    })),
-    mesesProgramados,
-  );
+  // Sin gastos generales en la meta no hay lineas que puedan pasarse del
+  // plazo: la lista se retiro con ellos.
+  const lineasLargas = lineasMasLargasQueLaObra([], mesesProgramados);
 
   return {
     ok: true,
@@ -414,6 +393,13 @@ export interface EntradaItemMeta {
   /// contractual, aqui no hay jerarquia que resolver: cada fila lleva lo suyo
   /// y el costo directo es la suma llana de las que tienen importe.
   parcial: string | null;
+  /// Solo en capitulos: % de recargo con el que se genera el contractual.
+  ///
+  /// OBLIGATORIO a proposito, aunque casi siempre sea null: este dato ya se
+  /// perdio una vez en silencio (el importador lo leia y el mapeo de la
+  /// accion no lo copiaba). Siendo obligatorio, quien construya la entrada
+  /// tiene que decidir, y `tsc` senala el sitio si alguien lo olvida.
+  porcentajeRecargo: string | null;
 }
 
 export interface EntradaGastoMeta {
@@ -463,22 +449,23 @@ export async function crearMeta(
     return { ok: false, error: "La meta no tiene ni una linea." };
   }
 
-  // Sin linea base aprobada no hay `baselineVersion` que anotar, y sobre todo
-  // no hay contra que comparar: una meta sin contractual no es una meta, es
-  // una lista de deseos.
+  /**
+   * La linea base ya NO es obligatoria para fijar la meta.
+   *
+   * Antes lo era: sin contractual no habia contra que comparar. Pero desde
+   * que el contractual SE GENERA a partir del real, exigir un contractual
+   * para poder crear el real era pescadilla que se muerde la cola.
+   *
+   * Se anota la version si la hay y null si no. Null es la verdad: esta meta
+   * no se fijo contra ningun contractual porque nacio antes que el. Un cero
+   * mentiria, y `desfaseDeMeta` no tiene nada que medir mientras no exista
+   * el otro presupuesto.
+   */
   const base = await prisma.baseline.findFirst({
     where: { projectId: obraId, aprobadaAt: { not: null } },
     orderBy: { version: "desc" },
     select: { version: true },
   });
-  if (!base) {
-    return {
-      ok: false,
-      error:
-        "La obra no tiene linea base aprobada. Aprueba el presupuesto " +
-        "contractual antes de fijar la meta.",
-    };
-  }
 
   const mesesPlazo = normalizarDecimal(datos.mesesPlazo, 2);
   if (mesesPlazo === null || !esPositivo(mesesPlazo)) {
@@ -500,12 +487,13 @@ export async function crearMeta(
     };
   }
 
-  const entradasGasto: EntradaGasto[] = datos.gastosGenerales.map((g) => ({
-    tipo: g.tipo,
-    montoMensual: g.montoMensual ?? null,
-    meses: g.meses ?? null,
-    montoFijo: g.montoFijo ?? null,
-  }));
+  // LOS GASTOS GENERALES YA NO SON DE LA META (20/08/2026).
+  //
+  // La lista se sigue leyendo del Excel para poder AVISAR de que viene, pero
+  // no entra en la meta ni en la bolsa: los gastos generales los reconoce el
+  // contrato como un porcentaje y los gestiona la empresa. La tabla queda
+  // dormida en el esquema para no perder lo que ya cargaron las metas viejas.
+  const entradasGasto: EntradaGasto[] = [];
 
   const resumenGG = resumenGastosGenerales(entradasGasto);
   if (resumenGG.invalidas > 0) {
@@ -552,7 +540,7 @@ export async function crearMeta(
         gastosGenerales: resumenGG.total,
         costoTotal,
         mesesPlazo,
-        baselineVersion: base.version,
+        baselineVersion: base?.version ?? null,
         movimientosAlFijar: movimientos,
         creadaPor,
       },
@@ -571,28 +559,10 @@ export async function crearMeta(
         metrado: i.metrado ?? null,
         precioUnitario: i.precioUnitario ?? null,
         parcial: i.parcial,
+        porcentajeRecargo: i.porcentajeRecargo ?? null,
       })),
     });
 
-    await tx.gastoGeneralMeta.createMany({
-      data: datos.gastosGenerales.map((g, orden) => ({
-        presupuestoMetaId: meta.id,
-        concepto: g.concepto,
-        tipo: g.tipo,
-        montoMensual: g.tipo === "VARIABLE" ? g.montoMensual : null,
-        meses: g.tipo === "VARIABLE" ? g.meses : null,
-        // Ya validado arriba: `resumenGastosGenerales` no dejo pasar ninguna
-        // fila incompleta, asi que aqui `totalDeGasto` no puede ser null.
-        montoTotal:
-          totalDeGasto({
-            tipo: g.tipo,
-            montoMensual: g.montoMensual ?? null,
-            meses: g.meses ?? null,
-            montoFijo: g.montoFijo ?? null,
-          }) ?? "0.00",
-        orden,
-      })),
-    });
 
     await tx.auditLog.create({
       data: {
@@ -609,7 +579,7 @@ export async function crearMeta(
           gastosGenerales: resumenGG.total,
           costoTotal,
           mesesPlazo,
-          baselineVersion: base.version,
+          baselineVersion: base?.version ?? null,
           lineas: datos.items.length,
         },
       },

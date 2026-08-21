@@ -897,6 +897,45 @@ model Baseline {
   porcentajeUtilidad        Decimal @default(0) @db.Decimal(6, 4)
   porcentajeIgv             Decimal @default(0.18) @db.Decimal(6, 4)
 
+  /// Descuento comercial como PORCENTAJE, para la cascada 2.
+  ///
+  /// Convive con `descuentos` (un monto) porque la cascada 1 lo usaba asi y
+  /// las revisiones ya congeladas guardan aquel valor. Cada version usa el
+  /// suyo; no se convierte uno en otro.
+  porcentajeDescuento Decimal @default(0) @db.Decimal(6, 4)
+
+  /// Como tributa el presupuesto que se entrega al cliente.
+  ///
+  /// Se reutiliza el mismo enum que las ordenes de compra a proposito: es el
+  /// mismo hecho tributario visto desde el otro lado, y tener dos
+  /// vocabularios para lo mismo es como acaban divergiendo.
+  ///
+  /// - IGV:     constructora que factura. Se desglosa el 18%.
+  /// - RENTA:   emite recibo por honorarios. Sin IGV, con retencion de 4ta.
+  /// - NINGUNO: sin impuesto en el documento.
+  tipoImpuesto TipoImpuesto @default(IGV)
+
+  /// Tasa de la retencion de cuarta categoria. Solo cuenta con RENTA.
+  porcentajeRetencion Decimal @default(0.08) @db.Decimal(6, 4)
+
+  /// Si la constructora ASUME la retencion subiendo el precio.
+  ///
+  /// false: el precio pactado no cambia y se ensena cuanto queda limpio.
+  /// true:  el precio se infla para que, tras retener, quede lo pactado. Es
+  ///        lo mismo que ya hacen las ordenes con TipoImpuesto.RENTA.
+  retencionAsumida Boolean @default(false)
+
+  /// Que cascada calculo esta revision. NO se toca al reeditar.
+  ///
+  /// 1: costo directo + descuentos, y sobre eso gastos generales y utilidad.
+  /// 2: gastos generales y utilidad sobre el costo directo, y el descuento
+  ///    despues. Es la que se acordo el 20/08.
+  ///
+  /// Existe para que las revisiones firmadas con la cascada 1 sigan dando su
+  /// total guardado. Cambiarles el orden las haria contradecirse solas, sin
+  /// dar ningun error.
+  versionCascada Int @default(1)
+
   /// Presupuesto de la revision, sin IGV: es la cifra de control.
   /// costoDirecto + descuentos, mas gastos generales y utilidad.
   montoTotal Decimal @db.Decimal(14, 2)
@@ -2305,6 +2344,16 @@ model PlanSemanal {
   /// La semana que cubre, anclada a su dia de corte (la cadencia de la obra).
   fechaCorte DateTime @db.Date
 
+  /// Cuando EMPIEZA la semana. Null = los siete dias hacia atras desde el
+  /// corte, que es la cadencia normal y lo que valen todas las semanas
+  /// existentes.
+  ///
+  /// Solo la PRIMERA semana de la obra puede arrancar antes: una obra que
+  /// empieza un miercoles con corte en viernes dejaria sus dos primeros dias
+  /// fuera de toda semana, y ese trabajo existe. Las demas semanas siguen
+  /// siendo de siete dias para que el PPC se pueda comparar entre ellas.
+  fechaInicio DateTime? @db.Date
+
   estado EstadoPlanSemanal @default(ABIERTO)
 
   notas String? @db.Text
@@ -3506,7 +3555,7 @@ model PresupuestoMeta {
   // Estos dos campos son lo que permite detectarlo y decir CUANTO.
 
   /// Version de la linea base contra la que se fijo esta meta.
-  baselineVersion Int
+  baselineVersion Int?
 
   /// Cuantos movimientos aprobados habia en la obra al fijarla. Si despues hay
   /// mas, la meta esta desfasada y la bolsa exagera: ver `desfaseDeMeta`.
@@ -3564,6 +3613,14 @@ model PresupuestoMetaItem {
   precioUnitario Decimal? @db.Decimal(14, 4)
   parcial        Decimal? @db.Decimal(14, 2)
 
+  /// Solo en CAPITULOS: cuanto se recarga este capitulo del presupuesto real
+  /// para llegar al presupuesto contractual.
+  ///
+  /// Se guarda COMO PORCENTAJE, no como fraccion: 18.000 son 18%. Es lo que
+  /// se escribe en la plantilla y lo que ensena la hoja, y guardarlo igual
+  /// evita el error de cien veces, que en un presupuesto no da error: da una
+  /// cifra creible y equivocada. Para calcular, `porcentajeAFraccion`.
+  porcentajeRecargo Decimal? @db.Decimal(6, 3)
   meta    PresupuestoMeta   @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
   reparto MetaItemPartida[]
 

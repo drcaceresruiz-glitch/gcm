@@ -1,9 +1,16 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { esNegativo, normalizarDecimal } from "@/lib/decimal";
+import { esNegativo, normalizarDecimal, sumar } from "@/lib/decimal";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
-import { calcularCascada, compararRevisiones, type Cascada } from "@/lib/presupuesto";
+import {
+  calcularCascada,
+  calcularCascadaComercial,
+  compararRevisiones,
+  parametrosDeImpuesto,
+  TASA_RETENCION_RENTA,
+  type Cascada,
+} from "@/lib/presupuesto";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -125,6 +132,12 @@ export interface DatosRevision {
   porcentajeGastosGenerales: string;
   porcentajeUtilidad: string;
   porcentajeIgv: string;
+  /// Descuento comercial, como porcentaje. Cascada 2.
+  porcentajeDescuento?: string;
+  /// Como tributa lo que se entrega al cliente. Por defecto, IGV.
+  tipoImpuesto?: "IGV" | "RENTA" | "NINGUNO";
+  /// Solo con RENTA: si la constructora asume la retencion subiendo el precio.
+  retencionAsumida?: boolean;
   tipoCambio?: string | null;
   clausulas?: string | null;
   notas?: string | null;
@@ -197,18 +210,47 @@ export async function crearRevision(
     porcentajeGastosGenerales: normalizarDecimal(datos.porcentajeGastosGenerales, 4),
     porcentajeUtilidad: normalizarDecimal(datos.porcentajeUtilidad, 4),
     porcentajeIgv: normalizarDecimal(datos.porcentajeIgv, 4),
+    porcentajeDescuento: normalizarDecimal(datos.porcentajeDescuento ?? "0", 4),
   };
 
   for (const [campo, valor] of Object.entries(porcentajes)) {
     if (valor === null) return { ok: false, error: `El valor de ${campo} no es valido.` };
   }
 
-  const cascada = calcularCascada({
-    costoDirecto,
-    descuentos,
+  const tipoImpuesto = datos.tipoImpuesto ?? "IGV";
+  const retencionAsumida = datos.retencionAsumida ?? false;
+
+  /**
+   * El costo directo NETO: con las partidas negativas del propio presupuesto
+   * ya restadas.
+   *
+   * `separarDescuentos` no separa un descuento comercial: separa las lineas
+   * con importe negativo que trae el presupuesto (un descuento de proveedor,
+   * un ajuste). Eso ES costo directo, solo que en negativo. Pasar aqui el
+   * bruto las dejaria fuera del calculo y la obra saldria mas cara de lo que
+   * es, sin dar ningun error.
+   */
+  const costoDirectoNeto = sumar([costoDirecto, descuentos], 2);
+
+  // La traduccion de tipoImpuesto y retencionAsumida a lo que entiende la
+  // cascada vive en UNA sola funcion, compartida con el formulario y con la
+  // propuesta imprimible: si divergieran, cada pantalla diria otra cifra.
+  const impuesto = parametrosDeImpuesto(
+    tipoImpuesto,
+    porcentajes.porcentajeIgv!,
+    retencionAsumida,
+  );
+
+  // Lo que se guarda es el IGV EFECTIVO, no el que se tecleo: un recibo por
+  // honorarios no lo lleva, y dejar el 18% escrito lo resucitaria al releer.
+  const igvEfectivo = impuesto.porcentajeIgv;
+
+  const cascada = calcularCascadaComercial({
+    costoDirecto: costoDirectoNeto,
     porcentajeGastosGenerales: porcentajes.porcentajeGastosGenerales!,
     porcentajeUtilidad: porcentajes.porcentajeUtilidad!,
-    porcentajeIgv: porcentajes.porcentajeIgv!,
+    porcentajeDescuento: porcentajes.porcentajeDescuento!,
+    ...impuesto,
   });
 
   const ultima = await prisma.baseline.findFirst({
@@ -232,8 +274,16 @@ export async function crearRevision(
         descuentos,
         porcentajeGastosGenerales: porcentajes.porcentajeGastosGenerales!,
         porcentajeUtilidad: porcentajes.porcentajeUtilidad!,
-        porcentajeIgv: porcentajes.porcentajeIgv!,
-        montoTotal: cascada.presupuesto,
+        porcentajeIgv: igvEfectivo,
+        porcentajeDescuento: porcentajes.porcentajeDescuento!,
+        tipoImpuesto,
+        porcentajeRetencion: TASA_RETENCION_RENTA,
+        retencionAsumida,
+        // Las revisiones nuevas se calculan con la cascada 2. Las que ya
+        // estaban se quedan en 1 y siguen dando su total guardado.
+        versionCascada: 2,
+        // El presupuesto sin IGV: la cifra de control, como antes.
+        montoTotal: cascada.valorVenta,
         tipoCambio,
         clausulas: datos.clausulas?.trim() || null,
         notas: datos.notas?.trim() || null,
@@ -271,14 +321,14 @@ export async function crearRevision(
           version,
           costoDirecto,
           descuentos,
-          presupuesto: cascada.presupuesto,
+          presupuesto: cascada.valorVenta,
           partidas: items.length,
         },
       },
     });
   });
 
-  return { ok: true, version, montoTotal: cascada.presupuesto };
+  return { ok: true, version, montoTotal: cascada.valorVenta };
 }
 
 /**

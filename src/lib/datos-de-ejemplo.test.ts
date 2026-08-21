@@ -8,7 +8,6 @@ import {
 import { TOTAL_EJEMPLO } from "@/lib/plantilla-presupuesto";
 import {
   TOTAL_COSTO_EJEMPLO,
-  TOTAL_GASTOS_EJEMPLO,
 } from "@/lib/plantilla-meta";
 
 /**
@@ -30,18 +29,6 @@ describe("reconocer los datos de ejemplo de las plantillas", () => {
     expect(
       pareceMetaDeEjemplo({
         costoDirectoMeta: TOTAL_COSTO_EJEMPLO,
-        gastosGeneralesMeta: "1857.36",
-      }),
-    ).toBe(true);
-  });
-
-  it("caza la meta de ejemplo tambien por sus gastos generales", () => {
-    // Alguien puede rehacer el costo directo y olvidarse de la hoja de gastos,
-    // que es justo la que disparaba la bolsa de plazo.
-    expect(
-      pareceMetaDeEjemplo({
-        costoDirectoMeta: "48000.00",
-        gastosGeneralesMeta: TOTAL_GASTOS_EJEMPLO,
       }),
     ).toBe(true);
   });
@@ -53,7 +40,6 @@ describe("reconocer los datos de ejemplo de las plantillas", () => {
       origenDeEjemplo({
         costoDirectoContractual: "735255.61",
         costoDirectoMeta: "612000.00",
-        gastosGeneralesMeta: "88530.67",
       }),
     ).toEqual({ contractual: false, meta: false, hay: false });
   });
@@ -65,7 +51,6 @@ describe("reconocer los datos de ejemplo de las plantillas", () => {
       origenDeEjemplo({
         costoDirectoContractual: TOTAL_EJEMPLO,
         costoDirectoMeta: "612000.00",
-        gastosGeneralesMeta: "88530.67",
       }),
     ).toEqual({ contractual: true, meta: false, hay: true });
   });
@@ -75,7 +60,6 @@ describe("reconocer los datos de ejemplo de las plantillas", () => {
       origenDeEjemplo({
         costoDirectoContractual: TOTAL_EJEMPLO,
         costoDirectoMeta: TOTAL_COSTO_EJEMPLO,
-        gastosGeneralesMeta: TOTAL_GASTOS_EJEMPLO,
       }),
     ).toEqual({ contractual: true, meta: true, hay: true });
   });

@@ -3,7 +3,6 @@ import { CalendarDays, Download, MapPin, Pencil } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, hitosDeObra, avisosDeSeccion } from "@/services/obras.service";
 import { planesAbiertos } from "@/services/plan-semanal.service";
-import { criterioDeObra } from "@/services/criterio-obra.service";
 import { PasoSiguiente } from "@/components/obras/PasoSiguiente";
 import { siguientePaso } from "@/lib/siguiente-paso";
 import { puede } from "@/lib/rbac";
@@ -47,7 +46,7 @@ export default async function ObraLayout({
   // Solo hace falta publicarlo para que la miga —montada arriba del todo,
   // en el layout raiz— lo pueda leer sin volver a consultar nada.
   const raiz = `/obras/${id}`;
-  const [hitos, avisos, semanasAbiertas, criterio] = await Promise.all([
+  const [hitos, avisos, semanasAbiertas] = await Promise.all([
     hitosDeObra(sesion, id),
     avisosDeSeccion(sesion, id),
     // Solo las ABIERTAS: es una consulta plana (id, numero, fechaCorte, sin
@@ -55,10 +54,6 @@ export default async function ObraLayout({
     // cerradas son historia, no trabajo por hacer, y ya se ven enteras desde
     // dentro de `/plan-semanal`.
     planesAbiertos(sesion, id),
-    // El criterio de gastos generales. Si esta sin decidir y ya hay
-    // presupuesto, la obra no deja avanzar: cualquier cifra de margen que se
-    // enseñara estaria calculada con un criterio que nadie ha confirmado.
-    criterioDeObra(sesion, id),
   ]);
 
   /**
@@ -98,13 +93,30 @@ export default async function ObraLayout({
       clave: "plan",
       titulo: "Plan",
       secciones: [
+        /**
+         * VA PRIMERA, y es el orden del trabajo: desde el 20/08 el
+         * presupuesto entra por aqui -el REAL- y de el se genera el
+         * contractual, inflando cada capitulo por su recargo.
+         *
+         * Antes iba detras de Revisiones, cuando la meta se fijaba contra una
+         * linea base aprobada. Eso dejo de ser cierto al hacer
+         * `baselineVersion` opcional, y el menu se quedo contando el orden
+         * viejo: el manual da por hecho que este riel ES su indice.
+         */
+        puede(sesion, "meta:leer") && {
+          clave: "meta",
+          titulo: "Meta",
+          pregunta: "cuánto queremos gastar",
+          href: `${raiz}/meta`,
+          hecho: hitos.meta,
+        },
         puede(sesion, "partida:leer") && {
           clave: "presupuesto",
           titulo: "Presupuesto",
           pregunta: "cuánto cuesta",
           href: raiz,
           // El importador de partidas es presupuesto aunque cuelgue aparte.
-          prefijos: [`${raiz}/importar`],
+          prefijos: [`${raiz}/contractual`],
           hecho: hitos.presupuesto,
           // OBLIGATORIO: `href` es la raiz de la obra, y sin esto seria
           // prefijo de CUALQUIER subruta —encendia «Presupuesto» al editar la
@@ -112,6 +124,39 @@ export default async function ObraLayout({
           // `soloExacto` en MenuObra.tsx.
           soloExacto: true,
         },
+        puede(sesion, "linea_base:leer") && {
+          clave: "revisiones",
+          titulo: "Revisiones",
+          pregunta: "presupuesto congelado",
+          href: `${raiz}/revisiones`,
+          hecho: hitos.lineaBase,
+        },
+        /**
+         * La propuesta cuelga de la revision -de ahi saca sus cifras-, por
+         * eso va justo detras.
+         *
+         * Solo aparece si hay ALGUNA revision, aprobada o no. Sin ninguna, la
+         * pantalla no tiene nada que enseñar y contestaria 404: un enlace del
+         * menu que lleva a "Aqui no hay nada" es peor que no tenerlo, y hoy
+         * mismo ya paso una vez.
+         *
+         * No lleva `hecho`: no es un hito del alta. Emitir la propuesta es
+         * algo que se hace, no un paso que quede pendiente.
+         */
+        puede(sesion, "linea_base:leer") &&
+          hitos.revision && {
+            clave: "propuesta",
+            titulo: "Propuesta",
+            pregunta: "cuánto le cobro al cliente",
+            href: `${raiz}/propuesta`,
+          },
+        /**
+         * El cronograma va AL FINAL del grupo, detras de todo el hilo del
+         * dinero: su EDT sale del presupuesto, asi que antes de que exista no
+         * hay nada que planificar. Estaba en medio -entre Presupuesto y
+         * Revisiones- y partia en dos la secuencia real, y bastante confusion
+         * hay ya con dos presupuestos.
+         */
         puede(sesion, "cronograma:leer") && {
           clave: "cronograma",
           titulo: "Cronograma",
@@ -123,22 +168,6 @@ export default async function ObraLayout({
             { titulo: "Informe semanal", href: `${raiz}/cronograma/informe` },
             { titulo: "Enlazar con partidas", href: `${raiz}/cronograma/mapeo` },
           ],
-        },
-        puede(sesion, "linea_base:leer") && {
-          clave: "revisiones",
-          titulo: "Revisiones",
-          pregunta: "presupuesto congelado",
-          href: `${raiz}/revisiones`,
-          hecho: hitos.lineaBase,
-        },
-        /// Va DESPUES de Revisiones y no antes: la meta se fija contra una
-        /// linea base aprobada, asi que el orden del menu es el del trabajo.
-        puede(sesion, "meta:leer") && {
-          clave: "meta",
-          titulo: "Meta",
-          pregunta: "cuánto queremos gastar",
-          href: `${raiz}/meta`,
-          hecho: hitos.meta,
         },
       ].filter(Boolean),
     },
@@ -279,11 +308,12 @@ export default async function ObraLayout({
       : siguientePaso(
           {
             presupuesto: hitos.presupuesto,
+            meta: hitos.metaCargada,
             cronograma: hitos.cronograma,
             equipo: hitos.equipo,
+            equipoAsignable: hitos.equipoAsignable,
             lineaBase: hitos.lineaBase,
           },
-          criterio?.faltaDecidir ?? false,
           {
             // Para PROPONER un paso hace falta poder darlo, que no es lo
             // mismo que poder ver la seccion. Los dos ultimos si son de

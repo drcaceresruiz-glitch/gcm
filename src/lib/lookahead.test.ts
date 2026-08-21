@@ -6,6 +6,7 @@ import {
   confiabilidad,
   planificarFlujos,
   normalizarSemanas,
+  SEMANAS_SUGERIDAS,
   FLUJOS_RESTRICCION,
   TIPOS_RESTRICCION,
   SEMANAS_POR_DEFECTO,
@@ -57,6 +58,26 @@ describe("normalizarSemanas", () => {
 
   it("trunca los decimales: media semana no significa nada aqui", () => {
     expect(normalizarSemanas("4.7")).toBe(4);
+  });
+});
+
+/**
+ * Las obras cortas tambien planifican.
+ *
+ * El Last Planner habla de tres semanas como minimo util, y ese sigue siendo
+ * el defecto. Pero una obra de dos semanas no tiene tres que mirar: si el
+ * selector solo ofreciera ventanas mas largas que la obra entera, la matriz
+ * se llenaria de trabajo que no existe.
+ */
+describe("la ventana admite obras cortas", () => {
+  it("ofrece 1 y 2 semanas en el selector", () => {
+    expect(SEMANAS_SUGERIDAS).toContain(1);
+    expect(SEMANAS_SUGERIDAS).toContain(2);
+  });
+
+  it("y sigue proponiendo 3 por defecto", () => {
+    expect(SEMANAS_POR_DEFECTO).toBe(3);
+    expect(normalizarSemanas(1)).toBe(1);
   });
 });
 

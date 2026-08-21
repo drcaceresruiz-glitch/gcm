@@ -84,7 +84,7 @@ interface LineaProps {
   fuerte?: boolean;
 }
 
-function Linea({
+export function Linea({
   etiqueta,
   valor,
   sufijo,

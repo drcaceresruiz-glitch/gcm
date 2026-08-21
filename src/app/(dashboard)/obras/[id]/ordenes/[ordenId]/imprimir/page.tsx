@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerOrdenParaImpresion } from "@/services/ordenes.service";
+import { logoDeEmpresa } from "@/services/logo.service";
 import { DocumentoOrden } from "@/components/ordenes/DocumentoOrden";
-import { BarraImpresion } from "@/components/ordenes/BarraImpresion";
+import { BarraImpresion } from "@/components/ui/BarraImpresion";
 
 export const metadata: Metadata = { title: "Orden" };
 
@@ -31,10 +32,16 @@ export default async function ImprimirOrdenPage({
   const orden = await obtenerOrdenParaImpresion(sesion, id, ordenId);
   if (!orden) notFound();
 
+  // El logo va aparte de la orden: es de la empresa, no del pedido.
+  const logo = await logoDeEmpresa(sesion);
+
   return (
     <div className="py-2 print:py-0">
-      <BarraImpresion obraId={id} />
-      <DocumentoOrden orden={orden} />
+      <BarraImpresion
+        volverA={`/obras/${id}/ordenes`}
+        volverTexto="Volver a las órdenes"
+      />
+      <DocumentoOrden orden={orden} logo={logo} />
     </div>
   );
 }

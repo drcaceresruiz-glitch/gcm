@@ -126,6 +126,8 @@ export const TABLAS: readonly TablaRespaldo[] = [
       porcentajeGastosGenerales: 4,
       porcentajeUtilidad: 4,
       porcentajeIgv: 4,
+      porcentajeDescuento: 4,
+      porcentajeRetencion: 4,
       montoTotal: 2,
       tipoCambio: 4,
     },
@@ -194,7 +196,7 @@ export const TABLAS: readonly TablaRespaldo[] = [
     tabla: "presupuesto_meta_items",
     modelo: "presupuestoMetaItem",
     refs: [{ campo: "presupuestoMetaId", a: "presupuestos_meta" }],
-    decimales: { metrado: 4, precioUnitario: 4, parcial: 2 },
+    decimales: { metrado: 4, precioUnitario: 4, parcial: 2, porcentajeRecargo: 3 },
   },
   {
     /// El ORDEN de estas dos referencias importa, y no es capricho: se llega a
@@ -297,7 +299,7 @@ export const TABLAS: readonly TablaRespaldo[] = [
     tabla: "planes_semanales",
     modelo: "planSemanal",
     refs: [{ campo: "projectId", a: "projects" }],
-    fechas: ["fechaCorte"],
+    fechas: ["fechaCorte", "fechaInicio"],
   },
   {
     tabla: "compromisos_semanales",

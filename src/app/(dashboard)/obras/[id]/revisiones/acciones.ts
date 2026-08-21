@@ -88,6 +88,18 @@ export async function accionCrearRevision(
   const igv = leerPorcentaje(texto("porcentajeIgv"), "IGV");
   if (!igv.ok) return { error: igv.error };
 
+  const descuento = leerPorcentaje(
+    texto("porcentajeDescuento") || "0",
+    "descuento comercial",
+  );
+  if (!descuento.ok) return { error: descuento.error };
+
+  // El desplegable manda uno de los tres; cualquier otra cosa se trata como
+  // el caso corriente en vez de romper: es un formulario, no una API.
+  const impuesto = texto("tipoImpuesto");
+  const tipoImpuesto =
+    impuesto === "RENTA" || impuesto === "NINGUNO" ? impuesto : "IGV";
+
   // El tipo de cambio es opcional: sin el, la comparacion entre revisiones
   // se muestra solo en soles.
   let tipoCambio: string | null = null;
@@ -104,6 +116,9 @@ export async function accionCrearRevision(
     porcentajeGastosGenerales: gastosGenerales.valor,
     porcentajeUtilidad: utilidad.valor,
     porcentajeIgv: igv.valor,
+    porcentajeDescuento: descuento.valor,
+    tipoImpuesto,
+    retencionAsumida: datos.get("retencionAsumida") === "on",
     tipoCambio,
     clausulas: texto("clausulas") || null,
     notas: texto("notas") || null,
