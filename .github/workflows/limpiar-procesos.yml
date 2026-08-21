@@ -1,0 +1,35 @@
+name: Limpiar procesos zombis
+
+on:
+  workflow_dispatch:
+
+jobs:
+  limpiar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Limpiar procesos zombis en el servidor
+        env:
+          SSH_HOST: server0808.cloudhostservers.com
+          SSH_USER: drcacere
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass
+          
+          echo "Conectando a $SSH_HOST para limpiar procesos..."
+          
+          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" << 'EOF'
+            echo "=== Estado antes de limpiar ==="
+            ps -u drcacere | grep -E "bash|node|npm|prisma|migrate" | wc -l
+            
+            echo ""
+            echo "=== Matando procesos zombis ==="
+            pkill -9 -f prisma || true
+            pkill -9 -f "npm exec" || true
+            pkill -9 -f "migrate deploy" || true
+            pkill -9 -f "tar -xzf" || true
+            
+            sleep 3
+            
+            echo "✅ Limpieza completada"
+          EOF
