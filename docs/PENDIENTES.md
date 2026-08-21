@@ -116,6 +116,14 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      del numero grande). No es un bug de calculo —`ResumenEmpresaPanel.tsx`
      lo hace a proposito, y lo explica en su comentario— pero la jerarquia
      visual induce a leer las cifras de dinero como si fueran de las 5.
+     ~~Parcialmente HECHO el 21 de agosto de 2026~~: con mas de una obra en
+     ejecucion, el detalle de Presupuesto/Comprometido/Saldo ahora dice
+     "Suma de N obras en ejecución" en vez de dejarlo implicito —el usuario
+     pregunto en vivo "si hay mas de una obra, ¿esas cifras a quien
+     corresponden?" viendo el panel—. Sigue abierta la jerarquia visual en
+     si (el "5" grande al lado del dinero, aunque el dinero sea de un
+     subconjunto mas chico): eso pide rediseno, no solo texto, y queda para
+     la auditoria de UX mas amplia.
    - `/gerencia` (`src/app/(dashboard)/gerencia/page.tsx`) solo trae dos
      bloques (semaforo de partidas criticas por SPI, adicionales sin
      aprobar). El usuario lo considera insuficiente para lo que un gerente
