@@ -1,3 +1,7 @@
+// Prueba de despliegue automatico post-limpieza 2026
+
+
+
 # GCM — Gestor de Construcción y Mantenimiento
 
 Sistema multiproyecto de control de obra: presupuesto por partidas, avance
