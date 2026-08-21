@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Eye, HardHat } from "lucide-react";
+import { Eye, HardHat, Home } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
   contarSolicitudesPendientes,
@@ -144,26 +144,52 @@ export default async function DashboardLayout({
               o muy apaisada. El `max-w` evita que un logo panoramico se coma
               la cabecera entera. */}
           <Link href="/panel" className="flex items-center gap-2.5">
-            {logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={logo.src}
-                alt={logo.alt}
-                width={logo.ancho}
-                height={logo.alto}
-                className="h-8 w-auto max-w-40 object-contain"
-              />
-            ) : (
-              <>
-                <div
-                  className="flex size-8 shrink-0 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: "var(--color-marca-500)" }}
-                >
-                  <HardHat className="size-4 text-white" aria-hidden="true" />
-                </div>
-                <span className="font-semibold">GCM</span>
-              </>
-            )}
+            {/* `.elevacion-3` —la sombra fuerte, la de los popovers— es lo
+                que hace que el logo se vea MONTADO sobre la cabecera (que ya
+                lleva su propia `.elevacion-1`, mas suave) en vez de plano
+                contra ella. El fondo propio es necesario para que la sombra
+                tenga un borde solido del que despegarse: sin el, el logo
+                esta sobre el mismo color que el resto de la cabecera y la
+                sombra se ve sucia, no "sobrepuesta". */}
+            <div
+              className="elevacion-3 flex items-center gap-2.5 rounded-lg p-1.5"
+              style={{ backgroundColor: "var(--superficie)" }}
+            >
+              {logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logo.src}
+                  alt={logo.alt}
+                  width={logo.ancho}
+                  height={logo.alto}
+                  className="h-8 w-auto max-w-40 object-contain"
+                />
+              ) : (
+                <>
+                  <div
+                    className="flex size-8 shrink-0 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: "var(--color-marca-500)" }}
+                  >
+                    <HardHat className="size-4 text-white" aria-hidden="true" />
+                  </div>
+                  <span className="font-semibold">GCM</span>
+                </>
+              )}
+            </div>
+          </Link>
+
+          {/* El logo YA es un enlace a `/panel`, pero solo con la imagen no
+              se ve como un boton -no hay ningun affordance de "esto se
+              pulsa". Este de aqui es explicito, e imita al icono del manual
+              de `Navegacion.tsx`: mismo tamano, mismo borde, mismo trato. */}
+          <Link
+            href="/panel"
+            title="Ir al inicio"
+            aria-label="Ir al inicio"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <Home className="size-4 opacity-70" aria-hidden="true" />
           </Link>
 
           {/* En el medio de la cabecera y no en un rincon: es la unica
