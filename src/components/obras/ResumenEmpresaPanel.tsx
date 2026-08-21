@@ -6,12 +6,18 @@ import { AlertasEmpresa } from "@/components/obras/AlertasEmpresa";
 
 /**
  * Las cifras de la empresa encabezando el panel: obras contadas todas, el
- * dinero SOLO de las que estan en ejecucion.
+ * dinero SOLO de la que esta en ejecucion —y SOLO si es una sola—.
  *
  * Sumar la cartera completa mezclaba planificacion, ejecucion y cerradas en
  * un numero contra el que nadie decide nada; lo que se necesita a primera
  * vista es la exposicion de hoy. Cada etiqueta dice su ambito, porque una
  * cifra acotada que no declara el corte parece simplemente equivocada.
+ *
+ * Con MAS de una obra en ejecucion, Presupuesto/Comprometido/Saldo se
+ * OCULTAN en vez de sumarse: una mezcla de varias obras en tres numeros no
+ * dice a cual corresponde nada, y no hay decision que tomar contra un total
+ * que no es de ninguna obra en particular. El dinero de cada una sigue
+ * visible, uno por uno, en su propia tarjeta de la lista de abajo.
  *
  * El presupuesto va SIN IGV, que es la cifra de control. El comprometido va
  * por el importe IMPUTABLE de cada orden —neto con IGV, total con retencion—,
@@ -32,15 +38,15 @@ export function ResumenEmpresaPanel({
 
   /**
    * Presupuesto, Comprometido y Saldo son la SUMA de todas las obras en
-   * ejecucion, no de una sola -"obtenerResumenEmpresa" en obras.service.ts
-   * las agrega con `estado: EN_EJECUCION`, sin distinguir de cual obra viene
-   * cada sol-. Con una sola obra en ejecucion eso no se nota: la suma y esa
-   * obra son la misma cifra. Con varias, un usuario pregunto exactamente
-   * esto -"a quien corresponden estas cifras"- viendo el panel en vivo, asi
-   * que se dice explicitamente en vez de dejar que se adivine.
+   * ejecucion, no de una sola. Con una sola obra en ejecucion la suma y esa
+   * obra son la misma cifra, y ahi tiene sentido mostrarlas. Con varias, un
+   * usuario las vio en vivo y no encontro a que obra correspondian: un
+   * resumen de varias obras mezcladas en tres numeros no dice nada que se
+   * pueda accionar. El dinero de CADA obra ya esta, uno por uno, en su
+   * propia tarjeta de la lista de abajo -eso no cambia-, asi que aqui se
+   * quitan en vez de explicarlas con texto.
    */
-  const sumaDeVarias =
-    resumen.obrasEnEjecucion > 1 ? `Suma de ${resumen.obrasEnEjecucion} obras en ejecución` : null;
+  const unaSolaEnEjecucion = resumen.obrasEnEjecucion <= 1;
 
   return (
     // `relative z-20`: crea un contexto de apilamiento para TODO el panel de
@@ -61,49 +67,44 @@ export function ResumenEmpresaPanel({
         }
       />
 
-      <Cifra
-        icono={Wallet}
-        etiqueta="Presupuesto"
-        valor={soles(resumen.presupuestoTotal)}
-        numero={Number(resumen.presupuestoTotal)}
-        moneda
-        acento="var(--color-exito)"
-        detalle={sumaDeVarias ? `${sumaDeVarias}, sin IGV` : "Obras en ejecución, sin IGV"}
-      />
+      {unaSolaEnEjecucion && (
+        <>
+          <Cifra
+            icono={Wallet}
+            etiqueta="Presupuesto"
+            valor={soles(resumen.presupuestoTotal)}
+            numero={Number(resumen.presupuestoTotal)}
+            moneda
+            acento="var(--color-exito)"
+            detalle="Obra en ejecución, sin IGV"
+          />
 
-      <Cifra
-        icono={HandCoins}
-        etiqueta="Comprometido"
-        valor={soles(resumen.comprometido)}
-        numero={Number(resumen.comprometido)}
-        moneda
-        acento="var(--color-alerta)"
-        detalle={
-          sumaDeVarias
-            ? `${sumaDeVarias}: encargos vigentes + órdenes sueltas`
-            : "En ejecución: encargos vigentes + órdenes sueltas"
-        }
-      />
+          <Cifra
+            icono={HandCoins}
+            etiqueta="Comprometido"
+            valor={soles(resumen.comprometido)}
+            numero={Number(resumen.comprometido)}
+            moneda
+            acento="var(--color-alerta)"
+            detalle="En ejecución: encargos vigentes + órdenes sueltas"
+          />
 
-      <Cifra
-        icono={AlertTriangle}
-        etiqueta="Saldo"
-        valor={soles(resumen.saldo)}
-        numero={Math.abs(Number(resumen.saldo))}
-        moneda
-        // En negativo se ha comprometido mas de lo presupuestado, y eso no
-        // puede leerse igual que un saldo holgado: el degradado tambien lo
-        // dice, no solo el numero.
-        tono={saldoNegativo ? "peligro" : undefined}
-        acento={saldoNegativo ? "var(--color-peligro)" : "var(--color-exito)"}
-        detalle={
-          <>
-            {sumaDeVarias && <>{sumaDeVarias} · </>}
-            <AlertasEmpresa alertas={alertas} />
-          </>
-        }
-        detalleTono={alertas.length > 0 ? "peligro" : undefined}
-      />
+          <Cifra
+            icono={AlertTriangle}
+            etiqueta="Saldo"
+            valor={soles(resumen.saldo)}
+            numero={Math.abs(Number(resumen.saldo))}
+            moneda
+            // En negativo se ha comprometido mas de lo presupuestado, y eso no
+            // puede leerse igual que un saldo holgado: el degradado tambien lo
+            // dice, no solo el numero.
+            tono={saldoNegativo ? "peligro" : undefined}
+            acento={saldoNegativo ? "var(--color-peligro)" : "var(--color-exito)"}
+            detalle={<AlertasEmpresa alertas={alertas} />}
+            detalleTono={alertas.length > 0 ? "peligro" : undefined}
+          />
+        </>
+      )}
     </dl>
   );
 }
