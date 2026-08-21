@@ -180,16 +180,17 @@ export default async function DashboardLayout({
 
           {/* El logo YA es un enlace a `/panel`, pero solo con la imagen no
               se ve como un boton -no hay ningun affordance de "esto se
-              pulsa". Este de aqui es explicito, e imita al icono del manual
-              de `Navegacion.tsx`: mismo tamano, mismo borde, mismo trato. */}
+              pulsa". Este de aqui es explicito, con su propio texto: solo el
+              icono (como el del manual) no bastaba, se pedia que se leyera. */}
           <Link
             href="/panel"
             title="Ir al inicio"
             aria-label="Ir al inicio"
-            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium"
             style={{ borderColor: "var(--borde)" }}
           >
             <Home className="size-4 opacity-70" aria-hidden="true" />
+            <span className="hidden sm:inline">Inicio</span>
           </Link>
 
           {/* En el medio de la cabecera y no en un rincon: es la unica
