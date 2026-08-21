@@ -23,6 +23,7 @@ import {
 } from "@/services/lookahead.service";
 import { MODULOS_POR_DEFECTO, type ModuloTablero } from "@/lib/tablero";
 import { pendientesDeObra, type Pendiente } from "@/lib/pendientes";
+import { recordatoriosDeObra, type RecordatorioNota } from "@/services/notas.service";
 import { diasSinReportar } from "@/lib/parte-diario";
 import { arrastreDeIncumplidos, causaQueMasFrena } from "@/lib/plan-semanal";
 import { cumplimientoDeLiberacion } from "@/lib/lookahead-compromiso";
@@ -102,6 +103,10 @@ export interface DatosTablero {
     borradores: number;
     anuladas: number;
   } | null;
+  /// Notas pendientes con recordatorio, vencidas primero. Null sin permiso
+  /// `nota:leer` (o modulo apagado) — y NO lista vacia, que significaria "al
+  /// dia" en vez de "no puede verlo".
+  recordatorios: RecordatorioNota[] | null;
   /// Null si la obra no tiene cronograma cargado, o sin `cronograma:leer`.
   cronograma: DatosCronogramaTablero | null;
   /// Null sin permiso `plan_semanal:leer`.
@@ -297,7 +302,7 @@ export async function datosTablero(
   const necesitaPlanes =
     encendido("ppc") || encendido("causas") || encendido("pendientes");
 
-  const [presupuesto, ordenes, cronograma, curva, calendario, planes] =
+  const [presupuesto, ordenes, cronograma, curva, calendario, planes, recordatorios] =
     await Promise.all([
       encendido("presupuesto") ||
       encendido("valorGanado") ||
@@ -311,6 +316,7 @@ export async function datosTablero(
       necesitaCronograma ? datosCurvaS(sesion, obraId) : null,
       encendido("plazo") ? obtenerCalendario(sesion, obraId) : [],
       necesitaPlanes ? planSemanalDeObra(sesion, obraId) : null,
+      encendido("recordatorios") ? recordatoriosDeObra(sesion, obraId, 5) : null,
     ]);
 
   // Segunda tanda, y una sola consulta: la confiabilidad se calcula con las
@@ -416,6 +422,7 @@ export async function datosTablero(
     },
     presupuesto,
     ordenes,
+    recordatorios,
     cronograma:
       cronograma && curva ? armarCronograma(cronograma, curva) : null,
     planSemanal: planes,

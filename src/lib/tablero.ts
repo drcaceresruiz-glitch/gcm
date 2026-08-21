@@ -45,6 +45,17 @@ export const MODULOS = [
     requiereCronograma: false,
   },
   {
+    // Va JUNTO a "Que falta": los dos son listas de atencion del residente,
+    // una derivada del cronograma y del Last Planner, esta de lo que alguien
+    // anoto a mano. `requiereCronograma` es false: una nota con recordatorio
+    // existe aunque la obra no tenga cronograma cargado.
+    clave: "recordatorios",
+    etiqueta: "Próximos recordatorios",
+    nota: "Notas pendientes con fecha, vencidas primero",
+    ancho: 1,
+    requiereCronograma: false,
+  },
+  {
     clave: "avance",
     etiqueta: "Avance físico",
     nota: "Ejecutado contra plan en el último corte",

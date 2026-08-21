@@ -102,6 +102,14 @@ export const PERMISOS = [
   "orden:aprobar",
   "orden:anular",
 
+  "nota:leer",
+  "nota:crear",
+  /// Reescribir o borrar lo que ya se anoto. Va aparte de `crear` porque no
+  /// es lo mismo: anotar y marcar atendido/reabrir son actos reversibles de
+  /// campo, y corregir o destruir el texto de otro es un acto distinto —el
+  /// mismo reparto que ya separa `encargo:valorizar` de `encargo:gestionar`.
+  "nota:gestionar",
+
   "permiso:leer",
   "permiso:editar",
 
@@ -187,6 +195,11 @@ export function esInnegociable(permiso: string): boolean {
  * ensena el presupuesto de VENTA, que es suyo y lo han firmado, pero la meta
  * es el COSTO al que la empresa cree que puede hacerlo, y su diferencia es el
  * margen. Eso no se ensena a la otra parte de la mesa.
+ *
+ * `nota:leer` tampoco, por el mismo principio que ya aplica `galeria:leer`:
+ * la bitacora de la obra ensena TODO lo que alguien anoto, y sus categorias
+ * fijas incluyen financiero y legal. Eso es exactamente lo que este comentario
+ * ya excluye del perfil cliente dos parrafos mas arriba.
  */
 const SOLO_LECTURA: Permiso[] = [
   "empresa:leer",
@@ -269,6 +282,11 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// es administracion, y va en ADMIN_OBRA.
     "encargo:leer",
     "encargo:valorizar",
+    /// La bitacora de la obra: anota y marca atendido/reabre. Es trabajo de
+    /// campo reversible, igual que valorizar un encargo. Reescribir o borrar
+    /// lo ya anotado (`nota:gestionar`) se queda en ADMIN_OBRA.
+    "nota:leer",
+    "nota:crear",
   ],
 
   /// Administrador de obra: perfil economico-administrativo. Consulta el
@@ -312,6 +330,11 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "galeria:leer",
     "galeria:gestionar",
     "galeria:publicar",
+    /// La bitacora completa: anota, y tambien corrige o borra lo que ya
+    /// escribio cualquiera. Gerencia de obra, igual que con la galeria.
+    "nota:leer",
+    "nota:crear",
+    "nota:gestionar",
   ],
 
   /// Almacen: necesita ver las partidas para imputar movimientos de

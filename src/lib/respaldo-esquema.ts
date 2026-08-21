@@ -273,6 +273,16 @@ export const TABLAS: readonly TablaRespaldo[] = [
     refs: [{ campo: "projectId", a: "projects" }],
   },
   {
+    // `creadoPor`/`atendidaPor` son texto suelto, sin FK: no hay nada que
+    // remapear ahi, a diferencia de `hitos_obra`. Es historia permanente de
+    // la obra —igual que `hitos_obra`, no un buzon como `avisos`—, por eso
+    // viaja en el respaldo y no en `EXCLUIDAS`.
+    tabla: "notas",
+    modelo: "nota",
+    refs: [{ campo: "projectId", a: "projects" }],
+    fechas: ["fechaRecordatorio"],
+  },
+  {
     tabla: "pases_obra",
     modelo: "paseObra",
     refs: [{ campo: "projectId", a: "projects" }],

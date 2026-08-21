@@ -60,6 +60,7 @@ function identificador(...fuentes: unknown[]): string | null {
     "nombre",
     "codigoPartida",
     "version",
+    "titulo",
   ];
 
   for (const fuente of fuentes) {
@@ -88,6 +89,7 @@ const NOMBRE: Record<string, string> = {
   FormaPagoPlantilla: "Forma de pago",
   MensajeContratista: "Mensaje a contratista",
   CompanyPermission: "Permisos",
+  Nota: "Nota",
 };
 
 /**

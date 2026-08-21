@@ -99,6 +99,7 @@ const CAPITULO_DE_LA_SECCION: Record<string, string | null> = {
   lookahead: "lookahead",
   planSemanal: "plan-semanal",
   avance: "parte-del-dia",
+  notas: "notas",
   kanban: "kanban",
   galeria: "galeria",
   personal: "personal",

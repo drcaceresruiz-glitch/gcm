@@ -739,6 +739,7 @@ model Project {
   ajustesAvisos        AjustesAvisosObra?
   presupuestosMeta     PresupuestoMeta[]
   valorizaciones       ValorizacionEncargo[]
+  notas                Nota[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -3711,4 +3712,72 @@ model GastoGeneralMeta {
 
   @@index([presupuestoMetaId, orden])
   @@map("gastos_generales_meta")
+}
+
+// ---------------------------------------------------------------------------
+// Notas y recordatorios: la bitacora libre de la obra
+// ---------------------------------------------------------------------------
+
+/// Las cuatro categorias fijas del lanzamiento. Un catalogo cerrado y no
+/// texto libre: el filtro y el widget del tablero necesitan agrupar por algo
+/// estable, y una etiqueta escrita a mano nunca coincide dos veces igual.
+enum CategoriaNota {
+  FINANCIERO
+  LOGISTICA
+  OPERATIVO
+  LEGAL
+}
+
+/// Una entrada de la bitacora de la obra: lo que no encaja en ningun
+/// formulario reglado —un hallazgo, un pago pendiente, un tema legal, un
+/// recordatorio suelto—. NO es una Restriccion: esa vive en el Lookahead,
+/// tiene tipo cerrado, responsable y fecha de COMPROMISO, y bloquea una tarea
+/// concreta. Una Nota no tiene responsable ni compromete a nadie: es texto
+/// libre con, como mucho, una fecha en la que alguien quiere que se la
+/// recuerden.
+///
+/// NO GUARDA "vencida". Vencida = pendiente (no atendida) + fechaRecordatorio
+/// en el pasado, y eso se deriva SIEMPRE en el servicio (`esVencida` en
+/// `@/lib/notas`), nunca en una columna: una columna se desincroniza en
+/// cuanto pasa un dia sin que nadie toque la fila, y entonces miente.
+model Nota {
+  id        String @id @default(cuid())
+  companyId String
+  projectId String
+
+  categoria CategoriaNota
+
+  /// Encabezado corto, lo que se lee en la lista y en el widget del tablero.
+  titulo String @db.VarChar(150)
+  /// El cuerpo libre. Text y no VarChar: a diferencia del cuerpo de un
+  /// Aviso —una linea de notificacion, acotada a 400—, esto es la nota en
+  /// si, y puede ser tan larga como haga falta.
+  cuerpo String @db.Text
+
+  /// Cuando alguien quiere que se lo recuerden. NULL = nota sin recordatorio:
+  /// no puede estar vencida y no aparece en el widget de proximos
+  /// recordatorios, solo en la bitacora.
+  fechaRecordatorio DateTime? @db.Date
+
+  atendida    Boolean   @default(false)
+  atendidaAt  DateTime?
+  atendidaPor String?   @db.VarChar(150)
+
+  /// Quien la escribio, tal como `EncargoProveedor.creadoPor` y
+  /// `Restriccion.resueltaPor`: sin FK a proposito. Una Nota es historial
+  /// permanente de la obra, y desactivar la cuenta de quien la escribio no
+  /// tiene por que borrar lo que anoto.
+  creadoPor String @db.VarChar(150)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Alimenta el widget de "proximos recordatorios" y el contador de
+  /// vencidas del riel de la obra: notas pendientes con recordatorio,
+  /// ordenadas por fecha.
+  @@index([projectId, atendida, fechaRecordatorio])
+  @@index([projectId, createdAt])
+  @@map("notas")
 }

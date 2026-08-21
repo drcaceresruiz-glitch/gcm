@@ -2064,6 +2064,93 @@ const MAPEO = (
 );
 
 // ---------------------------------------------------------------------------
+// Capitulo: las notas de la obra
+// ---------------------------------------------------------------------------
+
+const NOTAS = (
+  <>
+    <Clave>
+      La bitácora libre de la obra: un pago pendiente, un tema legal, un
+      hallazgo suelto que no tienen dónde ir en ningún formulario reglado.
+      Cuatro categorías fijas —financiero, logística, operativo, legal— y, si
+      hace falta, una fecha en la que alguien quiere que se lo recuerden.
+    </Clave>
+
+    <S titulo="No es una Restricción del Lookahead">
+      <p>
+        Si lo que hay que anotar es <strong>por qué una tarea está
+        bloqueada</strong>, no es una nota: es una Restricción, en el
+        Lookahead. Una Restricción tiene un tipo cerrado (seguridad,
+        información, espacio…), un responsable con nombre y una fecha de{" "}
+        <strong>compromiso</strong> — alguien se hace cargo. Una nota no
+        compromete a nadie: es texto libre y, como mucho, una fecha de{" "}
+        <strong>recordatorio</strong>, que no es lo mismo que un compromiso.
+      </p>
+      <p>
+        La pantalla lo recuerda con un aviso justo debajo del cuerpo de la
+        nota, con el enlace al Lookahead a mano. Mezclarlas esconde el
+        bloqueo real de la obra en un cajón que nadie revisa con la misma
+        disciplina que la matriz de restricciones.
+      </p>
+    </S>
+
+    <S titulo="Vencida se calcula, no se guarda">
+      <p>
+        Una nota con recordatorio se marca <strong>vencida</strong> sola
+        cuando su fecha ya pasó y sigue sin atender — nadie la marca a mano ni
+        hay que acordarse de cambiarla. Atenderla la saca de vencidas al
+        instante, sin tocar su fecha, y queda su historial de quién y cuándo.
+      </p>
+      <p>
+        Las vencidas salen también en <strong>«Próximos recordatorios»</strong>{" "}
+        del tablero de la obra, y en el aviso rojo de la propia pestaña
+        «Notas» en el riel: son dos avisos del mismo hecho, no dos hechos
+        distintos.
+      </p>
+    </S>
+
+    <S titulo="Quién puede qué">
+      <p>
+        Anotar y marcar atendido o reabrir es trabajo de campo, reversible: lo
+        hace quien tiene permiso de <strong>crear</strong>. Corregir el texto
+        de otro o borrar una nota es distinto — reescribe o destruye lo que
+        alguien ya escribió — y pide el permiso de <strong>gestionar</strong>,
+        aparte.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Usar una nota para explicar por qué una tarea no puede empezar",
+            pasa: (
+              <p>
+                Se pierde en la bitácora general en vez de aparecer en la
+                matriz de restricciones del Lookahead, que es donde el
+                residente mira antes de comprometer la semana. Créala ahí: de
+                verdad bloquea algo en pantalla, con responsable y fecha de
+                compromiso.
+              </p>
+            ),
+          },
+          {
+            hace: "Esperar que una nota sin fecha salga en «Próximos recordatorios»",
+            pasa: (
+              <p>
+                No sale, y es a propósito: sin fecha no hay nada que recordar
+                en un día concreto. Sigue viva en la bitácora de la obra,
+                solo que no en el widget del tablero.
+              </p>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
 // Capitulo: el Kanban de obra
 // ---------------------------------------------------------------------------
 
@@ -2681,6 +2768,17 @@ export const CAPITULOS: CapituloManual[] = [
       "el valor ganado y el informe semanal. Y por qué una casilla vacía " +
       "no escribe nada.",
     contenido: PARTE,
+  },
+  {
+    slug: "notas",
+    titulo: "Las notas de la obra",
+    pregunta: "qué hay que no olvidar",
+    paraQuien: "Quien anota: trabajo de campo. Corregir o borrar pide gestionar.",
+    resumen:
+      "La bitácora libre —lo que no encaja en ningún formulario reglado—, " +
+      "con recordatorios que vencen solos y por qué no es lo mismo que una " +
+      "Restricción del Lookahead.",
+    contenido: NOTAS,
   },
   {
     slug: "personal",

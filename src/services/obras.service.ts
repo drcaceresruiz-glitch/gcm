@@ -999,14 +999,19 @@ export interface AvisosSeccion {
   lookahead: number;
   /// Semanas ABIERTAS cuyo corte ya paso: estan sin cerrar y ya toca.
   planSemanal: number;
+  /// Notas pendientes cuyo recordatorio ya paso. "Vencida" nunca se guarda
+  /// (ver `esVencida` en `@/lib/notas`): se cuenta con la misma condicion,
+  /// no leyendo una columna que no existe.
+  notas: number;
 }
 
 export const avisosDeSeccion = cache(async function avisosDeSeccion(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<AvisosSeccion> {
-  if (!puede(sesion, "obra:leer")) return { lookahead: 0, planSemanal: 0 };
-  if (!alcanzaObra(sesion, obraId)) return { lookahead: 0, planSemanal: 0 };
+  const vacio = { lookahead: 0, planSemanal: 0, notas: 0 };
+  if (!puede(sesion, "obra:leer")) return vacio;
+  if (!alcanzaObra(sesion, obraId)) return vacio;
 
   const hoyDia = hoy();
   const deLaObra = {
@@ -1014,7 +1019,7 @@ export const avisosDeSeccion = cache(async function avisosDeSeccion(
     project: { companyId: sesion.companyId },
   };
 
-  const [vencidas, sinCerrar] = await Promise.all([
+  const [vencidas, sinCerrar, notasVencidas] = await Promise.all([
     puede(sesion, "lookahead:leer")
       ? prisma.restriccion.count({
           where: {
@@ -1029,9 +1034,19 @@ export const avisosDeSeccion = cache(async function avisosDeSeccion(
           where: { ...deLaObra, estado: "ABIERTO", fechaCorte: { lte: hoyDia } },
         })
       : 0,
+    puede(sesion, "nota:leer")
+      ? prisma.nota.count({
+          where: {
+            projectId: obraId,
+            companyId: sesion.companyId,
+            atendida: false,
+            fechaRecordatorio: { lt: hoyDia },
+          },
+        })
+      : 0,
   ]);
 
-  return { lookahead: vencidas, planSemanal: sinCerrar };
+  return { lookahead: vencidas, planSemanal: sinCerrar, notas: notasVencidas };
 });
 
 // ---------------------------------------------------------------------------

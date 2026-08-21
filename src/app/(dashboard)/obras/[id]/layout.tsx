@@ -218,6 +218,20 @@ export default async function ObraLayout({
           pregunta: "cuánto se avanzó hoy",
           href: `${raiz}/avance`,
         },
+        /// Justo detras del parte: es su companero libre. El parte reporta el
+        /// % reglado de cada tarea; aqui se anota lo que ese formulario no
+        /// tiene donde poner —un pago pendiente, un tema legal, un hallazgo
+        /// suelto—. `critico: true` en el aviso porque una nota con
+        /// recordatorio ya vencido es el mismo tipo de problema que una
+        /// restriccion vencida: alguien se puso una fecha y ya paso.
+        puede(sesion, "nota:leer") && {
+          clave: "notas",
+          titulo: "Notas",
+          pregunta: "qué hay que no olvidar",
+          href: `${raiz}/notas`,
+          pendientes:
+            avisos.notas > 0 ? { cuantos: avisos.notas, critico: true } : null,
+        },
         /// El escaparate: las fotos de avance que se curan y, si gerencia
         /// quiere, se ensenan al cliente. Va tras el Plan semanal porque la
         /// foto se sube cuando el trabajo ya se hizo.

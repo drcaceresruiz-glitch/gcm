@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   TrendingUp,
   CalendarClock,
+  Bell,
   Wallet,
   AlertTriangle,
   Link2,
@@ -77,6 +78,10 @@ export function moduloConDatos(
       return datos.cronograma !== null;
     case "ordenes":
       return datos.ordenes !== null;
+    case "recordatorios":
+      // Igual que "ordenes": null es "sin permiso o modulo apagado", no
+      // "sin recordatorios". Una lista vacia SI se pinta, en verde.
+      return datos.recordatorios !== null;
     case "ppc":
     case "causas":
       return datos.planSemanal !== null;
@@ -164,6 +169,9 @@ export function ModuloContenido({
       {modulo.clave === "ordenes" && datos.ordenes && (
         <Ordenes ordenes={datos.ordenes} obraId={obraId} />
       )}
+      {modulo.clave === "recordatorios" && datos.recordatorios && (
+        <Recordatorios lista={datos.recordatorios} obraId={obraId} />
+      )}
     </Caja>
   );
 }
@@ -226,6 +234,7 @@ const ICONOS = {
   criticas: Link2,
   capitulos: Layers,
   ordenes: FileText,
+  recordatorios: Bell,
 } satisfies Record<ModuloTablero, typeof Wallet>;
 
 /**
@@ -299,6 +308,12 @@ function acentoDeModulo(
       const { criticas, total } = resumirPendientes(datos.pendientes);
       if (criticas > 0) return COLOR_SEMAFORO.rojo;
       if (total > 0) return COLOR_SEMAFORO.ambar;
+      return COLOR_SEMAFORO.verde;
+    }
+    case "recordatorios": {
+      const lista = datos.recordatorios ?? [];
+      if (lista.some((r) => r.vencida)) return COLOR_SEMAFORO.rojo;
+      if (lista.length > 0) return COLOR_SEMAFORO.ambar;
       return COLOR_SEMAFORO.verde;
     }
     case "avance":
@@ -1506,6 +1521,86 @@ function Pendientes({
         ))}
       </ul>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Proximos recordatorios
+// ---------------------------------------------------------------------------
+
+/// "vence el 3 sep." leido en UTC, no en hora local: `fechaRecordatorio` es
+/// un dia de calendario, y convertirlo a hora de Lima (UTC-5) lo correria un
+/// dia hacia atras justo despues de medianoche.
+const FORMATO_FECHA_RECORDATORIO = new Intl.DateTimeFormat("es-PE", {
+  timeZone: "UTC",
+  day: "numeric",
+  month: "short",
+});
+
+function Recordatorios({
+  lista,
+  obraId,
+}: {
+  lista: NonNullable<DatosTablero["recordatorios"]>;
+  obraId: string;
+}) {
+  if (lista.length === 0) {
+    return (
+      <p
+        className="mt-2 flex items-center gap-1.5 text-sm"
+        style={{ color: "var(--color-exito)" }}
+      >
+        <CircleCheck className="size-4 shrink-0" aria-hidden="true" />
+        Sin recordatorios pendientes.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto">
+      {lista.map((r) => (
+        <li key={r.id} className="flex items-start gap-2">
+          {r.vencida ? (
+            <TriangleAlert
+              className="mt-0.5 size-4 shrink-0"
+              style={{ color: "var(--color-peligro)" }}
+              aria-label="Vencida"
+            />
+          ) : (
+            <CalendarClock
+              className="mt-0.5 size-4 shrink-0"
+              style={{ color: "var(--color-alerta)" }}
+              aria-label="Con fecha"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{r.titulo}</p>
+            <p
+              className="text-xs"
+              style={{
+                color: r.vencida ? "var(--color-peligro)" : undefined,
+                opacity: r.vencida ? undefined : 0.7,
+              }}
+            >
+              {r.vencida
+                ? `Vencida — ${FORMATO_FECHA_RECORDATORIO.format(r.fechaRecordatorio)}`
+                : `Vence el ${FORMATO_FECHA_RECORDATORIO.format(r.fechaRecordatorio)}`}
+            </p>
+            <Link
+              href={`/obras/${obraId}/notas`}
+              className="group mt-1 inline-flex items-start gap-1 text-xs font-medium underline decoration-dotted underline-offset-2 hover:decoration-solid"
+              style={{ color: "var(--color-marca-600)" }}
+            >
+              <span>Ver en Notas</span>
+              <ArrowRight
+                className="mt-0.5 size-3 shrink-0 transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
+            </Link>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
