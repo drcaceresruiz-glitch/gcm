@@ -706,6 +706,11 @@ export interface TareaDelPlan {
   porcentajeArchivo: string;
   holguraDias: string;
   holguraInferida: boolean;
+  /// `inicio`/`fin` son un relleno, no un plan: ver la nota de
+  /// `fechasDelCronograma` en `encargos.service.ts`. Se expone para que la
+  /// pantalla del cronograma sepa cuando una EDT recien generada todavia no
+  /// tiene ninguna fecha real.
+  sinProgramar: boolean;
 }
 
 export interface DependenciaDelPlan {
@@ -761,7 +766,7 @@ export async function obtenerCronograma(
           esResumen: true, esHito: true, esCritico: true,
           inicio: true, fin: true, duracionDias: true,
           porcentajePlaneado: true, porcentajeArchivo: true,
-          holguraDias: true, holguraInferida: true,
+          holguraDias: true, holguraInferida: true, sinProgramar: true,
         },
       },
       dependencias: {
@@ -1253,7 +1258,7 @@ export async function informeAlCorte(
           esResumen: true, esHito: true, esCritico: true,
           inicio: true, fin: true, duracionDias: true,
           porcentajePlaneado: true, porcentajeArchivo: true,
-          holguraDias: true, holguraInferida: true,
+          holguraDias: true, holguraInferida: true, sinProgramar: true,
         },
       },
     },

@@ -139,6 +139,22 @@ export default async function CronogramaPage({
       )
     : [];
 
+  /**
+   * Una EDT recien traida del presupuesto, y TODAVIA sin ni una fecha real.
+   *
+   * `generarEdtDesdePresupuesto` marca cada tarea `sinProgramar: true` y le
+   * pone la fecha de inicio de la obra como relleno —nunca un plan—. Con eso,
+   * la curva, el valor ganado, el ritmo, los hitos y la ruta critica no tienen
+   * nada que medir: son ocho secciones en blanco o enganosas entre el boton de
+   * generar y la tabla donde de verdad se teclean las fechas. Se ocultan hasta
+   * que exista AL MENOS una fecha real —no hace falta que sea la obra
+   * entera—: en cuanto hay una, mostrarlas vuelve a ser mas util que ocultarlas.
+   */
+  const edtSinProgramar =
+    cronograma !== null &&
+    cronograma.tareas.length > 0 &&
+    cronograma.tareas.every((t) => t.sinProgramar);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -281,14 +297,27 @@ export default async function CronogramaPage({
             {cronograma.importadoPor} {haceCuanto(cronograma.importadoAt)}
           </p>
 
-          {/* El plazo del cronograma puede no coincidir con las fechas que
-              tiene registrada la obra, y conviene que se vea: en CRIOCORD la
-              obra decia 22/10 y el Project 05/10. */}
-          <DesajusteDePlazo
-            inicioObra={obra.fechaInicio}
-            finObra={obra.fechaFinProgramada}
-            tareas={cronograma.tareas}
-          />
+          {edtSinProgramar ? (
+            <Mensaje tono="alerta" icono={<Info className="size-4 shrink-0" />}>
+              La EDT ya trajo las {cronograma.tareas.length} filas del
+              presupuesto, pero ninguna tiene fecha todavía: la curva, el valor
+              ganado, el ritmo, los hitos y la ruta crítica no tienen nada que
+              medir, así que se quedan ocultos hasta entonces. Pon las fechas
+              en la tabla de abajo —o carga el cronograma desde MS Project, que
+              las trae solas— y todo lo demás aparece.
+            </Mensaje>
+          ) : (
+            // El plazo del cronograma puede no coincidir con las fechas que
+            // tiene registrada la obra, y conviene que se vea: en CRIOCORD la
+            // obra decia 22/10 y el Project 05/10. Se omite mientras la EDT
+            // esta sin programar: comparar contra fechas de relleno no dice
+            // nada.
+            <DesajusteDePlazo
+              inicioObra={obra.fechaInicio}
+              finObra={obra.fechaFinProgramada}
+              tareas={cronograma.tareas}
+            />
+          )}
 
           {cronograma.huerfanos.length > 0 && (
             <Mensaje tono="alerta" icono={<AlertTriangle className="size-4 shrink-0" />}>
@@ -305,164 +334,168 @@ export default async function CronogramaPage({
             </Mensaje>
           )}
 
-          <Tarjeta>
-            <h3 className="text-base font-semibold">Curva de avance</h3>
-            <p className="mt-0.5 mb-4 text-sm opacity-70">
-              La línea de puntos es el plan repartido día a día; la continua, lo
-              medido en cada corte. Cada tarea pesa según su duración, no todas
-              por igual: terminar una partida de un día no es lo mismo que
-              terminar una de veinte.
-            </p>
-
-            <div
-              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
-              style={{ borderColor: "var(--borde)" }}
-            >
-              <p className="text-sm">
-                Corte semanal los{" "}
-                <strong>{DIAS_SEMANA[obra.diaCorteSemanal] ?? "viernes"}</strong>.
-                {curva.cadencia.ultimoCorteEsperado &&
-                  (curva.cadencia.semanaPendiente ? (
-                    <span style={{ color: "var(--color-peligro)" }}>
-                      {" "}Falta el reporte del corte del{" "}
-                      {fechaCorta(curva.cadencia.ultimoCorteEsperado)}.
-                    </span>
-                  ) : (
-                    <span style={{ color: "var(--color-exito)" }}>
-                      {" "}Al día (último corte{" "}
-                      {fechaCorta(curva.cadencia.ultimoCorteEsperado)}).
-                    </span>
-                  ))}
+          {!edtSinProgramar && (
+          <>
+            <Tarjeta>
+              <h3 className="text-base font-semibold">Curva de avance</h3>
+              <p className="mt-0.5 mb-4 text-sm opacity-70">
+                La línea de puntos es el plan repartido día a día; la continua, lo
+                medido en cada corte. Cada tarea pesa según su duración, no todas
+                por igual: terminar una partida de un día no es lo mismo que
+                terminar una de veinte.
               </p>
-              {puedeImportar && (
-                <DiaCorteSemanal obraId={id} diaActual={obra.diaCorteSemanal} />
+
+              <div
+                className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                style={{ borderColor: "var(--borde)" }}
+              >
+                <p className="text-sm">
+                  Corte semanal los{" "}
+                  <strong>{DIAS_SEMANA[obra.diaCorteSemanal] ?? "viernes"}</strong>.
+                  {curva.cadencia.ultimoCorteEsperado &&
+                    (curva.cadencia.semanaPendiente ? (
+                      <span style={{ color: "var(--color-peligro)" }}>
+                        {" "}Falta el reporte del corte del{" "}
+                        {fechaCorta(curva.cadencia.ultimoCorteEsperado)}.
+                      </span>
+                    ) : (
+                      <span style={{ color: "var(--color-exito)" }}>
+                        {" "}Al día (último corte{" "}
+                        {fechaCorta(curva.cadencia.ultimoCorteEsperado)}).
+                      </span>
+                    ))}
+                </p>
+                {puedeImportar && (
+                  <DiaCorteSemanal obraId={id} diaActual={obra.diaCorteSemanal} />
+                )}
+              </div>
+
+              <CurvaS
+                datos={curva}
+                obraId={id}
+                nombreObra={obra.nombreObra}
+                totalTareas={cronograma.tareas.length}
+                totalCriticas={cronograma.tareas.filter((t) => t.esCritico).length}
+              />
+
+              {curva.cortes.length === 1 && (
+                <p className="mt-3 text-xs opacity-60">
+                  Con un solo corte la línea real es todavía un punto. Carga los
+                  cortes siguientes y se irá dibujando sola.
+                </p>
               )}
-            </div>
 
-            <CurvaS
-              datos={curva}
-              obraId={id}
-              nombreObra={obra.nombreObra}
-              totalTareas={cronograma.tareas.length}
-              totalCriticas={cronograma.tareas.filter((t) => t.esCritico).length}
-            />
-
-            {curva.cortes.length === 1 && (
               <p className="mt-3 text-xs opacity-60">
-                Con un solo corte la línea real es todavía un punto. Carga los
-                cortes siguientes y se irá dibujando sola.
+                La ponderación es por duración porque es el único peso que trae el
+                archivo —no lleva costes ni horas de trabajo—.{" "}
+                <Link
+                  href={`/obras/${id}/cronograma/mapeo`}
+                  className="font-medium underline"
+                >
+                  Enlaza las tareas con las partidas del presupuesto
+                </Link>{" "}
+                y pasará a ponderarse por dinero, que es lo que hace comparable el
+                avance con lo comprometido.
               </p>
+            </Tarjeta>
+
+            {evm && (
+              <Tarjeta>
+                <h3 className="text-base font-semibold">Valor ganado (EVM)</h3>
+                <p className="mt-0.5 mb-4 text-sm opacity-70">
+                  El avance y el gasto en la misma escala de dinero: el control
+                  integrado de plazo y costo. El SPI dice cómo se va de plazo; el
+                  CPI, de costo.
+                </p>
+
+                <PanelEvm datos={evm} />
+              </Tarjeta>
             )}
 
-            <p className="mt-3 text-xs opacity-60">
-              La ponderación es por duración porque es el único peso que trae el
-              archivo —no lleva costes ni horas de trabajo—.{" "}
-              <Link
-                href={`/obras/${id}/cronograma/mapeo`}
-                className="font-medium underline"
-              >
-                Enlaza las tareas con las partidas del presupuesto
-              </Link>{" "}
-              y pasará a ponderarse por dinero, que es lo que hace comparable el
-              avance con lo comprometido.
-            </p>
-          </Tarjeta>
+            {/* Debajo de la curva y del EVM porque contesta la pregunta que
+                deja abierta una curva acumulada: la meseta que se ve arriba,
+                ¿es que la obra frena o es que nadie reporta? */}
+            {ritmo && (
+              <Tarjeta>
+                <RitmoDeObra datos={ritmo} />
+              </Tarjeta>
+            )}
 
-          {evm && (
             <Tarjeta>
-              <h3 className="text-base font-semibold">Valor ganado (EVM)</h3>
+              <h3 className="text-base font-semibold">Hitos</h3>
               <p className="mt-0.5 mb-4 text-sm opacity-70">
-                El avance y el gasto en la misma escala de dinero: el control
-                integrado de plazo y costo. El SPI dice cómo se va de plazo; el
-                CPI, de costo.
+                Las fechas clave del cronograma.{" "}
+                {baseCron
+                  ? "El desvío se mide contra la línea base."
+                  : "Fija una línea base para medir su desvío."}
               </p>
 
-              <PanelEvm datos={evm} />
-            </Tarjeta>
-          )}
+              <Hitos filas={filasDeHitos} hayBase={baseCron !== null} />
 
-          {/* Debajo de la curva y del EVM porque contesta la pregunta que
-              deja abierta una curva acumulada: la meseta que se ve arriba,
-              ¿es que la obra frena o es que nadie reporta? */}
-          {ritmo && (
+              {/* Los hitos los pone el planificador sobre la EDT ya generada: el
+                  presupuesto dice que se construye y cuanto cuesta, no que fechas
+                  son clave. */}
+              <MarcarHitos
+                obraId={id}
+                hitos={hitosMarcados}
+                anclas={anclasPosibles}
+                personas={personasPosibles}
+                puedeEditar={puedeEditarTareas}
+                puedeEliminar={puedeEliminarTareas}
+              />
+            </Tarjeta>
+
             <Tarjeta>
-              <RitmoDeObra datos={ritmo} />
+              <h3 className="text-base font-semibold">Hitos que propone GCM</h3>
+              <p className="mt-0.5 mb-4 text-sm opacity-70">
+                Deducidos del estado de la obra. <strong>Nada se marca solo</strong>:
+                hasta que aceptas una, no existe en el cronograma.
+              </p>
+
+              <HitosPropuestos
+                obraId={id}
+                prediccion={prediccion}
+                puedeAceptar={puedeEditarTareas}
+              />
             </Tarjeta>
+
+            <Tarjeta>
+              <h3 className="text-base font-semibold">Qué está frenando la obra</h3>
+              <p className="mt-0.5 mb-4 text-sm opacity-70">
+                Solo partidas de trabajo. Un capítulo atrasado no se lista aparte:
+                lo está porque lo están sus partidas.
+              </p>
+
+              <AlertasAtraso
+                alertas={alertasDeAtraso(cronograma.tareas, cronograma.fechaCorte)}
+              />
+            </Tarjeta>
+
+            <Tarjeta>
+              <h3 className="text-base font-semibold">Ruta crítica</h3>
+              <p className="mt-0.5 mb-4 text-sm opacity-70">
+                La cadena de tareas cuyo atraso corre la fecha de entrega de toda
+                la obra. No aparecen ni los capítulos ni los hitos que Project
+                también marca como críticos: no son trabajo sobre el que se pueda
+                actuar.
+              </p>
+
+              <CadenaCritica
+                cadena={cadenaCritica(cronograma.tareas, cronograma.fechaCorte)}
+              />
+            </Tarjeta>
+
+            <Tarjeta>
+              <h3 className="text-base font-semibold">Avance por capítulo</h3>
+              <p className="mt-0.5 mb-4 text-sm opacity-70">
+                La lectura que falta entre la curva —una cifra para toda la obra— y
+                la tabla de {cronograma.tareas.length} filas.
+              </p>
+
+              <ControlCapitulos capitulos={agruparPorCapitulo(cronograma.tareas)} />
+            </Tarjeta>
+          </>
           )}
-
-          <Tarjeta>
-            <h3 className="text-base font-semibold">Hitos</h3>
-            <p className="mt-0.5 mb-4 text-sm opacity-70">
-              Las fechas clave del cronograma.{" "}
-              {baseCron
-                ? "El desvío se mide contra la línea base."
-                : "Fija una línea base para medir su desvío."}
-            </p>
-
-            <Hitos filas={filasDeHitos} hayBase={baseCron !== null} />
-
-            {/* Los hitos los pone el planificador sobre la EDT ya generada: el
-                presupuesto dice que se construye y cuanto cuesta, no que fechas
-                son clave. */}
-            <MarcarHitos
-              obraId={id}
-              hitos={hitosMarcados}
-              anclas={anclasPosibles}
-              personas={personasPosibles}
-              puedeEditar={puedeEditarTareas}
-              puedeEliminar={puedeEliminarTareas}
-            />
-          </Tarjeta>
-
-          <Tarjeta>
-            <h3 className="text-base font-semibold">Hitos que propone GCM</h3>
-            <p className="mt-0.5 mb-4 text-sm opacity-70">
-              Deducidos del estado de la obra. <strong>Nada se marca solo</strong>:
-              hasta que aceptas una, no existe en el cronograma.
-            </p>
-
-            <HitosPropuestos
-              obraId={id}
-              prediccion={prediccion}
-              puedeAceptar={puedeEditarTareas}
-            />
-          </Tarjeta>
-
-          <Tarjeta>
-            <h3 className="text-base font-semibold">Qué está frenando la obra</h3>
-            <p className="mt-0.5 mb-4 text-sm opacity-70">
-              Solo partidas de trabajo. Un capítulo atrasado no se lista aparte:
-              lo está porque lo están sus partidas.
-            </p>
-
-            <AlertasAtraso
-              alertas={alertasDeAtraso(cronograma.tareas, cronograma.fechaCorte)}
-            />
-          </Tarjeta>
-
-          <Tarjeta>
-            <h3 className="text-base font-semibold">Ruta crítica</h3>
-            <p className="mt-0.5 mb-4 text-sm opacity-70">
-              La cadena de tareas cuyo atraso corre la fecha de entrega de toda
-              la obra. No aparecen ni los capítulos ni los hitos que Project
-              también marca como críticos: no son trabajo sobre el que se pueda
-              actuar.
-            </p>
-
-            <CadenaCritica
-              cadena={cadenaCritica(cronograma.tareas, cronograma.fechaCorte)}
-            />
-          </Tarjeta>
-
-          <Tarjeta>
-            <h3 className="text-base font-semibold">Avance por capítulo</h3>
-            <p className="mt-0.5 mb-4 text-sm opacity-70">
-              La lectura que falta entre la curva —una cifra para toda la obra— y
-              la tabla de {cronograma.tareas.length} filas.
-            </p>
-
-            <ControlCapitulos capitulos={agruparPorCapitulo(cronograma.tareas)} />
-          </Tarjeta>
 
           <TablaCronograma
             obraId={id}
