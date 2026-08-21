@@ -10,4 +10,4 @@
 - [Git va por delante de los docs](git-esta-mas-al-dia-que-los-docs.md) — comprobar el reflog antes de fiarse de la fecha de un documento
 - [Avisar si faltan herramientas](avisar-si-faltan-herramientas.md) — decirlo en la primera respuesta, no despues de trabajar
 - [Estilo de escritura del proyecto](estilo-de-escritura-del-proyecto.md) — espanol sin tildes, commits que describen el efecto visible
-- [Estado pendiente al 21 de agosto de 2026](estado-pendiente-21-agosto-2026.md) — hueco de 90 commits, WIP sin describir, _msg.txt por borrar
+- [Estado pendiente al 21 de agosto de 2026](estado-pendiente-21-agosto-2026.md) — lo abierto vive en PENDIENTES.md; lo encabeza el WIP 835d988, que compila y esta a medias
