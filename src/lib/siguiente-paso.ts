@@ -131,25 +131,10 @@ function plural(n: number, singular: string, plural: string): string {
 
 export function siguientePaso(
   alta: EstadoAlta,
-  faltaCriterio: boolean,
   puede: PuedeHacer,
   avisos: AvisosVivos,
 ): PasoSiguiente | null {
-  // 1. Lo unico bloqueante. Va delante incluso del alta: mientras no se
-  // decida, ninguna cifra de margen de esta obra significa nada.
-  if (faltaCriterio) {
-    return {
-      clave: "criterio",
-      gravedad: "bloqueante",
-      titulo: "Falta decidir una cosa antes de seguir",
-      consecuencia:
-        "Hasta que elijas si los gastos generales cuentan en la bolsa, el margen que se calcule no sería fiable.",
-      accion: "Decidir ahora",
-      camino: "/criterio",
-    };
-  }
-
-  // 2. El alta, en el orden en que se hace.
+  // 1. El alta, en el orden en que se hace.
   // El presupuesto entra en DOS tramos: primero el REAL, con la plantilla, y
   // de el se genera el contractual inflando cada capitulo. Enseñar solo el
   // primero deja a medias a quien llega nuevo: carga la meta, ve desaparecer

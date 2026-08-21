@@ -48,26 +48,7 @@ const EN_PAZ: AvisosVivos = { restriccionesVencidas: 0, semanasSinCerrar: 0 };
 
 describe("el paso siguiente de la obra", () => {
   it("con la obra al dia y sin nada vencido, no sugiere nada", () => {
-    expect(siguientePaso(ALTA_COMPLETA, false, TODO, EN_PAZ)).toBeNull();
-  });
-
-  it("el criterio bloqueante va por delante de todo el alta", () => {
-    const sinNada: EstadoAlta = {
-      presupuesto: false,
-      meta: false,
-      cronograma: false,
-      equipo: false,
-      lineaBase: false,
-      equipoAsignable: true,
-    };
-
-    const paso = siguientePaso(sinNada, true, TODO, {
-      restriccionesVencidas: 9,
-      semanasSinCerrar: 9,
-    });
-
-    expect(paso?.clave).toBe("criterio");
-    expect(paso?.gravedad).toBe("bloqueante");
+    expect(siguientePaso(ALTA_COMPLETA, TODO, EN_PAZ)).toBeNull();
   });
 
   /**
@@ -87,7 +68,7 @@ describe("el paso siguiente de la obra", () => {
     const vistos: string[] = [];
 
     for (const paso of ["presupuesto", "cronograma", "equipo", "lineaBase"] as const) {
-      const siguiente = siguientePaso(estado, false, TODO, EN_PAZ);
+      const siguiente = siguientePaso(estado, TODO, EN_PAZ);
       vistos.push(siguiente!.clave);
       estado[paso] = true;
     }
@@ -99,7 +80,7 @@ describe("el paso siguiente de la obra", () => {
       "alta-linea-base",
     ]);
     // Y al terminar el alta ya no queda nada que sugerir.
-    expect(siguientePaso(estado, false, TODO, EN_PAZ)).toBeNull();
+    expect(siguientePaso(estado, TODO, EN_PAZ)).toBeNull();
   });
 
   it("no propone un paso a quien no puede darlo", () => {
@@ -112,7 +93,7 @@ describe("el paso siguiente de la obra", () => {
       equipoAsignable: true,
     };
 
-    expect(siguientePaso(sinNada, false, NADA, EN_PAZ)).toBeNull();
+    expect(siguientePaso(sinNada, NADA, EN_PAZ)).toBeNull();
   });
 
   /**
@@ -131,7 +112,6 @@ describe("el paso siguiente de la obra", () => {
 
     const paso = siguientePaso(
       sinNada,
-      false,
       { ...NADA, equipo: true },
       EN_PAZ,
     );
@@ -148,11 +128,11 @@ describe("el paso siguiente de la obra", () => {
       equipo: false,
       equipoAsignable: false,
     };
-    expect(siguientePaso(sinAsignables, false, TODO, EN_PAZ)).toBeNull();
+    expect(siguientePaso(sinAsignables, TODO, EN_PAZ)).toBeNull();
   });
 
   it("con el alta hecha, recuerda lo que vencio", () => {
-    const paso = siguientePaso(ALTA_COMPLETA, false, TODO, {
+    const paso = siguientePaso(ALTA_COMPLETA, TODO, {
       restriccionesVencidas: 3,
       semanasSinCerrar: 1,
     });
@@ -162,13 +142,13 @@ describe("el paso siguiente de la obra", () => {
   });
 
   it("singular y plural, que se leen en la cabecera de cada pantalla", () => {
-    const una = siguientePaso(ALTA_COMPLETA, false, TODO, {
+    const una = siguientePaso(ALTA_COMPLETA, TODO, {
       restriccionesVencidas: 1,
       semanasSinCerrar: 0,
     });
     expect(una?.titulo).toBe("1 restricción con la fecha ya pasada");
 
-    const semana = siguientePaso(ALTA_COMPLETA, false, TODO, {
+    const semana = siguientePaso(ALTA_COMPLETA, TODO, {
       restriccionesVencidas: 0,
       semanasSinCerrar: 1,
     });
@@ -182,24 +162,23 @@ describe("el paso siguiente de la obra", () => {
    */
   it("ningun paso tiene el camino vacio", () => {
     const casos: PasoPosible[] = [
-      [{ ...ALTA_COMPLETA }, true, EN_PAZ],
-      [{ ...ALTA_COMPLETA, presupuesto: false }, false, EN_PAZ],
-      [{ ...ALTA_COMPLETA, cronograma: false }, false, EN_PAZ],
-      [{ ...ALTA_COMPLETA, equipo: false }, false, EN_PAZ],
-      [{ ...ALTA_COMPLETA, lineaBase: false }, false, EN_PAZ],
-      [ALTA_COMPLETA, false, { restriccionesVencidas: 1, semanasSinCerrar: 0 }],
-      [ALTA_COMPLETA, false, { restriccionesVencidas: 0, semanasSinCerrar: 1 }],
+            [{ ...ALTA_COMPLETA, presupuesto: false }, EN_PAZ],
+      [{ ...ALTA_COMPLETA, cronograma: false }, EN_PAZ],
+      [{ ...ALTA_COMPLETA, equipo: false }, EN_PAZ],
+      [{ ...ALTA_COMPLETA, lineaBase: false }, EN_PAZ],
+      [ALTA_COMPLETA, { restriccionesVencidas: 1, semanasSinCerrar: 0 }],
+      [ALTA_COMPLETA, { restriccionesVencidas: 0, semanasSinCerrar: 1 }],
     ];
 
-    for (const [alta, criterio, avisos] of casos) {
-      const paso = siguientePaso(alta, criterio, TODO, avisos);
+    for (const [alta, avisos] of casos) {
+      const paso = siguientePaso(alta, TODO, avisos);
       expect(paso, JSON.stringify(alta)).not.toBeNull();
       expect(paso!.camino.startsWith("/"), paso!.clave).toBe(true);
     }
   });
 });
 
-type PasoPosible = [EstadoAlta, boolean, AvisosVivos];
+type PasoPosible = [EstadoAlta, AvisosVivos];
 
 /**
  * Que cada camino sugerido lleve a una pantalla que existe.
@@ -253,7 +232,7 @@ describe("el alta del presupuesto, en dos tramos", () => {
   const conMeta: EstadoAlta = { ...ALTA_COMPLETA, presupuesto: false, meta: true };
 
   it("sin nada, manda al real y ANUNCIA el segundo tramo", () => {
-    const paso = siguientePaso(sinNada, false, TODO, EN_PAZ);
+    const paso = siguientePaso(sinNada, TODO, EN_PAZ);
 
     expect(paso?.camino).toBe("/meta");
     expect(paso?.despues?.camino).toBe("/contractual");
@@ -261,14 +240,14 @@ describe("el alta del presupuesto, en dos tramos", () => {
 
   it("con el real ya cargado, pide solo el contractual", () => {
     // Y sin `despues`: no queda ningun tramo por anunciar.
-    const paso = siguientePaso(conMeta, false, TODO, EN_PAZ);
+    const paso = siguientePaso(conMeta, TODO, EN_PAZ);
 
     expect(paso?.camino).toBe("/contractual");
     expect(paso?.despues).toBeUndefined();
   });
 
   it("a quien no puede cargarlo no se le propone ninguno de los dos", () => {
-    expect(siguientePaso(sinNada, false, NADA, EN_PAZ)).toBeNull();
-    expect(siguientePaso(conMeta, false, NADA, EN_PAZ)).toBeNull();
+    expect(siguientePaso(sinNada, NADA, EN_PAZ)).toBeNull();
+    expect(siguientePaso(conMeta, NADA, EN_PAZ)).toBeNull();
   });
 });

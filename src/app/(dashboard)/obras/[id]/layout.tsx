@@ -3,7 +3,6 @@ import { CalendarDays, Download, MapPin, Pencil } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra, hitosDeObra, avisosDeSeccion } from "@/services/obras.service";
 import { planesAbiertos } from "@/services/plan-semanal.service";
-import { criterioDeObra } from "@/services/criterio-obra.service";
 import { PasoSiguiente } from "@/components/obras/PasoSiguiente";
 import { siguientePaso } from "@/lib/siguiente-paso";
 import { puede } from "@/lib/rbac";
@@ -47,7 +46,7 @@ export default async function ObraLayout({
   // Solo hace falta publicarlo para que la miga —montada arriba del todo,
   // en el layout raiz— lo pueda leer sin volver a consultar nada.
   const raiz = `/obras/${id}`;
-  const [hitos, avisos, semanasAbiertas, criterio] = await Promise.all([
+  const [hitos, avisos, semanasAbiertas] = await Promise.all([
     hitosDeObra(sesion, id),
     avisosDeSeccion(sesion, id),
     // Solo las ABIERTAS: es una consulta plana (id, numero, fechaCorte, sin
@@ -55,10 +54,6 @@ export default async function ObraLayout({
     // cerradas son historia, no trabajo por hacer, y ya se ven enteras desde
     // dentro de `/plan-semanal`.
     planesAbiertos(sesion, id),
-    // El criterio de gastos generales. Si esta sin decidir y ya hay
-    // presupuesto, la obra no deja avanzar: cualquier cifra de margen que se
-    // enseñara estaria calculada con un criterio que nadie ha confirmado.
-    criterioDeObra(sesion, id),
   ]);
 
   /**
@@ -319,7 +314,6 @@ export default async function ObraLayout({
             equipoAsignable: hitos.equipoAsignable,
             lineaBase: hitos.lineaBase,
           },
-          criterio?.faltaDecidir ?? false,
           {
             // Para PROPONER un paso hace falta poder darlo, que no es lo
             // mismo que poder ver la seccion. Los dos ultimos si son de
