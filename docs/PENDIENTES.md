@@ -116,14 +116,17 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      del numero grande). No es un bug de calculo —`ResumenEmpresaPanel.tsx`
      lo hace a proposito, y lo explica en su comentario— pero la jerarquia
      visual induce a leer las cifras de dinero como si fueran de las 5.
-     ~~Parcialmente HECHO el 21 de agosto de 2026~~: con mas de una obra en
-     ejecucion, el detalle de Presupuesto/Comprometido/Saldo ahora dice
-     "Suma de N obras en ejecución" en vez de dejarlo implicito —el usuario
-     pregunto en vivo "si hay mas de una obra, ¿esas cifras a quien
-     corresponden?" viendo el panel—. Sigue abierta la jerarquia visual en
-     si (el "5" grande al lado del dinero, aunque el dinero sea de un
-     subconjunto mas chico): eso pide rediseno, no solo texto, y queda para
-     la auditoria de UX mas amplia.
+     ~~HECHO el 21 de agosto de 2026~~: el usuario vio en vivo el panel con
+     varias obras y pregunto "a quien corresponden estas cifras" — un
+     primer intento le agrego texto aclarando la suma, y lo rechazo: un
+     resumen de dinero de varias obras mezcladas "ahi no tiene sentido",
+     diga lo que diga el texto. Se dejo asi: Presupuesto/Comprometido/Saldo
+     SOLO se muestran con exactamente una obra en ejecucion —donde la suma
+     y esa obra son la misma cifra—; con mas de una, se ocultan
+     (`ResumenEmpresaPanel.tsx`). En su lugar se sumo un semaforo de salud
+     por obra (ver el nuevo punto 12): a diferencia del dinero, un punto de
+     color por obra SI tiene sentido con varias, porque no mezcla ninguna
+     escala entre ellas.
    - `/gerencia` (`src/app/(dashboard)/gerencia/page.tsx`) solo trae dos
      bloques (semaforo de partidas criticas por SPI, adicionales sin
      aprobar). El usuario lo considera insuficiente para lo que un gerente
@@ -190,6 +193,20 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
     validacion (RUC invalido, contratista que no existe aun en GCM, quien
     tiene permiso para crearlo de rebote). Sin decidir el alcance todavia;
     pendiente de que el usuario confirme si quiere seguir con esto.
+
+12. ~~**Semaforo de salud de la cartera en el panel.**~~ **HECHO el 21 de
+    agosto de 2026.** Se le mostraron al usuario varias referencias visuales
+    (Triskell, dashboards de deliverables, informes semanales de una
+    pagina); casi todo lo que traian ya existe en GCM con otra piel (curva
+    S, avance por capitulo, informe semanal), salvo el semaforo de salud
+    por obra — y ese YA estaba construido, solo que enterrado en
+    `/gerencia` (`semaforoDeCartera`, SPI por duracion + color
+    verde/ambar/rojo, con tope de `MAX_OBRAS_POR_CARGA` obras por carga).
+    Se reuso el mismo servicio, sin logica nueva, en un componente
+    compacto (`SemaforoCarteraPanel.tsx`): un punto de color y el SPI por
+    obra, con enlace a Gerencia para el detalle de partidas criticas.
+    `/gerencia` en si sigue igual — su rediseno de fondo (punto 1 del
+    anexo anterior) sigue pendiente.
 
 **Avisado, no pedido todavia**: pagina de marketing y venta, exponer la app
 web y la autoinstalable (`docs/instalable.md` ya documenta esta ultima),
