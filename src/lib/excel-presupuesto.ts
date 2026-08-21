@@ -155,7 +155,7 @@ function letraDeColumna(indice: number): string {
  */
 const ALIAS: Record<string, string[]> = {
   // Los alias van sin tildes ni simbolos: la cabecera leida se normaliza
-  // antes de comparar, asi que "Descripcion", "DescripciÃ³n" y "DESCRIPCION"
+  // antes de comparar, asi que "Descripcion", "Descripción" y "DESCRIPCION"
   // acaban siendo la misma cadena.
   codigo: ["item", "codigo", "cod", "nro", "n", "no", "num"],
   descripcion: ["descripcion", "partida", "detalle", "concepto", "actividad"],
@@ -180,7 +180,7 @@ const ALIAS: Record<string, string[]> = {
  */
 const DIACRITICOS = new RegExp("[\\u0300-\\u036f]", "g");
 
-/** Simbolos de grado y ordinal: aparecen en cabeceras como "NÂ°" o "NÂº". */
+/** Simbolos de grado y ordinal: aparecen en cabeceras como "N°" o "Nº". */
 const ORDINALES = new RegExp("[\\u00b0\\u00ba]", "g");
 
 function normalizarTexto(valor: unknown): string {
@@ -306,7 +306,7 @@ function clasificarCodigo(
     return { tipo: "CAPITULO", nivel };
   }
 
-  // SeÃ±al de contenido: en el formato S10 los niveles intermedios como
+  // Señal de contenido: en el formato S10 los niveles intermedios como
   // "01.02" son subtitulos que agrupan, sin metrado ni precio. Una fila sin
   // datos economicos agrupa; no es una partida a la que se le pueda exigir
   // un metrado.

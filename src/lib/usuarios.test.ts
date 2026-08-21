@@ -88,8 +88,8 @@ describe("validarAltaUsuario", () => {
 /**
  * El choque de correos.
  *
- * Por la manana esto tenia DOS ramas â€”una para la gente de casa y otra, muda,
- * para la de otra constructoraâ€” porque el correo era unico en toda la
+ * Por la manana esto tenia DOS ramas —una para la gente de casa y otra, muda,
+ * para la de otra constructora— porque el correo era unico en toda la
  * instalacion. Por la tarde paso a ser unico POR EMPRESA y la segunda dejo de
  * existir: un choque solo puede ser con alguien de casa, y de los de casa
  * siempre se puede decir el nombre.
