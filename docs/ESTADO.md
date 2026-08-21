@@ -811,6 +811,61 @@ que cubren lo que ninguna otra cosa ve:
   `npm run build`. Verde no significa sano hasta que se ha visto rojo por el
   motivo correcto.
 
+### 21. Fechas opcionales en la plantilla del presupuesto, hasta la EDT
+
+Cuando se genera la EDT desde el presupuesto, cada tarea nacia SIN
+PROGRAMAR: `WbsItem` no tenia ningun campo de fecha, asi que
+`generarEdtDesdePresupuesto` rellenaba con el inicio de obra y marcaba
+`sinProgramar: true` siempre, sin excepcion (ver punto 9 de mas arriba, que
+oculta las tarjetas analiticas mientras eso dure). El usuario pidio que la
+plantilla ya permitiera poner las fechas, para que "todo cuadrara casi
+automaticamente" — confirmando de entrada que debia ser OPCIONAL: sin
+fecha en el archivo, el camino de hoy (editar en la tabla del cronograma)
+sigue igual.
+
+La plantilla de la meta (`/plantilla-meta`, hoja "Costo Directo" — el
+UNICO camino vivo hoy hacia `WbsItem`, desde que el 20 de agosto el
+contractual dejo de importarse directo y paso a generarse desde el real)
+gano dos columnas opcionales, "Fecha Inicio" y "Fecha Fin", **al final**
+de las ocho que ya tenia: `formulaContractual` referencia columnas por
+letra fija, e insertar en medio las habria roto. La fecha viaja intacta
+por el pipeline existente sin que ninguna capa la transforme —
+`analizarExcel` (el mismo parser que ya compartian el presupuesto y la
+meta) → `PresupuestoMetaItem` → `generarContractual` (logica pura,
+`contractual-desde-meta.ts`) → `WbsItem.fechaInicioPlan/fechaFinPlan`, dos
+migraciones aditivas, mismos nombres en los dos modelos—.
+
+Dos piezas ya existian en el codigo, escritas para esto y sin conectar:
+
+- `TareaCronograma.sinProgramar` ya seguia el patron "valor por defecto +
+  bandera dedicada" que usa `msproject-xml.ts` para la holgura — se repitio
+  aqui, no se invento uno nuevo.
+- `subirFechas()` en `edt-desde-presupuesto.ts` ya subia fechas de hojas a
+  resumenes, tolerando hojas sin fecha, pero `edtDesdePresupuesto` nunca la
+  llamaba porque nunca habia fechas que subir. Su propio docstring ya
+  decia "lo unico que se anade encima del presupuesto son las fechas, y
+  solo en las hojas" — la funcion estaba escrita para esto. Ahora
+  `edtDesdePresupuesto` la llama por dentro antes de devolver, asi que un
+  resumen toma la fecha de sus hojas programadas aunque solo alguna la
+  traiga: el mismo criterio que la pantalla del cronograma (punto 9) usa
+  para decidir cuando destapar las tarjetas analiticas. Las dos entregas de
+  la tarde encajaron solas, sin coordinarlas a proposito.
+
+Riesgo verificado, no asumido: ExcelJS decodifica la fecha serial de Excel
+en UTC, asi que `leerFecha` en `excel-presupuesto.ts` usa getters UTC
+(`getUTCFullYear` etc.), no locales —los locales habrian corrido el dia en
+Peru (UTC-5), el mismo defecto que ya tiene su propio nombre en el
+proyecto, `diaLocal`—. Un test de ida y vuelta en `plantilla-meta.test.ts`
+(escribe la fecha con ExcelJS, la relee con `analizarExcel`, compara el
+"YYYY-MM-DD" exacto) lo certifica.
+
+Se dejo fuera a proposito la idea que el usuario menciono junto a esta —
+declarar el contratista de cada partida por su RUC en la misma plantilla—:
+crea o vincula una entidad de negocio nueva (con su propia validacion de
+RUC, alta de contratista, permisos) en vez de repartir un dato que ya vive
+en el cronograma, y mezclar las dos habria hecho mas dificil entregar la
+mas simple. Ver `PENDIENTES.md`.
+
 ---
 
 ## Anexo — estado al 10 de agosto de 2026

@@ -152,25 +152,36 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
    sigan sin programar, con un mensaje que apunta a la tabla de abajo. En
    cuanto una sola tarea tiene fecha real, todo vuelve a aparecer.
 
-10. **Dos ideas de producto del usuario sobre la plantilla de presupuesto,
-    sin decidir el alcance todavia**:
-    - Que la plantilla de presupuesto (la que hoy se descarga para
-      importar) permita ya poner las fechas de cada partida/tarea, para
-      que al generar la EDT las fechas entren solas en vez de tener que
-      editar las 368 filas a mano dentro de la app. Confirmado por el
-      usuario como OPCIONAL: si no se rellenan en la plantilla, sigue
-      funcionando como hoy (`sinProgramar`, edicion manual).
-    - Extender la misma plantilla para declarar el contratista de cada
-      partida/tarea con solo su RUC, autocompletando el resto. Consulta
-      abierta, todavia sin respuesta dada: la intuicion es NO mezclarla
-      con el punto anterior (fechas), porque son dos automatizaciones de
-      naturaleza distinta — una reparte un dato que ya vive en el
-      cronograma (fechas), la otra crea o vincula una entidad de negocio
-      nueva (contratista/proveedor, con sus propios permisos y flujo de
-      alta) a partir de un identificador externo (RUC), lo que pide su
-      propia validacion (RUC invalido, contratista que no existe aun en
-      GCM, quien tiene permiso para crearlo de rebote) y no deberia
-      bloquear la entrega, mas simple, de las fechas.
+10. ~~**Fechas opcionales en la plantilla de presupuesto, hasta la
+    EDT.**~~ **HECHO el 21 de agosto de 2026.** La plantilla de la meta
+    (`/plantilla-meta`, hoja "Costo Directo") gano dos columnas opcionales
+    al final, "Fecha Inicio" y "Fecha Fin" — al final a proposito, para no
+    correr las referencias de columna de `formulaContractual`—. La fecha
+    viaja intacta por el pipeline ya existente (`analizarExcel` →
+    `PresupuestoMetaItem` → el contractual generado desde la meta →
+    `WbsItem.fechaInicioPlan/fechaFinPlan`, dos migraciones aditivas) y
+    `generarEdtDesdePresupuesto` la usa si esta: la tarea nace programada
+    (`sinProgramar: false`) con su duracion real en dias laborables
+    (`diasEntre`, ya existia), en vez del relleno de siempre. Sin fecha en
+    el archivo, todo sigue exactamente igual que antes — confirmado con
+    pruebas, no solo afirmado. `edtDesdePresupuesto` ahora conecta
+    `subirFechas` (ya existia, nunca se usaba): un resumen toma la fecha de
+    sus hojas programadas aunque solo alguna de ellas la traiga, el mismo
+    criterio que ya usa la pantalla del cronograma (punto 9) para decidir
+    cuando mostrar las tarjetas analiticas — las dos entregas encajan solas.
+    La idea del contratista por RUC se dejo fuera a proposito, ver mas
+    abajo.
+
+11. **Contratista por RUC en la plantilla de presupuesto** — propuesta del
+    usuario, con mi recomendacion ya dada: NO mezclarla con la entrega de
+    fechas (punto 10), porque son dos automatizaciones de naturaleza
+    distinta — una reparte un dato que ya vive en el cronograma (fechas),
+    esta otra crea o vincula una entidad de negocio nueva
+    (contratista/proveedor, con sus propios permisos y flujo de alta) a
+    partir de un identificador externo (RUC), lo que pide su propia
+    validacion (RUC invalido, contratista que no existe aun en GCM, quien
+    tiene permiso para crearlo de rebote). Sin decidir el alcance todavia;
+    pendiente de que el usuario confirme si quiere seguir con esto.
 
 **Avisado, no pedido todavia**: pagina de marketing y venta, exponer la app
 web y la autoinstalable (`docs/instalable.md` ya documenta esta ultima),
