@@ -23,6 +23,11 @@ const eslintConfig = [
       // puede tumbar el lint de main sin que nadie haya tocado main. Git ya
       // los ignora (.gitignore linea 107); esto es lo mismo para ESLint.
       ".claude/**",
+      // Codigo AJENO que solo se lee (proyecto de referencia). Git ya lo
+      // ignora (.gitignore linea 104) y el CI ni lo ve, asi que auditarlo
+      // solo sirve para que el lint de main muera por 328 errores que no son
+      // nuestros ni podemos arreglar. Mismo motivo que los worktrees.
+      "docs/COMUNIDADGIT/**",
     ],
   },
 
