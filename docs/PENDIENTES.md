@@ -122,6 +122,56 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      de una constructora esperaria. Ligado al punto 1: si "Gerencia" pasa a
      ser un rol propio, esta pantalla probablemente se rehace de fondo.
 
+8. **Bug en produccion visto en vivo: `/obras/.../meta` se rompia al
+   cargar** — el usuario mando una captura de "Esta pantalla no se pudo
+   cargar" en `gcm.drcaceresruiz.com`. Diagnostico (por lectura de codigo,
+   no confirmado aun en vivo): todo apunta a una condicion de carrera del
+   propio desplegador — `desplegar.sh` cambia de version con un `mv` por
+   entrada de nivel superior, no atomico, y el SHA del pie de pagina y el
+   de `/api/health` no coincidian justo en ese momento, con una latencia
+   anormal (392 ms contra 1-4 ms normales). El error queda aislado al
+   render de `meta/page.tsx` (que ya tiene su propio try/catch) sin tocar
+   layout/cabecera/menu, que es justo lo que se esperaria de una peticion
+   mixta durante la ventana del `mv`, no de un bug del codigo. **Pendiente
+   real**: confirmar con el usuario si recargar lo resolvio o si el error
+   se repite de forma estable — si se repite, hay que investigar mas a
+   fondo en vez de asumir la condicion de carrera.
+
+9. ~~**Cronograma: demasiada informacion antes de llegar a la tabla, al
+   generar la EDT desde presupuesto**~~ **HECHO el 21 de agosto de 2026.**
+   El usuario reporto (captura en mano) que al generar la EDT y entrar a
+   `cronograma` tenia que desplazarse mucho para llegar a la tabla donde de
+   verdad se cargan las fechas. Causa: `generarEdtDesdePresupuesto` marca
+   cada tarea `sinProgramar: true` con la fecha de inicio de obra como
+   relleno, y la pantalla mostraba igual las ocho tarjetas analiticas
+   (curva, EVM, ritmo, hitos, hitos propuestos, que frena la obra, ruta
+   critica, avance por capitulo) aunque no tuvieran ninguna fecha real que
+   medir. Se anadio `TareaDelPlan.sinProgramar` a `cronograma.service.ts` y
+   en la pantalla (`obras/[id]/cronograma/page.tsx`) esas ocho tarjetas y
+   el aviso de desajuste de plazo se ocultan mientras TODAS las tareas
+   sigan sin programar, con un mensaje que apunta a la tabla de abajo. En
+   cuanto una sola tarea tiene fecha real, todo vuelve a aparecer.
+
+10. **Dos ideas de producto del usuario sobre la plantilla de presupuesto,
+    sin decidir el alcance todavia**:
+    - Que la plantilla de presupuesto (la que hoy se descarga para
+      importar) permita ya poner las fechas de cada partida/tarea, para
+      que al generar la EDT las fechas entren solas en vez de tener que
+      editar las 368 filas a mano dentro de la app. Confirmado por el
+      usuario como OPCIONAL: si no se rellenan en la plantilla, sigue
+      funcionando como hoy (`sinProgramar`, edicion manual).
+    - Extender la misma plantilla para declarar el contratista de cada
+      partida/tarea con solo su RUC, autocompletando el resto. Consulta
+      abierta, todavia sin respuesta dada: la intuicion es NO mezclarla
+      con el punto anterior (fechas), porque son dos automatizaciones de
+      naturaleza distinta — una reparte un dato que ya vive en el
+      cronograma (fechas), la otra crea o vincula una entidad de negocio
+      nueva (contratista/proveedor, con sus propios permisos y flujo de
+      alta) a partir de un identificador externo (RUC), lo que pide su
+      propia validacion (RUC invalido, contratista que no existe aun en
+      GCM, quien tiene permiso para crearlo de rebote) y no deberia
+      bloquear la entrega, mas simple, de las fechas.
+
 **Avisado, no pedido todavia**: pagina de marketing y venta, exponer la app
 web y la autoinstalable (`docs/instalable.md` ya documenta esta ultima),
 creacion de usuarios/reportes de cara al negocio, y migracion a otro hosting

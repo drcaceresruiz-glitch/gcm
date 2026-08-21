@@ -724,7 +724,63 @@ cerrada se llevaba por delante lo que se le pago a cada contratista.
 > `tail -40 tmp/despliegue.log` y distingue las causas que esa bitacora puede
 > decir de lo que solo dice `/api/health`.
 
-### 18. La red de pruebas: lo que TypeScript no ve
+### 18. Notas y Recordatorios (Notas E1)
+
+Bitacora libre por obra, con recordatorio opcional. Sin adjuntos ni
+notificaciones a proposito —quedan para una entrega posterior—. `Nota`
+guarda `categoria` (catalogo `CategoriaNota` por empresa), `texto`,
+`recordarEl` opcional y quien la escribio; `vencida` **se deriva, nunca se
+guarda** (se calcula contra `recordarEl` en cada lectura), siguiendo la
+misma disciplina que el resto de GCM para no arrastrar una columna que
+pueda mentir. Vive como pestana propia de la obra
+(`obras/[id]/notas/page.tsx`), aparece en los avisos de seccion de
+`obras.service.ts` y tiene su propio modulo en el tablero. Tres huecos de
+integracion los cazaron las pruebas de consistencia ya existentes del
+repo (`respaldo-esquema.test.ts` y las de `capitulos.tsx`), no la revision
+manual: la tabla nueva faltaba en el catalogo de respaldo, y el manual
+dentro de la app no tenia su capitulo. Primer capitulo del manual
+(`src/components/manual/capitulos.tsx`, slug `notas`).
+
+### 19. Rol GERENTE y vista previa de rol
+
+`GERENTE` es un rol propio del enum `Role`, pedido por el usuario para ver
+la cartera entera sin administrar ni aprobar nada. Sus permisos no se
+enumeran a mano: `MATRIZ.GERENTE` es `TODO_LO_QUE_SE_LEE` en `rbac.ts`,
+derivado en tiempo de definicion como todo permiso que termina en `:leer`
+salvo el innegociable `permiso:leer` — un permiso de lectura nuevo entra
+solo, sin tocar esta lista. Se sumo a `VE_TODAS_LAS_OBRAS` en
+`alcance-obras.ts`, junto a ADMIN.
+
+Junto al rol, un interruptor de "ver como" para que la MISMA cuenta ADMIN
+pueda navegar la app como la veria otro rol —pensado para equipos chicos
+que aun no tienen una cuenta por persona, y para que el propio usuario
+pruebe cada rol sin crear cuentas de prueba—. El diseno de seguridad esta
+en una funcion pura y probada aparte, `src/lib/vista-rol.ts`
+(`vistaEfectiva`): los permisos efectivos son la **INTERSECCION** entre
+los del rol simulado y los REALES de la cuenta, nunca una sustitucion, asi
+que manipular la cookie a mano no puede ganar privilegio —verificado con
+un caso de prueba dedicado, no solo afirmado—. Solo una cuenta cuyo rol
+REAL es ADMIN puede activarlo, y solo si la empresa lo enciende en
+`/empresa/configuracion` (`Company.permitirVistaPreviaRoles`, apagado por
+defecto): eso no es la frontera de seguridad —la interseccion ya lo es—,
+es una decision de producto sobre quien deberia ver el control.
+
+**Bug real, encontrado probandolo en vivo, no en las pruebas
+automatizadas**: los formularios de "Ver como" vivian dentro de un menu
+desplegable que se cierra al primer clic dentro de si mismo. El clic
+burbujeaba, cerraba el menu y desmontaba el formulario antes de que el
+envio (una Server Action) llegara a ejecutarse — el boton no hacia nada,
+en silencio, sin error en consola ni en servidor, con typecheck, lint y
+2450 pruebas en verde todo el tiempo. El propio codigo ya documentaba este
+exacto problema junto al boton de "Salir" (`BotonSalir`, mismo archivo),
+con el arreglo (`onClick={(e) => e.stopPropagation()}`) escrito al lado;
+se aplico el mismo arreglo al componente nuevo. Ver
+`docs/memoria/clic-dentro-de-menu-desplegable.md`.
+
+Fuera de alcance a proposito: `/gerencia` sigue con el mismo contenido
+delgado de siempre (ver `PENDIENTES.md`).
+
+### 20. La red de pruebas: lo que TypeScript no ve
 
 De ~500 pruebas se paso a **mas de 2.400**. Lo importante no es el numero sino
 que cubren lo que ninguna otra cosa ve:
