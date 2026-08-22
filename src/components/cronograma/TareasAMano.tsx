@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { diasLaborablesEntre, type DiaLaboral } from "@/lib/calendario";
-import { AlertCircle, CalendarPlus, Flag, LoaderCircle, Pencil, Trash2 } from "lucide-react";
+import { AlertCircle, CalendarPlus, Flag, LoaderCircle, Pencil, Search, Trash2 } from "lucide-react";
 
 import {
   accionCrearTareaManual,
@@ -100,6 +100,10 @@ export function TareasAMano({
   const [error, setError] = useState<string | null>(null);
   const [porConfirmar, setPorConfirmar] = useState<{ uid: number; texto: string } | null>(null);
   const [guardando, guardar] = useTransition();
+  // Solo para encontrar la predecesora en una lista larga —una EDT generada
+  // desde presupuesto puede traer cientos de tareas—: no filtra lo que se
+  // guarda, solo lo que se ve mientras se busca.
+  const [buscarDependencia, setBuscarDependencia] = useState("");
 
   /**
    * La duracion no se teclea: la dicen las dos fechas.
@@ -128,12 +132,25 @@ export function TareasAMano({
     return String(diasLaborablesEntre(desde, hasta, calendario));
   }, [campos.inicio, campos.fin, calendario]);
 
+  const candidatosDependencia = tareas.filter(
+    (t) => !t.esResumen && t.uid !== editando,
+  );
+  const busquedaDependencia = buscarDependencia.trim().toLowerCase();
+  const candidatosDependenciaVisibles = busquedaDependencia
+    ? candidatosDependencia.filter(
+        (t) =>
+          t.nombre.toLowerCase().includes(busquedaDependencia) ||
+          (t.codigo ?? "").toLowerCase().includes(busquedaDependencia),
+      )
+    : candidatosDependencia;
+
   if (!puedeEditar && tareas.length === 0) return null;
 
   function limpiar() {
     setCampos({ ...VACIA });
     setEditando(null);
     setError(null);
+    setBuscarDependencia("");
   }
 
   function enviar() {
@@ -174,6 +191,7 @@ export function TareasAMano({
     setEditando(t.uid);
     setAbierto(true);
     setError(null);
+    setBuscarDependencia("");
     setCampos({
       codigo: t.codigo ?? "",
       nombre: t.nombre,
@@ -422,30 +440,54 @@ export function TareasAMano({
                   <legend className="px-1 text-xs font-medium opacity-70">
                     Depende de (tiene que terminar antes de poder empezar)
                   </legend>
+
+                  {/* Una EDT generada desde presupuesto puede traer cientos
+                      de tareas: sin buscador, encontrar la predecesora en el
+                      scroll seria impracticable. */}
+                  {candidatosDependencia.length > 8 && (
+                    <label className="relative mb-2 block">
+                      <Search
+                        className="absolute top-1/2 left-2 size-3.5 -translate-y-1/2 opacity-50"
+                        aria-hidden="true"
+                      />
+                      <input
+                        type="search"
+                        value={buscarDependencia}
+                        onChange={(e) => setBuscarDependencia(e.target.value)}
+                        placeholder="Buscar por código o nombre"
+                        className="w-full rounded border py-1 pr-2 pl-7 text-xs"
+                        style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+                      />
+                    </label>
+                  )}
+
                   <div className="max-h-40 space-y-1 overflow-y-auto">
-                    {tareas
-                      .filter((t) => !t.esResumen && t.uid !== editando)
-                      .map((t) => (
-                        <label key={t.uid} className="flex items-start gap-2 text-xs">
-                          <input
-                            type="checkbox"
-                            className="mt-0.5"
-                            checked={campos.dependeDeUids.includes(t.uid)}
-                            onChange={(e) =>
-                              setCampos({
-                                ...campos,
-                                dependeDeUids: e.target.checked
-                                  ? [...campos.dependeDeUids, t.uid]
-                                  : campos.dependeDeUids.filter((u) => u !== t.uid),
-                              })
-                            }
-                          />
-                          <span>
-                            {t.codigo ? `${t.codigo} ` : ""}
-                            {t.nombre}
-                          </span>
-                        </label>
-                      ))}
+                    {candidatosDependenciaVisibles.map((t) => (
+                      <label key={t.uid} className="flex items-start gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={campos.dependeDeUids.includes(t.uid)}
+                          onChange={(e) =>
+                            setCampos({
+                              ...campos,
+                              dependeDeUids: e.target.checked
+                                ? [...campos.dependeDeUids, t.uid]
+                                : campos.dependeDeUids.filter((u) => u !== t.uid),
+                            })
+                          }
+                        />
+                        <span>
+                          {t.codigo ? `${t.codigo} ` : ""}
+                          {t.nombre}
+                        </span>
+                      </label>
+                    ))}
+                    {candidatosDependenciaVisibles.length === 0 && (
+                      <p className="px-1 py-1 text-xs opacity-60">
+                        Ninguna tarea coincide con la búsqueda.
+                      </p>
+                    )}
                   </div>
                 </fieldset>
               )}

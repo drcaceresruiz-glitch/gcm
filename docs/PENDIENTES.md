@@ -736,10 +736,25 @@ Dos avisos antes de leer nada de mas abajo:
    situarse contra el plan real, pero lo que trajo un archivo nunca se pisa
    con un calculo propio. La tabla ya muestra la bandera de "en la ruta
    critica" y los dias de holgura cuando se conocen (mismo icono que
-   `TablaCronograma.tsx`). **Lo unico que sigue sin ruta critica es la EDT
-   generada desde presupuesto** —no tiene concepto de precedencia en su
-   propia estructura, y anadirselo es un cambio de otra naturaleza, no una
-   pieza que faltara—.
+   `TablaCronograma.tsx`).
+
+   **Tercera pasada, la EDT generada desde presupuesto**
+   (`generarEdtDesdePresupuesto`, `edt.service.ts`): al generarla no hay
+   ruta critica que calcular —la estructura del presupuesto es jerarquia
+   (capitulo/partida/subpartida), no precedencia, y eso sigue sin
+   inventarse—, pero se confirmo investigando que sus tareas nacen con
+   `origen: "MANUAL"`, EXACTAMENTE el mismo valor que las tecleadas a mano
+   (`edt.service.ts:378,449`). El editor de dependencias de la segunda
+   pasada ya filtra y escribe por ese campo, no por como nacio la fila:
+   basta con editar una tarea de la EDT desde `TareasAMano` (el lapiz de la
+   tabla; el propio servicio ya avisaba de esto de antes, en el comentario
+   de "sinProgramar: false" de `editarTareaManual`) y marcar de que depende
+   para que la ruta critica se calcule para toda la red, sin haber
+   escrito ninguna linea nueva de backend. Lo unico que hacia falta era
+   que la lista de "Depende de" siguiera siendo usable con cientos de
+   filas (una EDT real, ver "368 tareas" en `plantilla-cronograma`): se le
+   anadio un buscador por codigo o nombre (mismo patron que
+   `MapeoTareas.tsx`), visible solo cuando hay mas de 8 candidatas.
 
 5. ~~**Lo que quedo abierto de la auditoria del 10 de agosto**~~ (seccion 6c)
    **CERRADO el 21 de agosto de 2026**: los puntos 3, 4, 5, 6, 10, 11 y 12
@@ -1245,12 +1260,13 @@ Lo que falta:
 ## 3. Cronograma: opcion B (decidida el 10 de agosto) — CASI CERRADA
 
 > **Al 21 de agosto por la noche, la ruta critica y la holgura se calculan
-> de verdad para los cronogramas importados por Excel y para las tareas
-> tecleadas a mano** (ver el punto 4 de la seccion de arriba, con el
-> editor de dependencias). Sigue sin calcularse solo para la EDT generada
-> desde presupuesto, que es de otra naturaleza: no tiene concepto de
-> precedencia en su propia estructura. Todo lo demas se hizo entre el 15 y
-> el 20 de agosto, y ademas por
+> de verdad para los cronogramas importados por Excel, para las tareas
+> tecleadas a mano y para la EDT generada desde presupuesto** (ver el
+> punto 4 de la seccion de arriba, con el editor de dependencias): la EDT
+> nace sin red de precedencias —eso no se inventa—, pero sus tareas
+> comparten `origen: MANUAL` con las tecleadas a mano, asi que el mismo
+> editor y el mismo calculo ya aplican en cuanto alguien marca de que
+> depende una de ellas. Todo lo demas se hizo entre el 15 y el 20 de agosto, y ademas por
 > una via que este apartado no preveia: **la EDT se genera desde el
 > presupuesto** y se sincroniza sola detras de las cinco operaciones que lo
 > cambian. Hay tres puertas de entrada (MS Project/ProjectLibre, Excel y
@@ -1266,11 +1282,10 @@ que hoy lee del archivo:
   `planeadoEnFecha`, y lo usan la curva, el panel y el informe, para que no
   puedan discrepar.
 - ~~Camino critico (`esCritico`) y holgura.~~ **HECHO el 21 de agosto de
-  2026, para Excel y para lo tecleado a mano** — ver el punto 4 de la
-  seccion de arriba para el detalle completo (algoritmo, editor de
-  dependencias). Sigue sin calcularse solo para la EDT generada desde
-  presupuesto, que no tiene concepto de precedencia — no es una pieza que
-  faltara, es una entrega de otra naturaleza.
+  2026, para Excel, para lo tecleado a mano y para la EDT generada desde
+  presupuesto** — ver el punto 4 de la seccion de arriba para el detalle
+  completo (algoritmo, editor de dependencias, y por que la EDT no
+  necesito backend nuevo: comparte `origen: MANUAL`).
 - ~~Motor de fechas que respete el calendario laboral de la obra.~~ HECHO: la
   duracion se calcula desde las fechas en dias de TRABAJO con el calendario de
   la obra, y la cifra la calcula el SERVIDOR para no depender del reloj del
