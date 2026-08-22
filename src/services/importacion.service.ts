@@ -50,9 +50,12 @@ export async function analizarRiesgoDeReemplazo(
 ): Promise<EnRiesgoPorReemplazo> {
   const vacio = { creadasAMano: [], corregidasAMano: [], totalPartidas: 0 };
 
-  // La pantalla ya exige `partida:importar`, pero el permiso se comprueba
-  // aqui igualmente: los servicios son la frontera real y una ruta nueva
-  // podria llamar a esto sin pasar por alli.
+  // Esta funcion solo ANALIZA (partida:leer): la pantalla entera exige
+  // meta:leer, mas floja, porque ver la vista previa no es importar nada
+  // todavia. El boton que si importa esta oculto sin `partida:importar`
+  // (`ConfirmarContractual`), y `aplicarImportacion` lo vuelve a exigir
+  // aqui debajo: los servicios son la frontera real, y una ruta nueva
+  // podria llamar a esto sin pasar por la pantalla.
   if (!puede(sesion, "partida:leer")) return vacio;
 
   const items = await prisma.wbsItem.findMany({

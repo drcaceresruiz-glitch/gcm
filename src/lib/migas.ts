@@ -47,9 +47,13 @@ const TABLA: readonly Entrada[] = [
   { patron: "/panel", texto: "Panel" },
   { patron: "/avisos", texto: "Avisos" },
   { patron: "/perfil", texto: "Mi perfil" },
+  { patron: "/gerencia", texto: "Gerencia" },
+  { patron: "/manual", texto: "Manual" },
+  { patron: "/manual/:capitulo", texto: ":capitulo", respaldo: "Capítulo" },
 
   { patron: "/operador", texto: "Constructoras" },
   { patron: "/operador/nueva", texto: "Nueva constructora" },
+  { patron: "/operador/:empresaId", texto: ":empresaId", respaldo: "Constructora" },
 
   { patron: "/empresa", texto: "Empresa", sinPagina: true },
   { patron: "/empresa/datos", texto: "Datos de la empresa" },
@@ -57,8 +61,19 @@ const TABLA: readonly Entrada[] = [
   { patron: "/empresa/permisos", texto: "Permisos" },
   { patron: "/empresa/solicitudes", texto: "Solicitudes" },
   { patron: "/empresa/proveedores", texto: "Proveedores" },
+  {
+    patron: "/empresa/proveedores/:proveedorId/contratos",
+    texto: "Contratos",
+  },
+  {
+    patron: "/empresa/proveedores/:proveedorId/mensajes",
+    texto: "Mensajes",
+  },
   { patron: "/empresa/formas-pago", texto: "Formas de pago" },
   { patron: "/empresa/configuracion", texto: "Configuración" },
+  { patron: "/empresa/archivo", texto: "Archivo" },
+  { patron: "/empresa/migracion", texto: "Llevarse la empresa" },
+  { patron: "/empresa/puesta-en-marcha", texto: "Puesta en marcha" },
 
   { patron: "/obras", texto: "Obras" },
   { patron: "/obras/nueva", texto: "Nueva obra" },
@@ -93,7 +108,8 @@ const TABLA_OBRA: readonly Entrada[] = [
   { patron: "/obras/:obra/evidencia", texto: "Evidencia" },
   { patron: "/obras/:obra/galeria", texto: "Galería" },
   { patron: "/obras/:obra/personal", texto: "Personal y avisos" },
-  { patron: "/obras/:obra/respaldo", texto: "Respaldo" },
+  { patron: "/obras/:obra/equipo", texto: "Equipo" },
+  { patron: "/obras/:obra/notas", texto: "Notas" },
 
   { patron: "/obras/:obra/ordenes", texto: "Órdenes" },
   { patron: "/obras/:obra/ordenes/nueva", texto: "Nueva orden" },
@@ -102,6 +118,8 @@ const TABLA_OBRA: readonly Entrada[] = [
   { patron: "/obras/:obra/proveedores", texto: "Proveedores" },
   { patron: "/obras/:obra/proveedores/nuevo", texto: "Nuevo encargo" },
   { patron: "/obras/:obra/proveedores/:encargo", texto: "Encargo", respaldo: "Encargo" },
+
+  { patron: "/obras/:obra/valorizaciones", texto: "Valorizaciones" },
 ];
 
 const TODAS: readonly Entrada[] = [...TABLA, ...TABLA_OBRA];

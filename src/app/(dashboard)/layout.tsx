@@ -87,7 +87,7 @@ export default async function DashboardLayout({
       grupo: "personas",
       badge: pendientes,
     },
-    puede(sesion, "empresa:editar") && {
+    puede(sesion, "empresa:leer") && {
       href: "/empresa/datos",
       etiqueta: "Datos de la empresa",
       clave: "empresa",
@@ -100,6 +100,20 @@ export default async function DashboardLayout({
       href: "/empresa/configuracion",
       etiqueta: "Configuración",
       clave: "configuracion",
+      grupo: "empresa",
+    },
+    // Mismo permiso y mismo destino que ya usa /panel: dos pantallas para la
+    // misma operacion no deberian pedir permisos distintos para llegar.
+    puede(sesion, "obra:restaurar") && {
+      href: "/empresa/archivo",
+      etiqueta: "Archivo",
+      clave: "archivo",
+      grupo: "empresa",
+    },
+    puede(sesion, "empresa:migrar") && {
+      href: "/empresa/migracion",
+      etiqueta: "Llevarse la empresa",
+      clave: "migracion",
       grupo: "empresa",
     },
   ].filter(Boolean) as EnlaceEmpresa[];

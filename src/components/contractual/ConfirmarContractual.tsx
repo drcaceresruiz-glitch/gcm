@@ -24,15 +24,29 @@ export function ConfirmarContractual({
   obraId,
   partidas,
   riesgo,
+  puedeGenerar,
 }: {
   obraId: string;
   partidas: number;
   riesgo: Riesgo;
+  /// El servidor exige `partida:importar` para el POST, no `meta:leer` que
+  /// ya exige la pantalla entera: sin el, mostrar el boton solo lleva a un
+  /// rechazo silencioso al pulsarlo.
+  puedeGenerar: boolean;
 }) {
   const [estado, accion, pendiente] = useActionState<EstadoContractual, FormData>(
     accionGenerarContractual,
     {},
   );
+
+  if (!puedeGenerar) {
+    return (
+      <p className="rounded-lg border bg-slate-50 p-4 text-sm text-slate-600">
+        Puedes ver esta vista previa, pero no tienes permiso para generar el
+        contractual.
+      </p>
+    );
+  }
 
   return (
     <form action={accion} className="space-y-3 rounded-lg border bg-slate-50 p-4">

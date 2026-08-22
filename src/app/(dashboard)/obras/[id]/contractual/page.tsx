@@ -100,7 +100,12 @@ export default async function ContractualPage({
         </section>
       )}
 
-      <ConfirmarContractual obraId={id} partidas={partidas.length} riesgo={riesgo} />
+      <ConfirmarContractual
+        obraId={id}
+        partidas={partidas.length}
+        riesgo={riesgo}
+        puedeGenerar={puede(sesion, "partida:importar")}
+      />
 
       <section>
         <h2 className="mb-2 text-sm font-semibold uppercase text-slate-500">
