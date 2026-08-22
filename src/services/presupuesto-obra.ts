@@ -180,9 +180,10 @@ export async function bacDeObra(obraId: string): Promise<BacObra> {
  * por arbol: mezclar los codigos de dos obras haria que la "4.1" de una
  * pareciera hija de la "4" de la otra.
  *
- * `estado` acota la suma a las obras en ese estado; sin el, entran todas.
- * Existe porque el panel ensena solo lo EN EJECUCION —la exposicion de
- * hoy—, mientras que la cartera completa es cifra de presentacion.
+ * `estado` acota la suma a las obras en ese estado (uno o varios); sin el,
+ * entran todas. Existe porque el panel ensena solo lo que sigue teniendo
+ * exposicion real —EN_EJECUCION y PARALIZADA—, mientras que la cartera
+ * completa es cifra de presentacion.
  *
  * El sujeto trae su ALCANCE y es obligatorio, no opcional: quien solo
  * gestiona una obra no puede leer el presupuesto agregado de la cartera
@@ -191,12 +192,16 @@ export async function bacDeObra(obraId: string): Promise<BacObra> {
  */
 export async function totalDeEmpresa(
   sujeto: { companyId: string } & ConAlcance,
-  estado?: ProjectState,
+  estado?: ProjectState | readonly ProjectState[],
 ): Promise<string> {
+  const filtroEstado = estado
+    ? { estado: { in: Array.isArray(estado) ? [...estado] : [estado] } }
+    : {};
+
   const obras = await prisma.project.findMany({
     where: {
       companyId: sujeto.companyId,
-      ...(estado ? { estado } : {}),
+      ...filtroEstado,
       ...filtroDeObras(sujeto),
     },
     select: { id: true },

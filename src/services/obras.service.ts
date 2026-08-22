@@ -28,6 +28,7 @@ import {
   motivoNoAdmiteCambios,
   ETIQUETA_ESTADO_OBRA,
   fechaDeObra,
+  ESTADOS_OBRA_CON_EXPOSICION,
   type EstadoObra,
 } from "@/lib/obras";
 import { diasEntre, hoy } from "@/utils/fechas";
@@ -107,13 +108,20 @@ export interface ResumenEmpresa {
 
 /**
  * Las cifras de la empresa para encabezar el panel: el conteo de obras es de
- * todas; el dinero, SOLO de las que estan en ejecucion.
+ * todas; el dinero, SOLO de las que tienen exposicion real HOY
+ * (`ESTADOS_OBRA_CON_EXPOSICION`: en ejecucion o paralizada).
  *
  * Primero no existian en ninguna pantalla; despues sumaban la cartera
  * completa, y ese numero mezclaba obras en planificacion, en ejecucion y
  * cerradas: contra el no se decide nada. Lo que el panel debe contestar a
  * primera vista es la exposicion de HOY —cuanto hay presupuestado y
  * comprometido en lo que esta vivo—.
+ *
+ * Hasta el 22 de agosto de 2026 esto miraba solo `EN_EJECUCION`, y una obra
+ * paralizada con encargos vigentes desaparecia de estas cifras aunque la
+ * deuda con el proveedor siguiera existiendo —mientras `gerencia.service.ts`
+ * y `avisos-reloj.ts` ya la seguian contando como viva—. Ver
+ * `ESTADOS_OBRA_CON_EXPOSICION` en `lib/obras.ts`.
  *
  * Va aparte de `listarObras` a proposito: aquella devuelve UNA PAGINA y
  * estas cifras no dependen de la pagina. Calcularlas desde ella daria un
@@ -154,10 +162,11 @@ export async function obtenerResumenEmpresa(
 
       // Con la regla de hojas y no con un `SUM` plano: filtrar por `tipo` no
       // protege del doble conteo, porque un grupo a suma alzada con hijas
-      // costeadas tambien es PARTIDA. Acotado a EN_EJECUCION igual que el
-      // comprometido de abajo: las dos cifras se restan para dar el saldo, y
-      // restar ambitos distintos daria un numero que no es de nadie.
-      totalDeEmpresa(sesion, "EN_EJECUCION"),
+      // costeadas tambien es PARTIDA. Acotado a `ESTADOS_OBRA_CON_EXPOSICION`
+      // igual que el comprometido de abajo: las dos cifras se restan para dar
+      // el saldo, y restar ambitos distintos daria un numero que no es de
+      // nadie. PARALIZADA entra: paralizar no borra lo comprometido.
+      totalDeEmpresa(sesion, ESTADOS_OBRA_CON_EXPOSICION),
 
       // El comprometido son DOS agregados desde que el encargo manda: el
       // monto contratado de los encargos vigentes y las ordenes sueltas
@@ -170,7 +179,7 @@ export async function obtenerResumenEmpresa(
           // obra, y el alcance tambien se aplica ahi.
           project: {
             ...deLaEmpresa,
-            estado: "EN_EJECUCION",
+            estado: { in: [...ESTADOS_OBRA_CON_EXPOSICION] },
             ...filtroDeObras(sesion),
           },
         },
@@ -185,7 +194,10 @@ export async function obtenerResumenEmpresa(
             encargoId: null,
             // El alcance se aplica a la OBRA de la orden, que es donde `id`
             // significa lo que aqui hace falta.
-            project: { estado: "EN_EJECUCION", ...filtroDeObras(sesion) },
+            project: {
+              estado: { in: [...ESTADOS_OBRA_CON_EXPOSICION] },
+              ...filtroDeObras(sesion),
+            },
           },
         },
         _sum: { importe: true },
@@ -220,7 +232,8 @@ interface DatosAlertas {
   alertas: AlertaEmpresa[];
   /// Total de partidas de la empresa por encima de su presupuesto.
   partidasSobregiradas: number;
-  /// Obras en ejecucion con la fecha de fin ya pasada.
+  /// Obras con exposicion real (en ejecucion o paralizada, ver
+  /// `ESTADOS_OBRA_CON_EXPOSICION`) con la fecha de fin ya pasada.
   obrasConPlazoVencido: number;
 }
 
@@ -283,7 +296,9 @@ const datosAlertasEmpresa = cache(async function datosAlertasEmpresa(
       where: {
         ...deLaEmpresa,
         ...filtroDeObras(sesion),
-        estado: "EN_EJECUCION",
+        // PARALIZADA entra: si el plazo ya paso y la obra encima esta
+        // parada, eso es mas relevante para gerencia, no menos.
+        estado: { in: [...ESTADOS_OBRA_CON_EXPOSICION] },
         fechaFinProgramada: { lt: new Date() },
       },
       select: { id: true, nombreObra: true, fechaFinProgramada: true },

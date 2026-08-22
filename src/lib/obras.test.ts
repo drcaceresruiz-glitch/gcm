@@ -16,6 +16,7 @@ import {
   OBRA_CERRADA,
   OBRA_ARCHIVADA,
   OBRA_PARALIZADA,
+  ESTADOS_OBRA_CON_EXPOSICION,
 } from "@/lib/obras";
 
 describe("una obra cerrada no admite cambios", () => {
@@ -49,6 +50,16 @@ describe("una obra cerrada no admite cambios", () => {
     expect(puedeTransicionarObra("CERRADA", "EN_EJECUCION")).toBe(true);
     expect(puedeTransicionarObra("CERRADA", "PLANIFICACION")).toBe(false);
     expect(puedeTransicionarObra("CERRADA", "PARALIZADA")).toBe(false);
+  });
+});
+
+describe("ESTADOS_OBRA_CON_EXPOSICION: que obras cuentan para dinero y plazo", () => {
+  it("en ejecucion y paralizada cuentan; planificacion y cerrada no", () => {
+    // Unificado el 22 de agosto de 2026: paralizar bloquea trabajo NUEVO,
+    // no borra la deuda ni mueve la fecha fin, asi que sigue contando.
+    expect(ESTADOS_OBRA_CON_EXPOSICION).toEqual(["EN_EJECUCION", "PARALIZADA"]);
+    expect(ESTADOS_OBRA_CON_EXPOSICION).not.toContain("PLANIFICACION");
+    expect(ESTADOS_OBRA_CON_EXPOSICION).not.toContain("CERRADA");
   });
 });
 

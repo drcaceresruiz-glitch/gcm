@@ -85,6 +85,32 @@ export function puedeTransicionarObra(desde: string, hacia: string): boolean {
 }
 
 /**
+ * Los estados en los que una obra sigue teniendo EXPOSICION real de dinero y
+ * de plazo: cuanto hay comprometido, y si la fecha fin ya paso.
+ *
+ * Auditoria del 21 de agosto de 2026: `gerencia.service.ts` y
+ * `avisos-reloj.ts` ya contaban PARALIZADA como obra viva (SPI/atraso,
+ * recordatorios), pero `obras.service.ts` la excluia de las cifras de
+ * dinero del panel —solo miraba `EN_EJECUCION`—. Consecuencia real: al
+ * paralizar una obra con encargos vigentes, ese dinero desaparecia de
+ * inmediato del panel aunque la deuda con el proveedor seguia existiendo.
+ * Paralizar bloquea trabajo NUEVO (`motivoNoAdmiteCambios`), no borra lo que
+ * ya se debe ni mueve la fecha de fin.
+ *
+ * PLANIFICACION se queda fuera A PROPOSITO, y eso NO es lo que estaba
+ * desalineado: una obra en planificacion puede tener presupuesto cargado
+ * —es requisito para arrancar— pero nada empezo a gastarse todavia, y el
+ * panel ensena "la exposicion de HOY", no la cartera completa. CERRADA es
+ * historia. Ninguna de las dos entra aqui, y eso no cambia con esta
+ * constante: solo unifica el tratamiento de PARALIZADA entre los tres
+ * sitios que ya decidian cada uno por su cuenta.
+ */
+export const ESTADOS_OBRA_CON_EXPOSICION: readonly EstadoObra[] = [
+  "EN_EJECUCION",
+  "PARALIZADA",
+];
+
+/**
  * Que le falta a una obra para poder ponerse en marcha.
  *
  * Hasta el 10 de agosto de 2026 no se comprobaba NADA: bastaba con que la

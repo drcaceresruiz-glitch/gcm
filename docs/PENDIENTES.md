@@ -341,16 +341,22 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      que incluye PARALIZADA: se siguen mandando recordatorios de
      restriccion por vencer, resumenes diarios y avisos de valorizacion
      pendiente en una obra parada, gastando el mismo presupuesto de SMS.
-   - **Dos nociones de "obra viva" que no coinciden.**
-     `gerencia.service.ts` (semaforo de cartera) cuenta PARALIZADA como
-     obra viva y le calcula SPI/alertas de atraso; `obras.service.ts`
-     (`obtenerResumenEmpresa`, las tarjetas de dinero del panel) filtra
-     estrictamente `EN_EJECUCION` y EXCLUYE a PARALIZADA. Consecuencia: al
-     paralizar una obra con encargos vigentes, ese dinero comprometido
-     desaparece de inmediato de las cifras del panel aunque la deuda con
-     el proveedor sigue existiendo — y esa misma obra puede seguir
-     encendiendo el semaforo en rojo por "atraso" en una obra que nadie
-     esta trabajando a proposito.
+   - ~~**Dos nociones de "obra viva" que no coinciden.**~~ **UNIFICADO el 22
+     de agosto de 2026.** `gerencia.service.ts` ya contaba PARALIZADA como
+     obra viva (SPI/alertas de atraso); `obras.service.ts`
+     (`obtenerResumenEmpresa`, las tarjetas de dinero del panel) filtraba
+     estrictamente `EN_EJECUCION` y la excluia — el dinero comprometido
+     desaparecia de las cifras del panel al paralizar, aunque la deuda con
+     el proveedor seguia existiendo. Se agrego `ESTADOS_OBRA_CON_EXPOSICION`
+     (`lib/obras.ts`: `EN_EJECUCION` + `PARALIZADA`, PLANIFICACION y CERRADA
+     quedan fuera a proposito) y se uso en las tres cifras de dinero del
+     panel (`totalDeEmpresa`, ahora acepta uno o varios estados; los dos
+     agregados de comprometido) y en el conteo de `obrasConPlazoVencido`.
+     Tambien se corrigio el mismo patron en el aviso de "plazo vencido" por
+     TARJETA en `/panel` (`page.tsx`), que solo miraba `EN_EJECUCION` y
+     habria quedado inconsistente con el conteo agregado si no se tocaba a
+     la vez. 2516 pruebas, typecheck, lint, build y `scripts/humo.ts` (83
+     rutas, incluidas `/panel` y `/gerencia`) en verde.
    - **Paralizar no pide motivo ni fecha estimada de reanudacion.** El
      modelo `Project` no tiene ningun campo para esto (a diferencia de
      `Restriccion`, que exige responsable+fecha, o del propio mensaje de

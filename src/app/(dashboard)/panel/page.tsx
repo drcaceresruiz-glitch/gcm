@@ -15,6 +15,7 @@ import { puede } from "@/lib/rbac";
 import {
   ETIQUETA_ESTADO_OBRA,
   TONO_ESTADO_OBRA,
+  ESTADOS_OBRA_CON_EXPOSICION,
   type EstadoObra,
 } from "@/lib/obras";
 import { soles } from "@/utils/formato";
@@ -460,12 +461,20 @@ export default async function PanelPage({
 
             const diasDeRetraso = diasEntre(obra.fechaFinProgramada, hoy());
 
-            if (diasDeRetraso > 0 && obra.estado === "EN_EJECUCION") {
+            // Mismo criterio que `ESTADOS_OBRA_CON_EXPOSICION`: una obra
+            // paralizada con el plazo ya vencido sigue siendo relevante, no
+            // menos, y el conteo agregado del panel (arriba) ya la cuenta.
+            if (
+              diasDeRetraso > 0 &&
+              ESTADOS_OBRA_CON_EXPOSICION.includes(obra.estado as EstadoObra)
+            ) {
               alertas.push({
                 clave: "plazo",
                 texto: `El plazo venció hace ${diasDeRetraso} día(s)`,
                 detalle:
-                  "La obra sigue en ejecución después de la fecha de fin programada.",
+                  obra.estado === "PARALIZADA"
+                    ? "La obra está paralizada y la fecha de fin programada ya pasó."
+                    : "La obra sigue en ejecución después de la fecha de fin programada.",
               });
             }
 
