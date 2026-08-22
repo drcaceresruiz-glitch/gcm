@@ -113,17 +113,24 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      del numero grande). No es un bug de calculo —`ResumenEmpresaPanel.tsx`
      lo hace a proposito, y lo explica en su comentario— pero la jerarquia
      visual induce a leer las cifras de dinero como si fueran de las 5.
-     ~~HECHO el 21 de agosto de 2026~~: el usuario vio en vivo el panel con
-     varias obras y pregunto "a quien corresponden estas cifras" — un
-     primer intento le agrego texto aclarando la suma, y lo rechazo: un
-     resumen de dinero de varias obras mezcladas "ahi no tiene sentido",
-     diga lo que diga el texto. Se dejo asi: Presupuesto/Comprometido/Saldo
-     SOLO se muestran con exactamente una obra en ejecucion —donde la suma
-     y esa obra son la misma cifra—; con mas de una, se ocultan
-     (`ResumenEmpresaPanel.tsx`). En su lugar se sumo un semaforo de salud
-     por obra (ver el nuevo punto 12): a diferencia del dinero, un punto de
-     color por obra SI tiene sentido con varias, porque no mezcla ninguna
-     escala entre ellas.
+     ~~HECHO el 21 de agosto de 2026, en tres pasadas~~. Primero: el
+     usuario vio en vivo el panel con varias obras y pregunto "a quien
+     corresponden estas cifras" — un primer intento le agrego texto
+     aclarando la suma, y lo rechazo: un resumen de dinero de varias obras
+     mezcladas "ahi no tiene sentido", diga lo que diga el texto. Se dejo
+     asi: Presupuesto/Comprometido/Saldo SOLO se muestran con exactamente
+     una obra en ejecucion —donde la suma y esa obra son la misma cifra—;
+     con mas de una, se ocultan. En su lugar se sumo un semaforo de salud
+     por obra (punto 12): a diferencia del dinero, un punto de color por
+     obra SI tiene sentido con varias, porque no mezcla ninguna escala
+     entre ellas. Tercero, y lo que cerro el hallazgo del todo: aunque ya
+     no hubiera ambigüedad de ESCALA, seguia habiendo ambigüedad VISUAL —
+     las cuatro tarjetas en la misma rejilla seguian pareciendo del mismo
+     ambito—. `ResumenEmpresaPanel.tsx` ya no pone "Obras" en la misma
+     rejilla que el dinero: "Obras" queda sola, y Presupuesto/Comprometido/
+     Saldo van dentro de su propia caja con el titulo "La obra en
+     ejecución", que no necesita nombrar la obra porque solo se muestra
+     cuando hay exactamente una. Verificado en vivo en los dos casos.
    - `/gerencia` (`src/app/(dashboard)/gerencia/page.tsx`) solo trae dos
      bloques (semaforo de partidas criticas por SPI, adicionales sin
      aprobar). El usuario lo considera insuficiente para lo que un gerente
