@@ -8,6 +8,22 @@
  * Los dias van en ISO —1 = lunes, 7 = domingo—, igual que `diaCorteSemanal` de
  * la obra. Ojo: `Date.getDay()` de JavaScript devuelve 0 para el domingo, y de
  * ahi sale `diaIso()`.
+ *
+ * TODO ESTE ARCHIVO TRABAJA EN UTC, NUNCA EN HORA LOCAL. Hasta el 21 de
+ * agosto de 2026, `diaIso`/`esLaborable`/`diasLaborablesEntre` usaban
+ * `getDay()`/`setHours()`/`setDate()` (hora LOCAL del proceso de Node), y
+ * `avanzarDiasLaborables` -escrita despues- usaba UTC con su propia copia
+ * privada de `esLaborable` (`esLaborableUTC`) precisamente para no heredar
+ * ese problema. Mezclar las dos convenciones en el mismo archivo, con
+ * llamadores que construian fechas ancladas en UTC (`Date.UTC`, campos
+ * `@db.Date` de Prisma) y otros que las anclaban en hora local a proposito
+ * -cada uno con su propio comentario explicando por que- solo era correcto
+ * mientras la zona horaria del proceso de Node coincidiera con UTC, algo
+ * que este repositorio no fija en ningun sitio (`process.env.TZ`) y que por
+ * tanto depende de como este configurado el servidor de despliegue. Se
+ * unifico TODO a UTC -la convencion que ya usan las fechas `@db.Date` de la
+ * base y la mayoria de los llamadores- en vez de arriesgar a adivinar cual
+ * de las dos convenciones era la que corria en produccion.
  */
 
 export const DIAS_ISO = [1, 2, 3, 4, 5, 6, 7] as const;
@@ -29,9 +45,9 @@ export interface DiaLaboral {
   horas: string;
 }
 
-/// El dia de la semana en ISO. `getDay()` da 0 el domingo; aqui es 7.
+/// El dia de la semana en ISO. `getUTCDay()` da 0 el domingo; aqui es 7.
 export function diaIso(fecha: Date): number {
-  const d = fecha.getDay();
+  const d = fecha.getUTCDay();
   return d === 0 ? 7 : d;
 }
 
@@ -61,31 +77,15 @@ export function diasLaborablesEntre(
 
   let cuenta = 0;
   const cursor = new Date(desde.getTime());
-  cursor.setHours(0, 0, 0, 0);
+  cursor.setUTCHours(0, 0, 0, 0);
   const fin = new Date(hasta.getTime());
-  fin.setHours(0, 0, 0, 0);
+  fin.setUTCHours(0, 0, 0, 0);
 
   while (cursor.getTime() <= fin.getTime()) {
     if (esLaborable(cursor, calendario)) cuenta++;
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return cuenta;
-}
-
-/// Version UTC de `diaIso`/`esLaborable`, solo para `avanzarDiasLaborables`.
-///
-/// NO se reusa `esLaborable`: internamente llama a `diaIso`, que lee
-/// `getDay()` EN HORA LOCAL (defecto ya anotado en `PENDIENTES.md`, sin
-/// arreglar a proposito en esta entrega). Mezclar un cursor UTC con un
-/// dia-de-semana local desalinea el calendario segun la zona horaria del
-/// servidor —se detecto exactamente asi, con un test que cruzaba un fin de
-/// semana y salia un dia corrido—. Esta version se queda en UTC de punta a
-/// punta para no heredar ese problema.
-function esLaborableUTC(fecha: Date, calendario: readonly DiaLaboral[]): boolean {
-  const diaSemana = fecha.getUTCDay();
-  const iso = diaSemana === 0 ? 7 : diaSemana;
-  const dia = calendario.find((d) => d.diaSemana === iso);
-  return dia ? dia.laborable : true;
 }
 
 /**
@@ -108,7 +108,7 @@ export function avanzarDiasLaborables(
   let restantes = Math.max(0, Math.round(dias));
   while (restantes > 0) {
     cursor.setUTCDate(cursor.getUTCDate() + sentido);
-    if (esLaborableUTC(cursor, calendario)) restantes--;
+    if (esLaborable(cursor, calendario)) restantes--;
   }
   return cursor;
 }

@@ -200,9 +200,10 @@ export async function recalcularResumenes(
 /**
  * Dias de trabajo entre dos fechas de calendario, ambas incluidas.
  *
- * Las fechas se parten a mano en vez de pasarlas por `new Date(iso)`: eso las
- * interpreta en UTC, y en Peru —UTC-5— el dia sale corrido uno atras, con lo
- * que `getDay()` diria domingo donde hay lunes.
+ * Las fechas se parten a mano y se anclan en UTC (`Date.UTC`): `calendario.ts`
+ * entero trabaja en UTC (ver su comentario de cabecera), y anclar aqui en la
+ * hora local del proceso de Node desalinearia el calendario segun la zona
+ * horaria del servidor, que este repositorio no fija en ningun sitio.
  */
 function diasEntre(
   inicio: string,
@@ -211,7 +212,7 @@ function diasEntre(
 ): string {
   const dia = (iso: string) => {
     const [anio, mes, d] = iso.split("-").map(Number);
-    return new Date(anio!, mes! - 1, d!);
+    return new Date(Date.UTC(anio!, mes! - 1, d!));
   };
   return `${diasLaborablesEntre(dia(inicio), dia(fin), calendario)}.00`;
 }

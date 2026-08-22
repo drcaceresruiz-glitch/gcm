@@ -26,15 +26,17 @@ export type Resultado<T = void> =
   | { ok: false; error: string };
 
 /**
- * Una fecha de calendario "YYYY-MM-DD" en el dia LOCAL que nombra.
+ * Una fecha de calendario "YYYY-MM-DD", anclada en UTC.
  *
- * `new Date("2026-08-17T00:00:00.000Z")` no vale: en Peru —UTC-5— es el 16 a
- * las 19:00, y `getDay()` diria domingo en vez de lunes. Contando dias
- * laborables eso corre la cuenta un dia entero.
+ * `calendario.ts` entero trabaja en UTC (ver su comentario de cabecera):
+ * `diasLaborablesEntre` lee el dia de la semana con `getUTCDay()`, asi que
+ * lo que se le pase tiene que estar anclado igual. Un `new Date(anio, mes,
+ * dia)` local dependeria de la zona horaria del proceso de Node, que este
+ * repositorio no fija en ningun sitio (`process.env.TZ`).
  */
-function diaLocal(iso: string): Date {
+function diaUtc(iso: string): Date {
   const [anio, mes, dia] = iso.split("-").map(Number);
-  return new Date(anio!, mes! - 1, dia!);
+  return new Date(Date.UTC(anio!, mes! - 1, dia!));
 }
 
 /**
@@ -64,8 +66,8 @@ async function duracionDeLasFechas(
   });
 
   const dias = diasLaborablesEntre(
-    diaLocal(inicio),
-    diaLocal(fin),
+    diaUtc(inicio),
+    diaUtc(fin),
     calendario.map((d) => ({ ...d, horas: d.horas.toString() })),
   );
 

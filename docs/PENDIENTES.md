@@ -63,11 +63,10 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      implemento**: `ponderarPorDuracion` es la unica funcion de ponderacion
      que se llama en todo el repo. Avance fisico, curva y capitulos siempre
      pesan por duracion, nunca por dinero, con o sin mapeo completo.
-   - `calendario.ts` (`diaIso`, `diasLaborablesEntre`) sigue usando hora
-     LOCAL en vez de UTC —el mismo defecto que `docs/PENDIENTES.md` ya tenia
-     anotado en la seccion 7 sin arreglar—, y el modulo "Plazo" del tablero
-     es uno de sus consumidores: puede contar mal los dias laborables
-     restantes en el servidor de Lima.
+   - ~~`calendario.ts` (`diaIso`, `diasLaborablesEntre`) sigue usando hora
+     LOCAL en vez de UTC~~ **HECHO el 21 de agosto de 2026** (ver el
+     detalle completo en la seccion 7 mas abajo, que es donde este mismo
+     hallazgo ya estaba anotado desde antes).
    - ~~Solo el modulo "Que falta" enlaza a la vista EXACTA~~ **HECHO el 21
      de agosto de 2026, para 11 de los 14 modulos restantes.** Se anadio
      `id`/`scroll-mt-20` a las secciones que no lo tenian —curva de
@@ -2376,18 +2375,50 @@ reglas solo se han visto en pruebas.
 - **La cookie vieja `gcm-tablero`** sigue en los navegadores, ignorada desde
   que se paso a `gcm-tablero-off`. Inofensiva; caduca sola dentro de un ano.
 
-- **`src/lib/calendario.ts` cuenta los dias en hora LOCAL.** `diaIso` usa
-  `getDay()` y `diasLaborablesEntre` usa `setHours()`, pero las fechas de obra
-  vienen de columnas `@db.Date`, que Prisma devuelve a **medianoche UTC**. En
-  Peru (UTC−5) eso desplaza el dia entero: una fecha que es sabado se lee como
-  viernes, y `esLaborable` responde por el dia equivocado. Se descubrio el
-  12/08/2026 escribiendo el test del sabado de CRIOCORD.
+- ~~**`src/lib/calendario.ts` cuenta los dias en hora LOCAL.**~~ **HECHO el
+  22 de agosto de 2026.** `diaIso` usaba `getDay()` y `diasLaborablesEntre`
+  usaba `setHours()`/`setDate()`, pero las fechas de obra vienen de
+  columnas `@db.Date`, que Prisma devuelve a **medianoche UTC** —y buena
+  parte del resto del sistema tambien ancla en UTC (`Date.UTC`,
+  `avanzarDiasLaborables`, que ya era UTC desde la entrega de ruta
+  critica). Mezclar las dos convenciones en el mismo archivo solo era
+  correcto si la zona horaria del proceso de Node coincidia con UTC, algo
+  que este repositorio no fija en ningun sitio (`process.env.TZ`) y que
+  por tanto dependia de como estuviera configurado el servidor de
+  despliegue —investigado a fondo antes de tocar nada: ningun archivo del
+  repositorio confirma la zona horaria real de produccion—.
 
-  No se arreglo de paso porque `diasLaborablesEntre` ya lo usan el plazo de la
-  obra y el Lookahead, y cambiarlo mueve numeros que hoy alguien esta mirando:
-  toca hacerlo con sus tests delante. Mientras tanto, **`parte-diario.ts` no lo
-  arrastra**: cuenta en UTC con sus propios ayudantes, igual que `curva-s.ts`.
-  Si se arregla `calendario.ts`, esos ayudantes privados sobran.
+  Se opto por unificar TODO a UTC —la convencion que ya usan las fechas
+  `@db.Date` y la mayoria de los llamadores— en vez de arriesgar a
+  adivinar cual de las dos convenciones corria en produccion: asi el
+  resultado es correcto sin importar la zona horaria del servidor ni la
+  del navegador de quien usa la app, en vez de serlo solo "si el servidor
+  resulta estar en UTC" o "si resulta estar al oeste de UTC".
+
+  `diaIso`/`esLaborable`/`diasLaborablesEntre` pasan a `getUTCDay()`/
+  `setUTCHours()`/`setUTCDate()`, y `avanzarDiasLaborables` ya no necesita
+  su copia privada `esLaborableUTC` -llama directo al `esLaborable` ya
+  arreglado-. Los tres llamadores que construian fechas en hora LOCAL A
+  PROPOSITO para calzar con el `calendario.ts` de antes
+  (`TareasAMano.tsx`, `cronograma-manual.service.ts`,
+  `edt.service.ts`) pasan a anclar con `Date.UTC(...)`. Los que ya
+  anclaban en UTC (`tablero.service.ts`, `lib/ruta-critica.ts` via
+  `fechaInicioObra`, `plantilla-cronograma.service.ts`,
+  `lib/hitos-predictivos.ts`) no necesitaron ningun cambio: empiezan a
+  ser correctos solos, como efecto del arreglo.
+
+  **`parte-diario.ts` ya no arrastra sus ayudantes privados**
+  (`diaIsoUtc`/`esLaborableUtc`/`diasLaborablesUtc`, escritos el 12/08
+  para no heredar este mismo defecto): se retiraron y el modulo usa
+  directamente `diaIso`/`esLaborable`/`diasLaborablesEntre` de
+  `@/lib/calendario`, exactamente como preveia esta misma nota.
+
+  Verificado con los 2481 pruebas existentes en verde sin cambiar ningun
+  valor esperado -incluidas las que ejercitan estos llamadores a traves
+  de `cronograma-manual.service.test.ts`, `edt.service.test.ts`,
+  `ruta-critica.test.ts`, `hitos-predictivos` y `tablero.service`-, mas
+  `typecheck`/`lint`/`build` limpios. No se pudo verificar en un
+  navegador real -sin Claude in Chrome conectado esta sesion-.
 
 ---
 

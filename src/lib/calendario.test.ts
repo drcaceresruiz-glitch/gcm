@@ -9,10 +9,9 @@ import {
   type DiaLaboral,
 } from "./calendario";
 
-const d = (iso: string) => new Date(`${iso}T00:00:00`);
-/// `avanzarDiasLaborables` es UTC a proposito (ver su comentario); las
-/// fechas de sus pruebas se anclan igual, para no depender de la zona
-/// horaria de quien corre el test.
+/// Todo el archivo trabaja en UTC (ver el comentario de cabecera de
+/// `calendario.ts`); las fechas de las pruebas se anclan igual, para no
+/// depender de la zona horaria de quien corre el test.
 const utc = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 /// El de CRIOCORD: L-V 8h, sabado 5h, domingo libre.
@@ -36,42 +35,42 @@ const CORRIDO: DiaLaboral[] = [1, 2, 3, 4, 5, 6, 7].map((n) => ({
 describe("diaIso", () => {
   it("el domingo es 7, no 0 como en JavaScript", () => {
     // 09/08/2026 es domingo.
-    expect(diaIso(d("2026-08-09"))).toBe(7);
-    expect(diaIso(d("2026-08-10"))).toBe(1);
-    expect(diaIso(d("2026-08-15"))).toBe(6);
+    expect(diaIso(utc("2026-08-09"))).toBe(7);
+    expect(diaIso(utc("2026-08-10"))).toBe(1);
+    expect(diaIso(utc("2026-08-15"))).toBe(6);
   });
 });
 
 describe("esLaborable", () => {
   it("respeta el calendario de la obra", () => {
-    expect(esLaborable(d("2026-08-09"), CRIOCORD)).toBe(false);
-    expect(esLaborable(d("2026-08-15"), CRIOCORD)).toBe(true);
-    expect(esLaborable(d("2026-08-09"), CORRIDO)).toBe(true);
+    expect(esLaborable(utc("2026-08-09"), CRIOCORD)).toBe(false);
+    expect(esLaborable(utc("2026-08-15"), CRIOCORD)).toBe(true);
+    expect(esLaborable(utc("2026-08-09"), CORRIDO)).toBe(true);
   });
 
   it("sin fila para ese dia cuenta como laborable", () => {
     // Contar de mas es preferible a esconder trabajo ya programado.
-    expect(esLaborable(d("2026-08-09"), [])).toBe(true);
+    expect(esLaborable(utc("2026-08-09"), [])).toBe(true);
   });
 });
 
 describe("diasLaborablesEntre", () => {
   it("cuenta ambos extremos incluidos", () => {
     // Lunes 10 a domingo 16: 6 laborables en CRIOCORD, 7 en turno corrido.
-    expect(diasLaborablesEntre(d("2026-08-10"), d("2026-08-16"), CRIOCORD)).toBe(6);
-    expect(diasLaborablesEntre(d("2026-08-10"), d("2026-08-16"), CORRIDO)).toBe(7);
+    expect(diasLaborablesEntre(utc("2026-08-10"), utc("2026-08-16"), CRIOCORD)).toBe(6);
+    expect(diasLaborablesEntre(utc("2026-08-10"), utc("2026-08-16"), CORRIDO)).toBe(7);
   });
 
   it("un solo dia laborable cuenta uno", () => {
-    expect(diasLaborablesEntre(d("2026-08-10"), d("2026-08-10"), CRIOCORD)).toBe(1);
+    expect(diasLaborablesEntre(utc("2026-08-10"), utc("2026-08-10"), CRIOCORD)).toBe(1);
   });
 
   it("un solo dia de descanso cuenta cero", () => {
-    expect(diasLaborablesEntre(d("2026-08-09"), d("2026-08-09"), CRIOCORD)).toBe(0);
+    expect(diasLaborablesEntre(utc("2026-08-09"), utc("2026-08-09"), CRIOCORD)).toBe(0);
   });
 
   it("si la fecha final es anterior devuelve cero, no negativo", () => {
-    expect(diasLaborablesEntre(d("2026-08-16"), d("2026-08-10"), CRIOCORD)).toBe(0);
+    expect(diasLaborablesEntre(utc("2026-08-16"), utc("2026-08-10"), CRIOCORD)).toBe(0);
   });
 });
 

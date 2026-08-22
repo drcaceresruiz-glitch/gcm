@@ -1,4 +1,4 @@
-import type { DiaLaboral } from "@/lib/calendario";
+import { diasLaborablesEntre, esLaborable, diaIso, type DiaLaboral } from "@/lib/calendario";
 import { normalizarDecimal, sumar } from "@/lib/decimal";
 
 /**
@@ -31,69 +31,25 @@ import { normalizarDecimal, sumar } from "@/lib/decimal";
 export const MAX_FILAS_PARTE = 300;
 
 /**
- * TODO LO DE ESTE MODULO CUENTA LOS DIAS EN UTC, y no es un capricho.
- *
- * Las fechas de obra vienen de columnas `@db.Date`, que Prisma devuelve a
- * medianoche UTC. `@/lib/calendario` decide el dia de la semana con `getDay()`
- * —hora LOCAL—, asi que en Peru (UTC-5) una fecha `@db.Date` cae en el dia
- * anterior y `esLaborable` responde por el dia equivocado. Se descubrio aqui,
- * al escribir el test del sabado de CRIOCORD: pedia sabado y salia viernes.
- *
- * Es un defecto latente de `calendario.ts` que afecta tambien a
- * `diasLaborablesEntre`, y arreglarlo alli toca a quien ya lo usa —el plazo de
- * la obra, el Lookahead—, asi que no se hace de paso. Queda anotado en
- * `docs/PENDIENTES.md`. Mientras tanto, este modulo no lo arrastra: cuenta en
- * UTC, que es la misma referencia que usa `curva-s.ts` y la que corresponde a
- * un `@db.Date`.
- */
-function diaIsoUtc(fecha: Date): number {
-  const d = fecha.getUTCDay();
-  return d === 0 ? 7 : d;
-}
-
-function esLaborableUtc(
-  fecha: Date,
-  calendario: readonly DiaLaboral[],
-): boolean {
-  const dia = calendario.find((d) => d.diaSemana === diaIsoUtc(fecha));
-  // Sin fila para ese dia se asume laborable, igual que en `calendario.ts`: es
-  // preferible contar de mas a esconder trabajo que si esta programado.
-  return dia ? dia.laborable : true;
-}
-
-/// Dias laborables entre dos fechas, ambas incluidas, contados en UTC.
-function diasLaborablesUtc(
-  desde: Date,
-  hasta: Date,
-  calendario: readonly DiaLaboral[],
-): number {
-  if (hasta.getTime() < desde.getTime()) return 0;
-
-  let cuenta = 0;
-  const cursor = new Date(desde.getTime());
-  cursor.setUTCHours(0, 0, 0, 0);
-  const fin = new Date(hasta.getTime());
-  fin.setUTCHours(0, 0, 0, 0);
-
-  while (cursor.getTime() <= fin.getTime()) {
-    if (esLaborableUtc(cursor, calendario)) cuenta++;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return cuenta;
-}
-
-/**
  * Dias laborables transcurridos desde un reporte hasta hoy.
  *
- * Se descuenta uno porque `diasLaborablesUtc` cuenta los dos extremos:
+ * Se descuenta uno porque `diasLaborablesEntre` cuenta los dos extremos:
  * reportar hoy tiene que dar cero dias sin reportar, no uno.
+ *
+ * `calendario.ts` entero trabaja en UTC desde el 21 de agosto de 2026 (ver
+ * su comentario de cabecera) — hasta entonces este modulo llevaba su
+ * propia copia privada en UTC (`diaIsoUtc`/`esLaborableUtc`/
+ * `diasLaborablesUtc`) para no heredar el defecto de `calendario.ts`, que
+ * hasta esa fecha contaba en hora LOCAL y leia mal una fecha `@db.Date`
+ * —Prisma las devuelve a medianoche UTC—. Con el arreglo, esa copia sobra:
+ * se usan directamente las funciones publicas de `@/lib/calendario`.
  */
 export function diasSinReportar(
   ultimo: Date,
   hoy: Date,
   calendario: readonly DiaLaboral[],
 ): number {
-  return Math.max(0, diasLaborablesUtc(ultimo, hoy, calendario) - 1);
+  return Math.max(0, diasLaborablesEntre(ultimo, hoy, calendario) - 1);
 }
 
 export interface FilaParte {
@@ -285,11 +241,11 @@ export function ultimoDiaLaborableDeLaSemana(
 ): Date {
   const domingo = new Date(fecha.getTime());
   domingo.setUTCHours(0, 0, 0, 0);
-  domingo.setUTCDate(domingo.getUTCDate() + (7 - diaIsoUtc(domingo)));
+  domingo.setUTCDate(domingo.getUTCDate() + (7 - diaIso(domingo)));
 
   const cursor = new Date(domingo.getTime());
   for (let i = 0; i < 7; i++) {
-    if (esLaborableUtc(cursor, calendario)) return cursor;
+    if (esLaborable(cursor, calendario)) return cursor;
     cursor.setUTCDate(cursor.getUTCDate() - 1);
   }
   return domingo;

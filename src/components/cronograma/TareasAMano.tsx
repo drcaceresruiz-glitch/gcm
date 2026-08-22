@@ -113,8 +113,13 @@ export function TareasAMano({
    * que se ve mientras se escribe; la cifra que se guarda la vuelve a calcular
    * el servidor, para que no dependa del reloj del navegador.
    *
-   * Las fechas se parten a mano en vez de pasarlas por `new Date(iso)`: eso
-   * las interpreta en UTC, y en Peru —UTC-5— el dia sale corrido uno atras.
+   * Las fechas se parten a mano y se anclan en UTC (`Date.UTC`) en vez de
+   * pasarlas por `new Date(iso)` a secas o por el constructor local
+   * `new Date(anio, mes, dia)`: `calendario.ts` entero trabaja en UTC desde
+   * el 21 de agosto de 2026 (ver su comentario de cabecera), y anclar aqui
+   * en la hora local del NAVEGADOR de quien teclea desalinearia el
+   * calendario segun donde este esa persona, exactamente el problema que
+   * el propio arreglo de `calendario.ts` elimino para el servidor.
    */
   const duracionCalculada = useMemo(() => {
     if (!campos.inicio || !campos.fin) return "";
@@ -122,7 +127,7 @@ export function TareasAMano({
     const dia = (iso: string) => {
       const [anio, mes, d] = iso.split("-").map(Number);
       if (!anio || !mes || !d) return null;
-      return new Date(anio, mes - 1, d);
+      return new Date(Date.UTC(anio, mes - 1, d));
     };
 
     const desde = dia(campos.inicio);
