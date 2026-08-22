@@ -1,8 +1,25 @@
 # Skills propias de GCM — plan
 
-`.claude/skills` solo tiene las de Prisma, instaladas por `skills-lock.json`.
-Nada propio del proyecto. Este documento es el plan de que hace falta y en
-que orden; no crea ningun `SKILL.md` todavia.
+> **Los tres se escribieron el 21 de agosto de 2026**, en
+> `.claude/skills/gcm-limites-de-capas/SKILL.md`,
+> `.claude/skills/gcm-despliegue/SKILL.md` y
+> `.claude/skills/gcm-nuevo-servicio-y-pantalla/SKILL.md`, siguiendo el
+> plan de abajo tal cual. Este documento se conserva como el porque de
+> cada uno, no como pendiente.
+>
+> **Respaldo:** `.claude/` Y `.agents/` estan los dos en `.gitignore` —
+> ninguno de los dos se versiona con el repositorio, ni siquiera las
+> skills de Prisma—. Es la misma clase de fragilidad que ya vacio la
+> carpeta de memoria del perfil una vez (ver
+> `docs/memoria/reinstalacion-borro-memorias-y-plugin.md`). Por eso cada
+> `SKILL.md` de GCM tiene una copia identica versionada en
+> [`docs/skills/`](skills/): si `.claude/skills` vuelve a aparecer vacio,
+> se restaura copiando desde ahi. Si editas un skill, copia el cambio en
+> los dos sitios.
+
+`.claude/skills` solo tenia las de Prisma, instaladas por `skills-lock.json`.
+Nada propio del proyecto. Este documento fue el plan de que hacia falta y en
+que orden.
 
 ## Por que hace falta esto
 

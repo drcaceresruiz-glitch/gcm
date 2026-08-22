@@ -68,10 +68,26 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      anotado en la seccion 7 sin arreglar—, y el modulo "Plazo" del tablero
      es uno de sus consumidores: puede contar mal los dias laborables
      restantes en el servidor de Lima.
-   - Solo el modulo "Que falta" enlaza a la vista EXACTA (`?semanas=`,
-     `?estado=`, `#pareto`); los otros 13 modulos del catalogo enlazan
-     generico a la pantalla, sin el parametro que aterrizaria justo en lo
-     que la tarjeta esta mostrando.
+   - ~~Solo el modulo "Que falta" enlaza a la vista EXACTA~~ **HECHO el 21
+     de agosto de 2026, para 11 de los 14 modulos restantes.** Se anadio
+     `id`/`scroll-mt-20` a las secciones que no lo tenian —curva de
+     avance, valor ganado, "que esta frenando la obra", ruta critica,
+     avance por capitulo (cronograma); el resumen de confiabilidad
+     (lookahead) y la tendencia del PPC (plan semanal); una fila de nota
+     por su id (recordatorios)— y se enlazo `causas` al `#pareto` que ya
+     existia (construido para "Que falta" pero sin reusar). `capitulos`
+     se redirigio del informe semanal (que no es la misma vista) a la
+     seccion equivalente del propio cronograma. `confiabilidad` suma
+     ademas `?semanas=` con la misma ventana que la tarjeta esta
+     contando. `ordenes` se dejo tal cual: la tarjeta resume los tres
+     estados a la vez, asi que filtrar a uno seria arbitrario.
+     **Quedan fuera a proposito, por ser trabajo de otra naturaleza (no
+     un enlace que arreglar, sino una vista que no existe)**: `plazo`
+     enlaza a la ficha de la obra porque no hay pantalla dedicada a
+     "dias consumidos y restantes"; `liberacion` (Demora por flujo) no
+     tiene ningun sitio en `/lookahead` que muestre el desglose por
+     flujo que la tarjeta ya calcula —haria falta construir esa vista
+     ahi, no solo enlazarla—.
    - EAC y VAC (cuanto va a costar la obra al final, si sigue asi) ya estan
      calculados en `metricasEvm()` y nunca se muestran en el tablero — la
      cifra mas predictiva del sistema, sin coste de consulta extra.
@@ -809,13 +825,13 @@ Dos avisos antes de leer nada de mas abajo:
    todavia —esas siguen siendo entregas aparte, en el orden que fija la
    seccion 5—. Detalle completo, ahi mismo.
 
-8. ~~**Skills propias de GCM**: sigue sin plan escrito.~~ **Plan escrito el
-   21 de agosto de 2026**, en [`skills-gcm.md`](skills-gcm.md): tres skills,
-   en orden —limites de capas (Decimal, permisos en dos capas, filtro de
-   empresa desde la sesion), despliegue (el runbook de los incidentes de
-   agosto) y el patron de pantalla+servicio nuevo—. Sigue sin ESCRIBIRSE
-   ninguno; `.claude/skills` solo
-   tiene las de Prisma.
+8. ~~**Skills propias de GCM**: sigue sin plan escrito.~~ **HECHO el 21 de
+   agosto de 2026**: plan en [`skills-gcm.md`](skills-gcm.md) y las tres
+   skills ya escritas en `.claude/skills/` —`gcm-limites-de-capas`
+   (Decimal, permisos en dos capas, filtro de empresa desde la sesion),
+   `gcm-despliegue` (el runbook FTP+cron, `/api/health`, el criterio G6) y
+   `gcm-nuevo-servicio-y-pantalla` (el recorrido de tres capas, idioma,
+   comentarios, pruebas que muerden)—.
 
 ---
 
