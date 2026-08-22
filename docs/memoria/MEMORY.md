@@ -13,3 +13,4 @@
 - [PowerShell corrompe la codificacion](powershell-corrompe-la-codificacion.md) — no reescribir archivos con Get-Content/Set-Content; la bateria verde no lo caza, solo git diff
 - [Commit y push sin preguntar](commit-y-push-sin-preguntar.md) — autorizado el 21 de agosto: hacerlo cuando yo lo recomendaria, sin pedir confirmacion antes
 - [Clic dentro de menu desplegable](clic-dentro-de-menu-desplegable.md) — un form que se cierra al clic puede desmontarse antes de enviarse; probar con un clic real, no solo pruebas automatizadas
+- [E2E golden path verificado](e2e-golden-path-verificado.md) — obra->presupuesto->EDT->linea base->movimientos->encargos->Last Planner probado con navegador real el 21/08/2026; reiniciar dev server tras prisma generate

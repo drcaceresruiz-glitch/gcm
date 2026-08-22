@@ -208,9 +208,9 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
     `/gerencia` en si sigue igual — su rediseno de fondo (punto 1 del
     anexo anterior) sigue pendiente.
 
-13. **Prueba de extremo a extremo — primera pasada, permisos por rol vía
-    HTTP real.** Empezada el 21 de agosto de 2026, no terminada: cubre solo
-    el ACCESO A PANTALLAS por rol, no los flujos de escritura completos
+13. ~~**Prueba de extremo a extremo.**~~ **HECHA el 21 de agosto de 2026,
+    en dos pasadas.** Primera pasada, permisos por rol vía
+    HTTP real: cubre solo el ACCESO A PANTALLAS por rol, no los flujos de escritura completos
     (crear obra desde cero, ciclo completo de un encargo, etc.), que siguen
     pendientes. Metodo: sesiones fabricadas (mismo `hashToken` que usa el
     login real) para los 4 roles de prueba +RESIDENTE, contra
@@ -245,12 +245,22 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
     arreglar ahora. No tocar `rbac.ts` en este punto sin que el usuario
     pida ampliarlo primero.
 
-    Falta para completar esta prueba: los flujos de ESCRITURA completos
-    (crear una obra desde cero con el usuario, cargar presupuesto,
-    aprobar movimientos, ciclo de un encargo/orden, cerrar una semana de
-    Last Planner) — la capa de permisos de SERVICIO para eso ya la cubren
-    2461 pruebas automatizadas, pero el FLUJO de pantallas encadenadas,
-    completo, con clics reales, todavia no se ha recorrido.
+    ~~Falta para completar esta prueba: los flujos de ESCRITURA
+    completos~~ **HECHO el 21 de agosto de 2026**, con navegador real
+    (Claude in Chrome) conectado a la sesion. Se recorrio el ciclo
+    completo con clics reales: crear obra -> presupuesto meta con fechas
+    -> generar contractual -> generar EDT (confirmo en vivo la
+    funcionalidad de fechas del punto 10) -> revision y linea base ->
+    iniciar ejecucion -> movimiento presupuestal (crear y aprobar) ->
+    encargo a un proveedor real -> orden de compra (crear y aprobar, con
+    la alerta real de sobregiro disparandose sola) -> parte del dia ->
+    Last Planner completo (semana, compromisos con meta %, cierre con
+    correccion manual, PPC 80% calculado correcto). Cero bugs reales de
+    la app; un bug de entorno (el dev server con el Prisma Client viejo
+    tras el `prisma generate` de la sesion, resuelto reiniciandolo) y dos
+    comportamientos que parecian bug y resultaron ser diseño deliberado
+    ya documentado en el codigo. Detalle completo en la memoria
+    `e2e-golden-path-verificado` (`docs/memoria/`).
 
 **Avisado, no pedido todavia**: pagina de marketing y venta, exponer la app
 web y la autoinstalable (`docs/instalable.md` ya documenta esta ultima),
