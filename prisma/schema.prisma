@@ -750,6 +750,7 @@ model Project {
   presupuestosMeta     PresupuestoMeta[]
   valorizaciones       ValorizacionEncargo[]
   notas                Nota[]
+  adjuntosNota         AdjuntoNota[]
 
   @@unique([companyId, codigoObra])
   @@unique([companyId, correlativo])
@@ -3335,6 +3336,14 @@ enum EventoAviso {
   /// requiere `projectId`; las respuestas que no se atan viven en la ficha
   /// del contratista y no suenan.
   RESPUESTA_CONTRATISTA
+
+  /// Una nota con fecha de recordatorio vencio y sigue sin atenderse.
+  ///
+  /// Igual que VALORIZACION_PENDIENTE: solo campanita, insiste cada dia
+  /// mientras siga vencida y sin atender. Antes de esto, un recordatorio
+  /// vivia solo en el widget del tablero: si nadie abria el panel ese dia,
+  /// era como si no existiera.
+  NOTA_VENCIDA
 }
 
 /// El aviso dentro de GCM.
@@ -3797,7 +3806,8 @@ model Nota {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  adjuntos  AdjuntoNota[]
 
   /// Alimenta el widget de "proximos recordatorios" y el contador de
   /// vencidas del riel de la obra: notas pendientes con recordatorio,
@@ -3805,4 +3815,39 @@ model Nota {
   @@index([projectId, atendida, fechaRecordatorio])
   @@index([projectId, createdAt])
   @@map("notas")
+}
+
+/// Un archivo colgado de una Nota —el comprobante de un pago, el documento
+/// legal, la foto del hallazgo—.
+///
+/// A diferencia de `FotoEvidencia`, que es prueba de campo inmutable con su
+/// propio ciclo de purga, un adjunto de Nota es contenido de autor: vive y
+/// muere con la nota (`onDelete: Cascade`, no `SetNull`), y borrarlo es un
+/// gesto normal de edicion, no algo que deje rastro de auditoria aparte del
+/// `AuditLog` que ya escribe el servicio. Por eso no lleva `hash` ni
+/// `purgadaAt`: no hay nada que sobreviva a su borrado a proposito.
+model AdjuntoNota {
+  id        String @id @default(cuid())
+  notaId    String
+  /// Denormalizado desde `Nota.projectId`, igual que `FotoEvidencia`: filtrar
+  /// por obra sin tener que pasar por un `include` de la nota.
+  projectId String
+
+  /// Ruta RELATIVA dentro de STORAGE_ROOT (ej. "notas/<obra>/<id>.pdf").
+  ruta String @db.VarChar(255)
+
+  nombreOriginal String @db.VarChar(255)
+  mimeType       String @db.VarChar(100)
+  /// Bytes del archivo tal como se guardo.
+  tamano         Int
+
+  subidaPor String   @db.VarChar(150)
+  createdAt DateTime @default(now())
+
+  nota    Nota    @relation(fields: [notaId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([notaId])
+  @@index([projectId])
+  @@map("adjuntos_nota")
 }

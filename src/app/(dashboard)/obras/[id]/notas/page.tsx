@@ -11,6 +11,8 @@ import {
   accionCrearNota,
   accionEditarNota,
   accionEliminarNota,
+  accionSubirAdjuntoNota,
+  accionEliminarAdjuntoNota,
 } from "./acciones";
 
 export const metadata: Metadata = { title: "Notas" };
@@ -71,6 +73,8 @@ export default async function NotasPage({
             editar: accionEditarNota,
             alternarAtendida: accionAlternarAtendidaNota,
             eliminar: accionEliminarNota,
+            subirAdjunto: accionSubirAdjuntoNota,
+            eliminarAdjunto: accionEliminarAdjuntoNota,
           }}
         />
       )}

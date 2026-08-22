@@ -285,6 +285,18 @@ export const TABLAS: readonly TablaRespaldo[] = [
     fechas: ["fechaRecordatorio"],
   },
   {
+    // Igual que `fotos_evidencia`: guarda la RUTA de un archivo que vive en
+    // STORAGE_ROOT, fuera de la base. El respaldo copia el registro; el
+    // archivo fisico es responsabilidad de quien restaura, no de este
+    // catalogo.
+    tabla: "adjuntos_nota",
+    modelo: "adjuntoNota",
+    refs: [
+      { campo: "projectId", a: "projects" },
+      { campo: "notaId", a: "notas" },
+    ],
+  },
+  {
     tabla: "pases_obra",
     modelo: "paseObra",
     refs: [{ campo: "projectId", a: "projects" }],

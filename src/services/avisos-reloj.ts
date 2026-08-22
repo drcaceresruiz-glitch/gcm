@@ -35,6 +35,7 @@ import {
   suscripcionesResueltas,
 } from "@/services/avisos-envio";
 import { avisarValorizacionesPendientes } from "@/services/avisos-valorizacion";
+import { avisarNotasVencidas } from "@/services/avisos-notas";
 import type { EventoAviso, TipoRestriccion } from "@/generated/prisma/enums";
 
 /**
@@ -260,6 +261,21 @@ async function pasadaDeObra(
   // avisos concluiria —con razon— que esto es spam.
   if (esEstreno(ajustes.createdAt, ahora, umbral)) return nada;
 
+  /**
+   * Las notas con recordatorio vencido y sin atender.
+   *
+   * Va AQUI, antes de mirar hitos y restricciones, y no despues como
+   * `avisarValorizacionesPendientes`: una nota no depende de que la obra
+   * tenga ni un hito ni una restriccion abierta —hay obras que solo usan la
+   * bitacora libre—, y colgarla del `if` de mas abajo la dejaria sin sonar
+   * nunca en esas obras. Solo escribe en la campanita: no consume
+   * presupuesto de correo ni de SMS.
+   */
+  const avisosNotas = await avisarNotasVencidas(
+    { id: obra.id, companyId: obra.companyId },
+    ahora,
+  );
+
   const resueltas = await suscripcionesResueltas(obra.id);
 
   /**
@@ -288,7 +304,11 @@ async function pasadaDeObra(
           },
         });
 
-  if (hitos.length === 0 && abiertas.length === 0) return nada;
+  // `avisosNotas` no es parte de `nada`: aunque no haya ni hitos ni
+  // restricciones abiertas, ya pudo haber sonado un recordatorio de nota.
+  if (hitos.length === 0 && abiertas.length === 0) {
+    return { avisosApp: avisosNotas, correos: 0, sms: 0 };
+  }
 
   const personas = await personasPorClave(obra.id);
 
@@ -301,7 +321,7 @@ async function pasadaDeObra(
     correosDisponibles,
   });
 
-  let avisosApp = porHitos.avisosApp;
+  let avisosApp = porHitos.avisosApp + avisosNotas;
   let correos = porHitos.correos;
   let sms = porHitos.sms;
 

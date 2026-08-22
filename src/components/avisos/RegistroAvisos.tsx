@@ -42,6 +42,7 @@ const ETIQUETA_EVENTO: Record<EventoAviso, string> = {
   HITO_VENCIDO: "hito vencido",
   VALORIZACION_PENDIENTE: "valorización pendiente",
   RESPUESTA_CONTRATISTA: "respondió un contratista",
+  NOTA_VENCIDA: "nota vencida",
 };
 
 function hora(f: Date): string {

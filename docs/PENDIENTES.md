@@ -820,9 +820,37 @@ Dos avisos antes de leer nada de mas abajo:
 7. ~~**Notas y Recordatorios (seccion 5) no se empezo.**~~ **Notas E1
    entregada el 21 de agosto de 2026**: modelo, migracion, permisos
    `nota:leer/crear/gestionar`, servicio, pestana en la obra y widget de
-   "Proximos recordatorios" en el tablero. Sin adjuntos ni notificaciones
-   todavia —esas siguen siendo entregas aparte, en el orden que fija la
-   seccion 5—. Detalle completo, ahi mismo.
+   "Proximos recordatorios" en el tablero.
+
+   **Notas E2 (adjuntos y notificaciones) entregada el 22 de agosto de
+   2026**, sobre lo que E1 ya dejo listo:
+   - **Adjuntos**: modelo `AdjuntoNota` (id, notaId, projectId, ruta,
+     nombreOriginal, mimeType, tamano, subidaPor) — mismo patron que
+     `FotoEvidencia`, pero `onDelete: Cascade` en vez de `SetNull`: un
+     adjunto de Nota es contenido de autor, no evidencia de auditoria
+     inmutable, y vive y muere con la nota. Imagenes (JPG/PNG/WebP) o PDF,
+     hasta 10 MB. El archivo vive en `STORAGE_ROOT/notas/<obra>/<id><ext>`,
+     fuera del arbol de la app. Se sirve por `GET /api/notas/[id]`, con
+     sesion + `nota:leer` + empresa comprobados, igual que
+     `api/evidencia/[id]`. Subir y borrar exigen `nota:gestionar` —la misma
+     puerta que editar el texto—.
+   - **Notificaciones**: nuevo evento `NOTA_VENCIDA` en `EventoAviso`.
+     `avisos-notas.ts` (nuevo, mismo molde que `avisos-valorizacion.ts`:
+     solo campanita, sin correo ni SMS) escribe un aviso por cada nota
+     vencida y sin atender, una vez al dia mientras siga asi, a los
+     residentes asignados (o a los ADMIN_OBRA si no hay ninguno). Se llama
+     desde `pasadaDeObra` en `avisos-reloj.ts`, ANTES de mirar hitos y
+     restricciones abiertas —a diferencia de `avisarValorizacionesPendientes`,
+     que queda colgada de esa comprobacion y no suena en una obra sin
+     ninguno de los dos—: una obra puede usar solo la bitacora libre, y
+     colgar el aviso de notas del mismo sitio la habria dejado muda.
+
+   Sin test de disco (subir/borrar el archivo de verdad): mismo alcance
+   que tiene hoy `evidencia.service.ts`, que tampoco prueba su propio
+   camino de escritura. Si cubre las guardas (permiso, obra cerrada,
+   nota/adjunto inexistente, tipo y tamano) y el aviso completo
+   (`avisos-notas.test.ts`, 8 pruebas). No se pudo verificar en navegador
+   real esta sesion.
 
 8. ~~**Skills propias de GCM**: sigue sin plan escrito.~~ **HECHO el 21 de
    agosto de 2026**: plan en [`skills-gcm.md`](skills-gcm.md) y las tres
@@ -1423,26 +1451,37 @@ Restricciones tecnicas que NO se pueden olvidar:
 3. Respaldo: las fotos no estan en repo ni tar; sumarlas a las copias del
    servidor junto al volcado de la base.
 
-## 5. Notas y Recordatorios — Notas E1 HECHA el 21 de agosto de 2026
+## 5. Notas y Recordatorios — HECHA el 22 de agosto de 2026 (E1 + E2)
 
 Bitacora libre de obra con recordatorios. Adaptaciones a GCM ya decididas:
 permisos en la matriz (nota:leer/crear/gestionar), NO tabla de auditoria
 propia (se usa auditLog), estado "vencido" DERIVADO (pendiente + fecha
 pasada), categorias fijas al inicio (financiero/logistica/operativo/legal).
 Una nota que describe una restriccion de tarea debe marcarse en el Lookahead
-—la UI lo dira—. Adjuntos sobre la MISMA infraestructura de archivos de la
-evidencia (seccion 4), con hash SHA-256 al subir y purga que borra el archivo
-pero deja el registro inmutable (nombre, hash, quien, cuando, tamano).
-Compresion en el NAVEGADOR, nunca en el backend (LiteSpeed mata procesos
-lentos). Limite 5 MB. Notificaciones: campana in-app por sondeo ligero (sin
-websockets en este hosting) + resumen diario por correo via cron (el SMTP de
-recuperar clave ya existe) + preferencias por usuario en Perfil.
+—la UI lo dira—.
 
-Orden de entregas acordado: plantilla Excel → infraestructura de archivos
-(hash+purga) + Evidencia Fase A con QR → ~~Notas E1 (CRUD + pestana + widget
-de proximos recordatorios)~~ **HECHA** → Notas con adjuntos → Notificaciones.
+> **El plan original de aqui abajo (hash SHA-256 + purga para los adjuntos;
+> campana por sondeo + resumen por correo + preferencias en Perfil para las
+> notificaciones) se escribio ANTES de investigar a fondo, y E2 se aparto de
+> el a proposito en los dos puntos.** Investigado el 22/08: `Nota` no es
+> evidencia de auditoria inmutable como `FotoEvidencia` —es contenido de
+> autor, vive y muere con la nota (`onDelete: Cascade`)—, asi que un hash
+> que sobreviva a la purga y una purga que conserve el registro sin el
+> archivo no aportaban nada que este caso necesitara: son garantias del
+> mundo de la evidencia fotografica, no del de un adjunto de nota. Y las
+> notificaciones ya tenian un patron probado y mas barato en el sistema
+> —`avisos-valorizacion.ts`, campanita sola, sin correo ni SMS, sin
+> preferencias por persona— para exactamente esta clase de aviso: uno que
+> nadie configuro y que no debe gastar el presupuesto de correo/SMS de la
+> obra en nombre de quien escribio la nota. Se replico ESE patron en vez de
+> construir el mas caro que nadie habia pedido todavia.
 
-**Lo entregado en Notas E1**: modelo `Nota` + `CategoriaNota`
+Orden de entregas: plantilla Excel → infraestructura de archivos (hash+purga)
++ Evidencia Fase A con QR → ~~Notas E1 (CRUD + pestana + widget de proximos
+recordatorios)~~ **HECHA el 21/08** → ~~Notas E2 (adjuntos + notificaciones)~~
+**HECHA el 22/08**.
+
+**Lo entregado en Notas E1** (21 de agosto): modelo `Nota` + `CategoriaNota`
 (`prisma/schema.prisma`), migracion `20260821192925_notas_y_recordatorios`,
 permisos en `rbac.ts` (RESIDENTE: leer+crear; ADMIN_OBRA: los tres;
 CONSULTOR y ALMACENERO sin `nota:leer`, mismo motivo que `galeria:leer`),
@@ -1455,6 +1494,28 @@ consistencia que ya existian atraparon huecos reales: `Nota` no estaba
 clasificada ni en `respaldo-esquema.ts` (respaldo de obra) ni en el catalogo
 de migracion de empresa, y la pestana no tenia capitulo en el manual —los
 tres quedaron resueltos en el mismo commit.
+
+**Lo entregado en Notas E2** (22 de agosto): modelo `AdjuntoNota` (migraciones
+`20260822051510_notas_adjuntos_y_aviso_vencido` y
+`20260822051726_adjuntos_nota_relacion_project`), imagenes o PDF hasta 10 MB,
+guardados en `STORAGE_ROOT/notas/<obra>/<id><ext>` y servidos por
+`GET /api/notas/[id]` (sesion + `nota:leer` + empresa, sin flujo de pase de
+obra —a diferencia de evidencia, adjuntar a una Nota es siempre una accion de
+sesion—). Subir y borrar exigen `nota:gestionar`. Nuevo evento
+`NOTA_VENCIDA` en `EventoAviso`; `src/services/avisos-notas.ts`
+(`avisarNotasVencidas`) escribe la campanita una vez al dia mientras la nota
+siga vencida y sin atender, a los residentes asignados o, sin ninguno, a los
+ADMIN_OBRA. Llamada desde `pasadaDeObra` en `avisos-reloj.ts` ANTES del `if`
+que exige hitos o restricciones abiertas —a diferencia de
+`avisarValorizacionesPendientes`, que queda colgada de esa comprobacion y no
+sonaria en una obra que solo usa la bitacora libre—. Misma guarda maestra que
+el resto: si `AjustesAvisosObra.activo` esta apagado, no suena nada.
+
+Otras dos guardas de consistencia atraparon huecos reales, mismo mecanismo
+que en E1: `adjuntos_nota` no estaba clasificada en ninguno de los dos
+catalogos de respaldo/migracion, y `NOTA_VENCIDA` faltaba en los tres mapas
+exhaustivos de `BandejaAvisos.tsx`/`RegistroAvisos.tsx` que el propio
+`tsc` rechazo hasta completarlos.
 
 ## 6. Importacion de presupuesto (Excel) — SUPERADA el 20 de agosto
 

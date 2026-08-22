@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Banknote,
   BellRing,
+  CalendarClock,
   CircleCheck,
   Clock,
   Diamond,
@@ -40,6 +41,9 @@ const ICONO: Record<EventoAviso, typeof BellRing> = {
   VALORIZACION_PENDIENTE: Banknote,
   // El sobre: alguien de fuera escribio y hay algo que leer.
   RESPUESTA_CONTRATISTA: Mail,
+  // El mismo icono que el widget de "proximos recordatorios" del tablero:
+  // es la misma idea, una fecha que se queria recordar.
+  NOTA_VENCIDA: CalendarClock,
 };
 
 const COLOR: Record<EventoAviso, string> = {
@@ -54,6 +58,8 @@ const COLOR: Record<EventoAviso, string> = {
   VALORIZACION_PENDIENTE: "var(--color-alerta)",
   // El color de la marca: es una novedad que atender, no un problema.
   RESPUESTA_CONTRATISTA: "var(--color-marca-500)",
+  // Rojo, como HITO_VENCIDO: paso la fecha y sigue sin atenderse.
+  NOTA_VENCIDA: "var(--color-peligro)",
 };
 
 export function BandejaAvisos({ avisos }: { avisos: AvisoBandeja[] }) {

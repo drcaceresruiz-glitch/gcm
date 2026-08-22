@@ -85,7 +85,11 @@ vi.mock("@/lib/prisma", () => {
       // puede cambiar de valor sola cuando el `update` llega despues. Sin
       // esto, `editarNota` leia "antes" y el propio `update` se lo pisaba,
       // porque las dos operaciones apuntaban al mismo objeto en memoria.
-      return Promise.resolve(filas.map((f) => ({ ...f })));
+      //
+      // `adjuntos: []` porque `listarNotas` pide `include: { adjuntos }` y
+      // este doble no simula `include` de verdad: ninguna prueba de aqui
+      // sube archivos, asi que la lista vacia siempre es correcta.
+      return Promise.resolve(filas.map((f) => ({ ...f, adjuntos: [] })));
     },
     findFirst: (args: { where: Record<string, unknown> }) =>
       Promise.resolve(
@@ -150,6 +154,10 @@ vi.mock("@/lib/prisma", () => {
     prisma: {
       project: { findFirst: () => Promise.resolve(estado.obra) },
       nota: notaOps,
+      // Sin store real: las pruebas de adjuntos solo ejercitan las guardas
+      // (permiso, obra cerrada, nota/adjunto inexistente), que devuelven
+      // ANTES de tocar esta tabla. Ver el comentario de mas abajo.
+      adjuntoNota: { findFirst: () => Promise.resolve(null) },
       // Fuera de la transaccion: `alternarAtendida` no abre una, y aun asi
       // tiene que dejar rastro en la auditoria.
       auditLog: {
@@ -170,6 +178,8 @@ const {
   editarNota,
   alternarAtendida,
   eliminarNota,
+  subirAdjuntoNota,
+  eliminarAdjuntoNota,
 } = await import("@/services/notas.service");
 
 function sesion(permisos: string[]): SesionActiva {
@@ -468,5 +478,114 @@ describe("eliminarNota", () => {
     expect(auditoria.entidad).toBe("Nota");
     expect(auditoria.accion).toBe("DELETE");
     expect(auditoria.antes.titulo).toBe("A borrar");
+  });
+});
+
+/**
+ * Solo las guardas: permiso, obra cerrada, nota/adjunto inexistente y
+ * validacion de tipo/tamano. Todas devuelven ANTES de tocar el disco, asi
+ * que no hace falta doblar `node:fs` -mismo alcance que tiene hoy
+ * `evidencia.service.ts`, que tampoco tiene prueba propia del camino que sí
+ * escribe un archivo-.
+ */
+describe("subirAdjuntoNota", () => {
+  function archivo(
+    tipo = "application/pdf",
+    bytes = 10,
+    nombre = "contrato.pdf",
+  ): File {
+    return new File([new Uint8Array(bytes)], nombre, { type: tipo });
+  }
+
+  it("con solo nota:crear no puede adjuntar: hace falta nota:gestionar", async () => {
+    estado.notas = [nota({ id: "n-1" })];
+    const r = await subirAdjuntoNota(
+      sesion(["nota:crear"]),
+      "obra-1",
+      "n-1",
+      archivo(),
+    );
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("No tienes permiso");
+  });
+
+  it("con la obra cerrada se niega, aunque tenga permiso", async () => {
+    estado.notas = [nota({ id: "n-1" })];
+    estado.cerrada = "La obra esta cerrada desde el 01/07/2026.";
+    const r = await subirAdjuntoNota(CON_TODO, "obra-1", "n-1", archivo());
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("cerrada");
+  });
+
+  it("una nota que no existe no admite adjuntos", async () => {
+    const r = await subirAdjuntoNota(
+      CON_TODO,
+      "obra-1",
+      "n-fantasma",
+      archivo(),
+    );
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("Nota no encontrada");
+  });
+
+  it("rechaza un tipo que no es imagen ni PDF", async () => {
+    estado.notas = [nota({ id: "n-1" })];
+    const r = await subirAdjuntoNota(
+      CON_TODO,
+      "obra-1",
+      "n-1",
+      archivo("application/zip"),
+    );
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("PDF");
+  });
+
+  it("rechaza un archivo vacio", async () => {
+    estado.notas = [nota({ id: "n-1" })];
+    const r = await subirAdjuntoNota(
+      CON_TODO,
+      "obra-1",
+      "n-1",
+      archivo("application/pdf", 0),
+    );
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("vacío");
+  });
+
+  it("rechaza un archivo que pasa de 10 MB", async () => {
+    estado.notas = [nota({ id: "n-1" })];
+    const r = await subirAdjuntoNota(
+      CON_TODO,
+      "obra-1",
+      "n-1",
+      archivo("application/pdf", 10 * 1024 * 1024 + 1),
+    );
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("10 MB");
+  });
+});
+
+describe("eliminarAdjuntoNota", () => {
+  it("con solo nota:crear no puede borrar: hace falta nota:gestionar", async () => {
+    const r = await eliminarAdjuntoNota(
+      sesion(["nota:crear"]),
+      "obra-1",
+      "adj-1",
+    );
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("No tienes permiso");
+  });
+
+  it("con la obra cerrada se niega, aunque tenga permiso", async () => {
+    estado.cerrada = "La obra esta cerrada desde el 01/07/2026.";
+    const r = await eliminarAdjuntoNota(CON_TODO, "obra-1", "adj-1");
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("cerrada");
+  });
+
+  it("un adjunto que no existe no se puede borrar", async () => {
+    const r = await eliminarAdjuntoNota(CON_TODO, "obra-1", "adj-fantasma");
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.error).toContain("Adjunto no encontrado");
   });
 });

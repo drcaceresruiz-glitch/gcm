@@ -8,8 +8,11 @@ import {
   crearNota,
   editarNota,
   eliminarNota,
+  subirAdjuntoNota,
+  eliminarAdjuntoNota,
   type DatosNota,
   type ResultadoNota,
+  type ResultadoAdjunto,
 } from "@/services/notas.service";
 import type { CategoriaNota } from "@/generated/prisma/enums";
 
@@ -84,6 +87,36 @@ export async function accionEliminarNota(
   if (!sesion) redirect("/login");
 
   const r = await eliminarNota(sesion, obraId, notaId);
+  if (r.ok) revalidar(obraId);
+  return r;
+}
+
+export async function accionSubirAdjuntoNota(
+  obraId: string,
+  notaId: string,
+  datos: FormData,
+): Promise<ResultadoAdjunto> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const archivo = datos.get("archivo");
+  if (!(archivo instanceof File) || archivo.size === 0) {
+    return { ok: false, error: "No llegó ningún archivo." };
+  }
+
+  const r = await subirAdjuntoNota(sesion, obraId, notaId, archivo);
+  if (r.ok) revalidar(obraId);
+  return r;
+}
+
+export async function accionEliminarAdjuntoNota(
+  obraId: string,
+  adjuntoId: string,
+): Promise<ResultadoAdjunto> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await eliminarAdjuntoNota(sesion, obraId, adjuntoId);
   if (r.ok) revalidar(obraId);
   return r;
 }

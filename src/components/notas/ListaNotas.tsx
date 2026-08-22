@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   LoaderCircle,
+  Paperclip,
   Pencil,
   RotateCcw,
   Trash2,
   TriangleAlert,
+  X,
 } from "lucide-react";
 import { CATEGORIAS_NOTA } from "@/lib/notas";
 import type { NotaResumen, ResultadoNota } from "@/services/notas.service";
@@ -33,6 +35,20 @@ export interface AccionesNotas {
     atendida: boolean,
   ) => Promise<ResultadoNota>;
   eliminar: (obraId: string, notaId: string) => Promise<ResultadoNota>;
+  subirAdjunto: (
+    obraId: string,
+    notaId: string,
+    datos: FormData,
+  ) => Promise<ResultadoNota>;
+  eliminarAdjunto: (obraId: string, adjuntoId: string) => Promise<ResultadoNota>;
+}
+
+/** "12,4 KB" / "1,3 MB": lo que trae un tamaño en bytes, en lo que la
+ * gente lee. Dos decimales de MB serían falsa precisión para un adjunto. */
+function tamanoLegible(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /** "YYYY-MM-DD" leido en UTC, no en hora local: la fecha es un dia de
@@ -329,6 +345,12 @@ function FilaNota({
     else router.refresh();
   }
 
+  function subirAdjunto(archivo: File) {
+    const datos = new FormData();
+    datos.append("archivo", archivo);
+    void correr(() => acciones.subirAdjunto(obraId, nota.id, datos));
+  }
+
   if (editando) {
     return (
       <li>
@@ -398,6 +420,72 @@ function FilaNota({
               ? `Atendida por ${nota.atendidaPor}`
               : `Anotado por ${nota.creadoPor}`}
           </p>
+
+          {/* Adjuntos: el comprobante de pago, el documento legal, la foto
+              del hallazgo. Igual que el resto de la fila, se lee entera aun
+              sin permiso de escritura -solo el boton de borrar y el control
+              de subir dependen de `puedeGestionar`-. */}
+          {(nota.adjuntos.length > 0 || puedeGestionar) && (
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {nota.adjuntos.map((a) => (
+                <li
+                  key={a.id}
+                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  <Paperclip className="size-3 shrink-0 opacity-60" aria-hidden="true" />
+                  <a
+                    href={`/api/notas/${a.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="max-w-40 truncate underline decoration-dotted underline-offset-2"
+                    title={`${a.nombreOriginal} · ${tamanoLegible(a.tamano)}`}
+                  >
+                    {a.nombreOriginal}
+                  </a>
+                  {puedeGestionar && (
+                    <button
+                      type="button"
+                      disabled={ocupada}
+                      onClick={() => {
+                        if (window.confirm(`¿Borrar el adjunto "${a.nombreOriginal}"?`)) {
+                          void correr(() => acciones.eliminarAdjunto(obraId, a.id));
+                        }
+                      }}
+                      aria-label={`Borrar adjunto ${a.nombreOriginal}`}
+                      className="rounded-full opacity-50 hover:opacity-100"
+                      style={{ color: "var(--color-peligro)" }}
+                    >
+                      <X className="size-3" aria-hidden="true" />
+                    </button>
+                  )}
+                </li>
+              ))}
+
+              {puedeGestionar && (
+                <li>
+                  <label
+                    className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-xs opacity-70 hover:opacity-100"
+                    style={{ borderColor: "var(--borde)" }}
+                  >
+                    <Paperclip className="size-3 shrink-0" aria-hidden="true" />
+                    Adjuntar
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      disabled={ocupada}
+                      className="hidden"
+                      onChange={(e) => {
+                        const archivo = e.target.files?.[0];
+                        e.target.value = "";
+                        if (archivo) subirAdjunto(archivo);
+                      }}
+                    />
+                  </label>
+                </li>
+              )}
+            </ul>
+          )}
         </div>
 
         <div className="flex items-center gap-1">

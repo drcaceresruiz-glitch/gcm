@@ -1,8 +1,11 @@
 import "server-only";
 
+import { promises as fs } from "node:fs";
+import { join, resolve } from "node:path";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { esVencida } from "@/lib/notas";
+import { env } from "@/lib/env";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { CategoriaNota } from "@/generated/prisma/enums";
@@ -24,6 +27,15 @@ function quien(sesion: SesionActiva): string {
 // Lectura
 // ---------------------------------------------------------------------------
 
+export interface AdjuntoResumen {
+  id: string;
+  nombreOriginal: string;
+  mimeType: string;
+  tamano: number;
+  subidaPor: string;
+  createdAt: Date;
+}
+
 export interface NotaResumen {
   id: string;
   categoria: CategoriaNota;
@@ -37,6 +49,7 @@ export interface NotaResumen {
   creadoPor: string;
   createdAt: Date;
   updatedAt: Date;
+  adjuntos: AdjuntoResumen[];
 }
 
 /** Todas las notas de la obra, mas nuevas primero. La pantalla las ordena. */
@@ -57,6 +70,7 @@ export async function listarNotas(
   const filas = await prisma.nota.findMany({
     where: { projectId: obraId, companyId: sesion.companyId },
     orderBy: { createdAt: "desc" },
+    include: { adjuntos: { orderBy: { createdAt: "asc" } } },
   });
 
   return filas.map((n) => ({
@@ -72,6 +86,14 @@ export async function listarNotas(
     creadoPor: n.creadoPor,
     createdAt: n.createdAt,
     updatedAt: n.updatedAt,
+    adjuntos: n.adjuntos.map((a) => ({
+      id: a.id,
+      nombreOriginal: a.nombreOriginal,
+      mimeType: a.mimeType,
+      tamano: a.tamano,
+      subidaPor: a.subidaPor,
+      createdAt: a.createdAt,
+    })),
   }));
 }
 
@@ -399,5 +421,208 @@ export async function eliminarNota(
       ok: false,
       error: "No se pudo borrar la nota. Vuelve a intentarlo en unos segundos.",
     };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Adjuntos
+// ---------------------------------------------------------------------------
+
+/**
+ * El archivo fisico vive en STORAGE_ROOT, FUERA del arbol de la app —mismo
+ * motivo que `evidencia.service.ts`: un despliegue extrae un paquete encima
+ * y con un swap atomico, y eso jamas puede llevarse un adjunto por delante—.
+ */
+function raizAlmacen(): string {
+  return resolve(env.STORAGE_ROOT);
+}
+
+/// 10 MB: un adjunto de Nota suele ser un documento (contrato, factura
+/// escaneada), no una foto ya comprimida por el navegador como en
+/// evidencia -de ahi el tope mas alto que sus 5 MB-.
+export const TAMANO_MAXIMO_ADJUNTO = 10 * 1024 * 1024;
+
+const MIMES_PERMITIDOS_NOTA = new Map<string, string>([
+  ["image/jpeg", ".jpg"],
+  ["image/png", ".png"],
+  ["image/webp", ".webp"],
+  ["application/pdf", ".pdf"],
+]);
+
+export type ResultadoAdjunto =
+  | { ok: true; id: string }
+  | { ok: false; error: string };
+
+/**
+ * Sube un adjunto a una nota ya existente. Requiere `nota:gestionar`: es la
+ * misma puerta que editar el texto, no una aparte —adjuntar un archivo es
+ * otra forma de corregir la nota, no un acto distinto.
+ */
+export async function subirAdjuntoNota(
+  sesion: SesionActiva,
+  obraId: string,
+  notaId: string,
+  archivo: File,
+): Promise<ResultadoAdjunto> {
+  if (!puede(sesion, "nota:gestionar")) {
+    return { ok: false, error: "No tienes permiso para adjuntar archivos a una nota." };
+  }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
+  const nota = await prisma.nota.findFirst({
+    where: { id: notaId, projectId: obraId, companyId: sesion.companyId },
+    select: { id: true },
+  });
+  if (!nota) return { ok: false, error: "Nota no encontrada." };
+
+  const extension = MIMES_PERMITIDOS_NOTA.get(archivo.type);
+  if (!extension) {
+    return {
+      ok: false,
+      error: "Solo se aceptan imágenes (JPG, PNG, WebP) o PDF.",
+    };
+  }
+  if (archivo.size === 0) {
+    return { ok: false, error: "El archivo llegó vacío." };
+  }
+  if (archivo.size > TAMANO_MAXIMO_ADJUNTO) {
+    return { ok: false, error: "El archivo supera los 10 MB." };
+  }
+
+  const contenido = Buffer.from(await archivo.arrayBuffer());
+
+  // Primero el registro (para tener el id que nombra al archivo), despues el
+  // archivo, y si el disco falla se borra el registro: mismo orden que
+  // `guardarFoto` en evidencia.service.ts, por el mismo motivo.
+  const adjunto = await prisma.adjuntoNota.create({
+    data: {
+      notaId,
+      projectId: obraId,
+      ruta: "",
+      nombreOriginal: archivo.name.slice(0, 255) || `adjunto${extension}`,
+      mimeType: archivo.type,
+      tamano: archivo.size,
+      subidaPor: quien(sesion),
+    },
+  });
+
+  const rutaRelativa = join("notas", obraId, `${adjunto.id}${extension}`);
+  const rutaAbsoluta = join(raizAlmacen(), rutaRelativa);
+
+  try {
+    await fs.mkdir(join(raizAlmacen(), "notas", obraId), { recursive: true });
+    await fs.writeFile(rutaAbsoluta, contenido);
+    await prisma.adjuntoNota.update({
+      where: { id: adjunto.id },
+      data: { ruta: rutaRelativa.replaceAll("\\", "/") },
+    });
+  } catch (e) {
+    await prisma.adjuntoNota.delete({ where: { id: adjunto.id } });
+    console.error("[notas] No se pudo guardar el adjunto:", e);
+    return {
+      ok: false,
+      error: "No se pudo guardar el archivo en el servidor. Inténtalo de nuevo.",
+    };
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      companyId: sesion.companyId,
+      userId: sesion.userId,
+      projectId: obraId,
+      entidad: "AdjuntoNota",
+      entidadId: adjunto.id.slice(0, 40),
+      accion: "CREATE",
+      despues: {
+        notaId,
+        nombreOriginal: archivo.name,
+        tamano: archivo.size,
+      },
+    },
+  });
+
+  return { ok: true, id: adjunto.id };
+}
+
+/**
+ * Borra un adjunto —registro Y archivo—. Requiere `nota:gestionar`.
+ *
+ * A diferencia de una foto de evidencia, un adjunto de Nota no es prueba de
+ * auditoria inmutable: no hay purga que lo conserve marcado, se va del disco
+ * de verdad. El `AuditLog` es el unico rastro que queda.
+ */
+export async function eliminarAdjuntoNota(
+  sesion: SesionActiva,
+  obraId: string,
+  adjuntoId: string,
+): Promise<ResultadoAdjunto> {
+  if (!puede(sesion, "nota:gestionar")) {
+    return { ok: false, error: "No tienes permiso para borrar adjuntos." };
+  }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
+  const adjunto = await prisma.adjuntoNota.findFirst({
+    where: { id: adjuntoId, projectId: obraId },
+    select: { id: true, notaId: true, ruta: true, nombreOriginal: true },
+  });
+  if (!adjunto) return { ok: false, error: "Adjunto no encontrado." };
+
+  await prisma.adjuntoNota.delete({ where: { id: adjuntoId } });
+
+  if (adjunto.ruta) {
+    try {
+      await fs.unlink(join(raizAlmacen(), adjunto.ruta));
+    } catch (e) {
+      // El registro ya se borro: un archivo huerfano en disco no rompe nada
+      // que la aplicacion vuelva a mirar, y queda en el log para limpiarlo
+      // a mano si hace falta.
+      console.error("[notas] No se pudo borrar el archivo del adjunto:", e);
+    }
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      companyId: sesion.companyId,
+      userId: sesion.userId,
+      projectId: obraId,
+      entidad: "AdjuntoNota",
+      entidadId: adjuntoId.slice(0, 40),
+      accion: "DELETE",
+      antes: { notaId: adjunto.notaId, nombreOriginal: adjunto.nombreOriginal },
+    },
+  });
+
+  return { ok: true, id: adjuntoId };
+}
+
+/**
+ * Lee el archivo de un adjunto, para la ruta que lo sirve.
+ *
+ * Nada de URLs adivinables: pasa por sesion, `nota:leer` y EMPRESA, igual
+ * que `archivoEvidencia`. Sin pase de obra —los adjuntos de Nota no son un
+ * flujo de campo con pase, a diferencia de la evidencia fotografica.
+ */
+export async function archivoAdjuntoNota(
+  sesion: SesionActiva,
+  adjuntoId: string,
+): Promise<{ contenido: Buffer; mimeType: string; nombreOriginal: string } | { error: "no" }> {
+  if (!puede(sesion, "nota:leer")) return { error: "no" };
+
+  const adjunto = await prisma.adjuntoNota.findFirst({
+    where: { id: adjuntoId, project: { companyId: sesion.companyId } },
+    select: { ruta: true, mimeType: true, nombreOriginal: true },
+  });
+  if (!adjunto || !adjunto.ruta) return { error: "no" };
+
+  try {
+    const contenido = await fs.readFile(join(raizAlmacen(), adjunto.ruta));
+    return { contenido, mimeType: adjunto.mimeType, nombreOriginal: adjunto.nombreOriginal };
+  } catch {
+    console.error(`[notas] Archivo ausente para el adjunto ${adjuntoId}`);
+    return { error: "no" };
   }
 }
