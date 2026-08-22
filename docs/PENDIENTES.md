@@ -82,11 +82,163 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      validado antes, asi que no es explotable hoy, pero rompe el estandar
      del resto del archivo).
 
-3. **Auditoria de "todo lo demas"** — pedida, no empezada: dashboards,
-   curvas, calculos, plantillas preconfiguradas, pantallas, menus,
-   configuraciones. La del tablero (punto 2) es el molde: hallazgos
-   concretos con archivo:linea, verificados leyendo el codigo, no una
-   puntuacion generica.
+3. **Auditoria de "todo lo demas" — ENTREGADA el 21 de agosto de 2026.**
+   Cuatro agentes de exploracion en paralelo, mismo metodo que el punto 2:
+   curvas/EVM/calculos, plantillas preconfiguradas, pantallas de ejecucion y
+   compras no cubiertas por la prueba E2E, y configuracion/menus/navegacion.
+   Hallazgos confirmados leyendo el codigo, de mas a menos impacto:
+
+   **Critico/alto:**
+   - **El rol GERENTE no se puede editar en la matriz de permisos.**
+     `empresa/permisos/acciones.ts:33` valida los cambios contra un
+     `z.enum` escrito a mano con los 5 roles de antes de que GERENTE
+     existiera (commit `129411a`). La rejilla SI pinta su columna
+     (`obtenerMatriz` ya usa `ROLES` completo), pero en cuanto se guarda un
+     lote que incluye un cambio de GERENTE, Zod lo rechaza entero con "La
+     matriz llego incompleta" — y como valida el array completo, tira
+     abajo tambien los cambios de otros roles en el mismo lote. El
+     servicio (`permisos.service.ts`) si soporta GERENTE bien; el bug esta
+     aislado en esta validacion de forma, sin test propio.
+   - **La pantalla de la meta promete una hoja "Gastos Generales" que ya no
+     existe.** El 21/08 (commit `34c883c`) se borro esa hoja de
+     `plantilla-meta.ts` y la funcion que la escalaba al plazo de la obra,
+     pero `FormularioMeta.tsx:128-133,150-152` y
+     `obras/[id]/meta/page.tsx:262-267` nunca se actualizaron y le siguen
+     diciendo al usuario que va a descargar "las dos hojas —Costo Directo y
+     Gastos Generales—". La accion de importar de hecho RECHAZA un archivo
+     que traiga esa hoja. Consecuencia encadenada: el aviso "N gasto(s)
+     general(es) duran mas que la obra" y su boton de ajuste
+     (`PanelBolsa.tsx`, `BotonAjustarMeses.tsx`) quedan inalcanzables para
+     cualquier meta creada despues del 21/08 — la tabla que los alimenta
+     nunca vuelve a llenarse.
+   - **Patron sistematico de consultas sin filtro `companyId`**, el mismo
+     descuido que ya causo la fuga real de `tablero.service.ts`, repetido
+     en cuatro servicios distintos (hoy no explotable en ninguno porque la
+     obra ya se valida antes en la misma funcion, pero rompe el estandar
+     que el propio proyecto se exige y documenta en varios comentarios):
+     - `cronograma.service.ts`: `avanceTarea.findMany` sin `companyId` en
+       TRES funciones (`obtenerCronograma` usada por Gantt,
+       `informeAlCorte` e `informeSemanal` usadas por el Informe, y
+       `datosCurvaS`), mientras la consulta hermana de cada una si lo
+       lleva.
+     - `pagos.service.ts`: `panelDeValorizaciones` consulta
+       `encargoProveedor` sin `companyId`, mientras `registrarPago`,
+       `fijarCadencia` y `listarPagos` del mismo archivo si lo llevan.
+     - `revisiones.service.ts`: `crearRevision` — la funcion que CONGELA
+       el presupuesto que despues se aprueba como linea base — consulta
+       `wbsItem` sin `companyId`, 35 lineas debajo de
+       `obtenerCostoDirectoActual`, que si lo lleva sobre el mismo modelo.
+     - `kanban.service.ts`: `compromisosDelTablero` consulta `planSemanal`
+       (columnas Comprometida/Cerrada) sin `companyId`.
+   - **El EVM del tablero sigue sin `bacDeObra()`.** El bug que se dio por
+     arreglado el 10 de agosto (ver arriba, este mismo punto 2) solo se
+     conecto en `evm.service.ts`; `tablero.service.ts:363` sigue usando
+     `presupuesto.total` (sin los ajustes de la linea base aprobada) como
+     BAC. Confirmado: sigue vivo hoy.
+   - **El aviso de "ponderacion por dinero al pasar el 60% de mapeo"
+     desaparece sin que el calculo cambie.** Confirmado por grep
+     exhaustivo: NINGUNA parte del codigo pondera por dinero, solo por
+     duracion (`ponderarPorDuracion` es la unica funcion de ponderacion
+     que se llama en todo el repo). `PanelEvm.tsx:221-232` solo muestra el
+     aviso mientras `coberturaMapeo < 60`; si una obra supera el 60% de
+     mapeo, el aviso se apaga en silencio como si el calculo hubiera
+     pasado a ser mas fino, cuando en realidad sigue exactamente igual.
+
+   **Medio-alto:**
+   - `empresa/permisos/page.tsx:73-81` dice "Cuatro permisos no se tocan";
+     hoy `INNEGOCIABLES` (`rbac.ts`) tiene NUEVE. Las 5 filas nuevas salen
+     bloqueadas en la rejilla sin que el texto explique por que.
+   - "Archivo" (`/empresa/archivo`) y "Llevarse la empresa"
+     (`/empresa/migracion`) solo tienen enlace desde `/panel`; el
+     desplegable "Empresa" de la cabecera —visible en toda la app— no las
+     incluye, pese a que su propio comentario de diseno dice que existe
+     para agrupar justo eso.
+   - `datos-de-ejemplo.ts`: el detector de "esta obra es la plantilla de
+     ejemplo" compara contra `TOTAL_EJEMPLO` (18509.00, de la plantilla
+     CONTRACTUAL huerfana). El unico flujo vivo genera el contractual
+     recargando la META por capitulo, lo que da 18146.90 para los mismos
+     datos de ejemplo — el detector ya no puede dispararse nunca de forma
+     legitima.
+   - `msproject-xml-escribir.ts:191-195` afirma en un comentario que el
+     "% Planeado" se recupera igual que en la plantilla de Excel
+     (reparto lineal por fechas). Falso: el lector de MS Project
+     (`msproject-xml.ts:510-518`) lo deja en 0.00 sin repartir nada. Los
+     dos importadores "espejo" del cronograma producen curvas de avance
+     previsto distintas para el mismo caso ("campo vacio"), sin test que
+     lo cubra.
+   - Kanban: `TableroKanban.tsx` documenta ser "DE LECTURA" a proposito,
+     pero pinta el boton "Empezo en obra" sin comprobar permiso; CONSULTOR
+     (el cliente) lo ve y, si lo pulsa, el servidor lo rechaza en silencio
+     (no es hueco de seguridad, si es promesa de UI rota).
+   - El "SPI" de `PanelEvm.tsx` y el "SPI por duracion" de gerencia son,
+     algebraicamente, el mismo ratio (el BAC se cancela: EV/PV =
+     %real/%planeado, y las dos pantallas ponderan por duracion). Difieren
+     solo en la FUENTE (linea base congelada vs. cronograma vigente) y en
+     si excluyen tareas `sinProgramar`. Gerencia se cuida de rotular
+     "SPI por duracion, nunca SPI a secas"; el EVM del cronograma solo
+     dice "SPI", sin la misma advertencia.
+
+   **Medio:**
+   - "Solicitudes de perfil" solo tiene enlace en la cabecera; el badge de
+     pendientes en el panel lo cuelga de la seccion "Personas", que enlaza
+     a `/empresa/usuarios` — no a `/empresa/solicitudes`, donde de verdad
+     se aprueban.
+   - `/empresa/datos` se enlaza con permisos distintos segun el menu
+     (cabecera exige `empresa:editar`, panel exige `empresa:leer`); el que
+     de verdad gobierna la pantalla es `empresa:leer` (via
+     `obtenerEmpresa`), asi que la cabecera se lo oculta a roles que si
+     pueden verla en modo lectura.
+   - `migas.ts`: 5 rutas reales de `empresa/*` sin entrada (archivo,
+     migracion, contratos/mensajes de proveedor, puesta-en-marcha), mas el
+     mismo hueco confirmado como sistemico en `/gerencia`, `/manual`,
+     `obras/[id]/equipo`, `/notas`, `/valorizaciones`, `/operador/[id]` —
+     y una entrada MUERTA (`/obras/:obra/respaldo`, que ya solo es un
+     endpoint de descarga sin pantalla).
+   - El color del `GaugeIndice.tsx` decide el semaforo con el indice SIN
+     redondear, mientras el texto de al lado (`PanelEvm.tsx`) si usa la
+     version redondeada — la misma contradiccion que `redondeo.ts` y
+     `ESTADO.md` ya documentan como corregida (SPI 0.999 se lee "1.00" en
+     el numero pero pinta ambar en el aro).
+   - Dos definiciones de "comprometido" con el mismo nombre y sin remision
+     cruzada: el AC del EVM cuenta SOLO ordenes `APROBADA`; el
+     "economico" de Fisico vs. Economico suma tambien encargos vigentes
+     aun no formalizados en orden. Ambas pantallas usan la palabra
+     "comprometido" para describirlo al usuario.
+   - Contractual: un comentario en `importacion.service.ts:53-55` afirma
+     que "la pantalla ya exige `partida:importar`"; la pantalla
+     (`contractual/page.tsx`) en realidad exige `meta:leer`. ADMIN_OBRA
+     (tiene `meta:leer`, no `partida:importar`) ve el flujo completo de
+     generar/reemplazar el contractual condenado a fallar en el servidor.
+   - Personal: `nombresDe` en `avisos-auditoria.ts` resuelve nombres de
+     `contactoAviso` SIN ningun filtro de pertenencia (ni `companyId` ni
+     `projectId`), pese a que el comentario de la funcion de al lado cita
+     un incidente real del 19/08 sobre exactamente este tipo de fuga como
+     ya corregido.
+   - Plantilla de proveedores: unica de las cuatro plantillas sin test de
+     ida y vuelta; sin limites de longitud declarados (a diferencia de
+     `MAX_UNIDAD`/`MAX_CODIGO`, anadidos tras el incidente de "Data too
+     long" del 20/08); trunca campos largos en silencio en vez de avisar
+     por fila, al reves que `excel-presupuesto.ts`.
+
+   **Bajo:**
+   - `MatrizPermisos.tsx`: 10 de los 18 dominios de permiso no tienen
+     etiqueta en `ETIQUETA_DOMINIO` y salen en `snake_case` crudo
+     (`plan_semanal`, `lookahead`, `galeria`, etc.).
+   - Umbrales de `capacidad.ts` (1.0 / 1.4) confirmados, de nuevo, como
+     arbitrarios — coincide con lo ya anotado en el punto 3 de la seccion
+     de abajo, sin dato nuevo que lo cierre.
+   - `propuesta/excel/route.ts:316,331` compara importes de dinero con
+     `Number()` en vez de `esCero` (helper que el propio proyecto ya
+     tiene); bajo riesgo porque no decide ninguna cifra mostrada, solo si
+     se imprime una fila.
+   - `plantilla-presupuesto.ts` confirmado huerfano por grep exhaustivo:
+     ningun componente enlaza a `/plantilla-presupuesto` desde el 20/08.
+
+   **Revisado sin hallazgos de peso**: Lookahead, Galeria, Mapeo, Equipo,
+   `empresa/configuracion` (y sus componentes), `empresa/permisos` en su
+   defensa de `INNEGOCIABLES`, `empresa/formas-pago`, `empresa/proveedores`,
+   `empresa/usuarios`. Confirmado tambien en positivo: a diferencia del
+   tablero, el EVM del cronograma (`PanelEvm.tsx`) SI muestra EAC y VAC.
 
 4. **Estado de la obra (Planificacion/Ejecucion/Paralizada/Cerrada)** —
    pedida, no empezada. Verificar que cada estado permite y prohibe lo que
@@ -265,6 +417,28 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
     comportamientos que parecian bug y resultaron ser diseño deliberado
     ya documentado en el codigo. Detalle completo en la memoria
     `e2e-golden-path-verificado` (`docs/memoria/`).
+
+14. **`/operador` no tiene licencia, pago ni soporte — visto en vivo el 21
+    de agosto de 2026.** El usuario, mirando su propia pantalla de
+    superadministrador (`/operador`, la lista de constructoras clientes),
+    noto que no hay forma de saber COMO pago cada empresa, cuanto dura su
+    licencia, ni de comunicarse con ellas (sin ticket de soporte, sin canal
+    bidireccional), ni de dar de alta un acceso en modo demo. Confirmado
+    leyendo el codigo: `Company` (`schema.prisma:116-205`) no tiene ningun
+    campo de plan, vencimiento ni pago — la unica palanca es
+    `activa: Boolean`, y el propio comentario de `operador/page.tsx:18-24`
+    dice que la pantalla es deliberadamente minima ("solo metadatos... da
+    de alta, corrige la identificacion y suspende"). Metido en la cola,
+    sin folletear todavia — el usuario pidio guardarlo, no construirlo
+    ahora. Se le planteo que son dos entregas de tamano muy distinto:
+    - **Registro manual de licencia** (chica): campos en `Company` como
+      fecha de vencimiento, plan/modalidad ("Demo", "Anual") y notas de
+      pago, visibles en `/operador/[id]`. No integra ninguna pasarela de
+      pago, solo deja anotar lo que ya se sabe por fuera.
+    - **Canal de soporte/tickets** (grande): un sistema de mensajeria
+      nuevo entre el operador y cada constructora — modelo, bandeja,
+      notificaciones —, comparable en tamano a lo que ya existe para
+      proveedores (`ContactoAviso`/`MensajeSms`).
 
 **Avisado, no pedido todavia**: pagina de marketing y venta, exponer la app
 web y la autoinstalable (`docs/instalable.md` ya documenta esta ultima),
