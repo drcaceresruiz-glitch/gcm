@@ -3,6 +3,7 @@ import "server-only";
 import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { SIN_PROVEEDOR_ACTIVO } from "@/lib/agente-conversacion";
 import {
   conversar,
   configuracionProveedorActivo,
@@ -325,10 +326,7 @@ async function ejecutarTurno(
   try {
     const config = await configuracionProveedorActivo(sesion.companyId);
     if (!config) {
-      await marcarError(
-        mensajeAsistenteId,
-        "Configura y activa un proveedor de IA en Configuración antes de usar el asistente.",
-      );
+      await marcarError(mensajeAsistenteId, SIN_PROVEEDOR_ACTIVO);
       return;
     }
 

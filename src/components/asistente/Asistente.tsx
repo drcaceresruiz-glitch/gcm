@@ -2,11 +2,13 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+import Link from "next/link";
 import { LoaderCircle, Send, AlertCircle } from "lucide-react";
 import {
   accionEnviarMensajeAsistente,
   accionEstadoDeTurno,
 } from "@/app/(dashboard)/asistente/acciones";
+import { SIN_PROVEEDOR_ACTIVO } from "@/lib/agente-conversacion";
 import type { MensajeAgenteResumen } from "@/services/agente-conversacion.service";
 
 /**
@@ -66,7 +68,17 @@ function Burbuja({ mensaje }: { mensaje: MensajeAgenteResumen }) {
         ) : mensaje.error ? (
           <p className="flex items-start gap-2" style={{ color: "var(--color-peligro)" }}>
             <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <span>{mensaje.error}</span>
+            <span>
+              {mensaje.error}
+              {mensaje.error === SIN_PROVEEDOR_ACTIVO && (
+                <>
+                  {" "}
+                  <Link href="/empresa/configuracion/ia" className="underline">
+                    Ir a Configuración →
+                  </Link>
+                </>
+              )}
+            </span>
           </p>
         ) : (
           <p className="whitespace-pre-wrap">{mensaje.contenido}</p>

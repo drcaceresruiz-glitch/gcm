@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Bot, AlertCircle, CheckCircle2 } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { listarEmisores } from "@/services/emisor-sms.service";
 import { puede } from "@/lib/rbac";
@@ -8,6 +9,7 @@ import { env } from "@/lib/env";
 import { Volver } from "@/components/ui/Volver";
 import { PanelAyuda } from "@/components/ui/PanelAyuda";
 import { IlustracionDocumento } from "@/components/ui/IlustracionDocumento";
+import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
 import { EmisoresSms } from "@/components/empresa/EmisoresSms";
 import { RemitenteCorreo } from "@/components/empresa/RemitenteCorreo";
 import { PlantillasMensaje } from "@/components/empresa/PlantillasMensaje";
@@ -15,6 +17,7 @@ import { VistaPreviaRoles } from "@/components/empresa/VistaPreviaRoles";
 import { listarPlantillas } from "@/services/plantillas-mensaje.service";
 import { leerRemitente } from "@/services/remitente-correo.service";
 import { hayBuzonCompartido } from "@/services/mailer.service";
+import { listarProveedoresIa } from "@/services/agente-ia.service";
 import { hayLlaveDeCifrado } from "@/lib/secreto";
 
 export const metadata: Metadata = { title: "Configuración" };
@@ -36,11 +39,13 @@ export default async function ConfiguracionPage() {
 
   if (!puede(sesion, "configuracion:editar")) redirect("/panel");
 
-  const [emisores, remitente, plantillas] = await Promise.all([
+  const [emisores, remitente, plantillas, proveedoresIa] = await Promise.all([
     listarEmisores(sesion),
     leerRemitente(sesion),
     listarPlantillas(sesion),
+    listarProveedoresIa(sesion),
   ]);
+  const proveedorIaActivo = proveedoresIa.find((p) => p.activo) ?? null;
 
   return (
     <div className="space-y-8">
@@ -109,15 +114,62 @@ export default async function ConfiguracionPage() {
           tocar el primer dia, y la mas facil de dejar tal como esta. */}
       <VistaPreviaRoles activa={sesion.previsualizacionHabilitada} />
 
-      {/* Subpagina propia (lista, puede crecer) y no una tarjeta mas aqui.
-          Todavia no hay agente conversacional que use estas claves -es solo
-          la infraestructura de credenciales, ver el comentario de esa
-          pantalla-, asi que el enlace se queda discreto por ahora. */}
-      <p className="text-xs opacity-60">
-        <Link href="/empresa/configuracion/ia" className="underline">
-          Proveedores de IA
-        </Link>
-      </p>
+      {/* Subpagina propia (lista, puede crecer), pero YA NO discreta: desde
+          que existe el Asistente (Fase 2a) esto deja de ser infraestructura
+          sin consumidor -es lo que decide si el asistente puede responder o
+          no-, asi que se anuncia lo que afecta, igual que cualquier otra
+          tarjeta de esta pagina. */}
+      <Tarjeta>
+        <SeccionTarjeta
+          primera
+          titulo="Proveedores de IA"
+          nota="La clave con la que el Asistente le pregunta a un proveedor de inteligencia artificial. Sin uno activo, el Asistente no puede responder."
+        >
+          <p className="flex items-start gap-2 text-sm opacity-70">
+            <Bot className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            {proveedorIaActivo ? (
+              <span className="text-pretty">
+                <CheckCircle2
+                  className="mr-1 inline size-4 align-text-bottom"
+                  style={{ color: "var(--color-exito)" }}
+                  aria-hidden="true"
+                />
+                Activo: <strong>{proveedorIaActivo.nombre}</strong>
+                {proveedoresIa.length > 1 &&
+                  ` (${proveedoresIa.length} proveedores guardados en total).`}
+              </span>
+            ) : proveedoresIa.length > 0 ? (
+              <span className="text-pretty">
+                <AlertCircle
+                  className="mr-1 inline size-4 align-text-bottom"
+                  style={{ color: "var(--color-alerta)" }}
+                  aria-hidden="true"
+                />
+                {proveedoresIa.length} proveedor(es) guardado(s), pero ninguno
+                activo — el Asistente no puede responder todavía.
+              </span>
+            ) : (
+              <span className="text-pretty">
+                <AlertCircle
+                  className="mr-1 inline size-4 align-text-bottom"
+                  style={{ color: "var(--color-alerta)" }}
+                  aria-hidden="true"
+                />
+                Sin ningún proveedor configurado — el Asistente no puede
+                responder todavía.
+              </span>
+            )}
+          </p>
+
+          <Link
+            href="/empresa/configuracion/ia"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            Configurar proveedores de IA
+          </Link>
+        </SeccionTarjeta>
+      </Tarjeta>
 
       {/* Herramienta de diagnostico, no un ajuste: por eso va aparte, al
           final del todo, y como enlace de texto y no como una tarjeta mas.
