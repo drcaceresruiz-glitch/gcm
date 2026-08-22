@@ -705,27 +705,41 @@ Dos avisos antes de leer nada de mas abajo:
    medicion. `storage/contrastar-umbrales.ts` responde cuando haya suficientes
    semanas cerradas.
 
-4. ~~**GCM no calcula ruta critica ni holgura.**~~ **HECHO (parcial, a
-   proposito) el 21 de agosto de 2026, para el importador de Excel.**
-   `src/lib/ruta-critica.ts` (nuevo): CPM completo —pasada hacia adelante y
-   hacia atras, los cuatro tipos de enlace FC/CC/FF/CF, deteccion de
-   ciclos— mas `avanzarDiasLaborables` en `lib/calendario.ts` (la pieza de
-   fechas que faltaba). Se conecta en `excel-cronograma.ts`: si el archivo
-   trae la columna "Depende de" llena, `esCritico`/`holguraDias` salen
-   calculados de verdad en vez del relleno fijo de siempre; sin
-   dependencias, el comportamiento no cambia. Corre con un calendario
-   sintetico (todos los dias laborables) porque las cifras que devuelve
-   son medidas RELATIVAS —no cambian con el calendario real mientras se
-   use el mismo en toda la cuenta—, lo que evito tener que enhebrar la
-   sesion/obraId por las tres acciones de servidor que llaman al
-   analizador. **Sigue sin calcularse para tareas tecleadas a mano ni para
-   la EDT generada desde presupuesto** —ninguna de las dos tiene red de
-   precedencias que darle al algoritmo, porque no existe editor de
-   dependencias en ninguna pantalla (pieza de UI aparte, grande, no
-   construida aqui a proposito)—. Con esto, la regla de convergencia de
-   los hitos predictivos (`porConvergencia`) ya puede dispararse sola para
-   un Excel con la columna llena, sin haberla tocado: solo necesitaba que
-   `DependenciaTarea` tuviera filas, no `esCritico`.
+4. ~~**GCM no calcula ruta critica ni holgura.**~~ **HECHO el 21 de agosto
+   de 2026, en dos pasadas.** `src/lib/ruta-critica.ts` (nuevo): CPM
+   completo —pasada hacia adelante y hacia atras, los cuatro tipos de
+   enlace FC/CC/FF/CF, deteccion de ciclos— mas `avanzarDiasLaborables` en
+   `lib/calendario.ts` (la pieza de fechas que faltaba).
+
+   **Primera pasada, el importador de Excel**: si el archivo trae la
+   columna "Depende de" llena, `esCritico`/`holguraDias` salen calculados
+   de verdad en vez del relleno fijo de siempre; sin dependencias, el
+   comportamiento no cambia. Corre con un calendario sintetico (todos los
+   dias laborables) porque las cifras que devuelve son medidas RELATIVAS
+   —no cambian con el calendario real mientras se use el mismo en toda la
+   cuenta—, lo que evito tener que enhebrar la sesion/obraId por las tres
+   acciones de servidor que llaman al analizador. Con esto, la regla de
+   convergencia de los hitos predictivos (`porConvergencia`) ya puede
+   dispararse sola para un Excel con la columna llena, sin haberla tocado:
+   solo necesitaba que `DependenciaTarea` tuviera filas, no `esCritico`.
+
+   **Segunda pasada, el editor de dependencias para tareas tecleadas a
+   mano** (`cronograma-manual.service.ts`,
+   `TareasAMano.tsx`): el formulario de "Escribir una tarea a mano" ya deja
+   marcar de que tareas depende (siempre fin-comienzo, sin desfase — la
+   relacion mas comun con diferencia; quien necesite comienzo-comienzo,
+   fin-fin o un desfase sigue teniendo el Excel o MS Project). Cada alta,
+   edicion o borrado recalcula `esCritico`/`holguraDias` de todo el
+   cronograma, esta vez con el calendario y la fecha de inicio REALES de la
+   obra (aqui si hay sesion/obraId a mano). Solo se escriben filas
+   `origen: MANUAL`: una tarea manual puede depender de una importada para
+   situarse contra el plan real, pero lo que trajo un archivo nunca se pisa
+   con un calculo propio. La tabla ya muestra la bandera de "en la ruta
+   critica" y los dias de holgura cuando se conocen (mismo icono que
+   `TablaCronograma.tsx`). **Lo unico que sigue sin ruta critica es la EDT
+   generada desde presupuesto** —no tiene concepto de precedencia en su
+   propia estructura, y anadirselo es un cambio de otra naturaleza, no una
+   pieza que faltara—.
 
 5. ~~**Lo que quedo abierto de la auditoria del 10 de agosto**~~ (seccion 6c)
    **CERRADO el 21 de agosto de 2026**: los puntos 3, 4, 5, 6, 10, 11 y 12
@@ -1230,12 +1244,13 @@ Lo que falta:
 
 ## 3. Cronograma: opcion B (decidida el 10 de agosto) — CASI CERRADA
 
-> **Al 21 de agosto por la tarde, la ruta critica y la holgura se calculan
-> de verdad para los cronogramas importados por Excel** (ver el punto 4 de
-> la seccion de arriba). Sigue sin calcularse para lo tecleado a mano ni
-> para la EDT generada desde presupuesto —ninguna de las dos tiene red de
-> precedencias, que sigue siendo lo unico realmente pendiente de esta
-> lista—. Todo lo demas se hizo entre el 15 y el 20 de agosto, y ademas por
+> **Al 21 de agosto por la noche, la ruta critica y la holgura se calculan
+> de verdad para los cronogramas importados por Excel y para las tareas
+> tecleadas a mano** (ver el punto 4 de la seccion de arriba, con el
+> editor de dependencias). Sigue sin calcularse solo para la EDT generada
+> desde presupuesto, que es de otra naturaleza: no tiene concepto de
+> precedencia en su propia estructura. Todo lo demas se hizo entre el 15 y
+> el 20 de agosto, y ademas por
 > una via que este apartado no preveia: **la EDT se genera desde el
 > presupuesto** y se sincroniza sola detras de las cinco operaciones que lo
 > cambian. Hay tres puertas de entrada (MS Project/ProjectLibre, Excel y
@@ -1250,22 +1265,25 @@ que hoy lee del archivo:
 - ~~`porcentajePlaneado` por tarea a una fecha dada.~~ HECHO:
   `planeadoEnFecha`, y lo usan la curva, el panel y el informe, para que no
   puedan discrepar.
-- ~~Camino critico (`esCritico`) y holgura.~~ **HECHO (parcial) el 21 de
-  agosto de 2026, para Excel** — ver el punto 4 de la seccion de arriba
-  para el detalle. Las tareas tecleadas a mano siguen naciendo
-  `esCritico: false`/`holguraInferida: true`: no tienen red de
-  precedencias, y **eso** —el editor de dependencias, ver el punto de
-  abajo— es lo unico que sigue realmente abierto de esta lista.
+- ~~Camino critico (`esCritico`) y holgura.~~ **HECHO el 21 de agosto de
+  2026, para Excel y para lo tecleado a mano** — ver el punto 4 de la
+  seccion de arriba para el detalle completo (algoritmo, editor de
+  dependencias). Sigue sin calcularse solo para la EDT generada desde
+  presupuesto, que no tiene concepto de precedencia — no es una pieza que
+  faltara, es una entrega de otra naturaleza.
 - ~~Motor de fechas que respete el calendario laboral de la obra.~~ HECHO: la
   duracion se calcula desde las fechas en dias de TRABAJO con el calendario de
   la obra, y la cifra la calcula el SERVIDOR para no depender del reloj del
   navegador.
-- ~~Editor manual con dependencias y recalculo automatico.~~ HECHO a medias y
-  a proposito: `cronograma-manual.service` deja crear, editar y borrar tareas
-  con niveles y con recalculo de resumenes, con uid del contador monotono de
-  la obra. **No hay editor de dependencias** —sin el no hay red de
-  precedencias, que es lo que bloquea el punto anterior— y sigue sin haber
-  arrastrar y soltar, que era lo ultimo de la lista.
+- ~~Editor manual con dependencias y recalculo automatico.~~ **HECHO el 21
+  de agosto de 2026.** `cronograma-manual.service` deja crear, editar y
+  borrar tareas con niveles y con recalculo de resumenes, con uid del
+  contador monotono de la obra — y desde esa misma tarde, tambien deja
+  marcar de que otras tareas depende cada una (siempre fin-comienzo), con
+  recalculo automatico de ruta critica/holgura en cada cambio (ver el
+  punto 4 de arriba). Sigue sin haber arrastrar y soltar, que era lo
+  ultimo de esta lista y es una mejora de comodidad, no una pieza que
+  faltara para poder calcular nada.
 
 ## 4. Evidencia fotografica con QR (plan aprobado el 10 de agosto)
 
