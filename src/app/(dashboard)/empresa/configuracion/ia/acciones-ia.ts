@@ -4,11 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { obtenerSesion } from "@/services/sesion.service";
+import { puede } from "@/lib/rbac";
 import {
   guardarProveedorIa,
   eliminarProveedorIa,
   activarProveedorIa,
   probarProveedorIa,
+  listarModelosProveedor,
+  type RespuestaModelosIa,
 } from "@/services/agente-ia.service";
 
 /**
@@ -80,6 +83,41 @@ export async function accionActivarProveedorIa(
 
   revalidatePath(RUTA);
   return { ok: "Listo. El agente de IA usará este proveedor." };
+}
+
+/**
+ * Le pregunta al proveedor que modelos tiene, con los datos que el
+ * formulario tiene EN ESE MOMENTO -tipo, URL, clave-, todavia sin guardar.
+ *
+ * No es un `useActionState`: se llama a mano desde un boton "Detectar
+ * modelos", igual que `accionEstadoDeTurno` en el asistente. No toca
+ * Prisma —nunca crea ni guarda nada—, solo reenvia la consulta al
+ * proveedor real; el permiso se comprueba aqui de todos modos para que
+ * esto no se convierta en un proxy abierto para probar claves ajenas.
+ */
+export async function accionDetectarModelos(datos: {
+  tipo: string;
+  urlBase: string;
+  apiKey: string;
+}): Promise<RespuestaModelosIa> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+  if (!puede(sesion, "configuracion:editar")) {
+    return { ok: false, error: "No tienes permiso para configurar los proveedores de IA." };
+  }
+
+  const urlBaseTexto = datos.urlBase.trim();
+  if (urlBaseTexto && !/^https:\/\//i.test(urlBaseTexto)) {
+    return { ok: false, error: 'La URL base tiene que empezar con "https://".' };
+  }
+  if (!datos.apiKey) {
+    return { ok: false, error: "Escribe la clave de API primero." };
+  }
+
+  return listarModelosProveedor(datos.tipo, {
+    apiKey: datos.apiKey,
+    urlBase: urlBaseTexto.length > 0 ? urlBaseTexto.replace(/\/+$/, "") : null,
+  });
 }
 
 export async function accionEliminarProveedorIa(

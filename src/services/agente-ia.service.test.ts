@@ -119,8 +119,14 @@ vi.mock("@/lib/secreto", () => ({
     guardado.startsWith("cif:") ? guardado.slice(4) : null,
 }));
 
-const { listarProveedoresIa, guardarProveedorIa, eliminarProveedorIa, activarProveedorIa, probarProveedorIa } =
-  await import("@/services/agente-ia.service");
+const {
+  listarProveedoresIa,
+  guardarProveedorIa,
+  eliminarProveedorIa,
+  activarProveedorIa,
+  probarProveedorIa,
+  listarModelosProveedor,
+} = await import("@/services/agente-ia.service");
 
 function sesion(permisos: string[]): SesionActiva {
   return {
@@ -346,6 +352,96 @@ describe("probar", () => {
 
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain("URL base");
+    expect(fetchEspiado).not.toHaveBeenCalled();
+  });
+});
+
+describe("listarModelosProveedor", () => {
+  it("claude: pide /v1/models con x-api-key y devuelve los ids", async () => {
+    const fetchEspiado = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [{ id: "claude-sonnet-5" }, { id: "claude-haiku-4-5" }] }),
+    });
+    vi.stubGlobal("fetch", fetchEspiado);
+
+    const r = await listarModelosProveedor("claude", { apiKey: "sk-abc123", urlBase: null });
+
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.modelos).toEqual(["claude-sonnet-5", "claude-haiku-4-5"]);
+    const [url, opciones] = fetchEspiado.mock.calls[0]!;
+    expect(url).toBe("https://api.anthropic.com/v1/models");
+    expect(opciones.headers["x-api-key"]).toBe("sk-abc123");
+  });
+
+  it("openai_compatible: pide {urlBase}/models con Bearer y ordena los ids", async () => {
+    const fetchEspiado = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: [{ id: "z-modelo" }, { id: "a-modelo" }] }),
+    });
+    vi.stubGlobal("fetch", fetchEspiado);
+
+    const r = await listarModelosProveedor("openai_compatible", {
+      apiKey: "sk-abc123",
+      urlBase: "https://api.groq.com/openai/v1",
+    });
+
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.modelos).toEqual(["a-modelo", "z-modelo"]);
+    const [url, opciones] = fetchEspiado.mock.calls[0]!;
+    expect(url).toBe("https://api.groq.com/openai/v1/models");
+    expect(opciones.headers.authorization).toBe("Bearer sk-abc123");
+  });
+
+  it("openai_compatible sin URL base lo dice, sin llamar a la red", async () => {
+    const fetchEspiado = vi.fn();
+    vi.stubGlobal("fetch", fetchEspiado);
+
+    const r = await listarModelosProveedor("openai_compatible", { apiKey: "sk-abc123", urlBase: null });
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("URL base");
+    expect(fetchEspiado).not.toHaveBeenCalled();
+  });
+
+  it("en fallo del proveedor, nunca deja la clave en el mensaje", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve("clave sk-abc123 invalida"),
+      }),
+    );
+
+    const r = await listarModelosProveedor("claude", { apiKey: "sk-abc123", urlBase: null });
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).not.toContain("sk-abc123");
+      expect(r.error).toContain("***");
+    }
+  });
+
+  it("lista vacia se trata como fallo, no como exito sin modelos", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ data: [] }) }),
+    );
+
+    const r = await listarModelosProveedor("claude", { apiKey: "sk-abc123", urlBase: null });
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("sin ningún modelo");
+  });
+
+  it("un tipo sin adaptador lo dice, sin llamar a la red", async () => {
+    const fetchEspiado = vi.fn();
+    vi.stubGlobal("fetch", fetchEspiado);
+
+    const r = await listarModelosProveedor("algo_inventado", { apiKey: "sk-abc123", urlBase: null });
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("no permite detectar");
     expect(fetchEspiado).not.toHaveBeenCalled();
   });
 });

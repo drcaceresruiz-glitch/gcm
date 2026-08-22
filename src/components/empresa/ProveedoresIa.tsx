@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   AlertCircle,
   CheckCircle2,
   LoaderCircle,
   Bot,
+  Search,
   Send,
   Star,
   Trash2,
@@ -14,12 +15,13 @@ import {
 
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
 import { haceCuanto } from "@/utils/fechas";
-import { TIPOS_PROVEEDOR_IA_CONOCIDOS } from "@/lib/proveedor-ia";
+import { SERVICIOS_IA_CONOCIDOS } from "@/lib/proveedor-ia";
 import {
   accionGuardarProveedorIa,
   accionProbarProveedorIa,
   accionActivarProveedorIa,
   accionEliminarProveedorIa,
+  accionDetectarModelos,
   type EstadoProveedorIa,
 } from "@/app/(dashboard)/empresa/configuracion/ia/acciones-ia";
 import type { ProveedorIaResumen } from "@/services/agente-ia.service";
@@ -213,30 +215,176 @@ function Fila({
   );
 }
 
-function FormularioNuevo({ hayLlave }: { hayLlave: boolean }) {
-  const [guardado, guardar] = useActionState(accionGuardarProveedorIa, {});
-  const [tipo, setTipo] = useState<string>(TIPOS_PROVEEDOR_IA_CONOCIDOS[0].valor);
-  const pideUrlBase = TIPOS_PROVEEDOR_IA_CONOCIDOS.find((t) => t.valor === tipo)
-    ?.pideUrlBase ?? false;
+function BotonDetectar({
+  detectando,
+  onClick,
+}: {
+  detectando: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={detectando}
+      className="mt-2 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium disabled:opacity-60"
+      style={{ borderColor: "var(--borde)" }}
+    >
+      {detectando ? (
+        <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+      ) : (
+        <Search className="size-3.5" aria-hidden />
+      )}
+      {detectando ? "Detectando…" : "Detectar modelos"}
+    </button>
+  );
+}
+
+/**
+ * El bloque del modelo: por defecto se detecta EN VIVO contra el
+ * proveedor -nunca un catalogo fijo dentro de GCM, que se desactualizaria
+ * el dia que saquen un modelo nuevo-, con un campo de texto libre como
+ * salida de emergencia para lo que la deteccion no cubra (un proveedor sin
+ * `/models`, un modelo tan nuevo que el proveedor mismo no lo lista
+ * todavia, o un endpoint propio).
+ */
+function CampoModelo({
+  tipo,
+  urlBase,
+  leerApiKey,
+}: {
+  tipo: string;
+  urlBase: string;
+  leerApiKey: () => string;
+}) {
+  const [modelos, setModelos] = useState<string[] | null>(null);
+  const [modeloElegido, setModeloElegido] = useState("");
+  const [modoManual, setModoManual] = useState(false);
+  const [detectando, setDetectando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function detectar() {
+    const apiKey = leerApiKey();
+    if (!apiKey) {
+      setError("Escribe la clave de API primero.");
+      return;
+    }
+    setDetectando(true);
+    setError(null);
+    const r = await accionDetectarModelos({ tipo, urlBase, apiKey });
+    setDetectando(false);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    setModelos(r.modelos);
+    setModeloElegido(r.modelos[0] ?? "");
+    setModoManual(false);
+  }
+
+  const mostrarSelect = modelos !== null && modelos.length > 0 && !modoManual;
 
   return (
-    <form action={guardar} className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-sm">
-          <span className="font-medium">Tipo de proveedor</span>
+    <label className="text-sm sm:col-span-2">
+      <span className="font-medium">Modelo</span>
+      {mostrarSelect ? (
+        <>
           <select
-            name="tipo"
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value)}
+            name="modelo"
+            value={modeloElegido}
+            onChange={(e) => setModeloElegido(e.target.value)}
             className="mt-1 w-full rounded-lg border px-3 py-2"
             style={{ borderColor: "var(--borde)" }}
           >
-            {TIPOS_PROVEEDOR_IA_CONOCIDOS.map((t) => (
-              <option key={t.valor} value={t.valor}>
-                {t.etiqueta}
+            {modelos!.map((m) => (
+              <option key={m} value={m}>
+                {m}
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() => setModoManual(true)}
+            className="mt-1 text-xs underline opacity-70"
+          >
+            Escribirlo a mano
+          </button>
+        </>
+      ) : (
+        <>
+          <input
+            name="modelo"
+            value={modeloElegido}
+            onChange={(e) => setModeloElegido(e.target.value)}
+            placeholder="claude-sonnet-5"
+            className="mt-1 w-full rounded-lg border px-3 py-2"
+            style={{ borderColor: "var(--borde)" }}
+          />
+          {modelos && modelos.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setModoManual(false)}
+              className="mt-2 text-xs underline opacity-70"
+            >
+              Usar la lista detectada ({modelos.length})
+            </button>
+          ) : (
+            <BotonDetectar detectando={detectando} onClick={detectar} />
+          )}
+        </>
+      )}
+      {error && (
+        <span className="mt-1 block text-xs" style={{ color: "var(--color-peligro)" }}>
+          {error}
+        </span>
+      )}
+    </label>
+  );
+}
+
+function FormularioNuevo({ hayLlave }: { hayLlave: boolean }) {
+  const [guardado, guardar] = useActionState(accionGuardarProveedorIa, {});
+  const formRef = useRef<HTMLFormElement>(null);
+  const [servicio, setServicio] = useState<string>(SERVICIOS_IA_CONOCIDOS[0].valor);
+  const [urlBase, setUrlBase] = useState<string>(SERVICIOS_IA_CONOCIDOS[0].urlBase ?? "");
+
+  const definicion =
+    SERVICIOS_IA_CONOCIDOS.find((s) => s.valor === servicio) ?? SERVICIOS_IA_CONOCIDOS[0];
+  const tipo = definicion.tipo;
+  const pideUrlBase = tipo === "openai_compatible";
+
+  function alCambiarServicio(valor: string) {
+    setServicio(valor);
+    const def = SERVICIOS_IA_CONOCIDOS.find((s) => s.valor === valor) ?? SERVICIOS_IA_CONOCIDOS[0];
+    setUrlBase(def.urlBase ?? "");
+  }
+
+  function leerApiKey(): string {
+    const campo = formRef.current?.elements.namedItem("apiKey");
+    return campo instanceof HTMLInputElement ? campo.value : "";
+  }
+
+  return (
+    <form ref={formRef} action={guardar} className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm">
+          <span className="font-medium">Servicio</span>
+          <select
+            value={servicio}
+            onChange={(e) => alCambiarServicio(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            {SERVICIOS_IA_CONOCIDOS.map((s) => (
+              <option key={s.valor} value={s.valor}>
+                {s.etiqueta}
+              </option>
+            ))}
+          </select>
+          {/* El protocolo real -lo unico que el servidor conoce- viaja
+              oculto: "gemini"/"groq"/"openrouter" son marcas de esta
+              pantalla, no valores que `guardarProveedorIa` entienda. */}
+          <input type="hidden" name="tipo" value={tipo} />
         </label>
 
         <label className="text-sm">
@@ -257,25 +405,20 @@ function FormularioNuevo({ hayLlave }: { hayLlave: boolean }) {
             <span className="font-medium">URL base</span>
             <input
               name="urlBase"
+              value={urlBase}
+              onChange={(e) => setUrlBase(e.target.value)}
               placeholder="https://api.tuproveedor.com/v1"
               className="mt-1 w-full rounded-lg border px-3 py-2"
               style={{ borderColor: "var(--borde)" }}
             />
             <span className="mt-1 block text-xs opacity-70">
-              Hasta antes de /chat/completions, sin barra al final.
+              Hasta antes de /chat/completions, sin barra al final. Precargada de fábrica;
+              cámbiala si este servicio usa otra.
             </span>
           </label>
         )}
 
-        <label className="text-sm">
-          <span className="font-medium">Modelo</span>
-          <input
-            name="modelo"
-            placeholder="claude-sonnet-5"
-            className="mt-1 w-full rounded-lg border px-3 py-2"
-            style={{ borderColor: "var(--borde)" }}
-          />
-        </label>
+        <CampoModelo tipo={tipo} urlBase={urlBase} leerApiKey={leerApiKey} />
 
         <label className="text-sm">
           <span className="font-medium">Clave de API</span>

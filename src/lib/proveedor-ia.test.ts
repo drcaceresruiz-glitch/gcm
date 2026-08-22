@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { validarProveedorIa, type DatosProveedorIa } from "./proveedor-ia";
+import {
+  validarProveedorIa,
+  SERVICIOS_IA_CONOCIDOS,
+  TIPOS_PROVEEDOR_IA_CONOCIDOS,
+  type DatosProveedorIa,
+} from "./proveedor-ia";
 
 const BUENO: DatosProveedorIa = {
   tipo: "claude",
@@ -65,5 +70,29 @@ describe("un proveedor de IA de la empresa", () => {
   it("rechaza un tipo vacio", () => {
     const r = validarProveedorIa({ ...BUENO, tipo: "" }, true);
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("el catalogo de servicios conocidos", () => {
+  it("cada servicio apunta a un tipo que la pantalla sabe pintar", () => {
+    const tiposValidos = new Set(TIPOS_PROVEEDOR_IA_CONOCIDOS.map((t) => t.valor));
+    for (const s of SERVICIOS_IA_CONOCIDOS) {
+      expect(tiposValidos.has(s.tipo)).toBe(true);
+    }
+  });
+
+  it("cada valor de servicio es unico — el <select> del formulario no puede repetirlos", () => {
+    const valores = SERVICIOS_IA_CONOCIDOS.map((s) => s.valor);
+    expect(new Set(valores).size).toBe(valores.length);
+  });
+
+  it("un servicio openai_compatible con urlBase de fabrica, la deja pasar la validacion tal cual", () => {
+    const gemini = SERVICIOS_IA_CONOCIDOS.find((s) => s.valor === "gemini")!;
+    const r = validarProveedorIa(
+      { ...BUENO, tipo: gemini.tipo, urlBase: gemini.urlBase ?? "" },
+      true,
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.datos.urlBase).toBe(gemini.urlBase);
   });
 });

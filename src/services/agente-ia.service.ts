@@ -69,6 +69,17 @@ export type RespuestaTurno =
       bruto: unknown;
     };
 
+/// Lo que hace falta para preguntarle a un proveedor que modelos tiene —
+/// nunca un `modelo`, porque es justo lo que todavia no se sabe.
+export interface ConfigListadoIa {
+  apiKey: string;
+  urlBase: string | null;
+}
+
+export type RespuestaModelosIa =
+  | { ok: true; modelos: string[] }
+  | { ok: false; error: string };
+
 interface AdaptadorProveedorIa {
   /// Un mensaje minimo real, para confirmar que la clave y el modelo
   /// funcionan — mismo criterio que `probarRemitente`, que manda un correo
@@ -81,6 +92,13 @@ interface AdaptadorProveedorIa {
     config: ConfigLlamadaIa,
     turno: TurnoIa,
   ): Promise<RespuestaTurno | { ok: false; error: string }>;
+  /// Ausente = este proveedor no permite listar sus modelos -la pantalla
+  /// cae al campo de texto libre-. La lista es SIEMPRE en vivo, nunca un
+  /// catalogo guardado en GCM: un catalogo fijo se desactualiza el dia que
+  /// el proveedor saca un modelo nuevo o retira uno viejo, y eso es
+  /// justamente el tipo de dato que este proyecto no quiere mostrar como
+  /// si fuera cierto sin serlo.
+  listarModelos?(config: ConfigListadoIa): Promise<RespuestaModelosIa>;
 }
 
 /// Tope de espera de la llamada de prueba. Es UN mensaje corto, acotado.
@@ -196,6 +214,75 @@ async function conversarClaude(
   }
 }
 
+/// Forma comun a la respuesta de "listar modelos" de Anthropic y de
+/// cualquier proveedor compatible con OpenAI: una lista de objetos con un
+/// `id` de texto. Ambos adaptadores la leen igual.
+interface ListaModelosCruda {
+  data?: { id?: string }[];
+}
+
+async function listarModelosClaude(config: ConfigListadoIa): Promise<RespuestaModelosIa> {
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/models", {
+      headers: { "x-api-key": config.apiKey, "anthropic-version": "2023-06-01" },
+      signal: AbortSignal.timeout(TOPE_PRUEBA_MS),
+    });
+
+    if (!r.ok) {
+      const cuerpo = await r.text();
+      return { ok: false, error: mensajeSaneado(`(${r.status}) ${cuerpo}`, config.apiKey) };
+    }
+
+    const datos = (await r.json()) as ListaModelosCruda;
+    const modelos = (datos.data ?? [])
+      .map((m) => m.id)
+      .filter((id): id is string => Boolean(id));
+    if (modelos.length === 0) {
+      return { ok: false, error: "El proveedor respondió, pero sin ningún modelo en la lista." };
+    }
+    return { ok: true, modelos };
+  } catch (error) {
+    const texto = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
+  }
+}
+
+async function listarModelosOpenAiCompatible(
+  config: ConfigListadoIa,
+): Promise<RespuestaModelosIa> {
+  if (!config.urlBase) {
+    return {
+      ok: false,
+      error: "Este proveedor necesita una URL base y no tiene ninguna guardada.",
+    };
+  }
+
+  try {
+    const r = await fetch(`${config.urlBase}/models`, {
+      headers: { authorization: `Bearer ${config.apiKey}` },
+      signal: AbortSignal.timeout(TOPE_PRUEBA_MS),
+    });
+
+    if (!r.ok) {
+      const cuerpo = await r.text();
+      return { ok: false, error: mensajeSaneado(`(${r.status}) ${cuerpo}`, config.apiKey) };
+    }
+
+    const datos = (await r.json()) as ListaModelosCruda;
+    const modelos = (datos.data ?? [])
+      .map((m) => m.id)
+      .filter((id): id is string => Boolean(id))
+      .sort();
+    if (modelos.length === 0) {
+      return { ok: false, error: "El proveedor respondió, pero sin ningún modelo en la lista." };
+    }
+    return { ok: true, modelos };
+  } catch (error) {
+    const texto = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
+  }
+}
+
 async function probarOpenAiCompatible(
   config: ConfigLlamadaIa,
 ): Promise<RespuestaProveedorIa> {
@@ -240,13 +327,37 @@ async function probarOpenAiCompatible(
  * fallar en silencio.
  */
 const ADAPTADORES: Record<string, AdaptadorProveedorIa> = {
-  claude: { probar: probarClaude, conversar: conversarClaude },
+  claude: {
+    probar: probarClaude,
+    conversar: conversarClaude,
+    listarModelos: listarModelosClaude,
+  },
   // Sin `conversar`, a proposito: el formato de function-calling de
   // OpenAI-compatible es distinto al de tool-use de Claude, y copiarlo
   // apurado seria fallar oscuro en el primer uso real. Su propio trabajo,
   // no algo que colar aqui.
-  openai_compatible: { probar: probarOpenAiCompatible },
+  openai_compatible: { probar: probarOpenAiCompatible, listarModelos: listarModelosOpenAiCompatible },
 };
+
+/**
+ * Le pregunta al proveedor -en vivo, nunca de un catalogo guardado- que
+ * modelos tiene disponibles. Envuelve el registro de `ADAPTADORES` para
+ * que la Server Action que la llama no tenga que conocerlo, mismo criterio
+ * que `conversar()`.
+ */
+export async function listarModelosProveedor(
+  tipo: string,
+  config: ConfigListadoIa,
+): Promise<RespuestaModelosIa> {
+  const adaptador = ADAPTADORES[tipo];
+  if (!adaptador?.listarModelos) {
+    return {
+      ok: false,
+      error: `Este proveedor ("${tipo}") no permite detectar sus modelos automáticamente — escribe el nombre a mano.`,
+    };
+  }
+  return adaptador.listarModelos(config);
+}
 
 /**
  * Llama al proveedor ACTIVO de una empresa para una vuelta de
