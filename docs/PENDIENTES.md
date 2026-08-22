@@ -44,8 +44,9 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
    un menu desplegable hay que probarla con un clic de verdad, no solo con
    las pruebas automatizadas —esas prueban la logica, no la interaccion—.
 
-   Queda fuera a proposito, para otra entrega: rehacer `/gerencia` a fondo
-   (sigue con el mismo contenido delgado, ver el punto 7 de aqui abajo).
+   `/gerencia` tuvo su primera entrega de rediseno el 22 de agosto de 2026
+   (tres secciones nuevas, ver el punto 7 de aqui abajo); un rediseno mas a
+   fondo (graficos, filtros, EVM consolidado) sigue sin empezar.
 
 2. **Auditoria del tablero de la obra — ENTREGADA.** Agente de exploracion
    completo sobre `tablero.service.ts`, `pendientes.ts`, `modulos.tsx` y los
@@ -461,11 +462,36 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      Saldo van dentro de su propia caja con el titulo "La obra en
      ejecución", que no necesita nombrar la obra porque solo se muestra
      cuando hay exactamente una. Verificado en vivo en los dos casos.
-   - `/gerencia` (`src/app/(dashboard)/gerencia/page.tsx`) solo trae dos
+   - ~~`/gerencia` (`src/app/(dashboard)/gerencia/page.tsx`) solo trae dos
      bloques (semaforo de partidas criticas por SPI, adicionales sin
      aprobar). El usuario lo considera insuficiente para lo que un gerente
-     de una constructora esperaria. Ligado al punto 1: si "Gerencia" pasa a
-     ser un rol propio, esta pantalla probablemente se rehace de fondo.
+     de una constructora esperaria.~~ **REDISENADA (primera entrega) el 22
+     de agosto de 2026.** Investigado que consolidados de cartera NO existen
+     hoy en ningun sitio de la app (ni de obra individual), clasificados por
+     costo real de consulta, y elegidas por el usuario tres secciones
+     nuevas, las tres BARATAS de pagar (sin cargar cronogramas de mas):
+     **sobregiro proyectado** (compara %comprometido vs %avance fisico por
+     obra — la unica de las tres que no existia ni a nivel de obra, avisa
+     ANTES de que el sobregiro sea real), **compras/encargos sin aprobar**
+     (calco de la tarjeta de Adicionales, sobre `OrdenCompra` en borrador),
+     y **restricciones de Lookahead vencidas o por vencer** (agregado de
+     cartera, sin tocar el cronograma). Quedaron fuera a proposito: EVM
+     consolidado (incluso su version mas barata sigue siendo cara y
+     arrastra el mismo riesgo de rotulo confuso que ya costo el "SPI por
+     duracion"), valorizaciones consolidadas (se solapan con lo que ya se
+     ve en `/panel` obra por obra), y PPC consolidado (bajo valor
+     incremental hoy). Detalle tecnico: `semaforoDeCartera` y
+     `sobregiroProyectadoDeCartera` comparten el mismo lote de cronograma
+     vigente via un helper `loteConAvanceMedido` envuelto en `cache()` de
+     React —mismo patron que `datosAlertasEmpresa` en `obras.service.ts`—,
+     asi que pedir las cinco secciones juntas no duplica la consulta mas
+     cara de la pantalla. 2500 pruebas en verde (7 nuevas, en
+     `gerencia.service.test.ts`, archivo que antes no existia), typecheck,
+     lint, build y `scripts/humo.ts` en verde (`/gerencia` sin romperse,
+     488 ms contra 415 ms antes de anadir las tres secciones — sin salto
+     brusco). Rediseno de `/gerencia` a fondo con GRAFICOS/filtros/pestanas
+     sigue sin empezar, a proposito: el plan completo (con lo descartado y
+     por que) esta en `C:\Users\USER\.claude\plans\declarative-spinning-clock.md`.
 
 8. ~~**Bug en produccion visto en vivo: `/obras/.../meta` se rompia al
    cargar**~~ **CERRADO el 21 de agosto de 2026.** El usuario mando una

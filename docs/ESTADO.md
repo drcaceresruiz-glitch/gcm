@@ -48,9 +48,7 @@ que una en ejecucion; solo lo decia el chip. Ahora:
   avisos y alertas de atraso — exactamente el comportamiento que ya tenian.
   El default restrictivo nuevo de `obraAdmiteCambios` los habria excluido
   sin querer; los dos llaman ahora con `{ permiteEnParalizada: true }`
-  explicitamente para que nada cambiara ahi. Unificar esas dos nociones de
-  "obra viva" (la otra sigue sin coincidir con `obras.service.ts`) sigue
-  siendo un pendiente aparte.
+  explicitamente para que nada cambiara ahi.
 - `fijarFlujos`/`marcarSinRestricciones` (comparten codigo en
   `lookahead.service.ts`) se dejaron BLOQUEADOS a proposito: pueden crear
   restricciones nuevas, no solo cerrarlas, y separar los dos casos dentro de
@@ -61,8 +59,39 @@ que una en ejecucion; solo lo decia el chip. Ahora:
   interactivo del formulario nuevo — pendiente si el usuario quiere
   confirmarlo el mismo en pantalla.
 
-Detalle completo, con cada archivo y cada linea de guarda tocada, en el punto
-4 de [`PENDIENTES.md`](PENDIENTES.md).
+**Unificar "obra viva" entre paneles**, la MISMA tarde. El parrafo de
+arriba dejaba anotado que `obras.service.ts` (cifras de dinero del panel)
+seguia sin coincidir con `gerencia.service.ts`/`avisos-reloj.ts` sobre que
+es una obra "viva". Se cerro aparte: `ESTADOS_OBRA_CON_EXPOSICION`
+(`lib/obras.ts`) unifica el criterio en las tres cifras de dinero del
+panel, el conteo de plazo vencido, y el aviso por tarjeta —los tres
+seguian mirando solo `EN_EJECUCION` y dejaban de contar una obra paralizada
+con deuda real pendiente—.
+
+**Rediseno de `/gerencia`, primera entrega.** La pantalla llevaba desde
+que se creo con solo dos bloques (semaforo de partidas criticas,
+adicionales sin aprobar) — "insuficiente para lo que un gerente de una
+constructora esperaria", segun el propio usuario. Investigado que
+consolidados de cartera no existen hoy en NINGUN sitio de la app (ni de
+obra individual), clasificados por costo real de consulta (la regla de
+coste de `gerencia.service.ts` es innegociable: cargar un cronograma
+completo en esta pantalla ya tumbo produccion dos veces), y elegidas tres
+secciones nuevas, las tres baratas de pagar: **sobregiro proyectado**
+(compara %comprometido contra %avance fisico por obra — avisa ANTES de que
+el sobregiro sea real, la unica de las tres que no existia ni a nivel de
+obra individual), **compras/encargos sin aprobar**, y **restricciones de
+Lookahead vencidas o por vencer**. Detalle tecnico que vale la pena
+recordar: `semaforoDeCartera` y la nueva `sobregiroProyectadoDeCartera`
+comparten el mismo lote de cronograma vigente via un helper
+`loteConAvanceMedido` envuelto en `cache()` de React —mismo patron que
+`datosAlertasEmpresa` en `obras.service.ts`—, para que pedir las cinco
+secciones juntas no duplique la consulta mas cara de la pantalla. EVM
+consolidado, valorizaciones consolidadas y PPC consolidado quedaron fuera
+a proposito (ver el detalle de por que en `PENDIENTES.md`); el rediseno
+mas a fondo (graficos, filtros) sigue sin empezar.
+
+Detalle completo de las tres entregas, con cada archivo y cada linea
+tocada, en el punto 4 y el punto 7 de [`PENDIENTES.md`](PENDIENTES.md).
 
 ---
 

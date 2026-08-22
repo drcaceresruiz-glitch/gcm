@@ -1,15 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, FileWarning } from "lucide-react";
+import {
+  AlertTriangle,
+  FileWarning,
+  TrendingUp,
+  ShoppingCart,
+  ShieldAlert,
+} from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
   adicionalesEnBorrador,
   semaforoDeCartera,
+  sobregiroProyectadoDeCartera,
+  comprasPendientesDeAprobar,
+  restriccionesDeCartera,
+  UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS,
 } from "@/services/gerencia.service";
 import { COLOR_SEMAFORO } from "@/lib/tablero";
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
 import { soles } from "@/utils/formato";
+import { fechaCorta } from "@/utils/fechas";
 
 export const metadata: Metadata = { title: "Gerencia" };
 
@@ -21,12 +32,15 @@ export const metadata: Metadata = { title: "Gerencia" };
  * convertiria el nombre en ruido. Esta se distingue por su ambito: es de
  * EMPRESA, no de obra.
  *
- * Contesta las dos preguntas que no se ven mirando las obras de una en una:
- * que partidas criticas van tarde en la cartera —con el SPI por duracion de
- * cada obra— y cuanto hay pedido en adicionales que todavia no cuenta en
- * ningun presupuesto. Cada bloque sale de su servicio con consultas
+ * Contesta lo que no se ve mirando las obras de una en una: que partidas
+ * criticas van tarde en la cartera, que obras se estan comprometiendo mas
+ * rapido de lo que avanzan, cuanto hay pedido (adicionales y compras) que
+ * todavia no cuenta en ningun presupuesto, y que restricciones del
+ * Lookahead ya vencieron. Cada bloque sale de su servicio con consultas
  * acotadas: aqui no se carga un cronograma entero ni se llama nada en bucle
- * sin tope.
+ * sin tope — `semaforoDeCartera` y `sobregiroProyectadoDeCartera` comparten
+ * ademas el mismo lote de cronograma vigente (`cache()` en
+ * `gerencia.service.ts`), asi que pedirlas juntas no duplica esa consulta.
  */
 export default async function GerenciaPage() {
   const sesion = await obtenerSesion();
@@ -34,12 +48,17 @@ export default async function GerenciaPage() {
 
   // La puerta es el ALCANCE: quien no ve toda la cartera no tiene nada que
   // hacer en una pantalla que la resume. Lo deciden los servicios; solo si
-  // ambos dicen que no, esta pantalla no existe para esta sesion.
-  const [semaforo, adicionales] = await Promise.all([
+  // los cinco dicen que no, esta pantalla no existe para esta sesion.
+  const [semaforo, sobregiro, adicionales, compras, restricciones] = await Promise.all([
     semaforoDeCartera(sesion),
+    sobregiroProyectadoDeCartera(sesion),
     adicionalesEnBorrador(sesion),
+    comprasPendientesDeAprobar(sesion),
+    restriccionesDeCartera(sesion),
   ]);
-  if (!semaforo && !adicionales) redirect("/panel");
+  if (!semaforo && !sobregiro && !adicionales && !compras && !restricciones) {
+    redirect("/panel");
+  }
 
   return (
     <div className="space-y-6">
@@ -189,6 +208,95 @@ export default async function GerenciaPage() {
         </Tarjeta>
       )}
 
+      {sobregiro && (
+        <Tarjeta>
+          <SeccionTarjeta
+            primera
+            titulo="Sobregiro proyectado"
+            nota="Obras que se están comprometiendo más rápido de lo que avanzan: el sobregiro todavía no se nota partida por partida, pero al ritmo actual se está gestando. «Avance físico» es el mismo ponderado por duración de la ruta crítica; «comprometido» es sobre el presupuesto, no sobre lo gastado."
+          >
+            {sobregiro.obras.length === 0 ? (
+              <p className="text-sm opacity-70">
+                No hay ninguna obra viva que examinar.
+              </p>
+            ) : (
+              <>
+                <div
+                  className="rounded-lg border p-4"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  <p className="flex items-center gap-2 text-xs opacity-60">
+                    <TrendingUp className="size-4" aria-hidden="true" />
+                    Obras comprometiéndose por delante de su avance
+                  </p>
+                  <p className="mt-1 text-3xl font-semibold">
+                    {sobregiro.obrasEnRiesgo}
+                  </p>
+                  <p className="mt-1 text-xs opacity-60">
+                    {sobregiro.obras.length === 1
+                      ? "en 1 obra examinada"
+                      : `en ${sobregiro.obras.length} obras examinadas`}
+                    {" · "}
+                    umbral de {UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS} puntos de
+                    diferencia
+                  </p>
+                </div>
+
+                <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>
+                  {sobregiro.obras.map((o) => (
+                    <li
+                      key={o.obraId}
+                      className="flex flex-wrap items-center justify-between gap-3 py-3"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/obras/${o.obraId}/tablero`}
+                          className="truncate text-sm font-medium underline-offset-2 hover:underline"
+                        >
+                          {o.obraNombre}
+                        </Link>
+                        <p className="text-xs opacity-60">
+                          {o.avanceFisicoPct === null
+                            ? "Avance físico —"
+                            : `Avance físico ${o.avanceFisicoPct.toFixed(0)}%`}
+                          {" · "}
+                          {o.comprometidoPct === null
+                            ? "Comprometido —"
+                            : `Comprometido ${o.comprometidoPct.toFixed(0)}%`}
+                        </p>
+                      </div>
+                      <p
+                        className="text-sm font-medium"
+                        style={{
+                          color: o.enRiesgo ? "var(--color-peligro)" : undefined,
+                        }}
+                      >
+                        {o.desviacionPuntos === null
+                          ? "—"
+                          : `${o.desviacionPuntos > 0 ? "+" : ""}${o.desviacionPuntos.toFixed(0)} pts`}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+
+                {sobregiro.obrasVivas > sobregiro.obras.length && (
+                  <p className="text-xs" style={{ color: "var(--color-alerta)" }}>
+                    Para no cargar el servidor se examinan {sobregiro.tope} obras
+                    por carga: aquí se ven {sobregiro.obras.length} de las{" "}
+                    {sobregiro.obrasVivas} vivas.
+                  </p>
+                )}
+
+                <p className="text-xs opacity-60">
+                  Cada obra enlaza a su tablero, donde está el resto de sus
+                  indicadores.
+                </p>
+              </>
+            )}
+          </SeccionTarjeta>
+        </Tarjeta>
+      )}
+
       {adicionales && (
         <Tarjeta>
           <SeccionTarjeta
@@ -255,6 +363,159 @@ export default async function GerenciaPage() {
                   Cada obra enlaza a sus Movimientos, que es donde el adicional
                   se revisa y se aprueba. Aprobarlo es lo que lo mete en el
                   presupuesto: hasta entonces esta cifra es una intención.
+                </p>
+              </>
+            )}
+          </SeccionTarjeta>
+        </Tarjeta>
+      )}
+
+      {compras && (
+        <Tarjeta>
+          <SeccionTarjeta
+            primera
+            titulo="Compras y encargos sin aprobar"
+            nota="Órdenes de compra en borrador: dinero pedido que todavía no cuenta como comprometido, eso solo pasa al aprobarlas."
+          >
+            {compras.cuantas === 0 ? (
+              <p className="text-sm opacity-70">
+                No hay ninguna orden de compra en borrador.
+              </p>
+            ) : (
+              <>
+                <div
+                  className="rounded-lg border p-4"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  <p className="flex items-center gap-2 text-xs opacity-60">
+                    <ShoppingCart className="size-4" aria-hidden="true" />
+                    Impacto de la cartera si se aprobaran todas
+                  </p>
+                  <p className="mt-1 text-3xl font-semibold">
+                    {soles(compras.importe)}
+                  </p>
+                  <p className="mt-1 text-xs opacity-60">
+                    {compras.cuantas === 1
+                      ? "1 orden en borrador"
+                      : `${compras.cuantas} órdenes en borrador`}
+                    {" · "}
+                    {compras.porObra.length === 1
+                      ? "en 1 obra"
+                      : `en ${compras.porObra.length} obras`}
+                  </p>
+                </div>
+
+                <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>
+                  {compras.porObra.map((o) => (
+                    <li
+                      key={o.obraId}
+                      className="flex flex-wrap items-center justify-between gap-3 py-3"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/obras/${o.obraId}/ordenes`}
+                          className="truncate text-sm font-medium underline-offset-2 hover:underline"
+                        >
+                          {o.obraNombre}
+                        </Link>
+                        <p className="text-xs opacity-60">
+                          {o.cuantas === 1
+                            ? "1 orden en borrador"
+                            : `${o.cuantas} órdenes en borrador`}
+                        </p>
+                      </div>
+                      <p className="text-sm font-medium">{soles(o.importe)}</p>
+                    </li>
+                  ))}
+                </ul>
+
+                <p className="text-xs opacity-60">
+                  Cada obra enlaza a sus Órdenes, que es donde se revisan y se
+                  aprueban.
+                </p>
+              </>
+            )}
+          </SeccionTarjeta>
+        </Tarjeta>
+      )}
+
+      {restricciones && (
+        <Tarjeta>
+          <SeccionTarjeta
+            primera
+            titulo="Restricciones de Lookahead vencidas"
+            nota="Restricciones sin resolver cuya fecha de compromiso ya pasó, o está por pasar: son la razón por la que una obra no va a poder cumplir su próximo plan semanal."
+          >
+            {restricciones.vencidas.length === 0 &&
+            restricciones.porVencer.length === 0 ? (
+              <p className="text-sm opacity-70">
+                No hay ninguna restricción vencida ni por vencer.
+              </p>
+            ) : (
+              <>
+                <div
+                  className="rounded-lg border p-4"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  <p className="flex items-center gap-2 text-xs opacity-60">
+                    <ShieldAlert className="size-4" aria-hidden="true" />
+                    Restricciones vencidas
+                  </p>
+                  <p className="mt-1 text-3xl font-semibold">
+                    {restricciones.totalVencidas}
+                  </p>
+                  <p className="mt-1 text-xs opacity-60">
+                    {restricciones.porVencer.length === 0
+                      ? "ninguna por vencer en los próximos días"
+                      : restricciones.porVencer.length === 1
+                        ? "1 más por vencer en los próximos días"
+                        : `${restricciones.porVencer.length} más por vencer en los próximos días`}
+                  </p>
+                </div>
+
+                {[...restricciones.vencidas, ...restricciones.porVencer].length >
+                  0 && (
+                  <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>
+                    {[...restricciones.vencidas, ...restricciones.porVencer].map(
+                      (r) => (
+                        <li
+                          key={r.id}
+                          className="flex flex-wrap items-center justify-between gap-3 py-3"
+                        >
+                          <div className="min-w-0">
+                            <Link
+                              href={`/obras/${r.obraId}/lookahead`}
+                              className="truncate text-sm font-medium underline-offset-2 hover:underline"
+                            >
+                              {r.obraNombre}
+                            </Link>
+                            <p className="text-xs opacity-60">
+                              {r.tipo}
+                              {r.detalle ? ` — ${r.detalle}` : ""}
+                            </p>
+                          </div>
+                          <p
+                            className="text-sm font-medium"
+                            style={{
+                              color:
+                                r.diasVencida > 0
+                                  ? "var(--color-peligro)"
+                                  : "var(--color-alerta)",
+                            }}
+                          >
+                            {r.diasVencida > 0
+                              ? `vencida hace ${r.diasVencida} día(s)`
+                              : `vence el ${fechaCorta(r.fechaCompromiso)}`}
+                          </p>
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                )}
+
+                <p className="text-xs opacity-60">
+                  Cada obra enlaza a su Lookahead, donde se ve la tarea
+                  completa y se levanta la restricción.
                 </p>
               </>
             )}

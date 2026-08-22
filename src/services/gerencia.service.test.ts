@@ -9,6 +9,12 @@ import type { Permiso } from "@/lib/rbac";
  * que el importe salga de las LINEAS y no del total guardado —que en un
  * borrador puede ir por detras— y que el coste no crezca con el numero de
  * obras.
+ *
+ * Ampliado el 22 de agosto de 2026 con las tres secciones nuevas del
+ * rediseno de `/gerencia` (sobregiro proyectado, compras/encargos sin
+ * aprobar, restricciones de Lookahead vencidas) — mismo `llamadas`/`datos`
+ * que ya defendia el coste de `semaforoDeCartera`/`adicionalesEnBorrador`,
+ * extendido con los modelos que faltaban.
  */
 
 interface Llamada {
@@ -24,6 +30,11 @@ const datos = {
   /// Cronograma vigente por obra. Sin entrada = la obra no tiene ninguno.
   cronogramas: {} as Record<string, unknown>,
   avances: [] as unknown[],
+  ordenesCompra: [] as unknown[],
+  encargosVigentes: [] as { projectId: string; _sum: { montoContratado: string } }[],
+  imputacionesSueltas: [] as { importe: string; ordenCompra: { projectId: string } }[],
+  wbsItems: [] as unknown[],
+  restricciones: [] as unknown[],
 };
 
 vi.mock("@/lib/prisma", () => ({
@@ -59,11 +70,48 @@ vi.mock("@/lib/prisma", () => ({
         return datos.avances;
       },
     },
+    ordenCompra: {
+      findMany: async (args: unknown) => {
+        llamadas.push({ modelo: "ordenCompra", args });
+        return datos.ordenesCompra;
+      },
+    },
+    encargoProveedor: {
+      groupBy: async (args: unknown) => {
+        llamadas.push({ modelo: "encargoProveedor", args });
+        return datos.encargosVigentes;
+      },
+    },
+    ordenImputacion: {
+      findMany: async (args: unknown) => {
+        llamadas.push({ modelo: "ordenImputacion", args });
+        return datos.imputacionesSueltas;
+      },
+    },
+    wbsItem: {
+      findMany: async (args: unknown) => {
+        llamadas.push({ modelo: "wbsItem", args });
+        return datos.wbsItems;
+      },
+    },
+    restriccion: {
+      findMany: async (args: unknown) => {
+        llamadas.push({ modelo: "restriccion", args });
+        return datos.restricciones;
+      },
+    },
   },
 }));
 
-const { adicionalesEnBorrador, semaforoDeCartera, MAX_OBRAS_POR_CARGA } =
-  await import("@/services/gerencia.service");
+const {
+  adicionalesEnBorrador,
+  semaforoDeCartera,
+  sobregiroProyectadoDeCartera,
+  comprasPendientesDeAprobar,
+  restriccionesDeCartera,
+  MAX_OBRAS_POR_CARGA,
+  UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS,
+} = await import("@/services/gerencia.service");
 
 function sesion(
   obrasAsignadas: string[] | null,
@@ -107,6 +155,11 @@ beforeEach(() => {
   datos.obras = [];
   datos.cronogramas = {};
   datos.avances = [];
+  datos.ordenesCompra = [];
+  datos.encargosVigentes = [];
+  datos.imputacionesSueltas = [];
+  datos.wbsItems = [];
+  datos.restricciones = [];
 });
 
 describe("adicionalesEnBorrador", () => {
@@ -445,5 +498,228 @@ describe("semaforoDeCartera", () => {
 
     expect(r?.obras.map((o) => o.obraId)).toEqual(["tocada", "sana"]);
     expect(r?.obrasEnRojo).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Compras/encargos sin aprobar
+// ---------------------------------------------------------------------------
+
+describe("comprasPendientesDeAprobar", () => {
+  it("sin el permiso, no devuelve nada ni consulta", async () => {
+    expect(await comprasPendientesDeAprobar(sesion(null, []))).toBeNull();
+    expect(llamadas).toEqual([]);
+  });
+
+  it("no la ve quien no ve toda la cartera", async () => {
+    expect(await comprasPendientesDeAprobar(sesion(["o1"], ["orden:leer"]))).toBeNull();
+    expect(llamadas).toEqual([]);
+  });
+
+  it("sin ordenes en borrador, forma vacia", async () => {
+    const r = await comprasPendientesDeAprobar(sesion(null, ["orden:leer"]));
+    expect(r).toEqual({ porObra: [], importe: "0.00", cuantas: 0 });
+  });
+
+  it("agrega por obra y ordena por impacto, de mayor a menor", async () => {
+    datos.ordenesCompra = [
+      { id: "o-1", projectId: "obra-1", total: "500.00", project: { nombreObra: "Obra Uno" } },
+      { id: "o-2", projectId: "obra-2", total: "2000.00", project: { nombreObra: "Obra Dos" } },
+      { id: "o-3", projectId: "obra-1", total: "300.00", project: { nombreObra: "Obra Uno" } },
+    ];
+
+    const r = await comprasPendientesDeAprobar(sesion(null, ["orden:leer"]));
+    expect(r?.cuantas).toBe(3);
+    expect(r?.importe).toBe("2800.00");
+    expect(r?.porObra).toEqual([
+      { obraId: "obra-2", obraNombre: "Obra Dos", cuantas: 1, importe: "2000.00" },
+      { obraId: "obra-1", obraNombre: "Obra Uno", cuantas: 2, importe: "800.00" },
+    ]);
+  });
+
+  it("cuesta una sola consulta, sea cual sea el numero de ordenes", async () => {
+    datos.ordenesCompra = [
+      { id: "o-1", projectId: "obra-1", total: "500.00", project: { nombreObra: "Obra Uno" } },
+    ];
+    await comprasPendientesDeAprobar(sesion(null, ["orden:leer"]));
+    expect(llamadas.map((l) => l.modelo)).toEqual(["ordenCompra"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Restricciones de Lookahead vencidas o por vencer
+// ---------------------------------------------------------------------------
+
+/** Un dia relativo a hoy, a medianoche UTC — igual que `hoy()`/`diasEntre`. */
+function diasDesdeHoy(offset: number): Date {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + offset);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+describe("restriccionesDeCartera", () => {
+  it("sin el permiso, no devuelve nada ni consulta", async () => {
+    expect(await restriccionesDeCartera(sesion(null, []))).toBeNull();
+    expect(llamadas).toEqual([]);
+  });
+
+  it("no la ve quien no ve toda la cartera", async () => {
+    expect(
+      await restriccionesDeCartera(sesion(["o1"], ["lookahead:leer"])),
+    ).toBeNull();
+    expect(llamadas).toEqual([]);
+  });
+
+  it("separa vencidas de por-vencer, y deja fuera lo que esta lejos", async () => {
+    datos.restricciones = [
+      {
+        id: "r-vencida",
+        tipo: "MATERIALES",
+        detalle: "Falta cemento",
+        fechaCompromiso: diasDesdeHoy(-3),
+        tarea: { projectId: "obra-1", project: { nombreObra: "Obra Uno" } },
+      },
+      {
+        id: "r-por-vencer",
+        tipo: "INFORMACION",
+        detalle: "Falta plano",
+        fechaCompromiso: diasDesdeHoy(3),
+        tarea: { projectId: "obra-2", project: { nombreObra: "Obra Dos" } },
+      },
+      {
+        id: "r-lejos",
+        tipo: "MATERIALES",
+        detalle: "Sin urgencia",
+        fechaCompromiso: diasDesdeHoy(30),
+        tarea: { projectId: "obra-1", project: { nombreObra: "Obra Uno" } },
+      },
+    ];
+
+    const r = await restriccionesDeCartera(sesion(null, ["lookahead:leer"]));
+    expect(r?.totalVencidas).toBe(1);
+    expect(r?.vencidas.map((x) => x.id)).toEqual(["r-vencida"]);
+    expect(r?.porVencer.map((x) => x.id)).toEqual(["r-por-vencer"]);
+    const idsVisibles = [...(r?.vencidas ?? []), ...(r?.porVencer ?? [])].map(
+      (x) => x.id,
+    );
+    expect(idsVisibles).not.toContain("r-lejos");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sobregiro proyectado
+// ---------------------------------------------------------------------------
+
+describe("sobregiroProyectadoDeCartera", () => {
+  it("sin alguno de los permisos, no devuelve nada ni consulta", async () => {
+    expect(
+      await sobregiroProyectadoDeCartera(sesion(null, ["cronograma:leer"])),
+    ).toBeNull();
+    expect(llamadas).toEqual([]);
+
+    expect(
+      await sobregiroProyectadoDeCartera(
+        sesion(null, ["orden:leer", "encargo:leer"]),
+      ),
+    ).toBeNull();
+    expect(llamadas).toEqual([]);
+  });
+
+  it("no la ve quien no ve toda la cartera", async () => {
+    expect(
+      await sobregiroProyectadoDeCartera(
+        sesion(["o1"], ["cronograma:leer", "orden:leer", "encargo:leer"]),
+      ),
+    ).toBeNull();
+    expect(llamadas).toEqual([]);
+  });
+
+  it("por encima del umbral sale marcada; por debajo, no; sin presupuesto, sin dividir entre cero", async () => {
+    datos.obras = [obra("obra-1"), obra("obra-2"), obra("obra-3")];
+
+    // obra-1: avance fisico 50%, comprometido 800/1000 = 80% -> desviacion 30, EN RIESGO.
+    conCronograma("obra-1", [
+      tarea(1, { porcentajePlaneado: "50.00", porcentajeArchivo: "50.00" }),
+    ]);
+    // obra-2: avance fisico 52%, comprometido 500/1000 = 50% -> desviacion -2, no en riesgo.
+    conCronograma("obra-2", [
+      tarea(1, { porcentajePlaneado: "50.00", porcentajeArchivo: "52.00" }),
+    ]);
+    // obra-3: tiene cronograma, pero CERO presupuesto -> comprometidoPct null.
+    conCronograma("obra-3", [
+      tarea(1, { porcentajePlaneado: "40.00", porcentajeArchivo: "40.00" }),
+    ]);
+
+    datos.encargosVigentes = [
+      { projectId: "obra-1", _sum: { montoContratado: "800.00" } },
+      { projectId: "obra-2", _sum: { montoContratado: "500.00" } },
+      { projectId: "obra-3", _sum: { montoContratado: "100.00" } },
+    ];
+
+    datos.wbsItems = [
+      { projectId: "obra-1", codigoPartida: "01", tipo: "PARTIDA", parcial: "1000.00" },
+      { projectId: "obra-2", codigoPartida: "01", tipo: "PARTIDA", parcial: "1000.00" },
+      // obra-3 no tiene ninguna partida: presupuesto en cero.
+    ];
+
+    const r = await sobregiroProyectadoDeCartera(
+      sesion(null, ["cronograma:leer", "orden:leer", "encargo:leer"]),
+    );
+    expect(r).not.toBeNull();
+
+    const porId = new Map(r?.obras.map((o) => [o.obraId, o]));
+
+    const uno = porId.get("obra-1")!;
+    expect(uno.avanceFisicoPct).toBe(50);
+    expect(uno.comprometidoPct).toBe(80);
+    expect(uno.desviacionPuntos).toBe(30);
+    expect(uno.enRiesgo).toBe(true);
+
+    const dos = porId.get("obra-2")!;
+    expect(dos.enRiesgo).toBe(false);
+    expect(dos.desviacionPuntos).toBeCloseTo(-2, 5);
+
+    const tres = porId.get("obra-3")!;
+    expect(tres.comprometidoPct).toBeNull();
+    expect(tres.desviacionPuntos).toBeNull();
+    expect(tres.enRiesgo).toBe(false);
+
+    expect(r?.obrasEnRiesgo).toBe(1);
+    expect(UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS).toBe(10);
+  });
+
+  /**
+   * `semaforoDeCartera` y `sobregiroProyectadoDeCartera` piden ambas el
+   * mismo lote via `loteConAvanceMedido`. Aqui SOLO se defiende que las dos
+   * sigan dando resultados correctos al pedirse juntas -no que la consulta
+   * se comparta-: el `cache()` de React memoiza por el scope de peticion
+   * de un render de verdad (`AsyncLocalStorage` de Next.js), que este
+   * entorno de pruebas —Node liso, sin servidor— no tiene. Fuera de un
+   * request real, `cache()` no deduplica, asi que contar consultas aqui
+   * daria un resultado que no dice nada del comportamiento en produccion.
+   * Esa deduplicacion YA esta probada en produccion por el mismo patron en
+   * `datosAlertasEmpresa` (`obras.service.ts`); verificarla de verdad para
+   * este caso es cosa de `scripts/humo.ts` contra el servidor real, no de
+   * una prueba unitaria.
+   */
+  it("pedidas juntas (misma sesion), las dos siguen dando el resultado correcto", async () => {
+    datos.obras = [obra("obra-1")];
+    conCronograma("obra-1", [tarea(1, { porcentajePlaneado: "50.00", porcentajeArchivo: "50.00" })]);
+    datos.encargosVigentes = [{ projectId: "obra-1", _sum: { montoContratado: "100.00" } }];
+    datos.wbsItems = [
+      { projectId: "obra-1", codigoPartida: "01", tipo: "PARTIDA", parcial: "1000.00" },
+    ];
+
+    const permisos: Permiso[] = ["cronograma:leer", "orden:leer", "encargo:leer"];
+    const misma = sesion(null, permisos);
+
+    const [semaforo, sobregiro] = await Promise.all([
+      semaforoDeCartera(misma),
+      sobregiroProyectadoDeCartera(misma),
+    ]);
+
+    expect(semaforo?.obras[0]?.spiPorDuracion).toBe(1);
+    expect(sobregiro?.obras[0]?.avanceFisicoPct).toBe(50);
+    expect(sobregiro?.obras[0]?.comprometidoPct).toBe(10);
   });
 });

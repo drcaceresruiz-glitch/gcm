@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { sumar } from "@/lib/decimal";
@@ -8,6 +9,9 @@ import { medirAvance, type AvanceReportado } from "@/lib/cronograma";
 import { ponderarPorDuracion } from "@/lib/curva-s";
 import { obraAdmiteCambios } from "@/lib/obras";
 import { semaforoIndice, type Semaforo } from "@/lib/tablero";
+import { diasEntre, hoy } from "@/utils/fechas";
+import type { TipoRestriccion } from "@/generated/prisma/enums";
+import { totalesPorObra } from "@/services/presupuesto-obra";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -27,6 +31,14 @@ import type { SesionActiva } from "@/services/sesion.service";
  * forma de hacer una para todas. En particular **`datosEvm` no se llama
  * desde aqui**: encadena cinco consultas por obra, dos de ellas cargando el
  * cronograma completo y todas las partidas.
+ *
+ * El cronograma vigente + avances de cada obra —lo unico caro de este
+ * archivo— se carga UNA sola vez por peticion en `loteConAvanceMedido`,
+ * envuelto en `cache()`. `semaforoDeCartera` y `sobregiroProyectadoDeCartera`
+ * lo consumen los dos: sin el `cache()`, la pagina —que pide las dos con
+ * `Promise.all`— pagaria esa consulta dos veces. Cualquier funcion nueva que
+ * necesite el avance fisico de la cartera debe llamar a este helper, nunca
+ * repetir su propia consulta de cronograma.
  */
 
 export interface ObraConAdicionales {
@@ -191,40 +203,31 @@ export interface SemaforoCartera {
 export const MAX_OBRAS_POR_CARGA = 10;
 
 /**
- * El semaforo de partidas criticas de la cartera, con su SPI por duracion.
- *
- * La cuenta NO se reescribe: es `alertasDeAtraso`, la misma que pinta el
- * tablero de cada obra, sobre las MISMAS tareas medidas con `medirAvance` y
- * con la MISMA fecha de corte —la del cronograma vigente—. Dos pantallas que
- * calculan distinto el mismo atraso acabarian contradiciendose, y ese es el
- * modo de fallo caracteristico de GCM.
- *
- * Lo unico nuevo es de donde salen las tareas sin arruinar el servidor:
+ * Lo caro de este archivo, resuelto UNA sola vez por peticion: las obras
+ * vivas de la cartera (recortadas a `MAX_OBRAS_POR_CARGA`) con su cronograma
+ * VIGENTE y el avance ya medido.
  *
  * - UNA consulta estrecha por obra —el cronograma VIGENTE con solo las
- *   columnas que la cuenta necesita—, con la forma de
+ *   columnas que hace falta medir—, con la forma de
  *   `avisos-reloj.hitosQueTocanHoy`. NUNCA `obtenerCronograma`: trae el
  *   documento entero con sus dependencias, y cargarlo en bucle es lo que
  *   tumbo produccion dos veces.
  * - UNA consulta de avances para TODO el lote, no una por obra: son las
  *   mismas filas que N consultas, en un solo viaje.
- * - Y el tope de obras por carga, dicho en pantalla cuando recorta.
  *
- * Solo se ensenan las alertas de severidad ALTA que ademas son de la ruta
- * critica: son las que corren la fecha de fin de la obra entera. El resto ya
- * se ve dentro de cada obra, y aqui seria ruido.
+ * `medirAvance` corre aqui, no en cada llamador: es exactamente la misma
+ * cuenta que usa el tablero de cada obra, y calcularla dos veces con
+ * distintos llamadores es como dos pantallas acaban contradiciendose entre
+ * si —el modo de fallo caracteristico de GCM—.
  *
- * El SPI por duracion sale del MISMO lote de tareas y no cuesta ni una
- * consulta mas. El SPI en soles NO entra: exige la cobertura de mapeo
- * tarea-partida y eso arrastra el EVM entero, que es `datosEvm` en bucle.
+ * Envuelto en `cache()` de React: `semaforoDeCartera` y
+ * `sobregiroProyectadoDeCartera` lo llaman los dos, y la pagina pide ambas
+ * con `Promise.all` dentro del mismo request. Sin el `cache()`, la consulta
+ * de cronograma se pagaria dos veces por carga de pantalla.
  */
-export async function semaforoDeCartera(
+const loteConAvanceMedido = cache(async function loteConAvanceMedido(
   sesion: SesionActiva,
-): Promise<SemaforoCartera | null> {
-  // La misma puerta que el resto de la pantalla: el ALCANCE, no un permiso.
-  if (sesion.obrasAsignadas !== null) return null;
-  if (!puede(sesion, "cronograma:leer")) return null;
-
+) {
   const todas = await prisma.project.findMany({
     where: { companyId: sesion.companyId },
     orderBy: { nombreObra: "asc" },
@@ -236,21 +239,15 @@ export async function semaforoDeCartera(
   // PARALIZADA si cuenta: una obra parada puede seguir atrasada respecto a
   // su plan, y esconderla del panel de gerencia no es lo que se pidio aqui.
   const vivas = todas.filter((o) => obraAdmiteCambios(o, { permiteEnParalizada: true }));
-  const lote = vivas.slice(0, MAX_OBRAS_POR_CARGA);
+  const loteObras = vivas.slice(0, MAX_OBRAS_POR_CARGA);
 
-  if (lote.length === 0) {
-    return {
-      obras: [],
-      criticasAtrasadas: 0,
-      obrasEnRojo: 0,
-      obrasVivas: vivas.length,
-      tope: MAX_OBRAS_POR_CARGA,
-    };
+  if (loteObras.length === 0) {
+    return { lote: [], obrasVivas: vivas.length };
   }
 
   const [vigentes, avances] = await Promise.all([
     Promise.all(
-      lote.map((obra) =>
+      loteObras.map((obra) =>
         prisma.cronograma.findFirst({
           where: { projectId: obra.id },
           orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
@@ -272,7 +269,7 @@ export async function semaforoDeCartera(
     // El avance vive aparte del cronograma para sobrevivir a sus versiones,
     // igual que en `obtenerCronograma`.
     prisma.avanceTarea.findMany({
-      where: { projectId: { in: lote.map((obra) => obra.id) } },
+      where: { projectId: { in: loteObras.map((obra) => obra.id) } },
       select: {
         projectId: true, uid: true, porcentaje: true, fecha: true,
         createdAt: true, reportadoPor: true, nota: true,
@@ -295,20 +292,12 @@ export async function semaforoDeCartera(
     else avancesPorObra.set(a.projectId, [fila]);
   }
 
-  const obras: ObraDelSemaforo[] = lote.map((obra, i) => {
+  const lote = loteObras.map((obra, i) => {
     const vigente = vigentes[i] ?? null;
     if (!vigente) {
       // La obra sale con la mano vacia, no desaparece: para el gerente,
       // «sin cronograma» es un dato de la obra, no la ausencia de la obra.
-      return {
-        obraId: obra.id,
-        obraNombre: obra.nombreObra,
-        spiPorDuracion: null,
-        semaforo: null,
-        sinCronograma: true,
-        criticasAtrasadas: 0,
-        partidas: [],
-      };
+      return { obraId: obra.id, obraNombre: obra.nombreObra, datos: null };
     }
 
     // Los Decimal se pasan a texto en la frontera, como en todo el sistema,
@@ -324,7 +313,69 @@ export async function semaforoDeCartera(
       avancesPorObra.get(obra.id) ?? [],
     );
 
-    const criticas = alertasDeAtraso(tareas, vigente.fechaCorte).filter(
+    return {
+      obraId: obra.id,
+      obraNombre: obra.nombreObra,
+      datos: { fechaCorte: vigente.fechaCorte, tareas },
+    };
+  });
+
+  return { lote, obrasVivas: vivas.length };
+});
+
+/**
+ * El semaforo de partidas criticas de la cartera, con su SPI por duracion.
+ *
+ * La cuenta NO se reescribe: es `alertasDeAtraso`, la misma que pinta el
+ * tablero de cada obra, sobre las MISMAS tareas medidas con `medirAvance` y
+ * con la MISMA fecha de corte —la del cronograma vigente—. Dos pantallas que
+ * calculan distinto el mismo atraso acabarian contradiciendose, y ese es el
+ * modo de fallo caracteristico de GCM.
+ *
+ * Solo se ensenan las alertas de severidad ALTA que ademas son de la ruta
+ * critica: son las que corren la fecha de fin de la obra entera. El resto ya
+ * se ve dentro de cada obra, y aqui seria ruido.
+ *
+ * El SPI por duracion sale del MISMO lote de tareas —`loteConAvanceMedido`—
+ * y no cuesta ni una consulta mas. El SPI en soles NO entra: exige la
+ * cobertura de mapeo tarea-partida y eso arrastra el EVM entero, que es
+ * `datosEvm` en bucle.
+ */
+export async function semaforoDeCartera(
+  sesion: SesionActiva,
+): Promise<SemaforoCartera | null> {
+  // La misma puerta que el resto de la pantalla: el ALCANCE, no un permiso.
+  if (sesion.obrasAsignadas !== null) return null;
+  if (!puede(sesion, "cronograma:leer")) return null;
+
+  const { lote, obrasVivas } = await loteConAvanceMedido(sesion);
+
+  if (lote.length === 0) {
+    return {
+      obras: [],
+      criticasAtrasadas: 0,
+      obrasEnRojo: 0,
+      obrasVivas,
+      tope: MAX_OBRAS_POR_CARGA,
+    };
+  }
+
+  const obras: ObraDelSemaforo[] = lote.map((o) => {
+    if (!o.datos) {
+      return {
+        obraId: o.obraId,
+        obraNombre: o.obraNombre,
+        spiPorDuracion: null,
+        semaforo: null,
+        sinCronograma: true,
+        criticasAtrasadas: 0,
+        partidas: [],
+      };
+    }
+
+    const { fechaCorte, tareas } = o.datos;
+
+    const criticas = alertasDeAtraso(tareas, fechaCorte).filter(
       (a) => a.severidad === "alta" && a.esCritico,
     );
 
@@ -343,8 +394,8 @@ export async function semaforoDeCartera(
     const spi = planeado > 0 ? Number((real / planeado).toFixed(2)) : null;
 
     return {
-      obraId: obra.id,
-      obraNombre: obra.nombreObra,
+      obraId: o.obraId,
+      obraNombre: o.obraNombre,
       spiPorDuracion: spi,
       semaforo: semaforoIndice(spi),
       sinCronograma: false,
@@ -374,7 +425,332 @@ export async function semaforoDeCartera(
     obras,
     criticasAtrasadas: obras.reduce((n, o) => n + o.criticasAtrasadas, 0),
     obrasEnRojo: obras.filter((o) => o.semaforo === "rojo").length,
-    obrasVivas: vivas.length,
+    obrasVivas,
     tope: MAX_OBRAS_POR_CARGA,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Sobregiro proyectado: % comprometido contra % de avance fisico
+// ---------------------------------------------------------------------------
+
+export interface ObraConSobregiroProyectado {
+  obraId: string;
+  obraNombre: string;
+  /// Avance real ponderado por duracion. Rotulo obligatorio en pantalla:
+  /// "avance fisico", NUNCA "SPI" -es el mismo ponderado que usa el
+  /// semaforo, pero en puntos de avance, no en un ratio-. null sin
+  /// cronograma o sin nada planeado todavia.
+  avanceFisicoPct: number | null;
+  /// Comprometido (encargos VIGENTE + ordenes sueltas APROBADA, la MISMA
+  /// formula que `obtenerResumenEmpresa`/`datosAlertasEmpresa` en
+  /// `obras.service.ts` -no `comprometidoPorPartida`, que es para el
+  /// sobregiro YA ocurrido-) sobre el presupuesto de la obra. null si el
+  /// presupuesto esta en cero.
+  comprometidoPct: number | null;
+  /// comprometidoPct - avanceFisicoPct. Positivo = se esta comprometiendo
+  /// mas rapido de lo que avanza. null si falta cualquiera de los dos.
+  desviacionPuntos: number | null;
+  enRiesgo: boolean;
+}
+
+export interface SobregiroProyectadoCartera {
+  /// Peor desviacion primero. Solo obras con datos suficientes para
+  /// comparar (avanceFisicoPct y comprometidoPct no nulos) entran al orden;
+  /// las demas van al final, con su motivo visible en sus campos null.
+  obras: ObraConSobregiroProyectado[];
+  obrasEnRiesgo: number;
+  /// Igual que en `SemaforoCartera`: si supera `obras.length`, la pantalla
+  /// tiene que decirlo.
+  obrasVivas: number;
+  tope: number;
+}
+
+/**
+ * Cuantos puntos de diferencia entre comprometido y avance fisico cuentan
+ * como riesgo. Nombrada, no un numero magico en medio de la cuenta: cambiar
+ * el umbral es tocar una linea, no rastrear una cifra suelta.
+ */
+export const UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS = 10;
+
+/**
+ * Que obras se estan comprometiendo mas rapido de lo que avanzan, ANTES de
+ * que eso se note como sobregiro real de una partida.
+ *
+ * `partidasSobregiradas` (alertas de `obras.service.ts`) solo detecta el
+ * sobregiro YA ocurrido, partida por partida. Esto es lo mismo pero
+ * proyectado y de cartera: no existe en NINGUN otro sitio de GCM hoy, ni a
+ * nivel de obra individual.
+ *
+ * Reusa `loteConAvanceMedido` para el avance fisico —CERO consultas extra
+ * de cronograma— y anade dos consultas baratas y agregadas para el
+ * comprometido y el presupuesto de las mismas obras del lote.
+ */
+export async function sobregiroProyectadoDeCartera(
+  sesion: SesionActiva,
+): Promise<SobregiroProyectadoCartera | null> {
+  if (sesion.obrasAsignadas !== null) return null;
+  // Deny-by-default: se exige TODO lo que la cifra toca (avance fisico +
+  // comprometido), no solo el permiso "principal".
+  if (!puede(sesion, "cronograma:leer")) return null;
+  if (!puede(sesion, "orden:leer") || !puede(sesion, "encargo:leer")) return null;
+
+  const { lote, obrasVivas } = await loteConAvanceMedido(sesion);
+
+  if (lote.length === 0) {
+    return { obras: [], obrasEnRiesgo: 0, obrasVivas, tope: MAX_OBRAS_POR_CARGA };
+  }
+
+  const obraIds = lote.map((o) => o.obraId);
+
+  const [encargosVigentes, imputacionesSueltas, presupuestos] = await Promise.all([
+    // MISMA formula de comprometido que `obtenerResumenEmpresa` en
+    // obras.service.ts: encargos VIGENTE, agregados por obra. EncargoProveedor
+    // tiene `projectId` propio, asi que un `groupBy` directo alcanza.
+    prisma.encargoProveedor.groupBy({
+      by: ["projectId"],
+      where: { estado: "VIGENTE", projectId: { in: obraIds } },
+      _sum: { montoContratado: true },
+    }),
+    // Las ordenes SUELTAS aprobadas. `OrdenImputacion` NO tiene `projectId`
+    // propio (solo `ordenId`/`wbsItemId`), asi que no hay `groupBy` posible
+    // aqui: se trae la fila con el projectId de su orden y se agrega en JS,
+    // mismo patron que `adicionalesEnBorrador` con los movimientos.
+    prisma.ordenImputacion.findMany({
+      where: {
+        ordenCompra: { estado: "APROBADA", encargoId: null, projectId: { in: obraIds } },
+      },
+      select: { importe: true, ordenCompra: { select: { projectId: true } } },
+    }),
+    // Ya existe, ya es batched: una consulta a `wbsItem`, sin tocar cronograma.
+    totalesPorObra(obraIds),
+  ]);
+
+  const comprometidoPorObra = new Map<string, string[]>();
+  for (const e of encargosVigentes) {
+    const importes = comprometidoPorObra.get(e.projectId) ?? [];
+    importes.push(e._sum.montoContratado?.toString() ?? "0");
+    comprometidoPorObra.set(e.projectId, importes);
+  }
+  for (const i of imputacionesSueltas) {
+    const obraId = i.ordenCompra.projectId;
+    const importes = comprometidoPorObra.get(obraId) ?? [];
+    importes.push(i.importe.toString());
+    comprometidoPorObra.set(obraId, importes);
+  }
+
+  const obras: ObraConSobregiroProyectado[] = lote.map((o) => {
+    let avanceFisicoPct: number | null = null;
+    if (o.datos) {
+      const programadas = o.datos.tareas.filter((t) => !t.sinProgramar);
+      const planeado = Number(
+        ponderarPorDuracion(programadas, (t) => t.porcentajePlaneado),
+      );
+      if (planeado > 0) {
+        avanceFisicoPct = Number(
+          ponderarPorDuracion(programadas, (t) => t.porcentajeReal),
+        );
+      }
+    }
+
+    const presupuesto = Number(presupuestos.get(o.obraId)?.costoDirecto ?? "0");
+    const comprometido = Number(sumar(comprometidoPorObra.get(o.obraId) ?? []));
+    const comprometidoPct = presupuesto > 0 ? (comprometido / presupuesto) * 100 : null;
+
+    const desviacionPuntos =
+      avanceFisicoPct !== null && comprometidoPct !== null
+        ? comprometidoPct - avanceFisicoPct
+        : null;
+
+    return {
+      obraId: o.obraId,
+      obraNombre: o.obraNombre,
+      avanceFisicoPct,
+      comprometidoPct,
+      desviacionPuntos,
+      enRiesgo:
+        desviacionPuntos !== null &&
+        desviacionPuntos > UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS,
+    };
+  });
+
+  // Peor desviacion primero; las que no se pueden comparar (sin datos
+  // suficientes) van al final, no desaparecen.
+  obras.sort(
+    (a, b) =>
+      (b.desviacionPuntos ?? Number.NEGATIVE_INFINITY) -
+      (a.desviacionPuntos ?? Number.NEGATIVE_INFINITY),
+  );
+
+  return {
+    obras,
+    obrasEnRiesgo: obras.filter((o) => o.enRiesgo).length,
+    obrasVivas,
+    tope: MAX_OBRAS_POR_CARGA,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Compras/encargos sin aprobar
+// ---------------------------------------------------------------------------
+
+export interface ObraConComprasPendientes {
+  obraId: string;
+  obraNombre: string;
+  cuantas: number;
+  importe: string;
+}
+
+export interface ComprasPendientes {
+  porObra: ObraConComprasPendientes[];
+  importe: string;
+  cuantas: number;
+}
+
+/**
+ * Las ORDENES DE COMPRA en BORRADOR de toda la empresa, con su impacto.
+ *
+ * Calco de `adicionalesEnBorrador` (arriba en este mismo archivo) pero
+ * sobre `OrdenCompra`: dinero pedido que todavia no cuenta como
+ * comprometido -eso solo pasa al aprobar-, y que obra por obra no se
+ * percibe. UNA sola consulta: `OrdenCompra.total` no arrastra el mismo
+ * problema de "recalculado al aprobar" que los movimientos presupuestales
+ * (no tiene lineas que se editen aparte), asi que no hace falta una
+ * segunda consulta de agregado -a diferencia de `adicionalesEnBorrador`-.
+ */
+export async function comprasPendientesDeAprobar(
+  sesion: SesionActiva,
+): Promise<ComprasPendientes | null> {
+  if (sesion.obrasAsignadas !== null) return null;
+  if (!puede(sesion, "orden:leer")) return null;
+
+  const ordenes = await prisma.ordenCompra.findMany({
+    where: { companyId: sesion.companyId, estado: "BORRADOR" },
+    select: {
+      id: true,
+      projectId: true,
+      total: true,
+      project: { select: { nombreObra: true } },
+    },
+  });
+
+  if (ordenes.length === 0) {
+    return { porObra: [], importe: "0.00", cuantas: 0 };
+  }
+
+  const acumulado = new Map<string, { nombre: string; importes: string[] }>();
+  for (const o of ordenes) {
+    const fila = acumulado.get(o.projectId) ?? {
+      nombre: o.project.nombreObra,
+      importes: [],
+    };
+    fila.importes.push(o.total.toString());
+    acumulado.set(o.projectId, fila);
+  }
+
+  const porObra = [...acumulado.entries()].map(([obraId, fila]) => ({
+    obraId,
+    obraNombre: fila.nombre,
+    cuantas: fila.importes.length,
+    importe: sumar(fila.importes),
+  }));
+
+  // De mayor a menor impacto, mismo criterio que los adicionales.
+  porObra.sort((a, b) => Number(b.importe) - Number(a.importe));
+
+  return {
+    porObra,
+    importe: sumar(porObra.map((o) => o.importe)),
+    cuantas: ordenes.length,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Restricciones de Lookahead vencidas o por vencer
+// ---------------------------------------------------------------------------
+
+/// Ventana, en dias hacia adelante, para considerar una restriccion
+/// "por vencer" y no solo "vencida" o "al dia".
+const VENTANA_DIAS_POR_VENCER = 7;
+
+export interface RestriccionDeCartera {
+  id: string;
+  obraId: string;
+  obraNombre: string;
+  tipo: TipoRestriccion;
+  detalle: string | null;
+  fechaCompromiso: Date;
+  /// Positivo = dias que ya paso la fecha. Negativo = dias que faltan.
+  diasVencida: number;
+}
+
+export interface RestriccionesCartera {
+  vencidas: RestriccionDeCartera[];
+  porVencer: RestriccionDeCartera[];
+  totalVencidas: number;
+}
+
+/**
+ * Restricciones del Lookahead sin resolver y con fecha de compromiso ya
+ * pasada o proxima, agregadas de toda la cartera.
+ *
+ * UNA sola consulta. `Restriccion`/`LookaheadTask` son tablas
+ * INDEPENDIENTES de `Cronograma`/`TareaCronograma`: esto no toca el
+ * cronograma en absoluto, y no comparte nada con `loteConAvanceMedido`.
+ *
+ * A proposito NO se resuelve el nombre de la tarea (codigo/uid): eso
+ * exigiria una segunda consulta contra el cronograma vigente de cada obra
+ * para mapear `uid -> nombre`, justo el tipo de consulta que esta pantalla
+ * evita. Tipo + detalle + obra + fecha de compromiso ya dice lo esencial;
+ * el link a `/obras/[id]/lookahead` lleva al contexto completo.
+ */
+export async function restriccionesDeCartera(
+  sesion: SesionActiva,
+): Promise<RestriccionesCartera | null> {
+  if (sesion.obrasAsignadas !== null) return null;
+  if (!puede(sesion, "lookahead:leer")) return null;
+
+  const filas = await prisma.restriccion.findMany({
+    where: {
+      resuelta: false,
+      fechaCompromiso: { not: null },
+      tarea: { project: { companyId: sesion.companyId } },
+    },
+    select: {
+      id: true,
+      tipo: true,
+      detalle: true,
+      fechaCompromiso: true,
+      tarea: {
+        select: { projectId: true, project: { select: { nombreObra: true } } },
+      },
+    },
+    orderBy: { fechaCompromiso: "asc" },
+  });
+
+  const ahora = hoy();
+  const vencidas: RestriccionDeCartera[] = [];
+  const porVencer: RestriccionDeCartera[] = [];
+
+  for (const f of filas) {
+    // El `where` ya filtro `not: null`, pero el tipo generado sigue siendo
+    // `Date | null`: se descarta explicito en vez de silenciar con `!`.
+    if (!f.fechaCompromiso) continue;
+
+    const diasVencida = diasEntre(f.fechaCompromiso, ahora);
+    const fila: RestriccionDeCartera = {
+      id: f.id,
+      obraId: f.tarea.projectId,
+      obraNombre: f.tarea.project.nombreObra,
+      tipo: f.tipo,
+      detalle: f.detalle,
+      fechaCompromiso: f.fechaCompromiso,
+      diasVencida,
+    };
+
+    if (diasVencida > 0) vencidas.push(fila);
+    else if (diasVencida >= -VENTANA_DIAS_POR_VENCER) porVencer.push(fila);
+  }
+
+  return { vencidas, porVencer, totalVencidas: vencidas.length };
 }
