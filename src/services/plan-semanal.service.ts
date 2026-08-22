@@ -392,6 +392,7 @@ export async function obtenerPlanSemanal(
           inicio: true,
           fin: true,
           esResumen: true,
+          esHito: true,
           porcentajeArchivo: true,
         },
       },
@@ -955,9 +956,12 @@ export async function guardarCompromisos(
 
   await prisma.$transaction(async (tx) => {
     // Planificar REEMPLAZA la semana, asi que lo que esta pantalla no edita
-    // (zona, subcontratista, color, protocolo) se perderia en cada guardado.
-    // Se rescata por uid ANTES de borrar; `mapaPreservablePorUid` se abstiene
-    // cuando hay ambiguedad.
+    // (zona, subcontratista, color, protocolo) se perderia en cada guardado —
+    // y lo mismo lo que se anota al CERRAR (cumplido, causa, nota) o durante
+    // la ejecucion (enEjecucionAt): reabrir una semana y volver a guardar la
+    // planificacion no puede borrar un cierre que ya paso. Se rescata por uid
+    // ANTES de borrar; `mapaPreservablePorUid` se abstiene cuando hay
+    // ambiguedad.
     const previos = await tx.compromisoSemanal.findMany({
       where: { planSemanalId: planId },
       select: {
@@ -967,6 +971,10 @@ export async function guardarCompromisos(
         color: true,
         protocoloCalidad: true,
         cantidadEjec: true,
+        cumplido: true,
+        causa: true,
+        notaCierre: true,
+        enEjecucionAt: true,
       },
     });
     const preservar = mapaPreservablePorUid(
@@ -992,6 +1000,10 @@ export async function guardarCompromisos(
             color: guardado?.color ?? null,
             protocoloCalidad: guardado?.protocoloCalidad ?? false,
             cantidadEjec: guardado?.cantidadEjec ?? null,
+            cumplido: guardado?.cumplido ?? null,
+            causa: guardado?.causa ?? null,
+            notaCierre: guardado?.notaCierre ?? null,
+            enEjecucionAt: guardado?.enEjecucionAt ?? null,
           };
         }),
       });
@@ -1408,6 +1420,14 @@ export async function corregirFechaCorte(
  * cuando se creo por error o quedo mal planteada. Es destructivo y no reversible;
  * el correlativo no se recicla (la siguiente semana sigue subiendo de numero),
  * pero la auditoria conserva que existio y con que datos.
+ *
+ * Si el plan ya estaba CERRADO, tambien borra el avance que ESE cierre habia
+ * registrado (`AvanceTarea.planSemanalId === planId`) — el mismo borrado que
+ * ya hace `cerrarPlanSemanal` al reabrir/re-cerrar. Sin esto, el esquema
+ * (`onDelete: SetNull`) dejaba esas filas huerfanas: `planSemanalId` pasaba a
+ * null y quedaban indistinguibles de un reporte manual, sin que nada las
+ * volviera a encontrar para reemplazarlas. "Rehacerla" significa borrar TODO
+ * lo que el plan habia escrito, no solo su cabecera.
  */
 export async function eliminarPlanSemanal(
   sesion: SesionActiva,
@@ -1428,6 +1448,13 @@ export async function eliminarPlanSemanal(
   if (!plan) return { ok: false, error: "Plan no encontrado." };
 
   await prisma.$transaction(async (tx) => {
+    // El avance que este plan escribio en la curva, ANTES de borrar la
+    // cabecera: una vez borrada, el esquema pondria planSemanalId a null en
+    // vez de dejarlo encontrable.
+    const { count: avancesBorrados } = await tx.avanceTarea.deleteMany({
+      where: { projectId: obraId, planSemanalId: planId },
+    });
+
     // Los compromisos caen por la cascada de la FK (onDelete: Cascade).
     await tx.planSemanal.delete({ where: { id: planId } });
 
@@ -1443,6 +1470,7 @@ export async function eliminarPlanSemanal(
           numero: plan.numero,
           estado: plan.estado,
           fechaCorte: plan.fechaCorte.toISOString().slice(0, 10),
+          avancesBorrados,
         },
       },
     });

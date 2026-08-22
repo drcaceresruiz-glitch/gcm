@@ -402,20 +402,18 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      de una constructora esperaria. Ligado al punto 1: si "Gerencia" pasa a
      ser un rol propio, esta pantalla probablemente se rehace de fondo.
 
-8. **Bug en produccion visto en vivo: `/obras/.../meta` se rompia al
-   cargar** — el usuario mando una captura de "Esta pantalla no se pudo
-   cargar" en `gcm.drcaceresruiz.com`. Diagnostico (por lectura de codigo,
-   no confirmado aun en vivo): todo apunta a una condicion de carrera del
-   propio desplegador — `desplegar.sh` cambia de version con un `mv` por
-   entrada de nivel superior, no atomico, y el SHA del pie de pagina y el
-   de `/api/health` no coincidian justo en ese momento, con una latencia
-   anormal (392 ms contra 1-4 ms normales). El error queda aislado al
-   render de `meta/page.tsx` (que ya tiene su propio try/catch) sin tocar
-   layout/cabecera/menu, que es justo lo que se esperaria de una peticion
-   mixta durante la ventana del `mv`, no de un bug del codigo. **Pendiente
-   real**: confirmar con el usuario si recargar lo resolvio o si el error
-   se repite de forma estable — si se repite, hay que investigar mas a
-   fondo en vez de asumir la condicion de carrera.
+8. ~~**Bug en produccion visto en vivo: `/obras/.../meta` se rompia al
+   cargar**~~ **CERRADO el 21 de agosto de 2026.** El usuario mando una
+   captura de "Esta pantalla no se pudo cargar" en `gcm.drcaceresruiz.com`.
+   Diagnostico por lectura de codigo: todo apuntaba a una condicion de
+   carrera del propio desplegador —`desplegar.sh` cambia de version con un
+   `mv` por entrada de nivel superior, no atomico, y el SHA del pie de
+   pagina y el de `/api/health` no coincidian justo en ese momento, con una
+   latencia anormal (392 ms contra 1-4 ms normales)—. El usuario confirmo
+   ("SI") que recargar la pagina lo resolvio, y no volvio a repetirse en el
+   resto de la sesion. Diagnostico dado por bueno; si vuelve a pasar de
+   forma estable (no solo una vez, tras un recargar), investigar mas a
+   fondo en vez de asumir la misma causa.
 
 9. ~~**Cronograma: demasiada informacion antes de llegar a la tabla, al
    generar la EDT desde presupuesto**~~ **HECHO el 21 de agosto de 2026.**
@@ -1458,31 +1456,49 @@ estaba armado pero no se habia disparado.
    *El defecto era*: las partidas de adicional nacen con `parcial: null` a
    proposito, pero el AC si contaba sus ordenes, asi que **el CPI se degradaba
    solo** conforme se aprobaban adicionales legitimos.
-3. **Reabrir + reguardar borra cumplido/causa/notaCierre** (ALTO) — **sigue
-   abierto al 21 de agosto, pero medio cerrado**: `CamposPreservables` rescata
-   ya `cantidadEjec`, que se anota al CERRAR; siguen sin rescatarse
-   `cumplido`, la causa y la nota de cierre.
-   `mapaPreservablePorUid` rescata los campos operativos pero no los del
-   cierre. PPC a 0 y Pareto sin causas, mientras el avance escrito se queda.
-4. **Eliminar una semana deja avances huerfanos** (ALTO): `onDelete: SetNull`
-   sobre `planSemanalId`; quedan indistinguibles de un reporte manual y
-   **nadie los puede reemplazar nunca** (la limpieza filtra por plan).
-5. **Curva S / EVM leen otro conjunto de tareas** que la pantalla de avance
-   (base vs vigente): dos cifras con el mismo nombre en la misma pantalla.
-6. **Los hitos entran al Lookahead y al PPC** — **comprobado el 21 de agosto:
-   SIGUE ABIERTO.** `esHito` no aparece en `lib/plan-semanal.ts` y
-   `TareaProgramada` sigue sin declarar el campo. Lo que si se cerro por el
-   camino es el hermano de este defecto: **un RESUMEN ya no puede entrar en el
-   Lookahead ni pidiendolo** (`65e175d`), porque `analizar` comprueba en el
-   servicio —no en la pantalla— que los uid que manda el navegador no sean
-   resumen. El original decia: `tareasDeLaSemana` filtra
-   `esResumen` pero no `esHito`, y `TareaProgramada` ni declara el campo. Entra
-   al denominador del PPC. Otros modulos (`mapeo.service`, `control-avance`) SI
-   lo excluyen, con el razonamiento escrito.
-   > La mitad de este defecto se cerro el 11 de agosto de 2026: ya no se
-   > siembran 7 restricciones a un evento de duracion cero, porque no se
-   > siembra ninguna. Lo que sigue abierto es que el hito entre al denominador
-   > del PPC y a la ventana del Lookahead.
+3. ~~**Reabrir + reguardar borra cumplido/causa/notaCierre**~~ **ARREGLADO
+   el 21 de agosto de 2026.** `CamposPreservables` (`lib/plan-semanal.ts`)
+   solo rescataba `cantidadEjec` de los campos que se anotan al CERRAR;
+   `cumplido`, `causa` y `notaCierre` se perdian al reabrir una semana y
+   volver a guardar la planificacion, dejando el PPC en 0 y el Pareto sin
+   causas mientras el avance fisico sobrevivia intacto. De paso se encontro
+   un cuarto campo con el mismo problema, no anotado en el hallazgo
+   original: `enEjecucionAt` (cuando el trabajo empezo en obra, del
+   Kanban) tampoco se preservaba. Los cuatro se anaden a
+   `CamposPreservables`/`mapaPreservablePorUid` y a los `select`/`createMany`
+   de `guardarCompromisos` (`plan-semanal.service.ts`).
+4. ~~**Eliminar una semana deja avances huerfanos**~~ **ARREGLADO el 21 de
+   agosto de 2026.** `AvanceTarea.planSemanalId` tiene `onDelete: SetNull`:
+   al borrar un `PlanSemanal` ya CERRADO (nada lo impedia), sus avances
+   quedaban con `planSemanalId: null`, indistinguibles de un reporte manual
+   y sin que nada los volviera a encontrar para reemplazarlos.
+   `eliminarPlanSemanal` ahora borra tambien esos avances, DENTRO de la
+   misma transaccion y ANTES de borrar la cabecera —el mismo `deleteMany`
+   que ya usaba `cerrarPlanSemanal` al reabrir/re-cerrar—, y el conteo
+   queda en la auditoria. "Rehacerla" ahora borra TODO lo que el plan
+   habia escrito, no solo la cabecera.
+5. ~~**Curva S / EVM leen otro conjunto de tareas que la pantalla de
+   avance**~~ **ARREGLADO el 21 de agosto de 2026.** Confirmado: una vez
+   fijada la linea base, `datosCurvaS` calcula el PLAN de la curva contra
+   ella (`fuentePlan: "base"`), mientras la tabla editable del cronograma
+   (`obtenerCronograma`) siempre muestra el corte VIGENTE — a proposito, es
+   lo que impide que reprogramar mueva los postes del EVM. `PanelEvm.tsx`
+   ya explicaba esta distincion ("PV y SPI medidos contra la línea base
+   v...") pero la tarjeta "Curva de avance" (`CurvaS.tsx`), que usa la
+   MISMA fuente de datos y esta justo encima en la misma pantalla, no decia
+   nada. Se le anadio la misma aclaracion, usando `datos.lineaBase` que ya
+   viajaba sin usarse ahi.
+6. ~~**Los hitos entran al Lookahead y al PPC**~~ **ARREGLADO el 21 de
+   agosto de 2026.** `TareaProgramada` (`lib/plan-semanal.ts`) gano
+   `esHito: boolean` y `tareasDeLaSemana` ahora lo excluye junto con
+   `esResumen` — mismo criterio ya escrito en `mapeo.service.ts` y
+   `control-avance.ts` ("dura cero dias... no es trabajo que alguien
+   ejecute"). Se propago a los tres sitios que construian
+   `TareaProgramada` sin `esHito` (`lookahead.service.ts` ×2,
+   `plan-semanal.service.ts` ×1); `tablero.service.ts` no necesito cambios
+   porque ya reusa `TareaDelPlan`, que si trae el campo. Con esto un hito
+   deja de poder comprometerse en el Plan Semanal, de aparecer en la
+   ventana del Lookahead, y de contar en el denominador del PPC.
 7. ~~**Celda de importe editable en filas ALCANCE**~~ **ARREGLADO el 15 de
    agosto de 2026** (`ac717e6`), y en el SERVICIO, no en la pantalla: se
    rechazan importe, metrado y precio en filas de alcance, y al convertir a

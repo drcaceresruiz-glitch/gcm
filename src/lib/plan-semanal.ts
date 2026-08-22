@@ -770,6 +770,12 @@ export interface TareaProgramada {
   inicio: Date;
   fin: Date;
   esResumen: boolean;
+  /// Dura cero dias y marca un acontecimiento ("Fin de trabajos
+  /// preliminares"), no trabajo que alguien ejecute — mismo criterio que ya
+  /// usan `mapeo.service.ts` y `control-avance.ts`. Sin excluirlo aqui, un
+  /// hito entraba a la ventana del Lookahead y al denominador del PPC como
+  /// si fuera un compromiso mas.
+  esHito: boolean;
 }
 
 /**
@@ -814,6 +820,7 @@ export function tareasDeLaSemana(
     .filter(
       (t) =>
         !t.esResumen &&
+        !t.esHito &&
         !terminadas.has(t.uid) &&
         t.inicio.getTime() <= fin &&
         t.fin.getTime() >= ini,
@@ -999,6 +1006,16 @@ export interface CamposPreservables {
   /// Se anota al CERRAR la semana, no al planificar. Si no se preservara,
   /// reabrir y volver a guardar borraria lo que de verdad se ejecuto.
   cantidadEjec: string | null;
+  /// Los cuatro que siguen tambien se anotan al CERRAR (o durante la
+  /// ejecucion, `enEjecucionAt`), nunca al planificar. Sin preservarlos,
+  /// reabrir una semana ya cerrada y volver a guardar la planificacion
+  /// dejaba el PPC en 0 y el Pareto sin causas de un plumazo, mientras el
+  /// avance fisico (`cantidadEjec`, ya preservado arriba) sobrevivia intacto
+  /// — dos cifras del mismo cierre que dejaban de coincidir entre si.
+  cumplido: boolean | null;
+  causa: CausaNoCumplimiento | null;
+  notaCierre: string | null;
+  enEjecucionAt: Date | null;
 }
 
 /**
@@ -1036,6 +1053,10 @@ export function mapaPreservablePorUid(
       color: e.color,
       protocoloCalidad: e.protocoloCalidad,
       cantidadEjec: e.cantidadEjec,
+      cumplido: e.cumplido,
+      causa: e.causa,
+      notaCierre: e.notaCierre,
+      enEjecucionAt: e.enEjecucionAt,
     });
   }
   return mapa;

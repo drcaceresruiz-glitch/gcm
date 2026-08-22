@@ -515,6 +515,32 @@ export function CurvaS({
           </span>
         </div>
 
+        {/* La misma aclaracion que ya trae `PanelEvm`, y por el mismo motivo:
+            el PLAN de esta curva sale de la linea base congelada cuando
+            existe (para que reprogramar no mueva los postes), pero la tabla
+            de tareas de la pantalla siempre muestra el corte VIGENTE. Sin
+            este aviso, una tarea reprogramada despues de fijar la base
+            puede leerse en la tabla con una fecha que no coincide con el
+            plan que dibuja el grafico, y parece una discrepancia cuando es
+            la diferencia esperada entre "lo prometido" y "lo vigente". */}
+        {datos.lineaBase ? (
+          <p className="text-xs opacity-70">
+            El plan de esta curva está medido contra la{" "}
+            <strong>línea base v{datos.lineaBase.version}</strong>
+            {datos.lineaBase.fijadaEn
+              ? ` (fijada el ${fechaLarga(datos.lineaBase.fijadaEn)})`
+              : ""}
+            . Si el cronograma se reprogramó después, la tabla de tareas de
+            abajo puede no coincidir con este plan — es la línea base la que
+            no se mueve.
+          </p>
+        ) : (
+          <p className="text-xs opacity-60">
+            Sin línea base fijada: el plan de esta curva sale del corte
+            vigente, igual que la tabla de abajo.
+          </p>
+        )}
+
         <p className="text-sm">
           {enCorte ? "Al corte del " : "Al "}
           <strong>{fechaCorta(medida.fecha)}</strong>: real{" "}

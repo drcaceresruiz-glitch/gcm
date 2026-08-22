@@ -529,11 +529,11 @@ describe("tareasTerminadas y la ventana", () => {
     const tareas = [
       {
         uid: 1, codigo: "4.5", nombre: "Curado de concreto",
-        inicio: dc("2026-08-10"), fin: dc("2026-08-14"), esResumen: false,
+        inicio: dc("2026-08-10"), fin: dc("2026-08-14"), esResumen: false, esHito: false,
       },
       {
         uid: 2, codigo: "5.1", nombre: "Transporte de estructuras",
-        inicio: dc("2026-08-10"), fin: dc("2026-08-14"), esResumen: false,
+        inicio: dc("2026-08-10"), fin: dc("2026-08-14"), esResumen: false, esHito: false,
       },
     ];
 
@@ -763,6 +763,7 @@ describe("tareasDeLaSemana", () => {
     ini: string,
     f: string,
     esResumen = false,
+    esHito = false,
   ): TareaProgramada => ({
     uid,
     codigo,
@@ -770,6 +771,7 @@ describe("tareasDeLaSemana", () => {
     inicio: dc(ini),
     fin: dc(f),
     esResumen,
+    esHito,
   });
   const ini = dc("2026-08-01");
   const fin = dc("2026-08-07");
@@ -795,6 +797,11 @@ describe("tareasDeLaSemana", () => {
 
   it("excluye resumenes aunque solapen", () => {
     const tareas = [t(20, "R", "2026-08-01", "2026-08-07", true)];
+    expect(tareasDeLaSemana(tareas, ini, fin, VACIO)).toEqual([]);
+  });
+
+  it("excluye hitos aunque solapen: duran cero dias y no son trabajo", () => {
+    const tareas = [t(21, "H", "2026-08-03", "2026-08-03", false, true)];
     expect(tareasDeLaSemana(tareas, ini, fin, VACIO)).toEqual([]);
   });
 
@@ -917,6 +924,13 @@ describe("mapaPreservablePorUid", () => {
     // Se anota al cerrar la semana: si no se preservara, reabrir y volver a
     // guardar borraria lo que de verdad se ejecuto.
     cantidadEjec: "90.0000",
+    // Estos cuatro tambien se anotan al cerrar (o durante la ejecucion): sin
+    // preservarlos, reabrir y volver a guardar borraba el PPC y el Pareto de
+    // un cierre que ya paso.
+    cumplido: true,
+    causa: null,
+    notaCierre: "Listo antes de lo previsto.",
+    enEjecucionAt: new Date("2026-08-01T00:00:00.000Z"),
   };
 
   it("conserva lo que la pantalla no reenvia", () => {

@@ -286,6 +286,7 @@ async function cronogramaVigente(sesion: SesionActiva, obraId: string) {
           inicio: true,
           fin: true,
           esResumen: true,
+          esHito: true,
           // Para saber cuales estan acabadas: sin esto la ventana ofrecia
           // preparar y comprometer trabajo ya hecho.
           porcentajeArchivo: true,
@@ -344,6 +345,7 @@ async function tareasDeLaVentana(
     inicio: t.inicio,
     fin: t.fin,
     esResumen: t.esResumen,
+    esHito: t.esHito,
   }));
   return {
     desde,
@@ -698,7 +700,7 @@ export async function menuDePase(
       tareas: {
         select: {
           uid: true, codigo: true, nombre: true,
-          inicio: true, fin: true, esResumen: true,
+          inicio: true, fin: true, esResumen: true, esHito: true,
         },
       },
     },
@@ -712,6 +714,7 @@ export async function menuDePase(
       inicio: t.inicio,
       fin: t.fin,
       esResumen: t.esResumen,
+      esHito: t.esHito,
     })),
     desde,
     hasta,
