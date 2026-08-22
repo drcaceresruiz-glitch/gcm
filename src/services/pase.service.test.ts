@@ -189,7 +189,12 @@ beforeEach(() => {
   h.cfg.puede = ["lookahead:gestionar"];
   h.cfg.alcanza = true;
   h.cfg.validaOk = true;
-  h.cfg.proyecto = { id: "o1" };
+  h.cfg.proyecto = {
+    id: "o1",
+    estado: "PLANIFICACION",
+    archivadaEn: null,
+    company: { enMigracionAt: null },
+  };
   h.cfg.paseFindFirst = null;
   h.cfg.lista = [];
   h.cfg.desafio = null;
@@ -337,6 +342,9 @@ describe("crearPase: guardas de gestion", () => {
 describe("cambiarEstadoPase", () => {
   it("revocar tira sus sesiones y codigos en el acto", async () => {
     h.cfg.updateManyCount = 1;
+    h.cfg.paseFindFirst = {
+      project: { estado: "EN_EJECUCION", archivadaEn: null, company: { enMigracionAt: null } },
+    };
     const r = await cambiarEstadoPase(sesion, "o1", "p1", false);
     expect(r.ok).toBe(true);
     expect(h.reg.sesionDeleteMany).toHaveLength(1);

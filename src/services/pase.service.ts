@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { alcanzaObra, FUERA_DE_ALCANCE } from "@/lib/alcance-obras";
+import { motivoNoAdmiteCambios } from "@/lib/obras";
 import { isProduction } from "@/lib/env";
 import { generateToken, hashToken, generateNumericCode } from "@/lib/tokens";
 import {
@@ -145,9 +146,21 @@ export async function crearPase(
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
-    select: { id: true },
+    select: {
+      id: true,
+      estado: true,
+      archivadaEn: true,
+      company: { select: { enMigracionAt: true } },
+    },
   });
   if (!obra) return { ok: false, error: "Obra no encontrada." };
+
+  const noAdmite = motivoNoAdmiteCambios({
+    estado: obra.estado,
+    archivadaEn: obra.archivadaEn,
+    empresaEnMigracion: obra.company.enMigracionAt !== null,
+  });
+  if (noAdmite) return { ok: false, error: noAdmite };
 
   const v = validarAltaPase(datos);
   if (!v.ok) return { ok: false, error: v.error };
@@ -222,9 +235,27 @@ export async function editarPase(
 
   const previo = await prisma.paseObra.findFirst({
     where: { id: paseId, projectId: obraId, project: { companyId: sesion.companyId } },
-    select: { id: true, celular: true, email: true },
+    select: {
+      id: true,
+      celular: true,
+      email: true,
+      project: {
+        select: {
+          estado: true,
+          archivadaEn: true,
+          company: { select: { enMigracionAt: true } },
+        },
+      },
+    },
   });
   if (!previo) return { ok: false, error: "Pase no encontrado." };
+
+  const noAdmite = motivoNoAdmiteCambios({
+    estado: previo.project.estado,
+    archivadaEn: previo.project.archivadaEn,
+    empresaEnMigracion: previo.project.company.enMigracionAt !== null,
+  });
+  if (noAdmite) return { ok: false, error: noAdmite };
 
   const v = validarAltaPase(datos);
   if (!v.ok) return { ok: false, error: v.error };
@@ -306,9 +337,23 @@ export async function eliminarPase(
     select: {
       nombres: true, apellidos: true, celular: true, email: true,
       _count: { select: { fotos: true } },
+      project: {
+        select: {
+          estado: true,
+          archivadaEn: true,
+          company: { select: { enMigracionAt: true } },
+        },
+      },
     },
   });
   if (!pase) return { ok: false, error: "Pase no encontrado." };
+
+  const noAdmite = motivoNoAdmiteCambios({
+    estado: pase.project.estado,
+    archivadaEn: pase.project.archivadaEn,
+    empresaEnMigracion: pase.project.company.enMigracionAt !== null,
+  });
+  if (noAdmite) return { ok: false, error: noAdmite };
 
   await prisma.paseObra.delete({ where: { id: paseId } });
 
@@ -350,6 +395,27 @@ export async function cambiarEstadoPase(
   if (!puede(sesion, "lookahead:gestionar")) {
     return { ok: false, error: "No tienes permiso para gestionar los pases." };
   }
+
+  const previo = await prisma.paseObra.findFirst({
+    where: { id: paseId, projectId: obraId, project: { companyId: sesion.companyId } },
+    select: {
+      project: {
+        select: {
+          estado: true,
+          archivadaEn: true,
+          company: { select: { enMigracionAt: true } },
+        },
+      },
+    },
+  });
+  if (!previo) return { ok: false, error: "Pase no encontrado." };
+
+  const noAdmite = motivoNoAdmiteCambios({
+    estado: previo.project.estado,
+    archivadaEn: previo.project.archivadaEn,
+    empresaEnMigracion: previo.project.company.enMigracionAt !== null,
+  });
+  if (noAdmite) return { ok: false, error: noAdmite };
 
   const { count } = await prisma.paseObra.updateMany({
     where: {

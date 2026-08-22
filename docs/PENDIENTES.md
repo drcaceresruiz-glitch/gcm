@@ -269,22 +269,33 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
    (`motivoSiObraCerrada` en `obra-abierta.ts`, usada por ~24 servicios) y
    cada transicion. Hallazgos confirmados, de mas a menos impacto:
 
-   **Bugs reales (la guarda se salta, no es cuestion de diseno):**
-   - **`partidas.service.ts` y `evidencia.service.ts` no comprueban
-     `empresaEnMigracion`.** Ambos reimplementan la guarda a mano en vez de
-     llamar a `motivoSiObraCerrada`, y su propio `select` de la obra nunca
-     trae `company.enMigracionAt`, asi que esa rama de
-     `motivoNoAdmiteCambios` nunca se dispara ahi. Resultado: mientras la
-     empresa esta congelada para exportarse —cuyo propio mensaje
+   **Bugs reales (la guarda se saltaba, no era cuestion de diseno) —
+   ARREGLADOS el 21 de agosto de 2026:**
+   - ~~**`partidas.service.ts` y `evidencia.service.ts` no comprueban
+     `empresaEnMigracion`.**~~ Ambos reimplementaban la guarda a mano en
+     vez de llamar a `motivoSiObraCerrada`, y su `select` de la obra nunca
+     traia `company.enMigracionAt`, asi que esa rama de
+     `motivoNoAdmiteCambios` nunca se disparaba ahi: mientras la empresa
+     estaba congelada para exportarse —cuyo propio mensaje
      (`EMPRESA_EN_MIGRACION`) promete "nadie puede escribir mientras
      dure"— el presupuesto entero (`actualizarPartida`, `eliminarPartida`,
-     `crearPartida`, `renumerarPartidas`, `agruparEnSumaAlzada`) se sigue
-     pudiendo editar, y un pase de campo activo sigue pudiendo subir fotos.
-   - **`pase.service.ts` no comprueba el estado de la obra en absoluto.**
-     `crearPase`, `editarPase`, `eliminarPase` y `cambiarEstadoPase` (que
-     incluye REACTIVAR un pase) ni siquiera piden `estado` en su `select`
-     de la obra. Se puede dar de alta o reactivar un pase de campo para una
-     obra CERRADA, archivada o con la empresa en migracion.
+     `crearPartida`, `renumerarPartidas`, `agruparEnSumaAlzada`) se seguia
+     pudiendo editar, y un pase de campo activo seguia pudiendo subir
+     fotos. Se anadio `company: { select: { enMigracionAt: true } } }` a
+     los cinco `select` (4 en `partidas.service.ts`, 1 en
+     `subirEvidenciaConPase`) y se paso `empresaEnMigracion` a
+     `motivoNoAdmiteCambios`.
+   - ~~**`pase.service.ts` no comprueba el estado de la obra en
+     absoluto.**~~ `crearPase`, `editarPase`, `eliminarPase` y
+     `cambiarEstadoPase` (que incluye REACTIVAR un pase) ni siquiera pedian
+     `estado` en su `select` de la obra: se podia dar de alta o reactivar
+     un pase de campo para una obra CERRADA, archivada o con la empresa en
+     migracion. Las cuatro escrituras ahora consultan
+     `estado`/`archivadaEn`/`company.enMigracionAt` y llaman a
+     `motivoNoAdmiteCambios` antes de escribir —`cambiarEstadoPase` no
+     traia la obra en absoluto antes del `updateMany`, asi que ahora hace
+     un `findFirst` previo—. 2461 pruebas en verde, typecheck/lint/build
+     limpios.
 
    **Confirmado, y es una decision sin tomar, no un bug de codigo:**
    - **PARALIZADA no bloquea NINGUNA escritura**, verificado caso por caso:

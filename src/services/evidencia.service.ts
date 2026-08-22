@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { env } from "@/lib/env";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
+import { motivoNoAdmiteCambios } from "@/lib/obras";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -193,11 +194,20 @@ export async function subirEvidenciaConPase(
 
   const obra = await prisma.project.findFirst({
     where: { id: pase.obraId },
-    select: { estado: true },
+    select: {
+      estado: true,
+      archivadaEn: true,
+      company: { select: { enMigracionAt: true } },
+    },
   });
-  if (obra?.estado === "CERRADA") {
-    return { ok: false, error: "La obra está cerrada: ya no admite cambios." };
-  }
+  const noAdmite =
+    obra &&
+    motivoNoAdmiteCambios({
+      estado: obra.estado,
+      archivadaEn: obra.archivadaEn,
+      empresaEnMigracion: obra.company.enMigracionAt !== null,
+    });
+  if (noAdmite) return { ok: false, error: noAdmite };
 
   return guardarFoto(
     {

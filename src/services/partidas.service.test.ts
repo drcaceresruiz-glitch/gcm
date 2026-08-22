@@ -99,7 +99,7 @@ vi.mock("@/lib/prisma", () => {
         update: () => Promise.resolve({}),
         count: () => Promise.resolve(estado.sujeciones["mapeo"] ?? 0),
       },
-      project: { findFirst: () => Promise.resolve({ id: "obra", estado: "PLANIFICACION", archivadaEn: null }) },
+      project: { findFirst: () => Promise.resolve({ id: "obra", estado: "PLANIFICACION", archivadaEn: null, company: { enMigracionAt: null } }) },
       auditLog: { create: () => Promise.resolve({}) },
       $transaction: (fn: (tx: unknown) => unknown) =>
         Promise.resolve(
@@ -160,7 +160,7 @@ function partidaAlcance() {
     parcial: null,
     tipo: "PARTIDA",
     modalidad: "ALCANCE",
-    project: { estado: "PLANIFICACION", archivadaEn: null },
+    project: { estado: "PLANIFICACION", archivadaEn: null, company: { enMigracionAt: null } },
   };
 }
 
@@ -210,7 +210,7 @@ describe("un capitulo no tiene modalidad", () => {
       parcial: null,
       tipo: "CAPITULO",
       modalidad: "PRECIOS_UNITARIOS",
-      project: { estado: "PLANIFICACION", archivadaEn: null },
+      project: { estado: "PLANIFICACION", archivadaEn: null, company: { enMigracionAt: null } },
     };
 
     const r = await actualizarPartida(sesion, "c1", { modalidad: "SUMA_ALZADA" });
@@ -486,7 +486,7 @@ describe("borrar una partida sujeta por otra cosa", () => {
       metrado: null,
       precioUnitario: null,
       parcial: null,
-      project: { id: "obra", estado: "PLANIFICACION", archivadaEn: null },
+      project: { id: "obra", estado: "PLANIFICACION", archivadaEn: null, company: { enMigracionAt: null } },
     };
   }
 
@@ -1176,7 +1176,7 @@ describe("borrar una partida que ya se empezo", () => {
       metrado: null,
       precioUnitario: null,
       parcial: null,
-      project: { id: "obra", estado: "EN_EJECUCION", archivadaEn: null },
+      project: { id: "obra", estado: "EN_EJECUCION", archivadaEn: null, company: { enMigracionAt: null } },
     };
     estado.mapeos = [{ id: "m1", codigoPartida: "4.1" }];
   }

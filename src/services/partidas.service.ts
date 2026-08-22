@@ -65,7 +65,13 @@ async function contextoEditable(sesion: SesionActiva, partidaId: string) {
       parcial: true,
       tipo: true,
       modalidad: true,
-      project: { select: { estado: true, archivadaEn: true } },
+      project: {
+        select: {
+          estado: true,
+          archivadaEn: true,
+          company: { select: { enMigracionAt: true } },
+        },
+      },
     },
   });
 
@@ -73,7 +79,11 @@ async function contextoEditable(sesion: SesionActiva, partidaId: string) {
 
   // Antes que el congelado: una obra cerrada no admite cambios aunque su
   // presupuesto nunca llegara a congelarse.
-  const noAdmite = motivoNoAdmiteCambios(partida.project);
+  const noAdmite = motivoNoAdmiteCambios({
+    estado: partida.project.estado,
+    archivadaEn: partida.project.archivadaEn,
+    empresaEnMigracion: partida.project.company.enMigracionAt !== null,
+  });
   if (noAdmite) return { ok: false as const, error: noAdmite };
 
   const congelada = await prisma.baseline.findFirst({
@@ -550,11 +560,20 @@ export async function crearPartida(
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
-    select: { id: true, estado: true, archivadaEn: true },
+    select: {
+      id: true,
+      estado: true,
+      archivadaEn: true,
+      company: { select: { enMigracionAt: true } },
+    },
   });
   if (!obra) return { ok: false, error: "Obra no encontrada." };
 
-  const noAdmite = motivoNoAdmiteCambios(obra);
+  const noAdmite = motivoNoAdmiteCambios({
+    estado: obra.estado,
+    archivadaEn: obra.archivadaEn,
+    empresaEnMigracion: obra.company.enMigracionAt !== null,
+  });
   if (noAdmite) return { ok: false, error: noAdmite };
 
   const congelada = await prisma.baseline.findFirst({
@@ -964,11 +983,20 @@ export async function renumerarPartidas(
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
-    select: { id: true, estado: true, archivadaEn: true },
+    select: {
+      id: true,
+      estado: true,
+      archivadaEn: true,
+      company: { select: { enMigracionAt: true } },
+    },
   });
   if (!obra) return { ok: false, error: "Obra no encontrada." };
 
-  const noAdmite = motivoNoAdmiteCambios(obra);
+  const noAdmite = motivoNoAdmiteCambios({
+    estado: obra.estado,
+    archivadaEn: obra.archivadaEn,
+    empresaEnMigracion: obra.company.enMigracionAt !== null,
+  });
   if (noAdmite) return { ok: false, error: noAdmite };
 
   /**
@@ -1318,11 +1346,20 @@ export async function agruparEnSumaAlzada(
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
-    select: { id: true, estado: true, archivadaEn: true },
+    select: {
+      id: true,
+      estado: true,
+      archivadaEn: true,
+      company: { select: { enMigracionAt: true } },
+    },
   });
   if (!obra) return { ok: false, error: "Obra no encontrada." };
 
-  const noAdmite = motivoNoAdmiteCambios(obra);
+  const noAdmite = motivoNoAdmiteCambios({
+    estado: obra.estado,
+    archivadaEn: obra.archivadaEn,
+    empresaEnMigracion: obra.company.enMigracionAt !== null,
+  });
   if (noAdmite) return { ok: false, error: noAdmite };
 
   // Misma puerta que la renumeracion: con una revision viva —congelada o en
