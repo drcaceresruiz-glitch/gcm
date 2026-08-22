@@ -333,25 +333,30 @@ export default async function PanelPage({
       )}
 
       {vacioDeVerdad ? (
+        // Compacta a proposito: `Bienvenida`, justo arriba, ya dice "Crea tu
+        // primera obra" como siguiente paso. Esta caja no repite el mensaje
+        // para ocupar pantalla —solo aporta lo que Bienvenida no tiene, el
+        // BOTON— y por eso es una franja, no un bloque de p-10 con una
+        // mascota de 180px flotando.
         <div
-          className="rounded-xl border border-dashed p-10 text-center"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed px-5 py-3"
           style={{ borderColor: "var(--borde)" }}
         >
-          <div className="flex justify-center">
-            <Mascota pose="saludando" alto={180} flotar />
+          <div className="flex items-center gap-3">
+            <Mascota pose="saludando" alto={44} />
+            {/* Dos vacios distintos: la empresa sin obras (lo ve quien puede
+                crearlas) y la persona sin obras asignadas. Ver el comentario
+                de `siguientePaso` en Bienvenida. */}
+            <p className="text-sm opacity-70">
+              {puedeCrear
+                ? "Crea tu primera obra para empezar a cargar el presupuesto."
+                : "Todavía no tienes ninguna obra asignada. Pídele al administrador de la empresa que te asigne la tuya."}
+            </p>
           </div>
-          {/* Dos vacios distintos: la empresa sin obras (lo ve quien puede
-              crearlas) y la persona sin obras asignadas. Ver el comentario de
-              `siguientePaso` en Bienvenida. */}
-          <p className="mt-3 text-sm opacity-70">
-            {puedeCrear
-              ? "Crea tu primera obra para empezar a cargar el presupuesto."
-              : "Todavía no tienes ninguna obra asignada. Pídele al administrador de la empresa que te asigne la tuya."}
-          </p>
           {puedeCrear && (
             <Link
               href="/obras/nueva"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
               style={{ backgroundColor: "var(--color-marca-600)" }}
             >
               <Plus className="size-4" aria-hidden="true" />
