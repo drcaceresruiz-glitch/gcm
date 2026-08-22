@@ -14,3 +14,4 @@
 - [Commit y push sin preguntar](commit-y-push-sin-preguntar.md) — autorizado el 21 de agosto: hacerlo cuando yo lo recomendaria, sin pedir confirmacion antes
 - [Clic dentro de menu desplegable](clic-dentro-de-menu-desplegable.md) — un form que se cierra al clic puede desmontarse antes de enviarse; probar con un clic real, no solo pruebas automatizadas
 - [E2E golden path verificado](e2e-golden-path-verificado.md) — obra->presupuesto->EDT->linea base->movimientos->encargos->Last Planner probado con navegador real el 21/08/2026; reiniciar dev server tras prisma generate
+- [Hablar siempre en espanol](hablar-siempre-en-espanol.md) — pedido dos veces en la misma sesion (22/08/2026); ni una respuesta en ingles, ni corta ni tecnica
