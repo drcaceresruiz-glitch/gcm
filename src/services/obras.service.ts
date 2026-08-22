@@ -10,6 +10,7 @@ import { esPositivo, restar, sumar } from "@/lib/decimal";
 import {
   comprometidoPorPartida,
   desgloseComprometido,
+  importeValorizado,
   type EncargoDelComprometido,
 } from "@/lib/encargos";
 import { subtotalesPorRama, sumarHojas } from "@/lib/jerarquia-partidas";
@@ -22,6 +23,8 @@ import {
   puedeTransicionarObra,
   requisitosParaEjecutar,
   puedeArrancar,
+  requisitosParaCerrar,
+  puedeCerrar,
   motivoNoAdmiteCambios,
   ETIQUETA_ESTADO_OBRA,
   type EstadoObra,
@@ -1449,6 +1452,53 @@ export async function cambiarEstadoObra(
     });
 
     if (!puedeArrancar(faltan)) {
+      const bloqueante = faltan.find((r) => r.bloqueante);
+      return {
+        ok: false,
+        error: `${bloqueante?.falta ?? "Faltan requisitos."} ${bloqueante?.consecuencia ?? ""}`.trim(),
+      };
+    }
+  }
+
+  // Cerrar es historia: una vez cerrada, nadie puede ya aprobar un
+  // movimiento en borrador ni saldar una deuda pendiente. Se comprueba
+  // aqui, en el servidor, para las tres transiciones que llevan a CERRADA
+  // (PLANIFICACION, EN_EJECUCION y PARALIZADA).
+  //
+  // El tercer requisito de `requisitosParaCerrar` —pendientes criticos del
+  // tablero— no se comprueba todavia: reusar `pendientesDeLaObra` desde
+  // aqui crearia un ciclo de imports (`tablero.service` ya importa de este
+  // archivo), y no vale la pena duplicar esa logica solo para un aviso que
+  // ademas no bloquea nada. Se deja en `0` a proposito; ver PENDIENTES.md.
+  if (nuevoEstado === "CERRADA") {
+    const [encargosVigentes, movimientosBorrador] = await Promise.all([
+      prisma.encargoProveedor.findMany({
+        where: { projectId: obraId, estado: "VIGENTE" },
+        select: {
+          montoContratado: true,
+          valorizaciones: { orderBy: { fecha: "desc" }, take: 1, select: { porcentaje: true } },
+          pagos: { select: { monto: true } },
+        },
+      }),
+      prisma.movimientoPresupuestal.count({
+        where: { projectId: obraId, estado: "BORRADOR" },
+      }),
+    ]);
+
+    const valorizacionesPendientes = encargosVigentes.filter((e) => {
+      const porcentaje = e.valorizaciones[0]?.porcentaje.toString() ?? "0";
+      const valorizado = importeValorizado(e.montoContratado.toString(), porcentaje);
+      const pagado = sumar(e.pagos.map((p) => p.monto.toString()));
+      return esPositivo(restar(valorizado, pagado) ?? "0.00");
+    }).length;
+
+    const faltan = requisitosParaCerrar({
+      valorizacionesPendientes,
+      movimientosBorrador,
+      pendientesCriticos: 0,
+    });
+
+    if (!puedeCerrar(faltan)) {
       const bloqueante = faltan.find((r) => r.bloqueante);
       return {
         ok: false,

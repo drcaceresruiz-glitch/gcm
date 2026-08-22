@@ -94,12 +94,18 @@ export function puedeTransicionarObra(desde: string, hacia: string): boolean {
  * relleno para pasarla, que es peor que no tener puerta.
  */
 export interface RequisitoObra {
-  clave: "presupuesto" | "cronograma" | "linea_base";
+  clave:
+    | "presupuesto"
+    | "cronograma"
+    | "linea_base"
+    | "valorizaciones"
+    | "movimientos_borrador"
+    | "pendientes_criticos";
   /// Que falta, en una linea.
   falta: string;
-  /// Que NO va a funcionar si se arranca sin esto.
+  /// Que NO va a funcionar si se arranca (o se cierra) sin esto.
   consecuencia: string;
-  /// Si impide arrancar o solo se avisa.
+  /// Si impide la transicion o solo se avisa.
   bloqueante: boolean;
 }
 
@@ -154,6 +160,80 @@ export function requisitosParaEjecutar(
 export function puedeArrancar(faltan: readonly RequisitoObra[]): boolean {
   return !faltan.some((r) => r.bloqueante);
 }
+
+/**
+ * Que le falta a una obra para poder cerrarse, simetrico a
+ * `requisitosParaEjecutar`.
+ *
+ * Dos cosas SI bloquean, porque cerrar la obra las vuelve irresolubles para
+ * siempre —cerrada es historia, nadie puede ya aprobar un borrador ni saldar
+ * una deuda contra una obra que ya no admite escrituras—: valorizaciones con
+ * saldo por pagar, y movimientos presupuestales sin decidir. Los pendientes
+ * del tablero (tareas, restricciones) NO bloquean: esa lista ya se declara
+ * "informa, no bloquea" en `lib/pendientes.ts`, y convertirla en puerta de
+ * golpe rompería esa doctrina para cualquiera que la mire desde el tablero.
+ */
+export interface EstadoObraParaCerrar {
+  /// Encargos VIGENTES con saldo por pagar (valorizado - pagado > 0).
+  valorizacionesPendientes: number;
+  /// MovimientoPresupuestal en estado BORRADOR.
+  movimientosBorrador: number;
+  /// Pendientes del tablero (`lib/pendientes.ts`) de gravedad "critica".
+  pendientesCriticos: number;
+}
+
+export function requisitosParaCerrar(
+  estado: EstadoObraParaCerrar,
+): RequisitoObra[] {
+  const faltan: RequisitoObra[] = [];
+
+  if (estado.valorizacionesPendientes > 0) {
+    faltan.push({
+      clave: "valorizaciones",
+      falta:
+        estado.valorizacionesPendientes === 1
+          ? "Hay un encargo con saldo por pagar."
+          : `Hay ${estado.valorizacionesPendientes} encargos con saldo por pagar.`,
+      consecuencia:
+        "Cerrar la obra sin saldar la deuda con el proveedor la esconde: " +
+        "quedaria historia sin poder corregirse.",
+      bloqueante: true,
+    });
+  }
+
+  if (estado.movimientosBorrador > 0) {
+    faltan.push({
+      clave: "movimientos_borrador",
+      falta:
+        estado.movimientosBorrador === 1
+          ? "Hay un movimiento presupuestal sin aprobar."
+          : `Hay ${estado.movimientosBorrador} movimientos presupuestales sin aprobar.`,
+      consecuencia:
+        "Un borrador es una decision sin tomar; cerrada la obra nadie " +
+        "puede ya aprobarlo ni rechazarlo.",
+      bloqueante: true,
+    });
+  }
+
+  if (estado.pendientesCriticos > 0) {
+    faltan.push({
+      clave: "pendientes_criticos",
+      falta:
+        estado.pendientesCriticos === 1
+          ? "Queda una cosa pendiente en el tablero."
+          : `Quedan ${estado.pendientesCriticos} cosas pendientes en el tablero.`,
+      consecuencia:
+        "Se puede cerrar igual: esta lista informa, no impide — revisala " +
+        "antes por si algo merece resolverse primero.",
+      bloqueante: false,
+    });
+  }
+
+  return faltan;
+}
+
+/** Alias de `puedeArrancar`: la regla es la misma, "si algo bloquea". */
+export const puedeCerrar = puedeArrancar;
 
 /**
  * Si una obra admite cambios.

@@ -9,6 +9,8 @@ import {
   etiquetaTransicionObra,
   requisitosParaEjecutar,
   puedeArrancar,
+  requisitosParaCerrar,
+  puedeCerrar,
   obraAdmiteCambios,
   motivoNoAdmiteCambios,
   OBRA_CERRADA,
@@ -126,6 +128,68 @@ describe("requisitos para poner una obra en marcha", () => {
       partidas: 0,
       tieneCronograma: false,
       tieneLineaBase: false,
+    })) {
+      expect(r.consecuencia.length).toBeGreaterThan(30);
+    }
+  });
+});
+
+describe("requisitos para cerrar una obra", () => {
+  const sinNada = {
+    valorizacionesPendientes: 0,
+    movimientosBorrador: 0,
+    pendientesCriticos: 0,
+  };
+
+  it("sin nada pendiente, se puede cerrar", () => {
+    const faltan = requisitosParaCerrar(sinNada);
+    expect(faltan).toEqual([]);
+    expect(puedeCerrar(faltan)).toBe(true);
+  });
+
+  it("con saldo por pagar, NO se puede cerrar", () => {
+    const faltan = requisitosParaCerrar({ ...sinNada, valorizacionesPendientes: 2 });
+    expect(puedeCerrar(faltan)).toBe(false);
+    expect(faltan[0]?.clave).toBe("valorizaciones");
+    expect(faltan[0]?.bloqueante).toBe(true);
+    expect(faltan[0]?.falta).toContain("2 encargos");
+  });
+
+  it("con un movimiento en borrador, NO se puede cerrar", () => {
+    const faltan = requisitosParaCerrar({ ...sinNada, movimientosBorrador: 1 });
+    expect(puedeCerrar(faltan)).toBe(false);
+    expect(faltan[0]?.clave).toBe("movimientos_borrador");
+    expect(faltan[0]?.falta).toContain("un movimiento");
+  });
+
+  it("con pendientes criticos del tablero, se avisa pero SI se deja cerrar", () => {
+    // Esta lista es "informa, no bloquea" tambien aqui: la misma doctrina
+    // que ya tiene `lib/pendientes.ts`.
+    const faltan = requisitosParaCerrar({ ...sinNada, pendientesCriticos: 3 });
+    expect(puedeCerrar(faltan)).toBe(true);
+    expect(faltan[0]?.clave).toBe("pendientes_criticos");
+    expect(faltan[0]?.bloqueante).toBe(false);
+  });
+
+  it("acumula lo bloqueante y lo que solo avisa, bloqueantes primero", () => {
+    const faltan = requisitosParaCerrar({
+      valorizacionesPendientes: 1,
+      movimientosBorrador: 1,
+      pendientesCriticos: 1,
+    });
+    expect(faltan.map((r) => r.clave)).toEqual([
+      "valorizaciones",
+      "movimientos_borrador",
+      "pendientes_criticos",
+    ]);
+    expect(puedeCerrar(faltan)).toBe(false);
+  });
+
+  it("cada requisito dice que se rompe, no solo que falta", () => {
+    for (const r of requisitosParaCerrar({
+      valorizacionesPendientes: 1,
+      movimientosBorrador: 1,
+      pendientesCriticos: 1,
     })) {
       expect(r.consecuencia.length).toBeGreaterThan(30);
     }
