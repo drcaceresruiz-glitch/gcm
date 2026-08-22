@@ -1626,6 +1626,38 @@ Lo que SI se hara, en este orden:
    via API de pago (p. ej. Claude Haiku) anclada a los datos de la obra
    —decision de producto para ese momento—.
 
+   **Arquitectura pre-conversada el 22 de agosto de 2026**, sin compromiso
+   de negocio todavia (el usuario exploraba la idea, no hay venta que la
+   exija) — para no volver a empezar de cero cuando llegue el momento:
+   - **Modelo**: Claude via API (el tool-use es lo que hace falta para un
+     agente que actua con criterio, no solo responde). Un modelo
+     open-source autoalojado NO es viable con el hosting actual —el cPanel
+     compartido de 20 Entry Processes no tiene ni RAM ni GPU—; solo tendria
+     sentido si algun dia migran a infraestructura propia.
+   - **El principio que manda sobre todo lo demas**: el agente NUNCA toca
+     la base cruda ni tiene un bypass de permisos. Sus "herramientas" son
+     envoltorios delgados sobre las funciones de servicio que YA existen
+     (`crearMovimiento`, `registrarAvance`, `listarObras`...) —las mismas
+     que ya hacen `puede(sesion, ...)`, ya filtran por `companyId`, ya
+     respetan PARALIZADA—. Escribir una segunda autorizacion aparte para
+     el agente es exactamente el tipo de bug caro que este proyecto ya
+     penso (dos definiciones de lo mismo que se desalinean).
+   - **El host condiciona la arquitectura**: ya se cayo dos veces por
+     trabajo pesado dentro de una peticion (`docs/ESTADO.md`). Una llamada
+     a un LLM con varias vueltas de tool-use puede tardar 10-30 segundos —
+     no puede correr sincrono dentro de un Server Action ocupando uno de
+     los 20 procesos. Hace falta un servicio aparte (funcion serverless o
+     worker con cola) que llame de vuelta a GCM con la sesion real del
+     usuario, o un patron asincrono con sondeo dentro de la misma app.
+   - **Si algun dia incluye accion (crear/editar), no solo lectura**:
+     separar "proponer" de "ejecutar", mismo patron de friccion que ya usa
+     el resto de GCM (confirmacion escrita para cerrar obra, motivo
+     obligatorio para paralizar) — el agente PROPONE la accion en texto
+     claro y el usuario confirma antes de que se ejecute la llamada real.
+     Y el agente deberia poder crear movimientos en BORRADOR pero NUNCA
+     aprobarlos: la aprobacion de dinero se queda como clic humano
+     deliberado, igual que hoy.
+
 ---
 
 ## 6c. Auditoria del 10 de agosto: las costuras, no las formulas
