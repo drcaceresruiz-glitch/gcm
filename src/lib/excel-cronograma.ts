@@ -1,6 +1,8 @@
 import ExcelJS from "exceljs";
 
 import { normalizarDecimal } from "@/lib/decimal";
+import { calcularRutaCritica } from "@/lib/ruta-critica";
+import type { DiaLaboral } from "@/lib/calendario";
 import type {
   DependenciaImportada,
   ErrorCronograma,
@@ -21,11 +23,22 @@ import type {
  * Ese contrato compartido es lo que permite que la vista previa, las acciones
  * de servidor y `importarCronograma` no se enteren de por donde entro el plan.
  *
- * Lo que este archivo NO sabe, no lo inventa. Un Excel no trae la red de
- * precedencias completa, asi que no hay ruta critica ni holgura que calcular:
- * todas las tareas salen con `esCritico` en falso y `holguraInferida` en
- * cierto. Es la misma regla por la que el lector de MS Project se niega a
+ * Lo que este archivo NO sabe, no lo inventa: sin columna "Depende de"
+ * llena, no hay red de precedencias que resolver, y todas las tareas salen
+ * con `esCritico` en falso y `holguraInferida` en cierto, igual que
+ * siempre. Es la misma regla por la que el lector de MS Project se niega a
  * deducir `esCritico` de la holgura.
+ *
+ * Cuando la columna SI llega llena, `calcularRutaCritica` (@/lib/ruta-critica)
+ * calcula esCritico/holguraDias de verdad. Corre con un calendario
+ * SINTETICO —todos los dias laborables—, no el real de la obra: las dos
+ * cifras que devuelve son medidas RELATIVAS (cuantos dias de margen tiene
+ * una rama frente a otra dentro de la MISMA red), y esas no cambian con el
+ * calendario mientras se use el mismo en toda la cuenta, que es lo que se
+ * hace aqui. Pedir el calendario real habria significado enhebrar la
+ * sesion y el id de la obra por las tres acciones de servidor que llaman a
+ * este analizador —incluida la vista previa, que hoy ni conoce la obra—,
+ * un cambio mucho mayor que el que pide una cifra relativa.
  */
 
 /** El nombre que lleva la hoja de datos en la plantilla. */
@@ -33,6 +46,20 @@ export const HOJA_CRONOGRAMA = "Cronograma";
 
 /** Filas de cabecera y preambulo que se exploran buscando las etiquetas. */
 const MAXIMO_FILAS_CABECERA = 30;
+
+/// El calendario sintetico de `calcularRutaCritica` (ver el comentario de
+/// cabecera): todos los dias laborables, para que la cuenta de dias se
+/// mida en dias corridos y el resultado siga siendo la MISMA holgura
+/// relativa, sea cual sea el calendario real de la obra.
+const TODOS_LABORABLES: DiaLaboral[] = [1, 2, 3, 4, 5, 6, 7].map((diaSemana) => ({
+  diaSemana,
+  laborable: true,
+  horas: "8",
+}));
+
+/// Ancla arbitraria para el CPM: como devuelve medidas relativas, cualquier
+/// fecha fija sirve igual.
+const EPOCA = new Date("2000-01-01T00:00:00.000Z");
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -677,6 +704,24 @@ export async function analizarCronogramaExcel(
     return tarea;
   });
 
+  // Ruta critica y holgura, solo si la columna "Depende de" trajo la red
+  // completa (ver el comentario de cabecera del archivo). Sin dependencias
+  // no hay nada que resolver y se deja el relleno de siempre.
+  if (dependencias.length > 0) {
+    const cpm = calcularRutaCritica(tareas, dependencias, EPOCA, TODOS_LABORABLES);
+    if (!cpm.ciclo) {
+      for (const t of tareas) {
+        if (t.esResumen) continue;
+        const critico = cpm.esCritico.get(t.uid);
+        const holgura = cpm.holguraDias.get(t.uid);
+        if (critico === undefined || holgura === undefined) continue;
+        t.esCritico = critico;
+        t.holguraDias = holgura;
+        t.holguraInferida = false;
+      }
+    }
+  }
+
   const raiz = leidas.find((t) => t.nivel === 1);
   const nombreObra = leerEtiqueta(hoja, filaCabecera, ETIQUETAS_OBRA);
   const jornada = Number(leerEtiqueta(hoja, filaCabecera, ETIQUETAS_JORNADA));
@@ -697,9 +742,11 @@ export async function analizarCronogramaExcel(
     totalTareas: tareas.length,
     totalHitos: tareas.filter((t) => t.esHito).length,
     totalResumen: tareas.filter((t) => t.esResumen).length,
-    // Cero y `tareas.length`: consecuencia directa de que no se conozcan.
-    totalCriticas: 0,
-    holgurasInferidas: tareas.length,
+    // Se cuentan DESPUES del calculo de ruta critica de arriba: sin
+    // dependencias en el archivo, sigue siendo 0 y `tareas.length` como
+    // antes; con ellas, reflejan lo que `calcularRutaCritica` resolvio.
+    totalCriticas: tareas.filter((t) => t.esCritico).length,
+    holgurasInferidas: tareas.filter((t) => t.holguraInferida).length,
     filasOmitidas,
     dependenciasDescartadas,
   };

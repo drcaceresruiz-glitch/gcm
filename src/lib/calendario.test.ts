@@ -3,12 +3,17 @@ import {
   diaIso,
   esLaborable,
   diasLaborablesEntre,
+  avanzarDiasLaborables,
   horasPorSemana,
   validarCalendario,
   type DiaLaboral,
 } from "./calendario";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00`);
+/// `avanzarDiasLaborables` es UTC a proposito (ver su comentario); las
+/// fechas de sus pruebas se anclan igual, para no depender de la zona
+/// horaria de quien corre el test.
+const utc = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 /// El de CRIOCORD: L-V 8h, sabado 5h, domingo libre.
 const CRIOCORD: DiaLaboral[] = [
@@ -128,5 +133,29 @@ describe("validarCalendario", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.dias[5]?.horas).toBe("4.50");
+  });
+});
+
+describe("avanzarDiasLaborables", () => {
+  it("adelanta saltando un dia no laborable", () => {
+    // Viernes 14 + 2 laborables: sabado 15 (laborable), domingo 16 (no
+    // cuenta), lunes 17 (laborable) — cruza el fin de semana.
+    const r = avanzarDiasLaborables(utc("2026-08-14"), 2, CRIOCORD, 1);
+    expect(r.toISOString().slice(0, 10)).toBe("2026-08-17");
+  });
+
+  it("retrocede saltando un dia no laborable, en sentido contrario", () => {
+    const r = avanzarDiasLaborables(utc("2026-08-17"), 2, CRIOCORD, -1);
+    expect(r.toISOString().slice(0, 10)).toBe("2026-08-14");
+  });
+
+  it("cero dias no mueve la fecha", () => {
+    const r = avanzarDiasLaborables(utc("2026-08-14"), 0, CRIOCORD, 1);
+    expect(r.toISOString().slice(0, 10)).toBe("2026-08-14");
+  });
+
+  it("en turno corrido (siete dias laborables) avanza dia natural por dia", () => {
+    const r = avanzarDiasLaborables(utc("2026-08-14"), 3, CORRIDO, 1);
+    expect(r.toISOString().slice(0, 10)).toBe("2026-08-17");
   });
 });

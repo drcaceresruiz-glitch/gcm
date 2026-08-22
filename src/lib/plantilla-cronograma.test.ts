@@ -62,19 +62,26 @@ describe("lo que la plantilla ensena sin decirlo", () => {
   });
 
   /**
-   * El punto entero de este lector: un Excel no trae la red de precedencias
-   * completa, asi que la ruta critica NO SE CONOCE. Se marca como no
-   * informada en vez de deducirla, igual que el lector de MS Project se niega
-   * a deducir `esCritico` de la holgura.
+   * La columna "Depende de" de la plantilla SI trae la red completa (la
+   * cadena 3->4->6->7->8, lineal y sin ramas en paralelo), asi que
+   * `calcularRutaCritica` la resuelve de verdad: las cinco partidas de
+   * trabajo salen criticas, porque no hay ninguna rama mas corta que les
+   * de margen. Los tres resumen (la obra y los dos capitulos) siguen sin
+   * ruta critica —no entran a la red— exactamente como antes.
    */
-  it("no se inventa la ruta critica ni la holgura", async () => {
+  it("calcula la ruta critica cuando la red de precedencias llega completa", async () => {
     const r = await analizarCronogramaExcel(await generarPlantillaCronograma());
 
-    expect(r.totalCriticas).toBe(0);
-    expect(r.holgurasInferidas).toBe(r.tareas.length);
-    expect(r.tareas.every((t) => !t.esCritico)).toBe(true);
-    expect(r.tareas.every((t) => t.holguraInferida)).toBe(true);
-    expect(r.tareas.every((t) => t.holguraDias === "0.00")).toBe(true);
+    const trabajo = r.tareas.filter((t) => !t.esResumen);
+    const resumen = r.tareas.filter((t) => t.esResumen);
+
+    expect(r.totalCriticas).toBe(trabajo.length);
+    expect(r.holgurasInferidas).toBe(resumen.length);
+    expect(trabajo.every((t) => t.esCritico)).toBe(true);
+    expect(trabajo.every((t) => !t.holguraInferida)).toBe(true);
+    expect(trabajo.every((t) => t.holguraDias === "0.00")).toBe(true);
+    expect(resumen.every((t) => !t.esCritico)).toBe(true);
+    expect(resumen.every((t) => t.holguraInferida)).toBe(true);
   });
 
   it("lee los enlaces de la columna Depende de", async () => {

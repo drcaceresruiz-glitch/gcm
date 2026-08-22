@@ -72,6 +72,47 @@ export function diasLaborablesEntre(
   return cuenta;
 }
 
+/// Version UTC de `diaIso`/`esLaborable`, solo para `avanzarDiasLaborables`.
+///
+/// NO se reusa `esLaborable`: internamente llama a `diaIso`, que lee
+/// `getDay()` EN HORA LOCAL (defecto ya anotado en `PENDIENTES.md`, sin
+/// arreglar a proposito en esta entrega). Mezclar un cursor UTC con un
+/// dia-de-semana local desalinea el calendario segun la zona horaria del
+/// servidor —se detecto exactamente asi, con un test que cruzaba un fin de
+/// semana y salia un dia corrido—. Esta version se queda en UTC de punta a
+/// punta para no heredar ese problema.
+function esLaborableUTC(fecha: Date, calendario: readonly DiaLaboral[]): boolean {
+  const diaSemana = fecha.getUTCDay();
+  const iso = diaSemana === 0 ? 7 : diaSemana;
+  const dia = calendario.find((d) => d.diaSemana === iso);
+  return dia ? dia.laborable : true;
+}
+
+/**
+ * Adelanta (o retrocede) una fecha N dias LABORABLES, segun el calendario.
+ *
+ * Es la operacion inversa de `diasLaborablesEntre`: esa cuenta dias
+ * laborables ENTRE dos fechas fijas; esta, dada una fecha y una cantidad,
+ * dice a que fecha se llega. La necesita el CPM (`lib/ruta-critica.ts`)
+ * para propagar duraciones por la red de dependencias.
+ */
+export function avanzarDiasLaborables(
+  fecha: Date,
+  dias: number,
+  calendario: readonly DiaLaboral[],
+  sentido: 1 | -1,
+): Date {
+  const cursor = new Date(fecha.getTime());
+  cursor.setUTCHours(0, 0, 0, 0);
+
+  let restantes = Math.max(0, Math.round(dias));
+  while (restantes > 0) {
+    cursor.setUTCDate(cursor.getUTCDate() + sentido);
+    if (esLaborableUTC(cursor, calendario)) restantes--;
+  }
+  return cursor;
+}
+
 /** Horas de trabajo a la semana, segun el calendario. */
 export function horasPorSemana(calendario: readonly DiaLaboral[]): number {
   return calendario

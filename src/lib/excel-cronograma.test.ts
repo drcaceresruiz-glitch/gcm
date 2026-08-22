@@ -167,6 +167,60 @@ describe("lo que tolera", () => {
   });
 });
 
+describe("ruta critica y holgura", () => {
+  it("sin dependencias, sigue sin inventar nada (caso de siempre)", async () => {
+    const r = await analizarCronogramaExcel(await libro([OBRA, CAPITULO, PARTIDA]));
+
+    expect(r.totalCriticas).toBe(0);
+    expect(r.holgurasInferidas).toBe(r.tareas.length);
+    expect(r.tareas.every((t) => !t.esCritico)).toBe(true);
+    expect(r.tareas.every((t) => t.holguraInferida)).toBe(true);
+  });
+
+  it("con la red completa, calcula la ruta critica de verdad", async () => {
+    // Cadena lineal 3 -> 4 -> 5, sin ramas: las tres salen criticas.
+    const r = await analizarCronogramaExcel(
+      await libro([
+        OBRA,
+        CAPITULO,
+        [3, 3, 3, "1.1", "Zapatas", "2026-06-01", "2026-06-05", 5, 100, 100, ""],
+        [4, 4, 3, "1.2", "Columnas", "2026-06-06", "2026-06-10", 5, 100, 100, "3"],
+        [5, 5, 3, "1.3", "Losa", "2026-06-11", "2026-06-15", 5, 100, 100, "4"],
+      ]),
+    );
+
+    expect(r.errores).toEqual([]);
+    const trabajo = r.tareas.filter((t) => !t.esResumen);
+    expect(trabajo).toHaveLength(3);
+    expect(trabajo.every((t) => t.esCritico)).toBe(true);
+    expect(trabajo.every((t) => !t.holguraInferida)).toBe(true);
+    expect(trabajo.every((t) => t.holguraDias === "0.00")).toBe(true);
+    expect(r.totalCriticas).toBe(3);
+  });
+
+  it("una rama en paralelo mas corta sale con holgura, no critica", async () => {
+    // 3 (10 dias) -> 5 (5 dias) es el camino largo; 4 (10 dias) -> 5 es el
+    // corto y le sobran dias. Las dos parten del mismo capitulo (sin
+    // predecesora) y confluyen en 5.
+    const r = await analizarCronogramaExcel(
+      await libro([
+        OBRA,
+        CAPITULO,
+        [3, 3, 3, "1.1", "Excavacion (larga)", "2026-06-01", "2026-06-10", 10, 100, 100, ""],
+        [4, 4, 3, "1.2", "Encofrado (corta)", "2026-06-01", "2026-06-05", 5, 100, 100, ""],
+        [5, 5, 3, "1.3", "Vaciado", "2026-06-11", "2026-06-15", 5, 100, 100, "3;4"],
+      ]),
+    );
+
+    expect(r.errores).toEqual([]);
+    const porUid = new Map(r.tareas.map((t) => [t.uid, t]));
+    expect(porUid.get(3)?.esCritico).toBe(true);
+    expect(porUid.get(5)?.esCritico).toBe(true);
+    expect(porUid.get(4)?.esCritico).toBe(false);
+    expect(Number(porUid.get(4)?.holguraDias)).toBeGreaterThan(0);
+  });
+});
+
 
 /**
  * LA CONVERSION SILENCIOSA QUE COSTO UNA PARTIDA.
