@@ -158,10 +158,57 @@ const TOPE_CONVERSACION_MS = 45_000;
 
 /// Recorta y quita cualquier rastro de la clave del texto de error de un
 /// proveedor ajeno — mismo cuidado que `probarRemitente` con la contrasena
-/// SMTP.
-function mensajeSaneado(texto: string, clave: string): string {
-  return texto.replaceAll(clave, "***").slice(0, 300);
+/// SMTP. `maxLargo` por defecto es el limite de `ultimoError`
+/// (`AgenteIaProveedor`, VARCHAR(300)); quien guarde en otra columna con
+/// otro limite (p. ej. `MensajeAgente.error`, VARCHAR(500)) lo pasa aparte.
+function mensajeSaneado(texto: string, clave: string, maxLargo = 300): string {
+  return texto.replaceAll(clave, "***").slice(0, maxLargo);
 }
+
+/// Igual que `mensajeSaneado`, pero reservando espacio para una PISTA fija
+/// que se agrega al final. Sin esto, un mensaje del proveedor ya de por si
+/// largo mas la pista podian juntos superar el limite de la columna -paso
+/// de verdad, cazado en vivo: el guardado reventaba con "el valor es
+/// demasiado largo para la columna" en vez de guardar el error-. Aqui se
+/// trunca el mensaje del proveedor, nunca la pista.
+function mensajeSaneadoConPista(
+  texto: string,
+  clave: string,
+  pista: string,
+  maxLargo = 300,
+): string {
+  const base = mensajeSaneado(texto, clave, Math.max(maxLargo - pista.length, 0));
+  return `${base}${pista}`;
+}
+
+/// Nombre y descripcion de la herramienta de mentira que "Probar" manda
+/// junto al mensaje -nunca se le pide al modelo que la use, solo que
+/// pueda RECIBIRLA sin rechazar la llamada entera-. Sin esto, "Probar"
+/// solo confirmaba que el modelo sabe responder "listo", pero el
+/// Asistente de verdad SIEMPRE manda herramientas -no hay forma de saber
+/// de antemano si la pregunta las va a necesitar-, asi que un modelo sin
+/// soporte de tool-use pasaba la prueba y fallaba en el primer mensaje
+/// real. Detectarlo aqui, al guardar la clave, es mucho mas barato que
+/// descubrirlo a mitad de una conversacion.
+const HERRAMIENTA_DE_PRUEBA_OPENAI = {
+  type: "function",
+  function: {
+    name: "confirmar_recepcion",
+    description: "Herramienta de prueba. No hace falta llamarla para responder.",
+    parameters: { type: "object", properties: {} },
+  },
+};
+const HERRAMIENTA_DE_PRUEBA_CLAUDE = {
+  name: "confirmar_recepcion",
+  description: "Herramienta de prueba. No hace falta llamarla para responder.",
+  input_schema: { type: "object", properties: {} },
+};
+
+/// La pista que se agrega cuando la prueba fallo CON la herramienta de
+/// mentira puesta: la causa mas probable es que el modelo no soporta
+/// tool-use, no que la clave este mal.
+const PISTA_SIN_TOOL_USE =
+  ' Si el proveedor menciona "tool"/"function calling" en el error, es que este modelo no las soporta: el Asistente las necesita para consultar tus datos, así que prueba con otro modelo de este mismo proveedor.';
 
 async function probarClaude(config: ConfigLlamadaIa): Promise<RespuestaProveedorIa> {
   try {
@@ -175,6 +222,7 @@ async function probarClaude(config: ConfigLlamadaIa): Promise<RespuestaProveedor
       body: JSON.stringify({
         model: config.modelo,
         max_tokens: 16,
+        tools: [HERRAMIENTA_DE_PRUEBA_CLAUDE],
         messages: [{ role: "user", content: "Responde solo con la palabra: listo" }],
       }),
       signal: AbortSignal.timeout(TOPE_PRUEBA_MS),
@@ -182,7 +230,10 @@ async function probarClaude(config: ConfigLlamadaIa): Promise<RespuestaProveedor
 
     if (!r.ok) {
       const cuerpo = await r.text();
-      return { ok: false, error: mensajeSaneado(`(${r.status}) ${cuerpo}`, config.apiKey) };
+      return {
+        ok: false,
+        error: mensajeSaneadoConPista(`(${r.status}) ${cuerpo}`, config.apiKey, PISTA_SIN_TOOL_USE),
+      };
     }
     return { ok: true };
   } catch (error) {
@@ -377,6 +428,7 @@ async function probarOpenAiCompatible(
       body: JSON.stringify({
         model: config.modelo,
         max_tokens: 16,
+        tools: [HERRAMIENTA_DE_PRUEBA_OPENAI],
         messages: [{ role: "user", content: "Responde solo con la palabra: listo" }],
       }),
       signal: AbortSignal.timeout(TOPE_PRUEBA_MS),
@@ -384,7 +436,10 @@ async function probarOpenAiCompatible(
 
     if (!r.ok) {
       const cuerpo = await r.text();
-      return { ok: false, error: mensajeSaneado(`(${r.status}) ${cuerpo}`, config.apiKey) };
+      return {
+        ok: false,
+        error: mensajeSaneadoConPista(`(${r.status}) ${cuerpo}`, config.apiKey, PISTA_SIN_TOOL_USE),
+      };
     }
     return { ok: true };
   } catch (error) {
@@ -455,7 +510,22 @@ async function conversarOpenAiCompatible(
 
     if (!r.ok) {
       const cuerpo = await r.text();
-      return { ok: false, error: mensajeSaneado(`(${r.status}) ${cuerpo}`, config.apiKey) };
+      // El asistente SIEMPRE manda `tools` -no hay forma de saber de
+      // antemano si la pregunta los va a necesitar-, asi que un modelo sin
+      // soporte de function-calling falla en el primer mensaje, siempre, sin
+      // excepcion. Nunca se reintenta sin herramientas: contestar sin poder
+      // consultar nada seria adivinar cifras, justo lo que este proyecto
+      // prohibe. En la practica "Probar" (arriba) ya deberia haber cazado
+      // esto antes de llegar aqui -manda la misma herramienta de mentira-,
+      // pero la pista se repite por si el proveedor se comporta distinto
+      // entre una llamada de prueba y una de verdad. 500, no 300: aqui se
+      // guarda en `MensajeAgente.error`, una columna mas ancha que
+      // `AgenteIaProveedor.ultimoError`.
+      const pista = turno.herramientas.length > 0 ? PISTA_SIN_TOOL_USE : "";
+      return {
+        ok: false,
+        error: mensajeSaneadoConPista(`(${r.status}) ${cuerpo}`, config.apiKey, pista, 500),
+      };
     }
 
     const datos = (await r.json()) as RespuestaChatCompletionsOpenAi;

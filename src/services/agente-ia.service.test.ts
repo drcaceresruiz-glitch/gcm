@@ -319,7 +319,7 @@ describe("probar", () => {
     expect(estado.filas[0]?.ultimoError).toBeNull();
   });
 
-  it("en fallo, guarda el motivo del proveedor pero nunca la clave", async () => {
+  it("en fallo, guarda el motivo del proveedor pero nunca la clave, y sugiere probar otro modelo", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -337,9 +337,73 @@ describe("probar", () => {
     if (!r.ok) {
       expect(r.error).not.toContain("sk-abc123");
       expect(r.error).toContain("***");
+      expect(r.error).toContain("tool");
     }
     expect(estado.filas[0]?.verificadoAt).toBeNull();
     expect(estado.filas[0]?.ultimoError).not.toContain("sk-abc123");
+  });
+
+  it("manda una herramienta de mentira -para que 'Probar' detecte un modelo sin tool-use, no solo una clave mala-", async () => {
+    const fetchEspiado = vi
+      .fn()
+      .mockResolvedValue({ ok: true, text: () => Promise.resolve("") });
+    vi.stubGlobal("fetch", fetchEspiado);
+    await guardarProveedorIa(ADMIN, DATOS_BUENOS); // tipo: "claude"
+    const id = estado.filas[0]!.id;
+
+    await probarProveedorIa(ADMIN, id);
+
+    const cuerpo = JSON.parse(fetchEspiado.mock.calls[0]![1].body);
+    expect(cuerpo.tools).toHaveLength(1);
+    expect(cuerpo.tools[0].name).toBe("confirmar_recepcion");
+  });
+
+  it("openai_compatible: tambien manda la herramienta de mentira, en su propio formato", async () => {
+    const fetchEspiado = vi
+      .fn()
+      .mockResolvedValue({ ok: true, text: () => Promise.resolve("") });
+    vi.stubGlobal("fetch", fetchEspiado);
+    await guardarProveedorIa(ADMIN, {
+      ...DATOS_BUENOS,
+      tipo: "openai_compatible",
+      urlBase: "https://api.groq.com/openai/v1",
+    });
+    const id = estado.filas[0]!.id;
+
+    await probarProveedorIa(ADMIN, id);
+
+    const cuerpo = JSON.parse(fetchEspiado.mock.calls[0]![1].body);
+    expect(cuerpo.tools).toHaveLength(1);
+    expect(cuerpo.tools[0].type).toBe("function");
+    expect(cuerpo.tools[0].function.name).toBe("confirmar_recepcion");
+  });
+
+  it("un error de proveedor LARGO mas la pista de tool-use nunca supera el limite de la columna (300)", async () => {
+    // Regresion de un fallo real, cazado en vivo: un cuerpo de error largo
+    // -algunos proveedores mandan trazas HTML o JSON con detalle- mas la
+    // pista de tool-use juntos superaban VARCHAR(300) y el guardado
+    // reventaba con "el valor es demasiado largo para la columna" en vez
+    // de guardar el error. `ultimoError` es la columna real que se llena
+    // -y la que importa aqui: lo que devuelve la funcion al que llama
+    // (`r.error`) lleva ADEMAS el prefijo "El proveedor rechazó la
+    // prueba: ", que no va a ninguna columna con limite, asi que no hace
+    // falta acotarlo-.
+    const cuerpoLargo = "x".repeat(500);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 400, text: () => Promise.resolve(cuerpoLargo) }),
+    );
+    await guardarProveedorIa(ADMIN, DATOS_BUENOS); // tipo: "claude"
+    const id = estado.filas[0]!.id;
+
+    const r = await probarProveedorIa(ADMIN, id);
+
+    expect(r.ok).toBe(false);
+    // La pista se conserva ENTERA -se trunca el mensaje del proveedor,
+    // nunca la parte util para quien lo lee-.
+    if (!r.ok) expect(r.error).toContain("prueba con otro modelo");
+    expect(estado.filas[0]?.ultimoError?.length).toBeLessThanOrEqual(300);
+    expect(estado.filas[0]?.ultimoError).toContain("prueba con otro modelo");
   });
 
   it("openai_compatible sin URL base lo dice, sin llamar a la red", async () => {
