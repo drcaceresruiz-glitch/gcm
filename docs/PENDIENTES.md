@@ -380,12 +380,34 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      `puedeTransicionarObra`) no tienen fuga: no hay forma de mandar un
      estado fuera de `TRANSICIONES_OBRA` desde el formulario ni desde la
      accion de servidor.
-   - Nota menor, sin decidir: `equipo.service.ts`
+   - ~~Nota menor, sin decidir: `equipo.service.ts`
      (`asignarAObra`/`quitarDeObra`) y
      `mensajes-contratista.service.ts:266` tampoco comprueban el estado de
-     la obra. Defendible (no son datos de presupuesto/cronograma/avance),
-     pero no hay ningun comentario que documente esa exclusion como
-     decision.
+     la obra.~~ **DECIDIDO el 22 de agosto de 2026, dos reglas distintas
+     porque son dos cosas distintas:**
+     - `equipo.service.ts` es control de ACCESO, asi que sigue la MISMA
+       guarda que todo lo demas: `asignarAObra` (abrir) llama a
+       `motivoSiObraCerrada` sin excepcion; `quitarDeObra` (cerrar, revocar
+       un acceso que ya estaba) la llama con `{ permiteEnParalizada: true }`,
+       mismo criterio que `aprobarMovimiento`. De regalo, esto cierra un
+       hueco de ALCANCE que no estaba pedido: `motivoSiObraCerrada` tambien
+       comprueba que la obra este dentro de `obrasAsignadas` de quien
+       escribe, y ninguna de las dos funciones lo hacia antes.
+     - `mensajes-contratista.service.ts` es COMUNICACION con un tercero, no
+       datos de la obra: escribirle a un contratista sobre un pago final,
+       una pausa o un cierre es justo el mensaje que tiene sentido seguir
+       mandando en esos momentos, asi que CERRADA y PARALIZADA NO bloquean.
+       Solo se bloquea si la empresa esta en migracion (nadie escribe nada
+       mientras dure) o si la obra ligada es una copia archivada (escribir
+       "en nombre" de una obra congelada no tiene sentido). `datosParaEscribir`
+       gano `obraArchivada`/`empresaEnMigracion` para que la pantalla de
+       redaccion (que tambien usa esa funcion, solo para LEER) siga
+       abriendo con normalidad — el bloqueo vive en `escribirAlContratista`,
+       no en el dato compartido.
+     Verificado con typecheck, lint, build y las 2534 pruebas existentes en
+     verde; ninguno de los dos servicios tenia archivo de pruebas propio
+     antes de este cambio y sigue sin tenerlo — deuda preexistente, no
+     introducida aqui.
 
    ~~**Recomendacion del agente, sin decidir todavia:** separar las
    escrituras de PARALIZADA en dos grupos en vez de bloquear todo o nada.~~

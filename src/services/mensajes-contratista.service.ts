@@ -14,6 +14,7 @@ import {
   type Firma,
 } from "@/lib/mensaje-contratista";
 import { nuevoTokenDeHilo } from "@/lib/correo-entrante";
+import { EMPRESA_EN_MIGRACION, OBRA_ARCHIVADA } from "@/lib/obras";
 import { correoAlContratista, enviarCorreo, type Adjunto } from "./mailer.service";
 import { empresaLeeRespuestas } from "./remitente-correo.service";
 import { enviarSms, hayCanalSms } from "./sms.service";
@@ -53,6 +54,16 @@ export interface ContratistaParaEscribir {
   /// gente a la ficha a arreglar lo que ya esta puesto.
   telefonoEnFicha: string | null;
   obra: { id: string; nombre: string } | null;
+  /**
+   * La obra ligada es una copia restaurada de un respaldo (`archivadaEn`).
+   * Se distingue de `obra: null` —que es "sin obra"— porque aqui SI hay
+   * obra, solo que esta congelada: `escribirAlContratista` la usa para
+   * bloquear el ENVIO, no la lectura de esta ficha.
+   */
+  obraArchivada: boolean;
+  /// La empresa esta congelada para exportarse. Igual que arriba, bloquea
+  /// el envio, no que se pueda abrir esta pantalla a mirarla.
+  empresaEnMigracion: boolean;
   hayCanalSms: boolean;
   /// El correo de quien escribe, que es el «Responder a» por defecto.
   respuestaPorDefecto: string;
@@ -113,14 +124,14 @@ export async function datosParaEscribir(
     obraId && alcanzaObra(sesion, obraId)
       ? await prisma.project.findFirst({
           where: { id: obraId, companyId: sesion.companyId },
-          select: { id: true, nombreObra: true },
+          select: { id: true, nombreObra: true, archivadaEn: true },
         })
       : null;
   const obra = fila ? { id: fila.id, nombre: fila.nombreObra } : null;
 
   const empresa = await prisma.company.findUnique({
     where: { id: sesion.companyId },
-    select: { razonSocial: true },
+    select: { razonSocial: true, enMigracionAt: true },
   });
 
   return {
@@ -132,6 +143,8 @@ export async function datosParaEscribir(
       : null,
     telefonoEnFicha: proveedor.contactoTelefono,
     obra,
+    obraArchivada: fila?.archivadaEn != null,
+    empresaEnMigracion: empresa?.enMigracionAt != null,
     hayCanalSms: await hayCanalSms(sesion.companyId),
     respuestaPorDefecto: sesion.email,
     respuestasEnGcm: await empresaLeeRespuestas(sesion.companyId),
@@ -270,6 +283,20 @@ export async function escribirAlContratista(
   const contratista = await datosParaEscribir(sesion, datos.proveedorId, datos.obraId);
   if (!contratista) {
     return { ok: false, error: "No tienes permiso para escribir a este contratista." };
+  }
+
+  // A proposito NO se bloquea por CERRADA ni PARALIZADA: esto es
+  // comunicacion con un tercero, no datos de presupuesto/cronograma/avance
+  // de la obra, y avisar de un pago final, una pausa o un cierre es
+  // justo el tipo de mensaje que tiene sentido seguir mandando en esos
+  // casos. Solo se bloquea si la obra ligada es una copia archivada
+  // (escribir "en nombre" de una obra congelada no tiene sentido) o si
+  // la empresa entera esta en migracion (nadie escribe nada mientras dure).
+  if (contratista.empresaEnMigracion) {
+    return { ok: false, error: EMPRESA_EN_MIGRACION };
+  }
+  if (contratista.obraArchivada) {
+    return { ok: false, error: OBRA_ARCHIVADA };
   }
 
   const cuerpo = datos.cuerpo.trim();

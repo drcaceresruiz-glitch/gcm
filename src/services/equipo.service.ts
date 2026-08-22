@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede, ETIQUETA_ROL } from "@/lib/rbac";
 import { veTodasLasObras, ETIQUETA_ALCANCE_TOTAL } from "@/lib/alcance-obras";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { Role } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -117,6 +118,11 @@ export async function asignarAObra(
     return { ok: false, error: "No tienes permiso para repartir el equipo." };
   }
 
+  // Asignar es ABRIR: dar acceso nuevo a alguien. Sin excepcion en
+  // PARALIZADA, igual que crear cualquier otra cosa.
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   // Las dos comprobaciones son de EMPRESA y van juntas: sin la del usuario,
   // mandando un id ajeno se podria meter en la obra a alguien de otra
   // constructora, que es el aislamiento que sostiene todo lo demas.
@@ -199,6 +205,13 @@ export async function quitarDeObra(
   if (!puedeRepartir(sesion)) {
     return { ok: false, error: "No tienes permiso para repartir el equipo." };
   }
+
+  // Quitar es CERRAR: revocar un acceso que ya estaba, no abrir nada. Se
+  // permite en obra paralizada, mismo criterio que aprobarMovimiento.
+  const cerrada = await motivoSiObraCerrada(sesion, obraId, {
+    permiteEnParalizada: true,
+  });
+  if (cerrada) return { ok: false, error: cerrada };
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
