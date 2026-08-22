@@ -19,6 +19,14 @@ import { AlertasEmpresa } from "@/components/obras/AlertasEmpresa";
  * que no es de ninguna obra en particular. El dinero de cada una sigue
  * visible, uno por uno, en su propia tarjeta de la lista de abajo.
  *
+ * "Obras" y el dinero NO van en la misma rejilla, a proposito. Las cuatro
+ * tarjetas en fila pareja hacian leer las tres de dinero como si fueran del
+ * mismo "5" de la primera: la jerarquia visual decia "mismo ambito" aunque
+ * el texto dijera lo contrario. "Obras" queda sola, de cartera; el dinero
+ * va aparte, dentro de una caja con su propio titulo —"La obra en
+ * ejecución"—, que ya no necesita nombrar la obra: al mostrarse solo cuando
+ * hay exactamente una, decirlo asi es exacto y no una aproximacion.
+ *
  * El presupuesto va SIN IGV, que es la cifra de control. El comprometido va
  * por el importe IMPUTABLE de cada orden —neto con IGV, total con retencion—,
  * que no es lo mismo: decir «todo sin IGV» describia mal justo la columna que
@@ -53,59 +61,71 @@ export function ResumenEmpresaPanel({
     // cifras, por encima de la fila de filtros que viene despues en el DOM.
     // Sin esto, el popup de alertas -que se abre hacia abajo- quedaba por
     // detras del buscador y el select de estado, que se pintan despues.
-    <dl className="relative z-20 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Cifra
-        icono={Building2}
-        etiqueta="Obras"
-        valor={String(resumen.obras)}
-        numero={resumen.obras}
-        acento="var(--color-marca-500)"
-        detalle={
-          resumen.obrasEnEjecucion === 1
-            ? "1 en ejecución"
-            : `${resumen.obrasEnEjecucion} en ejecución`
-        }
-      />
+    <div className="relative z-20 space-y-3">
+      {/* Sola, no en la misma rejilla que el dinero: es la unica cifra de
+          aqui que de verdad describe toda la cartera. */}
+      <dl className="max-w-[15rem]">
+        <Cifra
+          icono={Building2}
+          etiqueta="Obras"
+          valor={String(resumen.obras)}
+          numero={resumen.obras}
+          acento="var(--color-marca-500)"
+          detalle={
+            resumen.obrasEnEjecucion === 1
+              ? "1 en ejecución"
+              : `${resumen.obrasEnEjecucion} en ejecución`
+          }
+        />
+      </dl>
 
       {unaSolaEnEjecucion && (
-        <>
-          <Cifra
-            icono={Wallet}
-            etiqueta="Presupuesto"
-            valor={soles(resumen.presupuestoTotal)}
-            numero={Number(resumen.presupuestoTotal)}
-            moneda
-            acento="var(--color-exito)"
-            detalle="Obra en ejecución, sin IGV"
-          />
+        <div
+          className="rounded-xl border p-3"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <p className="mb-2 px-1 text-xs font-medium opacity-60">
+            La obra en ejecución
+          </p>
+          <dl className="grid gap-3 sm:grid-cols-3">
+            <Cifra
+              icono={Wallet}
+              etiqueta="Presupuesto"
+              valor={soles(resumen.presupuestoTotal)}
+              numero={Number(resumen.presupuestoTotal)}
+              moneda
+              acento="var(--color-exito)"
+              detalle="Sin IGV"
+            />
 
-          <Cifra
-            icono={HandCoins}
-            etiqueta="Comprometido"
-            valor={soles(resumen.comprometido)}
-            numero={Number(resumen.comprometido)}
-            moneda
-            acento="var(--color-alerta)"
-            detalle="En ejecución: encargos vigentes + órdenes sueltas"
-          />
+            <Cifra
+              icono={HandCoins}
+              etiqueta="Comprometido"
+              valor={soles(resumen.comprometido)}
+              numero={Number(resumen.comprometido)}
+              moneda
+              acento="var(--color-alerta)"
+              detalle="Encargos vigentes + órdenes sueltas"
+            />
 
-          <Cifra
-            icono={AlertTriangle}
-            etiqueta="Saldo"
-            valor={soles(resumen.saldo)}
-            numero={Math.abs(Number(resumen.saldo))}
-            moneda
-            // En negativo se ha comprometido mas de lo presupuestado, y eso no
-            // puede leerse igual que un saldo holgado: el degradado tambien lo
-            // dice, no solo el numero.
-            tono={saldoNegativo ? "peligro" : undefined}
-            acento={saldoNegativo ? "var(--color-peligro)" : "var(--color-exito)"}
-            detalle={<AlertasEmpresa alertas={alertas} />}
-            detalleTono={alertas.length > 0 ? "peligro" : undefined}
-          />
-        </>
+            <Cifra
+              icono={AlertTriangle}
+              etiqueta="Saldo"
+              valor={soles(resumen.saldo)}
+              numero={Math.abs(Number(resumen.saldo))}
+              moneda
+              // En negativo se ha comprometido mas de lo presupuestado, y eso no
+              // puede leerse igual que un saldo holgado: el degradado tambien lo
+              // dice, no solo el numero.
+              tono={saldoNegativo ? "peligro" : undefined}
+              acento={saldoNegativo ? "var(--color-peligro)" : "var(--color-exito)"}
+              detalle={<AlertasEmpresa alertas={alertas} />}
+              detalleTono={alertas.length > 0 ? "peligro" : undefined}
+            />
+          </dl>
+        </div>
       )}
-    </dl>
+    </div>
   );
 }
 
