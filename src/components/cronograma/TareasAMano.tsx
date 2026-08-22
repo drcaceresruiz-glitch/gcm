@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { diasLaborablesEntre, type DiaLaboral } from "@/lib/calendario";
-import { AlertCircle, CalendarPlus, LoaderCircle, Pencil, Trash2 } from "lucide-react";
+import { AlertCircle, CalendarPlus, Flag, LoaderCircle, Pencil, Trash2 } from "lucide-react";
 
 import {
   accionCrearTareaManual,
@@ -23,6 +23,13 @@ export interface TareaManual {
   esHito: boolean;
   nivel: number;
   esResumen: boolean;
+  /// Solo tiene sentido cuando `!holguraInferida`: viene de la red de
+  /// dependencias, no de un archivo (esta tarea no tiene archivo).
+  esCritico: boolean;
+  holguraDias: string;
+  holguraInferida: boolean;
+  /// De que tareas depende para poder empezar (fin-comienzo).
+  dependeDeUids: number[];
 }
 
 /**
@@ -45,6 +52,7 @@ const VACIA = {
   porcentajePlaneado: "",
   esHito: false,
   padreUid: "",
+  dependeDeUids: [] as number[],
 };
 
 function Campo({
@@ -144,6 +152,7 @@ export function TareasAMano({
         // Solo al CREAR: mover una tarea de sitio arrastra a las suyas y eso
         // es otra operacion, no un campo mas de este formulario.
         padreUid: campos.padreUid === "" ? null : Number(campos.padreUid),
+        dependeDeUids: campos.dependeDeUids,
       };
 
       const r =
@@ -174,6 +183,7 @@ export function TareasAMano({
       porcentajePlaneado: t.porcentajePlaneado,
       esHito: t.esHito,
       padreUid: "",
+      dependeDeUids: t.dependeDeUids,
     });
   }
 
@@ -226,9 +236,24 @@ export function TareasAMano({
                     className="px-3 py-2"
                     style={{ paddingLeft: `${0.75 + (t.nivel - 1) * 1.25}rem` }}
                   >
+                    {t.esCritico && !t.esHito && (
+                      <Flag
+                        className="mr-1 inline size-3 shrink-0"
+                        style={{ color: "var(--color-peligro)" }}
+                        aria-label="En la ruta crítica"
+                      />
+                    )}
                     <span className={t.esResumen ? "font-medium" : undefined}>
                       {t.nombre}
                     </span>
+                    {!t.esResumen && !t.holguraInferida && (
+                      <span
+                        className="ml-2 text-xs opacity-60"
+                        title="Holgura: cuantos dias de trabajo puede retrasarse sin mover el fin de la obra"
+                      >
+                        ({Number(t.holguraDias).toFixed(0)}d de holgura)
+                      </span>
+                    )}
                     {/*
                       Un hito CON CODIGO se marca aparte y en rojo. La etiqueta
                       gris «(hito)» era la unica senal, y no distingue el hito
@@ -347,9 +372,11 @@ export function TareasAMano({
               </legend>
 
               <p className="mt-2 text-xs text-pretty opacity-70">
-                Sin la red de precedencias no hay ruta crítica, así que estas
-                tareas nacen sin ella y con la holgura marcada como no conocida.
-                No se inventa lo que el archivo sabría y aquí no se sabe.
+                Sin marcar ninguna dependencia, esta tarea nace sin ruta
+                crítica y con la holgura marcada como no conocida —no se
+                inventa lo que aquí no se sabe—. Marca de qué tareas depende
+                para que GCM calcule cuáles son las que de verdad no tienen
+                margen.
               </p>
 
               {/* Solo al crear. Mover una tarea ya escrita arrastra a todas
@@ -378,6 +405,49 @@ export function TareasAMano({
                     Entra justo detrás de lo que ya cuelgue de ella.
                   </span>
                 </label>
+              )}
+
+              {/*
+                Disponible al crear Y al editar —a diferencia de "Cuelga de",
+                cambiar de que depende no reorganiza nada, solo mueve el
+                calculo—. Solo tareas de trabajo (sin resumenes: quedan fuera
+                del calculo y marcarlas seria un enlace que nunca hace nada),
+                y nunca la propia tarea que se esta editando.
+              */}
+              {tareas.some((t) => !t.esResumen && t.uid !== editando) && (
+                <fieldset
+                  className="mt-4 rounded-lg border p-2.5"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  <legend className="px-1 text-xs font-medium opacity-70">
+                    Depende de (tiene que terminar antes de poder empezar)
+                  </legend>
+                  <div className="max-h-40 space-y-1 overflow-y-auto">
+                    {tareas
+                      .filter((t) => !t.esResumen && t.uid !== editando)
+                      .map((t) => (
+                        <label key={t.uid} className="flex items-start gap-2 text-xs">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={campos.dependeDeUids.includes(t.uid)}
+                            onChange={(e) =>
+                              setCampos({
+                                ...campos,
+                                dependeDeUids: e.target.checked
+                                  ? [...campos.dependeDeUids, t.uid]
+                                  : campos.dependeDeUids.filter((u) => u !== t.uid),
+                              })
+                            }
+                          />
+                          <span>
+                            {t.codigo ? `${t.codigo} ` : ""}
+                            {t.nombre}
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                </fieldset>
               )}
 
               <div className="mt-4 flex flex-wrap items-start gap-3">

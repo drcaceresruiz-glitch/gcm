@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { normalizarDecimal } from "@/lib/decimal";
 import { diasLaborablesEntre } from "@/lib/calendario";
+import { calcularRutaCritica, type TipoEnlace } from "@/lib/ruta-critica";
 import { hoy as hoyCalendario } from "@/utils/fechas";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { recalcularResumenes } from "@/services/edt.service";
@@ -97,6 +98,18 @@ export interface TareaAMano {
    * detras de su ultima descendiente.
    */
   padreUid?: number | null;
+  /**
+   * De que tareas depende para PODER EMPEZAR (fin-comienzo, sin desfase):
+   * la mas comun con diferencia en un cronograma real, y la unica que este
+   * editor ofrece —a proposito, para que el formulario siga siendo el de
+   * una obra sin planificador—. Quien necesite comienzo-comienzo,
+   * fin-fin o un desfase en dias sigue teniendo el Excel o MS Project.
+   *
+   * Distinto de `padreUid`: el padre es jerarquia EDT (de que capitulo
+   * cuelga), esto es PRECEDENCIA (que tiene que terminar antes). Una tarea
+   * puede depender de varias a la vez.
+   */
+  dependeDeUids?: readonly number[];
 }
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -198,6 +211,13 @@ export async function crearTareaManual(
       return { ok: false, error: "La tarea de la que quieres colgar esta ya no existe." };
     }
   }
+
+  const predecesoras = await predecesorasValidas(
+    ctx.vigente?.id ?? null,
+    null,
+    tarea.dependeDeUids,
+  );
+  if (!predecesoras.ok) return predecesoras;
 
   const quien = `${sesion.nombres} ${sesion.apellidos} (${sesion.email})`.trim().slice(0, 150);
 
@@ -301,7 +321,9 @@ export async function crearTareaManual(
         nivel,
         esResumen: false,
         esHito: tarea.esHito ?? false,
-        // Sin red de precedencias no hay ruta critica: no se inventa.
+        // Punto de partida sin dependencias. Si `predecesoras.uids` trae
+        // algo, `recalcularRutaCritica` de mas abajo lo corrige en el
+        // mismo paso.
         esCritico: false,
         holguraDias: "0.00",
         holguraInferida: true,
@@ -314,9 +336,14 @@ export async function crearTareaManual(
       },
     });
 
+    if (predecesoras.uids.length > 0) {
+      await escribirDependenciasManual(tx, cronogramaId, uid, predecesoras.uids);
+    }
+
     // Las fechas de los paquetes y capitulos son la envoltura de sus hojas: en
     // cuanto entra o cambia una hoja, hay que volver a subirlas.
     await recalcularResumenes(tx, cronogramaId);
+    await recalcularRutaCritica(tx, cronogramaId, obraId);
 
     await tx.auditLog.create({
       data: {
@@ -349,6 +376,160 @@ function revisarCampos(tarea: TareaAMano): string | null {
     return "La tarea no puede terminar antes de empezar.";
   }
   return null;
+}
+
+/**
+ * Recalcula esCritico/holguraDias de todo el cronograma tras cualquier
+ * cambio que pueda mover la red: crear, editar o borrar una tarea manual,
+ * o solo cambiar sus dependencias.
+ *
+ * Corre SIEMPRE, no solo cuando la tarea tocada tiene dependencias: quitar
+ * el ultimo enlace de todo el cronograma tiene que devolver a
+ * `esCritico:false`/`holguraInferida:true` a quien antes salia critico, y
+ * solo recorriendolo entero se sabe si sigue quedando alguna dependencia.
+ *
+ * SOLO ESCRIBE filas `origen: MANUAL`. La red que le da de comer al CPM
+ * incluye tareas IMPORTADAS si estan enlazadas (sus fechas ya son reales y
+ * ayudan a situar a las manuales), pero su `esCritico`/`holguraDias` sigue
+ * viniendo del archivo siempre —no se pisa con un calculo propio—, mismo
+ * principio que ya rige en todo el modulo de ruta critica: lo que trajo un
+ * archivo se respeta, lo que no tiene archivo se calcula.
+ */
+async function recalcularRutaCritica(
+  tx: Parameters<typeof recalcularResumenes>[0],
+  cronogramaId: string,
+  projectId: string,
+): Promise<void> {
+  const [obra, calendarioFilas, filas, enlaces] = await Promise.all([
+    tx.project.findFirst({ where: { id: projectId }, select: { fechaInicio: true } }),
+    tx.workCalendar.findMany({
+      where: { projectId },
+      select: { diaSemana: true, laborable: true, horas: true },
+    }),
+    tx.tareaCronograma.findMany({
+      where: { cronogramaId },
+      select: { uid: true, duracionDias: true, esResumen: true, esHito: true, origen: true },
+    }),
+    tx.dependenciaTarea.findMany({
+      where: { cronogramaId },
+      select: { tareaUid: true, predecesoraUid: true, tipo: true, desfaseDias: true },
+    }),
+  ]);
+
+  if (!obra) return;
+
+  if (enlaces.length === 0) {
+    // Ninguna dependencia en todo el cronograma: nadie manual puede seguir
+    // marcado como critico de una red que ya no existe.
+    await tx.tareaCronograma.updateMany({
+      where: { cronogramaId, origen: "MANUAL" },
+      data: { esCritico: false, holguraDias: "0.00", holguraInferida: true },
+    });
+    return;
+  }
+
+  const calendario = calendarioFilas.map((d) => ({ ...d, horas: d.horas.toString() }));
+
+  const cpm = calcularRutaCritica(
+    filas.map((f) => ({
+      uid: f.uid,
+      duracionDias: f.duracionDias.toString(),
+      esResumen: f.esResumen,
+      esHito: f.esHito,
+    })),
+    // `tipo` es texto libre en la base (@db.VarChar(2), no un enum de
+    // Prisma) porque `DependenciaTarea` es compartida con el importador de
+    // MS Project/Excel; ahi ya se valida contra los cuatro tipos al leer
+    // el archivo, y aqui solo se crea con "FC" a mano, asi que el cast es
+    // seguro.
+    enlaces.map((e) => ({
+      ...e,
+      tipo: e.tipo as TipoEnlace,
+      desfaseDias: e.desfaseDias.toString(),
+    })),
+    obra.fechaInicio,
+    calendario,
+  );
+
+  // Un ciclo no se puede resolver: se deja todo como estaba, no se finge
+  // un numero. Nada impide crear uno a mano —A depende de B y B de A—,
+  // asi que esto SI puede pasar, a diferencia del padre (que no admite
+  // ciclos por construccion).
+  if (cpm.ciclo) return;
+
+  for (const f of filas) {
+    if (f.esResumen || f.origen !== "MANUAL") continue;
+    const critico = cpm.esCritico.get(f.uid);
+    const holgura = cpm.holguraDias.get(f.uid);
+    if (critico === undefined || holgura === undefined) continue;
+
+    await tx.tareaCronograma.updateMany({
+      where: { cronogramaId, uid: f.uid },
+      data: { esCritico: critico, holguraDias: holgura, holguraInferida: false },
+    });
+  }
+}
+
+/**
+ * Que las tareas de las que se quiere depender existan en este cronograma.
+ *
+ * Se comprueba ANTES de abrir la transaccion, mismo patron que el padre
+ * unas lineas mas arriba: aqui se puede decir cual falta, dentro de la
+ * transaccion solo cabria lanzar. Descarta la auto-referencia y los
+ * duplicados en vez de rechazarlos —es el tipo de error que se comete
+ * tildando dos veces la misma casilla, no una intencion que corregir—.
+ */
+async function predecesorasValidas(
+  cronogramaId: string | null,
+  propioUid: number | null,
+  dependeDeUids: readonly number[] | undefined,
+): Promise<{ ok: true; uids: number[] } | { ok: false; error: string }> {
+  const pedidas = Array.from(
+    new Set((dependeDeUids ?? []).filter((p) => p !== propioUid)),
+  );
+  if (pedidas.length === 0) return { ok: true, uids: [] };
+
+  if (!cronogramaId) {
+    return { ok: false, error: "Esta obra no tiene cronograma del que colgar la tarea." };
+  }
+
+  const existentes = await prisma.tareaCronograma.findMany({
+    where: { cronogramaId, uid: { in: pedidas } },
+    select: { uid: true },
+  });
+  if (existentes.length !== pedidas.length) {
+    return { ok: false, error: "Una de las tareas de las que depende ya no existe." };
+  }
+
+  return { ok: true, uids: pedidas };
+}
+
+/**
+ * Deja las dependencias de una tarea EXACTAMENTE como diga `predecesoras`:
+ * borra las que hubiera y crea las nuevas. Reemplazar el conjunto entero,
+ * no ir sumando, es lo que permite QUITAR una dependencia desde el
+ * formulario sin un boton aparte para cada enlace. No valida —quien llama
+ * ya lo hizo con `predecesorasValidas`—.
+ */
+async function escribirDependenciasManual(
+  tx: Parameters<typeof recalcularResumenes>[0],
+  cronogramaId: string,
+  uid: number,
+  predecesoras: readonly number[],
+): Promise<void> {
+  await tx.dependenciaTarea.deleteMany({ where: { cronogramaId, tareaUid: uid } });
+
+  if (predecesoras.length > 0) {
+    await tx.dependenciaTarea.createMany({
+      data: predecesoras.map((predecesoraUid) => ({
+        cronogramaId,
+        tareaUid: uid,
+        predecesoraUid,
+        tipo: "FC",
+        desfaseDias: "0.00",
+      })),
+    });
+  }
 }
 
 /**
@@ -391,6 +572,9 @@ export async function editarTareaManual(
     };
   }
 
+  const predecesoras = await predecesorasValidas(ctx.vigente.id, uid, tarea.dependeDeUids);
+  if (!predecesoras.ok) return predecesoras;
+
   await prisma.$transaction(async (tx) => {
     await tx.tareaCronograma.update({
       where: { id: fila.id },
@@ -409,9 +593,12 @@ export async function editarTareaManual(
       },
     });
 
+    await escribirDependenciasManual(tx, ctx.vigente!.id, uid, predecesoras.uids);
+
     // Cambiar la fecha de una hoja mueve la envoltura de todo lo que la
     // contiene, hasta el capitulo.
     await recalcularResumenes(tx, ctx.vigente!.id);
+    await recalcularRutaCritica(tx, ctx.vigente!.id, obraId);
 
     await tx.auditLog.create({
       data: {
@@ -529,6 +716,9 @@ export async function eliminarTareaManual(
 
     // Al irse una hoja, su paquete puede empezar mas tarde o acabar antes.
     await recalcularResumenes(tx, ctx.vigente!.id);
+    // Y la red de precedencias tambien pierde un nodo: quien dependia de
+    // esta tarea puede dejar de estar en la ruta critica, o entrar en ella.
+    await recalcularRutaCritica(tx, ctx.vigente!.id, obraId);
 
     await tx.auditLog.create({
       data: {
@@ -563,6 +753,14 @@ export interface TareaManualListada {
   /// usa para ofrecer padres.
   nivel: number;
   esResumen: boolean;
+  /// Solo tiene sentido cuando `!holguraInferida`: viene de
+  /// `recalcularRutaCritica`, no del archivo (esta tarea no tiene archivo).
+  esCritico: boolean;
+  holguraDias: string;
+  holguraInferida: boolean;
+  /// De que tareas depende para poder empezar. Uids, no ids: es lo que la
+  /// pantalla usa para pre-marcar las casillas al editar.
+  dependeDeUids: number[];
 }
 
 /**
@@ -600,8 +798,29 @@ export async function listarTareasManuales(
       esHito: true,
       nivel: true,
       esResumen: true,
+      esCritico: true,
+      holguraDias: true,
+      holguraInferida: true,
     },
   });
+
+  // Las dependencias de las MANUALES: una predecesora puede ser importada
+  // (situar una tarea tecleada contra el plan real es justo el caso de
+  // uso), pero esta pantalla solo edita filas manuales, asi que solo hace
+  // falta traer los enlaces que SALEN de una.
+  const uids = tareas.map((t) => t.uid);
+  const enlaces = uids.length
+    ? await prisma.dependenciaTarea.findMany({
+        where: { cronogramaId: vigente.id, tareaUid: { in: uids } },
+        select: { tareaUid: true, predecesoraUid: true },
+      })
+    : [];
+  const predecesorasPorUid = new Map<number, number[]>();
+  for (const e of enlaces) {
+    const lista = predecesorasPorUid.get(e.tareaUid) ?? [];
+    lista.push(e.predecesoraUid);
+    predecesorasPorUid.set(e.tareaUid, lista);
+  }
 
   return tareas.map((t) => ({
     ...t,
@@ -609,5 +828,7 @@ export async function listarTareasManuales(
     fin: t.fin.toISOString().slice(0, 10),
     duracionDias: t.duracionDias.toString(),
     porcentajePlaneado: t.porcentajePlaneado.toString(),
+    holguraDias: t.holguraDias.toString(),
+    dependeDeUids: predecesorasPorUid.get(t.uid) ?? [],
   }));
 }

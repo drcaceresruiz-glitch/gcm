@@ -39,10 +39,13 @@ const estado: {
   corrimientos: Record<string, unknown>[];
   /// Regimen laboral de la obra. Vacio = se trabaja los siete dias.
   calendario: { diaSemana: number; laborable: boolean; horas: string }[];
+  /// Lo que `dependenciaTarea.createMany` recibio, aplanado.
+  dependenciasCreadas: Record<string, unknown>[];
 } = {
   orden: [],
   corrimientos: [],
   calendario: [],
+  dependenciasCreadas: [],
   obra: { id: "obra", ultimoUidManual: 0 },
   vigente: { id: "cro", version: 1, lineaBaseAt: null },
   tarea: null,
@@ -140,6 +143,14 @@ vi.mock("@/lib/prisma", () => {
         estado.borrados.push("dependencias");
         return Promise.resolve({ count: 0 });
       },
+      // Sin dependencias declaradas en ninguna de estas pruebas:
+      // `recalcularRutaCritica` las lee siempre (para saber si YA no queda
+      // ninguna en el cronograma), pero aqui la red esta vacia a proposito.
+      findMany: () => Promise.resolve([]),
+      createMany: (args: { data: Record<string, unknown>[] }) => {
+        estado.dependenciasCreadas.push(...args.data);
+        return Promise.resolve({ count: args.data.length });
+      },
     },
     auditLog: { create: () => Promise.resolve({}) },
   };
@@ -191,6 +202,7 @@ beforeEach(() => {
   estado.orden = [];
   estado.corrimientos = [];
   estado.calendario = [];
+  estado.dependenciasCreadas = [];
 });
 
 describe("crear una tarea a mano", () => {
@@ -292,6 +304,62 @@ describe("solo se tocan las tareas escritas a mano", () => {
 
     expect(r.ok).toBe(true);
     expect(estado.actualizada?.["nombre"]).toBe("Vaciado de zapatas Z-1");
+  });
+});
+
+describe("depender de otras tareas", () => {
+  it("rechaza depender de una tarea que no existe", async () => {
+    estado.orden = []; // el cronograma no tiene ninguna otra tarea
+
+    const r = await crearTareaManual(sesion, "obra", { ...tarea, dependeDeUids: [-99] });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("ya no existe");
+    expect(estado.creada).toBeNull();
+    expect(estado.dependenciasCreadas).toEqual([]);
+  });
+
+  it("crea el enlace FC si la predecesora existe", async () => {
+    estado.orden = [{ uid: -1, fila: 1, nivel: 1 }];
+
+    const r = await crearTareaManual(sesion, "obra", { ...tarea, dependeDeUids: [-1] });
+
+    expect(r.ok).toBe(true);
+    expect(estado.dependenciasCreadas).toHaveLength(1);
+    expect(estado.dependenciasCreadas[0]).toMatchObject({
+      predecesoraUid: -1,
+      tipo: "FC",
+      desfaseDias: "0.00",
+    });
+  });
+
+  it("descarta duplicados: tildar dos veces la misma casilla no crea dos enlaces", async () => {
+    estado.orden = [{ uid: -1, fila: 1, nivel: 1 }];
+
+    await crearTareaManual(sesion, "obra", { ...tarea, dependeDeUids: [-1, -1] });
+
+    expect(estado.dependenciasCreadas).toHaveLength(1);
+  });
+
+  it("al editar, descarta la auto-referencia sin dar error", async () => {
+    estado.tarea = { id: "t1", uid: -1, origen: "MANUAL", nombre: "Vaciado" };
+    estado.orden = [{ uid: -1, fila: 1, nivel: 1 }];
+
+    const r = await editarTareaManual(sesion, "obra", -1, { ...tarea, dependeDeUids: [-1] });
+
+    expect(r.ok).toBe(true);
+    expect(estado.dependenciasCreadas).toEqual([]);
+  });
+
+  it("al editar, rechaza depender de una tarea que no existe", async () => {
+    estado.tarea = { id: "t1", uid: -1, origen: "MANUAL", nombre: "Vaciado" };
+    estado.orden = [];
+
+    const r = await editarTareaManual(sesion, "obra", -1, { ...tarea, dependeDeUids: [-99] });
+
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.error).toContain("ya no existe");
+    expect(estado.actualizada).toBeNull();
   });
 });
 
