@@ -63,6 +63,12 @@ export const EXCLUIDAS_MIGRACION: Readonly<Record<string, string>> = {
     "tiene. Llegaria una clave imposible de descifrar y una fila que " +
     "parece un proveedor configurado sin serlo. Se vuelve a teclear en la " +
     "instalacion nueva.",
+  mensajes_soporte:
+    "Es correspondencia con el OPERADOR de ESTA instalacion, no datos " +
+    "portables de la empresa. En la instalacion nueva -sobre todo la " +
+    "autoinstalable, que no tiene ningun operador de GCM detras- esa " +
+    "conversacion no tiene con quien seguir: llevarla haria parecer que " +
+    "el destino sigue un hilo que en realidad se quedo en el origen.",
   solicitudes_cambio_perfil:
     "Tramites a medias —alguien pidio cambiar su celular— que en la " +
     "instalacion nueva no tienen a quien reclamar. Se vuelven a pedir.",

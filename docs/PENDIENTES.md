@@ -681,8 +681,9 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
     ya documentado en el codigo. Detalle completo en la memoria
     `e2e-golden-path-verificado` (`docs/memoria/`).
 
-14. **`/operador` no tiene licencia, pago ni soporte — visto en vivo el 21
-    de agosto de 2026.** El usuario, mirando su propia pantalla de
+14. **`/operador` no tenia licencia, pago ni soporte — visto en vivo el 21
+    de agosto de 2026, las dos entregas HECHAS el 22.** El usuario, mirando
+    su propia pantalla de
     superadministrador (`/operador`, la lista de constructoras clientes),
     noto que no hay forma de saber COMO pago cada empresa, cuanto dura su
     licencia, ni de comunicarse con ellas (sin ticket de soporte, sin canal
@@ -714,10 +715,42 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
       operador a mano — fingir ese automatismo prometeria un cobro que
       este registro no hace. Verificado con 17 pruebas en el archivo (7
       nuevas), typecheck, lint, build y `scripts/humo.ts` en verde.
-    - **Canal de soporte/tickets** (grande): un sistema de mensajeria
-      nuevo entre el operador y cada constructora — modelo, bandeja,
-      notificaciones —, comparable en tamano a lo que ya existe para
-      proveedores (`ContactoAviso`/`MensajeSms`). Sigue sin empezar.
+    - ~~**Canal de soporte/tickets** (grande): un sistema de mensajeria
+      nuevo entre el operador y cada constructora.~~ **HECHO el 22 de
+      agosto de 2026.** Investigado antes de construir (dos agentes de
+      exploracion en paralelo) que la referencia original a
+      "ContactoAviso/MensajeSms" ya no era exacta —`ContactoAviso` es un
+      listado de contactos externos por obra, sin relacion con esto— y
+      que esta es la PRIMERA pieza del sistema que se lee y se escribe
+      legitimamente desde los dos lados de la pared operador/empresa:
+      `aislamiento.test.ts` (la prueba que impide fugas entre empresas)
+      estructuralmente no cubre sesiones `esOperador`, asi que hizo falta
+      una prueba de aislamiento propia para este modelo, no reusar esa.
+      `MensajeSoporte` (`prisma/schema.prisma`) es un hilo CONTINUO por
+      empresa —sin estado de ticket (abierto/cerrado/prioridad), que no
+      se pidio—, con permiso nuevo `soporte:usar` (innegociable, como
+      `configuracion:editar`) del lado empresa y `sesion.esOperador` del
+      lado operador. A diferencia de `MensajeContratista` (para
+      contratistas que NO son usuarios de GCM, con correo/SMS/WhatsApp),
+      aqui los dos lados YA estan logueados en GCM: el canal vive DENTRO
+      de la app —badge de no-leidos real en el menu de "Empresa"
+      (`EnlaceEmpresa.badge`, mecanismo que ya existia y no se uso hasta
+      ahora) y en la lista `/operador`— con un correo de aviso
+      best-effort como recordatorio ("tienes un mensaje nuevo, entra a
+      verlo"), nunca como el canal en si: sin IMAP, sin token de hilo por
+      correo, sin SMS ni WhatsApp — complejidad de `MensajeContratista`
+      que aqui no hacia falta. `src/services/soporte.service.ts` tiene
+      funciones SEPARADAS y EXPLICITAS por lado (nunca una funcion con
+      una rama interna que decida el permiso segun `esOperador`), y el
+      lado operador exige el `empresaId` de forma explicita en cada
+      llamada. Verificado con 13 pruebas nuevas (aislamiento entre
+      empresas verificado de forma explicita, no solo asumido),
+      typecheck, lint, build y `scripts/humo.ts` en verde.
+
+    **Lo que queda sin tocar de este hallazgo**: "dar de alta un acceso
+    en modo demo" no se construyo — las dos entregas de hoy fueron
+    licencia (registro manual) y soporte (mensajeria); un flujo de alta
+    en modo demo es una pieza distinta, sin disenar todavia.
 
 **Avisado, no pedido todavia**: pagina de marketing y venta, exponer la app
 web y la autoinstalable (`docs/instalable.md` ya documenta esta ultima),

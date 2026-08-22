@@ -332,6 +332,53 @@ export function correoBienvenida(datos: {
 }
 
 /**
+ * Aviso de que llego un mensaje nuevo por el canal de soporte.
+ *
+ * RECORDATORIO, no el canal: nunca lleva el cuerpo del mensaje —evita
+ * dejar correspondencia de soporte en una bandeja que no es GCM— y no se
+ * puede responder por correo, asi que usa el pie por defecto de
+ * `plantilla` ("no respondas a este mensaje"). Sirve para los dos lados:
+ * `paraOperador` cambia el saludo y a donde manda.
+ */
+export function correoNuevoMensajeSoporte(datos: {
+  paraOperador: boolean;
+  /// Nombre de la constructora, para que quien lee sepa de cual es.
+  constructora: string;
+  /// A donde entrar a leerlo: `/operador/[id]` o `/empresa/soporte`.
+  ruta: string;
+}): Omit<Correo, "para"> {
+  const url = `${env.APP_URL.replace(/\/$/, "")}${datos.ruta}`;
+  const texto = datos.paraOperador
+    ? [
+        `Nuevo mensaje de soporte de ${datos.constructora}.`,
+        ``,
+        `Entra a leerlo: ${url}`,
+      ].join("\n")
+    : [
+        `Tienes un mensaje nuevo de soporte de ${MARCA}.`,
+        ``,
+        `Entra a leerlo: ${url}`,
+      ].join("\n");
+
+  const html = plantilla(
+    "Mensaje nuevo de soporte",
+    datos.paraOperador
+      ? `<p>Nuevo mensaje de <strong>${esc(datos.constructora)}</strong>.</p>
+         <p><a href="${esc(url)}" style="background:#0f7186;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:bold;">Entrar a leerlo</a></p>`
+      : `<p>Tienes un mensaje nuevo de soporte de ${esc(MARCA)}.</p>
+         <p><a href="${esc(url)}" style="background:#0f7186;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;font-weight:bold;">Entrar a leerlo</a></p>`,
+  );
+
+  return {
+    asunto: datos.paraOperador
+      ? `Soporte: mensaje de ${datos.constructora}`
+      : `Tienes un mensaje de soporte`,
+    texto,
+    html,
+  };
+}
+
+/**
  * Correo cuando un administrador restablece la clave de un usuario: la nueva
  * clave temporal, con el aviso de que las sesiones anteriores se cerraron.
  */

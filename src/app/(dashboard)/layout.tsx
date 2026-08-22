@@ -7,6 +7,7 @@ import {
   obtenerFotoPerfil,
 } from "@/services/perfil.service";
 import { contarAvisosSinLeer } from "@/services/avisos-bandeja";
+import { contarSoporteSinLeer } from "@/services/soporte.service";
 import { logoDeEmpresa } from "@/services/logo.service";
 import { puede, ROLES, ETIQUETA_ROL } from "@/lib/rbac";
 import {
@@ -43,10 +44,13 @@ export default async function DashboardLayout({
   //
   // El de avisos corre en CADA carga del area privada, asi que es un `count`
   // con su indice hecho a medida (`userId, leidoAt, createdAt`) y nada mas.
-  const [pendientes, foto, avisosSinLeer, logo] = await Promise.all([
+  const [pendientes, foto, avisosSinLeer, soporteSinLeer, logo] = await Promise.all([
     contarSolicitudesPendientes(sesion),
     obtenerFotoPerfil(sesion),
     contarAvisosSinLeer(sesion),
+    // Mismo criterio que avisosSinLeer: un `count` acotado por companyId,
+    // barato de pagar en cada carga.
+    contarSoporteSinLeer(sesion),
     // Una fila por su clave primaria: entra en el mismo `Promise.all` para no
     // sumar su latencia a la de la cabecera, que se pinta en cada pantalla.
     logoDeEmpresa(sesion),
@@ -118,6 +122,13 @@ export default async function DashboardLayout({
       etiqueta: "Archivo",
       clave: "archivo",
       grupo: "empresa",
+    },
+    puede(sesion, "soporte:usar") && {
+      href: "/empresa/soporte",
+      etiqueta: "Soporte",
+      clave: "soporte",
+      grupo: "empresa",
+      badge: soporteSinLeer,
     },
     puede(sesion, "empresa:migrar") && {
       href: "/empresa/migracion",

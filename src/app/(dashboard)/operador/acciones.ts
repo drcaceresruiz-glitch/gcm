@@ -19,6 +19,8 @@ import {
   type ConfirmacionBorradoEmpresa,
   type ResultadoBorradoEmpresa,
 } from "@/services/empresa-borrado.service";
+import { escribirSoportePorOperador } from "@/services/soporte.service";
+import type { EstadoSoporteForm } from "@/components/soporte/HiloSoporte";
 import type { DatosAltaEmpresa } from "@/lib/empresas";
 import { consultarRuc, type ConsultaRuc } from "@/services/sunat.service";
 
@@ -69,6 +71,25 @@ export async function accionEditarLicencia(
   const r = await editarLicenciaConstructora(sesion, empresaId, datos);
   if (r.ok) revalidatePath(`/operador/${empresaId}`);
   return r;
+}
+
+export async function accionEscribirSoportePorOperador(
+  _previo: EstadoSoporteForm,
+  datos: FormData,
+): Promise<EstadoSoporteForm> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const empresaId = String(datos.get("empresaId") ?? "");
+  const r = await escribirSoportePorOperador(
+    sesion,
+    empresaId,
+    String(datos.get("cuerpo") ?? ""),
+  );
+  if (!r.ok) return { error: r.error };
+
+  revalidatePath(`/operador/${empresaId}`);
+  return { ok: "Enviado." };
 }
 
 export async function accionAlternarConstructora(

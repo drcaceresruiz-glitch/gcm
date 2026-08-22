@@ -118,6 +118,11 @@ export const PERMISOS = [
 
   "configuracion:editar",
 
+  /// Hablar con GCM: el canal de soporte entre el operador y la empresa.
+  /// Un solo permiso, sin separar leer/escribir, mismo criterio que
+  /// `proveedor:contactar`.
+  "soporte:usar",
+
   "auditoria:leer",
 ] as const;
 
@@ -150,6 +155,11 @@ export type Permiso = (typeof PERMISOS)[number];
  * la empresa, y por esa cola viajan los codigos de acceso en claro. Quien
  * pueda vincular un emisor puede leer el segundo factor de cualquiera de sus
  * companeros. Es escalada de privilegios con otro nombre.
+ *
+ * `soporte:usar` va con `configuracion:editar` por la misma familia de
+ * razones, no por costumbre: la correspondencia con GCM puede tocar
+ * facturacion o la cuenta misma, y no deberia poder delegarse desde la
+ * pantalla de permisos de empresa como un ajuste cualquiera.
  *
  * `obra:eliminar_cerrada` borra una obra TERMINADA y todo lo que cuelga de
  * ella: presupuesto, ordenes, cronograma, avances, fotos. Es el unico acto de
@@ -187,6 +197,7 @@ export const INNEGOCIABLES: readonly Permiso[] = [
   "permiso:leer",
   "permiso:editar",
   "configuracion:editar",
+  "soporte:usar",
 ];
 
 /** Los que si admiten excepcion por empresa. Es lo que dibuja la pantalla. */

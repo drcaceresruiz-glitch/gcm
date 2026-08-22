@@ -8,8 +8,10 @@ import { Volver } from "@/components/ui/Volver";
 import { BotonSuspender } from "@/components/operador/BotonSuspender";
 import { FichaConstructora } from "@/components/operador/FichaConstructora";
 import { LicenciaConstructora } from "@/components/operador/LicenciaConstructora";
+import { SoporteConstructora } from "@/components/operador/SoporteConstructora";
 import { EliminarConstructora } from "@/components/operador/EliminarConstructora";
 import { motivoSiNoSePuedeBorrar } from "@/services/empresa-borrado.service";
+import { hiloDeSoportePorOperador } from "@/services/soporte.service";
 
 export const metadata: Metadata = { title: "Constructora" };
 
@@ -39,6 +41,12 @@ export default async function FichaConstructoraPage({
   const { empresaId } = await params;
   const c = await detalleConstructora(sesion, empresaId);
   if (!c) notFound();
+
+  // Fuera del Promise.all de arriba a proposito: depende de que `c` exista
+  // primero, y esta pantalla no se pinta si la constructora no aparecio.
+  const mensajesSoporte = c.esLaPropia
+    ? []
+    : await hiloDeSoportePorOperador(sesion, empresaId);
 
   return (
     <div className="space-y-6">
@@ -125,6 +133,12 @@ export default async function FichaConstructoraPage({
           notas: c.licencia.notas ?? "",
         }}
       />
+
+      {/* No tiene sentido con la empresa propia del operador -seria hablar
+          con uno mismo-, mismo criterio que suspender/eliminar de abajo. */}
+      {!c.esLaPropia && (
+        <SoporteConstructora empresaId={c.id} mensajes={mensajesSoporte} />
+      )}
 
       {/* Lo irreversible, al final y separado. La propia empresa del operador
           NO lo ofrece siquiera: el servicio lo rechaza igual, pero enseñar un

@@ -194,6 +194,7 @@ model Company {
   /// que lo garantice. `onDelete: SetNull` es la red de seguridad; el
   /// servicio ademas lo limpia el mismo al borrar (ver `agente-ia.service.ts`).
   proveedorIaActivo   AgenteIaProveedor?      @relation("ProveedorActivo", fields: [proveedorIaActivoId], references: [id], onDelete: SetNull)
+  mensajesSoporte     MensajeSoporte[]
   // `respaldosObra` ya NO es relacion: sus recibos tienen que sobrevivir al
   // borrado de la empresa. Ver `RespaldoObra`.
   /// Singular, no lista: «desde donde sale mi correo» solo admite una
@@ -438,6 +439,61 @@ model AgenteIaProveedor {
 
   @@index([companyId])
   @@map("agente_ia_proveedores")
+}
+
+enum DireccionSoporte {
+  DEL_OPERADOR
+  DE_LA_EMPRESA
+}
+
+/**
+ * Un hilo continuo de mensajes entre el operador de GCM y UNA constructora.
+ * Es la primera tabla del sistema que se lee y se escribe legitimamente
+ * desde LOS DOS LADOS de la pared operador/empresa: `operador.service.ts`
+ * declara que "no entra en los datos de un cliente", y esto es la
+ * excepcion deliberada a esa regla -correspondencia, no datos de obra ni
+ * de presupuesto-. No es un sistema de tickets con estado
+ * (abierto/cerrado/prioridad): un solo hilo por empresa, como el hallazgo
+ * que lo pidio.
+ */
+model MensajeSoporte {
+  id String @id @default(cuid())
+
+  /// La empresa CLIENTE, siempre. Nunca la propia del operador -el
+  /// operador puede tener su propia cuenta/empresa, pero eso no participa
+  /// aqui-.
+  companyId String
+
+  direccion DireccionSoporte
+  cuerpo    String           @db.Text
+
+  /// Snapshot de quien escribio, igual que `enviadoPor` en
+  /// `MensajeContratista`: sobrevive aunque la persona cambie de nombre o
+  /// se desactive.
+  autorNombre String  @db.VarChar(150)
+  /// Sin FK a proposito, mismo criterio que `userId` en
+  /// `MensajeContratista`: solo para saber quien si hace falta, no ata la
+  /// fila a que el usuario siga existiendo.
+  autorUserId String?
+
+  /// Solo tiene sentido cuando `direccion = DE_LA_EMPRESA`: cuando el
+  /// OPERADOR lo leyo.
+  leidoPorOperadorAt DateTime?
+  /**
+   * Solo tiene sentido cuando `direccion = DEL_OPERADOR`: cuando alguien
+   * de la EMPRESA lo leyo. Es lectura de LADO, no por usuario individual
+   * -cualquier administrador de la empresa lo marca leido para todos-,
+   * mismo nivel de detalle que ya basta en `MensajeContratista`, que ni
+   * siquiera guarda leido/no leido, solo cuenta.
+   */
+  leidoPorEmpresaAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
+  @@map("mensajes_soporte")
 }
 
 /// Excepcion al permiso que un rol trae por defecto, para UNA empresa.

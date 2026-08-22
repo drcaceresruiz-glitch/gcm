@@ -11,6 +11,7 @@ import {
   Eye,
   Landmark,
   KeyRound,
+  LifeBuoy,
   LogOut,
   Menu,
   PackageOpen,
@@ -64,6 +65,7 @@ const ICONOS = {
   solicitudes: ClipboardCheck,
   archivo: Archive,
   migracion: PackageOpen,
+  soporte: LifeBuoy,
 } as const;
 
 /**

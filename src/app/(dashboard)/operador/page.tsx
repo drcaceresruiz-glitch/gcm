@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, MessageCircle } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { listarConstructoras } from "@/services/operador.service";
+import { contadorSoportePorEmpresa } from "@/services/soporte.service";
 import { fechaCorta } from "@/utils/fechas";
 import { Chip } from "@/components/ui/Chip";
 import { Mascota } from "@/components/ui/Mascota";
@@ -49,7 +50,12 @@ export default async function OperadorPage() {
    * las dos cosas ya estaban escritas en la tabla, esperando a que alguien la
    * dejara pintarse—.
    */
-  const constructoras = await listarConstructoras(sesion);
+  // Una sola consulta para toda la lista, no una por fila -mismo criterio
+  // de coste que el resto del sistema-.
+  const [constructoras, soporteSinLeer] = await Promise.all([
+    listarConstructoras(sesion),
+    contadorSoportePorEmpresa(sesion),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -113,6 +119,21 @@ export default async function OperadorPage() {
                     </Link>
                     {c.esLaPropia && (
                       <span className="ml-2 text-xs opacity-60">tu empresa</span>
+                    )}
+                    {/* Mensajes de soporte sin leer, para no tener que abrir
+                        cada ficha a mirar. */}
+                    {(soporteSinLeer.get(c.id) ?? 0) > 0 && (
+                      <span
+                        className="ml-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+                        style={{
+                          backgroundColor:
+                            "color-mix(in oklab, var(--color-marca-500) 16%, transparent)",
+                          color: "var(--color-marca-600)",
+                        }}
+                      >
+                        <MessageCircle className="size-3" aria-hidden="true" />
+                        {soporteSinLeer.get(c.id)}
+                      </span>
                     )}
                   </td>
                   <td className="px-3 py-2 tabular-nums opacity-80">{c.ruc}</td>
