@@ -1188,8 +1188,20 @@ EN_EJECUCION sin presupuesto (cronograma y linea base solo avisan).
 
 Lo que falta:
 
-- **Requisitos de cierre**: no permitir cerrar con valorizaciones, pagos o
-  tareas pendientes; listar lo que falta igual que al arrancar.
+- ~~**Requisitos de cierre**~~ **HECHO (parcial) el 21 de agosto de
+  2026.** `requisitosParaCerrar` en `lib/obras.ts`, simetrico a
+  `requisitosParaEjecutar`: BLOQUEA cerrar (desde PLANIFICACION,
+  EN_EJECUCION o PARALIZADA) si queda algun encargo VIGENTE con saldo por
+  pagar, o algun movimiento presupuestal en BORRADOR — los dos quedarian
+  irresolubles para siempre en cuanto la obra sea historia. Las tareas
+  pendientes del tablero quedan como tercer requisito de la funcion pura
+  (aviso, no bloqueante, misma doctrina que `lib/pendientes.ts`), pero
+  **todavia no esta enganchado** en `cambiarEstadoObra`: reusar
+  `pendientesDeLaObra` desde `obras.service.ts` crearia un ciclo de
+  imports (`tablero.service.ts` ya importa `obtenerObra` de ese mismo
+  archivo). Falta decidir como resolverlo —exportar una version del conteo
+  que no dependa de `obras.service`, o calcularlo en la accion de servidor
+  y pasarlo como parametro— antes de que el aviso se muestre de verdad.
 - **Acta de cierre** con lecciones aprendidas (auditoria y aprendizaje).
 - **Repositorio de obras cerradas**: sigue sin existir como pantalla. Lo que
   SI hay desde el 16 de agosto es la **restauracion**: un respaldo se vuelve a
