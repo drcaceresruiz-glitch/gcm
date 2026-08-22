@@ -102,7 +102,7 @@ export default async function MapeoPage({
         <h3 className="text-base font-semibold">Tareas del cronograma</h3>
         <p className="mt-0.5 mb-4 text-sm opacity-70">
           GCM propone por parecido de la descripción; tú decides. No aparecen
-          ni las tareas resumen —su dinero es el de sus partidas hijas, y
+          ni las tareas resumen —su dinero es el de sus tareas hijas, y
           enlazarlas contaría el mismo importe dos veces— ni los hitos, que
           marcan un acontecimiento y no trabajo que ejecutar.
         </p>

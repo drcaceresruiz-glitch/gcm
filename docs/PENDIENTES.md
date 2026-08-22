@@ -1524,23 +1524,59 @@ estaba armado pero no se habia disparado.
    que ya viene en porcentaje: convertir metrados en porcentajes parecia
    exacto y habria escrito un 100 en la curva S en cuanto el compromiso fuera
    de otra tarea o cubriera dos partidas.
-10. **`MapeoTareaPartida` no tiene `fraccion`** (su hermano `EncargoPartida`
-    si). Hoy `importePorTarea` cuenta la partida entera en cada tarea que la
-    mapea y la pantalla de mapeo ya suma de mas. **Bloqueante antes de
-    activar la ponderacion por dinero**, que la UI promete y `curva-s` no
-    implementa (pondera siempre por duracion).
-11. **`subtotalesPorRama`** (`jerarquia-partidas.ts`, nuevo y probado con el
-    invariante «la suma de los subtotales raiz == costo directo») todavia NO
-    lo usa `listarPartidas`, que mantiene su propio rollup por `parentId`.
-12. **Vocabulario**: «partida» significa `WbsItem` en presupuesto y
-    `TareaCronograma` en cronograma, a veces en la misma pantalla; «frente de
-    trabajo» es una tarea en evidencia y un paquete de partidas en encargos.
-    El peor: la pantalla de mapeo, cuyo proposito es ensenar la diferencia,
-    dice «sus partidas hijas» donde debe decir «sus tareas hijas».
+10. ~~**`MapeoTareaPartida` no tiene `fraccion`**~~ **RECLASIFICADO el 21 de
+    agosto de 2026: no es un bug de hoy.** Se investigo `importePorTarea`
+    (`lib/mapeo-partidas.ts`) a fondo: cuenta, a proposito y documentado,
+    el importe COMPLETO de una partida en cada tarea que la mapea —el
+    propio comentario dice por que: "repartir ese importe exigiria saber en
+    que proporcion, y eso no lo sabe ningun algoritmo"—. La cifra que
+    realmente decide si se puede ponderar por dinero (`cobertura`, la misma
+    funcion) cuenta cada partida UNA sola vez, con su propio conjunto
+    independiente (`Set` de codigos cubiertos), asi que no hereda el doble
+    conteo. `fraccion` solo haria falta el dia que alguien sume
+    `importePorTarea` en un TOTAL unico para pesar la curva por dinero —y
+    esa funcionalidad sigue sin existir (confirmado de nuevo en la auditoria
+    de EVM del mismo dia, ver el punto 3 de la seccion "Lo que dejo la
+    tarde del 21 de agosto")—. Nada que arreglar hoy; el pendiente real es
+    "si algun dia se construye la ponderacion por dinero, hay que resolver
+    el reparto ahi, no antes".
+11. ~~**`subtotalesPorRama` no lo usa `listarPartidas`**~~ **ARREGLADO el 21
+    de agosto de 2026.** `listarPartidas` (`obras.service.ts`) mantenia su
+    propio rollup a mano por `parentId`, sumando cualquier hija `PARTIDA`
+    con parcial sin aplicar la regla de `aportantes` —la misma funcion que
+    SI aplica dos lineas mas abajo, en `montoTotal`, via `sumarHojas`—: dos
+    algoritmos distintos para dos numeros del mismo arbol, que podian
+    divergir en el caso exacto que `aportantes` existe para resolver (un
+    capitulo a suma alzada con una hija que tambien tiene cifra propia,
+    p.ej. un descuento). Se sustituyo por `subtotalesPorRama`, que trae
+    probado el invariante "la suma de los subtotales raiz == el total" —el
+    mismo que ya garantizaba `montoTotal`—, asi que ahora las dos cifras de
+    la pantalla nunca pueden descuadrar entre si.
+12. ~~**Vocabulario**~~ **ARREGLADO (parcialmente) el 21 de agosto de
+    2026.** «partida» sigue significando `WbsItem` en presupuesto y
+    `TareaCronograma` en cronograma, a veces en la misma pantalla — eso no
+    se toco, es un cambio de fondo del vocabulario del sistema, no de un
+    texto suelto. Lo que si se corrigio: las TRES apariciones encontradas
+    de "sus partidas hijas" para describir los hijos de una TAREA resumen
+    del cronograma (`mapeo.service.ts`, `mapeo/page.tsx`,
+    `lib/control-avance.ts`), que decian justamente lo que la pantalla de
+    mapeo existe para ensenar a no confundir. Ahora dicen "sus tareas
+    hijas" en los tres sitios. «Frente de trabajo» (tarea en evidencia,
+    paquete de partidas en encargos) sigue sin unificar — no es un texto
+    suelto, es un nombre usado con dos significados de producto distintos
+    en dos modulos, y cambiar cualquiera de los dos es una decision de
+    alcance, no una correccion.
 
 **Orden acordado**: 1 y 2 (el dinero) —HECHOS—, luego 7, luego el resto. Con
 el BAC ya sano, la **pagina de control economico** deja de estar bloqueada:
 era lo que faltaba para no darle autoridad visual a cifras infladas.
+
+**La lista de "lo que quedo PENDIENTE, por dano" queda cerrada el 21 de
+agosto de 2026.** De los doce puntos originales, los 3, 4, 5, 6, 10, 11 y 12
+se resolvieron esa tarde (7, 8 y 9 ya estaban hechos de antes; 1 y 2, el
+dinero, tambien). El 10 se reclasifico: no era un bug, era un prerrequisito
+para una funcionalidad (ponderar por dinero) que sigue sin construirse. No
+queda ningun punto abierto de esta auditoria.
 
 **Al retomar el dinero, lo siguiente es** el 7 (rendija del ALCANCE) y
 despues decidir si se construye la pagina de control economico o se ataca

@@ -12,7 +12,7 @@ import {
   desgloseComprometido,
   type EncargoDelComprometido,
 } from "@/lib/encargos";
-import { sumarHojas } from "@/lib/jerarquia-partidas";
+import { subtotalesPorRama, sumarHojas } from "@/lib/jerarquia-partidas";
 import { totalDeEmpresa, totalesPorObra } from "@/services/presupuesto-obra";
 import {
   estadoDeObra,
@@ -1528,23 +1528,24 @@ export async function listarPartidas(
     },
   });
 
-  // Subtotal de cada capitulo: se acumula hacia arriba por la cadena de
-  // padres, para que un capitulo refleje tambien lo que hay en sus
-  // subcapitulos y no solo en sus hijos directos.
-  const parcialesPorNodo = new Map<string, string[]>();
-  const padreDe = new Map(items.map((i) => [i.id, i.parentId]));
-
-  for (const item of items) {
-    if (item.tipo !== "PARTIDA" || !item.parcial) continue;
-
-    let ancestro = padreDe.get(item.id) ?? null;
-    while (ancestro) {
-      const acumulado = parcialesPorNodo.get(ancestro) ?? [];
-      acumulado.push(item.parcial.toString());
-      parcialesPorNodo.set(ancestro, acumulado);
-      ancestro = padreDe.get(ancestro) ?? null;
-    }
-  }
+  // Subtotal de cada capitulo: el MISMO algoritmo que decide el costo
+  // directo de la obra (`subtotalesPorRama`, sobre el codigo y la regla de
+  // `aportantes`), no un rollup aparte por `parentId`. Hasta el 21 de agosto
+  // de 2026 este rollup sumaba a mano cualquier hija de tipo PARTIDA con
+  // parcial, sin aplicar `aportantes`: un capitulo a suma alzada con hijas
+  // de ALCANCE ya no puede darse (ver el arreglo del 15 de agosto), pero el
+  // calculo seguia siendo uno DISTINTO del que usa `montoTotal` dos lineas
+  // mas abajo, y las dos ramas de un mismo numero pueden divergir en cuanto
+  // alguien reintroduce el caso que `aportantes` sabe resolver. Con
+  // `subtotalesPorRama`, la suma de los subtotales raiz cuadra siempre,
+  // exactamente, con `montoTotal` — es el invariante que el propio helper
+  // trae probado.
+  const subtotales = subtotalesPorRama(
+    items.map((i) => ({
+      codigo: i.codigoPartida,
+      parcial: i.tipo === "PARTIDA" ? (i.parcial?.toString() ?? null) : null,
+    })),
+  );
 
   const filas: PartidaFila[] = items.map((i) => ({
     id: i.id,
@@ -1560,7 +1561,7 @@ export async function listarPartidas(
     parcial:
       i.tipo === "PARTIDA"
         ? (i.parcial?.toString() ?? null)
-        : sumar(parcialesPorNodo.get(i.id) ?? []),
+        : (subtotales.get(i.codigoPartida) ?? "0.00"),
   }));
 
   const partidas = items.filter((i) => i.tipo === "PARTIDA");

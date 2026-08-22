@@ -202,7 +202,7 @@ export async function confirmarEnlace(
     return {
       ok: false,
       error:
-        "Las tareas resumen no se mapean: su importe es el de sus partidas hijas, " +
+        "Las tareas resumen no se mapean: su importe es el de sus tareas hijas, " +
         "y enlazarlas contaria el mismo dinero dos veces.",
     };
   }

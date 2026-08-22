@@ -146,7 +146,7 @@ export function agruparPorCapitulo(
      * cifra —67,82% donde el informe del cliente dice 64%— y descuadraba el
      * documento que ya se entrega.
      *
-     * El real, en cambio, lo manda GCM: sale de las partidas hijas, cuyo
+     * El real, en cambio, lo manda GCM: sale de las tareas hijas, cuyo
      * porcentaje es el reportado desde obra cuando lo hay. Leerlo del archivo
      * congelaria el avance en lo que dijera el ultimo export de Project.
      */
