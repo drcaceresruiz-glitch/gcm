@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import ExcelJS from "exceljs";
 
 import {
@@ -6,6 +6,16 @@ import {
   leerFilasDelLibro,
 } from "./proveedores-excel.service";
 import { CAMPOS_EXCEL, FILA_CABECERA } from "@/lib/proveedores-excel";
+
+// Ninguna de las dos funciones probadas aqui toca la base -son la parte
+// PURA de este servicio-, pero el archivo entero importa `@/lib/prisma` en
+// su cabecera (lo usa `importarProveedores`, que esto no ejercita). Sin
+// este doble, importar el modulo arrastra el cliente real de Prisma, que
+// en una maquina de CI recien clonada no esta generado: el 21 de agosto de
+// 2026 esto tumbo el despliegue #525 con "Cannot find package
+// '@prisma/client'", porque en un checkout local ya generado el fallo no
+// se ve.
+vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
 /**
  * El contrato de la plantilla: lo que GCM regala para descargar, GCM lo
