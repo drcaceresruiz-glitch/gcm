@@ -418,6 +418,65 @@ describe("probar", () => {
     if (!r.ok) expect(r.error).toContain("URL base");
     expect(fetchEspiado).not.toHaveBeenCalled();
   });
+
+  describe("reintento ante sobrecarga transitoria del proveedor", () => {
+    // Regresion de un fallo real, cazado en vivo: Gemini devolviendo
+    // "(503) ... high demand ... try again later" y GCM dandolo por
+    // perdido en vez de reintentar solo una vez, que es exactamente lo
+    // que el propio proveedor sugiere hacer.
+    it("un 503 se reintenta una vez, y si el segundo intento funciona, se recupera solo", async () => {
+      const fetchEspiado = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          text: () => Promise.resolve('{"error":{"message":"high demand"}}'),
+        })
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve("") });
+      vi.stubGlobal("fetch", fetchEspiado);
+      await guardarProveedorIa(ADMIN, DATOS_BUENOS);
+      const id = estado.filas[0]!.id;
+
+      const r = await probarProveedorIa(ADMIN, id);
+
+      expect(r.ok).toBe(true);
+      expect(fetchEspiado).toHaveBeenCalledTimes(2);
+    });
+
+    it("un error permanente (401) NUNCA se reintenta -insistir no arregla una clave mala-", async () => {
+      const fetchEspiado = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: () => Promise.resolve("invalid api key"),
+      });
+      vi.stubGlobal("fetch", fetchEspiado);
+      await guardarProveedorIa(ADMIN, DATOS_BUENOS);
+      const id = estado.filas[0]!.id;
+
+      const r = await probarProveedorIa(ADMIN, id);
+
+      expect(r.ok).toBe(false);
+      expect(fetchEspiado).toHaveBeenCalledTimes(1);
+    });
+
+    it("si el proveedor sigue saturado tras el reintento, se rinde y lo explica -no una guerra de desgaste-", async () => {
+      const fetchEspiado = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: () => Promise.resolve("still overloaded"),
+      });
+      vi.stubGlobal("fetch", fetchEspiado);
+      await guardarProveedorIa(ADMIN, DATOS_BUENOS);
+      const id = estado.filas[0]!.id;
+
+      const r = await probarProveedorIa(ADMIN, id);
+
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error).toContain("503");
+      // Un intento original + UN reintento, nunca mas.
+      expect(fetchEspiado).toHaveBeenCalledTimes(2);
+    });
+  });
 });
 
 describe("listarModelosProveedor", () => {

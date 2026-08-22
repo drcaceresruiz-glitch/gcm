@@ -156,6 +156,44 @@ const TOPE_PRUEBA_MS = 15_000;
 /// decidir que herramienta llamar.
 const TOPE_CONVERSACION_MS = 45_000;
 
+/// Codigos de estado que vale la pena reintentar: el proveedor esta
+/// temporalmente sobrecargado o hubo un fallo transitorio de SU lado
+/// -cazado en vivo: Gemini devolviendo 503 "high demand... try again
+/// later"-, no un problema con la peticion en si. 400/401/404 y compania
+/// NO estan aqui a proposito: reintentar esos no los arregla, solo tarda
+/// mas en dar el mismo error.
+const CODIGOS_REINTENTABLES = new Set([429, 500, 502, 503, 504]);
+/// Una vez mas, no una guerra de desgaste: si el proveedor sigue
+/// saturado tras el reintento, se le dice a quien pregunta -no se le
+/// hace esperar en bucle por algo que puede tardar minutos en despejarse-.
+const REINTENTOS_MAX = 1;
+const ESPERA_REINTENTO_MS = 1500;
+
+/**
+ * `fetch` con un reintento automatico ante una sobrecarga transitoria del
+ * proveedor. `construirOpciones` es una FUNCION, no un objeto ya armado:
+ * cada intento necesita su propio `AbortSignal.timeout(...)` fresco -reusar
+ * la misma senal entre intentos la dejaria ya vencida para el segundo,
+ * abortandolo de inmediato sin ni siquiera intentarlo-.
+ */
+async function fetchConReintento(
+  url: string,
+  construirOpciones: () => RequestInit,
+): Promise<Response> {
+  let ultima: Response | null = null;
+  for (let intento = 0; intento <= REINTENTOS_MAX; intento++) {
+    const r = await fetch(url, construirOpciones());
+    if (r.ok || !CODIGOS_REINTENTABLES.has(r.status) || intento === REINTENTOS_MAX) {
+      return r;
+    }
+    ultima = r;
+    await new Promise((resolve) => setTimeout(resolve, ESPERA_REINTENTO_MS));
+  }
+  // Inalcanzable -el bucle siempre devuelve en la ultima vuelta-, pero
+  // TypeScript no lo sabe sin esto.
+  return ultima!;
+}
+
 /// Recorta y quita cualquier rastro de la clave del texto de error de un
 /// proveedor ajeno — mismo cuidado que `probarRemitente` con la contrasena
 /// SMTP. `maxLargo` por defecto es el limite de `ultimoError`
@@ -212,7 +250,7 @@ const PISTA_SIN_TOOL_USE =
 
 async function probarClaude(config: ConfigLlamadaIa): Promise<RespuestaProveedorIa> {
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
+    const r = await fetchConReintento("https://api.anthropic.com/v1/messages", () => ({
       method: "POST",
       headers: {
         "x-api-key": config.apiKey,
@@ -226,7 +264,7 @@ async function probarClaude(config: ConfigLlamadaIa): Promise<RespuestaProveedor
         messages: [{ role: "user", content: "Responde solo con la palabra: listo" }],
       }),
       signal: AbortSignal.timeout(TOPE_PRUEBA_MS),
-    });
+    }));
 
     if (!r.ok) {
       const cuerpo = await r.text();
@@ -259,7 +297,7 @@ async function conversarClaude(
   turno: TurnoIa,
 ): Promise<RespuestaTurno | { ok: false; error: string }> {
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
+    const r = await fetchConReintento("https://api.anthropic.com/v1/messages", () => ({
       method: "POST",
       headers: {
         "x-api-key": config.apiKey,
@@ -278,7 +316,7 @@ async function conversarClaude(
         messages: turno.mensajes,
       }),
       signal: AbortSignal.timeout(TOPE_CONVERSACION_MS),
-    });
+    }));
 
     if (!r.ok) {
       const cuerpo = await r.text();
@@ -340,10 +378,10 @@ interface ListaModelosCruda {
 
 async function listarModelosClaude(config: ConfigListadoIa): Promise<RespuestaModelosIa> {
   try {
-    const r = await fetch("https://api.anthropic.com/v1/models", {
+    const r = await fetchConReintento("https://api.anthropic.com/v1/models", () => ({
       headers: { "x-api-key": config.apiKey, "anthropic-version": "2023-06-01" },
       signal: AbortSignal.timeout(TOPE_PRUEBA_MS),
-    });
+    }));
 
     if (!r.ok) {
       const cuerpo = await r.text();
@@ -375,10 +413,10 @@ async function listarModelosOpenAiCompatible(
   }
 
   try {
-    const r = await fetch(`${config.urlBase}/models`, {
+    const r = await fetchConReintento(`${config.urlBase}/models`, () => ({
       headers: { authorization: `Bearer ${config.apiKey}` },
       signal: AbortSignal.timeout(TOPE_PRUEBA_MS),
-    });
+    }));
 
     if (!r.ok) {
       const cuerpo = await r.text();
@@ -419,7 +457,7 @@ async function probarOpenAiCompatible(
   }
 
   try {
-    const r = await fetch(`${config.urlBase}/chat/completions`, {
+    const r = await fetchConReintento(`${config.urlBase}/chat/completions`, () => ({
       method: "POST",
       headers: {
         authorization: `Bearer ${config.apiKey}`,
@@ -432,7 +470,7 @@ async function probarOpenAiCompatible(
         messages: [{ role: "user", content: "Responde solo con la palabra: listo" }],
       }),
       signal: AbortSignal.timeout(TOPE_PRUEBA_MS),
-    });
+    }));
 
     if (!r.ok) {
       const cuerpo = await r.text();
@@ -486,7 +524,7 @@ async function conversarOpenAiCompatible(
       ? [{ role: "system", content: turno.sistema }, ...turno.mensajes]
       : turno.mensajes;
 
-    const r = await fetch(`${config.urlBase}/chat/completions`, {
+    const r = await fetchConReintento(`${config.urlBase}/chat/completions`, () => ({
       method: "POST",
       headers: {
         authorization: `Bearer ${config.apiKey}`,
@@ -506,7 +544,7 @@ async function conversarOpenAiCompatible(
           : {}),
       }),
       signal: AbortSignal.timeout(TOPE_CONVERSACION_MS),
-    });
+    }));
 
     if (!r.ok) {
       const cuerpo = await r.text();
