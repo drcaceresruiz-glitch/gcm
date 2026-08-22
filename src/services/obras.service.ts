@@ -1408,6 +1408,12 @@ export async function cambiarEstadoObra(
   sesion: SesionActiva,
   obraId: string,
   nuevoEstado: string,
+  /// Solo se usa (y se exige) al reabrir: el nombre tecleado tiene que
+  /// coincidir con el de la obra, mismo patron de confirmacion que
+  /// `eliminarObraCerrada` — sin la contrasena, porque esto es reversible
+  /// (volver a cerrar deshace el cambio) y no hace falta la misma friccion
+  /// que un borrado permanente.
+  confirmacionNombre?: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!puede(sesion, "obra:editar")) {
     return { ok: false, error: "No tienes permiso para cambiar el estado de la obra." };
@@ -1430,6 +1436,21 @@ export async function cambiarEstadoObra(
       ok: false,
       error: `No se puede pasar de ${ETIQUETA_ESTADO_OBRA[obra.estado as EstadoObra]} a ${ETIQUETA_ESTADO_OBRA[nuevoEstado as EstadoObra]}.`,
     };
+  }
+
+  // Reabrir exige su propio permiso, ADEMAS del `obra:editar` general de
+  // arriba: es la unica transicion que deshace la garantia de que una obra
+  // cerrada es historia, y por eso esta en `INNEGOCIABLES` (solo ADMIN).
+  if (obra.estado === "CERRADA" && nuevoEstado === "EN_EJECUCION") {
+    if (!puede(sesion, "obra:reabrir")) {
+      return { ok: false, error: "No tienes permiso para reabrir una obra cerrada." };
+    }
+    if ((confirmacionNombre ?? "").trim() !== obra.nombreObra.trim()) {
+      return {
+        ok: false,
+        error: "El nombre no coincide con el de la obra. Vuelve a escribirlo.",
+      };
+    }
   }
 
   // Arrancar POR PRIMERA VEZ exige presupuesto. Reanudar una obra paralizada

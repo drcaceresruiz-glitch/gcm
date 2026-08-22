@@ -315,7 +315,14 @@ export async function accionCambiarEstadoObra(
   if (!sesion) redirect("/login");
 
   const obraId = String(datos.get("id") ?? "");
-  const r = await cambiarEstadoObra(sesion, obraId, String(datos.get("estado") ?? ""));
+  const r = await cambiarEstadoObra(
+    sesion,
+    obraId,
+    String(datos.get("estado") ?? ""),
+    // Solo lo lee el servicio cuando la transicion es reabrir; en las
+    // demas no viaja ningun campo con este nombre y queda `undefined`.
+    datos.has("confirmacionNombre") ? String(datos.get("confirmacionNombre")) : undefined,
+  );
   if (!r.ok) return { ok: false, error: r.error };
 
   revalidatePath(`/obras/${obraId}`, "layout");

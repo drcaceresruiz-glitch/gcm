@@ -51,18 +51,27 @@ export const TONO_ESTADO_OBRA: Record<
 /**
  * Que estados puede tomar una obra a partir del que tiene ahora.
  *
- * No es una lista de deseos: una obra avanza, no salta ni retrocede. Se
- * planifica, arranca, quiza se paraliza y se reanuda, y termina cerrada. No
- * se paraliza lo que no empezo, no se vuelve a planificar lo ya iniciado, y
- * de CERRADA no se sale —el resultado de una obra cerrada es historia y
- * reabrirla lo falsearia—. Cancelar antes de empezar es pasar de planificacion
- * a cerrada directamente.
+ * No es una lista de deseos: una obra avanza, no salta ni retrocede en la
+ * mayoria de los casos. Se planifica, arranca, quiza se paraliza y se
+ * reanuda, y termina cerrada. No se paraliza lo que no empezo, no se vuelve
+ * a planificar lo ya iniciado. Cancelar antes de empezar es pasar de
+ * planificacion a cerrada directamente.
+ *
+ * CERRADA SI admite una salida, desde el 21 de agosto de 2026: reabrir,
+ * para la obra que se cerro por error. No es la puerta trasera que parece
+ * —exige el permiso `obra:reabrir`, innegociable y solo del ADMIN, mas una
+ * confirmacion explicita en la pantalla (ver `EstadoObra.tsx`)—, y por
+ * fuera de esa puerta la garantia sigue siendo la misma: el resultado de
+ * una obra cerrada es historia, y modificarlo sin pasar por aqui la
+ * falsearia. Reabrir SIEMPRE vuelve a EN_EJECUCION, nunca a PLANIFICACION
+ * ni a PARALIZADA: la obra ya tuvo gasto real, y "planificacion" dejaria
+ * de significar lo que dice.
  */
 export const TRANSICIONES_OBRA: Record<EstadoObra, EstadoObra[]> = {
   PLANIFICACION: ["EN_EJECUCION", "CERRADA"],
   EN_EJECUCION: ["PARALIZADA", "CERRADA"],
   PARALIZADA: ["EN_EJECUCION", "CERRADA"],
-  CERRADA: [],
+  CERRADA: ["EN_EJECUCION"],
 };
 
 /** Los estados a los que se puede pasar desde el actual. */
@@ -334,12 +343,15 @@ export const OBRA_ARCHIVADA =
 /**
  * El verbo del boton que hace la transicion, no el nombre del estado destino.
  *
- * "Iniciar ejecucion" y "Reanudar" llevan al MISMO estado (EN_EJECUCION) pero
- * se leen distinto segun de donde se venga: arrancar por primera vez no es lo
- * mismo que retomar algo parado, y el boton debe decir lo que de verdad hace.
+ * "Iniciar ejecucion", "Reanudar" y "Reabrir" llevan las tres al MISMO
+ * estado (EN_EJECUCION) pero se leen distinto segun de donde se venga:
+ * arrancar por primera vez, retomar algo parado y deshacer un cierre por
+ * error son tres actos distintos, y el boton debe decir cual de los tres
+ * es.
  */
 export function etiquetaTransicionObra(desde: EstadoObra, hacia: EstadoObra): string {
   if (hacia === "EN_EJECUCION") {
+    if (desde === "CERRADA") return "Reabrir";
     return desde === "PARALIZADA" ? "Reanudar" : "Iniciar ejecucion";
   }
   if (hacia === "PARALIZADA") return "Paralizar";

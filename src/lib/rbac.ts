@@ -41,6 +41,9 @@ export const PERMISOS = [
   "obra:eliminar_cerrada",
   /// Recargar el respaldo de una obra borrada, como copia de solo lectura.
   "obra:restaurar",
+  /// Volver una obra CERRADA a EN_EJECUCION. Ver `INNEGOCIABLES`: deshace
+  /// directamente la garantia de que de CERRADA no se sale.
+  "obra:reabrir",
   "obra:asignar_equipo",
 
   "partida:leer",
@@ -163,6 +166,13 @@ export type Permiso = (typeof PERMISOS)[number];
  * contrasena, contratistas, obras, dinero y fotos—, y ese archivo se
  * verifica con una frase, no con el secreto de esta instalacion: quien lo
  * tenga, la tiene entera. Es `obra:eliminar_cerrada` un piso mas arriba.
+ *
+ * `obra:reabrir` deshace la garantia de `TRANSICIONES_OBRA`: "de CERRADA no
+ * se sale, el resultado de una obra cerrada es historia". Reabrir es
+ * exactamente lo contrario —volver a escribir sobre lo que ya se dio por
+ * terminado—, y por eso es del ADMIN, mismo criterio que
+ * `obra:eliminar_cerrada`/`obra:restaurar`: las tres tocan el estado
+ * terminal de una obra.
  */
 export const INNEGOCIABLES: readonly Permiso[] = [
   "empresa:migrar",
@@ -173,6 +183,7 @@ export const INNEGOCIABLES: readonly Permiso[] = [
   /// Del ADMIN por el mismo motivo que el borrado: quien pueda recargar un
   /// respaldo puede meter en la empresa una obra entera venida de un archivo.
   "obra:restaurar",
+  "obra:reabrir",
   "permiso:leer",
   "permiso:editar",
   "configuracion:editar",

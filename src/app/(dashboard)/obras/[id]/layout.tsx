@@ -392,8 +392,10 @@ export default async function ObraLayout({
           <div className="mt-3">
             <EstadoObra
               obraId={obra.id}
+              nombreObra={obra.nombreObra}
               estado={obra.estado as EstadoObraTipo}
               puedeEditar={puede(sesion, "obra:editar")}
+              puedeReabrir={puede(sesion, "obra:reabrir")}
             />
           </div>
 

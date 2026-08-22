@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, LoaderCircle, Play, Pause, Lock } from "lucide-react";
+import { AlertCircle, LoaderCircle, Play, Pause, Lock, TriangleAlert } from "lucide-react";
 import {
   accionCambiarEstadoObra,
   type RespuestaEdicion,
@@ -21,18 +21,26 @@ import { Chip } from "@/components/ui/Chip";
  *
  * Se muestra el estado actual como chip y, al lado, un boton por cada
  * transicion permitida —"Iniciar ejecucion", "Paralizar", "Reanudar",
- * "Cerrar obra"—. Cerrar pide confirmacion: cerrada es terminal, no se
- * reabre. Que aparezcan solo las transiciones validas es la misma regla que
- * el servidor aplica; aqui solo se dibuja.
+ * "Cerrar obra", "Reabrir"—. Que aparezcan solo las transiciones validas es
+ * la misma regla que el servidor aplica; aqui solo se dibuja.
+ *
+ * "Reabrir" (CERRADA -> EN_EJECUCION) es la unica que ademas exige
+ * `puedeReabrir`, no solo `puedeEditar`: es la transicion que deshace la
+ * garantia de que una obra cerrada es historia, y por eso tiene su propio
+ * permiso innegociable (`obra:reabrir`, solo ADMIN).
  */
 export function EstadoObra({
   obraId,
+  nombreObra,
   estado,
   puedeEditar,
+  puedeReabrir,
 }: {
   obraId: string;
+  nombreObra: string;
   estado: Estado;
   puedeEditar: boolean;
+  puedeReabrir: boolean;
 }) {
   const [respuesta, accion] = useActionState<RespuestaEdicion, FormData>(
     accionCambiarEstadoObra,
@@ -42,17 +50,32 @@ export function EstadoObra({
   const transiciones = transicionesDeObra(estado);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-start gap-2">
       <Chip tono={TONO_ESTADO_OBRA[estado]}>{ETIQUETA_ESTADO_OBRA[estado]}</Chip>
 
       {puedeEditar &&
-        transiciones.map((destino) => (
-          <form key={destino} action={accion}>
-            <input type="hidden" name="id" value={obraId} />
-            <input type="hidden" name="estado" value={destino} />
-            <BotonTransicion desde={estado} hacia={destino} />
-          </form>
-        ))}
+        transiciones.map((destino) => {
+          const esReabrir = estado === "CERRADA" && destino === "EN_EJECUCION";
+
+          if (esReabrir) {
+            return puedeReabrir ? (
+              <FormularioReabrir
+                key={destino}
+                obraId={obraId}
+                nombreObra={nombreObra}
+                accion={accion}
+              />
+            ) : null;
+          }
+
+          return (
+            <form key={destino} action={accion}>
+              <input type="hidden" name="id" value={obraId} />
+              <input type="hidden" name="estado" value={destino} />
+              <BotonTransicion desde={estado} hacia={destino} />
+            </form>
+          );
+        })}
 
       {estado === "CERRADA" && (
         <span className="inline-flex items-center gap-1 text-xs opacity-60">
@@ -87,8 +110,9 @@ function BotonTransicion({ desde, hacia }: { desde: Estado; hacia: Estado }) {
       type="submit"
       disabled={pending}
       onClick={(e) => {
-        // Cerrar es terminal: se confirma para que no se dispare por inercia.
-        if (cerrar && !window.confirm("¿Cerrar la obra? Una vez cerrada no se puede reabrir.")) {
+        // Cerrar es terminal salvo por reabrir: se confirma para que no se
+        // dispare por inercia.
+        if (cerrar && !window.confirm("¿Cerrar la obra? Solo se puede reabrir con permiso de administrador.")) {
           e.preventDefault();
         }
       }}
@@ -104,6 +128,108 @@ function BotonTransicion({ desde, hacia }: { desde: Estado; hacia: Estado }) {
         <Icono className="size-3.5" aria-hidden="true" />
       )}
       {etiqueta}
+    </button>
+  );
+}
+
+/**
+ * "Reabrir" no es un solo clic: revela un mini-formulario que pide escribir
+ * el nombre de la obra, mismo patron que `BandejaSolicitudes.tsx` usa para
+ * pedir el motivo de un rechazo. Y avisa de los dos efectos que reabrir
+ * dispara solo, sin que nadie los pida: los avisos automaticos (`avisos-reloj`)
+ * vuelven a procesar la obra en el siguiente tick del cron, y una semana de
+ * Plan Semanal que quedara ABIERTA al cerrar reaparece en el tablero de la
+ * empresa. Ninguno de los dos se corrige aqui —son comportamiento de otros
+ * modulos—, pero que sea una sorpresa es peor que avisarlo.
+ */
+function FormularioReabrir({
+  obraId,
+  nombreObra,
+  accion,
+}: {
+  obraId: string;
+  nombreObra: string;
+  accion: (datos: FormData) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <Play className="size-3.5" aria-hidden="true" />
+        Reabrir
+      </button>
+    );
+  }
+
+  return (
+    <form
+      action={accion}
+      className="w-full max-w-md space-y-2.5 rounded-lg border p-3"
+      style={{ borderColor: "var(--color-alerta)" }}
+    >
+      <input type="hidden" name="id" value={obraId} />
+      <input type="hidden" name="estado" value="EN_EJECUCION" />
+
+      <p className="flex items-start gap-1.5 text-xs text-pretty opacity-80">
+        <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+        Al reabrir, los avisos automáticos (restricciones vencidas,
+        valorizaciones pendientes) se reanudan de inmediato y pueden avisar
+        de golpe de cosas que llevan tiempo paradas. Si quedó una semana del
+        Plan Semanal abierta al cerrar, también vuelve a aparecer en el
+        tablero de la empresa.
+      </p>
+
+      <label className="block text-xs">
+        <span className="opacity-70">
+          Escribe el nombre de la obra para confirmar:{" "}
+        </span>
+        <strong>{nombreObra}</strong>
+        <input
+          type="text"
+          name="confirmacionNombre"
+          required
+          autoComplete="off"
+          className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm"
+          style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+        />
+      </label>
+
+      <div className="flex items-center gap-3">
+        <BotonConfirmarReabrir />
+        <button
+          type="button"
+          onClick={() => setAbierto(false)}
+          className="text-xs font-medium underline opacity-70"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function BotonConfirmarReabrir() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+      style={{ backgroundColor: "var(--color-marca-600)" }}
+    >
+      {pending ? (
+        <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+      ) : (
+        <Play className="size-3.5" aria-hidden="true" />
+      )}
+      Confirmar reapertura
     </button>
   );
 }

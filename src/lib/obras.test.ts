@@ -30,10 +30,15 @@ describe("una obra cerrada no admite cambios", () => {
     expect(obraAdmiteCambios({ estado: "PARALIZADA" })).toBe(true);
   });
 
-  it("y de cerrada no se vuelve: no hay reabrir", () => {
-    // Si algun dia se anade, hay que decidirlo a proposito. Esta prueba esta
-    // aqui para que ese cambio no pase inadvertido.
-    expect(transicionesDeObra("CERRADA")).toEqual([]);
+  it("de cerrada solo se sale reabriendo, y siempre hacia en ejecucion", () => {
+    // Decidido a proposito el 21 de agosto de 2026, con permiso propio
+    // (`obra:reabrir`, innegociable) y confirmacion en pantalla — no es
+    // que la puerta se abriera sola. Nunca vuelve a planificacion ni a
+    // paralizada: la obra ya tuvo gasto real.
+    expect(transicionesDeObra("CERRADA")).toEqual(["EN_EJECUCION"]);
+    expect(puedeTransicionarObra("CERRADA", "EN_EJECUCION")).toBe(true);
+    expect(puedeTransicionarObra("CERRADA", "PLANIFICACION")).toBe(false);
+    expect(puedeTransicionarObra("CERRADA", "PARALIZADA")).toBe(false);
   });
 });
 
@@ -203,10 +208,11 @@ describe("transiciones de estado de obra", () => {
     expect(transicionesDeObra("PARALIZADA")).toEqual(["EN_EJECUCION", "CERRADA"]);
   });
 
-  it("cerrada es terminal: no se sale de ella", () => {
-    expect(transicionesDeObra("CERRADA")).toEqual([]);
-    expect(puedeTransicionarObra("CERRADA", "EN_EJECUCION")).toBe(false);
+  it("cerrada solo se reabre hacia en ejecucion, nunca a planificacion", () => {
+    expect(transicionesDeObra("CERRADA")).toEqual(["EN_EJECUCION"]);
+    expect(puedeTransicionarObra("CERRADA", "EN_EJECUCION")).toBe(true);
     expect(puedeTransicionarObra("CERRADA", "PLANIFICACION")).toBe(false);
+    expect(puedeTransicionarObra("CERRADA", "PARALIZADA")).toBe(false);
   });
 
   it("no se paraliza lo que no empezo, ni se vuelve a planificar", () => {
@@ -226,9 +232,10 @@ describe("transiciones de estado de obra", () => {
     expect(puedeTransicionarObra("INVENTADO", "CERRADA")).toBe(false);
   });
 
-  it("el verbo del boton distingue arrancar de reanudar", () => {
+  it("el verbo del boton distingue arrancar, reanudar y reabrir", () => {
     expect(etiquetaTransicionObra("PLANIFICACION", "EN_EJECUCION")).toBe("Iniciar ejecucion");
     expect(etiquetaTransicionObra("PARALIZADA", "EN_EJECUCION")).toBe("Reanudar");
+    expect(etiquetaTransicionObra("CERRADA", "EN_EJECUCION")).toBe("Reabrir");
     expect(etiquetaTransicionObra("EN_EJECUCION", "PARALIZADA")).toBe("Paralizar");
     expect(etiquetaTransicionObra("EN_EJECUCION", "CERRADA")).toBe("Cerrar obra");
   });
