@@ -28,11 +28,16 @@ import { obtenerCronograma, registrarAvance } from "@/services/cronograma.servic
 import { crearNota, type DatosNota } from "@/services/notas.service";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { RolAgente } from "@/generated/prisma/enums";
-/// Import de VALOR, no de tipo -a diferencia de `RolAgente` arriba-: hace
-/// falta `Prisma.JsonNull`, el centinela en tiempo de ejecucion que Prisma
-/// exige para filtrar "esta columna Json no es null" (`propuesta: { not: null }`
-/// a secas no compila contra un campo `Json?` en el cliente generado).
-import { Prisma } from "@/generated/prisma/client";
+// `import type`, no un import de valor: el cliente generado
+// (`src/generated/prisma/`) esta gitignored y solo existe despues de
+// `prisma generate` -parte de `npm run build`, un paso DESPUES de las
+// pruebas en el CI-. Un import de tipo se borra por completo al compilar,
+// asi que nunca necesita que el archivo exista en tiempo de ejecucion;
+// uno de valor (p. ej. `Prisma.JsonNull`) SI lo necesita, y eso es
+// exactamente lo que tumbo el CI la primera vez -ver
+// `barridoDePropuestasExpiradas`, que por eso filtra en memoria en vez de
+// pedirle ese centinela al `where`-.
+import type { Prisma } from "@/generated/prisma/client";
 
 /// Nombre de una obra, para las tarjetas de confirmacion -SOLO texto de
 /// pantalla, nunca una decision de permiso: la autorizacion real la hace
@@ -742,15 +747,26 @@ export interface ResumenBarridoPropuestas {
   expiradas: number;
 }
 
-/** Llamado desde el cron de `/api/reloj`, en su propio try/catch. */
+/**
+ * Llamado desde el cron de `/api/reloj`, en su propio try/catch.
+ *
+ * En dos pasos, a proposito: filtrar `propuesta IS NOT NULL` en el WHERE
+ * exigiria el centinela `Prisma.JsonNull` -un import de VALOR, no de tipo,
+ * del cliente generado-, y ese archivo no existe todavia cuando el CI
+ * corre las pruebas (`prisma generate` es parte de `npm run build`, un
+ * paso DESPUES). Filtrar en memoria evita esa dependencia por completo.
+ */
 export async function barridoDePropuestasExpiradas(): Promise<ResumenBarridoPropuestas> {
   const limite = new Date(Date.now() - PROPUESTA_EXPIRA_MS);
+  const candidatas = await prisma.mensajeAgente.findMany({
+    where: { propuestaResueltaAt: null, terminadoAt: { not: null, lt: limite } },
+    select: { id: true, propuesta: true },
+  });
+  const ids = candidatas.filter((m) => m.propuesta !== null).map((m) => m.id);
+  if (ids.length === 0) return { expiradas: 0 };
+
   const { count } = await prisma.mensajeAgente.updateMany({
-    where: {
-      propuesta: { not: Prisma.JsonNull },
-      propuestaResueltaAt: null,
-      terminadoAt: { not: null, lt: limite },
-    },
+    where: { id: { in: ids } },
     data: { propuestaResueltaAt: new Date(), propuestaResultado: "Expiró sin confirmar." },
   });
   return { expiradas: count };

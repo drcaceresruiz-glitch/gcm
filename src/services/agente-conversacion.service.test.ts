@@ -165,43 +165,43 @@ vi.mock("@/lib/prisma", () => {
         if (fila) Object.assign(fila, args.data);
         return Promise.resolve({});
       },
-      // Tres formas distintas segun quien llama, distinguidas por que
-      // claves trae el `where` -mismo criterio que `findFirst` de abajo,
-      // que ya hace este tipo de despacho manual-:
-      //   1. confirmarPropuestaAgente "reclama" por id: { id, propuestaResueltaAt: null }
-      //   2. barridoDeTurnosMuertos: { terminadoAt: null, iniciadoAt: { lt } }
-      //   3. barridoDePropuestasExpiradas: { propuesta: {...}, propuestaResueltaAt: null, terminadoAt: { not: null, lt } }
+      // Formas distintas segun quien llama, distinguidas por que claves
+      // trae el `where` -mismo criterio que `findFirst` de abajo, que ya
+      // hace este tipo de despacho manual-:
+      //   1. confirmarPropuestaAgente "reclama" por id: { id: "...", propuestaResueltaAt: null }
+      //   2. barridoDePropuestasExpiradas actualiza por lote de ids ya
+      //      filtrados en memoria: { id: { in: [...] } }
+      //   3. barridoDeTurnosMuertos: { terminadoAt: null, iniciadoAt: { lt } }
       updateMany: (args: { where: Record<string, unknown>; data: Partial<FilaMensaje> }) => {
         const w = args.where;
 
         if ("id" in w) {
+          const idFiltro = w["id"];
+          if (idFiltro && typeof idFiltro === "object" && "in" in idFiltro) {
+            const ids = (idFiltro as { in: string[] }).in;
+            let count = 0;
+            for (const m of estado.mensajes) {
+              if (!ids.includes(m.id)) continue;
+              Object.assign(m, args.data);
+              count++;
+            }
+            return Promise.resolve({ count });
+          }
           const fila = estado.mensajes.find(
-            (m) => m.id === w["id"] && m.propuestaResueltaAt === null,
+            (m) => m.id === idFiltro && m.propuestaResueltaAt === null,
           );
           if (!fila) return Promise.resolve({ count: 0 });
           Object.assign(fila, args.data);
           return Promise.resolve({ count: 1 });
         }
 
+        const limite = (w["iniciadoAt"] as { lt?: Date } | undefined)?.lt;
         let count = 0;
-        if ("propuesta" in w) {
-          const limite = (w["terminadoAt"] as { lt?: Date } | undefined)?.lt;
-          for (const m of estado.mensajes) {
-            if (m.propuesta === null) continue;
-            if (m.propuestaResueltaAt !== null) continue;
-            if (m.terminadoAt === null) continue;
-            if (limite && m.terminadoAt >= limite) continue;
-            Object.assign(m, args.data);
-            count++;
-          }
-        } else {
-          const limite = (w["iniciadoAt"] as { lt?: Date } | undefined)?.lt;
-          for (const m of estado.mensajes) {
-            if (m.terminadoAt !== null) continue;
-            if (limite && m.iniciadoAt >= limite) continue;
-            Object.assign(m, args.data);
-            count++;
-          }
+        for (const m of estado.mensajes) {
+          if (m.terminadoAt !== null) continue;
+          if (limite && m.iniciadoAt >= limite) continue;
+          Object.assign(m, args.data);
+          count++;
         }
         return Promise.resolve({ count });
       },
@@ -232,15 +232,30 @@ vi.mock("@/lib/prisma", () => {
         }
         return Promise.resolve(filas[0] ?? null);
       },
+      // Dos formas: el historial de una conversacion (`conversacionId`
+      // presente) y el barrido de propuestas expiradas (sin
+      // `conversacionId`, filtra por `propuestaResueltaAt`/`terminadoAt`).
       findMany: (args: {
-        where: { conversacionId: string; id?: { not: string }; terminadoAt?: { not: null } };
+        where: {
+          conversacionId?: string;
+          id?: { not: string };
+          terminadoAt?: { not: null } | { not: null; lt: Date };
+          propuestaResueltaAt?: null;
+        };
         orderBy?: unknown;
       }) => {
         const w = args.where;
         const filas = estado.mensajes.filter((m) => {
-          if (m.conversacionId !== w.conversacionId) return false;
+          if (w.conversacionId !== undefined && m.conversacionId !== w.conversacionId) return false;
           if (w.id && m.id === w.id.not) return false;
-          if (w.terminadoAt && m.terminadoAt === null) return false;
+          if (w.terminadoAt) {
+            if (m.terminadoAt === null) return false;
+            const lt = (w.terminadoAt as { lt?: Date }).lt;
+            if (lt && m.terminadoAt >= lt) return false;
+          }
+          if (w.propuestaResueltaAt === null && (m.propuestaResueltaAt ?? null) !== null) {
+            return false;
+          }
           return true;
         });
         filas.sort((a, b) => a.iniciadoAt.getTime() - b.iniciadoAt.getTime());
