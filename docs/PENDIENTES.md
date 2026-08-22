@@ -128,28 +128,21 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      mencionar gastos generales ni un "sobrecosto de plazo" que nunca se
      muestra (ver el hallazgo nuevo, justo abajo). La accion de importar
      ya rechazaba correctamente un archivo que trajera esa hoja — eso no
-     cambio. Consecuencia encadenada que SIGUE pendiente: el aviso "N
-     gasto(s) general(es) duran mas que la obra" y su boton de ajuste
-     (`PanelBolsa.tsx`, `BotonAjustarMeses.tsx`) quedan inalcanzables para
-     cualquier meta creada despues del 21/08 — la tabla que los alimenta
-     nunca vuelve a llenarse. Es codigo muerto candidato a retirar, no
-     arreglado en esta pasada (arreglar el texto no revive la tabla).
-   - **Hallazgo nuevo, encontrado arreglando el punto anterior: el
-     "sobrecosto de plazo" de la meta se calcula pero no se muestra en
-     ninguna pantalla, y desde el 21/08 siempre da cero.** `AvisoPlazo`
-     (`meta.service.ts:138,330-338`) calcula `mesesMeta`, `mesesProgramados`,
-     `desviacion`, `costeMensual` y `sobrecosto`, y viaja en
-     `comparacion.plazo` — pero un grep exhaustivo confirma que
-     `.plazo` de esa comparacion NUNCA se lee en ningun componente
-     (`PanelBolsa.tsx` no lo toca). Ademas, desde que los gastos generales
-     salieron de la meta, `costeMensualDelAtraso` siempre se calcula sobre
-     un array vacio (`resumenGastosGenerales([])`, linea 324) y da
-     "0.00" siempre, asi que aunque se mostrara, `sobrecosto` seria
-     siempre cero. Es codigo vivo (se calcula en cada carga de la
-     pantalla) que no le sirve a nadie hoy. Decidir: o se conecta a una
-     pantalla, o se retira junto con el resto de la maquinaria de
-     `resumenGastosGenerales`/`lineasMasLargasQueLaObra` que ya quedo
-     huerfana por el mismo motivo.
+     cambio.
+   - ~~Consecuencia encadenada: el aviso "N gasto(s) general(es) duran mas
+     que la obra" y su boton de ajuste (`PanelBolsa.tsx`,
+     `BotonAjustarMeses.tsx`) quedan inalcanzables — codigo muerto
+     candidato a retirar.~~ **YA NO APLICA, confirmado el 22 de agosto de
+     2026**: `BotonAjustarMeses.tsx` ya no existe como archivo,
+     `PanelBolsa.tsx` no referencia nada de esta maquinaria, y en
+     `meta.service.ts` `AvisoPlazo`/`costeMensualDelAtraso`/
+     `lineasMasLargasQueLaObra` ya no existen en absoluto (cero resultados
+     por grep). Solo queda `resumenGastosGenerales`, llamada con un array
+     SIEMPRE vacio en `meta.service.ts:431` (documentado en el propio
+     comentario: "LOS GASTOS GENERALES YA NO SON DE LA META") — no es
+     codigo muerto: la misma funcion sigue viva y con datos reales en
+     `excel-meta.ts:278`, para avisar de lo que trae un Excel viejo. No
+     queda nada que conectar ni retirar.
    - **Patron sistematico de consultas sin filtro `companyId`**, el mismo
      descuido que ya causo la fuga real de `tablero.service.ts`, repetido
      en cuatro servicios distintos (hoy no explotable en ninguno porque la
@@ -250,13 +243,16 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      redondear~~ **YA NO APLICA, confirmado el 22 de agosto de 2026**: ya
      redondea con `redondearA(indice, 2)` antes de decidir el semaforo,
      con un comentario que cita explicitamente este mismo hallazgo.
-   - **Sigue abierto, sin tocar**: dos definiciones de "comprometido" con
-     el mismo nombre y sin remision cruzada: el AC del EVM cuenta SOLO
-     ordenes `APROBADA`; el "economico" de Fisico vs. Economico suma
-     tambien encargos vigentes aun no formalizados en orden. Ambas
-     pantallas usan la palabra "comprometido" para describirlo al usuario.
-     No es un bug de codigo — es una decision de vocabulario/documentacion
-     pendiente, no un arreglo mecanico.
+   - ~~Dos definiciones de "comprometido" con el mismo nombre y sin
+     remision cruzada: el AC del EVM cuenta SOLO ordenes `APROBADA`; el
+     "economico" de Fisico vs. Economico suma tambien encargos vigentes
+     aun no formalizados en orden.~~ **YA NO APLICA, confirmado el 22 de
+     agosto de 2026**: las dos pantallas ya se remiten la una a la otra.
+     `PanelEvm.tsx` rotula "Costo real (AC, órdenes aprobadas)", nunca
+     "Comprometido" a secas; `evm.service.ts:26-32` documenta por que
+     difiere del "Comprometido" de las demas pantallas. Y
+     `FisicoVsEconomico.tsx:59` lleva un `title` textual: "Distinto del
+     «Costo real (AC)» del EVM, que solo cuenta órdenes ya aprobadas."
    - ~~Contractual: un comentario en `importacion.service.ts:53-55` afirma
      que "la pantalla ya exige `partida:importar`"~~ **YA NO APLICA,
      confirmado el 22 de agosto de 2026**: `contractual/page.tsx` exige
