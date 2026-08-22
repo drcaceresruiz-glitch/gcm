@@ -95,11 +95,8 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
    el hallazgo ya documentado del 10 de agosto sobre `CERRADA` (ver la
    seccion "Incidente del 10 de agosto" de `ESTADO.md`).
 
-5. **Prueba de extremo a extremo real** — pedida, no empezada. Crear una
-   obra, usuarios de cada rol, ejercitar permisos y flujos completos desde
-   cero. Se hace DESPUES del rol Gerente (punto 1) a proposito: probar
-   contra un modelo de permisos que esta a punto de cambiar seria repetir
-   el trabajo.
+5. ~~**Prueba de extremo a extremo real.**~~ **HECHA el 21 de agosto de
+   2026** — ver el punto 13 de esta misma lista, con el detalle completo.
 
 6. **Manual completo** — pedido: actualizado, intuitivo, paginado, con
    hipervinculos entre capitulos (hoy los capitulos se nombran unos a otros
