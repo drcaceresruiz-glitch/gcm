@@ -7,6 +7,7 @@ import { Chip } from "@/components/ui/Chip";
 import { Volver } from "@/components/ui/Volver";
 import { BotonSuspender } from "@/components/operador/BotonSuspender";
 import { FichaConstructora } from "@/components/operador/FichaConstructora";
+import { LicenciaConstructora } from "@/components/operador/LicenciaConstructora";
 import { EliminarConstructora } from "@/components/operador/EliminarConstructora";
 import { motivoSiNoSePuedeBorrar } from "@/services/empresa-borrado.service";
 
@@ -109,6 +110,19 @@ export default async function FichaConstructoraPage({
           direccion: c.direccion ?? "",
           telefono: c.telefono ?? "",
           email: c.email ?? "",
+        }}
+      />
+
+      {/* Aparte de la ficha: no es corregir un dato de identificacion, es
+          contabilidad del operador sobre la relacion comercial. Sigue
+          editable con la empresa congelada -ver el comentario del
+          servicio-, asi que no lleva el aviso de "congelada" de arriba. */}
+      <LicenciaConstructora
+        empresaId={c.id}
+        inicial={{
+          modalidad: c.licencia.modalidad ?? "",
+          vence: c.licencia.vence ? c.licencia.vence.toISOString().slice(0, 10) : "",
+          notas: c.licencia.notas ?? "",
         }}
       />
 

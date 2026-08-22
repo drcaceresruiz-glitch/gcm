@@ -694,14 +694,30 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
     de alta, corrige la identificacion y suspende"). Metido en la cola,
     sin folletear todavia — el usuario pidio guardarlo, no construirlo
     ahora. Se le planteo que son dos entregas de tamano muy distinto:
-    - **Registro manual de licencia** (chica): campos en `Company` como
+    - ~~**Registro manual de licencia** (chica): campos en `Company` como
       fecha de vencimiento, plan/modalidad ("Demo", "Anual") y notas de
-      pago, visibles en `/operador/[id]`. No integra ninguna pasarela de
-      pago, solo deja anotar lo que ya se sabe por fuera.
+      pago, visibles en `/operador/[id]`.~~ **HECHO el 22 de agosto de
+      2026.** `Company` gano `licenciaModalidad`, `licenciaVence` y
+      `licenciaNotas` (los tres opcionales, sin backfill), editables desde
+      un bloque propio en `/operador/[id]`
+      (`editarLicenciaConstructora`/`LicenciaConstructora.tsx`), aparte
+      del bloque que corrige identificacion: uno valida con
+      `validarAltaEmpresa`, esto no valida nada de negocio porque no hay
+      ninguna pasarela detras que lo exija. Sin integrar pago de verdad,
+      tal como se pidio — solo deja anotar lo que ya se sabe por fuera.
+      **A proposito no bloquea con la empresa congelada** (a diferencia de
+      `editarConstructora`): no es un dato que viaje en la copia
+      exportada, es contabilidad del operador sobre la relacion comercial,
+      y bloquearlo obligaria a descongelar una empresa justo para anotar
+      que se le vencio la licencia. **A proposito no toca `activa`**: una
+      licencia vencida no suspende sola, eso lo sigue decidiendo el
+      operador a mano — fingir ese automatismo prometeria un cobro que
+      este registro no hace. Verificado con 17 pruebas en el archivo (7
+      nuevas), typecheck, lint, build y `scripts/humo.ts` en verde.
     - **Canal de soporte/tickets** (grande): un sistema de mensajeria
       nuevo entre el operador y cada constructora — modelo, bandeja,
       notificaciones —, comparable en tamano a lo que ya existe para
-      proveedores (`ContactoAviso`/`MensajeSms`).
+      proveedores (`ContactoAviso`/`MensajeSms`). Sigue sin empezar.
 
 **Avisado, no pedido todavia**: pagina de marketing y venta, exponer la app
 web y la autoinstalable (`docs/instalable.md` ya documenta esta ultima),

@@ -9,6 +9,10 @@ import {
   CORREO_NO_DISPONIBLE,
   type DatosAltaEmpresa,
 } from "@/lib/empresas";
+// Reusada de `lib/obras`: valida un YYYY-MM-DD real (rechaza los dias que
+// no existen, como el 31 de febrero) sin escribir un segundo parser para
+// lo mismo. La logica no tiene nada de especifico de obras.
+import { fechaDeObra } from "@/lib/obras";
 import { enviarCorreo, correoBienvenida } from "@/services/mailer.service";
 import type { SesionActiva } from "@/services/sesion.service";
 
@@ -281,6 +285,16 @@ export interface ConstructoraDetalle extends ConstructoraResumen {
    * que el zip se genero completo. De el se colgara el permiso para borrarla.
    */
   ultimaExportacion: { at: Date; obras: number; tamano: number } | null;
+  /**
+   * Registro MANUAL de licencia. Nada de esto gobierna acceso: una licencia
+   * vencida no suspende sola, sigue haciendo falta apagar `activa` a mano.
+   * Ver el comentario del campo en `schema.prisma`.
+   */
+  licencia: {
+    modalidad: string | null;
+    vence: Date | null;
+    notas: string | null;
+  };
 }
 
 /**
@@ -310,6 +324,9 @@ export async function detalleConstructora(
       activa: true,
       enMigracionAt: true,
       createdAt: true,
+      licenciaModalidad: true,
+      licenciaVence: true,
+      licenciaNotas: true,
       _count: { select: { users: true, projects: true } },
     },
   });
@@ -344,6 +361,11 @@ export async function detalleConstructora(
           tamano: exportacion.tamano,
         }
       : null,
+    licencia: {
+      modalidad: e.licenciaModalidad,
+      vence: e.licenciaVence,
+      notas: e.licenciaNotas,
+    },
   };
 }
 
@@ -446,6 +468,96 @@ export async function editarConstructora(
     }
     return { ok: false, error: "No se pudo guardar. Vuelve a intentarlo." };
   }
+
+  return { ok: true };
+}
+
+export interface DatosLicencia {
+  /// Texto libre a proposito: "que plan tiene" no es un dato que GCM
+  /// gobierne todavia (no hay pasarela de pago detras), asi que una lista
+  /// fija de valores seria fingir una estructura que no existe.
+  modalidad: string;
+  /// Como llega del formulario: `YYYY-MM-DD` o vacio.
+  vence: string;
+  notas: string;
+}
+
+/**
+ * Guarda el registro MANUAL de licencia de una constructora.
+ *
+ * Aparte de `editarConstructora` a proposito, aunque toquen la misma fila:
+ * uno corrige COMO SE IDENTIFICA la empresa (valida con `validarAltaEmpresa`,
+ * los mismos limites que el alta), esto anota CON QUE PLAN Y HASTA CUANDO
+ * -sin validacion de negocio ninguna, porque no hay ninguna pasarela detras
+ * que la exija-. Mezclar los dos en un solo formulario confundiria "corregir
+ * un error de tecleo" con "anotar como paga este cliente".
+ *
+ * A PROPOSITO no se bloquea con la empresa en migracion: `enMigracionAt`
+ * protege que la COPIA EXPORTADA de los datos de la empresa no salga a
+ * medio escribir, y esto no es un dato de la empresa —ni siquiera viaja en
+ * el archivo, ver `EXCLUIDAS_MIGRACION`—, es contabilidad del OPERADOR sobre
+ * la relacion comercial. Bloquearlo obligaria a descongelar una empresa
+ * solo para anotar que se le vencio la licencia, que es precisamente el
+ * momento en que mas hace falta poder anotarlo.
+ *
+ * A PROPOSITO no cambia `activa`: una licencia vencida no suspende sola.
+ * Fingir ese automatismo prometeria un cobro que este registro no hace.
+ */
+export async function editarLicenciaConstructora(
+  sesion: SesionActiva,
+  empresaId: string,
+  datos: DatosLicencia,
+): Promise<ResultadoEdicion> {
+  if (!sesion.esOperador) {
+    return { ok: false, error: "Esta accion es solo para quien opera GCM." };
+  }
+
+  const modalidad = datos.modalidad.trim().slice(0, 30);
+
+  let vence: Date | null = null;
+  if (datos.vence.trim()) {
+    vence = fechaDeObra(datos.vence.trim());
+    if (!vence) return { ok: false, error: "La fecha de vencimiento no es válida." };
+  }
+
+  const notas = datos.notas.trim();
+
+  const antes = await prisma.company.findUnique({
+    where: { id: empresaId },
+    select: { licenciaModalidad: true, licenciaVence: true, licenciaNotas: true },
+  });
+  if (!antes) return { ok: false, error: "Constructora no encontrada." };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.company.update({
+      where: { id: empresaId },
+      data: {
+        licenciaModalidad: modalidad || null,
+        licenciaVence: vence,
+        licenciaNotas: notas || null,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        companyId: empresaId,
+        userId: sesion.userId,
+        entidad: "Company",
+        entidadId: empresaId,
+        accion: "UPDATE",
+        antes: {
+          evento: "editar_licencia",
+          modalidad: antes.licenciaModalidad ?? "",
+          vence: antes.licenciaVence?.toISOString().slice(0, 10) ?? "",
+        },
+        despues: {
+          evento: "editar_licencia",
+          modalidad: modalidad || "",
+          vence: vence?.toISOString().slice(0, 10) ?? "",
+        },
+      },
+    });
+  });
 
   return { ok: true };
 }

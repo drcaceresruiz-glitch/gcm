@@ -7,7 +7,9 @@ import {
   altaConstructora,
   alternarConstructora,
   editarConstructora,
+  editarLicenciaConstructora,
   type DatosAltaConstructora,
+  type DatosLicencia,
   type ResultadoAlta,
   type ResultadoEdicion,
   type ResultadoSuspension,
@@ -54,6 +56,18 @@ export async function accionEditarConstructora(
     revalidatePath("/operador");
     revalidatePath(`/operador/${empresaId}`);
   }
+  return r;
+}
+
+export async function accionEditarLicencia(
+  empresaId: string,
+  datos: DatosLicencia,
+): Promise<ResultadoEdicion> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await editarLicenciaConstructora(sesion, empresaId, datos);
+  if (r.ok) revalidatePath(`/operador/${empresaId}`);
   return r;
 }
 

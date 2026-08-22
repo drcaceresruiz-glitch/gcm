@@ -26,6 +26,9 @@ interface FilaEmpresa {
   activa: boolean;
   enMigracionAt: Date | null;
   createdAt: Date;
+  licenciaModalidad: string | null;
+  licenciaVence: Date | null;
+  licenciaNotas: string | null;
   _count: { users: number; projects: number };
 }
 
@@ -39,6 +42,9 @@ const EMPRESA: FilaEmpresa = {
   activa: true,
   enMigracionAt: null,
   createdAt: new Date("2026-08-07T00:00:00Z"),
+  licenciaModalidad: null,
+  licenciaVence: null,
+  licenciaNotas: null,
   _count: { users: 1, projects: 0 },
 };
 
@@ -100,9 +106,8 @@ vi.mock("@/lib/prisma", () => {
   };
 });
 
-const { detalleConstructora, editarConstructora } = await import(
-  "@/services/operador.service"
-);
+const { detalleConstructora, editarConstructora, editarLicenciaConstructora } =
+  await import("@/services/operador.service");
 
 function sesion(esOperador: boolean): SesionActiva {
   return {
@@ -167,6 +172,9 @@ describe("la ficha no asoma los datos del cliente", () => {
         "email",
         "enMigracionAt",
         "id",
+        "licenciaModalidad",
+        "licenciaNotas",
+        "licenciaVence",
         "razonSocial",
         "ruc",
         "telefono",
@@ -273,6 +281,102 @@ describe("corregir un alta", () => {
   it("si no existe, lo dice en vez de crearla", async () => {
     estado.empresa = null;
     const r = await editarConstructora(OPERADOR, "no-existe", DATOS);
+    expect(r).toEqual({ ok: false, error: "Constructora no encontrada." });
+  });
+});
+
+describe("el registro manual de licencia", () => {
+  it("solo el operador puede escribirlo", async () => {
+    const r = await editarLicenciaConstructora(CUALQUIERA, "emp-cliente", {
+      modalidad: "Anual",
+      vence: "",
+      notas: "",
+    });
+    expect(r.ok).toBe(false);
+    expect(estado.actualizada).toBeNull();
+  });
+
+  it("guarda modalidad, fecha y notas, y deja el ANTES en la auditoria", async () => {
+    const r = await editarLicenciaConstructora(OPERADOR, "emp-cliente", {
+      modalidad: "Anual",
+      vence: "2027-08-22",
+      notas: "Paga por transferencia cada agosto.",
+    });
+
+    expect(r.ok).toBe(true);
+    expect(estado.actualizada).toMatchObject({
+      licenciaModalidad: "Anual",
+      licenciaNotas: "Paga por transferencia cada agosto.",
+    });
+    expect(
+      (estado.actualizada?.["licenciaVence"] as Date).toISOString().slice(0, 10),
+    ).toBe("2027-08-22");
+
+    const apunte = estado.apuntes[0];
+    expect(apunte?.["entidad"]).toBe("Company");
+    expect((apunte?.["despues"] as Record<string, string>)["modalidad"]).toBe(
+      "Anual",
+    );
+  });
+
+  it("una fecha vacia se guarda como null, no como error", async () => {
+    const r = await editarLicenciaConstructora(OPERADOR, "emp-cliente", {
+      modalidad: "Demo",
+      vence: "",
+      notas: "",
+    });
+    expect(r.ok).toBe(true);
+    expect(estado.actualizada?.["licenciaVence"]).toBeNull();
+  });
+
+  it("rechaza una fecha que no es una fecha real", async () => {
+    const r = await editarLicenciaConstructora(OPERADOR, "emp-cliente", {
+      modalidad: "Demo",
+      vence: "2026-02-31",
+      notas: "",
+    });
+    expect(r.ok).toBe(false);
+    expect(estado.actualizada).toBeNull();
+  });
+
+  /**
+   * A PROPOSITO distinto de `editarConstructora`: esto no es un dato de la
+   * empresa que viaje en su copia exportada, es contabilidad del operador
+   * sobre la relacion comercial. Bloquearlo obligaria a descongelar una
+   * empresa solo para anotar que se le vencio la licencia.
+   */
+  it("SI funciona con la empresa congelada, a diferencia de editarConstructora", async () => {
+    estado.empresa = {
+      ...EMPRESA,
+      enMigracionAt: new Date("2026-08-19T10:00:00Z"),
+    };
+
+    const r = await editarLicenciaConstructora(OPERADOR, "emp-cliente", {
+      modalidad: "Anual",
+      vence: "",
+      notas: "",
+    });
+
+    expect(r.ok).toBe(true);
+    expect(estado.actualizada?.["licenciaModalidad"]).toBe("Anual");
+  });
+
+  it("no cambia `activa`: una licencia vencida no suspende sola", async () => {
+    await editarLicenciaConstructora(OPERADOR, "emp-cliente", {
+      modalidad: "Vencida hace un año",
+      vence: "2025-01-01",
+      notas: "",
+    });
+    expect(estado.actualizada).not.toHaveProperty("activa");
+  });
+
+  it("si no existe, lo dice", async () => {
+    estado.empresa = null;
+    const r = await editarLicenciaConstructora(OPERADOR, "no-existe", {
+      modalidad: "",
+      vence: "",
+      notas: "",
+    });
     expect(r).toEqual({ ok: false, error: "Constructora no encontrada." });
   });
 });

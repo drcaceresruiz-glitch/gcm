@@ -215,6 +215,20 @@ model Company {
    */
   enMigracionAt DateTime?
 
+  /**
+   * Registro MANUAL de licencia, del area del operador. Ninguna pasarela de
+   * pago detras: son tres campos para anotar lo que ya se sabe por fuera
+   * -que plan tiene, hasta cuando, y notas de pago- porque hoy no hay
+   * ningun sitio donde verlo sin preguntarle a la persona que vendio.
+   * Ningun campo de estos GOBIERNA nada: una licencia vencida no bloquea
+   * el acceso ni suspende la empresa por si sola -eso lo sigue decidiendo
+   * `activa`, a mano-. Confundir "vencida" con "suspendida" seria dar por
+   * hecho un cobro automatico que este registro no hace.
+   */
+  licenciaModalidad String?   @db.VarChar(30)
+  licenciaVence     DateTime? @db.Date
+  licenciaNotas     String?   @db.Text
+
   @@map("companies")
 }
 
