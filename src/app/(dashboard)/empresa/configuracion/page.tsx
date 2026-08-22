@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { listarEmisores } from "@/services/emisor-sms.service";
@@ -107,6 +108,16 @@ export default async function ConfiguracionPage() {
       {/* Al final: es la unica seccion de esta pagina que no hace falta
           tocar el primer dia, y la mas facil de dejar tal como esta. */}
       <VistaPreviaRoles activa={sesion.previsualizacionHabilitada} />
+
+      {/* Herramienta de diagnostico, no un ajuste: por eso va aparte, al
+          final del todo, y como enlace de texto y no como una tarjeta mas.
+          Existe para contrastar los umbrales de lib/capacidad.ts contra
+          semanas reales ya cerradas -ver el comentario de esa pantalla. */}
+      <p className="text-xs opacity-60">
+        <Link href="/empresa/configuracion/capacidad" className="underline">
+          Historial de capacidad (diagnóstico)
+        </Link>
+      </p>
     </div>
   );
 }
