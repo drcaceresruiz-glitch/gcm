@@ -1092,7 +1092,11 @@ export async function cerrarPlanSemanal(
     return { ok: false, error: "No tienes permiso para gestionar el plan semanal." };
   }
 
-  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  // Cerrar la semana ABIERTA es terminar lo que ya estaba en curso, no abrir
+  // trabajo nuevo: se permite en obra paralizada.
+  const cerrada = await motivoSiObraCerrada(sesion, obraId, {
+    permiteEnParalizada: true,
+  });
   if (cerrada) return { ok: false, error: cerrada };
 
   const plan = await prisma.planSemanal.findFirst({

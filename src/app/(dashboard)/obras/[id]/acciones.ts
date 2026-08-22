@@ -315,13 +315,24 @@ export async function accionCambiarEstadoObra(
   if (!sesion) redirect("/login");
 
   const obraId = String(datos.get("id") ?? "");
+  const estado = String(datos.get("estado") ?? "");
   const r = await cambiarEstadoObra(
     sesion,
     obraId,
-    String(datos.get("estado") ?? ""),
+    estado,
     // Solo lo lee el servicio cuando la transicion es reabrir; en las
     // demas no viaja ningun campo con este nombre y queda `undefined`.
     datos.has("confirmacionNombre") ? String(datos.get("confirmacionNombre")) : undefined,
+    // Solo lo lee el servicio al paralizar; en las demas transiciones no
+    // viajan estos campos y queda `undefined`.
+    estado === "PARALIZADA"
+      ? {
+          motivo: String(datos.get("motivoParalizacion") ?? ""),
+          fechaEstimada: datos.has("fechaEstimadaReanudacion")
+            ? String(datos.get("fechaEstimadaReanudacion"))
+            : undefined,
+        }
+      : undefined,
   );
   if (!r.ok) return { ok: false, error: r.error };
 

@@ -114,7 +114,7 @@ export const TABLAS: readonly TablaRespaldo[] = [
     tabla: "projects",
     modelo: "project",
     refs: [],
-    fechas: ["fechaInicio", "fechaFinProgramada"],
+    fechas: ["fechaInicio", "fechaFinProgramada", "fechaEstimadaReanudacion"],
   },
   {
     tabla: "baselines",

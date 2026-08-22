@@ -27,6 +27,7 @@ import {
   puedeCerrar,
   motivoNoAdmiteCambios,
   ETIQUETA_ESTADO_OBRA,
+  fechaDeObra,
   type EstadoObra,
 } from "@/lib/obras";
 import { diasEntre, hoy } from "@/utils/fechas";
@@ -759,6 +760,11 @@ export interface ObraDetalle {
   diaCorteSemanal: number;
   /// Version de la linea base aprobada, o null si el presupuesto sigue abierto.
   lineaBaseVersion: number | null;
+  /// Los tres solo tienen valor con `estado === "PARALIZADA"`; se limpian a
+  /// null al reanudar o cerrar. Una obra paralizada antes de que existiera
+  /// este campo tambien los trae en null.
+  motivoParalizacion: string | null;
+  fechaEstimadaReanudacion: Date | null;
 }
 
 /**
@@ -806,6 +812,8 @@ export const obtenerObra = cache(async function obtenerObra(
       fechaInicio: true,
       fechaFinProgramada: true,
       diaCorteSemanal: true,
+      motivoParalizacion: true,
+      fechaEstimadaReanudacion: true,
       baselines: {
         where: { aprobadaAt: { not: null } },
         orderBy: { version: "desc" },
@@ -1414,6 +1422,9 @@ export async function cambiarEstadoObra(
   /// (volver a cerrar deshace el cambio) y no hace falta la misma friccion
   /// que un borrado permanente.
   confirmacionNombre?: string,
+  /// Solo se usa (y se exige el motivo) al paralizar. `fechaEstimada` es
+  /// opcional: a veces de verdad no se sabe cuando se reanuda.
+  detallePausa?: { motivo: string; fechaEstimada?: string | null },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!puede(sesion, "obra:editar")) {
     return { ok: false, error: "No tienes permiso para cambiar el estado de la obra." };
@@ -1450,6 +1461,24 @@ export async function cambiarEstadoObra(
         ok: false,
         error: "El nombre no coincide con el de la obra. Vuelve a escribirlo.",
       };
+    }
+  }
+
+  // Paralizar exige motivo: sin el, meses despues nadie recuerda por que se
+  // paro. La fecha estimada de reanudacion NO se exige — a veces de verdad
+  // no se sabe (litigio, financiamiento pendiente), y forzarla invitaria a
+  // teclear cualquier fecha solo para pasar el formulario.
+  let fechaEstimadaReanudacion: Date | null = null;
+  if (nuevoEstado === "PARALIZADA") {
+    const motivo = (detallePausa?.motivo ?? "").trim();
+    if (!motivo) {
+      return { ok: false, error: "Indica el motivo de la paralizacion." };
+    }
+    if (detallePausa?.fechaEstimada) {
+      fechaEstimadaReanudacion = fechaDeObra(detallePausa.fechaEstimada);
+      if (!fechaEstimadaReanudacion) {
+        return { ok: false, error: "La fecha estimada de reanudacion no es valida." };
+      }
     }
   }
 
@@ -1528,10 +1557,24 @@ export async function cambiarEstadoObra(
     }
   }
 
+  // Al entrar en PARALIZADA se guarda el motivo/fecha/cuando; al salir
+  // (reanudar o cerrar) los tres se limpian a null — mismo criterio que
+  // `PaseObra.revocadoAt/revocadoPor` al reactivar un pase.
+  const datosParalizacion =
+    nuevoEstado === "PARALIZADA"
+      ? {
+          motivoParalizacion: (detallePausa?.motivo ?? "").trim(),
+          fechaEstimadaReanudacion,
+          paralizadaEn: new Date(),
+        }
+      : obra.estado === "PARALIZADA"
+        ? { motivoParalizacion: null, fechaEstimadaReanudacion: null, paralizadaEn: null }
+        : {};
+
   await prisma.$transaction(async (tx) => {
     await tx.project.update({
       where: { id: obraId },
-      data: { estado: nuevoEstado as EstadoObra },
+      data: { estado: nuevoEstado as EstadoObra, ...datosParalizacion },
     });
     await tx.auditLog.create({
       data: {

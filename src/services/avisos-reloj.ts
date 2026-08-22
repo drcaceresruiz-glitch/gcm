@@ -167,7 +167,10 @@ export async function pasadaDelReloj(): Promise<ResumenPasada> {
         archivadaEn: true,
       },
     });
-    const vivas = todas.filter(obraAdmiteCambios);
+    // PARALIZADA sigue contando como viva para avisos: paralizar no apaga los
+    // recordatorios de lo que ya estaba abierto (restricciones vencidas,
+    // valorizaciones pendientes). Cambiar eso es un cambio de otro alcance.
+    const vivas = todas.filter((o) => obraAdmiteCambios(o, { permiteEnParalizada: true }));
 
     const { lote, siguiente } = siguienteLote(
       vivas,

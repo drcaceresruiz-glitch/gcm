@@ -256,9 +256,19 @@ export const puedeCerrar = puedeArrancar;
  * Se declara aqui, en logica pura, para que el mismo criterio valga en la
  * pantalla y en el servidor. La comprobacion que MANDA es la del servidor: la
  * de la pantalla solo evita ofrecer un boton que va a fallar.
+ *
+ * El segundo parametro se propaga tal cual a `motivoNoAdmiteCambios` — ver su
+ * comentario. `avisos-reloj.ts` y `gerencia.service.ts` lo usan con
+ * `{ permiteEnParalizada: true }` para seguir tratando una obra paralizada
+ * como "viva" a efectos de avisos y alertas de atraso, que es el
+ * comportamiento que ya tenian antes de esta guarda y que esta entrega no
+ * cambia a proposito.
  */
-export function obraAdmiteCambios(obra: ObraParaEscribir): boolean {
-  return motivoNoAdmiteCambios(obra) === null;
+export function obraAdmiteCambios(
+  obra: ObraParaEscribir,
+  opciones: { permiteEnParalizada?: boolean } = {},
+): boolean {
+  return motivoNoAdmiteCambios(obra, opciones) === null;
 }
 
 /**
@@ -294,8 +304,22 @@ export interface ObraParaEscribir {
  * El orden importa: se mira primero `archivadaEn` porque una copia restaurada
  * SIEMPRE viene ademas en estado CERRADA, y decir "esta cerrada" cuando lo que
  * pasa es que estas mirando un respaldo confunde mas de lo que ayuda.
+ *
+ * PARALIZADA es distinta de las otras dos: no bloquea todo-o-nada. Una obra
+ * parada admite seguir CERRANDO lo que ya estaba en curso (aprobar un
+ * movimiento en borrador, subir evidencia, cerrar la semana abierta, resolver
+ * restricciones) pero no ABRIR trabajo nuevo (una orden, un encargo, un
+ * compromiso). El default de `opciones.permiteEnParalizada` es `false` a
+ * proposito —mismo principio deny-by-default que `rbac.ts`—: de las
+ * escrituras que llaman a esta guarda, la inmensa mayoria son "crear algo
+ * nuevo", y con el default restrictivo quedan protegidas sin tocarlas. Solo
+ * las pocas excepciones conocidas piden `{ permiteEnParalizada: true }`
+ * explicitamente.
  */
-export function motivoNoAdmiteCambios(obra: ObraParaEscribir): string | null {
+export function motivoNoAdmiteCambios(
+  obra: ObraParaEscribir,
+  opciones: { permiteEnParalizada?: boolean } = {},
+): string | null {
   // La empresa entera congelada manda sobre el estado de la obra: da igual que
   // esta este viva si lo que se esta haciendo es sacar una copia coherente de
   // TODA la constructora. Va primero porque es el motivo mas general y el
@@ -303,6 +327,9 @@ export function motivoNoAdmiteCambios(obra: ObraParaEscribir): string | null {
   if (obra.empresaEnMigracion) return EMPRESA_EN_MIGRACION;
   if (obra.archivadaEn) return OBRA_ARCHIVADA;
   if (obra.estado === "CERRADA") return OBRA_CERRADA;
+  if (obra.estado === "PARALIZADA" && !opciones.permiteEnParalizada) {
+    return OBRA_PARALIZADA;
+  }
   return null;
 }
 
@@ -315,6 +342,17 @@ export function motivoNoAdmiteCambios(obra: ObraParaEscribir): string | null {
 export const OBRA_CERRADA =
   "La obra esta cerrada y no admite cambios. El resultado de una obra " +
   "cerrada es historia: modificarlo falsearia lo que de verdad paso.";
+
+/**
+ * Igual que `OBRA_CERRADA` pero para PARALIZADA: aqui si se puede seguir
+ * cerrando lo que ya estaba en curso, asi que el mensaje lo dice — no es un
+ * candado total.
+ */
+export const OBRA_PARALIZADA =
+  "La obra esta paralizada: no se puede abrir trabajo nuevo mientras dure. " +
+  "Se puede seguir cerrando lo que ya estaba en curso (aprobar movimientos " +
+  "pendientes, subir evidencia, cerrar la semana abierta, resolver " +
+  "restricciones).";
 
 /**
  * La empresa entera esta congelada porque se esta exportando.

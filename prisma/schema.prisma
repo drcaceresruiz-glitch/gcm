@@ -683,6 +683,22 @@ model Project {
 
   estado ProjectState @default(PLANIFICACION)
 
+  /// Por que se paralizo, tecleado al pasar a PARALIZADA. Se limpia a null al
+  /// salir de PARALIZADA (reanudar o cerrar) — igual que
+  /// `PaseObra.revocadoAt/revocadoPor` se limpian al reactivar un pase. Una
+  /// obra paralizada ANTES de que existiera este campo se queda con null: no
+  /// se fuerza a completarlo con caracter retroactivo.
+  motivoParalizacion String? @db.VarChar(300)
+
+  /// Cuando se espera reanudar. Opcional a proposito: a veces de verdad no se
+  /// sabe (litigio, financiamiento pendiente), y obligarla invitaria a
+  /// teclear cualquier fecha solo para pasar el formulario.
+  fechaEstimadaReanudacion DateTime? @db.Date
+
+  /// Cuando se paralizo. Lo pone `cambiarEstadoObra`, no el usuario — marca de
+  /// cuando, como `archivadaEn`/`aprobadaAt` en el resto del esquema.
+  paralizadaEn DateTime?
+
   /// Dia de la semana en que se espera el corte de avance (cadencia semanal,
   /// Last Planner). ISO: 1=lunes … 7=domingo. Viernes por defecto.
   diaCorteSemanal Int @default(5)

@@ -48,6 +48,10 @@ import type { SesionActiva } from "@/services/sesion.service";
 export async function motivoSiObraCerrada(
   sesion: SesionActiva,
   obraId: string,
+  /// Se propaga tal cual a `motivoNoAdmiteCambios`: default restrictivo,
+  /// solo las escrituras que "cierran" (no "abren") pasan
+  /// `{ permiteEnParalizada: true }`. Ver el comentario de esa funcion.
+  opciones: { permiteEnParalizada?: boolean } = {},
 ): Promise<string | null> {
   /**
    * Antes de consultar: el alcance viaja en la sesion y no cuesta nada.
@@ -78,9 +82,12 @@ export async function motivoSiObraCerrada(
   // solo confundiria sobre que fallo.
   if (!obra) return null;
 
-  return motivoNoAdmiteCambios({
-    estado: obra.estado,
-    archivadaEn: obra.archivadaEn,
-    empresaEnMigracion: obra.company.enMigracionAt !== null,
-  });
+  return motivoNoAdmiteCambios(
+    {
+      estado: obra.estado,
+      archivadaEn: obra.archivadaEn,
+      empresaEnMigracion: obra.company.enMigracionAt !== null,
+    },
+    opciones,
+  );
 }

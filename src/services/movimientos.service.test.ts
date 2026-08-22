@@ -36,18 +36,30 @@ const estado: {
   cerrada: string | null;
   /// Lo que se llego a escribir. Debe quedar vacio en toda negativa.
   creados: Record<string, unknown>[];
+  /// Las opciones con las que se llamo a la guarda. Crear ABRE trabajo
+  /// nuevo: tiene que quedarse con el default restrictivo, sin pasar
+  /// `permiteEnParalizada`.
+  opcionesGuarda: { permiteEnParalizada?: boolean } | null;
 } = {
   base: { id: "base-1", version: 1 },
   partidas: [],
   ocupados: [],
   cerrada: null,
   creados: [],
+  opcionesGuarda: null,
 };
 
 // La obra cerrada se resuelve en su propio servicio, que tambien iria a la
 // base. Se dobla entero: aqui no se prueba el cierre, se prueba que se mire.
 vi.mock("@/services/obra-abierta", () => ({
-  motivoSiObraCerrada: () => Promise.resolve(estado.cerrada),
+  motivoSiObraCerrada: (
+    _sesion: unknown,
+    _obraId: string,
+    opciones?: { permiteEnParalizada?: boolean },
+  ) => {
+    estado.opcionesGuarda = opciones ?? null;
+    return Promise.resolve(estado.cerrada);
+  },
 }));
 
 vi.mock("@/lib/prisma", () => {
@@ -128,6 +140,7 @@ beforeEach(() => {
   estado.ocupados = [];
   estado.cerrada = null;
   estado.creados = [];
+  estado.opcionesGuarda = null;
 });
 
 /** Ninguna negativa puede haber escrito nada. */
@@ -291,5 +304,13 @@ describe("crearMovimiento: el camino bueno", () => {
       numero: 8,
       baselineId: "base-1",
     });
+  });
+
+  it("crear un movimiento ABRE trabajo nuevo: se queda con el default, no pide la excepcion de paralizada", async () => {
+    // Control del default restrictivo de `motivoNoAdmiteCambios`: si esta
+    // prueba se rompe porque alguien anadio `permiteEnParalizada: true` aqui,
+    // una obra paralizada podria volver a admitir movimientos nuevos.
+    await crearMovimiento(CON_PERMISO, "obra-1", movimiento());
+    expect(estado.opcionesGuarda).toBeFalsy();
   });
 });

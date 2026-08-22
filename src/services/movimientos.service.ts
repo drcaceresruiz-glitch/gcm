@@ -670,7 +670,11 @@ export async function aprobarMovimiento(
         throw new FalloAprobacion(`El movimiento ${mov.numero} ya estaba aprobado.`);
       }
 
-      const cerrada = await motivoSiObraCerrada(sesion, mov.projectId);
+      // Aprobar un movimiento cierra una decision que ya estaba en curso, no
+      // abre trabajo nuevo: se permite en obra paralizada.
+      const cerrada = await motivoSiObraCerrada(sesion, mov.projectId, {
+        permiteEnParalizada: true,
+      });
       if (cerrada) throw new FalloAprobacion(cerrada);
 
       /**

@@ -6,17 +6,63 @@ qué está construido así.
 **Lo que FALTA vive en [`PENDIENTES.md`](PENDIENTES.md)**, aparte, para poder
 tacharlo sin reescribir esto.
 
-Última actualización: 21 de agosto de 2026.
+Última actualización: 22 de agosto de 2026.
 
 > **Este documento se escribió por capas y las más nuevas van arriba.** Las
 > secciones numeradas del final son del 8 de agosto; los anexos recogen lo
 > ocurrido después. **Ante una contradicción, manda siempre el anexo más
-> reciente**, que es el del 11 al 21 de agosto.
+> reciente**, que es el del 22 de agosto.
 >
 > Entre el 12 y el 21 de agosto entraron 297 commits y el sistema cambió de
 > forma en cosas de fondo —el contractual ahora se genera desde el presupuesto
 > real, y los gastos generales dejaron de ser de la obra—. Si algo de más
 > abajo te suena raro, comprueba primero si el anexo lo desmiente.
+
+---
+
+## Anexo — 22 de agosto de 2026
+
+Sesion centrada en cerrar el resto de `PENDIENTES.md`: hallazgos de auditoria,
+sueltos, el pipeline de despliegue (un fallo real en produccion, resuelto
+aparte, ver el commit correspondiente), el vacio del panel sin obras, adjuntos
+en Notas con aviso de vencimiento, y por ultimo la entrega mas grande del dia:
+
+**PARALIZADA deja de ser todo-o-nada.** Hasta hoy una obra paralizada admitia
+CUALQUIER escritura —crear una orden, un encargo, un compromiso nuevo— igual
+que una en ejecucion; solo lo decia el chip. Ahora:
+
+- `motivoNoAdmiteCambios`/`motivoSiObraCerrada` (`lib/obras.ts`,
+  `services/obra-abierta.ts`) ganan `{ permiteEnParalizada?: boolean }`,
+  default `false`. Las ~76 escrituras que pasan por la guarda quedan
+  protegidas sin tocarlas; solo siete piden la excepcion porque CIERRAN algo
+  que ya estaba en curso en vez de abrir trabajo nuevo: `aprobarMovimiento`,
+  `cerrarPlanSemanal`, `levantarRestricciones`, `levantarTodasDeTareas`,
+  `comprometerRestricciones`, `subirEvidencia`, `subirEvidenciaConPase`.
+- `Project` gana `motivoParalizacion`, `fechaEstimadaReanudacion` (opcional
+  a proposito) y `paralizadaEn`. `cambiarEstadoObra` exige el motivo al
+  paralizar y limpia los tres al salir. `EstadoObra.tsx` gano
+  `FormularioParalizar`, mismo patron reveal-en-vez-de-clic que
+  `FormularioReabrir` (de la entrega anterior, ese mismo dia).
+- **Decision deliberada, no descuido**: `avisos-reloj.ts` y
+  `gerencia.service.ts` siguen tratando PARALIZADA como "obra viva" para
+  avisos y alertas de atraso — exactamente el comportamiento que ya tenian.
+  El default restrictivo nuevo de `obraAdmiteCambios` los habria excluido
+  sin querer; los dos llaman ahora con `{ permiteEnParalizada: true }`
+  explicitamente para que nada cambiara ahi. Unificar esas dos nociones de
+  "obra viva" (la otra sigue sin coincidir con `obras.service.ts`) sigue
+  siendo un pendiente aparte.
+- `fijarFlujos`/`marcarSinRestricciones` (comparten codigo en
+  `lookahead.service.ts`) se dejaron BLOQUEADOS a proposito: pueden crear
+  restricciones nuevas, no solo cerrarlas, y separar los dos casos dentro de
+  esa funcion compartida era mas regla de la que esta entrega necesitaba.
+- Verificado con `scripts/humo.ts` (83 rutas contra la base de desarrollo
+  real, todas responden) ademas de 2511 pruebas, typecheck, lint y build.
+  Sin navegador real disponible en esta sesion para el click-through
+  interactivo del formulario nuevo — pendiente si el usuario quiere
+  confirmarlo el mismo en pantalla.
+
+Detalle completo, con cada archivo y cada linea de guarda tocada, en el punto
+4 de [`PENDIENTES.md`](PENDIENTES.md).
 
 ---
 

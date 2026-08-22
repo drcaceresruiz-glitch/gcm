@@ -127,7 +127,11 @@ export async function subirEvidencia(
     return { ok: false, error: "No tienes permiso para subir evidencia aquí." };
   }
 
-  const cerrada = await motivoSiObraCerrada(sesion, objetivo.obraId);
+  // Subir evidencia documenta trabajo que ya estaba en curso, no abre nada
+  // nuevo: se permite en obra paralizada.
+  const cerrada = await motivoSiObraCerrada(sesion, objetivo.obraId, {
+    permiteEnParalizada: true,
+  });
   if (cerrada) return { ok: false, error: cerrada };
 
   return guardarFoto(
@@ -202,11 +206,15 @@ export async function subirEvidenciaConPase(
   });
   const noAdmite =
     obra &&
-    motivoNoAdmiteCambios({
-      estado: obra.estado,
-      archivadaEn: obra.archivadaEn,
-      empresaEnMigracion: obra.company.enMigracionAt !== null,
-    });
+    motivoNoAdmiteCambios(
+      {
+        estado: obra.estado,
+        archivadaEn: obra.archivadaEn,
+        empresaEnMigracion: obra.company.enMigracionAt !== null,
+      },
+      // Mismo criterio que `subirEvidencia`: documenta, no abre.
+      { permiteEnParalizada: true },
+    );
   if (noAdmite) return { ok: false, error: noAdmite };
 
   return guardarFoto(

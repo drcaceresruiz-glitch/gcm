@@ -233,7 +233,9 @@ export async function semaforoDeCartera(
 
   // Solo obras que admiten cambios, como el reloj de avisos: una cerrada no
   // tiene atrasos que corregir, y una restaurada de respaldo es una foto.
-  const vivas = todas.filter(obraAdmiteCambios);
+  // PARALIZADA si cuenta: una obra parada puede seguir atrasada respecto a
+  // su plan, y esconderla del panel de gerencia no es lo que se pidio aqui.
+  const vivas = todas.filter((o) => obraAdmiteCambios(o, { permiteEnParalizada: true }));
   const lote = vivas.slice(0, MAX_OBRAS_POR_CARGA);
 
   if (lote.length === 0) {

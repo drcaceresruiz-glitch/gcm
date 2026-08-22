@@ -15,19 +15,29 @@ import {
   motivoNoAdmiteCambios,
   OBRA_CERRADA,
   OBRA_ARCHIVADA,
+  OBRA_PARALIZADA,
 } from "@/lib/obras";
 
 describe("una obra cerrada no admite cambios", () => {
-  it("solo CERRADA cierra la puerta", () => {
+  it("solo CERRADA cierra la puerta del todo; PARALIZADA la cierra a medias", () => {
     expect(obraAdmiteCambios({ estado: "PLANIFICACION" })).toBe(true);
     expect(obraAdmiteCambios({ estado: "EN_EJECUCION" })).toBe(true);
-    expect(obraAdmiteCambios({ estado: "PARALIZADA" })).toBe(true);
+    expect(obraAdmiteCambios({ estado: "PARALIZADA" })).toBe(false);
     expect(obraAdmiteCambios({ estado: "CERRADA" })).toBe(false);
   });
 
-  it("paralizada SI admite cambios: esta parada, no terminada", () => {
-    // Una obra parada sigue teniendo papeleo pendiente que cerrar.
-    expect(obraAdmiteCambios({ estado: "PARALIZADA" })).toBe(true);
+  it("PARALIZADA bloquea por defecto, pero admite la excepcion explicita", () => {
+    // Decidido el 22 de agosto de 2026: PARALIZADA no es todo-o-nada. El
+    // default (sin opciones) bloquea, como cualquier escritura que "abre"
+    // trabajo nuevo; las pocas que "cierran" lo que ya estaba en curso piden
+    // `{ permiteEnParalizada: true }` explicitamente.
+    expect(motivoNoAdmiteCambios({ estado: "PARALIZADA" })).toBe(OBRA_PARALIZADA);
+    expect(
+      motivoNoAdmiteCambios({ estado: "PARALIZADA" }, { permiteEnParalizada: true }),
+    ).toBeNull();
+    expect(
+      obraAdmiteCambios({ estado: "PARALIZADA" }, { permiteEnParalizada: true }),
+    ).toBe(true);
   });
 
   it("de cerrada solo se sale reabriendo, y siempre hacia en ejecucion", () => {

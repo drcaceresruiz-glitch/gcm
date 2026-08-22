@@ -1038,11 +1038,17 @@ const NADA: ResultadoAnalisis = {
 async function puertaDeEscritura(
   sesion: SesionActiva,
   obraId: string,
+  /// Se propaga a `motivoSiObraCerrada`: default restrictivo. Los llamadores
+  /// que solo CIERRAN restricciones ya abiertas (levantar, comprometer) pasan
+  /// `{ permiteEnParalizada: true }`; `fijarFlujos`/`marcarSinRestricciones`
+  /// se dejan con el default porque tambien pueden crear restricciones
+  /// nuevas.
+  opciones: { permiteEnParalizada?: boolean } = {},
 ): Promise<string | null> {
   if (!puede(sesion, "lookahead:gestionar")) {
     return "No tienes permiso para gestionar el Lookahead.";
   }
-  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  const cerrada = await motivoSiObraCerrada(sesion, obraId, opciones);
   if (cerrada) return cerrada;
 
   const obra = await prisma.project.findFirst({
@@ -1257,7 +1263,11 @@ export async function levantarRestricciones(
   obraId: string,
   datos: { ids: readonly string[]; resuelta: boolean },
 ): Promise<ResultadoAnalisis> {
-  const error = await puertaDeEscritura(sesion, obraId);
+  // Levantar (o reabrir) una restriccion ya existente cierra algo que ya
+  // estaba en curso, no abre trabajo nuevo: se permite en obra paralizada.
+  const error = await puertaDeEscritura(sesion, obraId, {
+    permiteEnParalizada: true,
+  });
   if (error) return { ok: false, error };
 
   const ids = [...new Set(datos.ids)];
@@ -1327,7 +1337,10 @@ export async function levantarTodasDeTareas(
   obraId: string,
   uids: readonly number[],
 ): Promise<ResultadoAnalisis> {
-  const error = await puertaDeEscritura(sesion, obraId);
+  // Mismo boton de lote de `levantarRestricciones`: cierra, no abre.
+  const error = await puertaDeEscritura(sesion, obraId, {
+    permiteEnParalizada: true,
+  });
   if (error) return { ok: false, error };
 
   const lista = [...new Set(uids)].slice(0, MAX_LOTE);
@@ -1386,7 +1399,11 @@ export async function comprometerRestricciones(
     fecha: string;
   },
 ): Promise<ResultadoCompromiso> {
-  const error = await puertaDeEscritura(sesion, obraId);
+  // Fijar responsable/fecha a una restriccion ya abierta es "cerrarla", no
+  // crear trabajo nuevo: se permite en obra paralizada.
+  const error = await puertaDeEscritura(sesion, obraId, {
+    permiteEnParalizada: true,
+  });
   if (error) return { ok: false, error };
 
   const validacion = validarCompromisoRestriccion(

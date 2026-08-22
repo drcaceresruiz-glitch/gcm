@@ -396,6 +396,8 @@ export default async function ObraLayout({
               estado={obra.estado as EstadoObraTipo}
               puedeEditar={puede(sesion, "obra:editar")}
               puedeReabrir={puede(sesion, "obra:reabrir")}
+              motivoParalizacion={obra.motivoParalizacion}
+              fechaEstimadaReanudacion={obra.fechaEstimadaReanudacion}
             />
           </div>
 

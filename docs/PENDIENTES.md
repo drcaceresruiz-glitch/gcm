@@ -374,16 +374,44 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      pero no hay ningun comentario que documente esa exclusion como
      decision.
 
-   **Recomendacion del agente, sin decidir todavia:** separar las
-   escrituras de PARALIZADA en dos grupos en vez de bloquear todo o nada —
-   permitir cerrar lo que ya estaba en curso (aprobar movimientos
-   pendientes, subir evidencia, resolver restricciones abiertas, cerrar la
-   semana de Plan Semanal en curso) y bloquear lo que genera trabajo o
-   gasto NUEVO (orden nueva, encargo nuevo, compromiso nuevo de Last
-   Planner, avance nuevo). Y anadir `motivoParalizacion`/fecha estimada de
-   reanudacion a `Project`, obligatorios al paralizar, con el mismo patron
-   que `Restriccion`. Pendiente de que el usuario decida el alcance antes
-   de tocar la maquina de estados.
+   ~~**Recomendacion del agente, sin decidir todavia:** separar las
+   escrituras de PARALIZADA en dos grupos en vez de bloquear todo o nada.~~
+   **HECHO el 22 de agosto de 2026**, con el alcance que el usuario decidio:
+   - `motivoNoAdmiteCambios`/`motivoSiObraCerrada` ganan un segundo
+     parametro `{ permiteEnParalizada?: boolean }`, con default `false`
+     (deny-by-default, mismo criterio que `rbac.ts`): de las ~76 escrituras
+     que pasan por la guarda, la inmensa mayoria son "abrir algo nuevo" y
+     quedan protegidas SIN tocarlas. Solo siete llamadas piden la excepcion
+     explicita porque "cierran" lo que ya estaba en curso:
+     `aprobarMovimiento`, `cerrarPlanSemanal`, `levantarRestricciones`,
+     `levantarTodasDeTareas`, `comprometerRestricciones`, `subirEvidencia`,
+     `subirEvidenciaConPase`. `fijarFlujos` y `marcarSinRestricciones`
+     comparten codigo (`analizar()` en `lookahead.service.ts`) y se dejaron
+     BLOQUEADAS a proposito, por simplicidad: pueden crear restricciones
+     nuevas, no solo cerrarlas.
+   - `Project` gana `motivoParalizacion` (`VarChar(300)`),
+     `fechaEstimadaReanudacion` (`@db.Date`, OPCIONAL — a veces de verdad no
+     se sabe cuando se reanuda) y `paralizadaEn`. `cambiarEstadoObra` exige
+     el motivo al paralizar y limpia los tres a `null` al salir (reanudar o
+     cerrar), mismo criterio que `PaseObra.revocadoAt/revocadoPor`.
+   - `EstadoObra.tsx` gano `FormularioParalizar`, mismo patron
+     reveal-en-vez-de-un-clic que `FormularioReabrir` (textarea de motivo
+     obligatorio + fecha opcional + Confirmar/Cancelar), y muestra el
+     motivo/fecha junto al chip cuando la obra esta parada.
+   - **`avisos-reloj.ts` y `gerencia.service.ts` NO cambiaron de
+     comportamiento a proposito**: los dos seguian tratando PARALIZADA como
+     "obra viva" (avisos automaticos, alertas de atraso), y el default
+     restrictivo nuevo de `obraAdmiteCambios` los habria excluido sin
+     querer. Los dos ahora llaman con `{ permiteEnParalizada: true }`
+     explicitamente para conservar el comportamiento que ya tenian —
+     unificar esas dos nociones de "obra viva" sigue siendo un pendiente
+     aparte, sin tocar.
+   - 2511 pruebas en verde (motivoNoAdmiteCambios con y sin la excepcion;
+     `cambiarEstadoObra` exige motivo, valida la fecha, limpia al salir;
+     `aprobarMovimiento` pide la excepcion, `crearMovimiento` NO la pide —
+     control de que el default restrictivo protege de verdad), typecheck,
+     lint y build limpios, y `scripts/humo.ts` (83 rutas contra la base de
+     desarrollo real) sin ninguna rota.
 
 5. ~~**Prueba de extremo a extremo real.**~~ **HECHA el 21 de agosto de
    2026** — ver el punto 13 de esta misma lista, con el detalle completo.

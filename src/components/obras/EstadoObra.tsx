@@ -15,6 +15,7 @@ import {
   type EstadoObra as Estado,
 } from "@/lib/obras";
 import { Chip } from "@/components/ui/Chip";
+import { fechaCorta } from "@/utils/fechas";
 
 /**
  * El estado de la obra y los pasos que puede dar desde el.
@@ -35,12 +36,16 @@ export function EstadoObra({
   estado,
   puedeEditar,
   puedeReabrir,
+  motivoParalizacion,
+  fechaEstimadaReanudacion,
 }: {
   obraId: string;
   nombreObra: string;
   estado: Estado;
   puedeEditar: boolean;
   puedeReabrir: boolean;
+  motivoParalizacion: string | null;
+  fechaEstimadaReanudacion: Date | null;
 }) {
   const [respuesta, accion] = useActionState<RespuestaEdicion, FormData>(
     accionCambiarEstadoObra,
@@ -56,6 +61,7 @@ export function EstadoObra({
       {puedeEditar &&
         transiciones.map((destino) => {
           const esReabrir = estado === "CERRADA" && destino === "EN_EJECUCION";
+          const esParalizar = destino === "PARALIZADA";
 
           if (esReabrir) {
             return puedeReabrir ? (
@@ -66,6 +72,10 @@ export function EstadoObra({
                 accion={accion}
               />
             ) : null;
+          }
+
+          if (esParalizar) {
+            return <FormularioParalizar key={destino} obraId={obraId} accion={accion} />;
           }
 
           return (
@@ -81,6 +91,22 @@ export function EstadoObra({
         <span className="inline-flex items-center gap-1 text-xs opacity-60">
           <Lock className="size-3.5" aria-hidden="true" />
           Cerrada: no admite más cambios.
+        </span>
+      )}
+
+      {estado === "PARALIZADA" && (
+        <span className="inline-flex items-start gap-1 text-xs opacity-70">
+          <Pause className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+          {motivoParalizacion ? (
+            <span>
+              {motivoParalizacion}
+              {fechaEstimadaReanudacion && (
+                <> — reanudación estimada: {fechaCorta(fechaEstimadaReanudacion)}</>
+              )}
+            </span>
+          ) : (
+            <span>Paralizada — motivo no registrado.</span>
+          )}
         </span>
       )}
 
@@ -230,6 +256,112 @@ function BotonConfirmarReabrir() {
         <Play className="size-3.5" aria-hidden="true" />
       )}
       Confirmar reapertura
+    </button>
+  );
+}
+
+/**
+ * "Paralizar" tampoco es un solo clic: pide el motivo (obligatorio) y una
+ * fecha estimada de reanudación (opcional, porque a veces de verdad no se
+ * sabe), mismo patrón `FormularioReabrir`. Paralizada, la obra sigue
+ * admitiendo cerrar lo que ya estaba en curso (aprobar movimientos,
+ * evidencia, cerrar la semana, resolver restricciones); lo que bloquea es
+ * abrir trabajo nuevo — el formulario lo dice para que no sea sorpresa.
+ */
+function FormularioParalizar({
+  obraId,
+  accion,
+}: {
+  obraId: string;
+  accion: (datos: FormData) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <Pause className="size-3.5" aria-hidden="true" />
+        Paralizar
+      </button>
+    );
+  }
+
+  return (
+    <form
+      action={accion}
+      className="w-full max-w-md space-y-2.5 rounded-lg border p-3"
+      style={{ borderColor: "var(--color-alerta)" }}
+    >
+      <input type="hidden" name="id" value={obraId} />
+      <input type="hidden" name="estado" value="PARALIZADA" />
+
+      <p className="flex items-start gap-1.5 text-xs text-pretty opacity-80">
+        <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+        Mientras dure, no se podrá abrir trabajo nuevo (orden, encargo,
+        compromiso). Sí se puede seguir cerrando lo que ya estaba en curso:
+        aprobar movimientos pendientes, subir evidencia, cerrar la semana
+        abierta, resolver restricciones.
+      </p>
+
+      <label className="block text-xs">
+        <span className="opacity-70">Motivo de la paralización:</span>
+        <textarea
+          name="motivoParalizacion"
+          required
+          rows={2}
+          maxLength={300}
+          className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm"
+          style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+        />
+      </label>
+
+      <label className="block text-xs">
+        <span className="opacity-70">
+          Fecha estimada de reanudación (opcional):
+        </span>
+        <input
+          type="date"
+          name="fechaEstimadaReanudacion"
+          className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm"
+          style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+        />
+      </label>
+
+      <div className="flex items-center gap-3">
+        <BotonConfirmarParalizar />
+        <button
+          type="button"
+          onClick={() => setAbierto(false)}
+          className="text-xs font-medium underline opacity-70"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function BotonConfirmarParalizar() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+      style={{ backgroundColor: "var(--color-marca-600)" }}
+    >
+      {pending ? (
+        <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+      ) : (
+        <Pause className="size-3.5" aria-hidden="true" />
+      )}
+      Confirmar paralización
     </button>
   );
 }

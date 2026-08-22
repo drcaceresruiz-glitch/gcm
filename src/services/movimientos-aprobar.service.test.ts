@@ -36,6 +36,10 @@ const estado: {
   condicionCierre: Record<string, unknown> | null;
   /// Cuantas filas cambia el cierre. 0 simula que otro se adelanto.
   filasQueCambian: number;
+  /// Las opciones con las que se llamo a la guarda. Aprobar tiene que pasar
+  /// `{ permiteEnParalizada: true }`: cierra una decision que ya estaba en
+  /// curso, no abre trabajo nuevo.
+  opcionesGuarda: { permiteEnParalizada?: boolean } | null;
 } = {
   movimiento: null,
   lineas: [],
@@ -46,10 +50,18 @@ const estado: {
   aprobado: null,
   condicionCierre: null,
   filasQueCambian: 1,
+  opcionesGuarda: null,
 };
 
 vi.mock("@/services/obra-abierta", () => ({
-  motivoSiObraCerrada: () => Promise.resolve(estado.cerrada),
+  motivoSiObraCerrada: (
+    _sesion: unknown,
+    _obraId: string,
+    opciones?: { permiteEnParalizada?: boolean },
+  ) => {
+    estado.opcionesGuarda = opciones ?? null;
+    return Promise.resolve(estado.cerrada);
+  },
 }));
 
 vi.mock("@/lib/prisma", () => {
@@ -151,6 +163,7 @@ beforeEach(() => {
   estado.aprobado = null;
   estado.condicionCierre = null;
   estado.filasQueCambian = 1;
+  estado.opcionesGuarda = null;
 });
 
 function seNego(r: { ok: boolean; error?: string }, trozo: string) {
@@ -270,6 +283,18 @@ describe("aprobarMovimiento: quien puede y que se puede aprobar", () => {
     estado.cerrada = "La obra esta cerrada desde el 01/07/2026.";
     const r = await aprobarMovimiento(CON_PERMISO, "mov-1");
     seNego(r, "cerrada");
+  });
+
+  it("pide la excepcion de obra paralizada: aprobar cierra, no abre", async () => {
+    estado.itemsBase = [
+      { codigoPartida: "01.01.01", tipo: "PARTIDA", parcial: "1000.00" },
+    ];
+    estado.lineas = [
+      { wbsItemId: "p-1", importe: "-100.00", codigoPartida: "01.01.01" },
+    ];
+
+    await aprobarMovimiento(CON_PERMISO, "mov-1");
+    expect(estado.opcionesGuarda).toEqual({ permiteEnParalizada: true });
   });
 });
 
