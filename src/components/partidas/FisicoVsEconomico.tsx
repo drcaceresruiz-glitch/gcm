@@ -16,7 +16,7 @@ export function FisicoVsEconomico({ cruce }: { cruce: CruceDeObra }) {
   const avisan = conDato.filter((c) => c.avisa);
 
   return (
-    <section className="space-y-3">
+    <section id="avance-contra-gasto" className="space-y-3">
       <div>
         <h2 className="text-lg font-semibold">Avance contra gasto</h2>
         <p className="mt-0.5 max-w-3xl text-sm text-pretty opacity-70">

@@ -845,6 +845,28 @@ function ValorGanado({
         </p>
       )}
 
+      {/* EAC/VAC son proyeccion, no hecho: solo con base de costo (mismo
+          candado que CPI, arriba). Es la cifra mas predictiva del sistema
+          —cuanto va a costar la obra al final, si sigue asi— y ya estaba
+          calculada; solo faltaba mostrarla aqui. */}
+      {m.eac !== null && (
+        <p className="mt-1 text-xs opacity-70">
+          Terminaría en <strong>{soles(m.eac)}</strong>
+          {m.vac !== null && Number(m.vac) !== 0 && (
+            <span
+              style={{
+                color: Number(m.vac) > 0 ? "var(--color-exito)" : "var(--color-peligro)",
+              }}
+            >
+              {" "}
+              ({Number(m.vac) > 0 ? "+" : ""}
+              {soles(m.vac)})
+            </span>
+          )}
+          .
+        </p>
+      )}
+
       <EnlaceModulo href={`/obras/${obraId}/cronograma`}>
         Ver EVM completo
       </EnlaceModulo>

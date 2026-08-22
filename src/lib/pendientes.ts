@@ -121,6 +121,17 @@ export interface ConteoPendientes {
   tareasProximasSinCobertura: number;
   /// Partidas cuyo comprometido supera su presupuesto.
   partidasSobregiradas: number;
+  /**
+   * Capitulos donde el gasto va mas de `PUNTOS_DE_AVISO` puntos por delante
+   * del avance fisico, TODAVIA sin pasarse del presupuesto.
+   *
+   * Distinto de `partidasSobregiradas`: aquel es dinero contra dinero, y
+   * solo dice algo cuando el sobregiro YA ocurrio. Este es dinero contra
+   * obra real, y por eso puede avisar ANTES de que el presupuesto se agote
+   * —el mismo capitulo que hoy esta sano en soles puede llevar semanas
+   * gastando mas rapido de lo que avanza—.
+   */
+  capitulosConGastoAdelantado: number;
   /// PPC de la ultima semana cerrada y de la anterior, para ver la caida.
   ppcUltimo: number | null;
   ppcAnterior: number | null;
@@ -510,6 +521,24 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
     });
   }
 
+  if (c.capitulosConGastoAdelantado > 0) {
+    const n = c.capitulosConGastoAdelantado;
+    salida.push({
+      clave: "gasto-adelantado",
+      bloque: "salidas",
+      // Aviso, no critica: puede ser normal (acopios, adelantos a
+      // proveedor). `partidasSobregiradas` es la que grita cuando el
+      // presupuesto ya se paso de verdad.
+      gravedad: "aviso",
+      titulo: `${n} ${plural(n, "capítulo", "capítulos")} con el gasto por delante del avance`,
+      consecuencia:
+        "Puede ser normal si hay acopios o adelantos a proveedor; si no los hay, es sobrecosto que todavía no ha aflorado en el presupuesto.",
+      accion: "Revisa «Avance contra gasto» en la ficha de la obra.",
+      camino: "/#avance-contra-gasto",
+      cuantos: n,
+    });
+  }
+
   const ppc = lecturaDelPpc(c.ppcUltimo, c.ppcAnterior);
   if (ppc) {
     salida.push({
@@ -540,7 +569,7 @@ export function pendientesDeObra(c: ConteoPendientes): Pendiente[] {
       gravedad: "aviso",
       titulo: `Solo el ${Math.round(c.coberturaMapeo)}% del presupuesto esta enlazado al cronograma`,
       consecuencia:
-        "Mientras no pase del 60%, el avance se pondera por duracion y no por dinero: una tarea barata pesa igual que una cara.",
+        "Con menos del 60% mapeado, el CPI y sus proyecciones (EAC, VAC) son menos fiables: falta enlazar mucho gasto real con el cronograma.",
       accion:
         "Pulsa «Solo las sin enlazar» y asigna a cada tarea su partida del presupuesto.",
       camino: "/cronograma/mapeo",

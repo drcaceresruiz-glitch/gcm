@@ -12,7 +12,7 @@ import {
 import { diasLaborablesEntre } from "@/lib/calendario";
 import { metricasEvm, valorDeAvance, type MetricasEvm } from "@/lib/evm";
 import { obtenerObra } from "@/services/obras.service";
-import { totalDeObra } from "@/services/presupuesto-obra";
+import { bacDeObra, totalDeObra } from "@/services/presupuesto-obra";
 import { datosCurvaS, obtenerCronograma } from "@/services/cronograma.service";
 import { obtenerCalendario } from "@/services/calendario.service";
 import { listarPlanesSemanales } from "@/services/plan-semanal.service";
@@ -23,6 +23,7 @@ import {
 } from "@/services/lookahead.service";
 import { MODULOS_POR_DEFECTO, type ModuloTablero } from "@/lib/tablero";
 import { pendientesDeObra, type Pendiente } from "@/lib/pendientes";
+import { cruceDeObra } from "@/services/fisico-economico.service";
 import { recordatoriosDeObra, type RecordatorioNota } from "@/services/notas.service";
 import { diasSinReportar } from "@/lib/parte-diario";
 import { arrastreDeIncumplidos, causaQueMasFrena } from "@/lib/plan-semanal";
@@ -302,7 +303,7 @@ export async function datosTablero(
   const necesitaPlanes =
     encendido("ppc") || encendido("causas") || encendido("pendientes");
 
-  const [presupuesto, ordenes, cronograma, curva, calendario, planes, recordatorios] =
+  const [presupuesto, ordenes, cronograma, curva, calendario, planes, recordatorios, bacObra] =
     await Promise.all([
       encendido("presupuesto") ||
       encendido("valorGanado") ||
@@ -317,6 +318,12 @@ export async function datosTablero(
       encendido("plazo") ? obtenerCalendario(sesion, obraId) : [],
       necesitaPlanes ? planSemanalDeObra(sesion, obraId) : null,
       encendido("recordatorios") ? recordatoriosDeObra(sesion, obraId, 5) : null,
+      // El BAC de verdad, con los adicionales aprobados de la linea base
+      // vigente encima —la MISMA cifra que usa la pantalla EVM
+      // (`evm.service.ts`)—. `presupuesto.total` es solo el costo directo
+      // original, sin esos ajustes: usarlo aqui era el mismo bug que el 10
+      // de agosto se dio por corregido, pero solo se conecto alli.
+      encendido("valorGanado") ? bacDeObra(obraId) : null,
     ]);
 
   // Segunda tanda, y una sola consulta: la confiabilidad se calcula con las
@@ -357,10 +364,10 @@ export async function datosTablero(
   // punto actual, los mismos respaldos y las mismas compuertas—. Si el numero
   // de aqui y el de alla divergen, alguien duplico la regla.
   const valorGanado = (() => {
-    if (!encendido("valorGanado") || !curva || curva.cortes.length === 0) {
+    if (!encendido("valorGanado") || !curva || curva.cortes.length === 0 || !bacObra) {
       return null;
     }
-    const bac = presupuesto.total;
+    const bac = bacObra.bac;
     if (!(Number(bac) > 0)) return null;
 
     const ultimo = curva.cortes[curva.cortes.length - 1]!;
@@ -853,7 +860,10 @@ async function pendientesDeLaObra(
     // ventana: una restriccion que se prometio y vencio sigue siendo un
     // compromiso roto aunque su tarea ya no este en las proximas tres semanas.
     prisma.restriccion.findMany({
-      where: { resuelta: false, tarea: { projectId: obraId } },
+      where: {
+        resuelta: false,
+        tarea: { projectId: obraId, project: { companyId: sesion.companyId } },
+      },
       select: {
         fechaCompromiso: true,
         responsableUserId: true,
@@ -980,6 +990,14 @@ async function pendientesDeLaObra(
       !codigosMapeados.has(p.codigoPartida),
   ).length;
 
+  // El gasto adelantandose al avance, capitulo a capitulo — el mismo cruce
+  // que ya pinta "Avance contra gasto" en la ficha de la obra, reusado tal
+  // cual: es un aviso PROYECTADO (dinero contra obra real), distinto de
+  // `partidasSobregiradas` (dinero contra presupuesto, solo cuando ya paso).
+  const cruce = await cruceDeObra(sesion, obraId);
+  const capitulosConGastoAdelantado =
+    cruce?.capitulos.filter((c) => c.avisa).length ?? 0;
+
   // Cuanto hace que el archivo del cronograma dice lo que dice. QUE es viejo
   // lo decide pendientes.ts; aqui solo se cuenta.
   const diasDeCronograma =
@@ -1005,6 +1023,7 @@ async function pendientesDeLaObra(
     diasVentana: DIAS_PROXIMAS,
     tareasProximasSinCobertura,
     partidasSobregiradas: sobregiradas,
+    capitulosConGastoAdelantado,
     ppcUltimo: planes?.ultima?.ppc ?? null,
     ppcAnterior: planes?.anterior ?? null,
     coberturaMapeo: mapeos.length > 0 ? cob.porcentaje : null,

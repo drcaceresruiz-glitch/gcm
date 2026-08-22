@@ -23,6 +23,7 @@ function limpio(cambios: Partial<ConteoPendientes> = {}): ConteoPendientes {
     diasVentana: 14,
     tareasProximasSinCobertura: 0,
     partidasSobregiradas: 0,
+    capitulosConGastoAdelantado: 0,
     ppcUltimo: null,
     ppcAnterior: null,
     coberturaMapeo: null,
@@ -57,6 +58,7 @@ describe("pendientesDeObra", () => {
         tareasProximasSinAnalizar: 9,
         tareasProximasSinCobertura: 2,
         partidasSobregiradas: 4,
+        capitulosConGastoAdelantado: 2,
         incumplidosSinRetomar: 3,
         incumplidosCronicos: 1,
         restriccionesVencidas: 2,
@@ -67,7 +69,7 @@ describe("pendientesDeObra", () => {
       }),
     );
 
-    expect(todos.length).toBe(13);
+    expect(todos.length).toBe(14);
     for (const p of todos) {
       expect(p.camino, p.clave).toMatch(/^\//);
       // En imperativo y con sustancia: "Ver" o "Ir" no dicen que hacer.
@@ -255,6 +257,13 @@ describe("pendientesDeObra", () => {
       expect(p?.clave).toBe("sobregiro");
       expect(p?.consecuencia).toContain("adicional");
       expect(p?.consecuencia).toContain("reconvertir");
+    });
+
+    it("el gasto adelantado es aviso, distinto del sobregiro", () => {
+      const [p] = pendientesDeObra(limpio({ capitulosConGastoAdelantado: 2 }));
+      expect(p?.clave).toBe("gasto-adelantado");
+      expect(p?.gravedad).toBe("aviso");
+      expect(p?.camino).toBe("/#avance-contra-gasto");
     });
 
     it("un PPC bajo es critica", () => {
