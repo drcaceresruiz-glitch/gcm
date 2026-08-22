@@ -123,6 +123,14 @@ export const PERMISOS = [
   /// `proveedor:contactar`.
   "soporte:usar",
 
+  /// Conversar con el agente de IA. NO innegociable, a diferencia de
+  /// `soporte:usar`: preguntarle a un asistente por la cartera es de la
+  /// misma familia que cualquier otro `:leer`, delegable si la empresa
+  /// quiere. Termina en `:usar` y no en `:leer` a proposito, para que
+  /// `TODO_LO_QUE_SE_LEE` no lo arrastre solo -GERENTE lo gana explicito
+  /// mas abajo, no por derivacion-.
+  "agente_ia:usar",
+
   "auditoria:leer",
 ] as const;
 
@@ -386,7 +394,12 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
   /// tambien se puede PREVISUALIZAR desde una cuenta ADMIN —ver
   /// `@/lib/vista-rol`— para quien es gerente y administrador general a la
   /// vez con una sola cuenta.
-  GERENTE: TODO_LO_QUE_SE_LEE,
+  ///
+  /// `agente_ia:usar` se suma A MANO, no por derivacion: termina en
+  /// `:usar`, asi que `TODO_LO_QUE_SE_LEE` no lo arrastra solo, y
+  /// preguntarle al asistente por la cartera es exactamente el trabajo de
+  /// este rol.
+  GERENTE: [...TODO_LO_QUE_SE_LEE, "agente_ia:usar"],
 };
 
 /**

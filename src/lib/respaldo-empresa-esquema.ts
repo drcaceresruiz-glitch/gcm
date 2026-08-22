@@ -69,6 +69,17 @@ export const EXCLUIDAS_MIGRACION: Readonly<Record<string, string>> = {
     "autoinstalable, que no tiene ningun operador de GCM detras- esa " +
     "conversacion no tiene con quien seguir: llevarla haria parecer que " +
     "el destino sigue un hilo que en realidad se quedo en el origen.",
+  conversaciones_agente:
+    "El historial de conversacion con el agente de IA depende de un " +
+    "proveedor y una clave que YA estan excluidos de la migracion " +
+    "(`agente_ia_proveedores`, mismo motivo: cifrados con la llave de " +
+    "ESTE servidor). Sin ese proveedor en el destino, el historial " +
+    "quedaria haciendo referencia a una conversacion que no se puede " +
+    "continuar. Se empieza de cero en la instalacion nueva.",
+  mensajes_agente:
+    "Va con `conversaciones_agente`, mismo motivo: no tiene sentido " +
+    "portar el contenido de una conversacion sin el proveedor que la " +
+    "sostenia.",
   solicitudes_cambio_perfil:
     "Tramites a medias —alguien pidio cambiar su celular— que en la " +
     "instalacion nueva no tienen a quien reclamar. Se vuelven a pedir.",

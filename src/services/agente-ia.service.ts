@@ -38,18 +38,57 @@ export interface ConfigLlamadaIa {
 
 export type RespuestaProveedorIa = { ok: true } | { ok: false; error: string };
 
+/**
+ * Una herramienta del agente: un envoltorio delgado sobre una funcion de
+ * servicio que YA existe y ya hace `puede(sesion, ...)`. `ejecutar` recibe
+ * la sesion REAL de quien pregunta, nunca una fabricada -si esa funcion
+ * decide que no hay permiso, sencillamente devuelve lo que ya devuelve
+ * para ese caso (`[]`, `null`, un error), sin que la herramienta tenga
+ * que reimplementar nada-.
+ */
+export interface HerramientaAgente {
+  nombre: string;
+  descripcion: string;
+  /// JSON Schema de los argumentos, tal cual lo pide la API de Claude.
+  esquema: object;
+  ejecutar: (sesion: SesionActiva, args: unknown) => Promise<unknown>;
+}
+
+export interface TurnoIa {
+  mensajes: unknown[];
+  herramientas: HerramientaAgente[];
+  /// Instrucciones fijas de quien es el agente y como debe comportarse.
+  sistema?: string;
+}
+
+export type RespuestaTurno =
+  | { tipo: "texto"; texto: string }
+  | {
+      tipo: "usar_herramientas";
+      llamadas: { id: string; nombre: string; args: unknown }[];
+      bruto: unknown;
+    };
+
 interface AdaptadorProveedorIa {
   /// Un mensaje minimo real, para confirmar que la clave y el modelo
   /// funcionan — mismo criterio que `probarRemitente`, que manda un correo
   /// de verdad en vez de solo verificar la conexion.
   probar(config: ConfigLlamadaIa): Promise<RespuestaProveedorIa>;
+  /// Ausente = este proveedor todavia no sabe tener una conversacion con
+  /// herramientas -hoy solo `claude` lo implementa, ver el comentario de
+  /// `ADAPTADORES` mas abajo-.
+  conversar?(
+    config: ConfigLlamadaIa,
+    turno: TurnoIa,
+  ): Promise<RespuestaTurno | { ok: false; error: string }>;
 }
 
-/// Tope de espera de la llamada de prueba. Es UN mensaje corto, acotado; no
-/// el bucle de conversacion con tool-use de la Fase 2, que por su duracion
-/// (10-30s, varias vueltas) no puede correr sincrono dentro de una Server
-/// Action — ver la nota de arquitectura en `docs/PENDIENTES.md`.
+/// Tope de espera de la llamada de prueba. Es UN mensaje corto, acotado.
 const TOPE_PRUEBA_MS = 15_000;
+/// Tope de una vuelta de conversacion con herramientas: puede tardar mas
+/// que un simple "hola" porque el proveedor a veces razona antes de
+/// decidir que herramienta llamar.
+const TOPE_CONVERSACION_MS = 45_000;
 
 /// Recorta y quita cualquier rastro de la clave del texto de error de un
 /// proveedor ajeno — mismo cuidado que `probarRemitente` con la contrasena
@@ -80,6 +119,77 @@ async function probarClaude(config: ConfigLlamadaIa): Promise<RespuestaProveedor
       return { ok: false, error: mensajeSaneado(`(${r.status}) ${cuerpo}`, config.apiKey) };
     }
     return { ok: true };
+  } catch (error) {
+    const texto = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
+  }
+}
+
+interface BloqueContenidoClaude {
+  type: string;
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: unknown;
+}
+interface RespuestaMessagesClaude {
+  stop_reason: string;
+  content: BloqueContenidoClaude[];
+}
+
+async function conversarClaude(
+  config: ConfigLlamadaIa,
+  turno: TurnoIa,
+): Promise<RespuestaTurno | { ok: false; error: string }> {
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": config.apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: config.modelo,
+        max_tokens: 2048,
+        ...(turno.sistema ? { system: turno.sistema } : {}),
+        tools: turno.herramientas.map((h) => ({
+          name: h.nombre,
+          description: h.descripcion,
+          input_schema: h.esquema,
+        })),
+        messages: turno.mensajes,
+      }),
+      signal: AbortSignal.timeout(TOPE_CONVERSACION_MS),
+    });
+
+    if (!r.ok) {
+      const cuerpo = await r.text();
+      return { ok: false, error: mensajeSaneado(`(${r.status}) ${cuerpo}`, config.apiKey) };
+    }
+
+    const datos = (await r.json()) as RespuestaMessagesClaude;
+    const bloques = datos.content ?? [];
+    const bloquesHerramienta = bloques.filter((b) => b.type === "tool_use");
+
+    if (datos.stop_reason === "tool_use" && bloquesHerramienta.length > 0) {
+      return {
+        tipo: "usar_herramientas",
+        llamadas: bloquesHerramienta.map((b) => ({
+          id: b.id ?? "",
+          nombre: b.name ?? "",
+          args: b.input,
+        })),
+        bruto: bloques,
+      };
+    }
+
+    const texto = bloques
+      .filter((b) => b.type === "text")
+      .map((b) => b.text ?? "")
+      .join("\n")
+      .trim();
+    return { tipo: "texto", texto: texto || "No tengo una respuesta para eso." };
   } catch (error) {
     const texto = error instanceof Error ? error.message : String(error);
     return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
@@ -130,9 +240,34 @@ async function probarOpenAiCompatible(
  * fallar en silencio.
  */
 const ADAPTADORES: Record<string, AdaptadorProveedorIa> = {
-  claude: { probar: probarClaude },
+  claude: { probar: probarClaude, conversar: conversarClaude },
+  // Sin `conversar`, a proposito: el formato de function-calling de
+  // OpenAI-compatible es distinto al de tool-use de Claude, y copiarlo
+  // apurado seria fallar oscuro en el primer uso real. Su propio trabajo,
+  // no algo que colar aqui.
   openai_compatible: { probar: probarOpenAiCompatible },
 };
+
+/**
+ * Llama al proveedor ACTIVO de una empresa para una vuelta de
+ * conversacion con herramientas. Envuelve el registro de `ADAPTADORES`
+ * para que quien orquesta el turno (`agente-conversacion.service.ts`) no
+ * tenga que conocerlo.
+ */
+export async function conversar(
+  tipo: string,
+  config: ConfigLlamadaIa,
+  turno: TurnoIa,
+): Promise<RespuestaTurno | { ok: false; error: string }> {
+  const adaptador = ADAPTADORES[tipo];
+  if (!adaptador?.conversar) {
+    return {
+      ok: false,
+      error: `Este proveedor ("${tipo}") todavía no tiene conversación con herramientas implementada en GCM.`,
+    };
+  }
+  return adaptador.conversar(config, turno);
+}
 
 // ---------------------------------------------------------------------------
 // Lo que usa la pantalla
@@ -424,4 +559,44 @@ export async function probarProveedorIa(
     data: { verificadoAt: null, ultimoError: r.error, ultimoErrorAt: new Date() },
   });
   return { ok: false, error: `El proveedor rechazó la prueba: ${r.error}` };
+}
+
+// ---------------------------------------------------------------------------
+// Lo que usa el agente conversacional
+// ---------------------------------------------------------------------------
+
+export interface ConfiguracionProveedorActivo {
+  tipo: string;
+  modelo: string;
+  urlBase: string | null;
+  apiKey: string;
+}
+
+/**
+ * El proveedor ACTIVO de una empresa, listo para conversar. Mismo molde
+ * que `configuracionDeEnvio` en `remitente-correo.service.ts`: null en
+ * los mismos casos que ahi significan lo mismo para quien llama —no hay
+ * con que responder—: sin proveedor activo, sin llave de cifrado, o la
+ * clave guardada no descifra (llave rotada o fila manipulada).
+ */
+export async function configuracionProveedorActivo(
+  companyId: string,
+): Promise<ConfiguracionProveedorActivo | null> {
+  if (!hayLlaveDeCifrado()) return null;
+
+  const empresa = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: {
+      proveedorIaActivo: {
+        select: { tipo: true, modelo: true, urlBase: true, apiKeyCifrada: true },
+      },
+    },
+  });
+  const activo = empresa?.proveedorIaActivo;
+  if (!activo) return null;
+
+  const apiKey = descifrar(activo.apiKeyCifrada);
+  if (apiKey === null) return null;
+
+  return { tipo: activo.tipo, modelo: activo.modelo, urlBase: activo.urlBase, apiKey };
 }

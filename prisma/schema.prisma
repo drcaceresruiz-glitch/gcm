@@ -173,33 +173,34 @@ model Company {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
-  users               User[]
-  projects            Project[]
-  permisos            CompanyPermission[]
-  proveedores         Proveedor[]
-  ordenes             OrdenCompra[]
-  formasPago          FormaPagoPlantilla[]
-  plantillasMensaje   PlantillaMensaje[]
-  solicitudesPerfil   SolicitudCambioPerfil[]
-  emisoresSms         EmisorSms[]
-  mensajesSms         MensajeSms[]
+  users                User[]
+  projects             Project[]
+  permisos             CompanyPermission[]
+  proveedores          Proveedor[]
+  ordenes              OrdenCompra[]
+  formasPago           FormaPagoPlantilla[]
+  plantillasMensaje    PlantillaMensaje[]
+  solicitudesPerfil    SolicitudCambioPerfil[]
+  emisoresSms          EmisorSms[]
+  mensajesSms          MensajeSms[]
   /// Los proveedores de IA que esta empresa guardo (varios posibles, cada
   /// uno con su propia clave). Cual esta EN USO lo dice `proveedorIaActivo`
   /// abajo, no un booleano por fila.
-  proveedoresIa       AgenteIaProveedor[]     @relation("ProveedoresDeLaEmpresa")
-  proveedorIaActivoId String?
+  proveedoresIa        AgenteIaProveedor[]     @relation("ProveedoresDeLaEmpresa")
+  proveedorIaActivoId  String?
   /// Puntero al UNO activo. Se elige un puntero en `Company` y no un
   /// booleano `activo` en `AgenteIaProveedor` a proposito: por construccion
   /// no puede haber dos activos a la vez, sin depender de una transaccion
   /// que lo garantice. `onDelete: SetNull` es la red de seguridad; el
   /// servicio ademas lo limpia el mismo al borrar (ver `agente-ia.service.ts`).
-  proveedorIaActivo   AgenteIaProveedor?      @relation("ProveedorActivo", fields: [proveedorIaActivoId], references: [id], onDelete: SetNull)
-  mensajesSoporte     MensajeSoporte[]
+  proveedorIaActivo    AgenteIaProveedor?      @relation("ProveedorActivo", fields: [proveedorIaActivoId], references: [id], onDelete: SetNull)
+  mensajesSoporte      MensajeSoporte[]
+  conversacionesAgente ConversacionAgente[]
   // `respaldosObra` ya NO es relacion: sus recibos tienen que sobrevivir al
   // borrado de la empresa. Ver `RespaldoObra`.
   /// Singular, no lista: «desde donde sale mi correo» solo admite una
   /// respuesta. Ver `RemitenteCorreo`.
-  remitenteCorreo     RemitenteCorreo?
+  remitenteCorreo      RemitenteCorreo?
 
   /**
    * Desde cuando la empresa esta EN MIGRACION. Null = opera normal.
@@ -494,6 +495,63 @@ model MensajeSoporte {
 
   @@index([companyId, createdAt])
   @@map("mensajes_soporte")
+}
+
+enum RolAgente {
+  USUARIO
+  ASISTENTE
+}
+
+/**
+ * Una conversacion con el agente de IA. Una por usuario a la vez, no un
+ * archivo navegable de varias -ver el comentario de
+ * `agente-conversacion.service.ts` sobre el alcance de esta primera
+ * entrega-.
+ */
+model ConversacionAgente {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  mensajes MensajeAgente[]
+
+  @@index([companyId, userId, createdAt])
+  @@map("conversaciones_agente")
+}
+
+/**
+ * Un mensaje dentro de una conversacion con el agente de IA.
+ * El turno del ASISTENTE se crea VACIO y se completa despues -mismo
+ * patron de estado por fecha que `MensajeSms`, no un enum de estados-:
+ * `terminadoAt: null` es "todavia pensando", y el sondeo del cliente
+ * pregunta por esta fila hasta que deje de serlo. Ver
+ * `agente-conversacion.service.ts`.
+ */
+model MensajeAgente {
+  id             String    @id @default(cuid())
+  conversacionId String
+  rol            RolAgente
+  /// Vacio mientras el asistente sigue pensando.
+  contenido      String    @db.Text
+  /// Nombres de las herramientas que se llamaron para responder esta vez,
+  /// para poder decir "consultando el semaforo de cartera..." en la
+  /// pantalla. Solo tiene sentido en filas ASISTENTE.
+  herramientas   Json?
+  /// Cuando se creo la fila: para USUARIO es el envio, para ASISTENTE el
+  /// instante en que se encolo el turno.
+  iniciadoAt     DateTime  @default(now())
+  /// Null = todavia procesando. Solo tiene sentido en filas ASISTENTE -las
+  /// de USUARIO nacen ya completas-.
+  terminadoAt    DateTime?
+  /// Por que no se pudo responder, si fallo. Nunca la clave del proveedor.
+  error          String?   @db.VarChar(500)
+
+  conversacion ConversacionAgente @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+
+  @@index([conversacionId, iniciadoAt])
+  @@map("mensajes_agente")
 }
 
 /// Excepcion al permiso que un rol trae por defecto, para UNA empresa.

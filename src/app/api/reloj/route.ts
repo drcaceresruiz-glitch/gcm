@@ -5,6 +5,10 @@ import {
   pasadaDeCorreoEntrante,
   type ResumenCorreoEntrante,
 } from "@/services/correo-entrante.service";
+import {
+  barridoDeTurnosMuertos,
+  type ResumenBarridoTurnos,
+} from "@/services/agente-conversacion.service";
 
 /**
  * El reloj de GCM, visto desde el cron.
@@ -70,10 +74,26 @@ export async function POST(peticion: Request) {
     };
   }
 
+  /**
+   * Y el barrido de turnos del agente de IA que se quedaron a medias.
+   *
+   * Mismo criterio que el correo: su propio try/catch, no debe poder
+   * tumbar la respuesta del reloj. Un turno se queda `terminadoAt: null`
+   * para siempre solo si el proceso murio a mitad de un `after()` —el
+   * caso normal termina solo—, asi que esto es la red de seguridad, no el
+   * camino principal.
+   */
+  let agenteIa: ResumenBarridoTurnos & { error?: string };
+  try {
+    agenteIa = await barridoDeTurnosMuertos();
+  } catch (e) {
+    agenteIa = { marcados: 0, error: e instanceof Error ? e.message : String(e) };
+  }
+
   // 200 aunque la pasada falle: el cuerpo lo dice, y un 500 haria que `curl
   // -f` se callara justo cuando hay algo que contar.
   return Response.json(
-    { ...resumen, correoEntrante: correo },
+    { ...resumen, correoEntrante: correo, agenteIa },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

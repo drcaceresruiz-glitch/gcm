@@ -770,6 +770,29 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
     licencia (registro manual) y soporte (mensajeria); un flujo de alta
     en modo demo es una pieza distinta, sin disenar todavia.
 
+15. ~~**Cobertura de pruebas para las funciones que dependen de
+    `sesion.esOperador`.**~~ **HECHO el 22 de agosto de 2026.**
+    `aislamiento.test.ts` (la prueba que impide fugas entre empresas)
+    estructuralmente NO puede cubrir estas funciones —legitimamente no
+    filtran por el `companyId` de quien pregunta, es la sesion del
+    OPERADOR mirando la empresa de un tercero—, asi que hacia falta un
+    contrato aparte. `src/services/esOperador-guarda.test.ts` (nuevo)
+    formaliza un contrato general reutilizable, mismo metodo que
+    `empresa-congelada.test.ts` (lee el codigo como texto, no lo
+    ejecuta): un registro (`FUNCIONES`) declara que funciones de que
+    archivos deberian tener la guarda, y la prueba confirma dos cosas —
+    (1) cada funcion registrada contiene `sesion.esOperador` ANTES de su
+    primera llamada a Prisma, y (2) ninguna funcion de
+    `src/services/*.service.ts` que SI menciona `sesion.esOperador` se
+    quedo fuera del registro, barriendo el directorio entero—. La
+    segunda mitad se probo de verdad, no solo se escribio: se quito
+    `contadorSoportePorEmpresa` del registro a proposito, la prueba fallo
+    nombrando exactamente esa funcion, y se devolvio. Cubre las 6
+    funciones de `operador.service.ts`, `motivoSiNoSePuedeBorrar` de
+    `empresa-borrado.service.ts` y las 3 del lado operador de
+    `soporte.service.ts`. 12 pruebas nuevas, typecheck, lint y build en
+    verde.
+
 **Avisado, no pedido todavia**: pagina de marketing y venta, exponer la app
 web y la autoinstalable (`docs/instalable.md` ya documenta esta ultima),
 creacion de usuarios/reportes de cara al negocio, y migracion a otro hosting
@@ -1811,45 +1834,86 @@ Lo que SI se hara, en este orden:
    `clic-dentro-de-menu-desplegable` de la memoria: un envio de
    formulario se prueba con una interaccion real, no solo programatica.
 
-   **Sigue sin empezar** — la Fase 2, el agente conversacional en si:
-   - **Modelo**: el de la clave que la empresa haya activado en
-     `/empresa/configuracion/ia` (Fase 1) — Claude via API sigue siendo el
-     primer proveedor pensado para el tool-use, pero ya no el unico
-     posible, es lo que la Fase 1 abrio. Un modelo open-source autoalojado
-     NO es viable con el hosting actual —el cPanel compartido de 20 Entry
-     Processes no tiene ni RAM ni GPU—; solo tendria sentido si algun dia
-     migran a infraestructura propia.
-   - **El principio que manda sobre todo lo demas**: el agente NUNCA toca
-     la base cruda ni tiene un bypass de permisos. Sus "herramientas" son
-     envoltorios delgados sobre las funciones de servicio que YA existen
-     (`crearMovimiento`, `registrarAvance`, `listarObras`...) —las mismas
-     que ya hacen `puede(sesion, ...)`, ya filtran por `companyId`, ya
-     respetan PARALIZADA—. Escribir una segunda autorizacion aparte para
-     el agente es exactamente el tipo de bug caro que este proyecto ya
-     penso (dos definiciones de lo mismo que se desalinean).
-   - **El host condiciona la arquitectura**: ya se cayo dos veces por
-     trabajo pesado dentro de una peticion (`docs/ESTADO.md`). Una llamada
-     a un LLM con varias vueltas de tool-use puede tardar 10-30 segundos —
-     no puede correr sincrono dentro de un Server Action ocupando uno de
-     los 20 procesos. **Investigado el 22/08 cual patron asincrono ya
-     existe en GCM para reusar** (no hace falta un servicio aparte):
-     `ProbarSms.tsx` +
-     `accionEnviarSmsDePrueba`/`accionEstadoSmsDePrueba`
-     (`src/app/(dashboard)/empresa/configuracion/acciones.ts`) — una
-     Server Action crea la fila y devuelve su id de inmediato; el cliente
-     sondea OTRA Server Action cada pocos segundos, con tope de espera del
-     lado del cliente, derivando el estado de columnas con fecha, no un
-     enum. Ese es el patron para los TURNOS de conversacion — NO la cola de
-     SMS en si, que es para algo que de verdad sale del proceso a un
-     telefono. Como `obtenerSesion()` exige `cookies()` de una peticion
-     real, el turno tiene que ejecutarse dentro de una Server
-     Action/Route Handler de la sesion real del usuario, nunca en un
-     worker desconectado; para no bloquear la respuesta al cliente
-     mientras dura la llamada, evaluar `after()` de Next.js con un barrido
-     de respaldo (mismo patron de "pasada muerta" que ya usa
-     `correo-entrante.service.ts` via `RelojTarea`) por si el proceso se
-     reinicia a mitad de un turno.
-   - **Si algun dia incluye accion (crear/editar), no solo lectura**:
+   ~~**Fase 2a: el motor de conversacion, solo lectura.**~~ **HECHA el 22
+   de agosto de 2026.** Diseno primero (`EnterPlanMode`, plan aprobado
+   antes de escribir codigo), justo por como se decidio partir esta
+   entrega: el motor de lectura ya es grande por si solo (esquema, cola
+   asincrona, registro de herramientas, integracion real con un
+   proveedor, pantalla de chat) y verificarlo SIN ningun riesgo de que el
+   agente cambie un dato es la base sobre la que se construye la
+   escritura despues, no algo a mezclar con ella.
+   - **Esquema**: `ConversacionAgente` (una por usuario+empresa) y
+     `MensajeAgente` (`rol` USUARIO/ASISTENTE, `contenido`,
+     `herramientas` Json opcional, `terminadoAt` nulo mientras piensa),
+     mismo patron de estado-por-fecha que `MensajeSms` —no un enum de
+     estados—.
+   - **Herramientas, deliberadamente pocas y ya pagadas**: `listar_obras`
+     y `resumen_empresa` (`obras.service.ts`) mas `semaforo_cartera`,
+     `sobregiro_cartera` y `confiabilidad_cartera`
+     (`gerencia.service.ts`) —las tres de cartera son resumenes ya
+     acotados por la regla de coste del archivo (tope de obras, sin
+     cronogramas de mas), exactamente lo que alguien le preguntaria a un
+     asistente—. Cada herramienta es un envoltorio delgado sobre una
+     funcion de servicio que YA hace `puede(sesion, ...)`: la `sesion`
+     que recibe `ejecutar()` es la sesion REAL de quien pregunta, nunca
+     una fabricada, y si la funcion de abajo deniega o devuelve vacio eso
+     es lo que el modelo ve como resultado, sin una segunda autorizacion
+     paralela. **Nada de escritura** —`crear_movimiento`,
+     `registrar_avance`— queda para la Fase 2b.
+   - **Patron asincrono**: mismo de `ProbarSms.tsx` —el Server Action crea
+     la fila USUARIO completa y la fila ASISTENTE vacia, dispara
+     `after()` de Next.js para seguir trabajando tras responder, y
+     devuelve el id de inmediato; el cliente sondea otra Server Action
+     cada 2s con tope de espera propio—. Barrido de turnos muertos nuevo
+     en `pasadaDelReloj` (mismo `try/catch` aislado que ya protege
+     `pasadaDeCorreoEntrante`): marca con error cualquier fila
+     `terminadoAt: null` de mas de 3 minutos, por si el proceso se
+     reinicio a mitad de un turno.
+   - **Adaptador**: solo `claude` implementa `conversar()` por ahora
+     (Anthropic Messages API, `tools` + bloques `tool_use` reales, tope
+     de 6 vueltas antes de cortar con error explicado en vez de colgarse
+     en silencio); `openai_compatible` se queda solo con `probar()` de la
+     Fase 1 —su formato de function-calling es su propio trabajo, no una
+     copia apurada—.
+   - **Permiso**: `agente_ia:usar`, nuevo en `rbac.ts`, NO innegociable
+     (a diferencia de `soporte:usar`) —es de la misma familia que
+     cualquier otro `:leer`, delegable por la empresa si quiere—. Se
+     sumo a mano a la lista de GERENTE porque termina en `:usar`, no en
+     `:leer`, asi que `TODO_LO_QUE_SE_LEE` no lo arrastra solo.
+   - **Pantalla**: `/asistente`, entrada propia en la navegacion (no
+     dentro del desplegable de Empresa: es herramienta de trabajo diario,
+     no un ajuste), chat en burbujas con indicador de "Pensando…".
+   - Igual que con `agente_ia_proveedores`, `conversaciones_agente` y
+     `mensajes_agente` faltaban en `EXCLUIDAS_MIGRACION`
+     (`lib/respaldo-empresa-esquema.ts`) —mismo motivo: dependen de una
+     clave cifrada con la llave de ESTE servidor, que el destino de una
+     migracion no tiene—; la prueba que lee el esquema lo caza de nuevo,
+     tercera vez en el dia. Verificado con 13 pruebas nuevas, typecheck,
+     lint y build en verde.
+
+     **Verificado en navegador real el 22 de agosto de 2026** y caza un
+     bug de verdad: al mandar un mensaje aparecieron ~30 burbujas
+     duplicadas del mismo error ("Configura y activa un proveedor de IA
+     …"), y seguian creciendo. Una consulta directa a la base de datos
+     confirmo apenas 2 filas reales de `MensajeAgente` —era puramente de
+     RENDERIZADO en el cliente, no duplicacion de datos—. Causa: el
+     `useEffect` que agrega las burbujas comparaba
+     `estado.mensajeAsistenteId` contra `pendienteId` para no repetirse,
+     pero `pendienteId` vuelve a `null` en cuanto el sondeo detecta que
+     el turno termino; al volver a `null` el efecto se disparaba de
+     nuevo (`pendienteId` estaba en sus dependencias), la comparacion ya
+     no coincidia, y agregaba OTRO par de burbujas para el mismo turno ya
+     completo —lo que a su vez reactivaba el sondeo, que volvia a
+     encontrar el turno terminado y ponia `pendienteId` en `null` otra
+     vez—: un bucle sin fin. Arreglado con un `useRef` aparte
+     (`idAgregadoRef`) que se fija UNA vez por turno y nunca se resetea,
+     sacando `pendienteId` de las dependencias de ese efecto. Reverificado
+     con una segunda ronda completa —mensaje real, recarga de pagina,
+     segundo mensaje real— confirmando en la base de datos exactamente 2
+     filas por turno, sin duplicados, en el orden correcto.
+
+   **Sigue sin empezar**:
+   - **Fase 2b (escritura)**:
      separar "proponer" de "ejecutar", mismo patron de friccion que ya usa
      el resto de GCM (confirmacion escrita para cerrar obra, motivo
      obligatorio para paralizar) — el agente PROPONE la accion en texto
@@ -1885,10 +1949,11 @@ Lo que SI se hara, en este orden:
        otro servicio externo mas, otra clave de API mas) con sincronizado
        de labios, o solo gestos genericos mientras el texto aparece
        aparte.
-     - **Depende de que exista primero la Fase 2** (el motor de
-       conversacion, turnos, herramientas): un avatar sin nada que decir
-       no tiene sentido, asi que este punto no se puede empezar antes de
-       esa.
+     - ~~Depende de que exista primero la Fase 2 (el motor de
+       conversacion, turnos, herramientas)~~: **la Fase 2a ya existe**
+       (arriba), asi que este punto ya tiene con que hablar. Sigue sin
+       empezar por las tres preguntas de arriba (asset, libreria,
+       animacion), no por esta dependencia.
 
      Sin empezar. Cuando se retome, merece su propia sesion de diseno
      (posiblemente con `EnterPlanMode` e investigacion dedicada de

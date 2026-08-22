@@ -16,6 +16,7 @@ import {
   Menu,
   PackageOpen,
   Receipt,
+  Sparkles,
   Settings,
   ShieldCheck,
   UserCircle,
@@ -106,6 +107,10 @@ export interface VistaRolInfo {
 
 interface Props {
   empresa: EnlaceEmpresa[];
+  /// El agente de IA. Null sin `agente_ia:usar` -mismo criterio que
+  /// `operador`, un enlace de trabajo diario, no un ajuste dentro del
+  /// menu de Empresa-.
+  asistente: { href: string; etiqueta: string } | null;
   /// Alta de constructoras. Null salvo para quien opera GCM.
   operador: { href: string; etiqueta: string } | null;
   /// La campanita. Con `sinLeer` en cero no se pinta numerito, por lo mismo
@@ -156,7 +161,14 @@ function OpcionesAgrupadas({ empresa }: { empresa: EnlaceEmpresa[] }) {
   );
 }
 
-export function Navegacion({ empresa, operador, avisos, usuario, vistaRol }: Props) {
+export function Navegacion({
+  empresa,
+  asistente,
+  operador,
+  avisos,
+  usuario,
+  vistaRol,
+}: Props) {
   const [cajonAbierto, setCajonAbierto] = useState(false);
 
   return (
@@ -178,6 +190,16 @@ export function Navegacion({ empresa, operador, avisos, usuario, vistaRol }: Pro
         >
           <BookOpen className="size-4 opacity-70" aria-hidden="true" />
         </Link>
+        {asistente && (
+          <Link
+            href={asistente.href}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            <Sparkles className="size-4 opacity-70" aria-hidden="true" />
+            {asistente.etiqueta}
+          </Link>
+        )}
         {/* Fuera del menu de empresa y a su izquierda: se opera GCM o se
             trabaja en una obra, y quien hace lo primero no deberia tener que
             entrar en «Empresa» —la suya— para dar de alta otra distinta. */}
@@ -289,6 +311,12 @@ export function Navegacion({ empresa, operador, avisos, usuario, vistaRol }: Pro
             <EnlaceMenu href={avisos.href} icono={Bell} badge={avisos.sinLeer}>
               Avisos
             </EnlaceMenu>
+
+            {asistente && (
+              <EnlaceMenu href={asistente.href} icono={Sparkles}>
+                {asistente.etiqueta}
+              </EnlaceMenu>
+            )}
 
             <div className="my-1 border-t" style={{ borderColor: "var(--borde)" }} />
 

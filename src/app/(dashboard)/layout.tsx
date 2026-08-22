@@ -243,6 +243,11 @@ export default async function DashboardLayout({
 
           <Navegacion
             empresa={enlaces}
+            asistente={
+              puede(sesion, "agente_ia:usar")
+                ? { href: "/asistente", etiqueta: "Asistente" }
+                : null
+            }
             // Quien opera GCM. No va por `puede()` porque no es un permiso
             // DENTRO de la empresa: esta por encima de ella y se concede en el
             // servidor. Por lo mismo tampoco va en el menu de la empresa.
