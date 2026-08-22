@@ -126,10 +126,9 @@ export function FormularioMeta({
           igual, congelados en esta version: es lo que permite ver la
           desviacion si el cronograma se estira despues. */}
       <p className="rounded-lg border border-dashed px-4 py-3 text-sm opacity-80">
-        Esta meta se fija a <strong>{fechaHoy}</strong> y presupuesta{" "}
-        <strong>{mesesSugeridos} meses</strong> de gastos generales, que es el
-        plazo de la obra. Si el cronograma se alarga, la diferencia aparecerá
-        como sobrecosto de plazo.
+        Esta meta se fija a <strong>{fechaHoy}</strong>, con un plazo
+        comprometido de <strong>{mesesSugeridos} meses</strong>, que es el
+        plazo de la obra.
       </p>
       <input type="hidden" name="fechaMeta" value={fechaHoy} />
       <input type="hidden" name="mesesPlazo" value={mesesSugeridos} />
@@ -148,7 +147,7 @@ export function FormularioMeta({
           style={{ borderColor: "var(--borde)" }}
         />
         <p className="text-xs opacity-70">
-          Las dos hojas del mismo libro: «Costo Directo» y «Gastos Generales».
+          La hoja «Costo Directo» del libro, con las fórmulas ya hechas.
         </p>
       </div>
 

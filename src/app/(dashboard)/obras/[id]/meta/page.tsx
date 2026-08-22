@@ -260,11 +260,10 @@ export default async function MetaPage({
             }}
           >
             <p className="max-w-xl text-sm text-pretty">
-              <strong>Usa siempre la plantilla.</strong> Trae las dos hojas
-              —«Costo Directo» y «Gastos Generales»—, las fórmulas ya hechas y
-              las celdas que no se tocan bloqueadas, con {mesesSugeridos} mes(es)
-              de gastos generales, que es el plazo de esta obra. Un Excel propio
-              suele colar errores que el importador no puede ver.
+              <strong>Usa siempre la plantilla.</strong> Trae la hoja «Costo
+              Directo» con las fórmulas ya hechas y las celdas que no se
+              tocan bloqueadas. Un Excel propio suele colar errores que el
+              importador no puede ver.
             </p>
             <a
               href={`/plantilla-meta?meses=${mesesSugeridos}`}

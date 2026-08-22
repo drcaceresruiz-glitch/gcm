@@ -89,28 +89,51 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
    Hallazgos confirmados leyendo el codigo, de mas a menos impacto:
 
    **Critico/alto:**
-   - **El rol GERENTE no se puede editar en la matriz de permisos.**
-     `empresa/permisos/acciones.ts:33` valida los cambios contra un
-     `z.enum` escrito a mano con los 5 roles de antes de que GERENTE
-     existiera (commit `129411a`). La rejilla SI pinta su columna
-     (`obtenerMatriz` ya usa `ROLES` completo), pero en cuanto se guarda un
-     lote que incluye un cambio de GERENTE, Zod lo rechaza entero con "La
-     matriz llego incompleta" — y como valida el array completo, tira
-     abajo tambien los cambios de otros roles en el mismo lote. El
-     servicio (`permisos.service.ts`) si soporta GERENTE bien; el bug esta
-     aislado en esta validacion de forma, sin test propio.
-   - **La pantalla de la meta promete una hoja "Gastos Generales" que ya no
-     existe.** El 21/08 (commit `34c883c`) se borro esa hoja de
-     `plantilla-meta.ts` y la funcion que la escalaba al plazo de la obra,
-     pero `FormularioMeta.tsx:128-133,150-152` y
-     `obras/[id]/meta/page.tsx:262-267` nunca se actualizaron y le siguen
-     diciendo al usuario que va a descargar "las dos hojas —Costo Directo y
-     Gastos Generales—". La accion de importar de hecho RECHAZA un archivo
-     que traiga esa hoja. Consecuencia encadenada: el aviso "N gasto(s)
-     general(es) duran mas que la obra" y su boton de ajuste
+   - ~~**El rol GERENTE no se puede editar en la matriz de permisos.**~~
+     **ARREGLADO el 21 de agosto de 2026.** `empresa/permisos/acciones.ts:33`
+     validaba los cambios contra un `z.enum` escrito a mano con los 5 roles
+     de antes de que GERENTE existiera (commit `129411a`). La rejilla SI
+     pintaba su columna (`obtenerMatriz` ya usa `ROLES` completo), pero en
+     cuanto se guardaba un lote que incluia un cambio de GERENTE, Zod lo
+     rechazaba entero con "La matriz llego incompleta" — y como valida el
+     array completo, tiraba abajo tambien los cambios de otros roles en el
+     mismo lote. El servicio (`permisos.service.ts`) ya soportaba GERENTE
+     bien; el bug estaba aislado en esta validacion de forma. Se anadio
+     `"GERENTE"` al enum.
+   - ~~**La pantalla de la meta promete una hoja "Gastos Generales" que ya
+     no existe.**~~ **ARREGLADO el 21 de agosto de 2026.** El 21/08
+     (commit `34c883c`) se borro esa hoja de `plantilla-meta.ts` y la
+     funcion que la escalaba al plazo de la obra, pero
+     `FormularioMeta.tsx:128-133,150-152` y
+     `obras/[id]/meta/page.tsx:262-267` nunca se actualizaron y le seguian
+     diciendo al usuario que iba a descargar "las dos hojas —Costo Directo
+     y Gastos Generales—". Corregido el texto en los tres sitios para
+     hablar solo de la hoja "Costo Directo" y del plazo comprometido, sin
+     mencionar gastos generales ni un "sobrecosto de plazo" que nunca se
+     muestra (ver el hallazgo nuevo, justo abajo). La accion de importar
+     ya rechazaba correctamente un archivo que trajera esa hoja — eso no
+     cambio. Consecuencia encadenada que SIGUE pendiente: el aviso "N
+     gasto(s) general(es) duran mas que la obra" y su boton de ajuste
      (`PanelBolsa.tsx`, `BotonAjustarMeses.tsx`) quedan inalcanzables para
      cualquier meta creada despues del 21/08 — la tabla que los alimenta
-     nunca vuelve a llenarse.
+     nunca vuelve a llenarse. Es codigo muerto candidato a retirar, no
+     arreglado en esta pasada (arreglar el texto no revive la tabla).
+   - **Hallazgo nuevo, encontrado arreglando el punto anterior: el
+     "sobrecosto de plazo" de la meta se calcula pero no se muestra en
+     ninguna pantalla, y desde el 21/08 siempre da cero.** `AvisoPlazo`
+     (`meta.service.ts:138,330-338`) calcula `mesesMeta`, `mesesProgramados`,
+     `desviacion`, `costeMensual` y `sobrecosto`, y viaja en
+     `comparacion.plazo` — pero un grep exhaustivo confirma que
+     `.plazo` de esa comparacion NUNCA se lee en ningun componente
+     (`PanelBolsa.tsx` no lo toca). Ademas, desde que los gastos generales
+     salieron de la meta, `costeMensualDelAtraso` siempre se calcula sobre
+     un array vacio (`resumenGastosGenerales([])`, linea 324) y da
+     "0.00" siempre, asi que aunque se mostrara, `sobrecosto` seria
+     siempre cero. Es codigo vivo (se calcula en cada carga de la
+     pantalla) que no le sirve a nadie hoy. Decidir: o se conecta a una
+     pantalla, o se retira junto con el resto de la maquinaria de
+     `resumenGastosGenerales`/`lineasMasLargasQueLaObra` que ya quedo
+     huerfana por el mismo motivo.
    - **Patron sistematico de consultas sin filtro `companyId`**, el mismo
      descuido que ya causo la fuga real de `tablero.service.ts`, repetido
      en cuatro servicios distintos (hoy no explotable en ninguno porque la

@@ -30,7 +30,14 @@ export interface EstadoPermisos {
 const esquemaCambios = z
   .array(
     z.object({
-      role: z.enum(["ADMIN", "RESIDENTE", "ADMIN_OBRA", "ALMACENERO", "CONSULTOR"]),
+      role: z.enum([
+        "ADMIN",
+        "RESIDENTE",
+        "ADMIN_OBRA",
+        "ALMACENERO",
+        "CONSULTOR",
+        "GERENTE",
+      ]),
       permiso: z.string().min(1).max(40),
       concedido: z.boolean(),
     }),
