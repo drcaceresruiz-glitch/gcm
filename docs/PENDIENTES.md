@@ -357,12 +357,18 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
 5. ~~**Prueba de extremo a extremo real.**~~ **HECHA el 21 de agosto de
    2026** — ver el punto 13 de esta misma lista, con el detalle completo.
 
-6. **Manual completo** — pedido: actualizado, intuitivo, paginado, con
-   hipervinculos entre capitulos (hoy los capitulos se nombran unos a otros
-   en prosa, nunca con un enlace — séria un cambio de estilo del manual
-   entero, no algo que meter en un solo capitulo sin criterio), con
-   ejemplos, con video si es viable. Notas ya tiene su primer capitulo
-   (`src/components/manual/capitulos.tsx`, slug `notas`); el resto del
+6. **Manual completo** — pedido, pero **APLAZADO A PROPOSITO por el usuario
+   el 21 de agosto de 2026**: "lo dejamos para el final porque vamos a
+   seguir cambiando cosas". Escribirlo ahora, con la app todavia moviendose
+   tanto (297 commits entre el 12 y el 21 de agosto, ver mas abajo), lo
+   dejaria desactualizado antes de terminarlo. No retomar sin que el
+   usuario lo pida. Cuando llegue el momento: actualizado, intuitivo,
+   paginado, con hipervinculos entre capitulos (hoy los capitulos se
+   nombran unos a otros en prosa, nunca con un enlace — séria un cambio de
+   estilo del manual entero, no algo que meter en un solo capitulo sin
+   criterio), con ejemplos, con video si es viable. Notas ya tiene su
+   primer capitulo (`src/components/manual/capitulos.tsx`, slug `notas`);
+   el resto del
    manual sigue con el estilo de antes.
 
 7. **Dos hallazgos sueltos de UX, vistos en vivo con el usuario**:
