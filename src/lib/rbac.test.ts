@@ -145,6 +145,29 @@ describe("GERENTE: ve todo lo que se lee, administra y aprueba nada", () => {
   });
 });
 
+describe("el asistente de IA (Fase 2b): quien ya escribe con las manos, tambien puede proponerlo", () => {
+  it("RESIDENTE y ADMIN_OBRA tienen agente_ia:usar y agente_ia:escribir", () => {
+    for (const rol of ["RESIDENTE", "ADMIN_OBRA"] as const) {
+      const permisos = permisosDe(rol);
+      expect(permisos, rol).toContain("agente_ia:usar");
+      expect(permisos, rol).toContain("agente_ia:escribir");
+    }
+  });
+
+  it("ALMACENERO y CONSULTOR no los tienen — no se los concedio nadie", () => {
+    for (const rol of ["ALMACENERO", "CONSULTOR"] as const) {
+      const permisos = permisosDe(rol);
+      expect(permisos, rol).not.toContain("agente_ia:usar");
+      expect(permisos, rol).not.toContain("agente_ia:escribir");
+    }
+  });
+
+  it("ninguno de los dos es innegociable — una empresa puede quitarlos o sumarlos", () => {
+    expect(INNEGOCIABLES).not.toContain("agente_ia:usar");
+    expect(INNEGOCIABLES).not.toContain("agente_ia:escribir");
+  });
+});
+
 describe("filas que la base puede traer y el codigo ya no reconoce", () => {
   it("ignora un permiso que no existe, sin romper", () => {
     const permisos = resolverPermisos("RESIDENTE", [

@@ -131,6 +131,17 @@ export const PERMISOS = [
   /// mas abajo, no por derivacion-.
   "agente_ia:usar",
 
+  /// Que el agente pueda PROPONER una escritura (crear un movimiento en
+  /// borrador, registrar un avance, crear una nota) para que un humano la
+  /// confirme -nunca ejecuta nada solo-. Deliberadamente SEPARADO de
+  /// `agente_ia:usar`: una empresa puede querer el chat de solo lectura
+  /// para todos y reservar la capacidad de proponer escrituras a quien ya
+  /// tiene el permiso de fondo (`movimiento:crear`, `avance:registrar`,
+  /// `nota:crear` siguen siendo la comprobacion real en cada escritura;
+  /// esto solo decide si se le OFRECE la herramienta al modelo). NO
+  /// innegociable, misma familia que `agente_ia:usar`.
+  "agente_ia:escribir",
+
   "auditoria:leer",
 ] as const;
 
@@ -332,6 +343,13 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// lo ya anotado (`nota:gestionar`) se queda en ADMIN_OBRA.
     "nota:leer",
     "nota:crear",
+    /// El asistente y la Fase 2b (proponer escrituras): es exactamente
+    /// quien hace `movimiento:crear`/`avance:registrar`/`nota:crear` con
+    /// las manos, asi que negarle el atajo del agente no protege nada —el
+    /// permiso de fondo de cada escritura sigue siendo la comprobacion
+    /// real cuando el humano confirma la propuesta.
+    "agente_ia:usar",
+    "agente_ia:escribir",
   ],
 
   /// Administrador de obra: perfil economico-administrativo. Consulta el
@@ -380,6 +398,11 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "nota:leer",
     "nota:crear",
     "nota:gestionar",
+    /// Mismo motivo que en RESIDENTE: ya tiene `movimiento:crear` y
+    /// `nota:crear` de fondo, asi que el agente solo le ahorra el
+    /// formulario, nunca amplia lo que puede escribir.
+    "agente_ia:usar",
+    "agente_ia:escribir",
   ],
 
   /// Almacen: necesita ver las partidas para imputar movimientos de

@@ -3,11 +3,15 @@ import "server-only";
 import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { sumar } from "@/lib/decimal";
+import { soles } from "@/utils/formato";
 import { SIN_PROVEEDOR_ACTIVO } from "@/lib/agente-conversacion";
 import {
   conversar,
+  mensajesDeResultados,
   configuracionProveedorActivo,
   type HerramientaAgente,
+  type HerramientaEscritura,
 } from "@/services/agente-ia.service";
 import { listarObras, obtenerResumenEmpresa } from "@/services/obras.service";
 import {
@@ -15,8 +19,32 @@ import {
   sobregiroProyectadoDeCartera,
   confiabilidadDeCartera,
 } from "@/services/gerencia.service";
+import {
+  obtenerPresupuestoVigente,
+  crearMovimiento,
+  type DatosMovimiento,
+} from "@/services/movimientos.service";
+import { obtenerCronograma, registrarAvance } from "@/services/cronograma.service";
+import { crearNota, type DatosNota } from "@/services/notas.service";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { RolAgente } from "@/generated/prisma/enums";
+/// Import de VALOR, no de tipo -a diferencia de `RolAgente` arriba-: hace
+/// falta `Prisma.JsonNull`, el centinela en tiempo de ejecucion que Prisma
+/// exige para filtrar "esta columna Json no es null" (`propuesta: { not: null }`
+/// a secas no compila contra un campo `Json?` en el cliente generado).
+import { Prisma } from "@/generated/prisma/client";
+
+/// Nombre de una obra, para las tarjetas de confirmacion -SOLO texto de
+/// pantalla, nunca una decision de permiso: la autorizacion real la hace
+/// cada funcion de servicio que la propuesta termina llamando-. Acotada
+/// por companyId, igual que cualquier otra consulta de apoyo del proyecto.
+async function nombreDeObra(companyId: string, obraId: string): Promise<string> {
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId },
+    select: { nombreObra: true },
+  });
+  return obra?.nombreObra ?? "esa obra";
+}
 
 /**
  * El agente conversacional — Fase 2a, SOLO LECTURA.
@@ -43,13 +71,23 @@ const MAX_MENSAJE = 4000;
 /// explica -nunca un bucle silencioso pagando llamadas sin fin-.
 const MAX_VUELTAS = 6;
 
-const SISTEMA = [
-  "Eres el asistente de GCM (Gestión en Construcción Moderna), una app de gestión de obras de construcción.",
-  "Respondes preguntas sobre la cartera de obras de quien te escribe, usando SOLO las herramientas disponibles.",
-  "Nunca inventes cifras: si una herramienta no trae un dato, dilo en vez de adivinar.",
-  "Si una herramienta devuelve vacío o dice que no hay permiso, explícalo con naturalidad, no como un error técnico.",
-  "Sé breve y concreto. Responde en español.",
-].join(" ");
+function construirSistema(puedeEscribir: boolean): string {
+  const base = [
+    "Eres el asistente de GCM (Gestión en Construcción Moderna), una app de gestión de obras de construcción.",
+    "Respondes preguntas sobre la cartera de obras de quien te escribe, usando SOLO las herramientas disponibles.",
+    "Nunca inventes cifras: si una herramienta no trae un dato, dilo en vez de adivinar.",
+    "Si una herramienta devuelve vacío o dice que no hay permiso, explícalo con naturalidad, no como un error técnico.",
+    "Sé breve y concreto. Responde en español.",
+  ];
+  if (puedeEscribir) {
+    base.push(
+      "Puedes PROPONER una escritura (crear un movimiento presupuestal en borrador, registrar un avance, crear una nota) con la herramienta proponer_accion, nunca de otra forma.",
+      "Antes de proponer, usa listar_obras/partidas_de_obra/tareas_de_obra para conseguir los ids reales que la propuesta necesita -nunca inventes un wbsItemId, un uid ni un obraId-.",
+      "Al llamar a proponer_accion tu turno TERMINA ahí: nunca digas que ya hiciste el cambio, nunca sigas conversando en el mismo turno. La confirma o cancela un humano en la pantalla, no tú.",
+    );
+  }
+  return base.join(" ");
+}
 
 // ---------------------------------------------------------------------------
 // Las herramientas — envoltorios delgados sobre servicios que ya existen
@@ -103,7 +141,277 @@ const HERRAMIENTAS: HerramientaAgente[] = [
     esquema: { type: "object", properties: {} },
     ejecutar: async (sesion) => confiabilidadDeCartera(sesion),
   },
+  {
+    nombre: "partidas_de_obra",
+    descripcion:
+      "Las partidas del presupuesto vigente de UNA obra, con su id (wbsItemId), código, descripción y monto vigente. Úsala antes de proponer un movimiento presupuestal, para conseguir el wbsItemId real de la partida -nunca lo inventes-.",
+    esquema: {
+      type: "object",
+      required: ["obraId"],
+      properties: {
+        obraId: { type: "string", description: "Id de la obra, de listar_obras." },
+      },
+    },
+    ejecutar: async (sesion, args) => {
+      const { obraId } = args as { obraId: string };
+      const p = await obtenerPresupuestoVigente(sesion, obraId);
+      return p.partidas.map((x) => ({
+        wbsItemId: x.wbsItemId,
+        codigo: x.codigoPartida,
+        descripcion: x.descripcion,
+        modalidad: x.modalidad,
+        vigente: x.vigente,
+      }));
+    },
+  },
+  {
+    nombre: "tareas_de_obra",
+    descripcion:
+      "Las tareas del cronograma vigente de UNA obra, con su id (uid), código y nombre. Úsala antes de proponer un registro de avance, para conseguir el uid real de la tarea -nunca lo inventes-.",
+    esquema: {
+      type: "object",
+      required: ["obraId"],
+      properties: {
+        obraId: { type: "string", description: "Id de la obra, de listar_obras." },
+      },
+    },
+    ejecutar: async (sesion, args) => {
+      const { obraId } = args as { obraId: string };
+      const c = await obtenerCronograma(sesion, obraId);
+      if (!c) return [];
+      return c.tareas
+        .filter((t) => !t.esResumen)
+        .map((t) => ({ uid: t.uid, codigo: t.codigo, nombre: t.nombre, esHito: t.esHito }));
+    },
+  },
 ];
+
+// ---------------------------------------------------------------------------
+// Herramientas de ESCRITURA (Fase 2b) — nunca se ejecutan solas. El modelo
+// solo puede llamar a `proponer_accion` (mas abajo), que calcula el resumen
+// desde `datos` -nunca desde lo que el modelo haya dicho- y CORTA el turno.
+// La escritura real solo la dispara `confirmarPropuestaAgente`, tras el
+// click humano, con el `datos` YA guardado, nunca uno nuevo.
+// ---------------------------------------------------------------------------
+
+interface DatosCrearMovimientoAgente extends DatosMovimiento {
+  obraId: string;
+}
+
+interface DatosRegistrarAvanceAgente {
+  obraId: string;
+  uid: number;
+  porcentaje: string;
+  fecha: string;
+  nota?: string;
+}
+
+interface DatosCrearNotaAgente extends DatosNota {
+  obraId: string;
+}
+
+const HERRAMIENTAS_ESCRITURA: HerramientaEscritura[] = [
+  {
+    nombre: "crear_movimiento",
+    descripcion:
+      "Propone crear un movimiento presupuestal en BORRADOR (RECONVERSION, ADICIONAL o DEDUCTIVO). No se ejecuta hasta que un humano confirme, y aun confirmado queda pendiente de que un administrador lo apruebe aparte -nunca afecta el presupuesto por sí solo-.",
+    esquema: {
+      type: "object",
+      required: ["obraId", "tipo", "fecha", "concepto", "motivo", "lineas"],
+      properties: {
+        obraId: { type: "string", description: "Id de la obra, de listar_obras." },
+        tipo: { type: "string", enum: ["RECONVERSION", "ADICIONAL", "DEDUCTIVO"] },
+        fecha: { type: "string", description: "YYYY-MM-DD, del documento que respalda el movimiento." },
+        concepto: { type: "string" },
+        motivo: {
+          type: "string",
+          description: "Por qué procede: la cláusula del contrato o el hecho que lo justifica.",
+        },
+        referencia: { type: "string" },
+        lineas: {
+          type: "array",
+          minItems: 1,
+          items: {
+            oneOf: [
+              {
+                description: "Ajuste sobre una partida que ya existe, de partidas_de_obra.",
+                type: "object",
+                required: ["wbsItemId", "importe"],
+                properties: {
+                  wbsItemId: { type: "string", description: "De partidas_de_obra." },
+                  importe: {
+                    type: "string",
+                    description: "Positivo entra, negativo sale, texto decimal, nunca cero.",
+                  },
+                  justificacion: { type: "string" },
+                },
+              },
+              {
+                description: "Alta de partida nueva. Solo válido si tipo=ADICIONAL.",
+                type: "object",
+                required: ["parentId", "codigoPartida", "descripcion", "importe"],
+                properties: {
+                  parentId: {
+                    type: "string",
+                    description: "wbsItemId de un CAPITULO, de partidas_de_obra.",
+                  },
+                  codigoPartida: {
+                    type: "string",
+                    description: "Formato 1, 2.03, 7.02.01 -no puede chocar con uno existente.",
+                  },
+                  descripcion: { type: "string" },
+                  unidad: { type: "string" },
+                  metrado: { type: "string" },
+                  precioUnitario: { type: "string" },
+                  modalidad: {
+                    type: "string",
+                    enum: ["PRECIOS_UNITARIOS", "SUMA_ALZADA", "ALCANCE"],
+                  },
+                  importe: { type: "string" },
+                  justificacion: { type: "string" },
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+    resumen: async (sesion, datosSinTipar) => {
+      const datos = datosSinTipar as DatosCrearMovimientoAgente;
+      const [nombreObra, presupuesto] = await Promise.all([
+        nombreDeObra(sesion.companyId, datos.obraId),
+        obtenerPresupuestoVigente(sesion, datos.obraId),
+      ]);
+      const porCodigo = new Map(presupuesto.partidas.map((p) => [p.wbsItemId, p]));
+
+      const lineas = datos.lineas.map((l) => {
+        if ("wbsItemId" in l) {
+          const partida = porCodigo.get(l.wbsItemId);
+          const etiqueta = partida ? `${partida.codigoPartida} (${partida.descripcion})` : l.wbsItemId;
+          return `${etiqueta}: ${soles(l.importe)}`;
+        }
+        return `NUEVA partida ${l.codigoPartida} (${l.descripcion}): ${soles(l.importe)}`;
+      });
+      const neto = sumar(datos.lineas.map((l) => l.importe));
+
+      return (
+        `¿Confirmas crear un movimiento ${datos.tipo} en la obra "${nombreObra}"?\n` +
+        `${lineas.join("\n")}\n` +
+        `Total neto: ${soles(neto)}. Motivo: "${datos.motivo}".\n` +
+        `Quedará en BORRADOR: no se descuenta del presupuesto hasta que un administrador lo apruebe aparte.`
+      );
+    },
+    ejecutarEscritura: async (sesion, datosSinTipar) => {
+      const { obraId, ...datos } = datosSinTipar as DatosCrearMovimientoAgente;
+      const r = await crearMovimiento(sesion, obraId, datos);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, mensaje: `Movimiento #${r.numero} creado en BORRADOR.` };
+    },
+  },
+  {
+    nombre: "registrar_avance",
+    descripcion:
+      "Propone registrar el avance de UNA tarea del cronograma. No se ejecuta hasta que un humano confirme. Cada reporte es un registro histórico nuevo -no reemplaza al anterior, y no se puede borrar después-.",
+    esquema: {
+      type: "object",
+      required: ["obraId", "uid", "porcentaje", "fecha"],
+      properties: {
+        obraId: { type: "string", description: "Id de la obra, de listar_obras." },
+        uid: { type: "integer", description: "Id de la tarea, de tareas_de_obra." },
+        porcentaje: { type: "string", description: "0 a 100, texto decimal." },
+        fecha: { type: "string", description: "YYYY-MM-DD, nunca futura." },
+        nota: { type: "string" },
+      },
+    },
+    resumen: async (sesion, datosSinTipar) => {
+      const datos = datosSinTipar as DatosRegistrarAvanceAgente;
+      const [nombreObra, cronograma] = await Promise.all([
+        nombreDeObra(sesion.companyId, datos.obraId),
+        obtenerCronograma(sesion, datos.obraId),
+      ]);
+      const tarea = cronograma?.tareas.find((t) => t.uid === datos.uid);
+      const etiquetaTarea = tarea ? `${tarea.codigo ?? ""} ${tarea.nombre}`.trim() : `la tarea ${datos.uid}`;
+
+      return (
+        `¿Confirmas registrar que "${etiquetaTarea}" (obra "${nombreObra}") llegó a ${datos.porcentaje}% el ${datos.fecha}?\n` +
+        `Se guarda como un reporte NUEVO en la serie histórica -no reemplaza el reporte anterior, y no se puede borrar después: para corregirlo hay que registrar otro reporte posterior-.`
+      );
+    },
+    ejecutarEscritura: async (sesion, datosSinTipar) => {
+      const { obraId, ...datos } = datosSinTipar as DatosRegistrarAvanceAgente;
+      const r = await registrarAvance(sesion, obraId, datos);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, mensaje: "Avance registrado." };
+    },
+  },
+  {
+    nombre: "crear_nota",
+    descripcion:
+      "Propone crear una nota de bitácora en una obra. No se ejecuta hasta que un humano confirme.",
+    esquema: {
+      type: "object",
+      required: ["obraId", "categoria", "titulo", "cuerpo"],
+      properties: {
+        obraId: { type: "string", description: "Id de la obra, de listar_obras." },
+        categoria: { type: "string", enum: ["FINANCIERO", "LOGISTICA", "OPERATIVO", "LEGAL"] },
+        titulo: { type: "string", maxLength: 150 },
+        cuerpo: { type: "string" },
+        fechaRecordatorio: { type: "string", description: "YYYY-MM-DD opcional." },
+      },
+    },
+    resumen: async (sesion, datosSinTipar) => {
+      const datos = datosSinTipar as DatosCrearNotaAgente;
+      const nombreObra = await nombreDeObra(sesion.companyId, datos.obraId);
+      const recordatorio = datos.fechaRecordatorio
+        ? ` Con recordatorio para el ${datos.fechaRecordatorio}.`
+        : "";
+      return `¿Confirmas crear una nota ${datos.categoria} en la obra "${nombreObra}": "${datos.titulo}"?${recordatorio}`;
+    },
+    ejecutarEscritura: async (sesion, datosSinTipar) => {
+      const { obraId, ...datos } = datosSinTipar as DatosCrearNotaAgente;
+      const r = await crearNota(sesion, obraId, datos);
+      if (!r.ok) return { ok: false, error: r.error };
+      return { ok: true, mensaje: "Nota creada." };
+    },
+  },
+];
+
+/**
+ * La UNICA puerta por la que el modelo puede pedir una escritura. Es una
+ * `HerramientaAgente` de lectura normal -su `ejecutar` nunca hace un
+ * `create`/`update`, solo busca la herramienta de escritura por nombre y
+ * calcula su resumen-, asi que el bucle de turnos no necesita ningun
+ * camino especial para DISPARARLA, solo para INTERPRETAR su resultado (ver
+ * `ejecutarTurno`: cuando esta herramienta tiene exito, el turno se corta
+ * ahi, no sigue a otra vuelta).
+ */
+const PROPONER_ACCION: HerramientaAgente = {
+  nombre: "proponer_accion",
+  descripcion:
+    "Propone una escritura para que un humano la confirme en pantalla. NUNCA ejecuta nada por sí sola. Tu turno termina en cuanto la llames -no sigas conversando después-.",
+  esquema: {
+    type: "object",
+    required: ["herramienta", "datos"],
+    properties: {
+      herramienta: {
+        type: "string",
+        enum: HERRAMIENTAS_ESCRITURA.map((h) => h.nombre),
+      },
+      datos: { type: "object" },
+    },
+  },
+  ejecutar: async (sesion, args) => {
+    const a = args as { herramienta?: string; datos?: unknown };
+    const h = HERRAMIENTAS_ESCRITURA.find((x) => x.nombre === a.herramienta);
+    if (!h) {
+      throw new Error(`Herramienta de escritura desconocida: "${a.herramienta}".`);
+    }
+    return {
+      propuesta: { herramienta: h.nombre, datos: a.datos },
+      resumen: await h.resumen(sesion, a.datos),
+    };
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Lo que usa la pantalla
@@ -116,6 +424,9 @@ export interface MensajeAgenteResumen {
   terminado: boolean;
   error: string | null;
   createdAt: Date;
+  /// true si esta fila es una propuesta de escritura esperando el click
+  /// humano. La pantalla dibuja Confirmar/Cancelar en vez de texto plano.
+  propuestaPendiente: boolean;
 }
 
 function mapearMensaje(f: {
@@ -125,6 +436,8 @@ function mapearMensaje(f: {
   terminadoAt: Date | null;
   error: string | null;
   iniciadoAt: Date;
+  propuesta: unknown;
+  propuestaResueltaAt: Date | null;
 }): MensajeAgenteResumen {
   return {
     id: f.id,
@@ -133,8 +446,20 @@ function mapearMensaje(f: {
     terminado: f.terminadoAt !== null,
     error: f.error,
     createdAt: f.iniciadoAt,
+    propuestaPendiente: f.propuesta !== null && f.propuestaResueltaAt === null,
   };
 }
+
+const SELECT_MENSAJE = {
+  id: true,
+  rol: true,
+  contenido: true,
+  terminadoAt: true,
+  error: true,
+  iniciadoAt: true,
+  propuesta: true,
+  propuestaResueltaAt: true,
+} as const;
 
 /** El historial de una conversación, la más antigua primero. */
 export async function historialDeConversacion(
@@ -152,14 +477,7 @@ export async function historialDeConversacion(
   const filas = await prisma.mensajeAgente.findMany({
     where: { conversacionId },
     orderBy: { iniciadoAt: "asc" },
-    select: {
-      id: true,
-      rol: true,
-      contenido: true,
-      terminadoAt: true,
-      error: true,
-      iniciadoAt: true,
-    },
+    select: SELECT_MENSAJE,
   });
 
   return filas.map(mapearMensaje);
@@ -222,6 +540,21 @@ export async function iniciarTurno(
       })
     : null;
 
+  // Con una propuesta sin resolver, el turno anterior no termino de
+  // verdad: nada nuevo entra hasta que se confirme o cancele. Es la
+  // comprobacion REAL -el cliente ya deshabilita el textarea, pero eso no
+  // protege nada por si solo-.
+  if (propia) {
+    const ultimo = await prisma.mensajeAgente.findFirst({
+      where: { conversacionId: propia.id, rol: "ASISTENTE" },
+      orderBy: { iniciadoAt: "desc" },
+      select: { propuesta: true, propuestaResueltaAt: true },
+    });
+    if (ultimo && ultimo.propuesta !== null && ultimo.propuestaResueltaAt === null) {
+      return { ok: false, error: "Resuelve la propuesta pendiente antes de seguir." };
+    }
+  }
+
   let convId = propia?.id ?? null;
   let mensajeAsistenteId = "";
 
@@ -261,6 +594,7 @@ export interface EstadoTurno {
   contenido: string;
   terminado: boolean;
   error: string | null;
+  propuestaPendiente: boolean;
 }
 
 /** Lo que el cliente sondea cada pocos segundos, mismo patrón que `ProbarSms.tsx`. */
@@ -275,11 +609,94 @@ export async function estadoDeTurno(
       id: mensajeAsistenteId,
       conversacion: { companyId: sesion.companyId, userId: sesion.userId },
     },
-    select: { contenido: true, terminadoAt: true, error: true },
+    select: { contenido: true, terminadoAt: true, error: true, propuesta: true, propuestaResueltaAt: true },
   });
   if (!fila) return null;
 
-  return { contenido: fila.contenido, terminado: fila.terminadoAt !== null, error: fila.error };
+  return {
+    contenido: fila.contenido,
+    terminado: fila.terminadoAt !== null,
+    error: fila.error,
+    propuestaPendiente: fila.propuesta !== null && fila.propuestaResueltaAt === null,
+  };
+}
+
+export type ResultadoConfirmacion =
+  | { ok: true; contenido: string }
+  | { ok: false; error: string };
+
+/**
+ * Resuelve una propuesta de escritura: confirma (ejecuta la funcion de
+ * servicio real, con el `datos` YA guardado, nunca uno nuevo) o cancela.
+ *
+ * El permiso de fondo (`movimiento:crear`, `avance:registrar`,
+ * `nota:crear`...) se vuelve a comprobar SOLO, dentro de la funcion real,
+ * con la sesion de ESTE instante -si el usuario lo perdio entre la
+ * propuesta y el click, la funcion real lo dice, esto no reimplementa
+ * nada-.
+ */
+export async function confirmarPropuestaAgente(
+  sesion: SesionActiva,
+  mensajeAsistenteId: string,
+  decision: "confirmar" | "cancelar",
+): Promise<ResultadoConfirmacion> {
+  if (!puede(sesion, "agente_ia:usar")) {
+    return { ok: false, error: "No tienes permiso para usar el asistente." };
+  }
+
+  const fila = await prisma.mensajeAgente.findFirst({
+    where: {
+      id: mensajeAsistenteId,
+      conversacion: { companyId: sesion.companyId, userId: sesion.userId },
+    },
+    select: { contenido: true, propuesta: true, propuestaResueltaAt: true },
+  });
+  if (!fila) return { ok: false, error: "No se encontró esa propuesta." };
+  if (fila.propuesta === null) return { ok: false, error: "Ese mensaje no es una propuesta." };
+  if (fila.propuestaResueltaAt !== null) {
+    return { ok: false, error: "Esa propuesta ya se resolvió." };
+  }
+
+  // Reclamar ANTES de ejecutar: si dos clicks llegan a la vez (doble click,
+  // doble pestaña), solo uno de los dos `updateMany` afecta una fila -el
+  // que gana ve `count === 1`, el otro `count === 0` y no ejecuta nada-.
+  const reclamado = await prisma.mensajeAgente.updateMany({
+    where: { id: mensajeAsistenteId, propuestaResueltaAt: null },
+    data: { propuestaResueltaAt: new Date() },
+  });
+  if (reclamado.count === 0) {
+    return { ok: false, error: "Esa propuesta ya se resolvió." };
+  }
+
+  if (decision === "cancelar") {
+    const contenido = `${fila.contenido}\n\nCancelada.`;
+    await prisma.mensajeAgente.update({
+      where: { id: mensajeAsistenteId },
+      data: { contenido, propuestaResultado: "Cancelada." },
+    });
+    return { ok: true, contenido };
+  }
+
+  const propuesta = fila.propuesta as { herramienta: string; datos: unknown };
+  const herramienta = HERRAMIENTAS_ESCRITURA.find((h) => h.nombre === propuesta.herramienta);
+  if (!herramienta) {
+    const error = `Herramienta de escritura desconocida: "${propuesta.herramienta}".`;
+    await prisma.mensajeAgente.update({
+      where: { id: mensajeAsistenteId },
+      data: { propuestaResultado: error.slice(0, 500) },
+    });
+    return { ok: false, error };
+  }
+
+  const r = await herramienta.ejecutarEscritura(sesion, propuesta.datos);
+  const resultado = r.ok ? r.mensaje : r.error;
+  const contenido = `${fila.contenido}\n\n${resultado}`;
+  await prisma.mensajeAgente.update({
+    where: { id: mensajeAsistenteId },
+    data: { contenido, propuestaResultado: resultado.slice(0, 500) },
+  });
+
+  return r.ok ? { ok: true, contenido } : { ok: false, error: r.error };
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +726,34 @@ export async function barridoDeTurnosMuertos(): Promise<ResumenBarridoTurnos> {
     },
   });
   return { marcados: count };
+}
+
+/// Una propuesta sin resolver mas alla de esto se da por abandonada: los
+/// datos que la sustentan (partidas, presupuesto vigente) pueden haber
+/// cambiado, y confirmarla tarde seria ejecutar sobre un estado que el
+/// humano ya no vio cuando decidio. NO es el mismo barrido que
+/// `TURNO_MUERTO_MS`: aquella resuelve "el proceso murio a mitad de un
+/// after()" en minutos; una propuesta sin confirmar es la situacion
+/// NORMAL -alguien cierra la pestana, se va a almorzar- y puede tardar
+/// horas.
+const PROPUESTA_EXPIRA_MS = 24 * 60 * 60 * 1000;
+
+export interface ResumenBarridoPropuestas {
+  expiradas: number;
+}
+
+/** Llamado desde el cron de `/api/reloj`, en su propio try/catch. */
+export async function barridoDePropuestasExpiradas(): Promise<ResumenBarridoPropuestas> {
+  const limite = new Date(Date.now() - PROPUESTA_EXPIRA_MS);
+  const { count } = await prisma.mensajeAgente.updateMany({
+    where: {
+      propuesta: { not: Prisma.JsonNull },
+      propuestaResueltaAt: null,
+      terminadoAt: { not: null, lt: limite },
+    },
+    data: { propuestaResueltaAt: new Date(), propuestaResultado: "Expiró sin confirmar." },
+  });
+  return { expiradas: count };
 }
 
 async function marcarError(mensajeAsistenteId: string, error: string): Promise<void> {
@@ -349,14 +794,18 @@ async function ejecutarTurno(
       content: m.contenido,
     }));
 
+    // Se decide UNA vez, con la sesion de este instante: si el permiso
+    // cambia a mitad de un turno no importa, ya se ofrecio o no se ofrecio
+    // la herramienta para esta vuelta completa. La escritura real, cuando
+    // se confirme, vuelve a comprobar el permiso de fondo de todos modos.
+    const puedeEscribir = puede(sesion, "agente_ia:escribir");
+    const herramientas = puedeEscribir ? [...HERRAMIENTAS, PROPONER_ACCION] : HERRAMIENTAS;
+    const sistema = construirSistema(puedeEscribir);
+
     const herramientasUsadas: string[] = [];
 
     for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {
-      const r = await conversar(config.tipo, config, {
-        mensajes,
-        herramientas: HERRAMIENTAS,
-        sistema: SISTEMA,
-      });
+      const r = await conversar(config.tipo, config, { mensajes, herramientas, sistema });
 
       if ("ok" in r) {
         // r: { ok: false; error: string }
@@ -376,12 +825,40 @@ async function ejecutarTurno(
         return;
       }
 
-      // r.tipo === "usar_herramientas"
-      mensajes = [...mensajes, { role: "assistant", content: r.bruto }];
+      // r.tipo === "usar_herramientas" — `r.bruto` ya es el mensaje
+      // "assistant" completo, en el formato exacto de este proveedor
+      // (Claude/OpenAI-compatible lo arman distinto). Nunca se envuelve
+      // aqui: ver el comentario de `RespuestaTurno` en `agente-ia.service.ts`.
+      mensajes = [...mensajes, r.bruto];
+
+      // Si `proponer_accion` tiene exito, se captura aqui y el turno se
+      // corta DESPUES del Promise.all -sin importar si el modelo la llamo
+      // junto con otras herramientas en el mismo lote: se procesan todas
+      // igual, para no dejar un tool_use sin su tool_result si hiciera
+      // falta reintentar, pero una vez que hay propuesta lista no se
+      // manda ninguna vuelta mas-.
+      let propuestaLista: { herramienta: string; datos: unknown } | null = null;
+      let propuestaResumen = "";
 
       const resultados = await Promise.all(
         r.llamadas.map(async (ll) => {
           herramientasUsadas.push(ll.nombre);
+
+          if (ll.nombre === "proponer_accion") {
+            try {
+              const res = (await PROPONER_ACCION.ejecutar(sesion, ll.args)) as {
+                propuesta: { herramienta: string; datos: unknown };
+                resumen: string;
+              };
+              propuestaLista = res.propuesta;
+              propuestaResumen = res.resumen;
+              return { toolUseId: ll.id, contenido: JSON.stringify({ ok: true }) };
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "No se pudo calcular la propuesta.";
+              return { toolUseId: ll.id, contenido: `Error: ${msg}` };
+            }
+          }
+
           const herramienta = HERRAMIENTAS.find((h) => h.nombre === ll.nombre);
           if (!herramienta) {
             return { toolUseId: ll.id, contenido: `Herramienta desconocida: ${ll.nombre}` };
@@ -399,17 +876,20 @@ async function ejecutarTurno(
         }),
       );
 
-      mensajes = [
-        ...mensajes,
-        {
-          role: "user",
-          content: resultados.map((res) => ({
-            type: "tool_result",
-            tool_use_id: res.toolUseId,
-            content: res.contenido,
-          })),
-        },
-      ];
+      if (propuestaLista) {
+        await prisma.mensajeAgente.update({
+          where: { id: mensajeAsistenteId },
+          data: {
+            contenido: propuestaResumen,
+            terminadoAt: new Date(),
+            propuesta: propuestaLista as Prisma.InputJsonValue,
+            herramientas: herramientasUsadas,
+          },
+        });
+        return;
+      }
+
+      mensajes = [...mensajes, ...mensajesDeResultados(config.tipo, resultados)];
     }
 
     await marcarError(

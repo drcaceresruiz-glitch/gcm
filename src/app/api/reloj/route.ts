@@ -7,7 +7,9 @@ import {
 } from "@/services/correo-entrante.service";
 import {
   barridoDeTurnosMuertos,
+  barridoDePropuestasExpiradas,
   type ResumenBarridoTurnos,
+  type ResumenBarridoPropuestas,
 } from "@/services/agente-conversacion.service";
 
 /**
@@ -90,10 +92,25 @@ export async function POST(peticion: Request) {
     agenteIa = { marcados: 0, error: e instanceof Error ? e.message : String(e) };
   }
 
+  /**
+   * Y las propuestas de escritura (Fase 2b) que nadie confirmo ni cancelo.
+   *
+   * Mismo criterio: propio try/catch, no debe poder tumbar la respuesta.
+   * A diferencia del barrido de arriba, esto NO es una red de seguridad
+   * contra un proceso que murio -es la situacion NORMAL, alguien cierra la
+   * pestana sin decidir-, por eso su plazo es de horas, no de minutos.
+   */
+  let propuestasIa: ResumenBarridoPropuestas & { error?: string };
+  try {
+    propuestasIa = await barridoDePropuestasExpiradas();
+  } catch (e) {
+    propuestasIa = { expiradas: 0, error: e instanceof Error ? e.message : String(e) };
+  }
+
   // 200 aunque la pasada falle: el cuerpo lo dice, y un 500 haria que `curl
   // -f` se callara justo cuando hay algo que contar.
   return Response.json(
-    { ...resumen, correoEntrante: correo, agenteIa },
+    { ...resumen, correoEntrante: correo, agenteIa, propuestasIa },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

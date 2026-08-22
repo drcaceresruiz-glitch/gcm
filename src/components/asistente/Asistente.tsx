@@ -3,10 +3,11 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
-import { LoaderCircle, Send, AlertCircle } from "lucide-react";
+import { LoaderCircle, Send, AlertCircle, Check, X } from "lucide-react";
 import {
   accionEnviarMensajeAsistente,
   accionEstadoDeTurno,
+  accionConfirmarPropuesta,
 } from "@/app/(dashboard)/asistente/acciones";
 import { SIN_PROVEEDOR_ACTIVO } from "@/lib/agente-conversacion";
 import type { MensajeAgenteResumen } from "@/services/agente-conversacion.service";
@@ -46,7 +47,70 @@ function BotonEnviar({ esperandoRespuesta }: { esperandoRespuesta: boolean }) {
   );
 }
 
-function Burbuja({ mensaje }: { mensaje: MensajeAgenteResumen }) {
+function TarjetaConfirmacion({
+  mensajeId,
+  onResuelto,
+}: {
+  mensajeId: string;
+  onResuelto: (contenido: string) => void;
+}) {
+  const [resolviendo, setResolviendo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function resolver(decision: "confirmar" | "cancelar") {
+    setResolviendo(true);
+    setError(null);
+    const r = await accionConfirmarPropuesta(mensajeId, decision);
+    setResolviendo(false);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    onResuelto(r.contenido);
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => resolver("confirmar")}
+        disabled={resolviendo}
+        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+        style={{ backgroundColor: "var(--color-marca-600)" }}
+      >
+        {resolviendo ? (
+          <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <Check className="size-3.5" aria-hidden="true" />
+        )}
+        Confirmar
+      </button>
+      <button
+        type="button"
+        onClick={() => resolver("cancelar")}
+        disabled={resolviendo}
+        className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <X className="size-3.5" aria-hidden="true" />
+        Cancelar
+      </button>
+      {error && (
+        <span className="w-full text-xs" style={{ color: "var(--color-peligro)" }}>
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Burbuja({
+  mensaje,
+  onPropuestaResuelta,
+}: {
+  mensaje: MensajeAgenteResumen;
+  onPropuestaResuelta: (id: string, contenido: string) => void;
+}) {
   const esUsuario = mensaje.rol === "USUARIO";
   const pensando = !esUsuario && !mensaje.terminado;
 
@@ -81,7 +145,15 @@ function Burbuja({ mensaje }: { mensaje: MensajeAgenteResumen }) {
             </span>
           </p>
         ) : (
-          <p className="whitespace-pre-wrap">{mensaje.contenido}</p>
+          <>
+            <p className="whitespace-pre-wrap">{mensaje.contenido}</p>
+            {mensaje.propuestaPendiente && (
+              <TarjetaConfirmacion
+                mensajeId={mensaje.id}
+                onResuelto={(contenido) => onPropuestaResuelta(mensaje.id, contenido)}
+              />
+            )}
+          </>
         )}
       </div>
     </li>
@@ -109,10 +181,22 @@ export function Asistente({
 
   const [estado, enviar] = useActionState(accionEnviarMensajeAsistente, {});
 
+  // `undefined` = usa lo que ya habia (el id derivado de `estado`/
+  // `conversacionInicial`, como siempre); `null` = "Nueva conversación"
+  // acaba de pedir que el PROXIMO envio abra una conversacion distinta.
+  // Se limpia solo en cuanto ese envio realmente pasa -ver el efecto de
+  // abajo-, para no quedar pisando el id real para siempre.
+  const [conversacionForzada, setConversacionForzada] = useState<string | null | undefined>(
+    undefined,
+  );
+
   // Se deriva del ultimo resultado de la accion, sin estado propio: cada
   // envio devuelve el mismo id de conversacion una vez que existe, asi
   // que no hace falta sincronizarlo aparte.
-  const conversacionId = estado.conversacionId ?? conversacionInicial?.id ?? null;
+  const conversacionId =
+    conversacionForzada !== undefined
+      ? conversacionForzada
+      : (estado.conversacionId ?? conversacionInicial?.id ?? null);
 
   // Al llegar un id nuevo de turno, se añaden las dos burbujas -la del
   // usuario, ya completa, y la del asistente, vacia- y arranca el sondeo.
@@ -121,6 +205,7 @@ export function Asistente({
       return;
     }
     idAgregadoRef.current = estado.mensajeAsistenteId;
+    setConversacionForzada(undefined);
 
     const textoEnviado = formRef.current?.elements.namedItem("mensaje");
     const texto =
@@ -135,6 +220,7 @@ export function Asistente({
         terminado: true,
         error: null,
         createdAt: new Date(),
+        propuestaPendiente: false,
       },
       {
         id: estado.mensajeAsistenteId!,
@@ -143,6 +229,7 @@ export function Asistente({
         terminado: false,
         error: null,
         createdAt: new Date(),
+        propuestaPendiente: false,
       },
     ]);
     setPendienteId(estado.mensajeAsistenteId);
@@ -174,6 +261,7 @@ export function Asistente({
                     (agotado && !r.terminado
                       ? "Esto está tardando más de lo normal. Puedes seguir esperando o intentar de nuevo."
                       : null),
+                  propuestaPendiente: r.propuestaPendiente,
                 }
               : m,
           ),
@@ -187,8 +275,40 @@ export function Asistente({
     return () => clearInterval(temporizador);
   }, [pendienteId]);
 
+  // Al confirmar o cancelar una propuesta, la escritura real ya paso -es
+  // una transaccion de Prisma, no una llamada al proveedor de IA-, asi que
+  // se actualiza de una vez, sin sondeo.
+  function alResolverPropuesta(id: string, contenido: string) {
+    setMensajes((previos) =>
+      previos.map((m) => (m.id === id ? { ...m, contenido, propuestaPendiente: false } : m)),
+    );
+  }
+
+  const hayPropuestaPendiente = mensajes.some((m) => m.propuestaPendiente);
+
+  // No borra nada de la base -las filas viejas se quedan, historicas,
+  // igual que cualquier otro registro de GCM-: solo deja de mostrarlas y
+  // hace que el proximo envio abra una conversacion nueva. Es lo mismo
+  // que ya pasa sola al recargar la pagina despues de un rato, solo que
+  // sin recargar.
+  function nuevaConversacion() {
+    setMensajes([]);
+    setPendienteId(null);
+    setConversacionForzada(null);
+  }
+
   return (
     <div className="flex flex-col gap-4">
+      {mensajes.length > 0 && (
+        <button
+          type="button"
+          onClick={nuevaConversacion}
+          className="self-start text-xs underline opacity-70"
+        >
+          Nueva conversación
+        </button>
+      )}
+
       {mensajes.length === 0 ? (
         <p className="text-sm opacity-70">
           Pregúntale por el semáforo de la cartera, qué obras se están
@@ -197,9 +317,15 @@ export function Asistente({
       ) : (
         <ul className="space-y-3">
           {mensajes.map((m) => (
-            <Burbuja key={m.id} mensaje={m} />
+            <Burbuja key={m.id} mensaje={m} onPropuestaResuelta={alResolverPropuesta} />
           ))}
         </ul>
+      )}
+
+      {hayPropuestaPendiente && (
+        <p className="text-xs opacity-70">
+          Resuelve la propuesta de arriba (Confirmar o Cancelar) antes de seguir.
+        </p>
       )}
 
       <form ref={formRef} action={enviar} className="space-y-2">
@@ -208,14 +334,14 @@ export function Asistente({
           name="mensaje"
           rows={2}
           required
-          disabled={pendienteId !== null}
+          disabled={pendienteId !== null || hayPropuestaPendiente}
           maxLength={4000}
           placeholder="Escribe tu pregunta…"
           className="w-full rounded-lg border px-3 py-2 text-sm disabled:opacity-60"
           style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
         />
         <div className="flex flex-wrap items-center gap-3">
-          <BotonEnviar esperandoRespuesta={pendienteId !== null} />
+          <BotonEnviar esperandoRespuesta={pendienteId !== null || hayPropuestaPendiente} />
           {estado.error && (
             <span className="text-sm" style={{ color: "var(--color-peligro)" }}>
               {estado.error}

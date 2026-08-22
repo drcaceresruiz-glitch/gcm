@@ -279,7 +279,11 @@ function CampoModelo({
       return;
     }
     setModelos(r.modelos);
-    setModeloElegido(r.modelos[0] ?? "");
+    // A proposito NO se preselecciona el primero: la lista de un proveedor
+    // puede traer modelos que no sirven para conversar (de imagen, de
+    // incrustado, o alguno experimental que solo habla otro protocolo) —
+    // preseleccionar cualquiera invita a guardar sin mirar. Que elija.
+    setModeloElegido("");
     setModoManual(false);
   }
 
@@ -292,11 +296,15 @@ function CampoModelo({
         <>
           <select
             name="modelo"
+            required
             value={modeloElegido}
             onChange={(e) => setModeloElegido(e.target.value)}
             className="mt-1 w-full rounded-lg border px-3 py-2"
             style={{ borderColor: "var(--borde)" }}
           >
+            <option value="" disabled>
+              Elige uno — no todos sirven para conversar
+            </option>
             {modelos!.map((m) => (
               <option key={m} value={m}>
                 {m}

@@ -54,6 +54,41 @@ export interface HerramientaAgente {
   ejecutar: (sesion: SesionActiva, args: unknown) => Promise<unknown>;
 }
 
+export type ResultadoEscrituraAgente =
+  | { ok: true; mensaje: string }
+  | { ok: false; error: string };
+
+/**
+ * Herramienta de ESCRITURA (Fase 2b) — proponer una accion, nunca
+ * ejecutarla sola. A proposito NO tiene `ejecutar`: el bucle de turnos
+ * (`agente-conversacion.service.ts`) solo conoce `HerramientaAgente[]`
+ * para lo que dispara solo, asi que una `HerramientaEscritura` no cabe
+ * ahi por construccion — es un error de compilacion, no una convencion
+ * que alguien tiene que recordar. Solo la alcanzan `proponer_accion` (que
+ * llama a `resumen`) y la confirmacion humana (que llama a
+ * `ejecutarEscritura`, y solo con el `datos` YA guardado en la propuesta,
+ * nunca uno nuevo).
+ */
+export interface HerramientaEscritura {
+  nombre: string;
+  descripcion: string;
+  /// JSON Schema de `datos`, el unico campo que el modelo rellena.
+  esquema: object;
+  /// Calcula el texto EXACTO de la tarjeta de confirmacion a partir de
+  /// `datos` -nunca lo que el modelo haya dicho-: misma aritmetica y las
+  /// mismas busquedas (nombre de partida, de tarea) que usaria la
+  /// escritura real. Si lanza, el error cae en el mismo `try/catch`
+  /// generico de cada llamada a herramienta -el modelo puede corregir y
+  /// reintentar, no revienta el turno-.
+  resumen: (sesion: SesionActiva, datos: unknown) => Promise<string>;
+  /// La escritura real. Solo la llama la confirmacion de la propuesta,
+  /// tras el click humano.
+  ejecutarEscritura: (
+    sesion: SesionActiva,
+    datos: unknown,
+  ) => Promise<ResultadoEscrituraAgente>;
+}
+
 export interface TurnoIa {
   mensajes: unknown[];
   herramientas: HerramientaAgente[];
@@ -66,6 +101,11 @@ export type RespuestaTurno =
   | {
       tipo: "usar_herramientas";
       llamadas: { id: string; nombre: string; args: unknown }[];
+      /// El mensaje "assistant" COMPLETO, ya en el formato exacto que este
+      /// proveedor espera de vuelta en `mensajes` -Claude y OpenAI lo
+      /// arman distinto (bloques `tool_use` vs. `tool_calls`), asi que
+      /// quien orquesta el turno (`agente-conversacion.service.ts`) nunca
+      /// lo construye a mano: solo hace `mensajes.push(bruto)` tal cual.
       bruto: unknown;
     };
 
@@ -86,12 +126,20 @@ interface AdaptadorProveedorIa {
   /// de verdad en vez de solo verificar la conexion.
   probar(config: ConfigLlamadaIa): Promise<RespuestaProveedorIa>;
   /// Ausente = este proveedor todavia no sabe tener una conversacion con
-  /// herramientas -hoy solo `claude` lo implementa, ver el comentario de
-  /// `ADAPTADORES` mas abajo-.
+  /// herramientas.
   conversar?(
     config: ConfigLlamadaIa,
     turno: TurnoIa,
   ): Promise<RespuestaTurno | { ok: false; error: string }>;
+  /// Solo relevante si `conversar` existe. Construye el o los mensajes que
+  /// representan el RESULTADO de ejecutar las herramientas, para agregarlos
+  /// al historial antes de la proxima vuelta -Claude empaqueta todos los
+  /// resultados en UN mensaje `user` con varios bloques `tool_result`;
+  /// OpenAI quiere un mensaje `role: "tool"` SEPARADO por cada resultado-,
+  /// asi que devuelve un arreglo: uno o varios, segun el proveedor.
+  mensajesDeResultados?(
+    resultados: { toolUseId: string; contenido: string }[],
+  ): unknown[];
   /// Ausente = este proveedor no permite listar sus modelos -la pantalla
   /// cae al campo de texto libre-. La lista es SIEMPRE en vivo, nunca un
   /// catalogo guardado en GCM: un catalogo fijo se desactualiza el dia que
@@ -198,7 +246,7 @@ async function conversarClaude(
           nombre: b.name ?? "",
           args: b.input,
         })),
-        bruto: bloques,
+        bruto: { role: "assistant", content: bloques },
       };
     }
 
@@ -212,6 +260,24 @@ async function conversarClaude(
     const texto = error instanceof Error ? error.message : String(error);
     return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
   }
+}
+
+/// Claude empaqueta TODOS los resultados de una vuelta en un unico mensaje
+/// `user` con varios bloques `tool_result` -asi habla su API, no una
+/// eleccion de GCM-.
+function mensajesDeResultadosClaude(
+  resultados: { toolUseId: string; contenido: string }[],
+): unknown[] {
+  return [
+    {
+      role: "user",
+      content: resultados.map((res) => ({
+        type: "tool_result",
+        tool_use_id: res.toolUseId,
+        content: res.contenido,
+      })),
+    },
+  ];
 }
 
 /// Forma comun a la respuesta de "listar modelos" de Anthropic y de
@@ -272,6 +338,14 @@ async function listarModelosOpenAiCompatible(
     const modelos = (datos.data ?? [])
       .map((m) => m.id)
       .filter((id): id is string => Boolean(id))
+      // Gemini expone su listado con el nombre de recurso nativo
+      // ("models/gemini-2.5-flash"), pero su propio endpoint de
+      // chat/completions -el que este adaptador llama- exige el nombre
+      // SIN ese prefijo. Es una inconsistencia del propio proveedor entre
+      // su listado y su capa de compatibilidad, no algo que dependa de
+      // cual proveedor sea: quitarlo si aparece es inofensivo para Groq u
+      // OpenRouter, que nunca lo traen.
+      .map((id) => (id.startsWith("models/") ? id.slice("models/".length) : id))
       .sort();
     if (modelos.length === 0) {
       return { ok: false, error: "El proveedor respondió, pero sin ningún modelo en la lista." };
@@ -319,6 +393,117 @@ async function probarOpenAiCompatible(
   }
 }
 
+interface LlamadaHerramientaOpenAi {
+  id: string;
+  type: string;
+  function: { name: string; arguments: string };
+}
+interface MensajeRespuestaOpenAi {
+  role: string;
+  content: string | null;
+  tool_calls?: LlamadaHerramientaOpenAi[];
+}
+interface RespuestaChatCompletionsOpenAi {
+  choices?: { message?: MensajeRespuestaOpenAi; finish_reason?: string }[];
+}
+
+/**
+ * Tool-use en el formato de OpenAI Chat Completions -distinto al de
+ * Claude: `tools` va anidado bajo `function`, el sistema es un mensaje
+ * `role: "system"` mas (Claude lo lleva aparte), y cada llamada trae sus
+ * argumentos como TEXTO JSON, no como objeto-. Sirve para Gemini, Groq,
+ * OpenRouter y cualquier "otro" compatible con OpenAI: los cuatro hablan
+ * este mismo protocolo, ver `SERVICIOS_IA_CONOCIDOS` en `lib/proveedor-ia.ts`.
+ */
+async function conversarOpenAiCompatible(
+  config: ConfigLlamadaIa,
+  turno: TurnoIa,
+): Promise<RespuestaTurno | { ok: false; error: string }> {
+  if (!config.urlBase) {
+    return {
+      ok: false,
+      error: "Este proveedor necesita una URL base y no tiene ninguna guardada.",
+    };
+  }
+
+  try {
+    const mensajes = turno.sistema
+      ? [{ role: "system", content: turno.sistema }, ...turno.mensajes]
+      : turno.mensajes;
+
+    const r = await fetch(`${config.urlBase}/chat/completions`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${config.apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: config.modelo,
+        max_tokens: 2048,
+        messages: mensajes,
+        ...(turno.herramientas.length > 0
+          ? {
+              tools: turno.herramientas.map((h) => ({
+                type: "function",
+                function: { name: h.nombre, description: h.descripcion, parameters: h.esquema },
+              })),
+            }
+          : {}),
+      }),
+      signal: AbortSignal.timeout(TOPE_CONVERSACION_MS),
+    });
+
+    if (!r.ok) {
+      const cuerpo = await r.text();
+      return { ok: false, error: mensajeSaneado(`(${r.status}) ${cuerpo}`, config.apiKey) };
+    }
+
+    const datos = (await r.json()) as RespuestaChatCompletionsOpenAi;
+    const mensaje = datos.choices?.[0]?.message;
+    if (!mensaje) {
+      return { ok: false, error: "El proveedor respondió sin ningún mensaje." };
+    }
+
+    const llamadas = mensaje.tool_calls ?? [];
+    if (llamadas.length > 0) {
+      return {
+        tipo: "usar_herramientas",
+        llamadas: llamadas.map((tc) => {
+          let args: unknown = {};
+          try {
+            args = JSON.parse(tc.function.arguments || "{}");
+          } catch {
+            // Argumentos que no son JSON valido: se le pasan como texto
+            // crudo a la herramienta, que fallara con un mensaje claro en
+            // vez de que esto reviente el turno entero.
+            args = { _argumentosSinParsear: tc.function.arguments };
+          }
+          return { id: tc.id, nombre: tc.function.name, args };
+        }),
+        bruto: { role: "assistant", content: mensaje.content, tool_calls: mensaje.tool_calls },
+      };
+    }
+
+    const texto = (mensaje.content ?? "").trim();
+    return { tipo: "texto", texto: texto || "No tengo una respuesta para eso." };
+  } catch (error) {
+    const texto = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
+  }
+}
+
+/// OpenAI quiere un mensaje `role: "tool"` SEPARADO por cada resultado
+/// -a diferencia de Claude, que los junta en uno solo-.
+function mensajesDeResultadosOpenAiCompatible(
+  resultados: { toolUseId: string; contenido: string }[],
+): unknown[] {
+  return resultados.map((res) => ({
+    role: "tool",
+    tool_call_id: res.toolUseId,
+    content: res.contenido,
+  }));
+}
+
 /**
  * Que sabe LLAMAR GCM hoy. Anadir un proveedor nuevo es una entrada mas
  * aqui, sin migracion: el `tipo` de la fila es texto libre (ver
@@ -330,14 +515,29 @@ const ADAPTADORES: Record<string, AdaptadorProveedorIa> = {
   claude: {
     probar: probarClaude,
     conversar: conversarClaude,
+    mensajesDeResultados: mensajesDeResultadosClaude,
     listarModelos: listarModelosClaude,
   },
-  // Sin `conversar`, a proposito: el formato de function-calling de
-  // OpenAI-compatible es distinto al de tool-use de Claude, y copiarlo
-  // apurado seria fallar oscuro en el primer uso real. Su propio trabajo,
-  // no algo que colar aqui.
-  openai_compatible: { probar: probarOpenAiCompatible, listarModelos: listarModelosOpenAiCompatible },
+  openai_compatible: {
+    probar: probarOpenAiCompatible,
+    conversar: conversarOpenAiCompatible,
+    mensajesDeResultados: mensajesDeResultadosOpenAiCompatible,
+    listarModelos: listarModelosOpenAiCompatible,
+  },
 };
+
+/**
+ * Construye el o los mensajes que representan el resultado de las
+ * herramientas, en el formato que este proveedor espera -ver el
+ * comentario de `mensajesDeResultados` en `AdaptadorProveedorIa`-. Envuelve
+ * el registro de `ADAPTADORES`, mismo criterio que `conversar()`.
+ */
+export function mensajesDeResultados(
+  tipo: string,
+  resultados: { toolUseId: string; contenido: string }[],
+): unknown[] {
+  return ADAPTADORES[tipo]?.mensajesDeResultados?.(resultados) ?? [];
+}
 
 /**
  * Le pregunta al proveedor -en vivo, nunca de un catalogo guardado- que

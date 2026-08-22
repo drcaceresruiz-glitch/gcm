@@ -392,6 +392,30 @@ describe("listarModelosProveedor", () => {
     expect(opciones.headers.authorization).toBe("Bearer sk-abc123");
   });
 
+  it("gemini: le quita el prefijo 'models/' que trae su listado -su chat/completions no lo acepta-", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [{ id: "models/gemini-2.5-flash" }, { id: "models/antigravity-preview-05-2026" }],
+          }),
+      }),
+    );
+
+    const r = await listarModelosProveedor("openai_compatible", {
+      apiKey: "sk-abc123",
+      urlBase: "https://generativelanguage.googleapis.com/v1beta/openai",
+    });
+
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.modelos).toEqual(["antigravity-preview-05-2026", "gemini-2.5-flash"]);
+      expect(r.modelos.some((m) => m.startsWith("models/"))).toBe(false);
+    }
+  });
+
   it("openai_compatible sin URL base lo dice, sin llamar a la red", async () => {
     const fetchEspiado = vi.fn();
     vi.stubGlobal("fetch", fetchEspiado);

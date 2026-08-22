@@ -547,6 +547,20 @@ model MensajeAgente {
   terminadoAt    DateTime?
   /// Por que no se pudo responder, si fallo. Nunca la clave del proveedor.
   error          String?   @db.VarChar(500)
+  /// Cuando el asistente, en vez de responder con texto final, PROPONE una
+  /// escritura (Fase 2b): guarda {herramienta, datos} -los argumentos
+  /// EXACTOS que se ejecutaran si el humano confirma-. Al confirmar se
+  /// ejecutan tal cual, sin volver a preguntarle nada al proveedor de IA.
+  /// Null en cualquier mensaje que no sea una propuesta.
+  propuesta           Json?
+  /// Null mientras la propuesta espera el click humano. No-null cuando ya
+  /// se resolvio -confirmada, cancelada o expirada-. Mismo patron de
+  /// estado por fecha que `terminadoAt`, no un enum.
+  propuestaResueltaAt DateTime?
+  /// Que paso al resolverse: null si se ejecuto con exito, o el motivo por
+  /// el que no -"Cancelada.", "Expiro sin confirmar.", o el error real de
+  /// la funcion de servicio al confirmar-.
+  propuestaResultado  String?   @db.VarChar(500)
 
   conversacion ConversacionAgente @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
 

@@ -26,6 +26,13 @@ interface FilaMensaje {
   iniciadoAt: Date;
   terminadoAt: Date | null;
   error: string | null;
+  // Opcionales a proposito: las pruebas de antes de la Fase 2b empujan
+  // filas literales sin estos tres campos, y `undefined` se comporta
+  // igual que "sin propuesta" en toda comparacion `!== null`/`=== null`
+  // de abajo -no hace falta tocar cada una de esas pruebas viejas-.
+  propuesta?: unknown;
+  propuestaResueltaAt?: Date | null;
+  propuestaResultado?: string | null;
 }
 
 const estado: {
@@ -38,14 +45,23 @@ const estado: {
     | { ok: false; error: string }
   )[];
   llamadasConversar: number;
+  /// Las herramientas que se le ofrecieron al proveedor en la ULTIMA
+  /// llamada -para comprobar que `proponer_accion` solo aparece con
+  /// `agente_ia:escribir`, sin tener que espiar la API real-.
+  ultimoTurnoHerramientas: string[];
   ultimoAfter: Promise<unknown> | null;
+  crearNotaResultado: { ok: true; id: string } | { ok: false; error: string };
+  crearNotaLlamadas: { obraId: string; datos: unknown }[];
 } = {
   conversaciones: [],
   mensajes: [],
   proveedorActivo: null,
   respuestasConversar: [],
   llamadasConversar: 0,
+  ultimoTurnoHerramientas: [],
   ultimoAfter: null,
+  crearNotaResultado: { ok: true, id: "nota-1" },
+  crearNotaLlamadas: [],
 };
 
 let contadorId = 0;
@@ -59,11 +75,16 @@ vi.mock("next/server", () => ({
 
 vi.mock("@/services/agente-ia.service", () => ({
   configuracionProveedorActivo: () => Promise.resolve(estado.proveedorActivo),
-  conversar: () => {
+  conversar: (_tipo: string, _config: unknown, turno: { herramientas: { nombre: string }[] }) => {
     estado.llamadasConversar++;
+    estado.ultimoTurnoHerramientas = turno.herramientas.map((h) => h.nombre);
     const r = estado.respuestasConversar.shift();
     return Promise.resolve(r ?? { ok: false, error: "sin script de prueba" });
   },
+  // Stub simple y deterministico: esta suite prueba la ORQUESTACION del
+  // turno, no el formato de union exacto de cada proveedor -eso ya lo
+  // cubre `agente-ia.service.test.ts`-.
+  mensajesDeResultados: (resultados: unknown[]) => [{ role: "user", content: resultados }],
 }));
 
 vi.mock("@/services/obras.service", () => ({
@@ -75,6 +96,25 @@ vi.mock("@/services/gerencia.service", () => ({
   semaforoDeCartera: () => Promise.resolve(null),
   sobregiroProyectadoDeCartera: () => Promise.resolve(null),
   confiabilidadDeCartera: () => Promise.resolve(null),
+}));
+
+vi.mock("@/services/movimientos.service", () => ({
+  obtenerPresupuestoVigente: () => Promise.resolve({ partidas: [] }),
+  crearMovimiento: () =>
+    Promise.resolve({ ok: false, error: "no cubierto en esta suite, ver agente-ia" }),
+}));
+
+vi.mock("@/services/cronograma.service", () => ({
+  obtenerCronograma: () => Promise.resolve(null),
+  registrarAvance: () =>
+    Promise.resolve({ ok: false, error: "no cubierto en esta suite, ver agente-ia" }),
+}));
+
+vi.mock("@/services/notas.service", () => ({
+  crearNota: (_sesion: unknown, obraId: string, datos: unknown) => {
+    estado.crearNotaLlamadas.push({ obraId, datos });
+    return Promise.resolve(estado.crearNotaResultado);
+  },
 }));
 
 vi.mock("@/lib/prisma", () => {
@@ -113,6 +153,9 @@ vi.mock("@/lib/prisma", () => {
           iniciadoAt: new Date(),
           terminadoAt: args.data.terminadoAt ?? null,
           error: null,
+          propuesta: args.data.propuesta ?? null,
+          propuestaResueltaAt: args.data.propuestaResueltaAt ?? null,
+          propuestaResultado: args.data.propuestaResultado ?? null,
         };
         estado.mensajes.push(fila);
         return Promise.resolve({ id: fila.id });
@@ -122,11 +165,40 @@ vi.mock("@/lib/prisma", () => {
         if (fila) Object.assign(fila, args.data);
         return Promise.resolve({});
       },
+      // Tres formas distintas segun quien llama, distinguidas por que
+      // claves trae el `where` -mismo criterio que `findFirst` de abajo,
+      // que ya hace este tipo de despacho manual-:
+      //   1. confirmarPropuestaAgente "reclama" por id: { id, propuestaResueltaAt: null }
+      //   2. barridoDeTurnosMuertos: { terminadoAt: null, iniciadoAt: { lt } }
+      //   3. barridoDePropuestasExpiradas: { propuesta: {...}, propuestaResueltaAt: null, terminadoAt: { not: null, lt } }
       updateMany: (args: { where: Record<string, unknown>; data: Partial<FilaMensaje> }) => {
-        const limite = (args.where["iniciadoAt"] as { lt: Date } | undefined)?.lt;
+        const w = args.where;
+
+        if ("id" in w) {
+          const fila = estado.mensajes.find(
+            (m) => m.id === w["id"] && m.propuestaResueltaAt === null,
+          );
+          if (!fila) return Promise.resolve({ count: 0 });
+          Object.assign(fila, args.data);
+          return Promise.resolve({ count: 1 });
+        }
+
         let count = 0;
-        for (const m of estado.mensajes) {
-          if (m.terminadoAt === null && limite && m.iniciadoAt < limite) {
+        if ("propuesta" in w) {
+          const limite = (w["terminadoAt"] as { lt?: Date } | undefined)?.lt;
+          for (const m of estado.mensajes) {
+            if (m.propuesta === null) continue;
+            if (m.propuestaResueltaAt !== null) continue;
+            if (m.terminadoAt === null) continue;
+            if (limite && m.terminadoAt >= limite) continue;
+            Object.assign(m, args.data);
+            count++;
+          }
+        } else {
+          const limite = (w["iniciadoAt"] as { lt?: Date } | undefined)?.lt;
+          for (const m of estado.mensajes) {
+            if (m.terminadoAt !== null) continue;
+            if (limite && m.iniciadoAt >= limite) continue;
             Object.assign(m, args.data);
             count++;
           }
@@ -134,11 +206,19 @@ vi.mock("@/lib/prisma", () => {
         return Promise.resolve({ count });
       },
       findFirst: (args: {
-        where: { id?: string; conversacion?: { companyId: string; userId: string } };
+        where: {
+          id?: string;
+          conversacionId?: string;
+          rol?: "USUARIO" | "ASISTENTE";
+          conversacion?: { companyId: string; userId: string };
+        };
+        orderBy?: { iniciadoAt: "asc" | "desc" };
       }) => {
         const w = args.where;
-        const fila = estado.mensajes.find((m) => {
+        let filas = estado.mensajes.filter((m) => {
           if (w.id !== undefined && m.id !== w.id) return false;
+          if (w.conversacionId !== undefined && m.conversacionId !== w.conversacionId) return false;
+          if (w.rol !== undefined && m.rol !== w.rol) return false;
           if (w.conversacion) {
             const conv = estado.conversaciones.find((c) => c.id === m.conversacionId);
             if (!conv) return false;
@@ -147,7 +227,10 @@ vi.mock("@/lib/prisma", () => {
           }
           return true;
         });
-        return Promise.resolve(fila ?? null);
+        if (args.orderBy?.iniciadoAt === "desc") {
+          filas = [...filas].sort((a, b) => b.iniciadoAt.getTime() - a.iniciadoAt.getTime());
+        }
+        return Promise.resolve(filas[0] ?? null);
       },
       findMany: (args: {
         where: { conversacionId: string; id?: { not: string }; terminadoAt?: { not: null } };
@@ -165,10 +248,17 @@ vi.mock("@/lib/prisma", () => {
       },
     };
 
+    // Solo para `nombreDeObra` -una consulta de apoyo para el texto de la
+    // tarjeta de confirmacion, ver el comentario en agente-conversacion.service.ts-.
+    const project = {
+      findFirst: () => Promise.resolve({ nombreObra: "Obra de prueba" }),
+    };
+
     return {
       prisma: {
         conversacionAgente,
         mensajeAgente,
+        project,
         $transaction: async (fn: (tx: unknown) => unknown) =>
           fn({ conversacionAgente, mensajeAgente }),
       },
@@ -181,6 +271,8 @@ const {
   historialDeConversacion,
   conversacionReciente,
   barridoDeTurnosMuertos,
+  confirmarPropuestaAgente,
+  barridoDePropuestasExpiradas,
 } = await import("@/services/agente-conversacion.service");
 
 function sesion(permisos: string[] = ["agente_ia:usar"]): SesionActiva {
@@ -197,6 +289,7 @@ function sesion(permisos: string[] = ["agente_ia:usar"]): SesionActiva {
 
 const CON_PERMISO = sesion();
 const SIN_PERMISO = sesion([]);
+const CON_ESCRITURA = sesion(["agente_ia:usar", "agente_ia:escribir"]);
 
 async function esperarTurno() {
   await estado.ultimoAfter;
@@ -208,7 +301,10 @@ beforeEach(() => {
   estado.proveedorActivo = { tipo: "claude", modelo: "claude-sonnet-5", urlBase: null, apiKey: "sk-test" };
   estado.respuestasConversar = [];
   estado.llamadasConversar = 0;
+  estado.ultimoTurnoHerramientas = [];
   estado.ultimoAfter = null;
+  estado.crearNotaResultado = { ok: true, id: "nota-1" };
+  estado.crearNotaLlamadas = [];
   contadorId = 0;
 });
 
@@ -436,5 +532,240 @@ describe("barridoDeTurnosMuertos", () => {
 
     expect(estado.mensajes.find((m) => m.id === "viejo-sin-terminar")?.terminadoAt).not.toBeNull();
     expect(estado.mensajes.find((m) => m.id === "reciente-sin-terminar")?.terminadoAt).toBeNull();
+  });
+});
+
+describe("proponer_accion (Fase 2b)", () => {
+  it("sin agente_ia:escribir, nunca se le ofrece proponer_accion al modelo", async () => {
+    estado.respuestasConversar = [{ tipo: "texto", texto: "listo" }];
+    const r = await iniciarTurno(CON_PERMISO, null, "hola");
+    if (!r.ok) throw new Error("deberia haber funcionado");
+    await esperarTurno();
+
+    expect(estado.ultimoTurnoHerramientas).not.toContain("proponer_accion");
+  });
+
+  it("con agente_ia:escribir, se ofrece proponer_accion", async () => {
+    estado.respuestasConversar = [{ tipo: "texto", texto: "listo" }];
+    const r = await iniciarTurno(CON_ESCRITURA, null, "hola");
+    if (!r.ok) throw new Error("deberia haber funcionado");
+    await esperarTurno();
+
+    expect(estado.ultimoTurnoHerramientas).toContain("proponer_accion");
+  });
+
+  it("al proponer una escritura, guarda la propuesta con el resumen del SERVIDOR y corta el turno ahi", async () => {
+    const datosPropuestos = {
+      obraId: "obra-1",
+      categoria: "OPERATIVO",
+      titulo: "Falta cemento",
+      cuerpo: "No hay cemento tipo I en almacen.",
+    };
+    estado.respuestasConversar = [
+      {
+        tipo: "usar_herramientas",
+        llamadas: [
+          { id: "call-1", nombre: "proponer_accion", args: { herramienta: "crear_nota", datos: datosPropuestos } },
+        ],
+        bruto: { role: "assistant", content: [] },
+      },
+      // Si el turno NO se cortara solo, este segundo guion se consumiria
+      // -la prueba de abajo (`llamadasConversar`) es la que lo demuestra-.
+      { tipo: "texto", texto: "esto nunca deberia llegar a guardarse" },
+    ];
+
+    const r = await iniciarTurno(CON_ESCRITURA, null, "hay que anotar que falta cemento");
+    if (!r.ok) throw new Error("deberia haber funcionado");
+    await esperarTurno();
+
+    expect(estado.llamadasConversar).toBe(1);
+    expect(estado.crearNotaLlamadas).toHaveLength(0); // proponer NUNCA ejecuta
+
+    const asistente = estado.mensajes.find((m) => m.id === r.mensajeAsistenteId);
+    expect(asistente?.terminadoAt).not.toBeNull();
+    expect(asistente?.propuesta).toEqual({ herramienta: "crear_nota", datos: datosPropuestos });
+    expect(asistente?.propuestaResueltaAt).toBeNull();
+    expect(asistente?.contenido).toContain("Falta cemento");
+    expect(asistente?.contenido).toContain("Obra de prueba"); // nombreDeObra, no lo que dijo el modelo
+  });
+
+  it("iniciarTurno bloquea un mensaje nuevo mientras haya una propuesta sin resolver", async () => {
+    const primero = await iniciarTurno(CON_ESCRITURA, null, "uno");
+    if (!primero.ok) throw new Error("deberia haber funcionado");
+
+    const fila = estado.mensajes.find((m) => m.id === primero.mensajeAsistenteId)!;
+    fila.propuesta = { herramienta: "crear_nota", datos: {} };
+    fila.propuestaResueltaAt = null;
+    fila.terminadoAt = new Date();
+
+    const segundo = await iniciarTurno(CON_ESCRITURA, primero.conversacionId, "dos");
+    expect(segundo.ok).toBe(false);
+    if (!segundo.ok) expect(segundo.error).toContain("propuesta pendiente");
+  });
+});
+
+describe("confirmarPropuestaAgente", () => {
+  function propuestaPendiente(datos: unknown = { obraId: "obra-1", titulo: "x" }) {
+    const conv: FilaConversacion = {
+      id: nuevoId("conv"),
+      companyId: "empresa-1",
+      userId: "u-1",
+      createdAt: new Date(),
+    };
+    estado.conversaciones.push(conv);
+    const msg: FilaMensaje = {
+      id: nuevoId("msg"),
+      conversacionId: conv.id,
+      rol: "ASISTENTE",
+      contenido: '¿Confirmas crear una nota OPERATIVO en la obra "Obra de prueba": "x"?',
+      herramientas: ["proponer_accion"],
+      iniciadoAt: new Date(),
+      terminadoAt: new Date(),
+      error: null,
+      propuesta: { herramienta: "crear_nota", datos },
+      propuestaResueltaAt: null,
+      propuestaResultado: null,
+    };
+    estado.mensajes.push(msg);
+    return msg;
+  }
+
+  it("confirmar: ejecuta la escritura con el datos EXACTO guardado, nunca uno nuevo", async () => {
+    const datos = { obraId: "obra-1", categoria: "OPERATIVO", titulo: "Falta cemento", cuerpo: "..." };
+    const msg = propuestaPendiente(datos);
+
+    const r = await confirmarPropuestaAgente(CON_ESCRITURA, msg.id, "confirmar");
+
+    expect(r.ok).toBe(true);
+    // `crearNota(sesion, obraId, datos)` recibe obraId APARTE -la
+    // herramienta lo saca de `datos` antes de llamar, ver
+    // `ejecutarEscritura` de crear_nota en agente-conversacion.service.ts-,
+    // asi que aqui NO se repite dentro de `datos`.
+    expect(estado.crearNotaLlamadas).toEqual([
+      { obraId: "obra-1", datos: { categoria: "OPERATIVO", titulo: "Falta cemento", cuerpo: "..." } },
+    ]);
+    expect(msg.propuestaResueltaAt).not.toBeNull();
+    expect(msg.propuestaResultado).toBe("Nota creada.");
+    expect(msg.contenido).toContain("Nota creada.");
+  });
+
+  it("cancelar: nunca ejecuta la escritura real", async () => {
+    const msg = propuestaPendiente();
+
+    const r = await confirmarPropuestaAgente(CON_ESCRITURA, msg.id, "cancelar");
+
+    expect(r.ok).toBe(true);
+    expect(estado.crearNotaLlamadas).toHaveLength(0);
+    expect(msg.propuestaResultado).toBe("Cancelada.");
+    expect(msg.contenido).toContain("Cancelada.");
+  });
+
+  it("si la funcion real rechaza la escritura (permiso perdido, obra cerrada...), lo dice tal cual", async () => {
+    estado.crearNotaResultado = { ok: false, error: "No tienes permiso para escribir notas." };
+    const msg = propuestaPendiente();
+
+    const r = await confirmarPropuestaAgente(CON_ESCRITURA, msg.id, "confirmar");
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe("No tienes permiso para escribir notas.");
+    expect(msg.propuestaResultado).toBe("No tienes permiso para escribir notas.");
+  });
+
+  it("una propuesta ya resuelta no se puede resolver otra vez", async () => {
+    const msg = propuestaPendiente();
+    msg.propuestaResueltaAt = new Date();
+    msg.propuestaResultado = "Cancelada.";
+
+    const r = await confirmarPropuestaAgente(CON_ESCRITURA, msg.id, "confirmar");
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("ya se resolvió");
+    expect(estado.crearNotaLlamadas).toHaveLength(0);
+  });
+
+  it("doble click: solo UNA de las dos peticiones simultaneas ejecuta la escritura", async () => {
+    const msg = propuestaPendiente();
+
+    const [a, b] = await Promise.all([
+      confirmarPropuestaAgente(CON_ESCRITURA, msg.id, "confirmar"),
+      confirmarPropuestaAgente(CON_ESCRITURA, msg.id, "confirmar"),
+    ]);
+
+    const resultados = [a, b];
+    expect(resultados.filter((r) => r.ok)).toHaveLength(1);
+    expect(resultados.filter((r) => !r.ok)).toHaveLength(1);
+    expect(estado.crearNotaLlamadas).toHaveLength(1);
+  });
+
+  it("no resuelve la propuesta de otra empresa", async () => {
+    const msg = propuestaPendiente();
+    const conv = estado.conversaciones.find((c) => c.id === msg.conversacionId)!;
+    conv.companyId = "otra-empresa";
+
+    const r = await confirmarPropuestaAgente(CON_ESCRITURA, msg.id, "confirmar");
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("No se encontró");
+    expect(estado.crearNotaLlamadas).toHaveLength(0);
+  });
+});
+
+describe("barridoDePropuestasExpiradas", () => {
+  it("expira solo las propuestas pendientes de mas de 24 horas", async () => {
+    const HACE_25H = new Date(Date.now() - 25 * 60 * 60_000);
+    const HACE_1H = new Date(Date.now() - 60 * 60_000);
+
+    estado.mensajes.push(
+      {
+        id: "vieja-pendiente",
+        conversacionId: "c1",
+        rol: "ASISTENTE",
+        contenido: "propuesta vieja",
+        herramientas: null,
+        iniciadoAt: HACE_25H,
+        terminadoAt: HACE_25H,
+        error: null,
+        propuesta: { herramienta: "crear_nota", datos: {} },
+        propuestaResueltaAt: null,
+        propuestaResultado: null,
+      },
+      {
+        id: "reciente-pendiente",
+        conversacionId: "c1",
+        rol: "ASISTENTE",
+        contenido: "propuesta reciente",
+        herramientas: null,
+        iniciadoAt: HACE_1H,
+        terminadoAt: HACE_1H,
+        error: null,
+        propuesta: { herramienta: "crear_nota", datos: {} },
+        propuestaResueltaAt: null,
+        propuestaResultado: null,
+      },
+      {
+        id: "vieja-ya-resuelta",
+        conversacionId: "c1",
+        rol: "ASISTENTE",
+        contenido: "propuesta vieja pero ya confirmada",
+        herramientas: null,
+        iniciadoAt: HACE_25H,
+        terminadoAt: HACE_25H,
+        error: null,
+        propuesta: { herramienta: "crear_nota", datos: {} },
+        propuestaResueltaAt: HACE_1H,
+        propuestaResultado: "Nota creada.",
+      },
+    );
+
+    const r = await barridoDePropuestasExpiradas();
+
+    expect(r.expiradas).toBe(1);
+    expect(estado.mensajes.find((m) => m.id === "vieja-pendiente")?.propuestaResultado).toBe(
+      "Expiró sin confirmar.",
+    );
+    expect(estado.mensajes.find((m) => m.id === "reciente-pendiente")?.propuestaResueltaAt).toBeNull();
+    expect(estado.mensajes.find((m) => m.id === "vieja-ya-resuelta")?.propuestaResultado).toBe(
+      "Nota creada.",
+    );
   });
 });
