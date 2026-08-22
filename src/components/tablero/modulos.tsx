@@ -413,7 +413,7 @@ function Avance({
         color={COLOR_SEMAFORO[semaforo]}
       />
 
-      <EnlaceModulo href={`/obras/${obraId}/cronograma`}>
+      <EnlaceModulo href={`/obras/${obraId}/cronograma#curva-de-avance`}>
         Ver cronograma
       </EnlaceModulo>
     </>
@@ -509,7 +509,7 @@ function Curva({
         </p>
       )}
 
-      <EnlaceModulo href={`/obras/${obraId}/cronograma`}>
+      <EnlaceModulo href={`/obras/${obraId}/cronograma#curva-de-avance`}>
         Ver curva completa
       </EnlaceModulo>
     </>
@@ -784,7 +784,7 @@ function Presupuesto({
         </p>
       )}
 
-      <EnlaceModulo href={`/obras/${obraId}/ordenes`}>
+      <EnlaceModulo href={`/obras/${obraId}/ordenes#comprometido`}>
         Ver órdenes
       </EnlaceModulo>
     </>
@@ -867,7 +867,7 @@ function ValorGanado({
         </p>
       )}
 
-      <EnlaceModulo href={`/obras/${obraId}/cronograma`}>
+      <EnlaceModulo href={`/obras/${obraId}/cronograma#valor-ganado`}>
         Ver EVM completo
       </EnlaceModulo>
     </>
@@ -925,7 +925,7 @@ function Ppc({
   plan: DatosPlanSemanalTablero;
   obraId: string;
 }) {
-  const href = `/obras/${obraId}/plan-semanal`;
+  const href = `/obras/${obraId}/plan-semanal#ppc-tendencia`;
 
   if (!plan.ultima) {
     return (
@@ -1060,7 +1060,11 @@ function Confiabilidad({
   lk: DatosLookaheadTablero;
   obraId: string;
 }) {
-  const href = `/obras/${obraId}/lookahead`;
+  // Misma ventana que esta tarjeta esta contando, y el ancla del resumen
+  // de confiabilidad (`MatrizLookahead.tsx`): sin los dos, se aterriza en
+  // el lookahead con la ventana por defecto, que puede no ser la que la
+  // tarjeta esta describiendo.
+  const href = `/obras/${obraId}/lookahead?semanas=${lk.semanas}#confiabilidad`;
 
   if (lk.total === 0) {
     return (
@@ -1156,7 +1160,10 @@ function Causas({
   plan: DatosPlanSemanalTablero;
   obraId: string;
 }) {
-  const href = `/obras/${obraId}/plan-semanal`;
+  // El ancla ya existe en GraficosPpc.tsx, construida a proposito para
+  // poder enlazar aqui desde el panel: la usaba "Que falta", esta la
+  // reusa igual.
+  const href = `/obras/${obraId}/plan-semanal#pareto`;
 
   if (!plan.causaTop) {
     return (
@@ -1258,7 +1265,7 @@ function Atrasos({
         </p>
       )}
 
-      <EnlaceModulo href={`/obras/${obraId}/cronograma`}>
+      <EnlaceModulo href={`/obras/${obraId}/cronograma#que-frena-la-obra`}>
         Ver alertas
       </EnlaceModulo>
     </>
@@ -1329,7 +1336,7 @@ function Criticas({
         </p>
       )}
 
-      <EnlaceModulo href={`/obras/${obraId}/cronograma`}>
+      <EnlaceModulo href={`/obras/${obraId}/cronograma#ruta-critica`}>
         Ver cadena crítica
       </EnlaceModulo>
     </>
@@ -1428,8 +1435,11 @@ function Capitulos({
         </>
       )}
 
-      <EnlaceModulo href={`/obras/${obraId}/cronograma/informe`}>
-        Ver informe
+      {/* A la seccion "Avance por capitulo" del cronograma, que es EXACTAMENTE
+          esta misma lista con mas detalle -no al informe semanal: ese trae
+          su propia tabla, filtrada por corte, no "los 3 mas desviados". */}
+      <EnlaceModulo href={`/obras/${obraId}/cronograma#avance-por-capitulo`}>
+        Ver capítulos
       </EnlaceModulo>
     </>
   );
@@ -1609,7 +1619,7 @@ function Recordatorios({
                 : `Vence el ${FORMATO_FECHA_RECORDATORIO.format(r.fechaRecordatorio)}`}
             </p>
             <Link
-              href={`/obras/${obraId}/notas`}
+              href={`/obras/${obraId}/notas#nota-${r.id}`}
               className="group mt-1 inline-flex items-start gap-1 text-xs font-medium underline decoration-dotted underline-offset-2 hover:decoration-solid"
               style={{ color: "var(--color-marca-600)" }}
             >

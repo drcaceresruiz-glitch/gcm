@@ -355,7 +355,11 @@ function FilaNota({
 
   return (
     <li
-      className="rounded-xl border p-4"
+      // `id` para poder enlazar aqui desde el recordatorio del tablero:
+      // sin esto, "Ver en Notas" siempre aterrizaba en la lista entera,
+      // sin importar cual de los recordatorios se toco.
+      id={`nota-${nota.id}`}
+      className="scroll-mt-20 rounded-xl border p-4"
       style={{
         borderColor: nota.vencida ? "var(--color-peligro)" : "var(--borde)",
         backgroundColor: "var(--superficie)",

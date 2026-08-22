@@ -336,7 +336,7 @@ export default async function CronogramaPage({
 
           {!edtSinProgramar && (
           <>
-            <Tarjeta>
+            <Tarjeta id="curva-de-avance">
               <h3 className="text-base font-semibold">Curva de avance</h3>
               <p className="mt-0.5 mb-4 text-sm opacity-70">
                 La línea de puntos es el plan repartido día a día; la continua, lo
@@ -400,7 +400,7 @@ export default async function CronogramaPage({
             </Tarjeta>
 
             {evm && (
-              <Tarjeta>
+              <Tarjeta id="valor-ganado">
                 <h3 className="text-base font-semibold">Valor ganado (EVM)</h3>
                 <p className="mt-0.5 mb-4 text-sm opacity-70">
                   El avance y el gasto en la misma escala de dinero: el control
@@ -459,7 +459,7 @@ export default async function CronogramaPage({
               />
             </Tarjeta>
 
-            <Tarjeta>
+            <Tarjeta id="que-frena-la-obra">
               <h3 className="text-base font-semibold">Qué está frenando la obra</h3>
               <p className="mt-0.5 mb-4 text-sm opacity-70">
                 Solo partidas de trabajo. Un capítulo atrasado no se lista aparte:
@@ -471,7 +471,7 @@ export default async function CronogramaPage({
               />
             </Tarjeta>
 
-            <Tarjeta>
+            <Tarjeta id="ruta-critica">
               <h3 className="text-base font-semibold">Ruta crítica</h3>
               <p className="mt-0.5 mb-4 text-sm opacity-70">
                 La cadena de tareas cuyo atraso corre la fecha de entrega de toda
@@ -485,7 +485,7 @@ export default async function CronogramaPage({
               />
             </Tarjeta>
 
-            <Tarjeta>
+            <Tarjeta id="avance-por-capitulo">
               <h3 className="text-base font-semibold">Avance por capítulo</h3>
               <p className="mt-0.5 mb-4 text-sm opacity-70">
                 La lectura que falta entre la curva —una cifra para toda la obra— y

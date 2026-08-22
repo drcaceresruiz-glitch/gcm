@@ -319,8 +319,12 @@ export function MatrizLookahead({
         </p>
       )}
 
-      {/* Resumen de confiabilidad + sincronizar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Resumen de confiabilidad + sincronizar. `id`+`scroll-mt-20` para
+          poder enlazar aqui desde el modulo "Lookahead" del tablero. */}
+      <div
+        id="confiabilidad"
+        className="scroll-mt-20 flex flex-wrap items-center justify-between gap-3"
+      >
         <div className="flex items-center gap-3">
           <span className="text-sm">
             Confiabilidad:{" "}

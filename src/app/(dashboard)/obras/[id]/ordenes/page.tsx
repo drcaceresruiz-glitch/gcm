@@ -150,15 +150,20 @@ export default async function OrdenesPage({
         </p>
       ))}
 
-      <PanelComprometido
-        comprometido={comprometido}
-        desglose={desglose}
-        presupuesto={presupuesto}
-        // El total de la obra SIN filtrar. Con el total filtrado, buscar algo
-        // que no coincide dejaba el panel en cero y desaparecia: parecia que
-        // el comprometido se hubiera esfumado por escribir en un buscador.
-        totalOrdenes={totalDeLaObra}
-      />
+      {/* `id` para poder enlazar aqui desde el modulo "Presupuesto" del
+          tablero: el panel ya se pinta al principio de la pantalla, pero
+          sin esto el ancla no tenia donde aterrizar. */}
+      <div id="comprometido" className="scroll-mt-20">
+        <PanelComprometido
+          comprometido={comprometido}
+          desglose={desglose}
+          presupuesto={presupuesto}
+          // El total de la obra SIN filtrar. Con el total filtrado, buscar algo
+          // que no coincide dejaba el panel en cero y desaparecia: parecia que
+          // el comprometido se hubiera esfumado por escribir en un buscador.
+          totalOrdenes={totalDeLaObra}
+        />
+      </div>
 
       <section className="space-y-4">
         <h3 className="text-lg font-semibold">Órdenes</h3>

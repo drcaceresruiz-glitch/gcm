@@ -31,8 +31,11 @@ export function GraficosPpc({
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      {/* `id` para poder enlazar aqui desde el modulo "PPC (Last Planner)"
+          del tablero, mismo criterio que el Pareto de al lado. */}
       <div
-        className="rounded-xl border p-4"
+        id="ppc-tendencia"
+        className="scroll-mt-20 rounded-xl border p-4"
         style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
       >
         <h3 className="text-sm font-semibold">PPC por semana</h3>

@@ -10,13 +10,19 @@
 export function Tarjeta({
   children,
   className = "",
+  id,
 }: {
   children: React.ReactNode;
   className?: string;
+  /// Para enlazar aqui con un ancla (`#id`) desde otra pantalla —el
+  /// tablero, por ejemplo—. Se le suma `scroll-mt-20` para que el ancla no
+  /// deje el titulo pegado al borde de arriba, tapado por la cabecera fija.
+  id?: string;
 }) {
   return (
     <div
-      className={`elevacion-1 rounded-xl border p-5 sm:p-6 ${className}`}
+      id={id}
+      className={`elevacion-1 rounded-xl border p-5 sm:p-6 ${id ? "scroll-mt-20" : ""} ${className}`}
       style={{
         borderColor: "var(--borde)",
         backgroundColor: "var(--superficie)",
