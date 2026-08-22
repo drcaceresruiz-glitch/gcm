@@ -1207,8 +1207,19 @@ Lo que falta:
   SI hay desde el 16 de agosto es la **restauracion**: un respaldo se vuelve a
   cargar y la obra entra como COPIA DE AUDITORIA (`archivadaEn` puesto), que
   no admite un solo cambio. Falta listar, buscar y comparar.
-- **¿Reabrir?** Hoy una obra cerrada por error no tiene salida. Propuesta:
-  permitirlo con permiso propio y quedando en la auditoria. Sin decidir.
+- ~~**¿Reabrir?**~~ **HECHO el 21 de agosto de 2026.** `TRANSICIONES_OBRA.CERRADA`
+  admite volver a EN_EJECUCION (nunca a PLANIFICACION ni PARALIZADA: la
+  obra ya tuvo gasto real). Permiso propio innegociable `obra:reabrir`
+  (solo ADMIN, mismo criterio que `obra:eliminar_cerrada`/`obra:restaurar`),
+  mas confirmacion escribiendo el nombre de la obra (mismo patron que el
+  borrado de obra cerrada, sin la contrasena porque esto es reversible). En
+  pantalla, "Reabrir" revela un formulario que avisa de dos efectos que se
+  disparan solos y que ESTA ENTREGA NO CORRIGE: `avisos-reloj.ts` vuelve a
+  procesar la obra de inmediato (rafaga posible de recordatorios sobre
+  restricciones/valorizaciones viejas), y una semana de Plan Semanal que
+  quedara ABIERTA al cerrar reaparece en el tablero de la empresa. Quedan
+  como comportamiento conocido y avisado, no arreglado — cada uno merece su
+  propia revision.
 - ~~**Eliminar obra**~~ **HECHO el 12 de agosto de 2026, y se decidio al
   reves de lo anotado aqui**: si existe el borrado en la app, con cinco
   puertas —permiso innegociable, obra CERRADA, nombre tecleado, contrasena de
