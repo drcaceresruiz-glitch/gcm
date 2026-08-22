@@ -76,10 +76,12 @@ export function ponderarPorDuracion<T extends Ponderable>(
 /**
  * Media ponderada exacta con el peso que se le diga.
  *
- * El peso es la duracion mientras no haya mapeo tarea-partida, y el DINERO en
- * cuanto lo hay. La cuenta es la misma; lo unico que cambia es con que se
- * pesa, y por eso vive en un solo sitio: dos copias acabarian redondeando
- * distinto y dando dos cifras de avance para la misma obra.
+ * Generica a proposito: recibe el peso, no lo decide. Hoy el unico peso que
+ * se usa en todo el sistema es la duracion (`ponderarPorDuracion`, abajo);
+ * no existe un `ponderarPorDinero`. Que la funcion admita cualquier peso es
+ * lo que evitaria, el dia que se decida ponderar por dinero, tener que
+ * escribir una segunda cuenta que redondeara distinto y diera dos cifras de
+ * avance para la misma obra.
  */
 export function ponderar<T>(
   items: readonly T[],

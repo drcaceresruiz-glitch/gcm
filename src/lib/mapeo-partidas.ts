@@ -192,10 +192,11 @@ export interface Cobertura {
 /**
  * Que parte del presupuesto esta cubierta por el mapeo.
  *
- * Es la cifra que decide si la curva puede pasar a ponderarse por dinero.
- * Pesar por dinero un mapeo que solo cubre el 20% del presupuesto seria peor
- * que pesar por duracion: la cifra parece mas seria y describe una quinta
- * parte de la obra.
+ * Es la cifra que decide si el CPI (y sus proyecciones, EAC/VAC) son
+ * fiables: un costo registrado que solo cubre el 20% del presupuesto
+ * describe una quinta parte de la obra, aunque la cifra parezca completa. No
+ * decide con que se pesa el avance —eso siempre es la duracion, GCM no
+ * pondera por dinero hoy—.
  *
  * Cada partida cuenta UNA vez aunque la cubran varias tareas; si no, el
  * porcentaje podria pasar del 100% y dejaria de significar nada.

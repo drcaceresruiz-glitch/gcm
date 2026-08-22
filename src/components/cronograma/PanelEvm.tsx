@@ -222,11 +222,12 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         <p className="flex items-start gap-2 text-xs opacity-70">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
-            El avance se pondera por <strong>duración</strong>, que es lo único
-            que trae el archivo. El mapeo tarea-partida cubre el{" "}
-            {datos.coberturaMapeo.toFixed(0)}% del presupuesto; al pasar del 60%
-            se podrá ponderar por <strong>dinero</strong> y estas cifras
-            afinarán.
+            El avance se pondera por <strong>duración</strong>: una partida
+            cara pesa igual que una barata, con cualquier cobertura. El mapeo
+            tarea-partida cubre el {datos.coberturaMapeo.toFixed(0)}% del
+            presupuesto —por debajo del 60% las cifras de costo (CPI, EAC,
+            VAC) además son menos fiables, aunque el peso siga siendo el
+            mismo—.
           </span>
         </p>
       )}

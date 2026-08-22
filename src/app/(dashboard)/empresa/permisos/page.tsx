@@ -4,7 +4,7 @@ import { CheckCircle2, ShieldAlert } from "lucide-react";
 import { Volver } from "@/components/ui/Volver";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerMatriz } from "@/services/permisos.service";
-import { puede } from "@/lib/rbac";
+import { INNEGOCIABLES, puede } from "@/lib/rbac";
 import { MatrizPermisos } from "@/components/permisos/MatrizPermisos";
 
 export const metadata: Metadata = { title: "Permisos por perfil" };
@@ -70,13 +70,17 @@ export default async function PermisosPage({
       >
         <ShieldAlert className="mt-0.5 size-5 shrink-0 opacity-70" aria-hidden="true" />
         <div>
-          <h2 className="text-sm font-semibold">Cuatro permisos no se tocan</h2>
+          <h2 className="text-sm font-semibold">
+            {INNEGOCIABLES.length} permisos no se tocan
+          </h2>
           <p className="mt-1 max-w-3xl text-sm text-pretty opacity-70">
-            Aprobar una línea base y aprobar un movimiento son actos
-            contractuales irreversibles: mueven la cifra contra la que se mide
-            la obra. Y quien reparte permisos podría repartírselos a sí mismo.
-            Los cuatro quedan reservados al administrador y salen bloqueados
-            en la rejilla.
+            Aprobar una línea base o un movimiento son actos contractuales
+            irreversibles: mueven la cifra contra la que se mide la obra.
+            Migrar, restaurar o eliminar una obra cerrada, y reabrirla,
+            mueven el historial de la empresa. Y quien reparte permisos
+            podría repartírselos a sí mismo, o abrir la configuración que
+            gobierna el resto. Todos quedan reservados al administrador y
+            salen bloqueados en la rejilla.
           </p>
         </div>
       </div>

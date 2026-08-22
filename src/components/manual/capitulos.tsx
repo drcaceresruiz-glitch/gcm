@@ -597,10 +597,10 @@ const CRONOGRAMA = (
       <p>
         La curva compara lo planeado con lo medido en cada corte, y cada
         tarea pesa <strong>según su duración</strong>: terminar una partida
-        de un día no es lo mismo que terminar una de veinte. Es el único
-        peso que trae el archivo — cuando el mapeo tarea-partida cubra
-        suficiente presupuesto, el avance pasará a ponderarse por dinero y
-        las cifras afinarán, sin cambiar de fórmula.
+        de un día no es lo mismo que terminar una de veinte. GCM no pondera
+        por dinero hoy, con cualquier cobertura de mapeo tarea-partida —el
+        mapeo sí decide qué tan fiables son el CPI y sus proyecciones (EAC,
+        VAC), que son cifras de dinero, no de duración.
       </p>
       <p>
         La <strong>línea base del cronograma</strong> congela contra qué se
@@ -1982,28 +1982,30 @@ const MAPEO = (
   <>
     <Clave>
       El cronograma dice <strong>cuándo</strong> y el presupuesto dice{" "}
-      <strong>cuánto</strong>, pero no se conocen entre sí. Enlazarlos permite
-      medir el avance <strong>en soles</strong> en vez de en días. Mientras no
-      haya enlaces, el avance se pondera por duración —lo único que trae el
-      archivo de Project— y una partida de 500 soles pesa igual que una de
-      200.000.
+      <strong>cuánto</strong>, pero no se conocen entre sí. Enlazarlos es lo
+      que permite comparar, partida por partida, cuánto se ha{" "}
+      <strong>gastado</strong> contra cuánto se ha <strong>avanzado</strong>{" "}
+      —y hace más fiables el índice de costo (CPI) y sus proyecciones (EAC,
+      VAC)—. El peso del avance sigue siendo la <strong>duración</strong>,
+      con o sin mapeo: eso no cambia aquí.
     </Clave>
 
     <S titulo="La cobertura es la cifra que manda">
       <p>
         La <strong>cobertura</strong> dice qué parte del presupuesto tiene ya
-        tarea enlazada. Al pasar del <strong>60%</strong>, el avance puede
-        ponderarse por dinero. Por debajo, pesar por dinero sería peor que no
-        hacerlo: la cifra parece más seria y describe una quinta parte de la
-        obra.
+        tarea enlazada. Por debajo del <strong>60%</strong>, el CPI y sus
+        proyecciones describen una fracción pequeña de la obra y conviene no
+        fiarse de ellos; al pasar del 60%, empiezan a representar la obra
+        real. El peso del avance, mientras tanto, no cambia: GCM pondera
+        siempre por duración, nunca por dinero.
       </p>
       <p>
         Ojo con una lectura tentadora: la cobertura no es la compuerta del
         índice de costo. Que el CPI se calle al principio de la obra depende
         de otra cosa —que el costo registrado respalde lo ya ganado—, y eso se
         explica en el capítulo de indicadores. Lo que cambia aquí es{" "}
-        <strong>con qué se pesa el avance</strong>, que es lo que alimenta el
-        valor ganado.
+        <strong>cuánta obra describe esa cifra de costo</strong>, no con qué
+        se pesa el avance.
       </p>
     </S>
 
@@ -2724,7 +2726,7 @@ export const CAPITULOS: CapituloManual[] = [
     pregunta: "qué parte del presupuesto cubre cada tarea",
     paraQuien: "Oficina técnica.",
     resumen:
-      "La cobertura que permite pesar el avance por dinero, y por qué GCM " +
+      "La cobertura que hace fiable el índice de costo, y por qué GCM " +
       "propone pero no enlaza solo: enlazar por código se midió y falló.",
     contenido: MAPEO,
   },
