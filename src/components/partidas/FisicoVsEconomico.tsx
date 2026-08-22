@@ -54,7 +54,12 @@ export function FisicoVsEconomico({ cruce }: { cruce: CruceDeObra }) {
             <tr className="text-left text-xs opacity-70">
               <th className="px-3 py-2 font-medium">Capítulo</th>
               <th className="px-3 py-2 text-right font-medium">Presupuesto</th>
-              <th className="px-3 py-2 text-right font-medium">Comprometido</th>
+              <th
+                className="px-3 py-2 text-right font-medium"
+                title="Encargos vigentes al precio del contratista, más las órdenes sueltas aprobadas. Distinto del «Costo real (AC)» del EVM, que solo cuenta órdenes ya aprobadas."
+              >
+                Comprometido
+              </th>
               <th className="px-3 py-2 text-right font-medium">Avance</th>
               <th className="px-3 py-2 text-right font-medium">Gasto</th>
               <th className="px-3 py-2 text-right font-medium">Distancia</th>

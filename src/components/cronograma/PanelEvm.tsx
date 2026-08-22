@@ -41,7 +41,11 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         <GaugeIndice
           indice={m.spi}
           etiqueta="SPI"
-          descripcion="Índice de plazo (EV/PV). Sobre 1, adelantado."
+          // "Por duracion" y no "SPI" a secas: EV/PV con las dos ponderadas
+          // por duracion es un ratio distinto del que ponderaria por dinero
+          // (que GCM no calcula), y llamarlas igual es como se pierde la
+          // confianza en las cifras (mismo criterio que gerencia.service.ts).
+          descripcion="Índice de plazo por duración (EV/PV). Sobre 1, adelantado."
         />
         {verCosto && m.cpi !== null ? (
           <GaugeIndice
@@ -156,7 +160,7 @@ export function PanelEvm({ datos }: { datos: DatosEvm }) {
         />
         {verCosto ? (
           <>
-            <Dato etiqueta="Costo real (AC)" valor={soles(m.ac)} />
+            <Dato etiqueta="Costo real (AC, órdenes aprobadas)" valor={soles(m.ac)} />
             <Dato
               etiqueta="Variación de costo (CV)"
               valor={conSigno(m.cv)}

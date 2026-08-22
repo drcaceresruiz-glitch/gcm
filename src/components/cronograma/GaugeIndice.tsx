@@ -1,4 +1,5 @@
 import { semaforoIndice, COLOR_SEMAFORO } from "@/lib/tablero";
+import { redondearA } from "@/lib/redondeo";
 
 /**
  * Un indicador —SPI o CPI— como aguja semaforica.
@@ -22,7 +23,11 @@ export function GaugeIndice({
 }) {
   const radio = 42;
   const circ = 2 * Math.PI * radio;
-  const semaforo = semaforoIndice(indice);
+  // Redondeado ANTES de decidir el color: el texto de abajo ya muestra el
+  // indice con 2 decimales (toFixed(2)), y un 0.999 sin redondear pintaria
+  // rojo junto a un "1.00" que dice lo contrario. Mismo bug que redondeo.ts
+  // ya documenta para el resto del sistema.
+  const semaforo = semaforoIndice(indice === null ? null : redondearA(indice, 2));
   const color = semaforo ? COLOR_SEMAFORO[semaforo] : "var(--borde)";
 
   // El indice se acota a [0, 2] para el anillo; el 1.00 cae en la mitad.

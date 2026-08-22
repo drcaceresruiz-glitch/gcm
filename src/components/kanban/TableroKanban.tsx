@@ -42,9 +42,14 @@ const TONO: Record<ColumnaKanban, string> = {
 export function TableroKanban({
   datos,
   obraId,
+  puedeMarcarEnEjecucion,
 }: {
   datos: KanbanDatos;
   obraId: string;
+  /// La unica excepcion a "DE LECTURA" (ver arriba): el servidor exige
+  /// `plan_semanal:gestionar` para aceptarlo, y sin el el boton solo lleva
+  /// a un rechazo silencioso.
+  puedeMarcarEnEjecucion: boolean;
 }) {
   return (
     // Scroll horizontal en pantalla estrecha: cinco columnas no caben en un
@@ -74,7 +79,11 @@ export function TableroKanban({
               <ul className="space-y-2">
                 {col.tarjetas.map((t) => (
                   <li key={t.clave}>
-                    <Tarjeta tarjeta={t} obraId={obraId} />
+                    <Tarjeta
+                      tarjeta={t}
+                      obraId={obraId}
+                      puedeMarcarEnEjecucion={puedeMarcarEnEjecucion}
+                    />
                   </li>
                 ))}
               </ul>
@@ -89,9 +98,11 @@ export function TableroKanban({
 function Tarjeta({
   tarjeta: t,
   obraId,
+  puedeMarcarEnEjecucion,
 }: {
   tarjeta: TarjetaKanban;
   obraId: string;
+  puedeMarcarEnEjecucion: boolean;
 }) {
   /**
    * A donde se va a ACTUAR sobre esta tarjeta.
@@ -188,7 +199,7 @@ function Tarjeta({
           izquierda. Solo se vio abriendo la pantalla. */}
       {/* Solo en los compromisos vivos: una tarea del Lookahead todavia no
           es compromiso, y uno ya evaluado pertenece a una semana cerrada. */}
-      {t.compromisoId && t.cumplido === null && (
+      {t.compromisoId && t.cumplido === null && puedeMarcarEnEjecucion && (
         <BotonEnEjecucion
           obraId={obraId}
           compromisoId={t.compromisoId}

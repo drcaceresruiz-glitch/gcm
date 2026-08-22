@@ -72,7 +72,11 @@ export default async function KanbanPage({
         </p>
       ) : (
         <>
-          <TableroKanban datos={datos} obraId={id} />
+          <TableroKanban
+            datos={datos}
+            obraId={id}
+            puedeMarcarEnEjecucion={puede(sesion, "plan_semanal:gestionar")}
+          />
 
           <p className="text-xs opacity-60">
             Las tres primeras columnas miran la ventana de {datos.semanas}{" "}
