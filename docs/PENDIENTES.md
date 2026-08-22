@@ -705,11 +705,27 @@ Dos avisos antes de leer nada de mas abajo:
    medicion. `storage/contrastar-umbrales.ts` responde cuando haya suficientes
    semanas cerradas.
 
-4. **GCM no calcula ruta critica ni holgura.** Es lo que sigue faltando de la
-   opcion B de la seccion 3: las tareas que entran por Excel o por teclado
-   nacen `esCritico: false` y `holguraInferida: true`. Sin red de
-   precedencias propia, la regla de convergencia de los hitos predictivos
-   tambien seguira muda.
+4. ~~**GCM no calcula ruta critica ni holgura.**~~ **HECHO (parcial, a
+   proposito) el 21 de agosto de 2026, para el importador de Excel.**
+   `src/lib/ruta-critica.ts` (nuevo): CPM completo —pasada hacia adelante y
+   hacia atras, los cuatro tipos de enlace FC/CC/FF/CF, deteccion de
+   ciclos— mas `avanzarDiasLaborables` en `lib/calendario.ts` (la pieza de
+   fechas que faltaba). Se conecta en `excel-cronograma.ts`: si el archivo
+   trae la columna "Depende de" llena, `esCritico`/`holguraDias` salen
+   calculados de verdad en vez del relleno fijo de siempre; sin
+   dependencias, el comportamiento no cambia. Corre con un calendario
+   sintetico (todos los dias laborables) porque las cifras que devuelve
+   son medidas RELATIVAS —no cambian con el calendario real mientras se
+   use el mismo en toda la cuenta—, lo que evito tener que enhebrar la
+   sesion/obraId por las tres acciones de servidor que llaman al
+   analizador. **Sigue sin calcularse para tareas tecleadas a mano ni para
+   la EDT generada desde presupuesto** —ninguna de las dos tiene red de
+   precedencias que darle al algoritmo, porque no existe editor de
+   dependencias en ninguna pantalla (pieza de UI aparte, grande, no
+   construida aqui a proposito)—. Con esto, la regla de convergencia de
+   los hitos predictivos (`porConvergencia`) ya puede dispararse sola para
+   un Excel con la columna llena, sin haberla tocado: solo necesitaba que
+   `DependenciaTarea` tuviera filas, no `esCritico`.
 
 5. ~~**Lo que quedo abierto de la auditoria del 10 de agosto**~~ (seccion 6c)
    **CERRADO el 21 de agosto de 2026**: los puntos 3, 4, 5, 6, 10, 11 y 12
@@ -1191,8 +1207,12 @@ Lo que falta:
 
 ## 3. Cronograma: opcion B (decidida el 10 de agosto) — CASI CERRADA
 
-> **Al 21 de agosto queda UNA cosa de esta lista: la ruta critica y la
-> holgura.** Todo lo demas se hizo entre el 15 y el 20 de agosto, y ademas por
+> **Al 21 de agosto por la tarde, la ruta critica y la holgura se calculan
+> de verdad para los cronogramas importados por Excel** (ver el punto 4 de
+> la seccion de arriba). Sigue sin calcularse para lo tecleado a mano ni
+> para la EDT generada desde presupuesto —ninguna de las dos tiene red de
+> precedencias, que sigue siendo lo unico realmente pendiente de esta
+> lista—. Todo lo demas se hizo entre el 15 y el 20 de agosto, y ademas por
 > una via que este apartado no preveia: **la EDT se genera desde el
 > presupuesto** y se sincroniza sola detras de las cinco operaciones que lo
 > cambian. Hay tres puertas de entrada (MS Project/ProjectLibre, Excel y
@@ -1207,12 +1227,12 @@ que hoy lee del archivo:
 - ~~`porcentajePlaneado` por tarea a una fecha dada.~~ HECHO:
   `planeadoEnFecha`, y lo usan la curva, el panel y el informe, para que no
   puedan discrepar.
-- **Camino critico (`esCritico`) y holgura. LO UNICO QUE SIGUE ABIERTO.** Las
-  tareas que entran por Excel o por teclado nacen `esCritico: false` y
-  `holguraInferida: true`, igual que se niega a deducirla el lector de
-  Project. Sin esto tampoco puede sonar la regla de convergencia de los hitos
-  predictivos, que hoy calla diciendo que el cronograma vigente tiene 0
-  enlaces.
+- ~~Camino critico (`esCritico`) y holgura.~~ **HECHO (parcial) el 21 de
+  agosto de 2026, para Excel** — ver el punto 4 de la seccion de arriba
+  para el detalle. Las tareas tecleadas a mano siguen naciendo
+  `esCritico: false`/`holguraInferida: true`: no tienen red de
+  precedencias, y **eso** —el editor de dependencias, ver el punto de
+  abajo— es lo unico que sigue realmente abierto de esta lista.
 - ~~Motor de fechas que respete el calendario laboral de la obra.~~ HECHO: la
   duracion se calcula desde las fechas en dias de TRABAJO con el calendario de
   la obra, y la cifra la calcula el SERVIDOR para no depender del reloj del
