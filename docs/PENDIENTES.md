@@ -1798,6 +1798,42 @@ Lo que SI se hara, en este orden:
      Y el agente deberia poder crear movimientos en BORRADOR pero NUNCA
      aprobarlos: la aprobacion de dinero se queda como clic humano
      deliberado, igual que hoy.
+   - **Pedido el 22 de agosto de 2026: que el agente tenga cara — un
+     avatar 3D animado en el navegador, llamado "Mike".** Confirmado con
+     el usuario que "Mike" no existe hoy en ningun lado (ni en GCM ni en
+     otro sistema): es una idea nueva, sin modelo 3D, sin diseno visual
+     todavia. Y que se quiere 3D DE VERDAD, animado en el navegador —no
+     una ilustracion fija ni un icono—, la opcion mas grande de las que se
+     plantearon.
+
+     Esto es una pieza de ingenieria NUEVA para GCM, separada del agente
+     conversacional en si y de tamano comparable o mayor: hoy CERO
+     pantallas usan WebGL o una libreria de graficos —hasta las curvas S y
+     los graficos de gerencia son SVG a mano, a proposito, para no sumar
+     dependencias—. Antes de disenarla en serio hace falta decidir, con el
+     usuario, al menos:
+     - **De donde sale el modelo 3D de "Mike"**: no se puede generar
+       codigo sin un asset —un personaje 3D rigged y animado hay que
+       modelarlo, encargarlo, o generarlo con un servicio (p. ej. Ready
+       Player Me u otro), no se escribe a mano—.
+     - **Que libreria de render en el navegador** (candidato obvio:
+       Three.js/`react-three-fiber`, pero es una decision a tomar, no un
+       hecho) y que impacto tiene en el peso de la pagina y el rendimiento
+       en equipos de obra modestos —el mismo criterio de "cuidado con el
+       cliente que no tiene GPU" que ya descarto WebLLM en la seccion 6b
+       de aqui arriba aplica tambien a un avatar 3D pesado—.
+     - **Que anima al avatar**: si habla con voz de verdad (texto a voz,
+       otro servicio externo mas, otra clave de API mas) con sincronizado
+       de labios, o solo gestos genericos mientras el texto aparece
+       aparte.
+     - **Depende de que exista primero la Fase 2** (el motor de
+       conversacion, turnos, herramientas): un avatar sin nada que decir
+       no tiene sentido, asi que este punto no se puede empezar antes de
+       esa.
+
+     Sin empezar. Cuando se retome, merece su propia sesion de diseno
+     (posiblemente con `EnterPlanMode` e investigacion dedicada de
+     librerias 3D para React/Next, que hoy no se ha hecho).
 
 ---
 
