@@ -7,6 +7,9 @@ import {
   TrendingUp,
   ShoppingCart,
   ShieldAlert,
+  Gauge,
+  ClipboardCheck,
+  Receipt,
 } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
@@ -15,12 +18,26 @@ import {
   sobregiroProyectadoDeCartera,
   comprasPendientesDeAprobar,
   restriccionesDeCartera,
+  evmDeCartera,
+  confiabilidadDeCartera,
+  valorizacionesDeCartera,
   UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS,
 } from "@/services/gerencia.service";
+import { textoSinCosto } from "@/lib/evm";
 import { COLOR_SEMAFORO } from "@/lib/tablero";
+import type { BandaPpc } from "@/lib/plan-semanal";
+import { BarraSobregiro } from "@/components/gerencia/BarraSobregiro";
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
 import { soles } from "@/utils/formato";
 import { fechaCorta } from "@/utils/fechas";
+
+/// Mismo criterio de color que `COLOR_SEMAFORO`: verde/ambar/rojo por CSS
+/// var del tema, nunca una clase de Tailwind suelta que se desincronice.
+const COLOR_BANDA_PPC: Record<BandaPpc, string> = {
+  bueno: "var(--color-exito)",
+  flojo: "var(--color-alerta)",
+  malo: "var(--color-peligro)",
+};
 
 export const metadata: Metadata = { title: "Gerencia" };
 
@@ -34,13 +51,16 @@ export const metadata: Metadata = { title: "Gerencia" };
  *
  * Contesta lo que no se ve mirando las obras de una en una: que partidas
  * criticas van tarde en la cartera, que obras se estan comprometiendo mas
- * rapido de lo que avanzan, cuanto hay pedido (adicionales y compras) que
- * todavia no cuenta en ningun presupuesto, y que restricciones del
- * Lookahead ya vencieron. Cada bloque sale de su servicio con consultas
- * acotadas: aqui no se carga un cronograma entero ni se llama nada en bucle
- * sin tope — `semaforoDeCartera` y `sobregiroProyectadoDeCartera` comparten
- * ademas el mismo lote de cronograma vigente (`cache()` en
- * `gerencia.service.ts`), asi que pedirlas juntas no duplica esa consulta.
+ * rapido de lo que avanzan, como va el valor ganado y la confiabilidad del
+ * plan semanal de toda la cartera, cuanto hay pedido (adicionales y
+ * compras) que todavia no cuenta en ningun presupuesto, cuantas
+ * valorizaciones estan vencidas, y que restricciones del Lookahead ya
+ * vencieron. Cada bloque sale de su servicio con consultas acotadas: aqui
+ * no se carga un cronograma entero ni se llama nada en bucle sin tope —
+ * `semaforoDeCartera`, `sobregiroProyectadoDeCartera`, `evmDeCartera` y
+ * `confiabilidadDeCartera` comparten ademas el mismo lote de cronograma
+ * vigente (`cache()` en `gerencia.service.ts`), asi que pedirlas juntas no
+ * duplica esa consulta.
  */
 export default async function GerenciaPage() {
   const sesion = await obtenerSesion();
@@ -48,15 +68,36 @@ export default async function GerenciaPage() {
 
   // La puerta es el ALCANCE: quien no ve toda la cartera no tiene nada que
   // hacer en una pantalla que la resume. Lo deciden los servicios; solo si
-  // los cinco dicen que no, esta pantalla no existe para esta sesion.
-  const [semaforo, sobregiro, adicionales, compras, restricciones] = await Promise.all([
+  // las ocho dicen que no, esta pantalla no existe para esta sesion.
+  const [
+    semaforo,
+    sobregiro,
+    evm,
+    adicionales,
+    compras,
+    confiabilidad,
+    valorizaciones,
+    restricciones,
+  ] = await Promise.all([
     semaforoDeCartera(sesion),
     sobregiroProyectadoDeCartera(sesion),
+    evmDeCartera(sesion),
     adicionalesEnBorrador(sesion),
     comprasPendientesDeAprobar(sesion),
+    confiabilidadDeCartera(sesion),
+    valorizacionesDeCartera(sesion),
     restriccionesDeCartera(sesion),
   ]);
-  if (!semaforo && !sobregiro && !adicionales && !compras && !restricciones) {
+  if (
+    !semaforo &&
+    !sobregiro &&
+    !evm &&
+    !adicionales &&
+    !compras &&
+    !confiabilidad &&
+    !valorizaciones &&
+    !restricciones
+  ) {
     redirect("/panel");
   }
 
@@ -242,6 +283,8 @@ export default async function GerenciaPage() {
                   </p>
                 </div>
 
+                <BarraSobregiro obras={sobregiro.obras} />
+
                 <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>
                   {sobregiro.obras.map((o) => (
                     <li
@@ -290,6 +333,108 @@ export default async function GerenciaPage() {
                 <p className="text-xs opacity-60">
                   Cada obra enlaza a su tablero, donde está el resto de sus
                   indicadores.
+                </p>
+              </>
+            )}
+          </SeccionTarjeta>
+        </Tarjeta>
+      )}
+
+      {evm && (
+        <Tarjeta>
+          <SeccionTarjeta
+            primera
+            titulo="EVM de cartera (aproximado)"
+            nota="Proxy de valor ganado, no el EVM exacto de cada obra: BAC es el presupuesto por costo directo, EV es el mismo avance físico de arriba convertido a soles, AC es lo aprobado en órdenes. CPI, EAC y VAC son una proyección y solo salen cuando hay base suficiente para sostenerla; si no, se explica el motivo en vez de inventar un número."
+          >
+            {evm.obras.length === 0 ? (
+              <p className="text-sm opacity-70">
+                No hay ninguna obra viva que examinar.
+              </p>
+            ) : (
+              <>
+                {(() => {
+                  const conBase = evm.obras.filter(
+                    (o) => o.metricas.motivoSinCosto === null,
+                  );
+                  const evTotal = conBase.reduce(
+                    (n, o) => n + Number(o.metricas.ev),
+                    0,
+                  );
+                  const acTotal = conBase.reduce(
+                    (n, o) => n + Number(o.metricas.ac ?? 0),
+                    0,
+                  );
+                  const cpiCartera = acTotal > 0 ? evTotal / acTotal : null;
+                  return (
+                    <div
+                      className="rounded-lg border p-4"
+                      style={{ borderColor: "var(--borde)" }}
+                    >
+                      <p className="flex items-center gap-2 text-xs opacity-60">
+                        <Gauge className="size-4" aria-hidden="true" />
+                        CPI de cartera (aproximado)
+                      </p>
+                      {cpiCartera === null ? (
+                        <p className="mt-1 text-sm opacity-70">
+                          Sin base para proyectar costo en ninguna obra
+                          todavía.
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-3xl font-semibold">
+                          {cpiCartera.toFixed(2)}
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs opacity-60">
+                        {conBase.length} de {evm.obras.length} obra(s) con
+                        base para proyectar costo
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>
+                  {evm.obras.map((o) => (
+                    <li key={o.obraId} className="py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <Link
+                          href={`/obras/${o.obraId}/cronograma`}
+                          className="truncate text-sm font-medium underline-offset-2 hover:underline"
+                        >
+                          {o.obraNombre}
+                        </Link>
+                        <p className="text-sm tabular-nums">
+                          {o.metricas.cpi === null ? (
+                            <span className="opacity-50">CPI —</span>
+                          ) : (
+                            <>
+                              <span className="opacity-60">CPI </span>
+                              <span className="font-medium">
+                                {o.metricas.cpi.toFixed(2)}
+                              </span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <p className="text-xs opacity-60">
+                        BAC {soles(o.metricas.bac)} · EV {soles(o.metricas.ev)}
+                        {" · "}
+                        AC{" "}
+                        {o.metricas.ac === null ? "—" : soles(o.metricas.ac)}
+                      </p>
+                      {o.metricas.motivoSinCosto && (
+                        <p className="mt-1 text-xs opacity-50">
+                          {textoSinCosto(o.metricas.motivoSinCosto)}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+
+                <p className="text-xs opacity-60">
+                  Cada obra enlaza a su cronograma, donde está su EVM exacto
+                  —con el BAC ajustado por línea base y el AC de todas sus
+                  órdenes, no este proxy de cartera—.
                 </p>
               </>
             )}
@@ -432,6 +577,157 @@ export default async function GerenciaPage() {
                 <p className="text-xs opacity-60">
                   Cada obra enlaza a sus Órdenes, que es donde se revisan y se
                   aprueban.
+                </p>
+              </>
+            )}
+          </SeccionTarjeta>
+        </Tarjeta>
+      )}
+
+      {confiabilidad && (
+        <Tarjeta>
+          <SeccionTarjeta
+            primera
+            titulo="Confiabilidad de cartera (PPC)"
+            nota="El PPC de la última semana cerrada de cada obra, no un promedio histórico: es lo que dice si el plan semanal se está cumpliendo AHORA. Verde, ámbar o rojo con el mismo umbral que usa el ritual semanal de cada obra."
+          >
+            {confiabilidad.obras.length === 0 ? (
+              <p className="text-sm opacity-70">
+                No hay ninguna obra viva que examinar.
+              </p>
+            ) : (
+              <>
+                <div
+                  className="rounded-lg border p-4"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  <p className="flex items-center gap-2 text-xs opacity-60">
+                    <ClipboardCheck className="size-4" aria-hidden="true" />
+                    Obras sin ninguna semana de Plan Semanal cerrada
+                  </p>
+                  <p className="mt-1 text-3xl font-semibold">
+                    {confiabilidad.obrasSinPlanCerrado}
+                  </p>
+                  <p className="mt-1 text-xs opacity-60">
+                    de {confiabilidad.obras.length} obra(s) examinadas
+                  </p>
+                </div>
+
+                <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>
+                  {confiabilidad.obras.map((o) => (
+                    <li
+                      key={o.obraId}
+                      className="flex flex-wrap items-center justify-between gap-3 py-3"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/obras/${o.obraId}/plan-semanal`}
+                          className="truncate text-sm font-medium underline-offset-2 hover:underline"
+                        >
+                          {o.obraNombre}
+                        </Link>
+                        <p className="text-xs opacity-60">
+                          {o.ultimo === null
+                            ? "Sin ninguna semana cerrada"
+                            : `Semana ${o.ultimo.numero}, cerrada el ${fechaCorta(o.ultimo.fechaCorte)}`}
+                        </p>
+                      </div>
+                      <p
+                        className="text-sm font-medium tabular-nums"
+                        style={{
+                          color: o.banda ? COLOR_BANDA_PPC[o.banda] : undefined,
+                        }}
+                      >
+                        {o.ultimo?.ppc === null || o.ultimo?.ppc === undefined
+                          ? "—"
+                          : `PPC ${Math.round(o.ultimo.ppc)}%`}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+
+                <p className="text-xs opacity-60">
+                  Cada obra enlaza a su Plan Semanal, donde se ve el detalle
+                  de compromisos y causas de no cumplimiento.
+                </p>
+              </>
+            )}
+          </SeccionTarjeta>
+        </Tarjeta>
+      )}
+
+      {valorizaciones && (
+        <Tarjeta>
+          <SeccionTarjeta
+            primera
+            titulo="Valorizaciones vencidas de cartera"
+            nota="Encargos vigentes con saldo por pagar, según su cadencia de valorización: fechas pactadas si las tiene, si no la cadencia del encargo, y si no el corte semanal de la obra. Esto no está en /panel: ahí solo se ve lo comprometido, nunca el estado de pago real."
+          >
+            {valorizaciones.obras.length === 0 ? (
+              <p className="text-sm opacity-70">
+                No hay ningún encargo vigente con saldo por pagar.
+              </p>
+            ) : (
+              <>
+                <div
+                  className="rounded-lg border p-4"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  <p className="flex items-center gap-2 text-xs opacity-60">
+                    <Receipt className="size-4" aria-hidden="true" />
+                    Valorizaciones vencidas
+                  </p>
+                  <p className="mt-1 text-3xl font-semibold">
+                    {valorizaciones.totalVencidas}
+                  </p>
+                  <p className="mt-1 text-xs opacity-60">
+                    {valorizaciones.obras.length === 1
+                      ? "en 1 obra con saldo por pagar"
+                      : `en ${valorizaciones.obras.length} obras con saldo por pagar`}
+                  </p>
+                </div>
+
+                <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>
+                  {valorizaciones.obras.map((o) => (
+                    <li
+                      key={o.obraId}
+                      className="flex flex-wrap items-center justify-between gap-3 py-3"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/obras/${o.obraId}/valorizaciones`}
+                          className="truncate text-sm font-medium underline-offset-2 hover:underline"
+                        >
+                          {o.obraNombre}
+                        </Link>
+                        <p className="text-xs opacity-60">
+                          {o.vencidas === 0
+                            ? "ninguna vencida"
+                            : o.vencidas === 1
+                              ? "1 vencida"
+                              : `${o.vencidas} vencidas`}
+                          {" · "}
+                          {o.pendientes === 1
+                            ? "1 pendiente"
+                            : `${o.pendientes} pendientes`}
+                        </p>
+                      </div>
+                      <p
+                        className="text-sm font-medium"
+                        style={{
+                          color:
+                            o.vencidas > 0 ? "var(--color-peligro)" : undefined,
+                        }}
+                      >
+                        {soles(o.porPagarTotal)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+
+                <p className="text-xs opacity-60">
+                  Cada obra enlaza a sus Valorizaciones, donde se ve el
+                  detalle por encargo.
                 </p>
               </>
             )}

@@ -35,6 +35,17 @@ const datos = {
   imputacionesSueltas: [] as { importe: string; ordenCompra: { projectId: string } }[],
   wbsItems: [] as unknown[],
   restricciones: [] as unknown[],
+  /// Encargos completos (fechasValorizacion/valorizaciones/pagos), para
+  /// `valorizacionesDeCartera` -distinto del agregado `encargosVigentes`.
+  encargosCompletos: [] as unknown[],
+  /// `PlanSemanal` CERRADO, para `ppcDeLaUltimaCerrada` (llamada de verdad,
+  /// no mockeada, desde `confiabilidadDeCartera`).
+  planesSemanales: [] as {
+    projectId: string;
+    numero: number;
+    fechaCorte: Date;
+    compromisos: { cumplido: boolean | null; causa: null }[];
+  }[],
 };
 
 vi.mock("@/lib/prisma", () => ({
@@ -78,8 +89,39 @@ vi.mock("@/lib/prisma", () => ({
     },
     encargoProveedor: {
       groupBy: async (args: unknown) => {
-        llamadas.push({ modelo: "encargoProveedor", args });
+        llamadas.push({ modelo: "encargoProveedor:groupBy", args });
         return datos.encargosVigentes;
+      },
+      findMany: async (args: unknown) => {
+        llamadas.push({ modelo: "encargoProveedor:findMany", args });
+        return datos.encargosCompletos;
+      },
+    },
+    planSemanal: {
+      groupBy: async (args: unknown) => {
+        llamadas.push({ modelo: "planSemanal:groupBy", args });
+        const porObra = new Map<string, Date>();
+        for (const p of datos.planesSemanales) {
+          const actual = porObra.get(p.projectId);
+          if (!actual || p.fechaCorte > actual) porObra.set(p.projectId, p.fechaCorte);
+        }
+        return [...porObra.entries()].map(([projectId, fechaCorte]) => ({
+          projectId,
+          _max: { fechaCorte },
+        }));
+      },
+      findMany: async (args: unknown) => {
+        llamadas.push({ modelo: "planSemanal:findMany", args });
+        const pares = (
+          args as { where: { OR: { projectId: string; fechaCorte: Date }[] } }
+        ).where.OR;
+        return datos.planesSemanales.filter((p) =>
+          pares.some(
+            (par) =>
+              par.projectId === p.projectId &&
+              par.fechaCorte.getTime() === p.fechaCorte.getTime(),
+          ),
+        );
       },
     },
     ordenImputacion: {
@@ -109,6 +151,9 @@ const {
   sobregiroProyectadoDeCartera,
   comprasPendientesDeAprobar,
   restriccionesDeCartera,
+  evmDeCartera,
+  confiabilidadDeCartera,
+  valorizacionesDeCartera,
   MAX_OBRAS_POR_CARGA,
   UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS,
 } = await import("@/services/gerencia.service");
@@ -160,6 +205,8 @@ beforeEach(() => {
   datos.imputacionesSueltas = [];
   datos.wbsItems = [];
   datos.restricciones = [];
+  datos.encargosCompletos = [];
+  datos.planesSemanales = [];
 });
 
 describe("adicionalesEnBorrador", () => {
@@ -256,6 +303,7 @@ function obra(id: string, sobre: Record<string, unknown> = {}) {
     nombreObra: `OBRA ${id.toUpperCase()}`,
     estado: "EN_EJECUCION",
     archivadaEn: null,
+    diaCorteSemanal: 5,
     ...sobre,
   };
 }
@@ -721,5 +769,200 @@ describe("sobregiroProyectadoDeCartera", () => {
     expect(semaforo?.obras[0]?.spiPorDuracion).toBe(1);
     expect(sobregiro?.obras[0]?.avanceFisicoPct).toBe(50);
     expect(sobregiro?.obras[0]?.comprometidoPct).toBe(10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EVM de cartera (proxy)
+// ---------------------------------------------------------------------------
+
+describe("evmDeCartera", () => {
+  it("sin alguno de los permisos, no devuelve nada", async () => {
+    expect(await evmDeCartera(sesion(null, ["cronograma:leer"]))).toBeNull();
+    expect(await evmDeCartera(sesion(null, ["orden:leer"]))).toBeNull();
+  });
+
+  it("no la ve quien no ve toda la cartera", async () => {
+    expect(
+      await evmDeCartera(sesion(["o1"], ["cronograma:leer", "orden:leer"])),
+    ).toBeNull();
+  });
+
+  it("calcula BAC/PV/EV/AC y el CPI cuando hay base para proyectar", async () => {
+    datos.obras = [obra("obra-1")];
+    // Planeado 50%, real 60%: PV = 500, EV = 600 sobre un BAC de 1000.
+    conCronograma("obra-1", [
+      tarea(1, { porcentajePlaneado: "50.00", porcentajeArchivo: "60.00" }),
+    ]);
+    datos.wbsItems = [
+      { projectId: "obra-1", codigoPartida: "01", tipo: "PARTIDA", parcial: "1000.00" },
+    ];
+    // AC = 300: justo la mitad de EV (300 = 600*0.5), asi que SI hay base
+    // para proyectar (el limite es "AC >= EV*0.5", no estrictamente mayor).
+    datos.imputacionesSueltas = [
+      { importe: "300.00", ordenCompra: { projectId: "obra-1" } },
+    ];
+
+    const r = await evmDeCartera(
+      sesion(null, ["cronograma:leer", "orden:leer"]),
+    );
+    const m = r?.obras[0]?.metricas;
+
+    expect(m?.bac).toBe("1000.00");
+    expect(m?.pv).toBe("500.00");
+    expect(m?.ev).toBe("600.00");
+    expect(m?.ac).toBe("300.00");
+    expect(m?.spi).toBe(1.2);
+    expect(m?.cpi).toBe(2);
+    expect(m?.motivoSinCosto).toBeNull();
+  });
+
+  it("sin ordenes aprobadas, explica el motivo en vez de inventar un CPI", async () => {
+    datos.obras = [obra("obra-1")];
+    conCronograma("obra-1", [
+      tarea(1, { porcentajePlaneado: "50.00", porcentajeArchivo: "60.00" }),
+    ]);
+    datos.wbsItems = [
+      { projectId: "obra-1", codigoPartida: "01", tipo: "PARTIDA", parcial: "1000.00" },
+    ];
+    datos.imputacionesSueltas = [];
+
+    const r = await evmDeCartera(
+      sesion(null, ["cronograma:leer", "orden:leer"]),
+    );
+    const m = r?.obras[0]?.metricas;
+
+    expect(m?.ac).toBe("0.00");
+    expect(m?.cpi).toBeNull();
+    // "sin_gasto", no "sin_permiso": el permiso YA se comprobo al entrar a
+    // la funcion, asi que null nunca debe llegar a `metricasEvm` aqui.
+    expect(m?.motivoSinCosto).toBe("sin_gasto");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Confiabilidad de cartera (PPC)
+// ---------------------------------------------------------------------------
+
+describe("confiabilidadDeCartera", () => {
+  it("sin el permiso, no devuelve nada", async () => {
+    expect(await confiabilidadDeCartera(sesion(null, []))).toBeNull();
+  });
+
+  it("no la ve quien no ve toda la cartera", async () => {
+    expect(
+      await confiabilidadDeCartera(sesion(["o1"], ["plan_semanal:leer"])),
+    ).toBeNull();
+  });
+
+  it("trae el PPC de la ultima semana cerrada, no un promedio", async () => {
+    datos.obras = [obra("obra-1")];
+    datos.planesSemanales = [
+      {
+        projectId: "obra-1",
+        numero: 1,
+        fechaCorte: new Date("2026-07-01"),
+        compromisos: [{ cumplido: false, causa: null }], // 0% -no cuenta, es vieja
+      },
+      {
+        projectId: "obra-1",
+        numero: 2,
+        fechaCorte: new Date("2026-07-08"),
+        compromisos: [
+          { cumplido: true, causa: null },
+          { cumplido: true, causa: null },
+          { cumplido: false, causa: null },
+        ], // 66.67% -la ULTIMA, es la que debe contar
+      },
+    ];
+
+    const r = await confiabilidadDeCartera(sesion(null, ["plan_semanal:leer"]));
+
+    expect(r?.obrasSinPlanCerrado).toBe(0);
+    expect(r?.obras[0]?.ultimo?.numero).toBe(2);
+    expect(r?.obras[0]?.ultimo?.ppc).toBeCloseTo(66.67, 1);
+    expect(r?.obras[0]?.banda).toBe("flojo");
+  });
+
+  it("una obra sin ninguna semana cerrada cuenta aparte, no desaparece", async () => {
+    datos.obras = [obra("obra-1")];
+    datos.planesSemanales = [];
+
+    const r = await confiabilidadDeCartera(sesion(null, ["plan_semanal:leer"]));
+
+    expect(r?.obrasSinPlanCerrado).toBe(1);
+    expect(r?.obras[0]?.ultimo).toBeNull();
+    expect(r?.obras[0]?.banda).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Valorizaciones de cartera
+// ---------------------------------------------------------------------------
+
+describe("valorizacionesDeCartera", () => {
+  it("sin el permiso, no devuelve nada", async () => {
+    expect(await valorizacionesDeCartera(sesion(null, []))).toBeNull();
+  });
+
+  it("no la ve quien no ve toda la cartera", async () => {
+    expect(
+      await valorizacionesDeCartera(sesion(["o1"], ["orden:leer"])),
+    ).toBeNull();
+  });
+
+  it("separa vencida de pendiente, y deja fuera lo que ya esta pagado", async () => {
+    datos.obras = [obra("obra-1")];
+    datos.encargosCompletos = [
+      // Vencida: fecha pactada ya paso, sin valorizacion que la cubra.
+      {
+        projectId: "obra-1",
+        montoContratado: "1000.00",
+        cadenciaDias: null,
+        fechaInicio: null,
+        createdAt: diasDesdeHoy(-60),
+        fechasValorizacion: [{ fecha: diasDesdeHoy(-10) }],
+        valorizaciones: [{ fecha: diasDesdeHoy(-40), porcentaje: "50.00" }],
+        pagos: [],
+      },
+      // Pendiente: fecha pactada en el futuro, con saldo por pagar.
+      {
+        projectId: "obra-1",
+        montoContratado: "1000.00",
+        cadenciaDias: null,
+        fechaInicio: null,
+        createdAt: diasDesdeHoy(-30),
+        fechasValorizacion: [{ fecha: diasDesdeHoy(10) }],
+        valorizaciones: [{ fecha: diasDesdeHoy(-15), porcentaje: "30.00" }],
+        pagos: [],
+      },
+      // Ya cobrado del todo: no debe contar ni como vencida ni pendiente.
+      {
+        projectId: "obra-1",
+        montoContratado: "500.00",
+        cadenciaDias: null,
+        fechaInicio: null,
+        createdAt: diasDesdeHoy(-30),
+        fechasValorizacion: [{ fecha: diasDesdeHoy(-5) }],
+        valorizaciones: [{ fecha: diasDesdeHoy(-5), porcentaje: "100.00" }],
+        pagos: [{ monto: "500.00" }],
+      },
+    ];
+
+    const r = await valorizacionesDeCartera(sesion(null, ["orden:leer"]));
+
+    expect(r?.totalVencidas).toBe(1);
+    expect(r?.obras[0]?.vencidas).toBe(1);
+    expect(r?.obras[0]?.pendientes).toBe(1);
+    // 500 (vencida, 50% de 1000, nada pagado) + 300 (pendiente, 30% de 1000).
+    expect(r?.obras[0]?.porPagarTotal).toBe("800.00");
+  });
+
+  it("cuesta una sola consulta de encargos, no una por obra", async () => {
+    datos.obras = [obra("obra-1"), obra("obra-2")];
+    await valorizacionesDeCartera(sesion(null, ["orden:leer"]));
+    expect(
+      llamadas.filter((l) => l.modelo === "encargoProveedor:findMany"),
+    ).toHaveLength(1);
   });
 });

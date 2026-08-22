@@ -2039,8 +2039,17 @@ export async function semanaDeLaEmpresa(
     sinEvaluar: plan.compromisos.filter((c) => c.cumplido === null).length,
     total: plan.compromisos.length,
     vencida: plan.fechaCorte < corteDeHoy,
-    ppcAnterior: ppcPorObra.get(plan.projectId) ?? null,
+    ppcAnterior: ppcPorObra.get(plan.projectId)?.ppc ?? null,
   }));
+}
+
+/// El PPC de la ultima semana cerrada de una obra, con el contexto que hace
+/// falta para mostrarlo (que semana fue, de que fecha) y no solo el numero
+/// pelado.
+export interface UltimoPpc {
+  ppc: number | null;
+  numero: number;
+  fechaCorte: Date;
 }
 
 /**
@@ -2053,11 +2062,15 @@ export async function semanaDeLaEmpresa(
  *
  * Primero se pregunta a la base cual es la fecha de corte mas alta de cada
  * obra, que es un agregado barato, y solo despues se piden esos planes.
+ *
+ * Exportada (antes privada) para que `gerencia.service.ts::confiabilidadDeCartera`
+ * la reuse tal cual, sin copiar la cuenta: el PPC de cartera tiene que ser el
+ * MISMO PPC que ya ve `/panel`, no una segunda formula que pueda desalinearse.
  */
-async function ppcDeLaUltimaCerrada(
+export async function ppcDeLaUltimaCerrada(
   obraIds: readonly string[],
-): Promise<Map<string, number | null>> {
-  const porObra = new Map<string, number | null>();
+): Promise<Map<string, UltimoPpc>> {
+  const porObra = new Map<string, UltimoPpc>();
 
   const ultimas = await prisma.planSemanal.groupBy({
     by: ["projectId"],
@@ -2076,6 +2089,8 @@ async function ppcDeLaUltimaCerrada(
     where: { OR: pares },
     select: {
       projectId: true,
+      numero: true,
+      fechaCorte: true,
       // `causa` no se usa para calcular el PPC, pero es parte de lo que define
       // un compromiso ya evaluado y `ppcDePlan` la pide en su tipo. Se trae en
       // vez de recortar el tipo compartido: cuesta una columna y deja el dato
@@ -2088,7 +2103,11 @@ async function ppcDeLaUltimaCerrada(
     // `ppcDePlan` es el MISMO calculo que la pantalla de la obra, no una copia
     // aparte: si algun dia cambia que cuenta como cumplido, cambia en los dos
     // sitios a la vez. Ya devuelve null cuando no hay compromisos.
-    porObra.set(plan.projectId, ppcDePlan(plan.compromisos).ppc);
+    porObra.set(plan.projectId, {
+      ppc: ppcDePlan(plan.compromisos).ppc,
+      numero: plan.numero,
+      fechaCorte: plan.fechaCorte,
+    });
   }
 
   return porObra;

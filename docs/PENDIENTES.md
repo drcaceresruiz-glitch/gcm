@@ -44,9 +44,10 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
    un menu desplegable hay que probarla con un clic de verdad, no solo con
    las pruebas automatizadas —esas prueban la logica, no la interaccion—.
 
-   `/gerencia` tuvo su primera entrega de rediseno el 22 de agosto de 2026
-   (tres secciones nuevas, ver el punto 7 de aqui abajo); un rediseno mas a
-   fondo (graficos, filtros, EVM consolidado) sigue sin empezar.
+   `/gerencia` tuvo su primera y segunda entrega de rediseno el 22 de agosto
+   de 2026 (ocho secciones en total, ver el punto 7 de aqui abajo); lo que
+   queda sin empezar es filtros, exportacion y el paso a pestanas si la
+   pantalla se siente larga con las ocho tarjetas.
 
 2. **Auditoria del tablero de la obra — ENTREGADA.** Agente de exploracion
    completo sobre `tablero.service.ts`, `pendientes.ts`, `modulos.tsx` y los
@@ -480,13 +481,8 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      ANTES de que el sobregiro sea real), **compras/encargos sin aprobar**
      (calco de la tarjeta de Adicionales, sobre `OrdenCompra` en borrador),
      y **restricciones de Lookahead vencidas o por vencer** (agregado de
-     cartera, sin tocar el cronograma). Quedaron fuera a proposito: EVM
-     consolidado (incluso su version mas barata sigue siendo cara y
-     arrastra el mismo riesgo de rotulo confuso que ya costo el "SPI por
-     duracion"), valorizaciones consolidadas (se solapan con lo que ya se
-     ve en `/panel` obra por obra), y PPC consolidado (bajo valor
-     incremental hoy). Detalle tecnico: `semaforoDeCartera` y
-     `sobregiroProyectadoDeCartera` comparten el mismo lote de cronograma
+     cartera, sin tocar el cronograma). Detalle tecnico: `semaforoDeCartera`
+     y `sobregiroProyectadoDeCartera` comparten el mismo lote de cronograma
      vigente via un helper `loteConAvanceMedido` envuelto en `cache()` de
      React —mismo patron que `datosAlertasEmpresa` en `obras.service.ts`—,
      asi que pedir las cinco secciones juntas no duplica la consulta mas
@@ -494,9 +490,54 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      `gerencia.service.test.ts`, archivo que antes no existia), typecheck,
      lint, build y `scripts/humo.ts` en verde (`/gerencia` sin romperse,
      488 ms contra 415 ms antes de anadir las tres secciones — sin salto
-     brusco). Rediseno de `/gerencia` a fondo con GRAFICOS/filtros/pestanas
-     sigue sin empezar, a proposito: el plan completo (con lo descartado y
-     por que) esta en `C:\Users\USER\.claude\plans\declarative-spinning-clock.md`.
+     brusco).
+
+     **SEGUNDA ENTREGA, el mismo 22 de agosto de 2026.** El usuario pidio
+     retomar los tres descartes de la primera entrega —EVM consolidado, PPC
+     consolidado, valorizaciones consolidadas— mas un grafico. Investigado
+     de nuevo (no se reuso la conclusion vieja): con `loteConAvanceMedido`
+     ya construido, tres de los cuatro descartes ya no aplicaban tal como se
+     habian escrito. **EVM de cartera** salio como PROXY barato: el
+     %avance que hace falta para PV/EV es la MISMA cuenta que ya paga
+     `sobregiroProyectadoDeCartera` (rotulada "avance fisico"), asi que solo
+     hizo falta una consulta nueva (AC = ordenes aprobadas, agregado);
+     `metricasEvm`/`textoSinCosto` de `@/lib/evm` (ya existian, sin tocar)
+     explican en pantalla por que falta CPI/EAC/VAC en vez de inventar un
+     numero — mismo criterio del incidente de CRIOCORD documentado en la
+     cabecera de ese archivo. **Confiabilidad de cartera (PPC)** exporto
+     `ppcDeLaUltimaCerrada` (antes privada en `plan-semanal.service.ts`,
+     usada por `/panel`) sin tocar su formula: la ultima semana cerrada de
+     cada obra, sin promediar el historico. **Valorizaciones de cartera**
+     resulto ser la unica pieza real (el descarte de "se solapa con
+     `/panel`" era falso: `/panel` solo muestra comprometido, nunca estado
+     de pago) y la unica de coste MEDIO —no BARATO— de toda la pantalla:
+     carga filas completas con relaciones anidadas (fechas pactadas +
+     ultima valorizacion + pagos) reusando `estadoDeCadencia`/
+     `importeValorizado` de `pagos.service.ts`, sin duplicar esa logica. El
+     **grafico** (`BarraSobregiro.tsx`, SVG a mano sin libreria, mismo
+     patron que `CurvaS.tsx`/`GraficosPpc.tsx`) fue el de sobregiro
+     proyectado por ser el de coste cero: el dato ya estaba en pantalla, es
+     trabajo de presentacion puro. La pagina paso de 5 a 8 llamadas en
+     `Promise.all`. Verificado: 2534 pruebas en verde (12 nuevas),
+     typecheck, lint, build y `scripts/humo.ts` en verde. Cronometrado en
+     serio esta vez —8 cargas seguidas contra la base real, no una
+     muestra suelta—: la primera entrega promediaba ~579 ms tras el
+     calentamiento; con las tres secciones nuevas y el grafico, ~683-800 ms
+     (el propio script de medicion, temporal, se borro tras usarlo). El
+     salto es real pero moderado, sin romper el segundo de carga; si algun
+     dia pesa, la primera candidata a revisar es valorizaciones, ya
+     documentado como la seccion MEDIA en el comentario de
+     `valorizacionesDeCartera`.
+
+     Lo que sigue sin empezar, a proposito: tendencia de PPC de cartera en
+     el tiempo (reabriria la decision de "PPC consolidado" con una pieza de
+     bucketing por semana de calendario, es su propia conversacion), BAC
+     "real" con ajustes de linea base (el proxy de costo directo sigue
+     siendo suficiente por ahora), filtros, exportacion, y pestanas —la
+     pantalla llego a las ocho tarjetas que la primera entrega ya marco
+     como el borde para considerarlas, pero el usuario no las pidio esta
+     vez—. Plan completo (con lo descartado y por que, las dos entregas):
+     `C:\Users\USER\.claude\plans\declarative-spinning-clock.md`.
 
 8. ~~**Bug en produccion visto en vivo: `/obras/.../meta` se rompia al
    cargar**~~ **CERRADO el 21 de agosto de 2026.** El usuario mando una

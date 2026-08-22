@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { sumar } from "@/lib/decimal";
+import { sumar, restar, esPositivo } from "@/lib/decimal";
 import { alertasDeAtraso } from "@/lib/control-avance";
 import { medirAvance, type AvanceReportado } from "@/lib/cronograma";
 import { ponderarPorDuracion } from "@/lib/curva-s";
@@ -12,6 +12,18 @@ import { semaforoIndice, type Semaforo } from "@/lib/tablero";
 import { diasEntre, hoy } from "@/utils/fechas";
 import type { TipoRestriccion } from "@/generated/prisma/enums";
 import { totalesPorObra } from "@/services/presupuesto-obra";
+import {
+  metricasEvm,
+  valorDeAvance,
+  type MetricasEvm,
+} from "@/lib/evm";
+import { bandaDePpc, type BandaPpc } from "@/lib/plan-semanal";
+import {
+  ppcDeLaUltimaCerrada,
+  type UltimoPpc,
+} from "@/services/plan-semanal.service";
+import { estadoDeCadencia } from "@/lib/cadencia-valorizacion";
+import { importeValorizado } from "@/lib/encargos";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -231,7 +243,16 @@ const loteConAvanceMedido = cache(async function loteConAvanceMedido(
   const todas = await prisma.project.findMany({
     where: { companyId: sesion.companyId },
     orderBy: { nombreObra: "asc" },
-    select: { id: true, nombreObra: true, estado: true, archivadaEn: true },
+    select: {
+      id: true,
+      nombreObra: true,
+      estado: true,
+      archivadaEn: true,
+      // Solo lo necesita `valorizacionesDeCartera` (la cadencia de cada
+      // encargo hereda el corte de SU obra si no tiene la suya propia),
+      // pero sale gratis en la misma fila: ninguna consulta mas.
+      diaCorteSemanal: true,
+    },
   });
 
   // Solo obras que admiten cambios, como el reloj de avisos: una cerrada no
@@ -297,7 +318,12 @@ const loteConAvanceMedido = cache(async function loteConAvanceMedido(
     if (!vigente) {
       // La obra sale con la mano vacia, no desaparece: para el gerente,
       // «sin cronograma» es un dato de la obra, no la ausencia de la obra.
-      return { obraId: obra.id, obraNombre: obra.nombreObra, datos: null };
+      return {
+        obraId: obra.id,
+        obraNombre: obra.nombreObra,
+        diaCorteSemanal: obra.diaCorteSemanal,
+        datos: null,
+      };
     }
 
     // Los Decimal se pasan a texto en la frontera, como en todo el sistema,
@@ -316,6 +342,7 @@ const loteConAvanceMedido = cache(async function loteConAvanceMedido(
     return {
       obraId: obra.id,
       obraNombre: obra.nombreObra,
+      diaCorteSemanal: obra.diaCorteSemanal,
       datos: { fechaCorte: vigente.fechaCorte, tareas },
     };
   });
@@ -753,4 +780,324 @@ export async function restriccionesDeCartera(
   }
 
   return { vencidas, porVencer, totalVencidas: vencidas.length };
+}
+
+// ---------------------------------------------------------------------------
+// EVM de cartera (proxy)
+// ---------------------------------------------------------------------------
+
+export interface ObraConEvmDeCartera {
+  obraId: string;
+  obraNombre: string;
+  metricas: MetricasEvm;
+}
+
+export interface EvmDeCartera {
+  obras: ObraConEvmDeCartera[];
+  obrasVivas: number;
+  tope: number;
+}
+
+/**
+ * Valor ganado (EVM) de la cartera, en version PROXY -no el BAC/EV exactos
+ * de `evm.service.ts` para una obra sola, que exige cargar el cronograma
+ * COMPLETO (todas las versiones) y por eso no se puede repetir 10 veces
+ * aqui.
+ *
+ * Reusa piezas que YA estan pagadas o son gratis:
+ * - BAC = `totalesPorObra` (el mismo proxy de presupuesto que ya usa
+ *   `sobregiroProyectadoDeCartera`; NO el BAC "real" con ajustes de linea
+ *   base de `bacDeObra`, que costaria varias consultas mas por obra).
+ * - PV/EV = `valorDeAvance(bac, %)` de `@/lib/evm`, con el %planeado/%real
+ *   ponderado por duracion que sale del MISMO `loteConAvanceMedido` que ya
+ *   paga `semaforoDeCartera`/`sobregiroProyectadoDeCartera` -es literalmente
+ *   el mismo numero que ahi se rotula "avance fisico", convertido a soles-.
+ * - AC = ordenes APROBADAS (unica consulta nueva de esta funcion), la MISMA
+ *   definicion que usa `evm.service.ts` para una obra: NO es el
+ *   "comprometido" de `sobregiroProyectadoDeCartera` (que suma encargos
+ *   vigentes aun sin formalizar) — son dos cifras a proposito distintas,
+ *   documentado en `evm.service.ts`.
+ * - `metricasEvm`/`hayBaseParaProyectar` de `@/lib/evm`: aritmetica pura,
+ *   sin tocar la base.
+ *
+ * Rotulo obligatorio en pantalla: CPI/EAC/VAC de esta seccion son
+ * "de cartera (aproximado)", nunca a secas -mismo criterio que "SPI por
+ * duracion"-. Es un CUARTO indicador de costo/avance en la app (junto al
+ * SPI del EVM de obra, el SPI por duracion de gerencia, y el avance fisico
+ * del sobregiro proyectado); llamarlo igual que cualquiera de esos tres
+ * seria repetir el problema de confianza que ya costo caro una vez.
+ */
+export async function evmDeCartera(
+  sesion: SesionActiva,
+): Promise<EvmDeCartera | null> {
+  if (sesion.obrasAsignadas !== null) return null;
+  if (!puede(sesion, "cronograma:leer")) return null;
+  if (!puede(sesion, "orden:leer")) return null;
+
+  const { lote, obrasVivas } = await loteConAvanceMedido(sesion);
+
+  if (lote.length === 0) {
+    return { obras: [], obrasVivas, tope: MAX_OBRAS_POR_CARGA };
+  }
+
+  const obraIds = lote.map((o) => o.obraId);
+
+  const [presupuestos, imputaciones] = await Promise.all([
+    totalesPorObra(obraIds),
+    // AC: SOLO ordenes ya aprobadas -sueltas y contra encargo, sin
+    // distincion-, igual que `evm.service.ts` para una obra. `OrdenImputacion`
+    // no tiene `projectId` propio (solo `ordenId`/`wbsItemId`): se agrega en
+    // JS por `ordenCompra.projectId`, mismo patron que `imputacionesSueltas`
+    // en `sobregiroProyectadoDeCartera`.
+    prisma.ordenImputacion.findMany({
+      where: {
+        ordenCompra: {
+          estado: "APROBADA",
+          projectId: { in: obraIds },
+          companyId: sesion.companyId,
+        },
+      },
+      select: { importe: true, ordenCompra: { select: { projectId: true } } },
+    }),
+  ]);
+
+  const acPorObra = new Map<string, string[]>();
+  for (const i of imputaciones) {
+    const obraId = i.ordenCompra.projectId;
+    const importes = acPorObra.get(obraId) ?? [];
+    importes.push(i.importe.toString());
+    acPorObra.set(obraId, importes);
+  }
+
+  const obras: ObraConEvmDeCartera[] = lote.map((o) => {
+    const bac = presupuestos.get(o.obraId)?.costoDirecto ?? "0.00";
+
+    let planeadoPct = 0;
+    let realPct = 0;
+    if (o.datos) {
+      const programadas = o.datos.tareas.filter((t) => !t.sinProgramar);
+      planeadoPct = Number(
+        ponderarPorDuracion(programadas, (t) => t.porcentajePlaneado),
+      );
+      realPct = Number(
+        ponderarPorDuracion(programadas, (t) => t.porcentajeReal),
+      );
+    }
+
+    const pv = valorDeAvance(bac, planeadoPct);
+    const ev = valorDeAvance(bac, realPct);
+    // `ac` NUNCA null aqui: el gate de "orden:leer" ya paso al entrar a la
+    // funcion. `null` en `EntradaEvm.ac` significa "sin permiso" -si se
+    // pasara aqui, `hayBaseParaProyectar` diria el motivo equivocado
+    // ("no tienes permiso") a una obra que en realidad solo no tiene
+    // todavia ninguna orden aprobada ("sin_gasto").
+    const ac = sumar(acPorObra.get(o.obraId) ?? []);
+
+    return {
+      obraId: o.obraId,
+      obraNombre: o.obraNombre,
+      metricas: metricasEvm({ bac, pv, ev, ac }),
+    };
+  });
+
+  return { obras, obrasVivas, tope: MAX_OBRAS_POR_CARGA };
+}
+
+// ---------------------------------------------------------------------------
+// Confiabilidad de cartera (PPC de la ultima semana cerrada, por obra)
+// ---------------------------------------------------------------------------
+
+export interface ObraConPpc {
+  obraId: string;
+  obraNombre: string;
+  /// null = esta obra todavia no tiene ninguna semana de Plan Semanal cerrada.
+  ultimo: UltimoPpc | null;
+  banda: BandaPpc | null;
+}
+
+export interface ConfiabilidadDeCartera {
+  /// Con ultimo PPC primero, peor banda arriba; las que no tienen ninguna
+  /// semana cerrada van al final.
+  obras: ObraConPpc[];
+  obrasSinPlanCerrado: number;
+}
+
+/**
+ * El PPC de la ultima semana cerrada de cada obra de la cartera.
+ *
+ * Reusa `ppcDeLaUltimaCerrada` de `plan-semanal.service.ts` tal cual -la
+ * MISMA cuenta que ya usa `/panel`, no una segunda formula-. A proposito
+ * NO promedia el historico de cada obra: eso exigiria traer todas sus
+ * semanas cerradas, el mismo coste que esa funcion evito desde que se
+ * escribio ("con un año de obra son cincuenta semanas, para acabar usando
+ * una de cada cincuenta").
+ *
+ * Los `obraIds` salen de `loteConAvanceMedido` -mismo lote y mismo filtro
+ * de "obra viva" que el resto de la pantalla-, no del filtro propio de
+ * `semanaDeLaEmpresa` (que no excluye obras `archivadaEn`): sin esto, una
+ * obra restaurada de un respaldo podria aparecer aqui mientras el resto de
+ * `/gerencia` ya la excluye.
+ */
+export async function confiabilidadDeCartera(
+  sesion: SesionActiva,
+): Promise<ConfiabilidadDeCartera | null> {
+  if (sesion.obrasAsignadas !== null) return null;
+  if (!puede(sesion, "plan_semanal:leer")) return null;
+
+  const { lote } = await loteConAvanceMedido(sesion);
+  if (lote.length === 0) return { obras: [], obrasSinPlanCerrado: 0 };
+
+  const porObra = await ppcDeLaUltimaCerrada(lote.map((o) => o.obraId));
+
+  const obras: ObraConPpc[] = lote.map((o) => {
+    const ultimo = porObra.get(o.obraId) ?? null;
+    return {
+      obraId: o.obraId,
+      obraNombre: o.obraNombre,
+      ultimo,
+      banda: ultimo?.ppc === null || ultimo?.ppc === undefined
+        ? null
+        : bandaDePpc(ultimo.ppc),
+    };
+  });
+
+  // Peor banda primero (malo, flojo, bueno), y dentro de cada banda el PPC
+  // mas bajo arriba; sin ninguna semana cerrada, al final.
+  const ORDEN_BANDA: Record<BandaPpc, number> = { malo: 0, flojo: 1, bueno: 2 };
+  obras.sort((a, b) => {
+    if (a.banda === null && b.banda === null) return 0;
+    if (a.banda === null) return 1;
+    if (b.banda === null) return -1;
+    if (a.banda !== b.banda) return ORDEN_BANDA[a.banda] - ORDEN_BANDA[b.banda];
+    return (a.ultimo?.ppc ?? 0) - (b.ultimo?.ppc ?? 0);
+  });
+
+  return {
+    obras,
+    obrasSinPlanCerrado: obras.filter((o) => o.ultimo === null).length,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Valorizaciones de cartera
+// ---------------------------------------------------------------------------
+
+export interface ObraConValorizaciones {
+  obraId: string;
+  obraNombre: string;
+  vencidas: number;
+  /// Con saldo por pagar, pero todavia no vencida.
+  pendientes: number;
+  porPagarTotal: string;
+}
+
+export interface ValorizacionesDeCartera {
+  /// Solo las obras con algo por pagar, mayor porPagarTotal primero.
+  obras: ObraConValorizaciones[];
+  totalVencidas: number;
+}
+
+/**
+ * Cuantas valorizaciones estan vencidas o pendientes de pago, de toda la
+ * cartera. No existe hoy ningun otro sitio donde verlo sin entrar obra por
+ * obra: `/panel` solo muestra "comprometido" (encargos + ordenes), nunca el
+ * estado de PAGO real.
+ *
+ * Reusa, sin copiar, las dos piezas puras que ya usa `pagos.service.ts`
+ * para una obra: `estadoDeCadencia` (los tres niveles de herencia -fechas
+ * pactadas, `cadenciaDias` del encargo, `diaCorteSemanal` de la obra-) e
+ * `importeValorizado`. `diaCorteSemanal` sale del lote de
+ * `loteConAvanceMedido`, ya extendido para traerlo.
+ *
+ * COSTE REAL, dicho sin adornar: MEDIA, no BARATA. Es la primera seccion de
+ * este archivo que carga filas COMPLETAS con relaciones anidadas (fechas
+ * pactadas + ultima valorizacion + todos los pagos) en vez de un agregado
+ * puro -sigue siendo UNA consulta, sin loop por obra, pero con mas payload
+ * que cualquier otro bloque de gerencia hoy-.
+ */
+export async function valorizacionesDeCartera(
+  sesion: SesionActiva,
+): Promise<ValorizacionesDeCartera | null> {
+  if (sesion.obrasAsignadas !== null) return null;
+  if (!puede(sesion, "orden:leer")) return null;
+
+  const { lote } = await loteConAvanceMedido(sesion);
+  if (lote.length === 0) return { obras: [], totalVencidas: 0 };
+
+  const diaCortePorObra = new Map(lote.map((o) => [o.obraId, o.diaCorteSemanal]));
+  const obraIds = lote.map((o) => o.obraId);
+
+  const encargos = await prisma.encargoProveedor.findMany({
+    where: { estado: "VIGENTE", projectId: { in: obraIds } },
+    select: {
+      projectId: true,
+      montoContratado: true,
+      cadenciaDias: true,
+      fechaInicio: true,
+      createdAt: true,
+      fechasValorizacion: { select: { fecha: true } },
+      valorizaciones: {
+        orderBy: { fecha: "desc" },
+        take: 1,
+        select: { fecha: true, porcentaje: true },
+      },
+      pagos: { select: { monto: true } },
+    },
+  });
+
+  const dia = hoy();
+  const acumulado = new Map<
+    string,
+    { vencidas: number; pendientes: number; porPagar: string[] }
+  >();
+
+  for (const e of encargos) {
+    const diaCorteObra = diaCortePorObra.get(e.projectId) ?? 5;
+    const ultima = e.valorizaciones[0] ?? null;
+    const porcentaje = ultima?.porcentaje.toString() ?? "0";
+    const valorizado = importeValorizado(e.montoContratado.toString(), porcentaje);
+    const pagado = sumar(e.pagos.map((p) => p.monto.toString()));
+    const porPagar = restar(valorizado, pagado) ?? "0.00";
+
+    if (!esPositivo(porPagar)) continue;
+
+    const cadencia = estadoDeCadencia(
+      {
+        diaCorteObra,
+        cadenciaDias: e.cadenciaDias,
+        fechas: e.fechasValorizacion.map((f) => f.fecha),
+        ultimaValorizacion: ultima?.fecha ?? null,
+        inicioEncargo: e.fechaInicio ?? e.createdAt,
+      },
+      dia,
+    );
+
+    const fila = acumulado.get(e.projectId) ?? {
+      vencidas: 0,
+      pendientes: 0,
+      porPagar: [],
+    };
+    if (cadencia.vencida) fila.vencidas++;
+    else fila.pendientes++;
+    fila.porPagar.push(porPagar);
+    acumulado.set(e.projectId, fila);
+  }
+
+  const nombrePorObra = new Map(lote.map((o) => [o.obraId, o.obraNombre]));
+  const obras: ObraConValorizaciones[] = [...acumulado.entries()].map(
+    ([obraId, f]) => ({
+      obraId,
+      obraNombre: nombrePorObra.get(obraId) ?? obraId,
+      vencidas: f.vencidas,
+      pendientes: f.pendientes,
+      porPagarTotal: sumar(f.porPagar),
+    }),
+  );
+
+  obras.sort((a, b) => Number(b.porPagarTotal) - Number(a.porPagarTotal));
+
+  return {
+    obras,
+    totalVencidas: obras.reduce((n, o) => n + o.vencidas, 0),
+  };
 }
