@@ -182,13 +182,20 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      recargando la META por capitulo, lo que da 18146.90 para los mismos
      datos de ejemplo — el detector ya no puede dispararse nunca de forma
      legitima.
-   - `msproject-xml-escribir.ts:191-195` afirma en un comentario que el
-     "% Planeado" se recupera igual que en la plantilla de Excel
-     (reparto lineal por fechas). Falso: el lector de MS Project
-     (`msproject-xml.ts:510-518`) lo deja en 0.00 sin repartir nada. Los
-     dos importadores "espejo" del cronograma producen curvas de avance
-     previsto distintas para el mismo caso ("campo vacio"), sin test que
-     lo cubra.
+   - ~~`msproject-xml-escribir.ts:191-195` afirma en un comentario que el
+     "% Planeado" se recupera igual que en la plantilla de Excel~~
+     **ARREGLADO el 21 de agosto de 2026: se corrigio el comentario, no el
+     comportamiento.** Investigado a fondo: el lector de MS Project
+     (`msproject-xml.ts`) SI deja el campo en 0.00 sin repartir nada —eso
+     era cierto—, pero es la cabecera del propio archivo la que lo exige
+     ("nada se deduce ni se recalcula: MS Project manda sobre el plan e
+     inventar una cifra que el planificador no escribio descuadraria el
+     informe que el cliente ya emite"). Portar el reparto lineal de Excel
+     ahi habria sido romper esa regla a proposito, no arreglar un bug. Se
+     dejo el comportamiento igual y se reescribio el comentario del
+     escritor para que diga la verdad. La prueba "avisa cuando una tarea
+     no trae % planeado y la deja en cero" (`msproject-xml.test.ts`) ya
+     cubria este caso — el "sin test que lo cubra" tambien era impreciso.
    - Kanban: `TableroKanban.tsx` documenta ser "DE LECTURA" a proposito,
      pero pinta el boton "Empezo en obra" sin comprobar permiso; CONSULTOR
      (el cliente) lo ve y, si lo pulsa, el servidor lo rechaza en silencio

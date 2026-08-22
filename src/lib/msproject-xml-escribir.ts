@@ -189,10 +189,14 @@ function tarea(t: {
     "      <Milestone>0</Milestone>",
     // Plan sin ejecutar: no hay avance que declarar.
     "      <PercentComplete>0</PercentComplete>",
-    // El «% Planeado» se OMITE a proposito, igual que en la plantilla de
-    // Excel: el lector lo deduce del reparto de la duracion y avisa de que lo
-    // hizo, que es mejor que traerlo escrito como si alguien lo hubiera
-    // pensado.
+    // El «% Planeado» se OMITE a proposito: es el campo que ProjectLibre
+    // llena al planificar, no algo que GCM deba inventar antes de que exista
+    // un plan. OJO, a diferencia de la plantilla de Excel: el lector de este
+    // XML (`msproject-xml.ts`) NO reparte la duracion para deducirlo -esa
+    // deduccion es solo del importador de Excel-. Aqui, sin el campo, el
+    // lector anota "0.00" y avisa; es la misma regla que el propio archivo
+    // declara en su cabecera ("nada se deduce ni se recalcula: MS Project
+    // manda sobre el plan").
     "    </Task>",
   ].join("\n");
 }
