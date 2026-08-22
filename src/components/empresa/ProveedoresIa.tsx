@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import {
   AlertCircle,
   CheckCircle2,
+  ExternalLink,
   LoaderCircle,
   Bot,
   Search,
@@ -429,6 +430,17 @@ function FormularioNuevo({ hayLlave }: { hayLlave: boolean }) {
             className="mt-1 w-full rounded-lg border px-3 py-2"
             style={{ borderColor: "var(--borde)" }}
           />
+          {definicion.urlClaves && (
+            <a
+              href={definicion.urlClaves}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-flex items-center gap-1 text-xs underline opacity-70"
+            >
+              Consigue tu clave de {definicion.etiqueta} aquí
+              <ExternalLink className="size-3" aria-hidden />
+            </a>
+          )}
         </label>
       </div>
 

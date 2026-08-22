@@ -106,31 +106,46 @@ export const TIPOS_PROVEEDOR_IA_CONOCIDOS = [
  * ofrecer. La URL sigue siendo editable aunque venga precargada: si un
  * servicio cambia la suya, o alguien usa un proxy, no hay que esperar un
  * cambio de codigo para escribir la que haga falta.
+ *
+ * `urlClaves` es la pagina del PROVEEDOR donde se genera la clave -no de
+ * GCM-, para que el formulario pueda ofrecer "consigue tu clave aqui" sin
+ * que quien la llena tenga que ir a buscarla por su cuenta. `null` solo en
+ * `otro`: ahi no hay un sitio unico que ofrecer.
  */
 export const SERVICIOS_IA_CONOCIDOS = [
-  { valor: "claude", etiqueta: "Claude (Anthropic)", tipo: "claude", urlBase: null },
+  {
+    valor: "claude",
+    etiqueta: "Claude (Anthropic)",
+    tipo: "claude",
+    urlBase: null,
+    urlClaves: "https://console.anthropic.com/settings/keys",
+  },
   {
     valor: "gemini",
     etiqueta: "Gemini (Google)",
     tipo: "openai_compatible",
     urlBase: "https://generativelanguage.googleapis.com/v1beta/openai",
+    urlClaves: "https://aistudio.google.com/app/apikey",
   },
   {
     valor: "groq",
     etiqueta: "Groq",
     tipo: "openai_compatible",
     urlBase: "https://api.groq.com/openai/v1",
+    urlClaves: "https://console.groq.com/keys",
   },
   {
     valor: "openrouter",
     etiqueta: "OpenRouter",
     tipo: "openai_compatible",
     urlBase: "https://openrouter.ai/api/v1",
+    urlClaves: "https://openrouter.ai/settings/keys",
   },
   {
     valor: "otro",
     etiqueta: "Otro compatible con OpenAI",
     tipo: "openai_compatible",
     urlBase: null,
+    urlClaves: null,
   },
 ] as const;
