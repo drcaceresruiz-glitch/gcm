@@ -55,7 +55,16 @@ export default async function DashboardLayout({
   // Los permisos se resuelven aqui y no en el componente de navegacion: la
   // comprobacion se queda en el servidor y al cliente solo viaja la lista de
   // enlaces que esa persona puede ver.
-  const enlaces = [
+  //
+  // Tipado como `(EnlaceEmpresa | false)[]` y no dejado inferir: sin esto,
+  // un `clave` que no existiera en `ICONOS` de `Navegacion.tsx` (como paso
+  // con "archivo"/"migracion", el 22 de agosto de 2026: React revento con
+  // el error #130 al intentar pintar un icono `undefined`) no lo veia ni
+  // `tsc` ni el smoke test —solo se dispara al ABRIR el desplegable, y
+  // ninguno de los dos hace clic—. El `as EnlaceEmpresa[]` que habia antes
+  // silenciaba justo este chequeo; ahora cada literal se valida contra
+  // `EnlaceEmpresa` ANTES del `.filter()`, no despues.
+  const candidatosEmpresa: (EnlaceEmpresa | false)[] = [
     puede(sesion, "proveedor:leer") && {
       href: "/empresa/proveedores",
       etiqueta: "Proveedores",
@@ -116,7 +125,10 @@ export default async function DashboardLayout({
       clave: "migracion",
       grupo: "empresa",
     },
-  ].filter(Boolean) as EnlaceEmpresa[];
+  ];
+  const enlaces = candidatosEmpresa.filter(
+    (e): e is EnlaceEmpresa => e !== false,
+  );
 
   return (
     // Envuelve TODO, `children` incluido: es la unica forma de que un layout

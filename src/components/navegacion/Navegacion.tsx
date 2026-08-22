@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
+  Archive,
   Bell,
   BookOpen,
   Building2,
@@ -12,6 +13,7 @@ import {
   KeyRound,
   LogOut,
   Menu,
+  PackageOpen,
   Receipt,
   Settings,
   ShieldCheck,
@@ -60,6 +62,8 @@ const ICONOS = {
   usuarios: UsersRound,
   permisos: ShieldCheck,
   solicitudes: ClipboardCheck,
+  archivo: Archive,
+  migracion: PackageOpen,
 } as const;
 
 /**
