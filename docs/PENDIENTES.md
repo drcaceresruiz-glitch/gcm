@@ -747,6 +747,24 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
       empresas verificado de forma explicita, no solo asumido),
       typecheck, lint, build y `scripts/humo.ts` en verde.
 
+      **Verificado en navegador real el 22 de agosto de 2026** (con
+      Claude in Chrome) y cazo un bug de verdad, no hipotetico: la
+      empresa propia del operador SI puede escribir a soporte —nada en
+      `/empresa/soporte` se lo impide, es el mismo enlace que ve
+      cualquier otra empresa—, la insignia de `/operador` SI contaba ese
+      mensaje como sin leer, pero la ficha ocultaba el bloque de Soporte
+      para `esLaPropia` "porque no tiene sentido hablar con uno mismo":
+      un mensaje real, contado como pendiente, sin ningun sitio donde
+      leerlo ni contestarlo. Se probo en vivo —se escribio un mensaje
+      real, la insignia aparecio, se abrio la ficha y el bloque no
+      estaba— antes de arreglarlo: se quito la exclusion de `esLaPropia`
+      para `SoporteConstructora` (a diferencia de suspender/eliminar, que
+      si siguen sin ofrecerse ahi, porque esas si son actos sobre un
+      tercero). Round-trip completo verificado en vivo despues: empresa
+      escribe -> aparece en `/operador` -> operador lo lee (marca
+      `leidoPorOperadorAt`) y responde -> la respuesta aparece en
+      `/empresa/soporte`.
+
     **Lo que queda sin tocar de este hallazgo**: "dar de alta un acceso
     en modo demo" no se construyo — las dos entregas de hoy fueron
     licencia (registro manual) y soporte (mensajeria); un flujo de alta
@@ -1779,11 +1797,19 @@ Lo que SI se hara, en este orden:
    escollo conocido—. Tambien cazo, aparte, que `AgenteIaProveedor` faltaba
    en `EXCLUIDAS_MIGRACION` (`lib/respaldo-empresa-esquema.ts`): la prueba
    que lee el esquema como texto lo marco en rojo antes de llegar a
-   produccion, exactamente para lo que existe. **Sin verificar en
-   navegador real** —esta sesion no tiene esa herramienta—: falta un
-   recorrido manual (guardar un proveedor, probarlo con una clave de
-   verdad, activarlo, eliminarlo) antes de darlo por completamente
-   probado.
+   produccion, exactamente para lo que existe.
+
+   **Verificado en navegador real el 22 de agosto de 2026** (con Claude in
+   Chrome, ya conectado esta sesion): guardar un proveedor, probarlo
+   —llamada de verdad a la API de Anthropic con una clave falsa, 401
+   real, mensaje saneado sin la clave—, confirmar que "Activar" se
+   bloquea sin `verificadoAt`, y eliminar. Los cuatro funcionaron a la
+   primera. Anecdota de metodo: el primer intento de escribir en el
+   formulario de soporte (mas abajo) parecio fallar en silencio con
+   `form_input` programatico seguido de un clic en lote; con clic y
+   tecleo REALES funciono a la primera —misma leccion que
+   `clic-dentro-de-menu-desplegable` de la memoria: un envio de
+   formulario se prueba con una interaccion real, no solo programatica.
 
    **Sigue sin empezar** — la Fase 2, el agente conversacional en si:
    - **Modelo**: el de la clave que la empresa haya activado en

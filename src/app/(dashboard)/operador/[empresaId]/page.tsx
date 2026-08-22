@@ -44,9 +44,15 @@ export default async function FichaConstructoraPage({
 
   // Fuera del Promise.all de arriba a proposito: depende de que `c` exista
   // primero, y esta pantalla no se pinta si la constructora no aparecio.
-  const mensajesSoporte = c.esLaPropia
-    ? []
-    : await hiloDeSoportePorOperador(sesion, empresaId);
+  //
+  // SI se pide tambien para `esLaPropia`: nada en `/empresa/soporte` le
+  // impide a un admin de la propia empresa del operador escribir un
+  // mensaje -es el mismo enlace que ve cualquier otra empresa-, y el
+  // listado de `/operador` YA cuenta esos mensajes en la insignia de
+  // no-leidos. Ocultar este bloque aqui dejaria esa insignia senalando a
+  // un mensaje que nadie puede leer ni contestar: se confirmo en vivo,
+  // no era hipotetico.
+  const mensajesSoporte = await hiloDeSoportePorOperador(sesion, empresaId);
 
   return (
     <div className="space-y-6">
@@ -134,11 +140,11 @@ export default async function FichaConstructoraPage({
         }}
       />
 
-      {/* No tiene sentido con la empresa propia del operador -seria hablar
-          con uno mismo-, mismo criterio que suspender/eliminar de abajo. */}
-      {!c.esLaPropia && (
-        <SoporteConstructora empresaId={c.id} mensajes={mensajesSoporte} />
-      )}
+      {/* SI se ofrece con la empresa propia del operador, a diferencia de
+          suspender/eliminar de mas abajo -ver el comentario de arriba, es
+          la comunicacion, no un acto de administracion sobre un tercero,
+          y no ofrecerla dejaria un mensaje real sin donde leerse-. */}
+      <SoporteConstructora empresaId={c.id} mensajes={mensajesSoporte} />
 
       {/* Lo irreversible, al final y separado. La propia empresa del operador
           NO lo ofrece siquiera: el servicio lo rechaza igual, pero enseñar un
