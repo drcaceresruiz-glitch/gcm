@@ -450,16 +450,9 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
     La idea del contratista por RUC se dejo fuera a proposito, ver mas
     abajo.
 
-11. **Contratista por RUC en la plantilla de presupuesto** — propuesta del
-    usuario, con mi recomendacion ya dada: NO mezclarla con la entrega de
-    fechas (punto 10), porque son dos automatizaciones de naturaleza
-    distinta — una reparte un dato que ya vive en el cronograma (fechas),
-    esta otra crea o vincula una entidad de negocio nueva
-    (contratista/proveedor, con sus propios permisos y flujo de alta) a
-    partir de un identificador externo (RUC), lo que pide su propia
-    validacion (RUC invalido, contratista que no existe aun en GCM, quien
-    tiene permiso para crearlo de rebote). Sin decidir el alcance todavia;
-    pendiente de que el usuario confirme si quiere seguir con esto.
+11. ~~**Contratista por RUC en la plantilla de presupuesto**~~ **DESCARTADO
+    el 21 de agosto de 2026, por decision del usuario.** No se sigue con
+    esta idea.
 
 12. ~~**Semaforo de salud de la cartera en el panel.**~~ **HECHO el 21 de
     agosto de 2026.** Se le mostraron al usuario varias referencias visuales
