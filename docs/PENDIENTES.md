@@ -718,10 +718,14 @@ Dos avisos antes de leer nada de mas abajo:
    precedencias propia, la regla de convergencia de los hitos predictivos
    tambien seguira muda.
 
-5. **Lo que quedo abierto de la auditoria del 10 de agosto** (seccion 6c):
-   los puntos 3, 4, 5, 6, 10, 11 y 12 siguen en pie. El 6 —los hitos entran
-   al denominador del PPC— se comprobo el 21 de agosto y sigue: `esHito` no
-   aparece en `plan-semanal.ts` y `TareaProgramada` sigue sin declararlo.
+5. ~~**Lo que quedo abierto de la auditoria del 10 de agosto**~~ (seccion 6c)
+   **CERRADO el 21 de agosto de 2026**: los puntos 3, 4, 5, 6, 10, 11 y 12
+   se resolvieron esa tarde (el 10, "reabrir+reguardar borra cierre",
+   arreglado; el 4, "eliminar semana deja huerfanos", arreglado; el 5, base
+   vs vigente, aclarado en pantalla; el 6, hitos en el PPC, arreglado; el
+   10 se reclasifico como no-bug; el 11, subtotales, arreglado; el 12,
+   vocabulario, corregido en los tres sitios encontrados). Ver la seccion
+   6c mas abajo para el detalle completo.
 
 6. ~~**El enlace del correo sigue aterrizando en el login y no vuelve a la
    obra.**~~ **HECHO el 21 de agosto de 2026.** `proxy.ts` ahora manda a
@@ -861,11 +865,13 @@ abajo.
      Personal lo dice de una mirada: si hay una fila `correo` y ninguna `GCM`,
      el suscrito es un contacto externo y el comportamiento era correcto —los
      de fuera no tienen bandeja donde ensenarselo—.
-   - **El enlace del correo aterriza en el login y no vuelve a la obra.**
-     **Comprobado el 21 de agosto: sigue igual.** No existe ningun
-     `?siguiente=` en el proyecto ni funcion que valide rutas internas; habria que escribirla (rechazar `//host`, esquema absoluto) y
-     propagar el destino tambien por el paso de 2FA, que hoy solo lleva la
-     cookie del desafio.
+   - ~~**El enlace del correo aterriza en el login y no vuelve a la obra.**~~
+     **HECHO el 21 de agosto de 2026** — ver el punto 6 de la seccion de
+     arriba, con el detalle completo (`?siguiente=`, `rutaSiguienteSegura`
+     en `src/lib/siguiente.ts`, propagado por el paso de 2FA). Esta entrada
+     habia quedado como "sigue igual" por no actualizarse el mismo dia que
+     se arreglo — misma tarde, dos entradas del mismo hallazgo
+     desincronizadas entre si.
    - ~~**Fase B: que el proveedor responda desde el correo.**~~ **HECHO el 19
      de agosto de 2026, y por otro camino.** No hizo falta enlace de un solo
      uso: `correo-entrante.service` LEE el buzon de la empresa por IMAP y ata
