@@ -1,5 +1,7 @@
-import { TOTAL_EJEMPLO } from "@/lib/plantilla-presupuesto";
-import { TOTAL_COSTO_EJEMPLO } from "@/lib/plantilla-meta";
+import {
+  TOTAL_COSTO_EJEMPLO,
+  TOTAL_CONTRACTUAL_EJEMPLO,
+} from "@/lib/plantilla-meta";
 
 /**
  * Reconoce las cifras que trae la PLANTILLA como ejemplo.
@@ -27,9 +29,14 @@ import { TOTAL_COSTO_EJEMPLO } from "@/lib/plantilla-meta";
  * borrado una linea o cambiado un texto, y lo que importa es si las CIFRAS
  * que mueven la obra siguen siendo las del ejemplo. Un total que coincide al
  * centimo con el de la plantilla no es una casualidad de obra.
+ *
+ * Contra `TOTAL_CONTRACTUAL_EJEMPLO`, no contra el total de la plantilla de
+ * presupuesto: desde el 20 de agosto de 2026 el contractual se GENERA desde
+ * la meta (recargando cada capitulo), nunca se importa directo, asi que la
+ * cifra que puede aparecer en una obra real es la que sale de ese pipeline.
  */
 export function pareceContractualDeEjemplo(costoDirecto: string): boolean {
-  return costoDirecto === TOTAL_EJEMPLO;
+  return costoDirecto === TOTAL_CONTRACTUAL_EJEMPLO;
 }
 
 /** La meta son las filas de ejemplo de su plantilla. */

@@ -105,7 +105,18 @@ export const FILAS_EJEMPLO: readonly FilaEjemplo[] = [
   },
 ] as const;
 
-/** Suma de las partidas de ejemplo, para que el test la fije. */
+/**
+ * Suma de las partidas de ejemplo DE ESTA PLANTILLA, para que el test de ida
+ * y vuelta la fije.
+ *
+ * OJO: esto ya NO es el total contractual de una obra de ejemplo. Desde el
+ * 20 de agosto de 2026 no se importa un contractual directo —se genera desde
+ * la meta, recargando cada capitulo (`generarContractual`,
+ * `contractual-desde-meta.ts`)—, y esa via da un total distinto para un
+ * ejemplo equivalente. Quien busque "el total que detecta una obra de
+ * ejemplo" quiere `TOTAL_CONTRACTUAL_EJEMPLO` en `plantilla-meta.ts`, no esta
+ * constante.
+ */
 export const TOTAL_EJEMPLO = "18509.00";
 
 const INSTRUCCIONES: readonly (readonly [string, string])[] = [

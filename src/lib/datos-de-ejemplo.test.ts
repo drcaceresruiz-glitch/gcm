@@ -5,9 +5,9 @@ import {
   pareceContractualDeEjemplo,
   pareceMetaDeEjemplo,
 } from "@/lib/datos-de-ejemplo";
-import { TOTAL_EJEMPLO } from "@/lib/plantilla-presupuesto";
 import {
   TOTAL_COSTO_EJEMPLO,
+  TOTAL_CONTRACTUAL_EJEMPLO,
 } from "@/lib/plantilla-meta";
 
 /**
@@ -22,7 +22,7 @@ import {
 
 describe("reconocer los datos de ejemplo de las plantillas", () => {
   it("caza el presupuesto contractual de ejemplo", () => {
-    expect(pareceContractualDeEjemplo(TOTAL_EJEMPLO)).toBe(true);
+    expect(pareceContractualDeEjemplo(TOTAL_CONTRACTUAL_EJEMPLO)).toBe(true);
   });
 
   it("caza la meta de ejemplo por su costo directo", () => {
@@ -49,7 +49,7 @@ describe("reconocer los datos de ejemplo de las plantillas", () => {
     // el presupuesto; si solo la meta, basta con volver a cargarla.
     expect(
       origenDeEjemplo({
-        costoDirectoContractual: TOTAL_EJEMPLO,
+        costoDirectoContractual: TOTAL_CONTRACTUAL_EJEMPLO,
         costoDirectoMeta: "612000.00",
       }),
     ).toEqual({ contractual: true, meta: false, hay: true });
@@ -58,7 +58,7 @@ describe("reconocer los datos de ejemplo de las plantillas", () => {
   it("el caso completo: la obra entera es la plantilla", () => {
     expect(
       origenDeEjemplo({
-        costoDirectoContractual: TOTAL_EJEMPLO,
+        costoDirectoContractual: TOTAL_CONTRACTUAL_EJEMPLO,
         costoDirectoMeta: TOTAL_COSTO_EJEMPLO,
       }),
     ).toEqual({ contractual: true, meta: true, hay: true });

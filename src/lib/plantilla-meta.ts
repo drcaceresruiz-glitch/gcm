@@ -238,6 +238,22 @@ export const FILAS_COSTO: readonly FilaCosto[] = [
 /** Suma de las filas de ejemplo, para que el test la fije. */
 export const TOTAL_COSTO_EJEMPLO = "15478.00";
 
+/**
+ * El total CONTRACTUAL que produce este mismo ejemplo al generarse.
+ *
+ * Es el resultado de correr el pipeline real —`analizarExcel` sobre el
+ * archivo que genera esta plantilla, y `generarContractual` (`@/lib/
+ * contractual-desde-meta`) sobre esas filas, recargando cada capitulo con su
+ * `porcentajeRecargo`—, no una cuenta hecha a mano. `datos-de-ejemplo.ts` lo
+ * usa para detectar una obra cuyo contractual sigue siendo el del ejemplo:
+ * desde el 20 de agosto de 2026 esa es la UNICA via (ya no se importa un
+ * contractual directo), asi que ya no coincide con `TOTAL_EJEMPLO` de
+ * `plantilla-presupuesto.ts` —esa era la cifra de la via retirada—. Si algo
+ * en este archivo o en `contractual-desde-meta.ts` cambia el calculo, hay
+ * que volver a correr el pipeline para fijar la cifra nueva, no adivinarla.
+ */
+export const TOTAL_CONTRACTUAL_EJEMPLO = "18146.90";
+
 interface FilaGasto {
   concepto: string;
   tipo: "FIJO" | "VARIABLE";
