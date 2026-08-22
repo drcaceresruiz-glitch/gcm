@@ -122,6 +122,7 @@ export interface EstadoImportacion {
     completados: number;
     sinCambios: number;
     rechazos: { fila: number; motivo: string }[];
+    avisos: { fila: number; motivo: string }[];
   };
 }
 

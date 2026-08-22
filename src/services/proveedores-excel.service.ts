@@ -12,6 +12,7 @@ import {
   leerFila,
   normalizarTitulo,
   type FilaExcel,
+  type ResultadoFila,
 } from "@/lib/proveedores-excel";
 import {
   crearProveedor,
@@ -95,6 +96,79 @@ export interface ResumenImportacion {
   /// Por que se descarto cada fila, con su numero. Se enseñan todas: «3 filas
   /// con error» sin decir cuales obliga a revisar el archivo entero a ojo.
   rechazos: { fila: number; motivo: string }[];
+  /// Filas que SI se guardaron, pero con algun texto recortado a lo que
+  /// aguanta su columna (`leerFila`, `proveedores-excel.ts`). No impide
+  /// nada -la fila entro-, pero sin esto nadie se enteraba de que su dato
+  /// no cupo entero.
+  avisos: { fila: number; motivo: string }[];
+}
+
+export type ResultadoHoja =
+  | { ok: true; filas: { fila: number; leida: ResultadoFila }[] }
+  | { ok: false; error: string };
+
+/**
+ * Localiza las columnas por su cabecera y lee cada fila con `leerFila`.
+ *
+ * Parte pura de `importarProveedores`, sin tocar la base: existe separada
+ * para que un test pueda generar la plantilla y analizarla de punta a punta,
+ * igual que ya hacen `plantilla-presupuesto.test.ts` y compania. Sin esto,
+ * el analisis vivia mezclado con la escritura y no habia forma de probar el
+ * "de ida y vuelta" sin simular Prisma entero.
+ */
+export function leerFilasDelLibro(hoja: ExcelJS.Worksheet): ResultadoHoja {
+  // Donde esta cada columna, buscando su titulo en la fila de cabecera.
+  const columnas = new Map<number, (typeof CAMPOS_EXCEL)[number]["clave"]>();
+  const cabecera = hoja.getRow(FILA_CABECERA);
+
+  cabecera.eachCell((celda, n) => {
+    const titulo = normalizarTitulo(String(celda.value ?? ""));
+
+    const campo = CAMPOS_EXCEL.find(
+      (c) => normalizarTitulo(c.titulo) === titulo,
+    );
+
+    if (campo) columnas.set(n, campo.clave);
+  });
+
+  if (columnas.size === 0) {
+    return {
+      ok: false,
+      error:
+        "No se reconocieron las columnas. Descarga la plantilla y rellénala sin cambiar la fila de títulos.",
+    };
+  }
+
+  const filas: { fila: number; leida: ResultadoFila }[] = [];
+
+  // Se empieza DESPUES de la cabecera. La fila de opciones y la de ejemplo se
+  // descartan solas: la primera no tiene RUC y la segunda lo tiene de mentira
+  // —y si alguien deja el ejemplo, entra como un proveedor llamado
+  // «CONSTRUCTORA EJEMPLO», que se ve y se desactiva—.
+  for (let n = FILA_CABECERA + 1; n <= hoja.rowCount; n++) {
+    const fila = hoja.getRow(n);
+    const datos: FilaExcel = {};
+
+    for (const [columna, clave] of columnas) {
+      const valor = fila.getCell(columna).value;
+      if (valor === null || valor === undefined) continue;
+
+      // Un RUC tecleado como numero llega como number, y un correo con enlace
+      // llega como objeto: se aplana todo a texto antes de mirarlo.
+      const texto =
+        typeof valor === "object" && "text" in valor
+          ? String(valor.text)
+          : typeof valor === "object" && "result" in valor
+            ? String(valor.result)
+            : String(valor);
+
+      datos[clave] = texto;
+    }
+
+    filas.push({ fila: n, leida: leerFila(datos) });
+  }
+
+  return { ok: true, filas };
 }
 
 export type ResultadoImportacion =
@@ -137,66 +211,25 @@ export async function importarProveedores(
 
   if (!hoja) return { ok: false, error: "El archivo no tiene ninguna hoja." };
 
-  // Donde esta cada columna, buscando su titulo en la fila de cabecera.
-  const columnas = new Map<number, (typeof CAMPOS_EXCEL)[number]["clave"]>();
-  const cabecera = hoja.getRow(FILA_CABECERA);
-
-  cabecera.eachCell((celda, n) => {
-    const titulo = normalizarTitulo(String(celda.value ?? ""));
-
-    const campo = CAMPOS_EXCEL.find(
-      (c) => normalizarTitulo(c.titulo) === titulo,
-    );
-
-    if (campo) columnas.set(n, campo.clave);
-  });
-
-  if (columnas.size === 0) {
-    return {
-      ok: false,
-      error:
-        "No se reconocieron las columnas. Descarga la plantilla y rellénala sin cambiar la fila de títulos.",
-    };
-  }
+  const leidas = leerFilasDelLibro(hoja);
+  if (!leidas.ok) return leidas;
 
   const resumen: ResumenImportacion = {
     creados: 0,
     completados: 0,
     sinCambios: 0,
     rechazos: [],
+    avisos: [],
   };
 
-  // Se empieza DESPUES de la cabecera. La fila de opciones y la de ejemplo se
-  // descartan solas: la primera no tiene RUC y la segunda lo tiene de mentira
-  // —y si alguien deja el ejemplo, entra como un proveedor llamado
-  // «CONSTRUCTORA EJEMPLO», que se ve y se desactiva—.
-  for (let n = FILA_CABECERA + 1; n <= hoja.rowCount; n++) {
-    const fila = hoja.getRow(n);
-    const datos: FilaExcel = {};
-
-    for (const [columna, clave] of columnas) {
-      const valor = fila.getCell(columna).value;
-      if (valor === null || valor === undefined) continue;
-
-      // Un RUC tecleado como numero llega como number, y un correo con enlace
-      // llega como objeto: se aplana todo a texto antes de mirarlo.
-      const texto =
-        typeof valor === "object" && "text" in valor
-          ? String(valor.text)
-          : typeof valor === "object" && "result" in valor
-            ? String(valor.result)
-            : String(valor);
-
-      datos[clave] = texto;
-    }
-
-    const leida = leerFila(datos);
+  for (const { fila: n, leida } of leidas.filas) {
     if (!leida.ok) {
       if (leida.motivo !== "fila vacía") {
         resumen.rechazos.push({ fila: n, motivo: leida.motivo });
       }
       continue;
     }
+    if (leida.aviso) resumen.avisos.push({ fila: n, motivo: leida.aviso });
 
     const existente = await prisma.proveedor.findFirst({
       where: { companyId: sesion.companyId, ruc: leida.datos.ruc },

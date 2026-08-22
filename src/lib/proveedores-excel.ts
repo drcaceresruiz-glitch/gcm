@@ -28,6 +28,12 @@ export interface CampoExcel {
   opciones?: readonly string[];
   /// Los dos unicos sin los cuales una fila no sirve para nada.
   obligatorio?: boolean;
+  /// Cuantos caracteres aguanta la columna de `Proveedor` en la base
+  /// (`prisma/schema.prisma`). Sin esto se trunca en silencio en
+  /// `proveedores.service.ts` (`saneado()`) y nadie se entera de que su
+  /// texto no cabia entero — el mismo descuido que causo el incidente de
+  /// "Data too long" del 20 de agosto en el importador de presupuesto.
+  maxLargo?: number;
 }
 
 export const CAMPOS_EXCEL: readonly CampoExcel[] = [
@@ -38,10 +44,11 @@ export const CAMPOS_EXCEL: readonly CampoExcel[] = [
     ancho: 42,
     ejemplo: "CONSTRUCTORA EJEMPLO S.A.C.",
     obligatorio: true,
+    maxLargo: 200,
   },
-  { clave: "contactoNombre", titulo: "Contacto", ancho: 24, ejemplo: "Juan Pérez" },
-  { clave: "contactoTelefono", titulo: "Teléfono", ancho: 14, ejemplo: "987654321" },
-  { clave: "email", titulo: "Correo", ancho: 28, ejemplo: "ventas@ejemplo.com" },
+  { clave: "contactoNombre", titulo: "Contacto", ancho: 24, ejemplo: "Juan Pérez", maxLargo: 150 },
+  { clave: "contactoTelefono", titulo: "Teléfono", ancho: 14, ejemplo: "987654321", maxLargo: 30 },
+  { clave: "email", titulo: "Correo", ancho: 28, ejemplo: "ventas@ejemplo.com", maxLargo: 150 },
   {
     clave: "rol",
     titulo: "Qué hace",
@@ -56,7 +63,7 @@ export const CAMPOS_EXCEL: readonly CampoExcel[] = [
     ejemplo: "IGV",
     opciones: ["IGV", "RENTA", "NINGUNO"],
   },
-  { clave: "banco", titulo: "Banco", ancho: 18, ejemplo: "BCP" },
+  { clave: "banco", titulo: "Banco", ancho: 18, ejemplo: "BCP", maxLargo: 80 },
   {
     clave: "tipoCuenta",
     titulo: "Tipo de cuenta",
@@ -71,13 +78,20 @@ export const CAMPOS_EXCEL: readonly CampoExcel[] = [
     ejemplo: "PEN",
     opciones: ["PEN", "USD"],
   },
-  { clave: "cuentaBancaria", titulo: "Número de cuenta", ancho: 24, ejemplo: "194 2629150 0 70" },
-  { clave: "cci", titulo: "CCI", ancho: 26, ejemplo: "00219400262915007012" },
+  {
+    clave: "cuentaBancaria",
+    titulo: "Número de cuenta",
+    ancho: 24,
+    ejemplo: "194 2629150 0 70",
+    maxLargo: 40,
+  },
+  { clave: "cci", titulo: "CCI", ancho: 26, ejemplo: "00219400262915007012", maxLargo: 40 },
   {
     clave: "cuentaDetraccion",
     titulo: "Cuenta de detracción",
     ancho: 24,
     ejemplo: "00-123-456789",
+    maxLargo: 40,
   },
 ];
 
@@ -88,8 +102,30 @@ export const FILA_CABECERA = 4;
 export type FilaExcel = Partial<Record<keyof DatosProveedor, string>>;
 
 export type ResultadoFila =
-  | { ok: true; datos: DatosProveedor }
+  | { ok: true; datos: DatosProveedor; aviso?: string }
   | { ok: false; motivo: string };
+
+/**
+ * Recorta un texto a lo que aguanta su columna, avisando si tuvo que hacerlo.
+ *
+ * Antes de esto, un texto largo se recortaba en silencio dentro de
+ * `saneado()` (`proveedores.service.ts`): quien subia el Excel nunca sabia
+ * que su dato no habia entrado entero. Mismo criterio que
+ * `excel-presupuesto.ts` con `MAX_UNIDAD`/`MAX_CODIGO`.
+ */
+function recortado(
+  etiqueta: string,
+  valor: string,
+  maxLargo: number,
+  avisos: string[],
+): string {
+  if (valor.length <= maxLargo) return valor;
+  const cortado = valor.slice(0, maxLargo);
+  avisos.push(
+    `${etiqueta} "${valor}" pasa de ${maxLargo} caracteres y se guardo como "${cortado}".`,
+  );
+  return cortado;
+}
 
 /**
  * Una fila del Excel convertida en datos, o el motivo de descartarla.
@@ -101,13 +137,19 @@ export type ResultadoFila =
  */
 export function leerFila(fila: FilaExcel): ResultadoFila {
   const ruc = (fila.ruc ?? "").replace(/\D/g, "");
-  const razonSocial = (fila.razonSocial ?? "").trim();
+  let razonSocial = (fila.razonSocial ?? "").trim();
 
   if (!ruc && !razonSocial) return { ok: false, motivo: "fila vacía" };
   if (!/^\d{11}$/.test(ruc)) {
     return { ok: false, motivo: `RUC inválido: «${fila.ruc ?? ""}»` };
   }
   if (!razonSocial) return { ok: false, motivo: `sin razón social (RUC ${ruc})` };
+
+  const avisos: string[] = [];
+  const razonSocialMax = CAMPOS_EXCEL.find((c) => c.clave === "razonSocial")?.maxLargo;
+  if (razonSocialMax) {
+    razonSocial = recortado("La razón social", razonSocial, razonSocialMax, avisos);
+  }
 
   const datos: DatosProveedor = { ruc, razonSocial };
 
@@ -128,10 +170,14 @@ export function leerFila(fila: FilaExcel): ResultadoFila {
       continue;
     }
 
-    datos[campo.clave] = bruto;
+    datos[campo.clave] = campo.maxLargo
+      ? recortado(`"${campo.titulo}"`, bruto, campo.maxLargo, avisos)
+      : bruto;
   }
 
-  return { ok: true, datos };
+  return avisos.length > 0
+    ? { ok: true, datos, aviso: avisos.join(" ") }
+    : { ok: true, datos };
 }
 
 /// Lo que ya tiene guardado un proveedor, para decidir que huecos rellenar.

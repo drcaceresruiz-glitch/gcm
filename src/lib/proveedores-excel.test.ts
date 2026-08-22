@@ -47,6 +47,30 @@ describe("leerFila", () => {
     expect(leerFila({})).toEqual({ ok: false, motivo: "fila vacía" });
   });
 
+  // Antes se recortaba en silencio dentro de saneado() (proveedores.service.ts):
+  // la fila entraba, pero nadie se enteraba de que el dato no cupo entero.
+  it("recorta un texto que pasa de su columna y avisa", () => {
+    const banco = "B".repeat(90); // la columna aguanta 80
+    const r = leerFila({ ruc: "20552103816", razonSocial: "ACME", banco });
+
+    expect(r.ok && r.datos.banco).toBe("B".repeat(80));
+    expect(r.ok && r.aviso).toContain("80 caracteres");
+  });
+
+  it("recorta tambien la razón social, que es obligatoria", () => {
+    const razonSocial = "R".repeat(210); // la columna aguanta 200
+    const r = leerFila({ ruc: "20552103816", razonSocial });
+
+    expect(r.ok && r.datos.razonSocial).toBe("R".repeat(200));
+    expect(r.ok && r.aviso).toContain("razón social");
+  });
+
+  it("un texto que sí cabe no dispara ningún aviso", () => {
+    const r = leerFila({ ruc: "20552103816", razonSocial: "ACME", banco: "BCP" });
+
+    expect(r.ok && r.aviso).toBeUndefined();
+  });
+
   // Quien rellena el Excel escribe «Corriente», no «CORRIENTE». Devolverle el
   // archivo por la caja de las letras es hacerle perder el tiempo.
   it("acepta las listas escritas como sea", () => {

@@ -244,11 +244,20 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      `projectId`), pese a que el comentario de la funcion de al lado cita
      un incidente real del 19/08 sobre exactamente este tipo de fuga como
      ya corregido.
-   - Plantilla de proveedores: unica de las cuatro plantillas sin test de
-     ida y vuelta; sin limites de longitud declarados (a diferencia de
-     `MAX_UNIDAD`/`MAX_CODIGO`, anadidos tras el incidente de "Data too
-     long" del 20/08); trunca campos largos en silencio en vez de avisar
-     por fila, al reves que `excel-presupuesto.ts`.
+   - ~~Plantilla de proveedores: unica de las cuatro plantillas sin test de
+     ida y vuelta~~ **HECHO el 21 de agosto de 2026.** `CAMPOS_EXCEL`
+     (`proveedores-excel.ts`) gano `maxLargo` por campo, reflejando los
+     `@db.VarChar` de `Proveedor` en el esquema (razonSocial 200,
+     contactoNombre 150, contactoTelefono 30, email 150, banco 80,
+     cuentaBancaria/cci/cuentaDetraccion 40 cada uno). `leerFila` recorta y
+     avisa por fila en vez de dejar que `saneado()`
+     (`proveedores.service.ts`) trunque en silencio -mismo patron que
+     `MAX_UNIDAD`/`MAX_CODIGO` de `excel-presupuesto.ts`-, y el aviso llega
+     hasta la pantalla (`ResumenImportacion.avisos`,
+     `ImportarProveedores.tsx`). Se extrajo `leerFilasDelLibro` (parte pura
+     de `importarProveedores`, antes mezclada con la escritura en base)
+     para poder escribir el test de ida y vuelta que faltaba,
+     `proveedores-excel.service.test.ts`.
 
    **Bajo:**
    - `MatrizPermisos.tsx`: 10 de los 18 dominios de permiso no tienen

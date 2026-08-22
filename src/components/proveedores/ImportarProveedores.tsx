@@ -139,6 +139,29 @@ export function ImportarProveedores() {
                   )}
                 </div>
               )}
+
+              {/* Estas SI se guardaron: el aviso es informativo, no un
+                  rechazo. Sin esto, un texto que no cupo entero en su
+                  columna se recortaba sin que nadie se enterara. */}
+              {estado.resumen.avisos.length > 0 && (
+                <div className="text-xs">
+                  <p className="font-medium">
+                    {estado.resumen.avisos.length} fila(s) se guardaron con algún dato recortado:
+                  </p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4 opacity-80">
+                    {estado.resumen.avisos.slice(0, 20).map((a) => (
+                      <li key={a.fila}>
+                        Fila {a.fila}: {a.motivo}
+                      </li>
+                    ))}
+                  </ul>
+                  {estado.resumen.avisos.length > 20 && (
+                    <p className="mt-1 opacity-70">
+                      …y {estado.resumen.avisos.length - 20} más.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </form>
