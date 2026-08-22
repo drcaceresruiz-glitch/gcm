@@ -1869,12 +1869,12 @@ Lo que SI se hara, en este orden:
      `pasadaDeCorreoEntrante`): marca con error cualquier fila
      `terminadoAt: null` de mas de 3 minutos, por si el proceso se
      reinicio a mitad de un turno.
-   - **Adaptador**: solo `claude` implementa `conversar()` por ahora
+   - **Adaptador**: al principio solo `claude` implementaba `conversar()`
      (Anthropic Messages API, `tools` + bloques `tool_use` reales, tope
      de 6 vueltas antes de cortar con error explicado en vez de colgarse
-     en silencio); `openai_compatible` se queda solo con `probar()` de la
-     Fase 1 —su formato de function-calling es su propio trabajo, no una
-     copia apurada—.
+     en silencio); `openai_compatible` se quedaba solo con `probar()` de
+     la Fase 1. **Esto duro poco** — ver mas abajo, "openai_compatible
+     tambien conversa", del mismo 22 de agosto.
    - **Permiso**: `agente_ia:usar`, nuevo en `rbac.ts`, NO innegociable
      (a diferencia de `soporte:usar`) —es de la misma familia que
      cualquier otro `:leer`, delegable por la empresa si quiere—. Se
@@ -1912,15 +1912,173 @@ Lo que SI se hara, en este orden:
      segundo mensaje real— confirmando en la base de datos exactamente 2
      filas por turno, sin duplicados, en el orden correcto.
 
+   ~~**openai_compatible tambien conversa.**~~ **HECHO el 22 de agosto de
+   2026, la misma tarde.** El usuario probo el Asistente en produccion con
+   Gemini activo -Claude se habia quedado sin credito- y se encontro con
+   "Este proveedor ('openai_compatible') todavia no tiene conversacion con
+   herramientas implementada en GCM". Se construyo el adaptador completo
+   de tool-use para OpenAI Chat Completions -formato distinto al de
+   Claude: `tools` anidado bajo `function`, el sistema va como un mensaje
+   `role: "system"` mas (Claude lo lleva aparte), y cada llamada trae sus
+   argumentos como TEXTO JSON, no como objeto-. Sirve para Gemini, Groq,
+   OpenRouter y cualquier "otro" compatible con OpenAI: los cuatro hablan
+   el mismo protocolo.
+
+   El contrato de `RespuestaTurno.bruto` cambio para que esto fuera
+   posible sin ensuciar el orquestador: antes era "los bloques crudos de
+   Claude" y quien orquesta el turno los envolvia a mano en
+   `{role:"assistant", content: bruto}` -codigo que asumia el formato de
+   UN proveedor-. Ahora `bruto` es el mensaje "assistant" YA COMPLETO, en
+   el formato exacto de cada proveedor, y el orquestador solo hace
+   `mensajes.push(bruto)`. Los resultados de las herramientas tuvieron el
+   mismo problema al reves -Claude junta todos los resultados de una
+   vuelta en UN mensaje `user` con varios bloques `tool_result`; OpenAI
+   quiere un mensaje `role: "tool"` SEPARADO por cada resultado-, resuelto
+   con `mensajesDeResultados(tipo, resultados)`, otra funcion que cada
+   adaptador implementa a su manera.
+
+   De paso, dos bugs mas cazados en vivo, probando con Gemini de verdad:
+   - **El listado de modelos de Gemini trae el prefijo nativo
+     `models/`** (`models/gemini-2.5-flash`), que su propio endpoint de
+     chat/completions RECHAZA -es una inconsistencia del proveedor entre
+     su listado y su capa de compatibilidad, no un capricho de GCM-. Se
+     quita el prefijo al detectar, para los cuatro servicios por igual
+     (inofensivo para Groq/OpenRouter, que nunca lo traen).
+   - **Ya no se preselecciona el primer modelo detectado.** Uno de los
+     modelos que trae el listado de Gemini result0 ser un modelo
+     experimental que ni siquiera habla el protocolo de chat -"solo
+     soporta Interactions API"-. Ahora el selector obliga a elegir uno a
+     proposito ("Elige uno — no todos sirven para conversar") en vez de
+     dejar puesto por defecto el primero que llego.
+
+   Ademas, dos rondas mas de arreglos sobre esto mismo, cada una cazada
+   probando en vivo:
+
+   1. **"Probar" no detectaba un modelo sin soporte de tool-use.** El
+      Asistente SIEMPRE manda herramientas -no hay forma de saber de
+      antemano si la pregunta las va a necesitar-, pero "Probar" solo
+      mandaba un "hola" sin ninguna: un modelo sin tool-use pasaba la
+      prueba y recien fallaba en el primer mensaje real del Asistente
+      ("`tool calling` is not supported with this model"). Ahora "Probar"
+      manda una herramienta de mentira junto al mensaje (nunca se le pide
+      al modelo que la use, solo que pueda RECIBIRLA sin rechazar la
+      llamada entera), asi que un modelo incompatible lo dice al guardar
+      la clave, no a mitad de una conversacion. Y si de todos modos falla
+      con `tools` puestos, el mensaje de error agrega una pista: "si el
+      proveedor menciona 'tool'/'function calling'... prueba con otro
+      modelo de este mismo proveedor".
+
+      **Esa misma pista provoco un bug real al guardarse**: un mensaje de
+      error largo del proveedor mas la pista juntos superaban el
+      `VARCHAR(300)` de `AgenteIaProveedor.ultimoError`, y el guardado
+      reventaba con "el valor es demasiado largo para la columna" en vez
+      de guardar el error -visto en vivo, con una pantalla de error
+      completa en `/empresa/configuracion/ia`-. `mensajeSaneadoConPista`
+      reserva espacio para la pista ANTES de truncar el mensaje del
+      proveedor, para que los dos juntos siempre quepan.
+
+   2. **Un 503 transitorio ("high demand... try again later") se daba por
+      perdido de una**, obligando a reenviar el mensaje a mano -exactamente
+      lo que el propio proveedor sugiere hacer, reintentar-. Las cuatro
+      llamadas de red del servicio (probar, conversar, detectar modelos,
+      para los dos protocolos) ahora reintentan UNA vez ante codigos
+      realmente transitorios (429/500/502/503/504), nunca ante un
+      400/401/404 -insistir no arregla una clave mala ni un modelo que no
+      existe, solo tarda mas en dar el mismo error-.
+
+   Tambien se agrego un enlace **"Nueva conversación"** en `/asistente`:
+   los intentos fallidos de probar un proveedor se quedaban apilados en
+   pantalla para siempre, sin forma de empezar de cero -no borra nada de
+   la base, las filas viejas se quedan como historia, solo deja de
+   mostrarlas y abre una conversacion distinta-.
+
+   Verificado con 6 pruebas nuevas de reintento/deteccion/largo de
+   columna sobre las ya existentes, typecheck, lint, build y navegador
+   real (Chrome, contra la API real de Anthropic con una clave falsa)
+   antes de cada envio.
+
+   **Un tropiezo en el camino, ya resuelto**: el primer intento de subir
+   la Fase 2b (ver abajo) tumbo el CI -"Cannot find package
+   '@/generated/prisma/client'"-. Causa: `Prisma.JsonNull` es un import
+   de VALOR (no de tipo) del cliente generado, que esta gitignored y solo
+   existe despues de `prisma generate` -en el workflow, un paso DENTRO de
+   `npm run build`, DESPUES de que corren las pruebas-. Un `import type`
+   se borra al compilar y nunca necesita que el archivo exista; uno de
+   valor si, y por eso funcionaba en local -con un cliente ya generado en
+   disco de sesiones anteriores- pero no en un checkout limpio. Nunca
+   llego a produccion -el CI lo freno antes del paso de despliegue-.
+   `barridoDePropuestasExpiradas` ahora filtra "propuesta no es null" en
+   MEMORIA en vez de pedirselo al `where` con el centinela de Prisma, y
+   se verifico de verdad borrando `src/generated/` del todo y corriendo
+   la bateria completa antes de confiar en que el arreglo funcionaba.
+
+   ~~**Fase 2b (escritura): que el agente proponga movimientos, avances y
+   notas.**~~ **HECHA el 22 de agosto de 2026.** Separa "proponer" de
+   "ejecutar", mismo patron de friccion que ya usa el resto de GCM
+   (confirmacion escrita para cerrar obra, motivo obligatorio para
+   paralizar) — el agente PROPONE la accion en texto claro y el usuario
+   confirma antes de que se ejecute la llamada real.
+   - **`proponer_accion`, la UNICA puerta**: una herramienta de lectura
+     normal para el bucle de turnos -nunca escribe nada, solo busca la
+     herramienta de escritura pedida y calcula su resumen-, asi que el
+     orquestador no necesita ningun camino especial para dispararla, solo
+     para interpretar su resultado: cuando tiene exito, el turno se corta
+     ahi mismo -nunca sigue a otra vuelta, ni contesta "ya lo hice"-.
+   - **El resumen de la tarjeta lo calcula el SERVIDOR, nunca el modelo.**
+     Si el texto que el humano lee para decidir saliera de lo que el
+     modelo escribio, podria decir S/ 5,000 mientras `datos` suma S/
+     50,000 -el mismo riesgo de "reinterpretacion" que se queria evitar
+     entre propuesta y confirmacion, un paso antes-. `HerramientaEscritura`
+     hace esto imposible de saltarse por construccion: NO tiene `ejecutar`
+     -a diferencia de `HerramientaAgente`-, asi que meterla por error en
+     el arreglo que el bucle dispara solo es un error de COMPILACION, no
+     una convencion que alguien tiene que recordar.
+   - **Tres herramientas de escritura**: `crear_movimiento` (BORRADOR,
+     nunca compromete el presupuesto por si solo — sigue pendiente de que
+     un administrador con `movimiento:aprobar` lo apruebe aparte, fuera
+     del alcance del agente), `registrar_avance` (un reporte NUEVO en la
+     serie historica, nunca sobrescribe uno viejo) y `crear_nota`. Cada
+     una envuelve la funcion de servicio real que ya existia
+     (`crearMovimiento`, `registrarAvance`, `crearNota`) — nunca Prisma
+     directo. Dos herramientas de LECTURA nuevas, `partidas_de_obra` y
+     `tareas_de_obra`, para que el modelo consiga wbsItemId/uid reales en
+     vez de inventarlos.
+   - **Confirmar o cancelar**: `confirmarPropuestaAgente` reclama la
+     propuesta con un `updateMany` condicionado (`propuestaResueltaAt:
+     null`) ANTES de ejecutar -si dos clicks llegan a la vez, solo uno de
+     los dos gana, el otro ve que ya se resolvio y no ejecuta nada-. Al
+     confirmar, se llama a la funcion de servicio real con el `datos` YA
+     GUARDADO en la propuesta, nunca uno nuevo, y esa funcion vuelve a
+     comprobar el permiso de fondo por su cuenta -si el usuario lo perdio
+     entre la propuesta y el click, lo dice ella sola, sin que la
+     herramienta reimplemente nada-.
+   - **Permiso nuevo `agente_ia:escribir`**, no innegociable, separado de
+     `agente_ia:usar` a proposito: una empresa puede querer el chat de
+     solo lectura para todos y reservar la capacidad de proponer
+     escrituras a quien ya tiene el permiso de fondo. RESIDENTE y
+     ADMIN_OBRA lo tienen junto con `agente_ia:usar` -son exactamente
+     quienes ya hacen `movimiento:crear`/`avance:registrar`/`nota:crear`
+     con las manos, asi que el agente solo les ahorra el formulario,
+     nunca amplia lo que pueden escribir-.
+   - **Propuestas sin resolver expiran solas a las 24 horas**, via un
+     barrido nuevo en el reloj (`barridoDePropuestasExpiradas`) — a
+     proposito NO el mismo barrido de "turnos muertos" (ese es para un
+     proceso que murio a mitad de un `after()`, minutos; una propuesta
+     sin resolver es la situacion NORMAL -alguien cierra la pestana- y
+     puede tardar horas-.
+   - **`MensajeAgente` gana tres columnas**: `propuesta` (Json, el
+     `{herramienta, datos}` exacto), `propuestaResueltaAt` (mismo patron
+     de estado-por-fecha que `terminadoAt`, no un enum) y
+     `propuestaResultado`.
+   - Verificado con pruebas unitarias exhaustivas (propuesta exitosa,
+     rechazada, cancelada, doble-click, aislamiento entre empresas,
+     bloqueo de mensaje nuevo con propuesta pendiente, expiracion),
+     typecheck, lint y build en verde. **Sin verificar todavia en
+     navegador real con un proveedor de IA respondiendo de verdad** — la
+     tarjeta de Confirmar/Cancelar nunca se vio disparar en vivo, solo en
+     las pruebas mockeadas.
+
    **Sigue sin empezar**:
-   - **Fase 2b (escritura)**:
-     separar "proponer" de "ejecutar", mismo patron de friccion que ya usa
-     el resto de GCM (confirmacion escrita para cerrar obra, motivo
-     obligatorio para paralizar) — el agente PROPONE la accion en texto
-     claro y el usuario confirma antes de que se ejecute la llamada real.
-     Y el agente deberia poder crear movimientos en BORRADOR pero NUNCA
-     aprobarlos: la aprobacion de dinero se queda como clic humano
-     deliberado, igual que hoy.
    - **Pedido el 22 de agosto de 2026: que el agente tenga cara — un
      avatar 3D animado en el navegador, llamado "Mike".** Confirmado con
      el usuario que "Mike" no existe hoy en ningun lado (ni en GCM ni en
@@ -1937,8 +2095,8 @@ Lo que SI se hara, en este orden:
      usuario, al menos:
      - **De donde sale el modelo 3D de "Mike"**: no se puede generar
        codigo sin un asset —un personaje 3D rigged y animado hay que
-       modelarlo, encargarlo, o generarlo con un servicio (p. ej. Ready
-       Player Me u otro), no se escribe a mano—.
+       modelarlo, encargarlo, o generarlo con un servicio, no se escribe
+       a mano—.
      - **Que libreria de render en el navegador** (candidato obvio:
        Three.js/`react-three-fiber`, pero es una decision a tomar, no un
        hecho) y que impacto tiene en el peso de la pagina y el rendimiento
@@ -1955,9 +2113,72 @@ Lo que SI se hara, en este orden:
        empezar por las tres preguntas de arriba (asset, libreria,
        animacion), no por esta dependencia.
 
-     Sin empezar. Cuando se retome, merece su propia sesion de diseno
-     (posiblemente con `EnterPlanMode` e investigacion dedicada de
-     librerias 3D para React/Next, que hoy no se ha hecho).
+     **Investigado el 22 de agosto de 2026** (workflow dedicado, dos
+     agentes en paralelo con busqueda web real, no de memoria) para
+     responder las tres preguntas de arriba antes de escribir codigo:
+     - **Ready Player Me, el candidato que se habia mencionado, CERRO el
+       31 de enero de 2026** — ya no es una opcion. En su lugar:
+       **Mixamo (Adobe) sigue operando en 2026** y sigue siendo gratis
+       con una cuenta Adobe gratuita —Adobe no lo actualiza hace anos y
+       su propio foro de soporte llego a decir que "ya no tiene
+       soporte", tratarlo como herramienta legada que hoy funciona, no
+       con SLA—. Licencia: personajes y animaciones gratis, sin
+       regalias, para uso comercial O no comercial ilimitado, con la
+       unica condicion de que el asset viaje EMBEBIDO en el producto
+       terminado (este caso exacto) y no se reempaquete suelto para
+       vender. Mixamo NO exporta glTF/GLB directo -solo FBX/OBJ/Collada-,
+       asi que hace falta pasar por Blender (gratis) para convertir.
+       **Alternativa de respaldo sin ese paso de conversion**:
+       Quaternius (quaternius.com), personajes ya en glTF con licencia
+       CC0 explicita, todavia mas permisiva que Mixamo.
+     - **Version exacta a instalar** (confirmado contra el registro de
+       npm, no de memoria): `three@^0.185.1`,
+       `@react-three/fiber@^9.7.0`, `@react-three/drei@^10.7.8` —
+       `three-stdlib` y `detect-gpu` entran como dependencias TRANSITIVAS
+       de drei, pero conviene declararlas directas porque el codigo las
+       importa directo (`SkeletonUtils` de three-stdlib, deteccion de
+       calidad inicial con detect-gpu). Compatibilidad con React 19.2.8 y
+       Next 16.3 confirmada via `npm view <paquete> peerDependencies`
+       sobre esas versiones exactas.
+     - **Turbopack** (bundler de dev y build de este proyecto): no se
+       encontro un problema vigente en 2026 de three.js/r3f/drei con
+       Turbopack en si —lo que aparece en busquedas es un hilo de mayo de
+       2024 contra Next 14.2, sin confirmar si sigue aplicando—.
+       Recomendacion: instalar y compilar SIN tocar `next.config.ts`
+       primero; si el build falla mencionando a esos paquetes por
+       nombre, recien ahi agregar `transpilePackages`. Si hay problemas
+       que Turbopack no resuelve, `next build --webpack` sigue existiendo
+       como valvula de escape. Aparte, vigente y confirmado: la funcion
+       `cacheComponents` de Next 16 (opt-in, este proyecto NO la tiene
+       activada hoy) rompe escenas de three.js/r3f al navegar
+       atras/adelante con el boton del navegador -si alguien la activa
+       algun dia para `/asistente`, hay que reprobar esa navegacion antes
+       de darlo por bueno-.
+     - **Arquitectura**: carga dinamica sin renderizado en servidor
+       (`ssr: false`) para que solo `/asistente` pague el costo de
+       three.js/r3f -ninguna otra pantalla de GCM debe cargarlo-, `Canvas`
+       + `useGLTF`/`useAnimations` de drei, GLB servido desde `public/`.
+       Salvaguarda si WebGL no esta disponible: mostrar solo el chat de
+       texto de siempre, sin romper la pantalla.
+
+     Sin empezar todavia el codigo. Reporte completo del workflow
+     (licencias con enlaces, flujo exacto de exportacion, plan de
+     archivos) disponible en la transcripcion de esta sesion si hace
+     falta revisarlo de nuevo antes de construir.
+
+   ~~**Dictado por voz en el Asistente.**~~ **Investigado el 22 de agosto
+   de 2026** (mismo workflow, en paralelo con lo de Mike), sin empezar el
+   codigo todavia. Decision ya tomada por el usuario: Web Speech API
+   nativa del navegador (`SpeechRecognition`), no un servicio de pago de
+   terceros —mismo criterio que ya descarto Gemini Nano en la seccion 6b:
+   "no se vende algo que funciona a veces", asi que el boton debe
+   degradarse con gracia (ocultarse) en navegadores sin soporte—. El texto
+   transcrito queda EDITABLE en el textarea antes de enviarse, nunca se
+   manda solo. Hallazgo de seguridad confirmado antes de investigar mas:
+   `next.config.ts` tiene hoy `Permissions-Policy` con `microphone=()` —
+   bloquea el microfono en TODO el sitio, GCM nunca lo necesito hasta
+   ahora— hay que cambiarlo a `microphone=(self)` para que esto funcione
+   en produccion. Sin empezar el codigo.
 
 ---
 
