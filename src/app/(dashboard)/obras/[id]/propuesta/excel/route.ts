@@ -8,7 +8,7 @@ import {
   SIMBOLO,
   type Moneda,
 } from "@/lib/propuesta-detalle";
-import { normalizarDecimal } from "@/lib/decimal";
+import { esCero, normalizarDecimal, restar } from "@/lib/decimal";
 import {
   calcularCascadaComercial,
   parametrosDeImpuesto,
@@ -313,7 +313,7 @@ function resumenDeCascada(
     ["SUBTOTAL", cascada.subtotal],
   ];
 
-  if (Number(cascada.descuento) !== 0) {
+  if (!esCero(cascada.descuento)) {
     filas.push([
       "DESCUENTO COMERCIAL (" + pct(porcentajes.descuento) + ")",
       cascada.descuento,
@@ -328,7 +328,8 @@ function resumenDeCascada(
 
   // Solo si de verdad difiere: sin IGV y sin retencion asumida es la misma
   // cifra que el valor de venta, y repetirla con otro nombre confunde.
-  if (Number(cascada.precioVenta) !== Number(cascada.valorVenta)) {
+  const diferenciaPrecioVenta = restar(cascada.precioVenta, cascada.valorVenta);
+  if (diferenciaPrecioVenta === null || !esCero(diferenciaPrecioVenta)) {
     filas.push(["PRECIO DE VENTA", cascada.precioVenta]);
   }
 
