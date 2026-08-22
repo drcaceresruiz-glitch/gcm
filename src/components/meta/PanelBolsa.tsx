@@ -1,12 +1,9 @@
-import { AlertTriangle, CalendarClock, Info, Lock } from "lucide-react";
+import { AlertTriangle, Info, Lock } from "lucide-react";
 
 import { soles } from "@/utils/formato";
 import { fechaCorta } from "@/utils/fechas";
 import { esNegativo, esPositivo } from "@/lib/decimal";
-import {
-} from "@/lib/bolsa";
 import { origenDeEjemplo } from "@/lib/datos-de-ejemplo";
-import { BotonAjustarMeses } from "@/components/meta/BotonAjustarMeses";
 import type { ComparacionMeta } from "@/services/meta.service";
 
 /**
@@ -73,13 +70,7 @@ function Aviso({
   );
 }
 
-export function PanelBolsa({
-  c,
-  obraId,
-}: {
-  c: ComparacionMeta;
-  obraId: string;
-}) {
+export function PanelBolsa({ c }: { c: ComparacionMeta }) {
   const { bolsa, meta, desfase } = c;
   const negativa = esNegativo(bolsa.bolsaTotal);
   const ejemplo = origenDeEjemplo(bolsa);
@@ -166,27 +157,6 @@ export function PanelBolsa({
           />
         </div>
       </div>
-
-
-      {c.lineasLargas.length > 0 && (
-        <Aviso
-          tono="alerta"
-          icono={CalendarClock}
-          titulo={`${c.lineasLargas.length} gasto(s) general(es) duran mas que la obra`}
-        >
-          La obra son {c.mesesObra} meses y estas lineas presupuestan mas:{" "}
-          {c.lineasLargas
-            .map((l) => `${l.concepto} (${l.meses} meses, ${l.exceso} de mas)`)
-            .join("; ")}
-          . Los meses se escriben a mano en el Excel y nada los ata al plazo
-          real, asi que suelen venir de la plantilla sin ajustar. Si es a
-          proposito —una fianza que sigue viva tras entregar— dejalo; si no,
-          corrige los meses y vuelve a cargar. O ajustalos aqui mismo:
-          {!meta.aprobada && (
-            <BotonAjustarMeses obraId={obraId} metaId={meta.id} />
-          )}
-        </Aviso>
-      )}
 
       {ejemplo.hay && (
         <Aviso

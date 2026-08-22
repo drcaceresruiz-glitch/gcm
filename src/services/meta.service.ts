@@ -1,13 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import {
-  normalizarDecimal,
-  sumar,
-  restar,
-  multiplicar,
-  esPositivo,
-} from "@/lib/decimal";
+import { normalizarDecimal, sumar, esPositivo } from "@/lib/decimal";
 import { subtotalesPorRama } from "@/lib/jerarquia-partidas";
 import {
   calcularBolsa,
@@ -25,10 +19,6 @@ import {
   SinLineaBaseError,
 } from "@/services/movimientos.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
-import {
-  lineasMasLargasQueLaObra,
-  type LineaLarga,
-} from "@/lib/gastos-contra-plazo";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -123,44 +113,11 @@ export async function metaQueManda(companyId: string, obraId: string) {
   });
 }
 
-/**
- * Meses entre dos fechas, a razon de 30 dias por mes.
- *
- * Es una convencion de COSTEO, no un calendario: sirve para comparar el plazo
- * que presupuesto la meta con el que dice el cronograma, y para poner precio
- * a la diferencia. No se guarda en ninguna parte ni sale en un documento.
- */
-function mesesEntre(inicio: Date, fin: Date): string {
-  const dias = (fin.getTime() - inicio.getTime()) / 86_400_000;
-  return normalizarDecimal(dias / 30, 2) ?? "0.00";
-}
-
-export interface AvisoPlazo {
-  /// Meses con los que la meta presupuesto sus gastos generales.
-  mesesMeta: string;
-  /// Meses que dice hoy el cronograma de la obra.
-  mesesProgramados: string;
-  /// Meses de mas (positivo) o de menos (negativo).
-  desviacion: string;
-  /// Lo que cuesta cada mes de mas: la suma de los gastos VARIABLES.
-  costeMensual: string;
-  /// desviacion x costeMensual. Gasto de sostenimiento que la meta no
-  /// presupuesto y que, a diferencia del de produccion, no se puede recuperar
-  /// trabajando mejor: solo terminando antes.
-  sobrecosto: string;
-  hay: boolean;
-}
-
 export interface ComparacionMeta {
   meta: MetaResumen;
   bolsa: Bolsa;
-  /// Gastos generales que duran mas que la obra. Vacio = todos cuadran.
-  lineasLargas: LineaLarga[];
-  /// El plazo de la obra, en meses, contra el que se comparan.
-  mesesObra: string;
   /// Cuanto exagera la bolsa por movimientos aprobados despues de fijarla.
   desfase: Desfase;
-  plazo: AvisoPlazo;
 }
 
 export type ResultadoComparacion =
@@ -321,32 +278,7 @@ export async function compararConContractual(
     select: { importeNeto: true },
   });
 
-  const resumenGG = resumenGastosGenerales([]);
-
   const mesesMeta = meta.mesesPlazo.toString();
-  const mesesProgramados = mesesEntre(obra.fechaInicio, obra.fechaFinProgramada);
-  const desviacion = restar(mesesProgramados, mesesMeta, 2) ?? "0.00";
-
-  const plazo: AvisoPlazo = {
-    mesesMeta,
-    mesesProgramados,
-    desviacion,
-    costeMensual: resumenGG.costeMensualDelAtraso,
-    sobrecosto:
-      multiplicar(desviacion, resumenGG.costeMensualDelAtraso, 2) ?? "0.00",
-    hay: esPositivo(desviacion),
-  };
-
-  /**
-   * Las lineas de gasto que duran mas que la obra.
-   *
-   * Se compara contra `mesesProgramados` —las fechas de la obra— y no contra
-   * `mesesMeta`: si alguien presupuesto ocho meses en una obra de trece dias,
-   * comparar contra su propio ocho no delataria nada.
-   */
-  // Sin gastos generales en la meta no hay lineas que puedan pasarse del
-  // plazo: la lista se retiro con ellos.
-  const lineasLargas = lineasMasLargasQueLaObra([], mesesProgramados);
 
   return {
     ok: true,
@@ -373,9 +305,6 @@ export async function compararConContractual(
       desfase: desfaseDeMeta(
         posteriores.map((m) => ({ importeNeto: m.importeNeto.toString() })),
       ),
-      plazo,
-      lineasLargas,
-      mesesObra: mesesProgramados,
     },
   };
 }

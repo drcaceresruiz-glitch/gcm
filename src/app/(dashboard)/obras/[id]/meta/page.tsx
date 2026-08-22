@@ -158,7 +158,7 @@ export default async function MetaPage({
 
       {comparacion.ok ? (
         <>
-          <PanelBolsa c={comparacion.comparacion} obraId={id} />
+          <PanelBolsa c={comparacion.comparacion} />
           <TablaBolsa lineas={comparacion.comparacion.bolsa.porLinea} />
         </>
       ) : (
