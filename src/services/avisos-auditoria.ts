@@ -218,7 +218,7 @@ async function nombresDe(
       : Promise.resolve([]),
     contactos.length
       ? prisma.contactoAviso.findMany({
-          where: { id: { in: contactos } },
+          where: { id: { in: contactos }, project: { companyId } },
           select: { id: true, nombre: true, empresa: true },
         })
       : Promise.resolve([]),

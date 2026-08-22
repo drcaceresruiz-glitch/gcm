@@ -780,7 +780,7 @@ export async function obtenerCronograma(
   // Todos los reportes de la obra, no solo los de este corte: el avance vive
   // aparte del cronograma justamente para sobrevivir a sus versiones.
   const avances = await prisma.avanceTarea.findMany({
-    where: { projectId: obraId },
+    where: { projectId: obraId, project: { companyId: sesion.companyId } },
     orderBy: [{ fecha: "asc" }, { createdAt: "asc" }],
     select: {
       uid: true, porcentaje: true, fecha: true,
@@ -1360,7 +1360,11 @@ export async function informeAlCorte(
 
   // El avance TAL COMO SE CONOCIA a esa fecha.
   const avances = await prisma.avanceTarea.findMany({
-    where: { projectId: obraId, fecha: { lte: fechaCorte } },
+    where: {
+      projectId: obraId,
+      fecha: { lte: fechaCorte },
+      project: { companyId: sesion.companyId },
+    },
     orderBy: [{ fecha: "asc" }, { createdAt: "asc" }],
     select: {
       uid: true, porcentaje: true, fecha: true,
@@ -1800,7 +1804,7 @@ export async function datosCurvaS(
       },
     }),
     prisma.avanceTarea.findMany({
-      where: { projectId: obraId },
+      where: { projectId: obraId, project: { companyId: sesion.companyId } },
       orderBy: [{ fecha: "asc" }, { createdAt: "asc" }],
       select: {
         uid: true, porcentaje: true, fecha: true,
@@ -2052,7 +2056,10 @@ export async function avanceFisicoPorObra(
       },
     }),
     prisma.avanceTarea.findMany({
-      where: { projectId: { in: proyectosConPlan } },
+      where: {
+        projectId: { in: proyectosConPlan },
+        project: { companyId: sesion.companyId },
+      },
       orderBy: [{ fecha: "asc" }, { createdAt: "asc" }],
       select: {
         projectId: true, uid: true, porcentaje: true,

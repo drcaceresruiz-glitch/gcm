@@ -138,7 +138,7 @@ export async function kanbanDeObra(
   const veElPts = puede(sesion, "plan_semanal:leer");
 
   const { abiertos, cerrada } = veElPts
-    ? await compromisosDelTablero(obraId)
+    ? await compromisosDelTablero(obraId, sesion.companyId)
     : { abiertos: [], cerrada: null };
 
   const comprometidas = new Set(
@@ -274,18 +274,21 @@ const CAMPOS_COMPROMISO = {
  * responder a «que pasa ahora», que es justo para lo que sirve. El historial
  * completo ya vive en la pantalla del plan semanal.
  */
-async function compromisosDelTablero(obraId: string): Promise<{
+async function compromisosDelTablero(
+  obraId: string,
+  companyId: string,
+): Promise<{
   abiertos: CompromisoDelTablero[];
   cerrada: { numero: number; compromisos: CompromisoDelTablero[] } | null;
 }> {
   const [planesAbiertos, ultimaCerrada] = await Promise.all([
     prisma.planSemanal.findMany({
-      where: { projectId: obraId, estado: "ABIERTO" },
+      where: { projectId: obraId, estado: "ABIERTO", project: { companyId } },
       orderBy: { fechaCorte: "asc" },
       select: { id: true, numero: true, compromisos: { select: CAMPOS_COMPROMISO } },
     }),
     prisma.planSemanal.findFirst({
-      where: { projectId: obraId, estado: "CERRADO" },
+      where: { projectId: obraId, estado: "CERRADO", project: { companyId } },
       orderBy: { fechaCorte: "desc" },
       select: { id: true, numero: true, compromisos: { select: CAMPOS_COMPROMISO } },
     }),

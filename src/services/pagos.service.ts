@@ -360,7 +360,11 @@ export async function panelDeValorizaciones(
   // Solo los VIGENTES: un encargo cerrado ya no debe valorizar, y uno anulado
   // no existio. Meterlos llenaria el panel de rojo que nadie puede resolver.
   const encargos = await prisma.encargoProveedor.findMany({
-    where: { projectId: obraId, estado: "VIGENTE" },
+    where: {
+      projectId: obraId,
+      estado: "VIGENTE",
+      project: { companyId: sesion.companyId },
+    },
     orderBy: { numero: "asc" },
     select: {
       id: true,

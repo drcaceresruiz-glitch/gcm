@@ -186,7 +186,7 @@ export async function crearRevision(
   }
 
   const items = await prisma.wbsItem.findMany({
-    where: { projectId: obraId },
+    where: { projectId: obraId, project: { companyId: sesion.companyId } },
     orderBy: { orden: "asc" },
     select: {
       codigoPartida: true, descripcion: true, tipo: true, modalidad: true,
