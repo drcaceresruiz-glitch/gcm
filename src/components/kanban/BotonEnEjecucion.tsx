@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useOptimistic } from "react";
 import { LoaderCircle, Play, Undo2 } from "lucide-react";
 
 import {
@@ -16,6 +16,13 @@ import {
  * mas la convertiria en algo que nadie marca —y entonces la columna estaria
  * siempre vacia y mentiria—.
  *
+ * El texto cambia AL TOCAR, no cuando el servidor responde
+ * (`useOptimistic`): en una obra con señal mala, esperar el viaje completo
+ * —guardar y volver a traer el tablero entero via `revalidatePath`— para ver
+ * el propio clic reflejado se siente como que no funciono, e invita a tocar
+ * dos veces. Si el servidor rechaza el cambio, `useOptimistic` deshace sola
+ * el texto en cuanto la transicion termina y el error queda a la vista.
+ *
  * `stopPropagation` porque la tarjeta entera es un enlace: sin eso, marcar
  * el arranque te sacaba de la pantalla.
  */
@@ -28,10 +35,19 @@ export function BotonEnEjecucion({
   compromisoId: string;
   enMarcha: boolean;
 }) {
-  const [estado, enviar, pendiente] = useActionState<EstadoMarcha, FormData>(
+  const [estado, enviarBase, pendiente] = useActionState<EstadoMarcha, FormData>(
     accionMarcarEnEjecucion,
     {},
   );
+  const [enMarchaOptimista, marcarOptimista] = useOptimistic(
+    enMarcha,
+    (_actual, siguiente: boolean) => siguiente,
+  );
+
+  function enviar(datos: FormData) {
+    marcarOptimista(!enMarcha);
+    enviarBase(datos);
+  }
 
   return (
     <form
@@ -56,12 +72,12 @@ export function BotonEnEjecucion({
       >
         {pendiente ? (
           <LoaderCircle className="size-3 animate-spin" aria-hidden />
-        ) : enMarcha ? (
+        ) : enMarchaOptimista ? (
           <Undo2 className="size-3" aria-hidden />
         ) : (
           <Play className="size-3" aria-hidden />
         )}
-        {enMarcha ? "Aún no empezó" : "Empezó en obra"}
+        {enMarchaOptimista ? "Aún no empezó" : "Empezó en obra"}
       </button>
     </form>
   );
