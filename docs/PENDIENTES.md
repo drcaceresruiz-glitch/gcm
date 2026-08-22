@@ -1692,11 +1692,58 @@ Lo que SI se hara, en este orden:
    **Arquitectura pre-conversada el 22 de agosto de 2026**, sin compromiso
    de negocio todavia (el usuario exploraba la idea, no hay venta que la
    exija) — para no volver a empezar de cero cuando llegue el momento:
-   - **Modelo**: Claude via API (el tool-use es lo que hace falta para un
-     agente que actua con criterio, no solo responde). Un modelo
-     open-source autoalojado NO es viable con el hosting actual —el cPanel
-     compartido de 20 Entry Processes no tiene ni RAM ni GPU—; solo tendria
-     sentido si algun dia migran a infraestructura propia.
+   Retomado, tambien el 22 de agosto, con un giro del usuario: cada
+   empresa trae su PROPIO proveedor de IA y su propia clave —GCM no paga
+   ni opera ningun servicio de IA compartido, lo mismo que ya rige para el
+   buzon de correo propio, y hace falta ademas para la version instalable,
+   donde no hay ningun servicio de GCM detras—.
+
+   ~~**Fase 1: proveedores de IA configurables por empresa.**~~ **HECHA el
+   22 de agosto de 2026.** Solo la infraestructura de credenciales, sin el
+   agente conversacional en si (eso sigue en la lista de abajo, sin
+   empezar). `AgenteIaProveedor` (`prisma/schema.prisma`) deja guardar
+   VARIOS proveedores por empresa —no uno, como `RemitenteCorreo`—, cada
+   uno con su clave cifrada (`src/lib/secreto.ts`, mismo cifrado, misma
+   llave, sin una segunda para esto) que nunca vuelve a la pantalla. Cual
+   esta ACTIVO es un puntero en `Company.proveedorIaActivoId`, no un
+   booleano por fila: por construccion nunca puede haber dos a la vez, sin
+   depender de una transaccion que lo garantice (el servicio de todas
+   formas limpia el puntero el mismo al borrar el activo, sin confiar solo
+   en el `onDelete: SetNull` del esquema). Dos adaptadores para arrancar
+   (`src/services/agente-ia.service.ts`) — Claude (Anthropic Messages API)
+   y OpenAI-compatible (Chat Completions contra una URL propia, formato
+   que hablan muchos otros proveedores) —, registrados por un `tipo` que
+   es TEXTO LIBRE en el esquema (mismo criterio que
+   `CompanyPermission.permiso`): sumar un tercer proveedor es una entrada
+   mas en el registro, sin migracion. `activarProveedorIa` exige
+   `verificadoAt`: no se puede activar una clave sin probarla de verdad
+   primero —mismo criterio que `probarRemitente`, que manda un correo real
+   en vez de solo `verify()`—. Pantalla en `/empresa/configuracion/ia`,
+   subpagina propia (no una tarjeta mas en la principal) porque es una
+   LISTA que puede crecer. Verificado: 2557 pruebas en verde (23 nuevas),
+   typecheck, lint, build y `scripts/humo.ts` en verde —que de hecho cazo
+   un fallo real durante la verificacion: el servidor de desarrollo que ya
+   estaba corriendo tenia el cliente de Prisma de ANTES de la migracion,
+   asi que `listarProveedoresIa` reventaba con «Cannot read properties of
+   undefined (reading 'findMany')» aunque el codigo fuera correcto —hubo
+   que reiniciar el servidor tras `prisma generate`, ya anotado antes como
+   escollo conocido—. Tambien cazo, aparte, que `AgenteIaProveedor` faltaba
+   en `EXCLUIDAS_MIGRACION` (`lib/respaldo-empresa-esquema.ts`): la prueba
+   que lee el esquema como texto lo marco en rojo antes de llegar a
+   produccion, exactamente para lo que existe. **Sin verificar en
+   navegador real** —esta sesion no tiene esa herramienta—: falta un
+   recorrido manual (guardar un proveedor, probarlo con una clave de
+   verdad, activarlo, eliminarlo) antes de darlo por completamente
+   probado.
+
+   **Sigue sin empezar** — la Fase 2, el agente conversacional en si:
+   - **Modelo**: el de la clave que la empresa haya activado en
+     `/empresa/configuracion/ia` (Fase 1) — Claude via API sigue siendo el
+     primer proveedor pensado para el tool-use, pero ya no el unico
+     posible, es lo que la Fase 1 abrio. Un modelo open-source autoalojado
+     NO es viable con el hosting actual —el cPanel compartido de 20 Entry
+     Processes no tiene ni RAM ni GPU—; solo tendria sentido si algun dia
+     migran a infraestructura propia.
    - **El principio que manda sobre todo lo demas**: el agente NUNCA toca
      la base cruda ni tiene un bypass de permisos. Sus "herramientas" son
      envoltorios delgados sobre las funciones de servicio que YA existen
@@ -1709,9 +1756,24 @@ Lo que SI se hara, en este orden:
      trabajo pesado dentro de una peticion (`docs/ESTADO.md`). Una llamada
      a un LLM con varias vueltas de tool-use puede tardar 10-30 segundos —
      no puede correr sincrono dentro de un Server Action ocupando uno de
-     los 20 procesos. Hace falta un servicio aparte (funcion serverless o
-     worker con cola) que llame de vuelta a GCM con la sesion real del
-     usuario, o un patron asincrono con sondeo dentro de la misma app.
+     los 20 procesos. **Investigado el 22/08 cual patron asincrono ya
+     existe en GCM para reusar** (no hace falta un servicio aparte):
+     `ProbarSms.tsx` +
+     `accionEnviarSmsDePrueba`/`accionEstadoSmsDePrueba`
+     (`src/app/(dashboard)/empresa/configuracion/acciones.ts`) — una
+     Server Action crea la fila y devuelve su id de inmediato; el cliente
+     sondea OTRA Server Action cada pocos segundos, con tope de espera del
+     lado del cliente, derivando el estado de columnas con fecha, no un
+     enum. Ese es el patron para los TURNOS de conversacion — NO la cola de
+     SMS en si, que es para algo que de verdad sale del proceso a un
+     telefono. Como `obtenerSesion()` exige `cookies()` de una peticion
+     real, el turno tiene que ejecutarse dentro de una Server
+     Action/Route Handler de la sesion real del usuario, nunca en un
+     worker desconectado; para no bloquear la respuesta al cliente
+     mientras dura la llamada, evaluar `after()` de Next.js con un barrido
+     de respaldo (mismo patron de "pasada muerta" que ya usa
+     `correo-entrante.service.ts` via `RelojTarea`) por si el proceso se
+     reinicia a mitad de un turno.
    - **Si algun dia incluye accion (crear/editar), no solo lectura**:
      separar "proponer" de "ejecutar", mismo patron de friccion que ya usa
      el resto de GCM (confirmacion escrita para cerrar obra, motivo

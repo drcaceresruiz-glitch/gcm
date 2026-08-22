@@ -109,6 +109,16 @@ export default async function ConfiguracionPage() {
           tocar el primer dia, y la mas facil de dejar tal como esta. */}
       <VistaPreviaRoles activa={sesion.previsualizacionHabilitada} />
 
+      {/* Subpagina propia (lista, puede crecer) y no una tarjeta mas aqui.
+          Todavia no hay agente conversacional que use estas claves -es solo
+          la infraestructura de credenciales, ver el comentario de esa
+          pantalla-, asi que el enlace se queda discreto por ahora. */}
+      <p className="text-xs opacity-60">
+        <Link href="/empresa/configuracion/ia" className="underline">
+          Proveedores de IA
+        </Link>
+      </p>
+
       {/* Herramienta de diagnostico, no un ajuste: por eso va aparte, al
           final del todo, y como enlace de texto y no como una tarjeta mas.
           Existe para contrastar los umbrales de lib/capacidad.ts contra

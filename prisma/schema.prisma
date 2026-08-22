@@ -173,21 +173,32 @@ model Company {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
-  users             User[]
-  projects          Project[]
-  permisos          CompanyPermission[]
-  proveedores       Proveedor[]
-  ordenes           OrdenCompra[]
-  formasPago        FormaPagoPlantilla[]
-  plantillasMensaje PlantillaMensaje[]
-  solicitudesPerfil SolicitudCambioPerfil[]
-  emisoresSms       EmisorSms[]
-  mensajesSms       MensajeSms[]
+  users               User[]
+  projects            Project[]
+  permisos            CompanyPermission[]
+  proveedores         Proveedor[]
+  ordenes             OrdenCompra[]
+  formasPago          FormaPagoPlantilla[]
+  plantillasMensaje   PlantillaMensaje[]
+  solicitudesPerfil   SolicitudCambioPerfil[]
+  emisoresSms         EmisorSms[]
+  mensajesSms         MensajeSms[]
+  /// Los proveedores de IA que esta empresa guardo (varios posibles, cada
+  /// uno con su propia clave). Cual esta EN USO lo dice `proveedorIaActivo`
+  /// abajo, no un booleano por fila.
+  proveedoresIa       AgenteIaProveedor[]     @relation("ProveedoresDeLaEmpresa")
+  proveedorIaActivoId String?
+  /// Puntero al UNO activo. Se elige un puntero en `Company` y no un
+  /// booleano `activo` en `AgenteIaProveedor` a proposito: por construccion
+  /// no puede haber dos activos a la vez, sin depender de una transaccion
+  /// que lo garantice. `onDelete: SetNull` es la red de seguridad; el
+  /// servicio ademas lo limpia el mismo al borrar (ver `agente-ia.service.ts`).
+  proveedorIaActivo   AgenteIaProveedor?      @relation("ProveedorActivo", fields: [proveedorIaActivoId], references: [id], onDelete: SetNull)
   // `respaldosObra` ya NO es relacion: sus recibos tienen que sobrevivir al
   // borrado de la empresa. Ver `RespaldoObra`.
   /// Singular, no lista: «desde donde sale mi correo» solo admite una
   /// respuesta. Ver `RemitenteCorreo`.
-  remitenteCorreo   RemitenteCorreo?
+  remitenteCorreo     RemitenteCorreo?
 
   /**
    * Desde cuando la empresa esta EN MIGRACION. Null = opera normal.
@@ -347,6 +358,72 @@ model RemitenteCorreo {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@map("remitentes_correo")
+}
+
+/**
+ * Un proveedor de IA que una empresa guardo, con su propia clave.
+ * A diferencia de `RemitenteCorreo` (una fila por empresa), aqui puede
+ * haber VARIAS: cada empresa trae su propio proveedor y su propia clave
+ * -en la version instalable no hay ningun servicio de IA que GCM opere-,
+ * y puede guardar mas de uno y elegir cual usar. Cual esta EN USO lo dice
+ * `Company.proveedorIaActivoId`, no un campo de esta tabla.
+ */
+model AgenteIaProveedor {
+  id        String @id @default(cuid())
+  companyId String
+
+  /**
+   * STRING, no enum: un proveedor nuevo no debe exigir una migracion,
+   * mismo criterio que `CompanyPermission.permiso`. Los que GCM sabe
+   * LLAMAR hoy viven en el registro de adaptadores
+   * (`src/services/agente-ia.service.ts`); un tipo sin adaptador
+   * registrado se puede guardar igual, pero `probarProveedorIa` lo dice
+   * en vez de fallar en silencio.
+   */
+  tipo String @db.VarChar(40)
+
+  /// Nombre visible, SIEMPRE obligatorio: una empresa puede tener dos
+  /// proveedores del mismo tipo (dos claves distintas de un mismo
+  /// formato) y la lista tiene que poder distinguirlas.
+  nombre String @db.VarChar(100)
+
+  /// Solo para adaptadores de URL configurable (p.ej. OpenAI-compatible).
+  /// Null en Claude, que usa la URL oficial de Anthropic, fija en su
+  /// adaptador.
+  urlBase String? @db.VarChar(300)
+
+  modelo String @db.VarChar(100)
+
+  /**
+   * La clave de API, CIFRADA. Ver `src/lib/secreto.ts` -mismo cifrado y
+   * misma llave que `RemitenteCorreo.claveCifrada`, sin una segunda llave
+   * para esto-. Hay que presentarsela al proveedor en cada llamada, asi
+   * que un hash no serviria. NUNCA sale hacia la pantalla.
+   */
+  apiKeyCifrada String @db.Text
+
+  /// Ultima prueba real que SALIO. Igual que en `RemitenteCorreo`:
+  /// «configurado» no es lo mismo que «funciona», y activar una clave sin
+  /// probar seria descubrir que esta mal el dia que el agente la necesite.
+  verificadoAt  DateTime?
+  /// Que dijo el proveedor la ultima vez que fallo. Nunca la clave.
+  ultimoError   String?   @db.VarChar(300)
+  ultimoErrorAt DateTime?
+
+  configuradoPor String   @db.VarChar(150)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company                Company   @relation("ProveedoresDeLaEmpresa", fields: [companyId], references: [id], onDelete: Cascade)
+  /// El otro lado del puntero de `Company.proveedorIaActivoId`. Lista y no
+  /// un valor unico porque Prisma no puede saber, solo por el esquema, que
+  /// nunca habra dos empresas apuntando a la misma fila -eso lo garantiza
+  /// que cada empresa solo puede activar SUS propios proveedores, en el
+  /// servicio-.
+  empresasQueLoActivaron Company[] @relation("ProveedorActivo")
+
+  @@index([companyId])
+  @@map("agente_ia_proveedores")
 }
 
 /// Excepcion al permiso que un rol trae por defecto, para UNA empresa.
@@ -3822,8 +3899,8 @@ model Nota {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project   Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  adjuntos  AdjuntoNota[]
+  project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  adjuntos AdjuntoNota[]
 
   /// Alimenta el widget de "proximos recordatorios" y el contador de
   /// vencidas del riel de la obra: notas pendientes con recordatorio,

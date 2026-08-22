@@ -57,6 +57,12 @@ export const EXCLUIDAS_MIGRACION: Readonly<Record<string, string>> = {
     "imposible de descifrar. Es mas honesto no traerlo y pedir que se teclee " +
     "otra vez, que es un minuto, que dejar una fila que parece configurada y " +
     "no manda ni un correo.",
+  agente_ia_proveedores:
+    "Mismo motivo que remitentes_correo: la clave de API esta cifrada con " +
+    "la llave de ESTE servidor (`src/lib/secreto.ts`), que el destino no " +
+    "tiene. Llegaria una clave imposible de descifrar y una fila que " +
+    "parece un proveedor configurado sin serlo. Se vuelve a teclear en la " +
+    "instalacion nueva.",
   solicitudes_cambio_perfil:
     "Tramites a medias —alguien pidio cambiar su celular— que en la " +
     "instalacion nueva no tienen a quien reclamar. Se vuelven a pedir.",
