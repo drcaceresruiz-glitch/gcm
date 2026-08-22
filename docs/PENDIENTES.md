@@ -263,12 +263,85 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
    `empresa/usuarios`. Confirmado tambien en positivo: a diferencia del
    tablero, el EVM del cronograma (`PanelEvm.tsx`) SI muestra EAC y VAC.
 
-4. **Estado de la obra (Planificacion/Ejecucion/Paralizada/Cerrada)** —
-   pedida, no empezada. Verificar que cada estado permite y prohibe lo que
-   debe, que las transiciones son las correctas, y arreglar lo que no lo
-   sea. Relacionado con `motivoNoAdmiteCambios` en `src/lib/obras.ts` y con
-   el hallazgo ya documentado del 10 de agosto sobre `CERRADA` (ver la
-   seccion "Incidente del 10 de agosto" de `ESTADO.md`).
+4. **Estado de la obra (Planificacion/Ejecucion/Paralizada/Cerrada) —
+   AUDITADA el 21 de agosto de 2026.** Agente de exploracion sobre la
+   maquina de estados (`src/lib/obras.ts`), la guarda central
+   (`motivoSiObraCerrada` en `obra-abierta.ts`, usada por ~24 servicios) y
+   cada transicion. Hallazgos confirmados, de mas a menos impacto:
+
+   **Bugs reales (la guarda se salta, no es cuestion de diseno):**
+   - **`partidas.service.ts` y `evidencia.service.ts` no comprueban
+     `empresaEnMigracion`.** Ambos reimplementan la guarda a mano en vez de
+     llamar a `motivoSiObraCerrada`, y su propio `select` de la obra nunca
+     trae `company.enMigracionAt`, asi que esa rama de
+     `motivoNoAdmiteCambios` nunca se dispara ahi. Resultado: mientras la
+     empresa esta congelada para exportarse —cuyo propio mensaje
+     (`EMPRESA_EN_MIGRACION`) promete "nadie puede escribir mientras
+     dure"— el presupuesto entero (`actualizarPartida`, `eliminarPartida`,
+     `crearPartida`, `renumerarPartidas`, `agruparEnSumaAlzada`) se sigue
+     pudiendo editar, y un pase de campo activo sigue pudiendo subir fotos.
+   - **`pase.service.ts` no comprueba el estado de la obra en absoluto.**
+     `crearPase`, `editarPase`, `eliminarPase` y `cambiarEstadoPase` (que
+     incluye REACTIVAR un pase) ni siquiera piden `estado` en su `select`
+     de la obra. Se puede dar de alta o reactivar un pase de campo para una
+     obra CERRADA, archivada o con la empresa en migracion.
+
+   **Confirmado, y es una decision sin tomar, no un bug de codigo:**
+   - **PARALIZADA no bloquea NINGUNA escritura**, verificado caso por caso:
+     se puede crear una orden de compra nueva, aprobar un movimiento
+     presupuestal, crear un Plan Semanal y comprometer tareas de Last
+     Planner, y registrar el parte de avance diario, todo en una obra
+     paralizada. `motivoNoAdmiteCambios` nunca menciona `PARALIZADA`. Esto
+     ya estaba anotado en este mismo documento como "pedido, no empezado":
+     no es una decision tomada, es lo que quedo por defecto al construir
+     el estado.
+   - **`avisos-reloj.ts:169`** filtra "obras vivas" con `obraAdmiteCambios`,
+     que incluye PARALIZADA: se siguen mandando recordatorios de
+     restriccion por vencer, resumenes diarios y avisos de valorizacion
+     pendiente en una obra parada, gastando el mismo presupuesto de SMS.
+   - **Dos nociones de "obra viva" que no coinciden.**
+     `gerencia.service.ts` (semaforo de cartera) cuenta PARALIZADA como
+     obra viva y le calcula SPI/alertas de atraso; `obras.service.ts`
+     (`obtenerResumenEmpresa`, las tarjetas de dinero del panel) filtra
+     estrictamente `EN_EJECUCION` y EXCLUYE a PARALIZADA. Consecuencia: al
+     paralizar una obra con encargos vigentes, ese dinero comprometido
+     desaparece de inmediato de las cifras del panel aunque la deuda con
+     el proveedor sigue existiendo — y esa misma obra puede seguir
+     encendiendo el semaforo en rojo por "atraso" en una obra que nadie
+     esta trabajando a proposito.
+   - **Paralizar no pide motivo ni fecha estimada de reanudacion.** El
+     modelo `Project` no tiene ningun campo para esto (a diferencia de
+     `Restriccion`, que exige responsable+fecha, o del propio mensaje de
+     `EMPRESA_EN_MIGRACION`, que explica que es temporal y quien lo
+     levanta). Solo "Cerrar" pide confirmacion (un `window.confirm`, no un
+     motivo); "Paralizar" no pide nada.
+
+   **Confirmado en positivo, sin hallazgos:**
+   - El borrado de obra (`obra-borrado.service.ts`) tiene realmente CINCO
+     puertas, no cuatro: permiso innegociable, alcance, `CERRADA`, nombre
+     tecleado, contrasena — y ademas exige un respaldo reciente utilizable.
+     Ninguna se debilito en sesiones recientes.
+   - Las transiciones (`accionCambiarEstadoObra` → `cambiarEstadoObra` →
+     `puedeTransicionarObra`) no tienen fuga: no hay forma de mandar un
+     estado fuera de `TRANSICIONES_OBRA` desde el formulario ni desde la
+     accion de servidor.
+   - Nota menor, sin decidir: `equipo.service.ts`
+     (`asignarAObra`/`quitarDeObra`) y
+     `mensajes-contratista.service.ts:266` tampoco comprueban el estado de
+     la obra. Defendible (no son datos de presupuesto/cronograma/avance),
+     pero no hay ningun comentario que documente esa exclusion como
+     decision.
+
+   **Recomendacion del agente, sin decidir todavia:** separar las
+   escrituras de PARALIZADA en dos grupos en vez de bloquear todo o nada —
+   permitir cerrar lo que ya estaba en curso (aprobar movimientos
+   pendientes, subir evidencia, resolver restricciones abiertas, cerrar la
+   semana de Plan Semanal en curso) y bloquear lo que genera trabajo o
+   gasto NUEVO (orden nueva, encargo nuevo, compromiso nuevo de Last
+   Planner, avance nuevo). Y anadir `motivoParalizacion`/fecha estimada de
+   reanudacion a `Project`, obligatorios al paralizar, con el mismo patron
+   que `Restriccion`. Pendiente de que el usuario decida el alcance antes
+   de tocar la maquina de estados.
 
 5. ~~**Prueba de extremo a extremo real.**~~ **HECHA el 21 de agosto de
    2026** — ver el punto 13 de esta misma lista, con el detalle completo.
