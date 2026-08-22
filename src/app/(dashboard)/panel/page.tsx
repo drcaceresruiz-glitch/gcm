@@ -182,7 +182,14 @@ export default async function PanelPage({
           clave: "personas",
           titulo: "Personas",
           pregunta: "quién trabaja",
-          href: "/empresa/usuarios",
+          // Con solicitudes pendientes, el clic lleva a donde de verdad se
+          // aprueban -/empresa/solicitudes-, no a la lista de usuarios que
+          // la insignia hacia parecer el destino. Solo si ademas puede
+          // aprobarlas: sin `usuario:editar` esa pantalla redirige sola.
+          href:
+            solicitudes > 0 && puede(sesion, "usuario:editar")
+              ? "/empresa/solicitudes"
+              : "/empresa/usuarios",
           hecho: marca(preliminares.equipo),
           // Las solicitudes de cambio de perfil esperan a alguien: es trabajo
           // pendiente, no un hito, y por eso va de insignia y no de check.

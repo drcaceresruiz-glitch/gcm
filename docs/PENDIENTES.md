@@ -184,20 +184,21 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      pasado a ser mas fino, cuando en realidad sigue exactamente igual.
 
    **Medio-alto:**
-   - `empresa/permisos/page.tsx:73-81` dice "Cuatro permisos no se tocan";
-     hoy `INNEGOCIABLES` (`rbac.ts`) tiene NUEVE. Las 5 filas nuevas salen
-     bloqueadas en la rejilla sin que el texto explique por que.
-   - "Archivo" (`/empresa/archivo`) y "Llevarse la empresa"
-     (`/empresa/migracion`) solo tienen enlace desde `/panel`; el
-     desplegable "Empresa" de la cabecera —visible en toda la app— no las
-     incluye, pese a que su propio comentario de diseno dice que existe
-     para agrupar justo eso.
-   - `datos-de-ejemplo.ts`: el detector de "esta obra es la plantilla de
-     ejemplo" compara contra `TOTAL_EJEMPLO` (18509.00, de la plantilla
-     CONTRACTUAL huerfana). El unico flujo vivo genera el contractual
-     recargando la META por capitulo, lo que da 18146.90 para los mismos
-     datos de ejemplo — el detector ya no puede dispararse nunca de forma
-     legitima.
+   - ~~`empresa/permisos/page.tsx:73-81` dice "Cuatro permisos no se tocan";
+     hoy `INNEGOCIABLES` (`rbac.ts`) tiene NUEVE.~~ **YA NO APLICA,
+     confirmado el 22 de agosto de 2026**: el texto ya lee
+     `{INNEGOCIABLES.length} permisos no se tocan`, dinamico. Se arreglo en
+     algun punto de la tanda de hallazgos del 21/08 sin que este documento
+     se actualizara.
+   - ~~"Archivo" (`/empresa/archivo`) y "Llevarse la empresa"
+     (`/empresa/migracion`) solo tienen enlace desde `/panel`~~ **YA NO
+     APLICA, confirmado el 22 de agosto de 2026**: `layout.tsx` (la
+     cabecera) ya incluye las dos en el desplegable "Empresa".
+   - ~~`datos-de-ejemplo.ts`: el detector de "esta obra es la plantilla de
+     ejemplo" compara contra `TOTAL_EJEMPLO` de la plantilla CONTRACTUAL
+     huerfana~~ **YA NO APLICA, confirmado el 22 de agosto de 2026**: el
+     archivo ya separa `TOTAL_CONTRACTUAL_EJEMPLO` de `TOTAL_COSTO_EJEMPLO`,
+     cada detector contra el total que le corresponde.
    - ~~`msproject-xml-escribir.ts:191-195` afirma en un comentario que el
      "% Planeado" se recupera igual que en la plantilla de Excel~~
      **ARREGLADO el 21 de agosto de 2026: se corrigio el comentario, no el
@@ -212,10 +213,11 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      escritor para que diga la verdad. La prueba "avisa cuando una tarea
      no trae % planeado y la deja en cero" (`msproject-xml.test.ts`) ya
      cubria este caso — el "sin test que lo cubra" tambien era impreciso.
-   - Kanban: `TableroKanban.tsx` documenta ser "DE LECTURA" a proposito,
-     pero pinta el boton "Empezo en obra" sin comprobar permiso; CONSULTOR
-     (el cliente) lo ve y, si lo pulsa, el servidor lo rechaza en silencio
-     (no es hueco de seguridad, si es promesa de UI rota).
+   - ~~Kanban: `TableroKanban.tsx` documenta ser "DE LECTURA" a proposito,
+     pero pinta el boton "Empezo en obra" sin comprobar permiso~~ **YA NO
+     APLICA, confirmado el 22 de agosto de 2026**: el boton ya esta detras
+     de `puedeMarcarEnEjecucion={puede(sesion, "plan_semanal:gestionar")}`
+     en `TableroKanban.tsx:202` y en la pagina que lo llama.
    - El "SPI" de `PanelEvm.tsx` y el "SPI por duracion" de gerencia son,
      algebraicamente, el mismo ratio (el BAC se cancela: EV/PV =
      %real/%planeado, y las dos pantallas ponderan por duracion). Difieren
@@ -225,41 +227,45 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      dice "SPI", sin la misma advertencia.
 
    **Medio:**
-   - "Solicitudes de perfil" solo tiene enlace en la cabecera; el badge de
+   - ~~"Solicitudes de perfil" solo tiene enlace en la cabecera; el badge de
      pendientes en el panel lo cuelga de la seccion "Personas", que enlaza
      a `/empresa/usuarios` — no a `/empresa/solicitudes`, donde de verdad
-     se aprueban.
-   - `/empresa/datos` se enlaza con permisos distintos segun el menu
-     (cabecera exige `empresa:editar`, panel exige `empresa:leer`); el que
-     de verdad gobierna la pantalla es `empresa:leer` (via
-     `obtenerEmpresa`), asi que la cabecera se lo oculta a roles que si
-     pueden verla en modo lectura.
-   - `migas.ts`: 5 rutas reales de `empresa/*` sin entrada (archivo,
-     migracion, contratos/mensajes de proveedor, puesta-en-marcha), mas el
-     mismo hueco confirmado como sistemico en `/gerencia`, `/manual`,
-     `obras/[id]/equipo`, `/notas`, `/valorizaciones`, `/operador/[id]` —
-     y una entrada MUERTA (`/obras/:obra/respaldo`, que ya solo es un
-     endpoint de descarga sin pantalla).
-   - El color del `GaugeIndice.tsx` decide el semaforo con el indice SIN
-     redondear, mientras el texto de al lado (`PanelEvm.tsx`) si usa la
-     version redondeada — la misma contradiccion que `redondeo.ts` y
-     `ESTADO.md` ya documentan como corregida (SPI 0.999 se lee "1.00" en
-     el numero pero pinta ambar en el aro).
-   - Dos definiciones de "comprometido" con el mismo nombre y sin remision
-     cruzada: el AC del EVM cuenta SOLO ordenes `APROBADA`; el
-     "economico" de Fisico vs. Economico suma tambien encargos vigentes
-     aun no formalizados en orden. Ambas pantallas usan la palabra
-     "comprometido" para describirlo al usuario.
-   - Contractual: un comentario en `importacion.service.ts:53-55` afirma
-     que "la pantalla ya exige `partida:importar`"; la pantalla
-     (`contractual/page.tsx`) en realidad exige `meta:leer`. ADMIN_OBRA
-     (tiene `meta:leer`, no `partida:importar`) ve el flujo completo de
-     generar/reemplazar el contractual condenado a fallar en el servidor.
-   - Personal: `nombresDe` en `avisos-auditoria.ts` resuelve nombres de
-     `contactoAviso` SIN ningun filtro de pertenencia (ni `companyId` ni
-     `projectId`), pese a que el comentario de la funcion de al lado cita
-     un incidente real del 19/08 sobre exactamente este tipo de fuga como
-     ya corregido.
+     se aprueban.~~ **ARREGLADO el 22 de agosto de 2026.** La tarjeta
+     "Personas" de `/panel` ahora enlaza a `/empresa/solicitudes` cuando
+     hay solicitudes pendientes Y la sesion puede aprobarlas
+     (`usuario:editar` — esa pantalla redirige sola sin el permiso, asi que
+     mandar ahi a quien solo tiene `usuario:leer` habria sido peor); sin
+     pendientes, o sin el permiso, sigue yendo a `/empresa/usuarios` como
+     siempre.
+   - ~~`/empresa/datos` se enlaza con permisos distintos segun el menu~~
+     **YA NO APLICA, confirmado el 22 de agosto de 2026**: la cabecera
+     (`layout.tsx`) ya exige `empresa:leer`, igual que el panel.
+   - ~~`migas.ts`: 5 rutas reales de `empresa/*` sin entrada~~ **YA NO
+     APLICA, confirmado el 22 de agosto de 2026**: las 11 rutas citadas
+     (archivo, migracion, contratos/mensajes de proveedor,
+     puesta-en-marcha, `/gerencia`, `/manual`, equipo, notas,
+     valorizaciones, `/operador/[id]`) ya tienen entrada en `migas.ts`, y
+     la entrada muerta de `/obras/:obra/respaldo` ya no esta.
+   - ~~El color del `GaugeIndice.tsx` decide el semaforo con el indice SIN
+     redondear~~ **YA NO APLICA, confirmado el 22 de agosto de 2026**: ya
+     redondea con `redondearA(indice, 2)` antes de decidir el semaforo,
+     con un comentario que cita explicitamente este mismo hallazgo.
+   - **Sigue abierto, sin tocar**: dos definiciones de "comprometido" con
+     el mismo nombre y sin remision cruzada: el AC del EVM cuenta SOLO
+     ordenes `APROBADA`; el "economico" de Fisico vs. Economico suma
+     tambien encargos vigentes aun no formalizados en orden. Ambas
+     pantallas usan la palabra "comprometido" para describirlo al usuario.
+     No es un bug de codigo — es una decision de vocabulario/documentacion
+     pendiente, no un arreglo mecanico.
+   - ~~Contractual: un comentario en `importacion.service.ts:53-55` afirma
+     que "la pantalla ya exige `partida:importar`"~~ **YA NO APLICA,
+     confirmado el 22 de agosto de 2026**: `contractual/page.tsx` exige
+     `meta:leer` para VER la pantalla y `partida:importar` para el boton de
+     generar/reemplazar (`puedeGenerar`) — el comentario ya dice la verdad.
+   - ~~Personal: `nombresDe` en `avisos-auditoria.ts` resuelve nombres de
+     `contactoAviso` SIN ningun filtro de pertenencia~~ **YA NO APLICA,
+     confirmado el 22 de agosto de 2026**: la funcion ya recibe y aplica
+     `companyId` en las dos consultas (usuarios y contactos).
    - ~~Plantilla de proveedores: unica de las cuatro plantillas sin test de
      ida y vuelta~~ **HECHO el 21 de agosto de 2026.** `CAMPOS_EXCEL`
      (`proveedores-excel.ts`) gano `maxLargo` por campo, reflejando los
@@ -276,18 +282,21 @@ ningun documento. Queda una cola clara, en el orden acordado con el usuario:
      `proveedores-excel.service.test.ts`.
 
    **Bajo:**
-   - `MatrizPermisos.tsx`: 10 de los 18 dominios de permiso no tienen
-     etiqueta en `ETIQUETA_DOMINIO` y salen en `snake_case` crudo
-     (`plan_semanal`, `lookahead`, `galeria`, etc.).
+   - ~~`MatrizPermisos.tsx`: 10 de los 18 dominios de permiso no tienen
+     etiqueta en `ETIQUETA_DOMINIO`~~ **YA NO APLICA, confirmado el 22 de
+     agosto de 2026**: los 18 dominios ya tienen etiqueta.
    - Umbrales de `capacidad.ts` (1.0 / 1.4) confirmados, de nuevo, como
      arbitrarios — coincide con lo ya anotado en el punto 3 de la seccion
-     de abajo, sin dato nuevo que lo cierre.
-   - `propuesta/excel/route.ts:316,331` compara importes de dinero con
-     `Number()` en vez de `esCero` (helper que el propio proyecto ya
-     tiene); bajo riesgo porque no decide ninguna cifra mostrada, solo si
-     se imprime una fila.
-   - `plantilla-presupuesto.ts` confirmado huerfano por grep exhaustivo:
-     ningun componente enlaza a `/plantilla-presupuesto` desde el 20/08.
+     de abajo, sin dato nuevo que lo cierre. **Sigue bloqueado**: no es
+     algo que se resuelva escribiendo codigo, hace falta acumular semanas
+     cerradas de datos reales.
+   - ~~`propuesta/excel/route.ts:316,331` compara importes de dinero con
+     `Number()` en vez de `esCero`~~ **YA NO APLICA, confirmado el 22 de
+     agosto de 2026**: esas mismas lineas ya usan `esCero`/`restar`.
+   - ~~`plantilla-presupuesto.ts` confirmado huerfano por grep exhaustivo~~
+     **BORRADO el 22 de agosto de 2026**, junto con su
+     `plantilla-presupuesto.test.ts`: sin ruta, sin import, confirmado de
+     nuevo por grep antes de borrar.
 
    **Revisado sin hallazgos de peso**: Lookahead, Galeria, Mapeo, Equipo,
    `empresa/configuracion` (y sus componentes), `empresa/permisos` en su
