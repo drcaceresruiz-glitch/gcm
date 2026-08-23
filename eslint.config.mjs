@@ -28,6 +28,12 @@ const eslintConfig = [
       // solo sirve para que el lint de main muera por 328 errores que no son
       // nuestros ni podemos arreglar. Mismo motivo que los worktrees.
       "docs/COMUNIDADGIT/**",
+      // Material de DISENO de las plantillas del informe: HTML de las hojas y
+      // el script de Node que las ensambla. No entra en el paquete ni lo
+      // ejecuta la app; es la referencia a partir de la cual se escribira el
+      // codigo de verdad. Mismo motivo que la linea de arriba: auditarlo solo
+      // sirve para que un script suelto tumbe el lint de main.
+      "docs/informe-plantillas/**",
     ],
   },
 
