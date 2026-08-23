@@ -33,8 +33,8 @@ export default async function NuevaObraPage() {
           Nueva obra
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
-          Se crea vacía. Después se le carga el presupuesto, desde un Excel o
-          partida a partida.
+          Si ya tienes el Excel del presupuesto meta, adjúntalo abajo y la obra
+          nace con él cargado. Si no, se crea vacía y se lo cargas después.
         </p>
       </div>
 
@@ -45,14 +45,15 @@ export default async function NuevaObraPage() {
         accion={accionCrearObra}
         modo="crear"
         fechaHoy={hoy().toISOString().slice(0, 10)}
+        conMeta={puede(sesion, "meta:crear")}
         ayuda={
           <PanelAyuda
             ilustracion={<IlustracionPlano />}
             puntos={[
               {
-                titulo: "La obra nace vacía",
+                titulo: "El presupuesto puede venir ya",
                 texto:
-                  "Al crearla no tiene partidas. El paso siguiente es cargarle el presupuesto, desde un Excel o partida a partida.",
+                  "Adjunta el Excel de la plantilla y la obra nace con su presupuesto meta cargado, sin pasar por otra pantalla. Es opcional: sin él la obra se crea vacía y el paso siguiente es cargárselo.",
               },
               {
                 titulo: "El código es opcional, pero no se repite",

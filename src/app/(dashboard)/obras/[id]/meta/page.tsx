@@ -65,7 +65,13 @@ export default async function MetaPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ creada?: string; aprobada?: string; eliminada?: string }>;
+  searchParams: Promise<{
+    creada?: string;
+    aprobada?: string;
+    eliminada?: string;
+    /// El Excel adjunto en el alta de obra no se pudo cargar. Ver abajo.
+    fallo?: string;
+  }>;
 }) {
   const sesion = await obtenerSesion();
   if (!sesion) redirect("/login");
@@ -134,7 +140,7 @@ export default async function MetaPage({
     );
   }
 
-  const { creada, aprobada, eliminada } = await searchParams;
+  const { creada, aprobada, eliminada, fallo } = await searchParams;
   const puedeCrear = puede(sesion, "meta:crear");
   const puedeAprobar = puede(sesion, "meta:aprobar");
 
@@ -173,6 +179,30 @@ export default async function MetaPage({
           esperado y no dinero disponible.
         </p>
       </div>
+
+      {/*
+        LA OBRA SE CREO, EL PRESUPUESTO NO.
+        Pasa cuando se adjunta el Excel en el alta y el archivo trae un
+        problema. No se deshace la obra a proposito: quien acaba de teclear
+        seis campos correctos no debe perderlos por un error que esta en otro
+        documento. Lo que hace falta es que quede claro que la obra existe y
+        que lo unico que falta es el presupuesto.
+      */}
+      {fallo && (
+        <p
+          role="alert"
+          className="rounded-xl border p-4 text-sm"
+          style={{
+            borderColor: "var(--color-peligro)",
+            backgroundColor:
+              "color-mix(in oklab, var(--color-peligro) 10%, transparent)",
+          }}
+        >
+          <strong>La obra se creó, pero el Excel no se pudo cargar.</strong>{" "}
+          {fallo} Corrige el archivo y súbelo aquí abajo: no hace falta volver
+          a crear la obra.
+        </p>
+      )}
 
       {creada && <AvisoHecho texto={`Meta v${creada} cargada como borrador.`} />}
       {aprobada && (

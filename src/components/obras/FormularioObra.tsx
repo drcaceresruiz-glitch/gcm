@@ -48,6 +48,7 @@ export function FormularioObra({
   modo = "crear",
   valores,
   fechaHoy,
+  conMeta = false,
   ayuda,
 }: {
   /// Accion de servidor: `accionCrearObra`, o `accionEditarObra` ya ligada al id.
@@ -56,6 +57,15 @@ export function FormularioObra({
   valores?: Partial<ValoresObra>;
   /// Solo para crear: fecha por defecto del campo de inicio.
   fechaHoy?: string;
+  /**
+   * Si se ofrece adjuntar el Excel del presupuesto meta al crear la obra.
+   *
+   * Lo decide la pagina segun `meta:crear`: quien no puede cargar un
+   * presupuesto no debe ver un campo que va a fallar al enviarlo. El servicio
+   * lo comprueba igual -es la frontera de verdad-, pero un campo que siempre
+   * responde «no tienes permiso» enseña a ignorar los avisos.
+   */
+  conMeta?: boolean;
   ayuda?: ReactNode;
 }) {
   const editar = modo === "editar";
@@ -173,6 +183,74 @@ export function FormularioObra({
                   Lo normal es abrirla en planificación y pasarla a ejecución
                   cuando arranque.
                 </p>
+              </div>
+            </SeccionTarjeta>
+          )}
+
+          {/*
+            EL PRESUPUESTO, DE UNA VEZ.
+            Antes: crear la obra, salir, entrar en Meta y subir el Excel. Los
+            campos de la obra se quedan donde estan -aqui se validan en vivo,
+            que es lo que una celda de Excel no puede hacer-; lo que se ahorra
+            es el viaje. Es opcional: quien todavia no tiene el presupuesto
+            crea la obra igual y lo carga despues.
+          */}
+          {!editar && conMeta && (
+            <SeccionTarjeta titulo="Presupuesto meta (opcional)">
+              <div className="space-y-3">
+                <p className="text-sm opacity-70">
+                  Si ya tienes el Excel, adjúntalo y la obra nace con su
+                  presupuesto cargado. Si no, créala y lo subes cuando lo
+                  tengas.
+                </p>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="archivo" className="block text-sm font-medium">
+                    Archivo de la plantilla
+                  </label>
+                  <input
+                    id="archivo"
+                    name="archivo"
+                    type="file"
+                    accept=".xlsx,.xlsm,.xls"
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    style={{
+                      borderColor: "var(--borde)",
+                      backgroundColor: "var(--fondo)",
+                    }}
+                  />
+                  <p className="text-xs opacity-60">
+                    Descárgala en{" "}
+                    <a href="/plantilla-meta" className="underline underline-offset-2">
+                      plantilla del presupuesto meta
+                    </a>
+                    . El plazo en meses sale de las fechas de arriba.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="modo" className="block text-sm font-medium">
+                    Con qué detalle se compara con el contractual
+                  </label>
+                  <select
+                    id="modo"
+                    name="modo"
+                    defaultValue="CAPITULO"
+                    className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                    style={{
+                      borderColor: "var(--borde)",
+                      backgroundColor: "var(--fondo)",
+                    }}
+                  >
+                    <option value="CAPITULO">Por capítulo</option>
+                    <option value="PARTIDA">Por partida</option>
+                    <option value="FRENTE">Por frente</option>
+                  </select>
+                  <p className="text-xs opacity-60">
+                    Por capítulo es lo habitual. Solo cambia el nivel al que se
+                    lee la bolsa; se puede recargar la meta después con otro.
+                  </p>
+                </div>
               </div>
             </SeccionTarjeta>
           )}
