@@ -2078,52 +2078,6 @@ Lo que SI se hara, en este orden:
      tarjeta de Confirmar/Cancelar nunca se vio disparar en vivo, solo en
      las pruebas mockeadas.
 
-   **Pedido el 22 de agosto de 2026: que el agente tenga cara — un
-   avatar 3D animado en el navegador, llamado "Mike".** Tres intentos el
-   mismo dia, los tres revertidos:
-   - **Primer intento**: `CesiumMan.glb`, el astronauta de muestra de
-     Khronos (CC-BY 4.0), con Three.js/`react-three-fiber`/drei
-     (`ssr:false`, solo `/asistente` pagaria ese peso). Rechazado: "ESO
-     SE VE HORRIBLE... SINO LO PUEDES MEJORAR Y QUE SEA REALISTA, COMO UN
-     CONSTRUCTOR" -un astronauta generico no tiene nada que ver con GCM-.
-   - **Segundo intento**: `Worker` de Quaternius (CC0, via poly.pizza) -
-     casco, chaleco reflectante, botas, 24 animaciones-, encuadre de
-     camara resuelto con `<Bounds fit clip observe>` de drei. Mejor asset,
-     pero el usuario señalo algo mas importante: GCM YA TIENE su propia
-     mascota -"el maestro de obra" en `public/mascota/` (`Mascota.tsx`),
-     en uso desde antes en media docena de pantallas- y un modelo nuevo
-     de internet, por bueno que sea, nunca se le iba a parecer. Pidio esa
-     mascota, no una nueva, "libre" -como el widget "Dormi" de
-     drcaceresruiz.com (otro proyecto del mismo usuario)-, no encerrada
-     dentro de la tarjeta del chat.
-   - **Tercer intento**: se saco WebGL del todo y se monto la mascota
-     existente como lanzador flotante (`LanzadorAsistente.tsx`) en
-     `(dashboard)/layout.tsx` -burbuja fija, visible en cualquier pantalla
-     del area privada, abre un panel con el mismo componente `Asistente`
-     de siempre al hacer clic-. Typecheck/lint/tests/build en verde,
-     **pero sin verificacion visual real** -las herramientas de navegador
-     seguian desconectadas- y el usuario, ya viendolo en produccion, lo
-     rechazo tambien: "no me parece que lo dejaste funcionando bien"
-     -sin precisar que fallaba exactamente-. Revertido por completo:
-     `LanzadorAsistente.tsx` fuera, `Asistente.tsx`/`acciones.ts`/
-     `layout.tsx` de vuelta a como estaban antes de tocar nada de esto
-     (commit `c8f424c`). El chat de texto solo, sin ningun avatar, sigue
-     funcionando igual.
-
-   **Leccion para el proximo intento**: dos de los tres intentos se
-   construyeron y desplegaron SIN que nadie -ni el usuario, ni una
-   verificacion visual real de mi parte, porque las herramientas de
-   navegador estuvieron caidas gran parte de la sesion- los viera
-   funcionando antes de darlos por buenos. La proxima vez que se retome
-   esto, verificar en vivo ANTES de comitear -o, si el navegador no esta
-   disponible, decirlo explicito y esperar confirmacion antes de seguir
-   construyendo encima-, en vez de iterar a ciegas sobre lo mismo.
-
-   La investigacion original de Mixamo/Quaternius/Three.js (licencias,
-   versiones exactas, notas de Turbopack) queda sin usar, pero disponible
-   en la transcripcion de esta sesion si algun dia se decide construir un
-   "Mike" 3D de verdad.
-
    ~~**Dictado por voz en el Asistente.**~~ **Investigado el 22 de agosto
    de 2026** (mismo workflow, en paralelo con lo de Mike), sin empezar el
    codigo todavia. Decision ya tomada por el usuario: Web Speech API
