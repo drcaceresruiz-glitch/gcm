@@ -10,6 +10,7 @@ import { alcanzaObra, FUERA_DE_ALCANCE } from "@/lib/alcance-obras";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { restar, sumar, esPositivo } from "@/lib/decimal";
 import {
+  cabeElPago,
   MIMES_COMPROBANTE,
   TAMANO_MAXIMO_COMPROBANTE,
   validarPago,
@@ -108,7 +109,16 @@ export async function registrarPago(
       projectId: obraId,
       project: { companyId: sesion.companyId },
     },
-    select: { id: true, estado: true, proveedor: { select: { razonSocial: true } } },
+    select: {
+      id: true,
+      estado: true,
+      montoContratado: true,
+      proveedor: { select: { razonSocial: true } },
+      // Solo las APROBADAS: una adenda pendiente no amplia todavia el
+      // contrato, asi que no puede ampliar lo que se le puede pagar.
+      adendas: { where: { estado: "APROBADA" }, select: { importe: true } },
+      pagos: { select: { monto: true } },
+    },
   });
   if (!encargo) return { ok: false, error: "No se encontró el encargo." };
 
@@ -121,6 +131,28 @@ export async function registrarPago(
 
   const valido = validarPago(datos, hoy());
   if (!valido.ok) return { ok: false, error: valido.error };
+
+  /**
+   * NO SE PUEDE PAGAR POR ENCIMA DEL CONTRATO.
+   *
+   * Probado por el usuario el 23 de agosto de 2026: pago 740 sobre un
+   * contrato de 735 y GCM lo acepto sin decir nada, llamandolo «pagado por
+   * adelantado». Ese rotulo es correcto para lo que pasa de lo VALORIZADO
+   * -un adelanto para materiales es normal y no se bloquea- pero no para lo
+   * que pasa del CONTRATO: por definicion no se le puede deber mas de lo que
+   * su contrato vale.
+   *
+   * Se comprueba DESPUES de validar el monto y ANTES de tocar el archivo o la
+   * base: es la ultima puerta antes de que salga dinero.
+   */
+  const cabe = cabeElPago(valido.monto, {
+    vigente: montoVigente(
+      encargo.montoContratado.toString(),
+      encargo.adendas.map((a) => ({ importe: a.importe.toString() })),
+    ),
+    yaPagado: sumar(encargo.pagos.map((p) => p.monto.toString())),
+  });
+  if (!cabe.ok) return { ok: false, error: cabe.error };
 
   // El archivo se comprueba ANTES de escribir nada en la base: un pago
   // guardado con el comprobante rechazado dejaria al usuario creyendo que

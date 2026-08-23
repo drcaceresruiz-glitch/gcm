@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cabeElPago,
   MIMES_COMPROBANTE,
   TAMANO_MAXIMO_COMPROBANTE,
   validarPago,
@@ -107,5 +108,57 @@ describe("el comprobante", () => {
   /// por el navegador y un PDF escaneado no se puede encoger antes de subirlo.
   it("da mas margen que la evidencia de obra", () => {
     expect(TAMANO_MAXIMO_COMPROBANTE).toBeGreaterThan(5 * 1024 * 1024);
+  });
+});
+
+describe("no se puede pagar por encima del contrato", () => {
+  /*
+   * PROBADO POR EL USUARIO el 23 de agosto de 2026: pago 740 sobre un
+   * contrato de 735 y GCM lo acepto sin decir nada, llamandolo «pagado por
+   * adelantado». Ese rotulo vale para lo que pasa de lo VALORIZADO, no para
+   * lo que pasa del CONTRATO.
+   */
+  it("el caso exacto: 740 sobre un contrato de 735", () => {
+    const r = cabeElPago("40.00", { vigente: "735.00", yaPagado: "700.00" });
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain("5.00 de mas");
+      // El mensaje nombra la salida en vez de dejar a nadie buscando.
+      expect(r.error).toContain("adenda");
+    }
+  });
+
+  it("pagar EXACTAMENTE el contrato si cabe", () => {
+    // El limite es inclusivo: liquidar un contrato es pagarlo entero.
+    expect(cabeElPago("35.00", { vigente: "735.00", yaPagado: "700.00" }).ok).toBe(true);
+  });
+
+  it("un ADELANTO sigue permitido: es normal en obra", () => {
+    /*
+     * Adelantar para materiales antes de que haya avance que valorizar pasa
+     * constantemente, y `PagoEncargo` tiene el `valorizacionId` opcional
+     * justo por eso. Lo que se bloquea es pasar del CONTRATO, no de lo
+     * valorizado.
+     */
+    expect(cabeElPago("500.00", { vigente: "735.00", yaPagado: "0.00" }).ok).toBe(true);
+  });
+
+  it("una adenda aprobada AMPLIA lo que se le puede pagar", () => {
+    // Contrato de 700 con un adicional de 35: el vigente es 735 y el pago que
+    // antes no cabia, ahora si.
+    expect(cabeElPago("735.00", { vigente: "735.00", yaPagado: "0.00" }).ok).toBe(true);
+    expect(cabeElPago("735.00", { vigente: "700.00", yaPagado: "0.00" }).ok).toBe(false);
+  });
+
+  it("cuenta lo YA pagado, no solo este pago", () => {
+    // Tres pagos de 300 sobre un contrato de 735: el tercero es el que sobra.
+    expect(cabeElPago("300.00", { vigente: "735.00", yaPagado: "300.00" }).ok).toBe(true);
+    expect(cabeElPago("300.00", { vigente: "735.00", yaPagado: "600.00" }).ok).toBe(false);
+  });
+
+  it("no arrastra el ruido de la coma flotante", () => {
+    expect(cabeElPago("0.10", { vigente: "0.30", yaPagado: "0.20" }).ok).toBe(true);
+    expect(cabeElPago("0.11", { vigente: "0.30", yaPagado: "0.20" }).ok).toBe(false);
   });
 });

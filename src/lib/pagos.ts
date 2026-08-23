@@ -1,4 +1,4 @@
-import { esPositivo, normalizarDecimal } from "@/lib/decimal";
+import { esPositivo, normalizarDecimal, restar, sumar } from "@/lib/decimal";
 
 /**
  * Las reglas de un pago al contratista, sin base de datos.
@@ -40,6 +40,65 @@ export interface DatosPago {
   /// "YYYY-MM-DD", como lo manda un <input type="date">.
   fecha: string;
   nota?: string;
+}
+
+/**
+ * El techo de lo que se le puede pagar a un contratista.
+ *
+ * NACE DE UNA PRUEBA DEL USUARIO, el 23 de agosto de 2026: pago 740 sobre un
+ * contrato de 735 y GCM lo acepto sin decir nada. La pantalla lo llamo
+ * «pagado por adelantado S/ 5,00», que es lo que dice cuando se paga mas de
+ * lo VALORIZADO, y ahi estaba la confusion.
+ *
+ * HAY QUE DISTINGUIR DOS EXCESOS, porque uno es normal y el otro no puede
+ * pasar:
+ *
+ * - **Pagar mas de lo VALORIZADO es un adelanto.** Pasa constantemente en
+ *   obra: se adelanta para materiales antes de que haya avance que valorizar.
+ *   No se bloquea; ya se enseña como «pagado por adelantado». `PagoEncargo`
+ *   tiene el `valorizacionId` opcional justo por esto.
+ *
+ * - **Pagar mas que el CONTRATO no es un adelanto, es un error.** Por
+ *   definicion no se le puede deber mas de lo que vale su contrato: si de
+ *   verdad hay que pagarle mas, lo que falta es una ADENDA que amplie el
+ *   contrato. Y desde que las adendas existen, esa salida esta a un clic, asi
+ *   que el mensaje la nombra en vez de dejar a nadie buscando.
+ *
+ * El tope es el VIGENTE -lo firmado mas sus adendas aprobadas-, no lo
+ * firmado: un adicional ya aprobado es dinero que se le debe.
+ *
+ * SIN IGV, como todo en esta cadena: `montoContratado` se guarda sin
+ * impuesto para poder compararse con el parcial del presupuesto, y lo
+ * valorizado y lo pagado se comparan contra el. Nada en el camino del encargo
+ * calcula un bruto.
+ */
+export interface TopeDePago {
+  /// Lo firmado mas las adendas APROBADAS.
+  vigente: string;
+  /// La suma de los pagos ya registrados.
+  yaPagado: string;
+}
+
+export type ResultadoTope =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export function cabeElPago(monto: string, tope: TopeDePago): ResultadoTope {
+  const total = sumar([tope.yaPagado, monto]);
+  const sobra = restar(total, tope.vigente);
+
+  // `esPositivo` y no `> 0`: esto es dinero y se compara con decimal exacto.
+  if (sobra === null || !esPositivo(sobra)) return { ok: true };
+
+  return {
+    ok: false,
+    error:
+      `Con este pago le habrias pagado ${total} y su contrato vigente es ` +
+      `${tope.vigente}: son ${sobra} de mas. No se puede pagar por encima del ` +
+      `contrato. Si de verdad hay que pagarle mas, registra una adenda en el ` +
+      `encargo y que gerencia la apruebe; entonces el contrato sube y el pago ` +
+      `cabe.`,
+  };
 }
 
 export type PagoValidado =
