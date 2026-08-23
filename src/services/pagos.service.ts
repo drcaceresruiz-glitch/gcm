@@ -9,13 +9,13 @@ import { env } from "@/lib/env";
 import { alcanzaObra, FUERA_DE_ALCANCE } from "@/lib/alcance-obras";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { restar, sumar, esPositivo } from "@/lib/decimal";
-import { importeValorizado } from "@/lib/encargos";
 import {
   MIMES_COMPROBANTE,
   TAMANO_MAXIMO_COMPROBANTE,
   validarPago,
   type DatosPago,
 } from "@/lib/pagos";
+import { importeDeValorizacion, montoVigente } from "@/lib/adendas";
 import {
   estadoDeCadencia,
   ETIQUETA_ORIGEN,
@@ -40,9 +40,14 @@ import type { SesionActiva } from "@/services/sesion.service";
  *
  * TRES CIFRAS QUE NO SE MEZCLAN, y es lo que mas cuesta al leer esta pantalla:
  *
- *   - `montoContratado`: SU precio, el del contratista. No es el presupuesto
- *     de la obra ni el costo meta. Puede quedar por encima o por debajo.
- *   - `valorizado`: monto contratado x el ultimo porcentaje acumulado.
+ *   - `montoContratado`: SU precio AL FIRMAR, el del contratista. No es el
+ *     presupuesto de la obra ni el costo meta. Puede quedar por encima o por
+ *     debajo.
+ *   - `montoVigente`: lo firmado mas sus adendas APROBADAS. Es lo que de
+ *     verdad hay que pagarle, y contra lo que se valoriza de ahi en adelante.
+ *   - `valorizado`: la suma de lo reconocido corte a corte. NO se recalcula
+ *     multiplicando un porcentaje por el monto de hoy: eso revalua el pasado
+ *     cada vez que entra una adenda.
  *   - `pagado`: la suma de los pagos registrados.
  *
  * Todo en aritmetica decimal. Aqui es dinero: nunca coma flotante.
@@ -305,8 +310,10 @@ export interface FilaValorizacion {
   numero: number;
   contratista: string;
   descripcion: string;
-  /// SU precio, no el presupuesto de la obra.
+  /// SU precio al FIRMAR, no el presupuesto de la obra.
   montoContratado: string;
+  /// Lo firmado mas sus adendas aprobadas: lo que de verdad hay que pagarle.
+  montoVigente: string;
   /// Ultimo porcentaje acumulado, 0..100. "0" si no ha valorizado nunca.
   porcentaje: string;
   valorizado: string;
@@ -379,8 +386,12 @@ export async function panelDeValorizaciones(
       valorizaciones: {
         orderBy: { fecha: "desc" },
         take: 1,
-        select: { fecha: true, porcentaje: true },
+        // `importe` es el valorizado CONGELADO del corte. Ver mas abajo.
+        select: { fecha: true, porcentaje: true, importe: true },
       },
+      // Solo las APROBADAS: una adenda pendiente es una peticion del
+      // contratista y no se le puede pagar contra ella.
+      adendas: { where: { estado: "APROBADA" }, select: { importe: true } },
       pagos: { select: { monto: true } },
     },
   });
@@ -392,11 +403,39 @@ export async function panelDeValorizaciones(
     const porcentaje = ultima?.porcentaje.toString() ?? "0";
     const montoContratado = e.montoContratado.toString();
 
-    // Con `importeValorizado` de `lib/encargos`, que YA existia: es la misma
-    // cuenta que usa la pantalla de Proveedores. Repetirla aqui —aunque diera
-    // el mismo resultado hoy— es como dos pantallas acaban diciendo cifras
-    // distintas del mismo encargo.
-    const valorizado = importeValorizado(montoContratado, porcentaje);
+    /*
+     * EL VIGENTE, no el contratado, y el importe CONGELADO del corte.
+     *
+     * Esta pantalla se quedo atras cuando llegaron las adendas: seguia
+     * calculando `contratado x porcentaje`, con dos consecuencias que se
+     * notan justo el dia que hay un adicional.
+     *
+     *  1. Un adicional aprobado NO aparecia como pagable. El contratista
+     *     ejecuta el alcance ampliado, valoriza su 100 %, y la pantalla
+     *     seguia diciendo que le tocaba lo del contrato original: parecia que
+     *     se le estaba pagando de mas.
+     *  2. Recalcular contra el monto de hoy revalua el pasado. Es el mismo
+     *     fallo que ya se cerro en `encargos.service`, y estaba aqui todavia.
+     *
+     * Se arregla igual: el corte manda con su importe congelado, y solo se
+     * cae al calculo si es una valorizacion anterior a esa columna —y
+     * entonces contra el CONTRATADO, que es el vigente que tenia—.
+     */
+    const vigente = montoVigente(
+      montoContratado,
+      e.adendas.map((a) => ({ importe: a.importe.toString() })),
+    );
+
+    const valorizado =
+      ultima === null
+        ? "0.00"
+        : importeDeValorizacion(
+            {
+              porcentaje,
+              importe: ultima.importe?.toString() ?? null,
+            },
+            montoContratado,
+          );
 
     const pagado = sumar(e.pagos.map((p) => p.monto.toString()));
 
@@ -419,6 +458,7 @@ export async function panelDeValorizaciones(
       contratista: e.proveedor.razonSocial,
       descripcion: e.descripcion,
       montoContratado,
+      montoVigente: vigente,
       porcentaje,
       valorizado,
       pagado,

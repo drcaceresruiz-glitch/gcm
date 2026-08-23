@@ -110,6 +110,45 @@ describe("una valorizacion no se revalua hacia atras", () => {
   });
 });
 
+describe("EL CAMINO COMPLETO: un adicional se valoriza y se cobra", () => {
+  /*
+   * Es la pregunta que hizo el usuario: «¿los adicionales tambien se reporta
+   * su pago?». Si: no hay un circuito de pago aparte para ellos. Una adenda
+   * aprobada sube el VIGENTE, y el contratista valoriza y cobra contra el
+   * vigente como contra cualquier otra parte de su contrato.
+   *
+   * Lo que hay que vigilar es que las dos pantallas que enseñan lo valorizado
+   * -Proveedores y Valorizaciones- usen el vigente y el importe congelado. La
+   * segunda se quedo atras cuando llegaron las adendas y decia que al
+   * contratista le tocaba lo del contrato original.
+   */
+  it("con el adicional aprobado, el 100 % vale mas que el contrato firmado", () => {
+    const contratado = "50000.00";
+    const vigente = montoVigente(contratado, [ad("8000.00")]);
+
+    expect(vigente).toBe("58000.00");
+    // El contratista termina el alcance ampliado y valoriza su 100 %.
+    expect(importeSobre(vigente, "100.000")).toBe("58000.00");
+  });
+
+  it("un corte anterior al adicional sigue valiendo lo que valia", () => {
+    // Valorizo el 50 % cuando el contrato eran 50.000: 25.000. Entra el
+    // adicional y ese corte NO pasa a valer 29.000.
+    const antes = { porcentaje: "50.000", importe: "25000.00" };
+    expect(importeDeValorizacion(antes, "50000.00")).toBe("25000.00");
+  });
+
+  it("y el siguiente corte ya cuenta el adicional", () => {
+    // El 100 % sobre el vigente son 58.000; descontando los 25.000 ya
+    // reconocidos, en este corte le toca cobrar 33.000.
+    const vigente = montoVigente("50000.00", [ad("8000.00")]);
+    const acumulado = importeSobre(vigente, "100.000");
+
+    expect(acumulado).toBe("58000.00");
+    expect(Number(acumulado) - 25000).toBe(33000);
+  });
+});
+
 describe("aritmetica de dinero", () => {
   it("no arrastra el ruido de la coma flotante", () => {
     expect(montoVigente("0.10", [ad("0.20")])).toBe("0.30");

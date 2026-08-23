@@ -37,6 +37,9 @@ export function FilaContratista({
   const [pendiente, iniciar] = useTransition();
 
   /// Se le pago mas de lo que ha valorizado.
+  /// Si el contrato se movio despues de firmarse. Ver abajo.
+  const conAdendas = fila.montoVigente !== fila.montoContratado;
+
   const adelantado = fila.porPagar.trim().startsWith("-");
 
   function pagar(datos: FormData) {
@@ -93,13 +96,28 @@ export function FilaContratista({
         )}
       </div>
 
-      {/* Las tres cifras, rotuladas. «Contratado» dice SU PRECIO en el propio
+      {/* Las cifras, rotuladas. «Contratado» dice SU PRECIO en el propio
           rotulo: es la confusion que mas cuesta en esta pantalla. */}
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
         <div>
-          <dt className="opacity-60">Contratado (su precio)</dt>
+          <dt className="opacity-60">
+            {conAdendas ? "Contratado (al firmar)" : "Contratado (su precio)"}
+          </dt>
           <dd className="font-medium">{soles(fila.montoContratado)}</dd>
         </div>
+        {/*
+          El VIGENTE solo aparece si difiere: enseñar dos veces la misma cifra
+          -«contratado 50.000 / vigente 50.000»- es ruido en una tabla que ya
+          tiene cuatro columnas. Cuando difiere hay que verlo, porque es lo
+          que de verdad se le paga y lo que explica que el valorizado pase del
+          contrato original.
+        */}
+        {conAdendas && (
+          <div>
+            <dt className="opacity-60">Vigente (con adendas)</dt>
+            <dd className="font-medium">{soles(fila.montoVigente)}</dd>
+          </div>
+        )}
         <div>
           <dt className="opacity-60">Valorizado ({fila.porcentaje}%)</dt>
           <dd className="font-medium">{soles(fila.valorizado)}</dd>
