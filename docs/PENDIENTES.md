@@ -2161,9 +2161,30 @@ Lo que SI se hara, en este orden:
        Salvaguarda si WebGL no esta disponible: mostrar solo el chat de
        texto de siempre, sin romper la pantalla.
 
-     Sin empezar todavia el codigo. Reporte completo del workflow
-     (licencias con enlaces, flujo exacto de exportacion, plan de
-     archivos) disponible en la transcripcion de esta sesion si hace
+     **Primer intento, hecho y REVERTIDO el mismo 22 de agosto de 2026**:
+     se armo la tuberia completa (componente `AvatarMike.tsx`, carga
+     dinamica sin SSR, `Canvas`+`useGLTF`/`useAnimations`, limite de error
+     propio) usando el placeholder mas rapido de conseguir sin cuenta de
+     Mixamo ni Blender a mano: `CesiumMan.glb`, el astronauta de muestra
+     oficial de Khronos (CC-BY 4.0). Typecheck/lint/tests/build en verde,
+     probado en vivo en el navegador (camara, animacion de caminar, chat
+     funcionando con el avatar montado). **El usuario lo vio y lo
+     rechazo de plano**: "ESO SE VE HORRIBLE, FEO ME NIEGO A QUE ESO
+     SIRVA... SINO LO PUEDES MEJORAR Y QUE SEA REALISTA, COMO UN
+     CONSTRUCTOR, MEJOR QUITALO". Con razon —un astronauta generico con
+     textura de globo terraqueo no tiene nada que ver con un constructor
+     ni con GCM—. Se saco todo (`AvatarMike.tsx`, `public/mike/`, las
+     dependencias de three.js del `package.json`, el enganche en
+     `Asistente.tsx`), el chat de texto solo sigue igual que siempre.
+     **Leccion para el proximo intento**: no vale cualquier modelo 3D
+     rigged que se consiga rapido: tiene que verse como alguien de obra
+     (casco, chaleco, ropa de trabajo), lo que probablemente saca de la
+     mesa los assets genericos de muestra y obliga a Mixamo/Quaternius
+     con un personaje elegido a proposito, o a un encargo de diseno.
+
+     Sin empezar todavia el codigo (de nuevo). Reporte completo del
+     workflow (licencias con enlaces, flujo exacto de exportacion, plan
+     de archivos) disponible en la transcripcion de esta sesion si hace
      falta revisarlo de nuevo antes de construir.
 
    ~~**Dictado por voz en el Asistente.**~~ **Investigado el 22 de agosto

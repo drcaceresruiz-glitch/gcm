@@ -35,15 +35,37 @@ interface FilaMensaje {
   propuestaResultado?: string | null;
 }
 
+interface ConfigProveedorPrueba {
+  id: string;
+  nombre: string;
+  tipo: string;
+  modelo: string;
+  urlBase: string | null;
+  apiKey: string;
+}
+
+type RespuestaConversarScript =
+  | { tipo: "texto"; texto: string }
+  | { tipo: "usar_herramientas"; llamadas: { id: string; nombre: string; args: unknown }[]; bruto: unknown }
+  | { ok: false; error: string };
+
 const estado: {
   conversaciones: FilaConversacion[];
   mensajes: FilaMensaje[];
-  proveedorActivo: { tipo: string; modelo: string; urlBase: string | null; apiKey: string } | null;
-  respuestasConversar: (
-    | { tipo: "texto"; texto: string }
-    | { tipo: "usar_herramientas"; llamadas: { id: string; nombre: string; args: unknown }[]; bruto: unknown }
-    | { ok: false; error: string }
-  )[];
+  proveedorActivo: ConfigProveedorPrueba | null;
+  respuestasConversar: RespuestaConversarScript[];
+  /// Guion POR PROVEEDOR (clave = id), para las pruebas del conmutador
+  /// automatico -donde el activo y la alternativa tienen que comportarse
+  /// distinto-. Vacio en el resto de las pruebas.
+  respuestasPorProveedor: Record<string, RespuestaConversarScript[]>;
+  /// Otros proveedores YA VERIFICADOS de la empresa, candidatos del
+  /// conmutador -vacio salvo que una prueba especifica lo llene-.
+  proveedoresAlternativos: ConfigProveedorPrueba[];
+  /// Ids de los proveedores que `activarProveedorInterno` activo, en
+  /// orden -para comprobar que el conmutador activo el que SI respondio-.
+  activaciones: string[];
+  /// {proveedorId, error} de cada llamada a `marcarErrorProveedorInterno`.
+  erroresMarcados: { proveedorId: string; error: string }[];
   llamadasConversar: number;
   /// Las herramientas que se le ofrecieron al proveedor en la ULTIMA
   /// llamada -para comprobar que `proponer_accion` solo aparece con
@@ -57,6 +79,10 @@ const estado: {
   mensajes: [],
   proveedorActivo: null,
   respuestasConversar: [],
+  respuestasPorProveedor: {},
+  proveedoresAlternativos: [],
+  activaciones: [],
+  erroresMarcados: [],
   llamadasConversar: 0,
   ultimoTurnoHerramientas: [],
   ultimoAfter: null,
@@ -75,9 +101,22 @@ vi.mock("next/server", () => ({
 
 vi.mock("@/services/agente-ia.service", () => ({
   configuracionProveedorActivo: () => Promise.resolve(estado.proveedorActivo),
-  conversar: (_tipo: string, _config: unknown, turno: { herramientas: { nombre: string }[] }) => {
+  conversar: (
+    _tipo: string,
+    config: { id: string },
+    turno: { herramientas: { nombre: string }[] },
+  ) => {
     estado.llamadasConversar++;
     estado.ultimoTurnoHerramientas = turno.herramientas.map((h) => h.nombre);
+    // Si el escenario script0 respuestas PARA ESTE proveedor en concreto
+    // -las pruebas del conmutador automatico lo hacen, para que el activo
+    // y la alternativa se comporten distinto-, esas mandan. Si no, cae al
+    // guion global compartido -asi las pruebas de antes del conmutador,
+    // que nunca conocieron mas de un proveedor, siguen igual-.
+    const propio = estado.respuestasPorProveedor[config.id];
+    if (propio && propio.length > 0) {
+      return Promise.resolve(propio.shift());
+    }
     const r = estado.respuestasConversar.shift();
     return Promise.resolve(r ?? { ok: false, error: "sin script de prueba" });
   },
@@ -85,6 +124,18 @@ vi.mock("@/services/agente-ia.service", () => ({
   // turno, no el formato de union exacto de cada proveedor -eso ya lo
   // cubre `agente-ia.service.test.ts`-.
   mensajesDeResultados: (resultados: unknown[]) => [{ role: "user", content: resultados }],
+  configuracionesAlternativas: (_companyId: string, excluirId: string) =>
+    Promise.resolve(estado.proveedoresAlternativos.filter((p) => p.id !== excluirId)),
+  activarProveedorInterno: (_companyId: string, proveedorId: string) => {
+    estado.activaciones.push(proveedorId);
+    const nuevo = estado.proveedoresAlternativos.find((p) => p.id === proveedorId);
+    if (nuevo) estado.proveedorActivo = nuevo;
+    return Promise.resolve();
+  },
+  marcarErrorProveedorInterno: (proveedorId: string, error: string) => {
+    estado.erroresMarcados.push({ proveedorId, error });
+    return Promise.resolve();
+  },
 }));
 
 vi.mock("@/services/obras.service", () => ({
@@ -313,8 +364,19 @@ async function esperarTurno() {
 beforeEach(() => {
   estado.conversaciones = [];
   estado.mensajes = [];
-  estado.proveedorActivo = { tipo: "claude", modelo: "claude-sonnet-5", urlBase: null, apiKey: "sk-test" };
+  estado.proveedorActivo = {
+    id: "activo-1",
+    nombre: "Proveedor de prueba",
+    tipo: "claude",
+    modelo: "claude-sonnet-5",
+    urlBase: null,
+    apiKey: "sk-test",
+  };
   estado.respuestasConversar = [];
+  estado.respuestasPorProveedor = {};
+  estado.proveedoresAlternativos = [];
+  estado.activaciones = [];
+  estado.erroresMarcados = [];
   estado.llamadasConversar = 0;
   estado.ultimoTurnoHerramientas = [];
   estado.ultimoAfter = null;
@@ -480,6 +542,115 @@ describe("ejecutarTurno, disparado por after()", () => {
     // Nunca mas de MAX_VUELTAS llamadas al adaptador, aunque el script de
     // prueba tenga 10 preparadas.
     expect(estado.llamadasConversar).toBeLessThanOrEqual(6);
+  });
+});
+
+describe("conmutador automatico de proveedor", () => {
+  const ALTERNATIVA: ConfigProveedorPrueba = {
+    id: "alt-1",
+    nombre: "Alternativa verificada",
+    tipo: "claude",
+    modelo: "claude-otro",
+    urlBase: null,
+    apiKey: "sk-alt",
+  };
+
+  it("si el activo responde bien, nunca se toca ninguna alternativa", async () => {
+    estado.proveedoresAlternativos = [ALTERNATIVA];
+    estado.respuestasPorProveedor["activo-1"] = [{ tipo: "texto", texto: "Todo en orden." }];
+
+    const r = await iniciarTurno(CON_PERMISO, null, "hola");
+    if (!r.ok) throw new Error("deberia haber funcionado");
+    await esperarTurno();
+
+    expect(estado.activaciones).toHaveLength(0);
+    expect(estado.erroresMarcados).toHaveLength(0);
+    const asistente = estado.mensajes.find((m) => m.id === r.mensajeAsistenteId);
+    expect(asistente?.contenido).toBe("Todo en orden.");
+  });
+
+  it("si el activo falla y una alternativa responde, el turno se completa igual -sin que quien pregunta note nada- y esa alternativa queda activa", async () => {
+    estado.proveedoresAlternativos = [ALTERNATIVA];
+    estado.respuestasPorProveedor["activo-1"] = [{ ok: false, error: "(503) sobrecargado" }];
+    estado.respuestasPorProveedor["alt-1"] = [{ tipo: "texto", texto: "Respondo yo." }];
+
+    const r = await iniciarTurno(CON_PERMISO, null, "hola");
+    if (!r.ok) throw new Error("deberia haber funcionado");
+    await esperarTurno();
+
+    const asistente = estado.mensajes.find((m) => m.id === r.mensajeAsistenteId);
+    expect(asistente?.terminadoAt).not.toBeNull();
+    expect(asistente?.error).toBeNull();
+    expect(asistente?.contenido).toBe("Respondo yo.");
+
+    expect(estado.erroresMarcados).toEqual([{ proveedorId: "activo-1", error: "(503) sobrecargado" }]);
+    expect(estado.activaciones).toEqual(["alt-1"]);
+    // El proveedor activo de la empresa cambio de verdad, para que el
+    // PROXIMO turno ya no pague el costo de reintentar el que esta caido.
+    expect(estado.proveedorActivo?.id).toBe("alt-1");
+  });
+
+  it("si el activo y todas las alternativas fallan, explica con el error del ACTIVO -el que quien administra ya conoce-, no el de la ultima alternativa", async () => {
+    estado.proveedoresAlternativos = [ALTERNATIVA];
+    estado.respuestasPorProveedor["activo-1"] = [{ ok: false, error: "(401) clave del activo invalida" }];
+    estado.respuestasPorProveedor["alt-1"] = [{ ok: false, error: "(500) la alternativa tambien cayo" }];
+
+    const r = await iniciarTurno(CON_PERMISO, null, "hola");
+    if (!r.ok) throw new Error("deberia haber funcionado");
+    await esperarTurno();
+
+    const asistente = estado.mensajes.find((m) => m.id === r.mensajeAsistenteId);
+    expect(asistente?.error).toBe("(401) clave del activo invalida");
+    expect(estado.erroresMarcados.map((e) => e.proveedorId)).toEqual(["activo-1", "alt-1"]);
+    // Ninguna alternativa funciono: el activo de la empresa NO cambia.
+    expect(estado.activaciones).toHaveLength(0);
+  });
+
+  it("nunca prueba mas de TOPE_ALTERNATIVAS -si la que funciona esta mas alla del tope, el turno falla igual-", async () => {
+    const alt2: ConfigProveedorPrueba = { ...ALTERNATIVA, id: "alt-2", nombre: "Segunda" };
+    const alt3QueFunciona: ConfigProveedorPrueba = { ...ALTERNATIVA, id: "alt-3", nombre: "Tercera, nunca se llega" };
+    estado.proveedoresAlternativos = [ALTERNATIVA, alt2, alt3QueFunciona];
+    estado.respuestasPorProveedor["activo-1"] = [{ ok: false, error: "cae el activo" }];
+    estado.respuestasPorProveedor["alt-1"] = [{ ok: false, error: "cae la primera" }];
+    estado.respuestasPorProveedor["alt-2"] = [{ ok: false, error: "cae la segunda" }];
+    estado.respuestasPorProveedor["alt-3"] = [{ tipo: "texto", texto: "esta SI responde, pero nunca se le pregunta" }];
+
+    const r = await iniciarTurno(CON_PERMISO, null, "hola");
+    if (!r.ok) throw new Error("deberia haber funcionado");
+    await esperarTurno();
+
+    const asistente = estado.mensajes.find((m) => m.id === r.mensajeAsistenteId);
+    expect(asistente?.error).toBe("cae el activo");
+    // activo + 2 alternativas (el tope) = 3 marcados, nunca la tercera.
+    expect(estado.erroresMarcados.map((e) => e.proveedorId)).toEqual(["activo-1", "alt-1", "alt-2"]);
+    expect(estado.activaciones).toHaveLength(0);
+  });
+
+  it("el cambio de proveedor solo puede pasar en la PRIMERA vuelta, nunca a mitad del uso de herramientas", async () => {
+    estado.proveedoresAlternativos = [ALTERNATIVA];
+    // La primera vuelta responde bien con el activo -pide una
+    // herramienta-; la SEGUNDA vuelta, ya con historial de esa
+    // herramienta acumulado en el formato del activo, falla. No debe
+    // intentarse ninguna alternativa a esa altura -mezclar el formato de
+    // dos proveedores a mitad de turno romperia el historial-.
+    estado.respuestasPorProveedor["activo-1"] = [
+      {
+        tipo: "usar_herramientas",
+        llamadas: [{ id: "call-1", nombre: "resumen_empresa", args: {} }],
+        bruto: { role: "assistant", content: [] },
+      },
+      { ok: false, error: "cae a mitad de turno" },
+    ];
+
+    const r = await iniciarTurno(CON_PERMISO, null, "hola");
+    if (!r.ok) throw new Error("deberia haber funcionado");
+    await esperarTurno();
+
+    const asistente = estado.mensajes.find((m) => m.id === r.mensajeAsistenteId);
+    expect(asistente?.error).toBe("cae a mitad de turno");
+    // Ni un solo intento de conmutar: la alternativa nunca se llamo.
+    expect(estado.activaciones).toHaveLength(0);
+    expect(estado.erroresMarcados).toHaveLength(0);
   });
 });
 

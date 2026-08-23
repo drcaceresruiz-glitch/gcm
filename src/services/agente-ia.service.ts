@@ -985,6 +985,8 @@ export async function probarProveedorIa(
 // ---------------------------------------------------------------------------
 
 export interface ConfiguracionProveedorActivo {
+  id: string;
+  nombre: string;
   tipo: string;
   modelo: string;
   urlBase: string | null;
@@ -1007,7 +1009,7 @@ export async function configuracionProveedorActivo(
     where: { id: companyId },
     select: {
       proveedorIaActivo: {
-        select: { tipo: true, modelo: true, urlBase: true, apiKeyCifrada: true },
+        select: { id: true, nombre: true, tipo: true, modelo: true, urlBase: true, apiKeyCifrada: true },
       },
     },
   });
@@ -1017,5 +1019,90 @@ export async function configuracionProveedorActivo(
   const apiKey = descifrar(activo.apiKeyCifrada);
   if (apiKey === null) return null;
 
-  return { tipo: activo.tipo, modelo: activo.modelo, urlBase: activo.urlBase, apiKey };
+  return {
+    id: activo.id,
+    nombre: activo.nombre,
+    tipo: activo.tipo,
+    modelo: activo.modelo,
+    urlBase: activo.urlBase,
+    apiKey,
+  };
+}
+
+/**
+ * Los OTROS proveedores YA VERIFICADOS de una empresa -nunca el que
+ * acaba de fallar, nunca uno que nadie probo nunca-, en orden de
+ * antiguedad. Es la lista de candidatos para el conmutador automatico
+ * (`agente-conversacion.service.ts`): si el activo falla, se intenta con
+ * el primero de esta lista antes de rendirse. Sin permiso de por medio
+ * a proposito -como `configuracionProveedorActivo`, es una consulta
+ * interna del propio motor del agente, no una pantalla que un usuario
+ * pida a mano-, pero SOLO entre proveedores que un humano ya probo de
+ * verdad alguna vez (`verificadoAt` no nulo): el conmutador nunca activa
+ * algo que nadie confirmo que funcionaba.
+ */
+export async function configuracionesAlternativas(
+  companyId: string,
+  excluirId: string,
+): Promise<ConfiguracionProveedorActivo[]> {
+  if (!hayLlaveDeCifrado()) return [];
+
+  const filas = await prisma.agenteIaProveedor.findMany({
+    where: { companyId, id: { not: excluirId }, verificadoAt: { not: null } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, nombre: true, tipo: true, modelo: true, urlBase: true, apiKeyCifrada: true },
+  });
+
+  const configuraciones: ConfiguracionProveedorActivo[] = [];
+  for (const f of filas) {
+    const apiKey = descifrar(f.apiKeyCifrada);
+    if (apiKey === null) continue; // fila manipulada o llave rotada: se salta, no revienta el conmutador
+    configuraciones.push({
+      id: f.id,
+      nombre: f.nombre,
+      tipo: f.tipo,
+      modelo: f.modelo,
+      urlBase: f.urlBase,
+      apiKey,
+    });
+  }
+  return configuraciones;
+}
+
+/**
+ * Activa un proveedor SIN pedir permiso ni exigir `verificadoAt` de
+ * nuevo -a diferencia de `activarProveedorIa`, que es la version
+ * expuesta a la pantalla-. Solo la llama el conmutador automatico, y
+ * solo con un proveedor que `configuracionesAlternativas` ya filtro por
+ * `verificadoAt` no nulo: no es una puerta nueva, es la MISMA puerta
+ * (un humano probo esto alguna vez) accionada por el sistema en vez de
+ * un click.
+ */
+export async function activarProveedorInterno(
+  companyId: string,
+  proveedorId: string,
+): Promise<void> {
+  await prisma.company.update({
+    where: { id: companyId },
+    data: { proveedorIaActivoId: proveedorId },
+  });
+}
+
+/**
+ * Registra que un proveedor fallo durante una conversacion real -no
+ * durante "Probar"-, para que quien administra `/empresa/configuracion/ia`
+ * lo vea la proxima vez que entre (mismo campo `ultimoError` que ya usa
+ * "Probar", misma pantalla, sin superficie nueva). A proposito NO toca
+ * `verificadoAt`: un fallo en una conversacion es una senal mas debil que
+ * un "Probar" fallido a proposito -alguien SI confirmo antes que este
+ * proveedor funciona-, asi que no le retira esa confianza sola.
+ */
+export async function marcarErrorProveedorInterno(
+  proveedorId: string,
+  error: string,
+): Promise<void> {
+  await prisma.agenteIaProveedor.update({
+    where: { id: proveedorId },
+    data: { ultimoError: error.slice(0, 300), ultimoErrorAt: new Date() },
+  });
 }

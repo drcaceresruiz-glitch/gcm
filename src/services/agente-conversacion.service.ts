@@ -10,8 +10,13 @@ import {
   conversar,
   mensajesDeResultados,
   configuracionProveedorActivo,
+  configuracionesAlternativas,
+  activarProveedorInterno,
+  marcarErrorProveedorInterno,
   type HerramientaAgente,
   type HerramientaEscritura,
+  type ConfiguracionProveedorActivo,
+  type RespuestaTurno,
 } from "@/services/agente-ia.service";
 import { listarObras, obtenerResumenEmpresa } from "@/services/obras.service";
 import {
@@ -779,14 +784,75 @@ async function marcarError(mensajeAsistenteId: string, error: string): Promise<v
   });
 }
 
+/// Cuantos proveedores alternativos probar como maximo antes de rendirse
+/// -ademas del activo-. Cada uno puede tardar hasta `TOPE_CONVERSACION_MS`
+/// (con su propio reintento interno adentro), asi que esto acota cuanto
+/// puede llegar a tardar un turno en el peor de los casos: el turno sigue
+/// corriendo en `after()`, no bloquea nada, pero tampoco es gratis
+/// encadenar proveedores sin limite.
+const TOPE_ALTERNATIVAS = 2;
+
+/**
+ * Resuelve CON QUE proveedor se va a correr el turno ENTERO -nunca a
+ * mitad del bucle de herramientas-: el `mensajes` acumulado por cada
+ * proveedor queda en SU propio formato (bloques `tool_use` de Claude vs.
+ * `tool_calls` de OpenAI), asi que cambiar de proveedor una vez que ya
+ * hay una vuelta de herramientas en el historial rompe al siguiente -por
+ * eso esto se llama UNA vez, antes de la primera vuelta, nunca despues-.
+ *
+ * Si el proveedor activo falla, prueba con otros proveedores YA
+ * VERIFICADOS de la misma empresa (`configuracionesAlternativas`, nunca
+ * uno que nadie confirmo que funcionaba), en orden, hasta
+ * `TOPE_ALTERNATIVAS`. El primero que responda:
+ * - se vuelve el proveedor ACTIVO de la empresa de ahi en adelante
+ *   (`activarProveedorInterno`) -asi el proximo turno no vuelve a pagar
+ *   el costo de reintentar el que esta caido-,
+ * - y el turno sigue exactamente igual que si nunca hubiera fallado
+ *   nada: quien pregunto no ve ningun aviso del cambio.
+ *
+ * Cada proveedor que SI falla queda con su `ultimoError` actualizado
+ * -mismo campo que ya llena "Probar"-, para que quien administra
+ * `/empresa/configuracion/ia` se entere la proxima vez que entre, aunque
+ * quien esta conversando ahora mismo no vea nada raro.
+ */
+async function resolverProveedorQueResponda(
+  companyId: string,
+  activo: ConfiguracionProveedorActivo,
+  turno: { mensajes: unknown[]; herramientas: HerramientaAgente[]; sistema: string },
+): Promise<{ config: ConfiguracionProveedorActivo; respuesta: RespuestaTurno } | { config: null; error: string }> {
+  const candidatos = [activo];
+  let errorDelActivo = "";
+
+  const rActivo = await conversar(activo.tipo, activo, turno);
+  if (!("ok" in rActivo)) return { config: activo, respuesta: rActivo };
+  errorDelActivo = rActivo.error;
+  await marcarErrorProveedorInterno(activo.id, rActivo.error);
+
+  const alternativas = await configuracionesAlternativas(companyId, activo.id);
+  for (const alt of alternativas.slice(0, TOPE_ALTERNATIVAS)) {
+    candidatos.push(alt);
+    const r = await conversar(alt.tipo, alt, turno);
+    if (!("ok" in r)) {
+      await activarProveedorInterno(companyId, alt.id);
+      return { config: alt, respuesta: r };
+    }
+    await marcarErrorProveedorInterno(alt.id, r.error);
+  }
+
+  // Todos fallaron: se explica con el error del ACTIVO -el que quien
+  // pregunta ya conoce y espera ver, si administra los proveedores-, no
+  // con el de la ultima alternativa que ni siquiera eligio.
+  return { config: null, error: errorDelActivo };
+}
+
 async function ejecutarTurno(
   sesion: SesionActiva,
   conversacionId: string,
   mensajeAsistenteId: string,
 ): Promise<void> {
   try {
-    const config = await configuracionProveedorActivo(sesion.companyId);
-    if (!config) {
+    const activo = await configuracionProveedorActivo(sesion.companyId);
+    if (!activo) {
       await marcarError(mensajeAsistenteId, SIN_PROVEEDOR_ACTIVO);
       return;
     }
@@ -818,13 +884,38 @@ async function ejecutarTurno(
     const herramientas = puedeEscribir ? [...HERRAMIENTAS, PROPONER_ACCION] : HERRAMIENTAS;
     const sistema = construirSistema(puedeEscribir);
 
+    // Conmutador automatico: si el proveedor activo no responde, prueba
+    // con otro YA VERIFICADO de la empresa ANTES de la primera vuelta -ver
+    // el comentario de `resolverProveedorQueResponda`-. Quien pregunta
+    // nunca se entera: si algo respondio, el turno sigue igual.
+    const resuelto = await resolverProveedorQueResponda(sesion.companyId, activo, {
+      mensajes,
+      herramientas,
+      sistema,
+    });
+    if (!resuelto.config) {
+      await marcarError(mensajeAsistenteId, resuelto.error);
+      return;
+    }
+    const config = resuelto.config;
+    let respuestaPendiente: RespuestaTurno | null = resuelto.respuesta;
+
     const herramientasUsadas: string[] = [];
 
     for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {
-      const r = await conversar(config.tipo, config, { mensajes, herramientas, sistema });
+      let r: RespuestaTurno | { ok: false; error: string };
+      if (respuestaPendiente) {
+        r = respuestaPendiente;
+        respuestaPendiente = null;
+      } else {
+        r = await conversar(config.tipo, config, { mensajes, herramientas, sistema });
+      }
 
       if ("ok" in r) {
-        // r: { ok: false; error: string }
+        // r: { ok: false; error: string } -ya paso por el conmutador en
+        // la primera vuelta; de aqui en adelante ya no se cambia de
+        // proveedor a mitad del historial acumulado, ver el comentario
+        // de `resolverProveedorQueResponda`.
         await marcarError(mensajeAsistenteId, r.error);
         return;
       }
