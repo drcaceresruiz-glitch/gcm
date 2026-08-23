@@ -118,12 +118,21 @@ como los casos aprendidos de CRIOCORD—. Se cambio solo lo visible.
 - **Ningun PDF se ha visto impreso.** Esta maquina no rasteriza PDF (sin
   `pdftoppm` ni ImageMagick). Las pruebas afirman que nada se sale del papel,
   pero la comparativa lleva una columna mas y es donde menos margen hay.
-- **Los cuatro datos `data-manual`** (RUC, colegiatura CAP del residente,
-  direccion, «PROGRAMACION EP»): el usuario pidio anadirlos al modelo y no se
-  ha hecho.
-- **Todo el codigo de las PLANTILLAS del informe** sigue sin empezar mas alla
-  de las cuatro hojas citadas: elegir plantilla por empresa con override por
-  obra, y apagar secciones una a una. Los dos estan decididos, no construidos.
+- ~~**Los cuatro datos `data-manual`**~~ **HECHO.** Y el hallazgo fue que
+  TRES YA ESTABAN en el modelo -`Company.ruc`, `Project.ubicacion`,
+  `Cronograma.nombreProyecto`-: lo que faltaba no era guardarlos sino USARLOS,
+  porque ningun documento los ensenaba. Solo se anadio `User.colegiatura`.
+  Ahora salen en el membrete y en la linea de firma de los tres presupuestos.
+- ~~**Las PLANTILLAS del informe**~~ **HECHO.** Resultaron ser un solo
+  mecanismo y no dos: una plantilla es un nombre para un conjunto de secciones
+  encendidas, y las secciones se apagan encima. Tres plantillas (COMPLETA,
+  EJECUTIVA, OBRA), eleccion por empresa en `/empresa/configuracion` y override
+  por obra en su pantalla de informe. El RESUMEN no se puede apagar -lleva el
+  avance y las alertas- y el pie confiesa cuantas secciones se omitieron.
+
+**Comprobado con `scripts/humo.ts`**: 88 de 88 rutas responden contra la base
+de desarrollo, incluida la nueva `/obras/[id]/presupuesto/pdf`, que devuelve
+200 -o sea que genera el PDF de verdad, no solo compila-.
 
 ---
 
