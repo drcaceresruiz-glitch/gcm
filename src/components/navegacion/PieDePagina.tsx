@@ -2,7 +2,8 @@ import { HardHat, Ruler, Tag } from "lucide-react";
 
 import { SelloMetodologia } from "@/components/ui/SelloMetodologia";
 import { AUTORIA } from "@/lib/autoria";
-import { versionParaMostrar } from "@/lib/version";
+import { shaDelPaquete, versionParaMostrar } from "@/lib/version";
+import { SelloVersion } from "@/components/navegacion/SelloVersion";
 
 /**
  * Pie de pagina del area privada: marca, ano, creditos y version.
@@ -26,6 +27,11 @@ const ANIO = new Intl.DateTimeFormat("es-PE", {
 
 export function PieDePagina() {
   return (
+    <>
+    {/* No pinta nada: deja en el navegador con que version se pinto esto,
+        para que la pantalla de error pueda distinguir un fallo de verdad de
+        una pestana que se quedo con el JavaScript de un despliegue anterior. */}
+    <SelloVersion sha={shaDelPaquete()} />
     <footer
       className="border-t print:hidden"
       style={{ borderColor: "var(--borde)" }}
@@ -80,5 +86,6 @@ export function PieDePagina() {
         <SelloMetodologia compacto className="mt-1" />
       </div>
     </footer>
+    </>
   );
 }

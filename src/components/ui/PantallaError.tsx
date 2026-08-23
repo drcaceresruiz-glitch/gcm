@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { RefreshCw, TriangleAlert } from "lucide-react";
+import { RefreshCw, RotateCw, TriangleAlert } from "lucide-react";
 
 import { Mascota } from "@/components/ui/Mascota";
+import { shaDeEstaPagina } from "@/components/navegacion/SelloVersion";
 
 /**
  * Lo que se ve cuando una pantalla revienta.
@@ -24,7 +26,52 @@ import { Mascota } from "@/components/ui/Mascota";
  * - **No enseña el mensaje tecnico en produccion**, y no es decision nuestra:
  *   Next lo sustituye por uno generico y deja solo el `digest`. En desarrollo
  *   si viaja, y ahi es donde hace falta.
+ * - **Distingue una pestana vieja de un fallo de verdad.** Ver mas abajo: es
+ *   el caso mas comun de todos y el unico que se arregla solo.
  */
+
+/**
+ * Si lo que fallo es que la pagina es de un despliegue anterior.
+ *
+ * Cada `git push` despliega, y los Server Actions se identifican por un id
+ * que cambia en cada compilacion. Una pestana abierta desde antes conserva el
+ * JavaScript viejo: en cuanto intenta guardar algo, el servidor no reconoce
+ * la accion y la pantalla revienta. No se ha roto nada y no hay nada que
+ * reportar; basta recargar.
+ *
+ * NO se adivina por el texto del error -en produccion Next lo sustituye por
+ * uno generico, asi que buscar «Server Action» ahi funcionaria en local y
+ * fallaria justo donde hace falta-. Se COMPRUEBA: se le pregunta al servidor
+ * que version corre y se compara con la que pinto esta pagina.
+ */
+function useEsPestanaVieja(): boolean {
+  const [vieja, setVieja] = useState(false);
+
+  useEffect(() => {
+    const mio = shaDeEstaPagina();
+    // En local no hay paquete desplegado: no hay nada que comparar y no se
+    // inventa un diagnostico.
+    if (mio === null) return;
+
+    let vivo = true;
+    fetch("/api/health", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((salud: { version?: string } | null) => {
+        if (!vivo || !salud?.version) return;
+        if (salud.version !== mio) setVieja(true);
+      })
+      // Si no se puede preguntar, no se afirma nada: se deja el aviso de
+      // siempre, que sigue siendo cierto.
+      .catch(() => undefined);
+
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  return vieja;
+}
+
 export function PantallaError({
   error,
   reset,
@@ -38,6 +85,38 @@ export function PantallaError({
   volverA: string;
   volverTexto?: string;
 }) {
+  const pestanaVieja = useEsPestanaVieja();
+
+  if (pestanaVieja) {
+    return (
+      <div
+        role="alert"
+        className="mx-auto flex max-w-xl flex-col items-center gap-4 rounded-xl border p-8 text-center"
+        style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
+      >
+        <Mascota pose="pensando" alto={150} />
+
+        <h2 className="text-lg font-semibold">GCM se actualizó mientras trabajabas</h2>
+
+        <p className="text-sm text-pretty opacity-70">
+          Esta pestaña llevaba abierta desde una versión anterior, y por eso lo
+          que acabas de pulsar no llegó. <strong>No se ha roto nada y no se ha
+          perdido nada</strong>: recarga la página y vuelve a intentarlo.
+        </p>
+
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+          style={{ backgroundColor: "var(--color-marca-600)" }}
+        >
+          <RotateCw className="size-4" aria-hidden="true" />
+          Recargar la página
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       role="alert"
