@@ -9,6 +9,7 @@ import {
 } from "./plantilla-meta";
 import { analizarExcel } from "./excel-presupuesto";
 import { cifrasDeLaMeta } from "./costo-meta";
+import { generarContractual } from "./contractual-desde-meta";
 
 /**
  * El contrato de la plantilla de la meta: lo que GCM regala para descargar,
@@ -235,6 +236,82 @@ describe("la columna de recargo, y donde se puede escribir", () => {
   it("las filas vacias tambien la aceptan, sean lo que sean", async () => {
     const h = await hoja();
     expect(h.getRow(200).getCell(7).protection?.locked).toBe(false);
+  });
+});
+
+describe("un recargo escrito en una PARTIDA llega hasta el contractual", () => {
+  /*
+   * REPORTADO EL 23 DE AGOSTO DE 2026 con captura: un 10 % escrito en la fila
+   * de la partida 1.1 desaparecia al importar, sin un solo aviso.
+   *
+   * El recargo por partida estaba cerrado en TRES sitios distintos, y
+   * abrirlos de uno en uno no arreglaba nada porque el dato moria en el
+   * siguiente: la celda del Excel estaba bloqueada, el servicio filtraba
+   * `tipo: "CAPITULO"` y el importador ponia `porcentajeRecargo: null` fijo
+   * en la rama de partida. Esta prueba recorre el camino ENTERO -escribir en
+   * la celda, importar, generar- porque es la unica forma de que no vuelva a
+   * pasar que una pieza este abierta y la de al lado no.
+   */
+  const conRecargoEnLa11 = async (pct: number) => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const hoja = libro.worksheets[0]!;
+
+    // Fila 6, columna G: la partida 1.1 del ejemplo. Es literalmente la celda
+    // de la captura.
+    expect(hoja.getRow(6).getCell(1).value).toBe("1.1");
+    hoja.getRow(6).getCell(7).value = pct;
+
+    const salida = await libro.xlsx.writeBuffer();
+    return analizarExcel(
+      new Uint8Array(salida as unknown as Uint8Array).buffer as ArrayBuffer,
+      { propiasDeLaMeta: true },
+    );
+  };
+
+  it("el importador lo lee, en vez de tirarlo", async () => {
+    const r = await conRecargoEnLa11(10);
+    const p11 = r.filas.find((f) => f.codigo === "1.1")!;
+
+    expect(p11.porcentajeRecargo).toBe("10.00");
+  });
+
+  it("y el contractual lo aplica: gana sobre el de su capitulo", async () => {
+    const r = await conRecargoEnLa11(10);
+    const c = generarContractual(
+      r.filas.map((f) => ({
+        codigo: f.codigo,
+        descripcion: f.descripcion,
+        tipo: f.tipo,
+        nivel: f.nivel,
+        orden: f.fila,
+        unidad: f.unidad,
+        metrado: f.metrado,
+        precioUnitario: f.precioUnitario,
+        parcial: f.parcial,
+        porcentajeRecargo: f.porcentajeRecargo,
+        fechaInicio: f.fechaInicio,
+        fechaFin: f.fechaFin,
+      })),
+    );
+
+    const p11 = c.lineas.find((l) => l.codigo === "1.1")!;
+    expect(p11.codigoDelRecargo).toBe("1.1");
+    expect(p11.porcentajeAplicado).toBe("10.00");
+
+    // Y su hermana sigue con el del capitulo: no se contagia.
+    const p12 = c.lineas.find((l) => l.codigo === "1.2")!;
+    expect(p12.codigoDelRecargo).toBe("1.0");
+  });
+
+  it("sin tocar nada, la partida sigue heredando", async () => {
+    // El control: si esto pasara igual con y sin recargo, la prueba de arriba
+    // no probaria nada.
+    const r = await analizarExcel(await generarPlantillaMeta(), {
+      propiasDeLaMeta: true,
+    });
+
+    expect(r.filas.find((f) => f.codigo === "1.1")!.porcentajeRecargo).toBeNull();
   });
 });
 

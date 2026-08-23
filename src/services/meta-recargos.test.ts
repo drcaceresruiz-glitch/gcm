@@ -152,6 +152,28 @@ describe("ajustarRecargosDeLaMeta", () => {
     expect(estado.escrituras).toHaveLength(0);
   });
 
+  it("vaciar la casilla borra el recargo: NO es un cero", async () => {
+    /*
+     * Vacio significa «esta linea no lleva recargo propio, que herede el de
+     * su capitulo» -un `null` para el motor-, y cero significa «entra a
+     * precio de costo». Son la misma tecla y decisiones opuestas.
+     *
+     * Antes vaciar la casilla salia «El recargo de 1.0 no es un numero»: no
+     * habia forma de deshacer un recargo sin recargar la meta desde el Excel.
+     */
+    const r = await ajustar({ "1.0": "" });
+
+    expect(r.ok).toBe(true);
+    expect(estado.escrituras).toEqual([{ id: "i1", porcentajeRecargo: null }]);
+  });
+
+  it("un cero SI se guarda como cero", async () => {
+    const r = await ajustar({ "1.1": "0" });
+
+    expect(r.ok).toBe(true);
+    expect(estado.escrituras).toEqual([{ id: "i3", porcentajeRecargo: "0.000" }]);
+  });
+
   it("un sueldo NO se puede recargar: no tiene codigo con el que pedirlo", async () => {
     /*
      * La garantia que queda en pie ahora que las partidas si se recargan. Una

@@ -459,9 +459,28 @@ export async function ajustarRecargosDeLaMeta(
    * El tope no es una manía: un recargo de cuatro cifras casi siempre es un
    * dedo de mas al teclear, y el numero acabaria en un contrato.
    */
-  const validados = new Map<string, string>();
+  const validados = new Map<string, string | null>();
   for (const [codigo, crudo] of Object.entries(recargos)) {
-    const pct = normalizarDecimal(String(crudo ?? ""), 3);
+    const texto = String(crudo ?? "").trim();
+
+    /*
+     * VACIO NO ES CERO: es «esta linea no lleva recargo propio, que herede el
+     * de su capitulo», que es exactamente lo que significa un `null` para
+     * `generarContractual`. Borrar un recargo es una decision y tiene que
+     * poder tomarse.
+     *
+     * Hasta el 23 de agosto de 2026 una casilla vaciada llegaba aqui y salia
+     * «El recargo de 1.1 no es un numero»: no habia forma de deshacer un
+     * recargo sin recargar la meta entera desde el Excel. Se notaba poco
+     * mientras solo se recargaban capitulos; con las partidas es la accion de
+     * todos los dias.
+     */
+    if (texto === "") {
+      validados.set(codigo, null);
+      continue;
+    }
+
+    const pct = normalizarDecimal(texto, 3);
     if (pct === null) {
       return { ok: false, error: `El recargo de ${codigo} no es un numero.` };
     }

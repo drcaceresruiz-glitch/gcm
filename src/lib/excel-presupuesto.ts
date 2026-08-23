@@ -33,7 +33,8 @@ export interface FilaImportada {
   metrado: string | null;
   precioUnitario: string | null;
   parcial: string | null;
-  /// Solo en capitulos: % de recargo con el que se genera el contractual.
+  /// % de recargo con el que se genera el contractual. En un capitulo lo
+  /// heredan sus partidas; en una partida gana sobre el de su capitulo.
   porcentajeRecargo: string | null;
   /// Fecha opcional de la plantilla, "YYYY-MM-DD". Van juntas o ninguna: ver
   /// la validacion en `analizarExcel`. Sin ellas, la EDT sale `sinProgramar`
@@ -995,7 +996,19 @@ function construirFila(args: ArgsFila): FilaImportada | null {
     descripcion: desc, nivel,
     unidad: unidadTexto || null,
     metrado, precioUnitario, parcial,
-    porcentajeRecargo: null,
+    /*
+     * UNA PARTIDA TAMBIEN PUEDE LLEVAR SU RECARGO.
+     *
+     * Esta linea decia `null` fijo, y era el tercer sitio -despues de la
+     * celda del Excel y del servicio que guarda- donde el recargo por partida
+     * estaba cerrado sin motivo. `generarContractual` siempre supo aplicarlo:
+     * resuelve empezando por el codigo de la PROPIA linea y solo sube al
+     * padre si esa no lo trae.
+     *
+     * Reportado el 23 de agosto de 2026: un 10 % escrito en la fila de la
+     * partida 1.1 desaparecia al importar, sin un solo aviso.
+     */
+    porcentajeRecargo: normalizarDecimal(leer("recargo"), 2),
     fechaInicio, fechaFin,
     ...(avisos.length > 0 ? { aviso: avisos.join(" ") } : {}),
   };
