@@ -1,0 +1,194 @@
+<title>Informes al Corte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,wght@1,400;1,500&display=swap" rel="stylesheet">
+
+<style>
+/* ===================== ESCRITORIO (alrededor del papel) ===================== */
+:root{
+  --esc-fondo:#eceae5; --esc-panel:#ffffff; --esc-tinta:#1b1c1e; --esc-tinta-2:#5f6167;
+  --esc-borde:#dcd9d2; --esc-marca:#b2551f; --esc-marca-tinta:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --esc-fondo:#141416; --esc-panel:#1c1d20; --esc-tinta:#eeece8; --esc-tinta-2:#a4a6ac;
+    --esc-borde:#2e2f33; --esc-marca:#d4762f; --esc-marca-tinta:#17181a;
+  }
+}
+:root[data-theme="dark"]{
+  --esc-fondo:#141416; --esc-panel:#1c1d20; --esc-tinta:#eeece8; --esc-tinta-2:#a4a6ac;
+  --esc-borde:#2e2f33; --esc-marca:#d4762f; --esc-marca-tinta:#17181a;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--esc-fondo); color:var(--esc-tinta);
+  font-family:"Plus Jakarta Sans", system-ui, sans-serif; -webkit-font-smoothing:antialiased;
+}
+.escritorio{ max-width:1220px; margin:0 auto; padding:2.6rem 1.4rem 5rem; }
+
+.intro h1{ font-weight:800; font-size:clamp(1.5rem,3vw,2.05rem); letter-spacing:-0.015em; margin:0 0 .7rem; text-wrap:balance; }
+.intro p{ max-width:68ch; color:var(--esc-tinta-2); line-height:1.65; font-size:.95rem; margin:0 0 .7rem; }
+.intro p b{ color:var(--esc-tinta); font-weight:600; }
+.fichas{ display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1rem; }
+.ficha{ display:inline-flex; align-items:center; gap:.45rem; font-size:.76rem; color:var(--esc-tinta-2);
+  border:1px solid var(--esc-borde); border-radius:999px; padding:.34rem .8rem; background:var(--esc-panel); }
+.ficha b{ color:var(--esc-tinta); font-weight:600; }
+.ficha .pip{ width:7px; height:7px; border-radius:50%; background:var(--esc-marca); flex:none; }
+
+/* ===================== PESTAÑAS Y CONTROLES ===================== */
+.doc-root{ margin-top:2.2rem; }
+.doc-root > input{ position:absolute; opacity:0; pointer-events:none; }
+.barra{ display:flex; flex-wrap:wrap; gap:.4rem; align-items:center; }
+.barra label.tab{ cursor:pointer; user-select:none; padding:.5rem .95rem; border-radius:9px; font-size:.83rem;
+  font-weight:600; color:var(--esc-tinta-2); border:1px solid var(--esc-borde); background:var(--esc-panel); }
+.barra label.tab .n{ font-family:"IBM Plex Mono", monospace; font-weight:500; opacity:.55; margin-right:.42em; }
+.barra label.tab:hover{ color:var(--esc-tinta); }
+.barra label.tab:focus-visible{ outline:2px solid var(--esc-marca); outline-offset:2px; }
+#h1:checked ~ .barra label[for="h1"], #h2:checked ~ .barra label[for="h2"],
+#h3:checked ~ .barra label[for="h3"], #h4:checked ~ .barra label[for="h4"],
+#h5:checked ~ .barra label[for="h5"]{
+  color:var(--esc-marca-tinta); border-color:var(--esc-marca); background:var(--esc-marca);
+}
+
+.utiles{ display:flex; flex-wrap:wrap; gap:1rem; align-items:center; justify-content:space-between;
+  margin:1.1rem 0 1.6rem; padding-bottom:1.1rem; border-bottom:1px solid var(--esc-borde); }
+label.interruptor{ cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:.55rem;
+  font-size:.82rem; font-weight:600; color:var(--esc-tinta-2); }
+label.interruptor .pista{ width:34px; height:19px; border-radius:999px; background:var(--esc-borde);
+  position:relative; flex:none; transition:background .15s ease; }
+label.interruptor .pista::after{ content:""; position:absolute; top:2.5px; left:2.5px; width:14px; height:14px;
+  border-radius:50%; background:var(--esc-panel); transition:transform .15s ease; }
+#mejoras:checked ~ .utiles label.interruptor{ color:var(--esc-tinta); }
+#mejoras:checked ~ .utiles label.interruptor .pista{ background:var(--esc-marca); }
+#mejoras:checked ~ .utiles label.interruptor .pista::after{ transform:translateX(15px); }
+.pista-nota{ font-size:.76rem; color:var(--esc-tinta-2); font-weight:400; }
+
+/* ===================== HOJAS ===================== */
+.hojas > section{ display:none; }
+#h1:checked ~ .hojas #s1, #h2:checked ~ .hojas #s2, #h3:checked ~ .hojas #s3,
+#h4:checked ~ .hojas #s4, #h5:checked ~ .hojas #s5{ display:block; }
+
+.pie-hoja{ max-width:74ch; margin:0 auto 1.1rem; text-align:center; color:var(--esc-tinta-2);
+  font-size:.87rem; line-height:1.6; }
+.pie-hoja b{ color:var(--esc-tinta); font-weight:600; }
+
+.marco{ overflow-x:auto; padding-bottom:.6rem; }
+.marco-centro{ display:flex; justify-content:flex-start; min-width:min-content; }
+@media (min-width:1240px){ .marco-centro{ justify-content:center; } }
+
+/*
+  El papel. Los tokens NO cambian con el tema del lector: una hoja impresa es
+  blanca, y el informe tiene que verse igual en pantalla que en la impresora.
+  Los valores de color estan verificados contra papel blanco: el gris del
+  planeado (#8f8f8a) llega a 3.25:1 —el #9c9c97 del original se quedaba en
+  2.76 y no se lee—, y el amarillo de severidad se parte en dos: relleno para
+  barras y una tinta bronce para el texto pequeno, que a 7.5px es ilegible en
+  amarillo puro.
+*/
+.hoja{
+  --tinta:#1c1c1c; --tinta-2:#6e6e6e; --tinta-3:#a3a3a0;
+  --papel:#ffffff; --linea:#e4e2dd; --linea-suave:#f1efeb; --gris-caja:#f7f6f4;
+  --marca:#b2551f; --marca-claro:#c4692f; --marca-tenue:#f7ece5;
+  --exito:#1f8440; --exito-fill:#2e9e4f;
+  --alerta:#c78a06; --alerta-tinta:#8f6210;
+  --peligro:#b23b28;
+  --plan:#8f8f8a;
+  background:var(--papel); color:var(--tinta); color-scheme:light;
+  box-shadow:0 1px 3px rgba(0,0,0,.13), 0 20px 50px -22px rgba(0,0,0,.35);
+  flex:none; position:relative; overflow:hidden;
+}
+
+/* Resaltar lo que no existia en el informe original */
+#mejoras:checked ~ .hojas [data-nuevo]{
+  outline:1.5px dashed var(--marca); outline-offset:2px;
+  background-color:color-mix(in oklab, var(--marca) 5%, transparent);
+}
+
+/* ===================== IMPRESION ===================== */
+@page vertical{ size:A4 portrait; margin:0; }
+@page apaisado{ size:A4 landscape; margin:0; }
+@media print{
+  body{ background:#fff; }
+  .escritorio{ max-width:none; padding:0; }
+  .intro, .barra, .utiles, .pie-hoja{ display:none !important; }
+  .hojas > section{ display:block !important; }
+  .marco{ overflow:visible; }
+  .hoja{ box-shadow:none; break-after:page; }
+  .hoja--v{ page:vertical; }
+  .hoja--h{ page:apaisado; }
+}
+@media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+
+<div class="escritorio">
+  <header class="intro">
+    <h1>Informe de Obra CRIOCORD &mdash; corte del 08 de agosto</h1>
+    <p>
+      Esto no es un diseño nuevo: es <b>el informe que Larquitectura Studio ya
+      entrega</b>, reconstruido hoja por hoja con sus mismas cifras del corte,
+      y con lo que le faltaba injertado encima. Cada elemento del original se
+      conservó en su sitio; lo añadido está marcado y se puede resaltar con el
+      interruptor de abajo.
+    </p>
+    <p>
+      Las mejoras no son decoración: cada una se llena con un dato que
+      <b>GCM ya calcula hoy</b> a partir del cronograma, el presupuesto y el
+      plan semanal que la obra ya tiene cargados.
+    </p>
+    <div class="fichas">
+      <span class="ficha"><span class="pip"></span><b>Corte:</b>&nbsp;08 ago 2026</span>
+      <span class="ficha"><b>Avance real:</b>&nbsp;11%</span>
+      <span class="ficha"><b>Plazo:</b>&nbsp;01/08 &ndash; 05/10/2026</span>
+      <span class="ficha"><b>Residente:</b>&nbsp;Arq. Eduardo Pérez, CAP 32467</span>
+    </div>
+  </header>
+
+  <nav class="doc-root">
+    <input type="radio" name="hoja" id="h1" checked>
+    <input type="radio" name="hoja" id="h2">
+    <input type="radio" name="hoja" id="h3">
+    <input type="radio" name="hoja" id="h4">
+    <input type="radio" name="hoja" id="h5">
+    <input type="checkbox" id="mejoras">
+
+    <div class="barra" role="tablist">
+      <label class="tab" for="h1" tabindex="0"><span class="n">01</span>Portada</label>
+      <label class="tab" for="h2" tabindex="0"><span class="n">02</span>Dashboard de control</label>
+      <label class="tab" for="h3" tabindex="0"><span class="n">03</span>Cronograma</label>
+      <label class="tab" for="h4" tabindex="0"><span class="n">04</span>Bitácora diaria</label>
+      <label class="tab" for="h5" tabindex="0"><span class="n">05</span>Control económico</label>
+    </div>
+
+    <div class="utiles">
+      <label class="interruptor" for="mejoras">
+        <span class="pista"></span>
+        Resaltar lo añadido
+        <span class="pista-nota">&mdash; marca lo que no estaba en el informe original</span>
+      </label>
+      <span class="pista-nota">Para PDF: imprimir desde el navegador (Ctrl&nbsp;+&nbsp;P) &mdash; cada hoja sale en su orientación.</span>
+    </div>
+
+    <div class="hojas">
+      <section id="s1">
+        <p class="pie-hoja"><!--PIE:portada--></p>
+        <div class="marco"><div class="marco-centro"><!--SLOT:portada--></div></div>
+      </section>
+      <section id="s2">
+        <p class="pie-hoja"><!--PIE:dashboard--></p>
+        <div class="marco"><div class="marco-centro"><!--SLOT:dashboard--></div></div>
+      </section>
+      <section id="s3">
+        <p class="pie-hoja"><!--PIE:cronograma--></p>
+        <div class="marco"><div class="marco-centro"><!--SLOT:cronograma--></div></div>
+      </section>
+      <section id="s4">
+        <p class="pie-hoja"><!--PIE:bitacora--></p>
+        <div class="marco"><div class="marco-centro"><!--SLOT:bitacora--></div></div>
+      </section>
+      <section id="s5">
+        <p class="pie-hoja"><!--PIE:control--></p>
+        <div class="marco"><div class="marco-centro"><!--SLOT:control--></div></div>
+      </section>
+    </div>
+  </nav>
+</div>

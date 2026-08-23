@@ -1,0 +1,1266 @@
+[
+ {
+  "dato": "Cadena critica en secuencia, con lo que ya cuesta",
+  "funcion": "cadenaCritica",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\control-avance.ts",
+  "devuelve": "CadenaCritica: eslabones: EslabonCritico[] {uid, codigo, nombre, capitulo, inicio, fin, duracionDias, porcentajePlaneado, porcentajeReal, desfase, diasAtraso, acumuladoDias, terminado, arrancado} sin resumenes ni hitos, ordenados por inicio; duracionTotal, atrasoAcumulado, atrasados: number, concentracion: {capitulo, tareas}[].",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Un dia perdido aqui es un dia perdido de obra: es la lista corta sobre la que de verdad se puede decidir."
+ },
+ {
+  "dato": "Valor ganado completo de la obra (EVM)",
+  "funcion": "datosEvm",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\evm.service.ts",
+  "devuelve": "DatosEvm: bac, baseBac, ajustesBac (string), fechaCorte, verCosto: boolean, coberturaMapeo: number, metricas: MetricasEvm {bac, pv, ev, ac, sv, cv, spi, cpi, eac, vac, avance, motivoSinCosto}, planPv/cortesEv/costoAc: PuntoEvm[] {fecha, valor}, lineaBase, inicio, fin. Null si no hay cortes de cronograma.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Traduce el avance a dinero y responde plazo y costo con la misma vara: SPI, CPI y cuanto acabaria costando la obra."
+ },
+ {
+  "dato": "Aritmetica EVM y sus compuertas de honestidad",
+  "funcion": "metricasEvm, valorDeAvance, hayBaseParaProyectar, textoSinCosto",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\evm.ts",
+  "devuelve": "metricasEvm({bac, pv, ev, ac}) -> MetricasEvm; hayBaseParaProyectar -> {ok:true} | {ok:false, motivo: 'sin_permiso'|'sin_gasto'|'avance_insuficiente'|'costo_rezagado'}; textoSinCosto(motivo) -> frase explicativa. Umbrales AVANCE_MINIMO_PROYECCION=15, RESPALDO_MINIMO_COSTO=0.5.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite poner CPI/EAC en el informe sin publicar un ahorro falso: cuando no hay base, el propio texto explica el hueco."
+ },
+ {
+  "dato": "BAC desglosado: presupuesto base mas adicionales aprobados",
+  "funcion": "bacDeObra",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\presupuesto-obra.ts",
+  "devuelve": "BacObra: {bac: string, base: string, ajustes: string, conLineaBase: boolean} (decimales exactos).",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Explica contra que presupuesto se mide todo y cuanto de el son adicionales aprobados encima de lo contratado."
+ },
+ {
+  "dato": "Cobertura del mapeo tarea-partida",
+  "funcion": "cobertura",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\mapeo-partidas.ts",
+  "devuelve": "Cobertura: {mapeado: string, total: string, porcentaje: number 0..100, partidasSinTarea: number}. Ya se calcula dentro de datosEvm (coberturaMapeo) y de cruceDeObra (coberturaPct).",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Dice sobre que parte del presupuesto se sostienen las cifras de costo, para que nadie lea un CPI parcial como si fuera de toda la obra."
+ },
+ {
+  "dato": "Ritmo de obra por tramos semanales y capitulo que la mueve",
+  "funcion": "ritmoDeObra (logica pura: ritmoPorTramos)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\ritmo.service.ts (y c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\ritmo-de-obra.ts)",
+  "devuelve": "RitmoDeObra: {tramos: TramoDeRitmo[] {desde, hasta, ganado: number, acumulado: number, capitulos: CapituloEnTramo[] {capitulo, avance, ganado, aporte}}, techo: number, motivo: 'sin-partes'|'primera-semana'|null}. Maximo 12 tramos, cadencia = diaCorteSemanal de la obra.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "La curva dice donde esta la obra; esto dice a que velocidad se mueve y que capitulo aporta cada punto."
+ },
+ {
+  "dato": "Hitos vigentes contra la linea base, con desvio en dias",
+  "funcion": "filasHitos (fuente de datos: lineaBaseCronograma + obtenerCronograma)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\hitos.ts",
+  "devuelve": "FilaHito[]: {uid, nombre, finVigente: Date, finBase: Date|null, desviacionDias: number|null (positivo = se corrio a mas tarde), estado: 'cumplido'|'en_plazo'|'vencido', cumplido: boolean}.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Las fechas clave de la obra y cuantos dias se han movido desde que se congelo el plan."
+ },
+ {
+  "dato": "Hitos declarados de la obra con responsable y aviso",
+  "funcion": "listarHitos",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\hitos.service.ts",
+  "devuelve": "HitoListado[]: {uid, nombre, fecha: 'YYYY-MM-DD', anclaCodigo: string|null, diasAviso: number, responsableClave: string|null, responsableNombre: string|null}.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Pone nombre y apellido a cada fecha clave: quien responde de que hito y con cuanta antelacion se avisa."
+ },
+ {
+  "dato": "Hitos que el sistema PROPONE y lo que no puede predecir",
+  "funcion": "hitosPropuestos (reglas puras: predecirHitos)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\hitos-predictivos.service.ts (y c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\hitos-predictivos.ts)",
+  "devuelve": "Prediccion: {propuestas: Propuesta[] {regla: 'estancamiento'|'holgura'|'spi'|'cpi'|'convergencia'|'recursos', uid, anclaCodigo, titulo, motivo (con la cifra dentro), fechaSugerida, severidad: 'avisar'|'urgente'}, sinDato: SinDato[] {regla, falta}}. Umbrales: DIAS_ESTANCADA=5, RETRASO_CRITICO=15, COBERTURA_MINIMA=60, CONVERGENCIA_MINIMA=3.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la seccion 'que va a pasar': tareas estancadas, holgura comida y proyeccion de SPI, cada una con su motivo escrito."
+ },
+ {
+  "dato": "Avance fisico contra avance economico, capitulo a capitulo",
+  "funcion": "cruceDeObra (logica pura: cruceFisicoEconomico)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\fisico-economico.service.ts (y c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\fisico-vs-economico.ts)",
+  "devuelve": "CruceDeObra: {capitulos: CapituloDelCruce[] {codigo, nombre, presupuesto, gastado, baseMedible, sinMedir, fisico: number|null, economico: number|null, avisa: boolean}, coberturaPct: number, partidasSinTarea: number, sinPermisoDeCosto: boolean}. Umbral PUNTOS_DE_AVISO=10.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Contesta la pregunta de gerencia -'voy al 40% y llevo gastado el 60%'- por capitulo y no solo para la obra entera."
+ },
+ {
+  "dato": "Confiabilidad de la ventana del Lookahead (trabajo listo para ejecutar)",
+  "funcion": "confiabilidadDeVentana",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\lookahead.service.ts",
+  "devuelve": "ConfiabilidadVentana: {listas, total, porcentaje: number 0..100, sinAnalizar: number, semanas: number, restriccionesResueltas: number, liberacion: CumplimientoLiberacion}. Recibe las tareas ya leidas y las terminadas para no releer el cronograma.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Dice cuanto del trabajo de las proximas semanas esta liberado, que es lo que anticipa el PPC de la semana que viene."
+ },
+ {
+  "dato": "Cumplimiento de las promesas de liberacion de restricciones",
+  "funcion": "cumplimientoDeLiberacion",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\lookahead-compromiso.ts",
+  "devuelve": "CumplimientoLiberacion: {conFecha, aTiempo, tarde, vencidasAbiertas, sinAsignar, sinFecha, porcentaje: number|null}. Se calcula ya dentro de confiabilidadDeVentana y de datosTablero.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Separa 'la cuadrilla no cumple' de 'el trabajo llega sin estar listo', que se arreglan en sitios distintos."
+ },
+ {
+  "dato": "Tasa de liberacion de restricciones a tiempo (TA) de toda la obra",
+  "funcion": "tasaDeLiberacionDeObra (logica pura: tasaDeLiberacion, suerteDeLaPromesa)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\lookahead.service.ts (y c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\indicadores-lps.ts)",
+  "devuelve": "TasaLiberacion: {aTiempo, tarde, vencidas, enPlazo, sinPromesa, medidas, porcentaje: number|null}. Las abiertas con fecha por llegar NO entran al denominador.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "El PPC mide si se cumple lo que se promete ejecutar; esto mide si se cumple lo que se promete dejar listo."
+ },
+ {
+  "dato": "Demora media por flujo de restriccion y ventana recomendada",
+  "funcion": "demoraDeLiberacion (logica pura: demoraPorFlujo, ventanaRecomendada)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\lookahead.service.ts (y c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\liberacion.ts)",
+  "devuelve": "DemoraLiberacion: {flujos: DemoraFlujo[] {tipo, etiqueta, dias: number (media), mediana: number, casos: number} de mayor a menor, ventana: number|null (semanas)}. Un flujo sin casos resueltos no aparece.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Dice cuanto tarda de verdad esta obra en conseguir material, plano o cuadrilla, medido en su propio historial."
+ },
+ {
+  "dato": "Inventario de trabajo ejecutable (SWI): el colchon de la obra",
+  "funcion": "inventarioEjecutable (hoy se invoca en la pagina del Lookahead, sin servicio propio: src\\app\\(dashboard)\\obras\\[id]\\lookahead\\page.tsx sobre obtenerLookahead().filas)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\indicadores-lps.ts",
+  "devuelve": "Inventario: {disponibles: number, listas: number, total: number, porcentajeLibre: number|null, tareas: TareaParaInventario[] {uid, nombre, codigo, zona, fase, comprometida}}.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Responde 'si mañana se cae una tarea, con que la sustituyo sin improvisar', y ademas lista las candidatas."
+ },
+ {
+  "dato": "Pareto de causas de incumplimiento con acumulado y corte 80/20",
+  "funcion": "filasDeParetoAcumulado (hoy solo se aplica en el componente src\\components\\cronograma\\InformeSemanal.tsx sobre lastPlanner.pareto; el servicio entrega el Pareto en crudo)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\plan-semanal.ts",
+  "devuelve": "FilaParetoAcumulada[]: {causa, conteo, porcentaje, acumulado, acumuladoPorcentaje, dentroDel80: boolean}. Corte CORTE_PARETO=80.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Convierte una lista de causas en una decision: estas dos explican el 80% de lo que falla, ataca esas."
+ },
+ {
+  "dato": "La causa que mas frena, solo cuando hay evidencia",
+  "funcion": "causaQueMasFrena",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\plan-semanal.ts",
+  "devuelve": "{causa: CausaNoCumplimiento, veces: number, porcentaje: number, total: number} | null. Exige MINIMO_PARA_PARETO=5 incumplimientos con causa y al menos dos causas distintas.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da el titular de la seccion de causas sin afirmar un 100% que en realidad es una tautologia de tres casos."
+ },
+ {
+  "dato": "Lectura del PPC en palabras, calibrada al numero",
+  "funcion": "lecturaDelPpc",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\pendientes.ts",
+  "devuelve": "LecturaPpc: {gravedad: 'critica'|'aviso', titulo: string, consecuencia: string} | null. Umbrales PPC_OBJETIVO=80, PPC_PREOCUPANTE=70, PPC_MENOS_DE_LA_MITAD=50; bandaDePpc(ppc) da 'bueno'|'flojo'|'malo'.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Pone al lado del PPC una frase que dice lo que significa, sin exagerar cuando el nivel es correcto."
+ },
+ {
+  "dato": "Compromisos incumplidos que siguen sin hacerse (arrastre)",
+  "funcion": "arrastreDeIncumplidos (expuesto por obtenerPlanSemanal como PlanSemanalDetalle.arrastradas; tambien se cuenta dentro de datosTablero)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\plan-semanal.ts",
+  "devuelve": "Arrastrada[]: {uid, descripcion, veces: number, ultimaSemana: number, ultimaFecha: Date, causa: CausaNoCumplimiento|null, avance: number}, ordenadas por veces que fallo. Tope MAX_ARRASTRADAS=12.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Saca a la luz el trabajo que se prometio tres semanas seguidas y sigue parado, que es donde se pierde el plazo en silencio."
+ },
+ {
+  "dato": "Capacidad observada de la obra frente a lo comprometido",
+  "funcion": "ambicionDelPlan (hoy se invoca en la pagina del plan semanal: src\\app\\(dashboard)\\obras\\[id]\\plan-semanal\\[planId]\\page.tsx; no hay servicio que lo exponga)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\capacidad.ts",
+  "devuelve": "Ambicion | null: {rendimiento: number (media de compromisos cumplidos/semana), semanas: number, comprometidos: number, indice: number, nivel: 'cabe'|'ambicioso'|'sobrecarga'}. Ventana 6 semanas, minimo 3.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Dice si lo prometido para la semana que viene cabe, comparando la obra contra su propio historial."
+ },
+ {
+  "dato": "Lista de pendientes de la obra ('que falta'), ordenada por lo que rompe",
+  "funcion": "pendientesDeObra y resumirPendientes (los conteos se arman en la funcion privada pendientesDeLaObra dentro de datosTablero)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\pendientes.ts (conteos en c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\tablero.service.ts)",
+  "devuelve": "Pendiente[]: {bloque: 'entradas'|'procesos'|'salidas', gravedad: 'critica'|'aviso', titulo, consecuencia, ...}; resumirPendientes -> {criticas, total}. Entra ConteoPendientes con ~20 conteos ya calculados (tareas empezadas sin avance, avance viejo, semanas sin porcentaje, restricciones vencidas, cobertura de mapeo, dias desde el corte del cronograma...).",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el cierre natural del informe: que hay que hacer antes del proximo corte, con la consecuencia escrita al lado."
+ },
+ {
+  "dato": "Dias sin parte y tareas vivas sin reportar",
+  "funcion": "obtenerParteDelDia (diasSinParte) y diasSinReportar",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\cronograma.service.ts (y c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\parte-diario.ts)",
+  "devuelve": "ParteDelDia: {grupos: GrupoParte[], tareas: number, fuera: number, diasVista: number|null, cierraEl: Date, diasSinParte: number|null}. diasSinReportar(ultimo, hoy, calendario) -> number de dias LABORABLES. datosTablero usa el umbral DIAS_SIN_REPORTAR=3.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Mide la calidad del dato del propio informe: cuantos dias laborables lleva la obra sin que nadie reporte nada."
+ },
+ {
+  "dato": "Tarea a tarea: quien reporto, cuando, con que nota, y si discrepa de MS Project",
+  "funcion": "medirAvance (via obtenerCronograma / informeAlCorte, que devuelven tareas: (TareaDelPlan & Medida)[])",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\cronograma.ts",
+  "devuelve": "Medida por tarea: {porcentajeReal, desfase, avance: AvanceReportado|null {uid, porcentaje, fecha, createdAt, reportadoPor, nota}, discrepa: boolean}. InformeCompuesto NO lleva el array `tareas`, solo capitulos/alertas/activas derivados de el, y esos tres pierden avance y discrepa.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da trazabilidad: cada porcentaje del informe lleva nombre, fecha y nota de quien lo reporto, y avisa cuando el archivo dice otra cosa."
+ },
+ {
+  "dato": "Avances huerfanos (reportes cuya tarea ya no esta en el plan)",
+  "funcion": "obtenerCronograma (campo huerfanos; regla en medirAvance)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\cronograma.service.ts",
+  "devuelve": "CronogramaVigente.huerfanos: AvanceReportado[] {uid, porcentaje, fecha, createdAt, reportadoPor, nota}.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Senala trabajo reportado que ha dejado de contar porque el planificador borro esa tarea: es avance que hoy desaparece del informe sin avisar."
+ },
+ {
+  "dato": "Historial de cortes de cronograma cargados",
+  "funcion": "historialCronogramas",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\cronograma.service.ts",
+  "devuelve": "CorteImportado[]: {id, version, fechaCorte, archivo: string|null, importadoAt, importadoPor, tareas: number}, del mas reciente al mas antiguo.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Fecha el plan: cuando se cargo por ultima vez el cronograma, con que archivo y quien lo hizo."
+ },
+ {
+  "dato": "Linea base del cronograma: version, fecha y quien la fijo",
+  "funcion": "lineaBaseCronograma",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\cronograma.service.ts",
+  "devuelve": "LineaBaseCronograma | null: {id, version, fechaCorte, fijadaEn: Date, fijadaPor: string|null, tareas: HitoBase[] {uid, nombre, esResumen, esHito, duracionDias, inicio, fin}}. En InformeCompuesto solo viaja curva.lineaBase {version, fijadaEn}: fijadaPor y las fechas base no.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Deja escrito en el documento contra que plan congelado se esta midiendo y quien lo autorizo."
+ },
+ {
+  "dato": "Ruta critica y holgura calculadas por GCM (CPM completo)",
+  "funcion": "calcularRutaCritica",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\ruta-critica.ts",
+  "devuelve": "ResultadoCPM: {esCritico: Map<number, boolean>, holguraDias: Map<number, string> (2 dec, dias laborables), ciclo: boolean}. Resuelve FC/CC/FF/CF en los dos sentidos sobre el calendario de la obra.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite dar holgura por partida -cuantos dias puede retrasarse sin mover el fin de obra- tambien en cronogramas que no vienen de MS Project."
+ },
+ {
+  "dato": "Avance fisico a HOY por obra (real, planeado, desfase y fin de plan)",
+  "funcion": "avanceFisicoPorObra",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\cronograma.service.ts",
+  "devuelve": "Map<string, AvanceFisico> con {real: string, planeado: string, desfase: string, fechaCorte: Date (=hoy), finPlan: Date}. Usa la misma ponderacion que la curva y el mismo planeadoEnFecha.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da el avance a dia de hoy y el fin de obra segun el cronograma -no segun la ficha-, util para un informe de varias obras o para contrastar el corte contra hoy."
+ },
+ {
+  "dato": "Titular del informe: al dia / por delante / por detras, con las partidas mas graves",
+  "funcion": "resumenParaCorreo",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\informe-correo.ts",
+  "devuelve": "ResumenCorreoInforme: {asunto, estado (frase), cifras: {etiqueta, valor}[], ppc: string|null, masGraves: LineaGrave[] {partida, detalle}, gravesOmitidas: number}. Umbral UMBRAL_AL_DIA=0.5 puntos, MAX_GRAVES_EN_CORREO=3. Se calcula sobre DatosCsvInforme, o sea aguas abajo del informe compuesto.",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el resumen ejecutivo ya escrito: una frase de estado y las tres partidas que justifican leer el resto."
+ },
+ {
+  "dato": "Tabla semana a semana de la obra: numero, corte, estado, comprometidos, cumplidos y PPC",
+  "funcion": "listarPlanesSemanales",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\plan-semanal.service.ts",
+  "devuelve": "{ semanas: { id: string; numero: number; fechaCorte: Date; estado: EstadoPlanSemanal; total: number; cumplidos: number; ppc: number|null }[] (orden fechaCorte desc); tendencia: { fecha: Date; ppc: number }[] (solo CERRADAS); pareto: { causa; conteo: number }[] }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite poner en el informe el historial completo de semanas (cuantas se cerraron, cuantas siguen abiertas, cuantos compromisos por semana), no solo la del corte."
+ },
+ {
+  "dato": "Cantidad comprometida contra cantidad ejecutada de cada compromiso, con su unidad, meta y fotos",
+  "funcion": "obtenerPlanSemanal (campo compromisos: CompromisoDetalle[])",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\plan-semanal.service.ts",
+  "devuelve": "CompromisoDetalle[] = { id: string; uid: number|null; descripcion: string; metaPorcentaje: string|null; cumplido: boolean|null; causa: CausaNoCumplimiento|null; notaCierre: string|null; tarea: { codigo: string|null; nombre: string }|null; porcentajeReal: string|null; cantidadPlan: string|null; unidad: string|null; cantidadEjec: string|null; avanceActual: string|null; lookaheadTaskId: string|null; fotos: FotoResumen[]; estadoLookahead: EstadoLookahead|null }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el metrado real de la semana: «se prometieron 120 m2 y se hicieron 90», que es lo que un cliente entiende mejor que un porcentaje, y ademas trae la evidencia fotografica del propio compromiso."
+ },
+ {
+  "dato": "Trabajo que el cronograma programaba para la semana y que nadie comprometio",
+  "funcion": "obtenerPlanSemanal (campo sugeridas), regla en tareasDeLaSemana",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\plan-semanal.service.ts (regla en src\\lib\\plan-semanal.ts)",
+  "devuelve": "sugeridas: { uid: number; descripcion: string; metaPorcentaje: string|null; cantidadPlan: string|null; unidad: string|null }[] — tareas de trabajo cuyo rango solapa la semana, sin resumenes, sin hitos, sin terminadas y sin las ya cumplidas en otra semana",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Dice cuanto del trabajo programado para esa semana ni siquiera llego a prometerse: el hueco entre el cronograma y el compromiso, que hoy no se ve en ningun lado."
+ },
+ {
+  "dato": "Lo que se prometio, fallo y sigue sin hacerse (arrastre), con cuantas veces se repite",
+  "funcion": "arrastreDeIncumplidos (puro) — ya resuelto y enriquecido en obtenerPlanSemanal (campo arrastradas)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\plan-semanal.ts (servicio: src\\services\\plan-semanal.service.ts)",
+  "devuelve": "Arrastrada[] = { uid: number; descripcion: string; veces: number; ultimaSemana: number; ultimaFecha: Date; causa: CausaNoCumplimiento|null; avance: number }, tope 12, ordenadas por veces. En el servicio sale como CompromisoArrastrado (mismo, mas cantidadPlan y unidad, sin ultimaFecha)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el titular de una reunion de obra: «esto lleva tres semanas prometiendose y no sale», y hoy solo se ve dentro de la pantalla del plan semanal."
+ },
+ {
+  "dato": "Pareto de causas con su acumulado y el corte del 80 %",
+  "funcion": "filasDeParetoAcumulado",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\plan-semanal.ts",
+  "devuelve": "FilaParetoAcumulada[] = { causa: CausaNoCumplimiento; conteo: number; porcentaje: number; acumulado: number; acumuladoPorcentaje: number; dentroDel80: boolean }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Convierte la lista de causas del informe en un Pareto de verdad: dice cuantas causas hay que atacar para resolver el 80 % de los fallos. Hoy el calculo vive en la pantalla (InformeSemanal.tsx, linea 482) y no dentro de InformeCompuesto."
+ },
+ {
+  "dato": "La causa que mas frena, solo cuando hay evidencia para decirlo",
+  "funcion": "causaQueMasFrena",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\plan-semanal.ts",
+  "devuelve": "{ causa: CausaNoCumplimiento; veces: number; porcentaje: number; total: number } | null — null si hay menos de 5 incumplimientos con causa (MINIMO_PARA_PARETO) o menos de 2 causas distintas",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da el titular en una linea («Materiales explica el 45 % de los incumplimientos») y se calla solo cuando la muestra no lo sostiene, que es justo lo que un informe firmado necesita."
+ },
+ {
+  "dato": "En que banda cae el PPC y cuales son los umbrales sanos",
+  "funcion": "bandaDePpc (mas PPC_OBJETIVO=80, PPC_PREOCUPANTE=70, PPC_MENOS_DE_LA_MITAD=50)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\plan-semanal.ts",
+  "devuelve": "BandaPpc = \"bueno\" | \"flojo\" | \"malo\"; y tres constantes number",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite colorear y calificar el PPC del informe con los MISMOS cortes que ya usan el panel y los graficos, sin inventar un semaforo nuevo."
+ },
+ {
+  "dato": "Que decir del PPC en una frase, con su gravedad",
+  "funcion": "lecturaDelPpc",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\pendientes.ts",
+  "devuelve": "{ gravedad: \"critica\"|\"aviso\"; titulo: string; consecuencia: string } | null (null cuando no hay nada que decir); recibe (ultimo: number|null, anterior: number|null)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da el comentario escrito del PPC —incluida la comparacion con la semana anterior— sin que nadie tenga que redactarlo, y con reglas ya probadas para no afirmar cosas falsas."
+ },
+ {
+  "dato": "Compromisos dados por cumplidos que no dejaron ni un punto de avance",
+  "funcion": "cumplidosSinAvance",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\plan-semanal.ts",
+  "devuelve": "{ compromisoId: string; descripcion: string }[] — solo los que tienen uid y se cierran cumplidos sin porcentaje escrito ni meta pactada",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Avisa de que el PPC de esa semana esta inflado respecto de la curva S: el mismo fallo que en CRIOCORD dejo el PPC al 100 % con partidas al 0 %."
+ },
+ {
+  "dato": "Semanas cerradas que no registraron ningun avance fisico",
+  "funcion": "NO hay funcion reutilizable: el conteo vive en linea dentro de pendientesDeLaObra, como `semanasSinPorcentaje` (planes CERRADOS con compromisos y _count.avances === 0), y sale agregado en pendientesDeObra",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\tablero.service.ts (linea ~916; regla de aviso en src\\lib\\pendientes.ts)",
+  "devuelve": "number (dentro del objeto ConteoPendientes que se pasa a pendientesDeObra)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el contador de semanas cuyo PPC no movio la curva; para llevarlo al informe habria que extraerlo a una funcion propia, hoy esta pegado al tablero."
+ },
+ {
+  "dato": "Cuanto cabe en una semana segun lo que esta obra viene cumpliendo (capacidad observada y sobrecarga)",
+  "funcion": "ambicionDelPlan — NO hay servicio: se compone en la pagina del plan (plan-semanal/[planId]/page.tsx, linea 127) con las semanas cerradas de listarPlanesSemanales",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\capacidad.ts",
+  "devuelve": "Ambicion | null = { rendimiento: number (media de cumplidos por semana, 1 decimal); semanas: number (cuantas la sostienen, ventana 6, minimo 3); comprometidos: number; indice: number; nivel: \"cabe\"|\"ambicioso\"|\"sobrecarga\" } — null sin historial, sin compromisos o con rendimiento 0",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Explica un PPC bajo sin culpar a la cuadrilla: «se prometio el doble de lo que esta obra cumple de media», comparando la obra contra si misma."
+ },
+ {
+  "dato": "Historial de comprometidos y cumplidos por semana cerrada, de toda la cartera",
+  "funcion": "historialDeCapacidad",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\capacidad-diagnostico.service.ts",
+  "devuelve": "ObraConHistorialCapacidad[] = { obraId: string; obraNombre: string; semanas: { numero: number; fechaCorte: Date; comprometidos: number; cumplidos: number }[] } — permiso configuracion:editar; declarada herramienta temporal de diagnostico",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da la serie cruda comprometido/cumplido por semana, que es la materia prima de cualquier grafico de fiabilidad del informe."
+ },
+ {
+  "dato": "Reparto de los compromisos de la semana por contratista y por dia (el tablero de la reunion)",
+  "funcion": "obtenerTablero (servicio) sobre construirTablero (puro)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\tablero-semanal.service.ts y src\\lib\\tablero-semanal.ts",
+  "devuelve": "TableroDatos = { planId; numero; fechaCorte; estado; puedeGestionar; contratistas: {id,nombre}[]; tablero: { dias: { iso: number; fecha: Date; laborable: boolean; visible: boolean }[]; filas: { proveedorId: string|null; nombre: string; tarjetas: (CompromisoEnTablero & { desde: number; hasta: number })[]; sinDia: CompromisoEnTablero[] }[]; colocadas: number; sinDia: number } }. Cada tarjeta lleva descripcion, proveedorNombre, zona, color, cantidadPlan, unidad, cumplido: boolean|null, diaInicio, diaFin",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da el reparto de trabajo por contratista y por dia, cuantos compromisos quedaron sin dia y cuantos sin dueño; y como cada tarjeta trae `cumplido`, es la base directa para un PPC por contratista (esa agregacion NO esta escrita hoy)."
+ },
+ {
+  "dato": "Semanas cuyo numero va a contramano de su fecha de corte",
+  "funcion": "semanasAContramano",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\plan-semanal.ts",
+  "devuelve": "T[] (las mismas semanas que se le pasan, filtradas: las que cierran antes que otra de numero menor)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Sirve para poner una nota al pie cuando la numeracion de semanas del informe se lee rara, en vez de que parezca un error del sistema."
+ },
+ {
+  "dato": "Causas de incumplimiento que ya son un patron y piden analisis de raiz",
+  "funcion": "causasParaAnalizar (servicio) sobre causasQuePidenAnalisis (puro)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\causa-raiz.service.ts y src\\lib\\causa-raiz.ts",
+  "devuelve": "{ pendientes: { causa: CausaNoCumplimiento; veces: number; semanas: number }[] (ordenadas por veces); enCurso: CausaNoCumplimiento[] } — ventana de 4 semanas cerradas, minimo 2 semanas distintas y 3 incumplimientos; OTRA nunca entra",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Convierte el Pareto en una accion: dice que causa dejo de ser mala suerte y ya toca analizar, sin generar burocracia por cada fallo suelto."
+ },
+ {
+  "dato": "Analisis de causa raiz abiertos y cerrados de la obra (por que paso y que se hara)",
+  "funcion": "listarAnalisis",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\causa-raiz.service.ts",
+  "devuelve": "AnalisisResumen[] = { id: string; causa: CausaNoCumplimiento; porQue: string; accion: string; responsable: string|null; fechaCompromiso: Date|null; cerradoAt: Date|null; creadoPor: string; createdAt: Date }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Cierra el circulo del informe: al lado del Pareto se puede decir que se esta haciendo con cada causa, quien responde y para cuando."
+ },
+ {
+  "dato": "Confiabilidad de la ventana del Lookahead: cuanto trabajo esta listo para empezar",
+  "funcion": "confiabilidadDeVentana",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\lookahead.service.ts (agregado en src\\lib\\lookahead.ts::confiabilidad)",
+  "devuelve": "ConfiabilidadVentana | null = { listas: number; total: number; porcentaje: number (0..100 entero); sinAnalizar: number; semanas: number; restriccionesResueltas: number; liberacion: CumplimientoLiberacion } — recibe las tareas del cronograma ya medidas y el Set de terminadas, y hace UNA sola consulta",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la mitad que le falta al informe: el PPC dice si se cumplio lo de esta semana, esto dice si lo de las proximas tres esta preparado. Y es barata: el informe ya carga el cronograma medido."
+ },
+ {
+  "dato": "Matriz completa del Lookahead: 7 flujos por tarea, quien responde y para cuando",
+  "funcion": "obtenerLookahead",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\lookahead.service.ts",
+  "devuelve": "LookaheadDatos | null = { desde: Date; hasta: Date; filas: FilaLookahead[] { uid, codigo, nombre, inicio, fin, faseBloque, zona, fase: \"SIN_ANALIZAR\"|\"CON_PENDIENTES\"|\"LISTA\", analizadaAt, analizadaPor, enMatriz, lookaheadTaskId, restricciones: CeldaRestriccion[7] { id, tipo, resuelta, detalle, fotos, responsableClave, fechaCompromiso, promesa }, comprometida: { planId, numero, abierta }[] }; confiabilidad; pendientesDeSincronizar; sinAnalizar; semanas; semanasDestino; personas; liberacion; carga }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Trae el detalle de que falta por liberar tarea a tarea, con foto de evidencia; es la fuente mas rica, pero tambien la mas cara (relee el cronograma entero)."
+ },
+ {
+  "dato": "Cumplimiento de las promesas de liberacion (el PPC de la fase de preparacion)",
+  "funcion": "cumplimientoDeLiberacion",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\lookahead-compromiso.ts",
+  "devuelve": "CumplimientoLiberacion = { conFecha: number; aTiempo: number; tarde: number; vencidasAbiertas: number; sinAsignar: number; sinFecha: number; porcentaje: number|null (null si nadie prometio nada) }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Contesta a «cuantas restricciones vencidas hay y cuantas sin dueño», que es la explicacion mas frecuente de un PPC bajo y hoy no aparece en ningun informe."
+ },
+ {
+  "dato": "Tasa de liberacion de restricciones a tiempo (TA) de toda la obra",
+  "funcion": "tasaDeLiberacionDeObra (servicio) sobre tasaDeLiberacion (puro)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\lookahead.service.ts y src\\lib\\indicadores-lps.ts",
+  "devuelve": "TasaLiberacion | null = { aTiempo: number; tarde: number; vencidas: number; enPlazo: number; sinPromesa: number; medidas: number; porcentaje: number|null } — historial completo de la obra, no solo la ventana",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Mide si se cumple lo que se promete LIBERAR, y viaja siempre con `sinPromesa`, que impide leer un 100 % sobre cuatro promesas como si fuera bueno."
+ },
+ {
+  "dato": "Cuanto tarda en liberarse cada flujo en esta obra, y que ventana de Lookahead pide",
+  "funcion": "demoraDeLiberacion (servicio) sobre demoraPorFlujo y ventanaRecomendada (puros)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\lookahead.service.ts y src\\lib\\liberacion.ts",
+  "devuelve": "DemoraLiberacion | null = { flujos: { tipo: TipoRestriccion; etiqueta: string; dias: number (media); mediana: number; casos: number }[] (de mas lento a menos, solo los que tienen casos); ventana: number|null (semanas recomendadas, null con menos de 3 casos fiables) }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "«Materiales tarda 9 dias de media en liberarse» es un dato que llega ANTES del fallo y justifica pedir mas antelacion al cliente o al proveedor."
+ },
+ {
+  "dato": "Inventario de trabajo ejecutable (SWI): colchon de tareas listas y sin comprometer",
+  "funcion": "inventarioEjecutable — NO hay servicio: se compone en la pagina del Lookahead (obras/[id]/lookahead/page.tsx, linea 62) con las filas de obtenerLookahead",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\indicadores-lps.ts",
+  "devuelve": "Inventario = { disponibles: number; listas: number; total: number; porcentajeLibre: number|null; tareas: { uid; nombre; codigo; zona; fase; comprometida }[] }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Dice si la obra tiene plan B: cuanto trabajo liberado hay de reserva si mañana se cae una tarea. Un SWI de cero explica por que cualquier imprevisto para la obra."
+ },
+ {
+  "dato": "Cuantas restricciones abiertas y vencidas lleva cada responsable",
+  "funcion": "cargaPorResponsable (puro) — ya resuelto con nombre en obtenerLookahead (campo carga)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\lookahead-compromiso.ts (servicio: src\\services\\lookahead.service.ts)",
+  "devuelve": "CargaResponsable[] = { responsableUserId: string; abiertas: number; vencidas: number } (ordenadas por vencidas y luego abiertas); en el servicio, CargaConNombre = { userId; nombre; abiertas; vencidas }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Pone nombre y apellidos al cuello de botella del make-ready, que es lo que hace que un reparto se sostenga entre reunion y reunion."
+ },
+ {
+  "dato": "En que punto esta la promesa de cada restriccion",
+  "funcion": "estadoDePromesa",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\lookahead-compromiso.ts",
+  "devuelve": "EstadoPromesa = \"sin-asignar\" | \"sin-fecha\" | \"a-tiempo\" | \"vence-hoy\" | \"vencida\" | \"liberada\"",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite listar en el informe las restricciones vencidas y las que vencen esta semana, separando «no hay quien» de «no hay cuando», que son dos conversaciones distintas."
+ },
+ {
+  "dato": "Si una tarea se puede iniciar segun sus predecesoras",
+  "funcion": "restriccionDeTarea",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\plan-semanal.ts",
+  "devuelve": "{ libre: boolean; motivo: string|null } — mira solo FC (predecesora < 100 %) y CC (predecesora en 0 %); FF y CF no restringen el inicio",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Justifica por escrito por que una partida no arranco: «depende de X, que va al 40 %», sin necesidad de abrir el Gantt."
+ },
+ {
+  "dato": "PPC de la ultima semana cerrada de una o varias obras",
+  "funcion": "ppcDeLaUltimaCerrada",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\plan-semanal.service.ts",
+  "devuelve": "Map<obraId, UltimoPpc> con UltimoPpc = { ppc: number|null; numero: number; fechaCorte: Date } — dos consultas, no crece con el numero de obras",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Tapa el agujero mas visible del informe de hoy: cuando la fecha del corte no coincide con ningun cierre de semana, el bloque de Last Planner sale vacio; con esto se puede decir «la ultima semana cerrada fue la 7, con PPC 72 %»."
+ },
+ {
+  "dato": "Estado del ritual semanal en toda la empresa: que semanas quedan sin cerrar",
+  "funcion": "semanaDeLaEmpresa",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\plan-semanal.service.ts",
+  "devuelve": "SemanaDeObra[] = { obraId; obra: string; planId; numero: number; fechaCorte: Date; sinEvaluar: number; total: number; vencida: boolean; ppcAnterior: number|null } — solo planes ABIERTOS de obras no CERRADAS; a proposito NO da un PPC agregado de empresa",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Para un informe de gerencia: que obras llevan la semana sin cerrar y cuantos compromisos siguen sin evaluar."
+ },
+ {
+  "dato": "Confiabilidad de la cartera: PPC de la ultima semana cerrada de cada obra, con su banda",
+  "funcion": "confiabilidadDeCartera",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\gerencia.service.ts",
+  "devuelve": "ConfiabilidadDeCartera | null = { obras: { obraId; obraNombre; ultimo: { ppc: number|null; numero: number; fechaCorte: Date }|null; banda: \"bueno\"|\"flojo\"|\"malo\"|null }[] (peor banda primero); obrasSinPlanCerrado: number } — solo para quien ve toda la cartera (obrasAsignadas === null)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el ranking de fiabilidad entre obras: en un informe de gerencia dice de un vistazo cual planifica y cual improvisa."
+ },
+ {
+  "dato": "Semaforo de cartera: SPI por duracion y partidas criticas atrasadas por obra",
+  "funcion": "semaforoDeCartera",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\gerencia.service.ts",
+  "devuelve": "SemaforoCartera | null = { obras: { obraId; obraNombre; spiPorDuracion: number|null; semaforo: Semaforo|null; sinCronograma: boolean; criticasAtrasadas: number; partidas: { uid; codigo; nombre; diasAtraso: string; motivo: string|null }[] (top 3) }[]; criticasAtrasadas: number; obrasEnRojo: number; obrasVivas: number; tope: number (10) }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da el indice de plazo y las tres partidas criticas que mas dias cuestan, con el MISMO calculo (alertasDeAtraso) que ya usa el informe de una obra."
+ },
+ {
+  "dato": "Sobregiro proyectado: se compromete dinero mas rapido de lo que avanza la obra",
+  "funcion": "sobregiroProyectadoDeCartera",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\gerencia.service.ts",
+  "devuelve": "SobregiroProyectadoCartera | null = { obras: { obraId; obraNombre; avanceFisicoPct: number|null; comprometidoPct: number|null; desviacionPuntos: number|null; enRiesgo: boolean (> 10 puntos) }[]; obrasEnRiesgo: number; obrasVivas: number; tope: number }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Avisa del sobrecosto ANTES de que ocurra, cruzando lo comprometido con el avance fisico; hoy no existe a nivel de obra individual, solo de cartera."
+ },
+ {
+  "dato": "Avance fisico contra gasto, capitulo a capitulo, de UNA obra",
+  "funcion": "cruceDeObra (agregado en agruparCruce)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\fisico-economico.service.ts y src\\lib\\fisico-vs-economico.ts",
+  "devuelve": "CruceDeObra | null = { capitulos: { codigo: string; nombre: string; presupuesto: string; gastado: string; baseMedible: string; sinMedir: string; fisico: number|null; economico: number|null; avisa: boolean }[]; coberturaPct: number; partidasSinTarea: number; sinPermisoDeCosto: boolean }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la version por obra del sobregiro proyectado: dice en que capitulo el dinero va por delante de la obra ejecutada, con la cobertura del mapeo al lado para no leerlo de mas."
+ },
+ {
+  "dato": "Valor ganado (EVM) aproximado de cada obra de la cartera",
+  "funcion": "evmDeCartera",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\gerencia.service.ts",
+  "devuelve": "EvmDeCartera | null = { obras: { obraId; obraNombre; metricas: MetricasEvm (BAC/PV/EV/AC, CPI, SPI, EAC, VAC segun @/lib/evm) }[]; obrasVivas: number; tope: number } — rotulo obligatorio «de cartera (aproximado)»",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Pone soles al avance: CPI, EAC y VAC por obra sin cargar el EVM completo de cada una."
+ },
+ {
+  "dato": "Restricciones del Lookahead vencidas o por vencer en toda la cartera",
+  "funcion": "restriccionesDeCartera",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\gerencia.service.ts",
+  "devuelve": "RestriccionesCartera | null = { vencidas: RestriccionDeCartera[]; porVencer: RestriccionDeCartera[] (7 dias); totalVencidas: number } con RestriccionDeCartera = { id; obraId; obraNombre; tipo: TipoRestriccion; detalle: string|null; fechaCompromiso: Date; diasVencida: number (positivo = ya paso) }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "La lista de compromisos de liberacion rotos, con dias de retraso; una sola consulta y no toca el cronograma."
+ },
+ {
+  "dato": "Adicionales en borrador de toda la empresa, con su impacto en soles",
+  "funcion": "adicionalesEnBorrador",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\gerencia.service.ts",
+  "devuelve": "AdicionalesPendientes | null = { porObra: { obraId; obraNombre; cuantos: number; importe: string }[] (mayor importe primero); importe: string; cuantos: number } — suma las LINEAS, no el total guardado del movimiento",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Dinero ya pedido que todavia no cuenta en ningun BAC: obra por obra no se percibe y en el informe de gerencia puede ser el margen del año."
+ },
+ {
+  "dato": "Ordenes de compra en borrador sin aprobar, de toda la empresa",
+  "funcion": "comprasPendientesDeAprobar",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\gerencia.service.ts",
+  "devuelve": "ComprasPendientes | null = { porObra: { obraId; obraNombre; cuantas: number; importe: string }[]; importe: string; cuantas: number }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Mide el atasco de aprobaciones, que es una causa de incumplimiento (MATERIALES) que el Pareto ve y no explica."
+ },
+ {
+  "dato": "Valorizaciones vencidas y saldo por pagar de la cartera",
+  "funcion": "valorizacionesDeCartera",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\gerencia.service.ts",
+  "devuelve": "ValorizacionesDeCartera | null = { obras: { obraId; obraNombre; vencidas: number; pendientes: number; porPagarTotal: string }[] (mayor saldo primero); totalVencidas: number } — reusa estadoDeCadencia e importeValorizado",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el unico sitio donde se ve el estado de PAGO real a contratistas; un contratista sin cobrar es una causa de incumplimiento futura."
+ },
+ {
+  "dato": "Si un contratista tiene trabajo contratado hoy en esta obra",
+  "funcion": "semaforoDeContratos (servicio) sobre estadoDelContrato (puro), con ROTULO_CONTRATO para el texto",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\proveedores.service.ts y src\\lib\\semaforo-contratista.ts",
+  "devuelve": "Map<proveedorId, EstadoContrato> con EstadoContrato = \"vigente\"|\"proximo\"|\"soloCompras\"|\"ninguno\"; ROTULO_CONTRATO[estado] = { texto: string; ayuda: string; color: string } — dos consultas para toda la lista",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite listar en el informe quien esta contratado y en marcha en la obra, y distinguir al que solo vende material del que ejecuta un frente."
+ },
+ {
+  "dato": "Lista priorizada de lo que le falta a la obra (pendientes con gravedad y consecuencia)",
+  "funcion": "pendientesDeObra (puro), alimentada por pendientesDeLaObra dentro de datosTablero",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\pendientes.ts (servicio: src\\services\\tablero.service.ts)",
+  "devuelve": "Pendiente[] = { clave: string; bloque: \"entradas\"|\"procesos\"|\"salidas\"; gravedad: \"critica\"|\"aviso\"; titulo: string; consecuencia: string; ... }. Se alimenta de ConteoPendientes: restriccionesVencidas, restriccionesSinResponsable, incumplidosSinRetomar, incumplidosCronicos, lookaheadSinAnalizar, confiabilidadMostrada, tareasProximasBloqueadas, tareasProximasSinAnalizar, tareasProximasSinCobertura, semanasSinPorcentaje, ppcUltimo, ppcAnterior, partidasSobregiradas, capitulosConGastoAdelantado, coberturaMapeo, diasDesdeCorteCronograma, entre otros",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es una seccion de «acciones» ya redactada, con lo que se rompe si no se hace; convierte el informe de descriptivo en accionable sin escribir texto nuevo."
+ },
+ {
+  "dato": "Resumen del PPC listo para tarjeta: ultima cerrada, anterior, serie y causa top",
+  "funcion": "datosTablero (campo planSemanal); la funcion interna planSemanalDeObra es privada",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\tablero.service.ts",
+  "devuelve": "DatosPlanSemanalTablero | null = { ultima: { numero: number; ppc: number; fechaCorte: string }|null; anterior: number|null; cerradas: number; abiertas: number; tendencia: number[]; causaTop: { causa; veces: number; porcentaje: number }|null; fallosConCausa: number }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Trae el PPC con su comparacion contra la semana anterior y la causa lider ya cocinados; para reusarlo en el informe habria que exportar planSemanalDeObra o llamar a datosTablero con los modulos ppc y causas."
+ },
+ {
+  "dato": "Confiabilidad del Lookahead resumida para tarjeta (listas, total, % y sin analizar)",
+  "funcion": "datosTablero (campo lookahead), calculado con confiabilidadDeVentana",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\tablero.service.ts",
+  "devuelve": "DatosLookaheadTablero | null = { listas: number; total: number; porcentaje: number; semanas: number; restriccionesResueltas: number; sinAnalizar: number }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la version compacta para el informe, y `sinAnalizar` evita el error de leer un porcentaje bajo como mala ejecucion cuando en realidad nadie ha analizado la ventana."
+ },
+ {
+  "dato": "Presupuesto vigente por partida: base contratada, ajustes aprobados y vigente",
+  "funcion": "obtenerPresupuestoVigente",
+  "archivo": "src/services/movimientos.service.ts",
+  "devuelve": "PresupuestoVigente.partidas: PartidaVigente[] { wbsItemId: string; codigoPartida: string; descripcion: string; modalidad: ModalidadPartida; nivel: number; base: string; ajustes: string; vigente: string; esAdicional: boolean }. Lanza SinLineaBaseError si la obra no tiene linea base aprobada; exige permiso movimiento:leer",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la unica cifra que dice contra que presupuesto se esta midiendo hoy la obra, partida a partida, adicionales incluidos."
+ },
+ {
+  "dato": "Cascada del presupuesto: base congelada contra vigente (costo directo, GG, utilidad, IGV, total)",
+  "funcion": "obtenerPresupuestoVigente",
+  "archivo": "src/services/movimientos.service.ts",
+  "devuelve": "cascadaBase y cascadaVigente, ambas Cascada { costoDirecto: string; descuentos: string; subtotal: string; gastosGenerales: string; utilidad: string; presupuesto: string; igv: string; totalGeneral: string } (calculadas por calcularCascada de src/lib/presupuesto.ts, con los porcentajes de la linea base a proposito)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Deja ver de un golpe cuanto ha crecido el contrato desde que se firmo, sin recalcular nada a mano."
+ },
+ {
+  "dato": "Adicionales y deductivos aprobados de la obra, separados por signo",
+  "funcion": "obtenerPresupuestoVigente",
+  "archivo": "src/services/movimientos.service.ts",
+  "devuelve": "totalEntradas: string y totalSalidas: string (suma de los ajustes positivos y de los negativos; un adicional y un deductivo del mismo importe NO se presentan como 0.00)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Contesta la pregunta de acta de obra: cuanto entro y cuanto salio del contrato en el periodo, sin que se compensen."
+ },
+ {
+  "dato": "Descuadre entre la suma de bases y lo guardado en la linea base, y codigos huerfanos",
+  "funcion": "obtenerPresupuestoVigente",
+  "archivo": "src/services/movimientos.service.ts",
+  "devuelve": "descuadreBase: string (deberia ser \"0.00\") y codigosSinPartida: string[] (codigos de la linea base cuya partida ya no existe en el arbol vivo)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el sello de fiabilidad del informe: si no es cero, ninguna cifra de dinero del documento se puede defender."
+ },
+ {
+  "dato": "Historial de movimientos presupuestales (adicionales, deductivos, reconversiones) con su estado y quien los aprobo",
+  "funcion": "listarMovimientos",
+  "archivo": "src/services/movimientos.service.ts",
+  "devuelve": "Pagina<MovimientoResumen> { filas; total; pagina; totalPaginas }, con MovimientoResumen { id; numero: number; tipo: TipoMovimiento; aprobado: boolean; aprobadoAt: Date|null; aprobadoPor: string|null; fecha: Date; concepto: string; motivo: string; referencia: string|null; totalEntradas: string; totalSalidas: string; importeNeto: string; lineas: { codigoPartida: string|null; descripcion: string; importe: string; esNueva: boolean }[] }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da la trazabilidad contractual del periodo: que se aprobo, por que motivo, con que referencia y firmado por quien."
+ },
+ {
+  "dato": "BAC: presupuesto contra el que se mide el valor ganado (base + ajustes aprobados)",
+  "funcion": "bacDeObra",
+  "archivo": "src/services/presupuesto-obra.ts",
+  "devuelve": "BacObra { bac: string; base: string; ajustes: string; conLineaBase: boolean }. No exige permiso de movimientos",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el denominador de todo el control de costo, y separa lo contratado de lo anadido para poder explicar el numero."
+ },
+ {
+  "dato": "Costo directo de la obra con la regla de hojas (sin doble conteo de capitulos a suma alzada)",
+  "funcion": "totalDeObra",
+  "archivo": "src/services/presupuesto-obra.ts",
+  "devuelve": "TotalObra { costoDirecto: string; partidas: number }. Version por lotes: totalesPorObra(obraIds) => Map<string, TotalObra>",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la cifra de presupuesto de la obra que todo el sistema considera correcta; cualquier otra suma plana infla el total."
+ },
+ {
+  "dato": "Costo directo agregado de la cartera de la empresa, por estado de obra",
+  "funcion": "totalDeEmpresa",
+  "archivo": "src/services/presupuesto-obra.ts",
+  "devuelve": "string (costo directo sumado obra a obra, con filtro opcional por ProjectState y acotado por el alcance del sujeto)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Sirve para encuadrar una obra dentro de la exposicion total de la constructora."
+ },
+ {
+  "dato": "Arbol de partidas con subtotal por capitulo y monto total de la obra",
+  "funcion": "listarPartidas",
+  "archivo": "src/services/obras.service.ts",
+  "devuelve": "ArbolPartidas { filas: PartidaFila[] { id; parentId: string|null; codigoPartida; tipo: CAPITULO|PARTIDA; modalidad: PRECIOS_UNITARIOS|SUMA_ALZADA|ALCANCE; descripcion; nivel: number; unidad: string|null; metrado: string|null; precioUnitario: string|null; parcial: string|null }; totalPartidas: number; montoTotal: string }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite un cuadro de presupuesto por capitulos en el informe cuyos subtotales cuadran exactamente con el total de la obra."
+ },
+ {
+  "dato": "Subtotal presupuestado de cualquier capitulo o rama del presupuesto",
+  "funcion": "subtotalesPorRama",
+  "archivo": "src/lib/jerarquia-partidas.ts",
+  "devuelve": "Map<string, string> (codigo de partida o capitulo -> subtotal). Funcion pura; la suma de los subtotales raiz es exactamente sumarHojas de la lista entera, fijado por prueba",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el bloque \"Estructuras cuesta 340 mil\" que un informe de obra siempre lleva y que hoy no se calcula en ninguna parte del informe."
+ },
+ {
+  "dato": "Que partidas aportan de verdad al costo directo (y cuales quedan cubiertas por una hija costeada)",
+  "funcion": "aportantes / sumarHojas",
+  "archivo": "src/lib/jerarquia-partidas.ts",
+  "devuelve": "aportantes<T extends NodoImporte>(nodos): T[] y sumarHojas(nodos): string. Puras, sin base de datos",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la regla que impide que el informe repita dinero al presentar capitulos y partidas juntos."
+ },
+ {
+  "dato": "Costo directo vivo separado en costo bruto y descuentos comerciales",
+  "funcion": "obtenerCostoDirectoActual",
+  "archivo": "src/services/revisiones.service.ts",
+  "devuelve": "CostoDirectoActual { costoDirecto: string; descuentos: string; totalPartidas: number }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Los descuentos comerciales se leen aparte, como en el presupuesto que firmo el cliente, en vez de ir escondidos dentro del costo."
+ },
+ {
+  "dato": "Revisiones del presupuesto y cuanto encarecio o abarato la ultima",
+  "funcion": "obtenerResumen",
+  "archivo": "src/services/revisiones.service.ts",
+  "devuelve": "ResumenPresupuesto { revisiones: RevisionResumen[] { id; version: number; fechaRevision: Date; aprobada: boolean; aprobadaAt: Date|null; aprobadaPor: string|null; tipoCambio: string|null; clausulas: string|null; cascada: Cascada; porcentajes: { gastosGenerales; utilidad; igv } }; comparacion: { anterior; actual; diferenciaSoles: string; diferenciaDolares: string|null; encarece: boolean } | null }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da la version del contrato vigente, quien la aprobo y en cuanto cambio respecto de la anterior, en soles y en dolares."
+ },
+ {
+  "dato": "Encargos a proveedores con todas sus cuentas cruzadas (contratado, presupuesto del frente, comprometido, valorizado)",
+  "funcion": "listarEncargos",
+  "archivo": "src/services/encargos.service.ts",
+  "devuelve": "EncargosDeObra { encargos: EncargoResumen[] { id; numero: number; descripcion; estado: EstadoEncargo; proveedor { id; razonSocial; ruc }; tipoImpuesto; fechaInicio: Date|null; fechaFin: Date|null; partidas: number; ultimaValorizacion: Date|null; numeroObra: number|null; numeroEncargo: number|null; cuentas: ResumenEncargo }; cobertura: Cobertura }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la foto de contratistas del periodo: quien esta contratado, por cuanto, cuanto lleva ejecutado y contra que numero de valorizacion."
+ },
+ {
+  "dato": "Cuentas de un encargo: contratado contra presupuesto, por comprometer, exceso comprometido y valorizado",
+  "funcion": "resumenEncargo",
+  "archivo": "src/lib/encargos.ts",
+  "devuelve": "ResumenEncargo { montoContratado: string; presupuestoFrente: string; comprometido: string; contraPresupuesto: string; porComprometer: string; excesoComprometido: string; valorizado: string; avancePorcentaje: string|null }. Pura; viaja dentro de listarEncargos como cuentas",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Dice si el contratista cobra por encima o por debajo de lo presupuestado y si las ordenes ya se pasaron de su contrato."
+ },
+ {
+  "dato": "Cobertura de la obra por proveedores: cuanto del presupuesto tiene ya contratista detras",
+  "funcion": "coberturaObra",
+  "archivo": "src/lib/encargos.ts",
+  "devuelve": "Cobertura { total: string; asignado: string; sinAsignar: string; porcentaje: number }. Viaja dentro de EncargosDeObra.cobertura",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Un porcentaje bajo significa obra por delante sin nadie asignado: es un riesgo de plazo que hoy el informe no menciona."
+ },
+ {
+  "dato": "Importe ejecutado por un contratista segun su ultima valorizacion",
+  "funcion": "importeValorizado",
+  "archivo": "src/lib/encargos.ts",
+  "devuelve": "string (montoContratado x porcentaje / 100, en aritmetica decimal exacta)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Convierte el porcentaje de avance del contratista en soles, que es como se lee en un acta."
+ },
+ {
+  "dato": "Cual es la valorizacion vigente de un encargo (corte mas reciente, con desempate por hora de registro)",
+  "funcion": "avanceVigente",
+  "archivo": "src/lib/encargos.ts",
+  "devuelve": "avanceVigente<T extends Valorizacion>(valorizaciones): T|null — devuelve la MISMA fila que entro, con sus correlativos numeroObra y numeroEncargo si los traia",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Fija sin ambiguedad de que corte habla el informe cuando hay dos valorizaciones el mismo dia."
+ },
+ {
+  "dato": "Presupuesto propio del frente de un encargo (parcial de sus partidas por su fraccion)",
+  "funcion": "importeDeFrente",
+  "archivo": "src/lib/encargos.ts",
+  "devuelve": "string (suma de parcial x fraccion / 100 de cada partida del frente)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el lado \"lo que a mi me costaba\" frente al precio del contratista, sin mezclar las dos cifras."
+ },
+ {
+  "dato": "Reparto exacto del monto contratado de un encargo entre sus partidas",
+  "funcion": "repartirContratado",
+  "archivo": "src/lib/encargos.ts",
+  "devuelve": "{ clave: string; importe: string }[] — la suma de las partes es SIEMPRE el monto contratado; el residuo del redondeo se carga a la partida de mayor peso",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite bajar el compromiso con proveedores a nivel de partida o capitulo sin que descuadre el total."
+ },
+ {
+  "dato": "Comprometido con proveedores por partida (encargos vigentes repartidos + ordenes sueltas aprobadas)",
+  "funcion": "comprometidoPorPartida (puro) / obtenerComprometido (con datos)",
+  "archivo": "src/lib/encargos.ts y src/services/ordenes.service.ts",
+  "devuelve": "comprometidoPorPartida(encargos, sueltas) => Map<string,string>; obtenerComprometido(sesion, obraId) => ComprometidoPorPartida[] { wbsItemId: string; comprometido: string } (exige orden:leer)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es LA definicion de comprometido del sistema: cuanto dinero de cada partida ya esta pedido a terceros."
+ },
+ {
+  "dato": "Comprometido total de la obra, separado por origen",
+  "funcion": "desgloseComprometidoDeObra",
+  "archivo": "src/services/ordenes.service.ts",
+  "devuelve": "DesgloseDeObra { total: string; deEncargos: string; deOrdenesSueltas: string; encargosVigentes: number } | null (null sin permiso orden:leer)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Rotula de donde sale el compromiso, para que nadie lea el precio del contratista como si fuera presupuesto propio."
+ },
+ {
+  "dato": "Detalle de un encargo con su frente de partidas y su historial completo de valorizaciones numeradas",
+  "funcion": "obtenerEncargo",
+  "archivo": "src/services/encargos.service.ts",
+  "devuelve": "EncargoDetalle | null, con partidas: { wbsItemId; codigoPartida; descripcion; parcial: string; fraccion: string }[] y valorizaciones: { id; fecha: Date; porcentaje: string; nota: string|null; registradoPor: string; numeroObra: number; numeroEncargo: number }[]",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el anexo por contratista de un informe: los cortes uno a uno, con el numero de papel que corresponde a cada uno."
+ },
+ {
+  "dato": "Partidas asignables con lo ya repartido entre proveedores y sus fechas del cronograma",
+  "funcion": "partidasAsignables",
+  "archivo": "src/services/encargos.service.ts",
+  "devuelve": "PartidaAsignable[] { id; codigoPartida; descripcion; parcial: string; asignadoPorcentaje: number; proveedores: string[]; inicio: Date|null; fin: Date|null }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Enumera que partidas siguen sin contratista y cuando estaban programadas, que es lo que anticipa el proximo atraso."
+ },
+ {
+  "dato": "Panel de valorizaciones y pagos de la obra: valorizado, pagado, por pagar y quien debe corte",
+  "funcion": "panelDeValorizaciones",
+  "archivo": "src/services/pagos.service.ts",
+  "devuelve": "PanelValorizaciones { filas: Pagina<FilaValorizacion> con FilaValorizacion { encargoId; numero: number; contratista; descripcion; montoContratado: string; porcentaje: string; valorizado: string; pagado: string; porPagar: string; ultimaValorizacion: Date|null; cadencia: EstadoCadencia; etiquetaCadencia: string; heredaCadencia: boolean }; totales: { sinCadenciaPropia: number; valorizacionVencida: number; conPagoPendiente: number }; diaCorteObra: number } | null",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el bloque de tesoreria del informe: cuanto se le debe a cada contratista y quien lleva retraso en valorizar. Ojo: los importes vienen paginados y los totales son solo contadores, no sumas de dinero."
+ },
+ {
+  "dato": "Pagos registrados contra un encargo, con respaldo documental",
+  "funcion": "listarPagos",
+  "archivo": "src/services/pagos.service.ts",
+  "devuelve": "PagoRegistrado[] { id; monto: string; fecha: Date; registradoPor: string; nota: string|null; comprobantes: number } (del mas reciente al mas antiguo)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite anexar el detalle de pagos del periodo y decir cuantos van sin comprobante adjunto."
+ },
+ {
+  "dato": "Cuando le toca valorizar a cada contratista y cuantos dias lleva de retraso",
+  "funcion": "estadoDeCadencia",
+  "archivo": "src/lib/cadencia-valorizacion.ts",
+  "devuelve": "EstadoCadencia { proxima: Date|null; vencida: boolean; diasDeRetraso: number; origen: \"fechas\"|\"encargo\"|\"obra\" }. Pura; resuelve los tres niveles de herencia (fechas pactadas > cadencia del encargo > dia de corte de la obra). ETIQUETA_ORIGEN traduce el origen a texto",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Convierte \"no consta el corte\" en una fecha y un numero de dias, que es lo unico que se puede reclamar en una reunion."
+ },
+ {
+  "dato": "Cuantos contratistas tienen valorizacion vencida hoy (calculo que NO se expone: solo escribe avisos)",
+  "funcion": "avisarValorizacionesPendientes",
+  "archivo": "src/services/avisos-valorizacion.ts",
+  "devuelve": "Promise<number> — solo cuantos avisos creo. La lista `vencidos` (encargo + EstadoCadencia por cada uno) se calcula en las lineas 86-100 y muere dentro de la funcion; para el informe habria que reusar estadoDeCadencia o panelDeValorizaciones",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "El dato existe y ya se calcula cada pasada del reloj, pero hoy solo llega a la campanita: no hay funcion reutilizable que lo devuelva."
+ },
+ {
+  "dato": "Avance fisico contra avance economico, capitulo por capitulo",
+  "funcion": "cruceDeObra",
+  "archivo": "src/services/fisico-economico.service.ts",
+  "devuelve": "CruceDeObra { capitulos: CapituloDelCruce[] { codigo; nombre; presupuesto: string; gastado: string; baseMedible: string; sinMedir: string; fisico: number|null; economico: number|null; avisa: boolean }; coberturaPct: number; partidasSinTarea: number; sinPermisoDeCosto: boolean } | null",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Contesta la pregunta de gerencia por capitulo: voy al 40% de obra y llevo gastado el 60%, y dice sobre cuanto presupuesto se calculo."
+ },
+ {
+  "dato": "Umbral de aviso del cruce fisico-economico",
+  "funcion": "PUNTOS_DE_AVISO / cruceFisicoEconomico",
+  "archivo": "src/lib/fisico-vs-economico.ts",
+  "devuelve": "PUNTOS_DE_AVISO = 10 (puntos que el gasto puede ir por delante del avance antes de avisar); cruceFisicoEconomico(partidas, gastoPorCodigo, avancePorCodigo) => CapituloDelCruce[], puro",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da el criterio con el que se pinta un capitulo en rojo, sin que el informe tenga que inventarse un umbral."
+ },
+ {
+  "dato": "Valor ganado completo de la obra: BAC, PV, EV, AC, SV, CV, SPI, CPI, EAC, VAC",
+  "funcion": "datosEvm",
+  "archivo": "src/services/evm.service.ts",
+  "devuelve": "DatosEvm { bac; baseBac; ajustesBac: string; fechaCorte: Date; verCosto: boolean; coberturaMapeo: number; metricas: MetricasEvm; planPv, cortesEv, costoAc: PuntoEvm[] { fecha: Date; valor: number }; lineaBase: { version: number; fijadaEn: Date|null }|null; inicio: Date|null; fin: Date|null } | null",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el control integrado de plazo y costo en soles: el informe hoy solo lleva porcentajes de avance, sin una sola cifra de dinero."
+ },
+ {
+  "dato": "Metricas EVM puras y la compuerta que impide proyectar un ahorro falso",
+  "funcion": "metricasEvm / hayBaseParaProyectar / textoSinCosto / valorDeAvance",
+  "archivo": "src/lib/evm.ts",
+  "devuelve": "MetricasEvm { bac; pv; ev: string; ac: string|null; sv: string; cv: string|null; spi: number|null; cpi: number|null; eac: string|null; vac: string|null; avance: number; motivoSinCosto: \"sin_permiso\"|\"sin_gasto\"|\"avance_insuficiente\"|\"costo_rezagado\"|null }. valorDeAvance(bac, porcentaje) => string",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Si el CPI no es fiable, el informe puede decir POR QUE en vez de dejar un guion, que es lo que hace que la gente pida el numero malo."
+ },
+ {
+  "dato": "Cobertura del mapeo tarea-partida: que parte del presupuesto tiene tarea que lo mida",
+  "funcion": "cobertura",
+  "archivo": "src/lib/mapeo-partidas.ts",
+  "devuelve": "Cobertura { mapeado: string; total: string; porcentaje: number; partidasSinTarea: number }. Pura; viaja dentro de DatosEvm.coberturaMapeo y de CruceDeObra.coberturaPct",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la letra pequena obligatoria de cualquier cifra de dinero del informe: sobre que parte de la obra se calculo."
+ },
+ {
+  "dato": "Presupuesto, comprometido y partidas sobregiradas de cada obra",
+  "funcion": "listarObras",
+  "archivo": "src/services/obras.service.ts",
+  "devuelve": "Pagina<ObraResumen> con ObraResumen { id; codigoObra: string|null; correlativo: string|null; nombreObra; ubicacion: string|null; estado; fechaInicio: Date; fechaFinProgramada: Date; presupuestoTotal: string; totalPartidas: number; comprometido: string; partidasSobregiradas: number }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da la cabecera economica de la obra —presupuesto, comprometido y cuantas partidas se pasaron— sin escribir una sola consulta nueva."
+ },
+ {
+  "dato": "Cifras economicas de la empresa: presupuesto, comprometido y saldo de las obras con exposicion real",
+  "funcion": "obtenerResumenEmpresa",
+  "archivo": "src/services/obras.service.ts",
+  "devuelve": "ResumenEmpresa { obras: number; obrasEnEjecucion: number; presupuestoTotal: string; comprometido: string; saldo: string; partidasSobregiradas: number; obrasConPlazoVencido: number }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Sirve para encabezar un informe de cartera o para situar la obra frente al total de la constructora."
+ },
+ {
+  "dato": "Alertas de sobregiro por obra y de plazo vencido",
+  "funcion": "listarAlertasEmpresa",
+  "archivo": "src/services/obras.service.ts",
+  "devuelve": "AlertaEmpresa[] { obraId: string|null; obraNombre: string; clave: \"sobregiro\"|\"plazo\"|\"emisor-dormido\"|\"despliegue-pendiente\"; texto: string; camino: string }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "El informe ya lleva alertas de atraso de cronograma; estas son las de dinero y de plazo contractual, con el texto ya redactado."
+ },
+ {
+  "dato": "Adicionales en BORRADOR de la cartera: dinero ya pedido que todavia no cuenta en ningun sitio",
+  "funcion": "adicionalesEnBorrador",
+  "archivo": "src/services/gerencia.service.ts",
+  "devuelve": "AdicionalesPendientes { porObra: ObraConAdicionales[] { obraId; obraNombre; cuantos: number; importe: string }; importe: string; cuantos: number } | null (solo para quien ve toda la cartera y con movimiento:leer)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la exposicion pendiente de firma: lo que subiria el contrato si se aprobara todo lo que ya esta redactado."
+ },
+ {
+  "dato": "Ordenes de compra en BORRADOR sin aprobar, por obra",
+  "funcion": "comprasPendientesDeAprobar",
+  "archivo": "src/services/gerencia.service.ts",
+  "devuelve": "ComprasPendientes { porObra: ObraConComprasPendientes[] { obraId; obraNombre; cuantas: number; importe: string }; importe: string; cuantas: number } | null",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Dice cuanto gasto esta esperando una firma, que es el compromiso que aun se puede parar."
+ },
+ {
+  "dato": "Sobregiro proyectado: se esta comprometiendo mas rapido de lo que se avanza",
+  "funcion": "sobregiroProyectadoDeCartera",
+  "archivo": "src/services/gerencia.service.ts",
+  "devuelve": "SobregiroProyectadoCartera { obras: ObraConSobregiroProyectado[] { obraId; obraNombre; avanceFisicoPct: number|null; comprometidoPct: number|null; desviacionPuntos: number|null; enRiesgo: boolean }; obrasEnRiesgo: number; obrasVivas: number; tope: number } | null. Umbral en UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS = 10",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Detecta el sobregiro ANTES de que ocurra partida a partida; hoy solo existe a nivel de cartera y no dentro de la obra."
+ },
+ {
+  "dato": "Valorizaciones vencidas y saldo por pagar a contratistas, por obra",
+  "funcion": "valorizacionesDeCartera",
+  "archivo": "src/services/gerencia.service.ts",
+  "devuelve": "ValorizacionesDeCartera { obras: ObraConValorizaciones[] { obraId; obraNombre; vencidas: number; pendientes: number; porPagarTotal: string }; totalVencidas: number } | null",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el unico sitio donde el saldo por pagar a contratistas sale sumado por obra; para un informe de una sola obra vale como plantilla exacta del calculo."
+ },
+ {
+  "dato": "EVM aproximado de la cartera (BAC/PV/EV/AC por obra, sin cargar cronogramas completos)",
+  "funcion": "evmDeCartera",
+  "archivo": "src/services/gerencia.service.ts",
+  "devuelve": "EvmDeCartera { obras: { obraId; obraNombre; metricas: MetricasEvm }[]; obrasVivas: number; tope: number } | null. Rotulo obligatorio en pantalla: \"de cartera (aproximado)\"",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da control de costo barato cuando el informe cubre varias obras a la vez, sin el coste de datosEvm por obra."
+ },
+ {
+  "dato": "Bolsa de la obra: contractual contra presupuesto meta, y margen esperado",
+  "funcion": "compararConContractual",
+  "archivo": "src/services/meta.service.ts",
+  "devuelve": "{ ok: true; comparacion: { meta: MetaResumen; bolsa: Bolsa; desfase: Desfase } } | { ok: false; error }. Bolsa { porLinea: LineaBolsa[] { codigo: string|null; descripcion; contractual; meta; bolsa: string; senal: \"favorable\"|\"ajustada\"|\"excedida\"|\"sin_meta\"; propia: boolean }; costoDirectoContractual; costoDirectoMeta; bolsaProduccion; bolsaTotal; utilidadContractual; margenEsperado; contractualSinMeta; bolsaProduccionCubierta }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el margen real de la obra linea a linea, y marca cuanto de esa bolsa es en realidad presupuesto olvidado."
+ },
+ {
+  "dato": "Cuanto exagera la bolsa por movimientos aprobados despues de fijar la meta",
+  "funcion": "desfaseDeMeta",
+  "archivo": "src/lib/bolsa.ts",
+  "devuelve": "Desfase { movimientos: number; importe: string; hay: boolean }. Pura; viaja dentro de ComparacionMeta.desfase",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Evita presentar como margen lo que en realidad es trabajo adicional todavia no presupuestado en la meta."
+ },
+ {
+  "dato": "Cuanto cuesta cada mes de atraso segun los gastos generales de la meta",
+  "funcion": "resumenGastosGenerales",
+  "archivo": "src/lib/bolsa.ts",
+  "devuelve": "ResumenGastosGenerales { total: string; fijos: string; variables: string; costeMensualDelAtraso: string; invalidas: number }. Pura",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Traduce el atraso del cronograma —que el informe ya calcula— a soles por mes, que es la unica forma de que se decida algo."
+ },
+ {
+  "dato": "Historial de un contratista cruzando obras: total contratado y avance de cada contrato",
+  "funcion": "historialDeProveedor",
+  "archivo": "src/services/proveedores.service.ts",
+  "devuelve": "HistorialProveedor { proveedor { id; razonSocial; ruc; activo }; contratos: ContratoDelProveedor[] { encargoId; numero: number; descripcion; estado; montoContratado: string; fechaInicio: Date|null; fechaFin: Date|null; avance: string|null; obraId; obraNombre; obraCorrelativo: string|null }; totalContratado: string (excluye ANULADOS); obras: number } | null",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite decir en el informe si el contratista que va mal en esta obra es el mismo que ya arrastra otros frentes."
+ },
+ {
+  "dato": "Estado de contrato de cada proveedor en la obra (con contrato, por empezar, solo compras, sin contrato)",
+  "funcion": "semaforoDeContratos (servicio) / estadoDelContrato (puro)",
+  "archivo": "src/services/proveedores.service.ts y src/lib/semaforo-contratista.ts",
+  "devuelve": "semaforoDeContratos => Map<string, EstadoContrato>; EstadoContrato = \"vigente\"|\"proximo\"|\"soloCompras\"|\"ninguno\". ROTULO_CONTRATO da texto, ayuda y color de cada estado",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Ordena la lista de contratistas del informe por si estan trabajando hoy, van a entrar o solo facturan material."
+ },
+ {
+  "dato": "Ordenes de compra de la obra con su importe imputable al presupuesto",
+  "funcion": "listarOrdenes / contarOrdenesDeObra",
+  "archivo": "src/services/ordenes.service.ts",
+  "devuelve": "Pagina<OrdenResumen> con OrdenResumen { id; numero: string; tipo; estado: EstadoOrden; origen; fecha: Date; descripcion; referencia: string|null; formaPago: string|null; proveedor { id; razonSocial; ruc }; encargo { id; numero; descripcion }|null; subtotal; descuentoComercial; tipoImpuesto; neto; impuesto; total; imputable: string; aprobadaAt: Date|null; aprobadaPor: string|null; anuladaAt: Date|null; motivoAnulado: string|null; totalLineas: number; imputaciones: { codigoPartida; descripcion; importe }[] }. contarOrdenesDeObra => number sin filtrar",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el anexo de compras del periodo, con la cifra que de verdad cuenta como costo (neto con IGV, total con retencion)."
+ },
+ {
+  "dato": "Cascada de una orden de compra y regla de que cifra imputa al presupuesto",
+  "funcion": "calcularCascadaOrden / importeImputable / descuadreDelReparto",
+  "archivo": "src/lib/ordenes.ts",
+  "devuelve": "CascadaOrden { subtotal; descuentoComercial; neto; impuesto; total }; importeImputable({ tipoImpuesto, neto, total }) => string; descuadreDelReparto(imputable, imputaciones) => string|null (null si cuadra)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da el criterio unico de costo por orden y una comprobacion de cuadre que puede acompanar al anexo de compras."
+ },
+ {
+  "dato": "Que partidas del presupuesto ya se estan ejecutando en obra",
+  "funcion": "partidasEnEjecucion / partidasEnEjecucionQueDesaparecen",
+  "archivo": "src/services/partidas-en-ejecucion.ts",
+  "devuelve": "string[] de codigos de partida (ordenados). Resuelve los dos saltos MapeoTareaPartida -> AvanceTarea que la base no puede hacer sola",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Deja separar en el informe las partidas arrancadas de las que ni se han tocado, con dinero detras."
+ },
+ {
+  "dato": "Cascada comercial del presupuesto que se firma con el cliente (valor de venta, IGV, retencion, neto a recibir)",
+  "funcion": "calcularCascadaComercial / parametrosDeImpuesto",
+  "archivo": "src/lib/presupuesto.ts",
+  "devuelve": "CascadaComercial { costoDirecto; gastosGenerales; utilidad; subtotal; descuento (negativo); valorVenta; igv; precioVenta; retencionRenta; netoARecibir }. Pura",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la cifra que ve el cliente, distinta del costo directo de control, y evita que el informe mezcle las dos."
+ },
+ {
+  "dato": "Cuantos compromisos sujetan a una partida (cronograma, ordenes, encargos, movimientos, meta, proveedor)",
+  "funcion": "NO EXPUESTO — vive inline en eliminarPartida (lineas 395-455) y en agruparEnSumaAlzada (lineas 1503-1543)",
+  "archivo": "src/services/partidas.service.ts",
+  "devuelve": "Hoy solo un texto de error. El calculo son contadores sueltos: prisma.mapeoTareaPartida.count, avanceTarea.count, ordenImputacion.count, encargoPartida.count, movimientoLinea.count, metaItemPartida.count, proveedorPartida.count por wbsItemId/codigoPartida",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Serviria como indicador de \"partidas comprometidas\" del informe, pero hoy no hay ninguna funcion reutilizable: habria que extraerla."
+ },
+ {
+  "dato": "Movimiento del costo directo al crear o agrupar partidas (que partidas dejan o vuelven a contar)",
+  "funcion": "NO EXPUESTO — vive inline en crearPartida (lineas 796-952, campo `aviso`) y en agruparEnSumaAlzada (lineas 1588-1629, devuelve { codigo, importe, suma })",
+  "archivo": "src/services/partidas.service.ts",
+  "devuelve": "crearPartida => Resultado<{ id: string; aviso?: string }> (el aviso incluye costoDirecto antes y despues); agruparEnSumaAlzada => Resultado<{ codigo: string; importe: string; suma: string }>",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la unica traza de por que cambio el costo directo por edicion manual del presupuesto; hoy solo se ve en el momento de la accion, no en el informe."
+ },
+ {
+  "dato": "Fotos de UN dia concreto (las del parte de la jornada)",
+  "funcion": "fotosDeTareas(sesion, obraId, uids, dia)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\evidencia.service.ts",
+  "devuelve": "Promise<Map<number, FotoResumen[]>> filtrado por FotoEvidencia.fecha (@db.Date, medianoche UTC). Misma forma que sin dia",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite un bloque 'lo que se hizo el dia del corte' o 'la semana del corte' en vez de todo el historial de la partida junto."
+ },
+ {
+  "dato": "Fotos que prueban que una restriccion del Lookahead se libero",
+  "funcion": "fotosPorDestino(sesion, obraId, { restricciones: string[] })",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\evidencia.service.ts",
+  "devuelve": "Promise<Map<string, FotoResumen[]>> con clave = restriccionId",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Ensena con foto que el frente se destrabo de verdad, no solo que alguien marco la casilla."
+ },
+ {
+  "dato": "Fotos que documentan la causa de no cumplimiento de un compromiso del Plan Semanal",
+  "funcion": "fotosPorDestino(sesion, obraId, { compromisos: string[] })",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\evidencia.service.ts",
+  "devuelve": "Promise<Map<string, FotoResumen[]>> con clave = compromisoId",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "El informe ya lleva el PPC al corte; esto pone cara a por que fallo lo que fallo, que es lo que el cliente pregunta."
+ },
+ {
+  "dato": "Los bytes de una foto de evidencia, para incrustarla en el papel",
+  "funcion": "archivoEvidencia(sesion, fotoId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\evidencia.service.ts",
+  "devuelve": "Promise<{ contenido: Buffer; mimeType: string } | { error: \"no\" | \"purgada\" }>. Exige lookahead:leer o plan_semanal:leer y filtra por empresa",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Hoy el PDF y el correo del informe no llevan ni una foto: solo viajan los metadatos. Con esto el informe impreso podria ensenarlas."
+ },
+ {
+  "dato": "Enlace QR de la obra, de una tarea o de una restriccion, y cuantos codigos caben por hoja A4",
+  "funcion": "enlaceEvidencia(base, obraId, destino), enPaginas(codigos, porPagina), POR_PAGINA",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\evidencia-qr.ts",
+  "devuelve": "enlaceEvidencia: string (`/pase/<obraId>` para la obra, `/obras/<obraId>/lookahead?tarea=<uid>` o `?evidencia=<restriccionId>`); enPaginas: T[][]; POR_PAGINA = { obra: 1, tarea: 9, restriccion: 16 }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Un QR impreso en el informe deja que quien lo lee en campo entre a documentar el frente sin navegar por menus."
+ },
+ {
+  "dato": "Galeria curada de la obra: fotos con titulo, descripcion y si estan publicadas al cliente",
+  "funcion": "listarGaleria(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\galeria.service.ts",
+  "devuelve": "Promise<GaleriaDeObra|null> = { fotos: { id: string; titulo: string|null; descripcion: string|null; uid: number|null; visibleCliente: boolean; subidaPor: string; createdAt: Date }[]; agrupacion: \"SEMANA\"|\"MES\"; enlace: { slug: string; activo: boolean }|null }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la cara presentable de la obra —descrita y elegida a mano—, justo lo que un informe al cliente deberia ensenar en vez de la prueba cruda."
+ },
+ {
+  "dato": "Reportaje fotografico agrupado por semana o por mes, en calendario de Lima",
+  "funcion": "agruparFotos(fotos, agrupacion), etiquetaGrupo(inicio, agrupacion), diaLima(instante)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\galeria.ts",
+  "devuelve": "GrupoFotos<T>[] = { clave: string (\"2026-08-10\" o \"2026-08\"); inicio: Date; fotos: T[] }; etiquetaGrupo: string (\"Semana del 10 de agosto de 2026\")",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da el bloque 'asi avanzo la obra semana a semana' sin inventar nada: es logica pura que ya corrige el desfase UTC/Lima."
+ },
+ {
+  "dato": "Fotos que el cliente ya puede ver por su enlace publico",
+  "funcion": "galeriaPublica(slug)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\galeria.service.ts",
+  "devuelve": "Promise<GaleriaPublica|null> = { obraNombre: string; agrupacion: \"SEMANA\"|\"MES\"; fotos: { id; titulo: string|null; descripcion: string|null; createdAt: Date }[] } — a proposito SIN subidaPor",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Marca que material ya es publicable: el informe al cliente puede reusar exactamente ese subconjunto sin filtrar nombres del personal."
+ },
+ {
+  "dato": "La bitacora completa de la obra (notas con categoria, cuerpo, quien y adjuntos)",
+  "funcion": "listarNotas(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\notas.service.ts",
+  "devuelve": "Promise<NotaResumen[]|null> = { id; categoria: FINANCIERO|LOGISTICA|OPERATIVO|LEGAL; titulo; cuerpo; fechaRecordatorio: Date|null; atendida: boolean; atendidaAt: Date|null; atendidaPor: string|null; vencida: boolean; creadoPor: string; createdAt; updatedAt; adjuntos: { id; nombreOriginal; mimeType; tamano; subidaPor; createdAt }[] }[]. null = sin permiso nota:leer",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el relato de lo que paso en obra y no cabe en ningun indicador: paros, temas legales, pagos. Un informe sin esto solo tiene numeros."
+ },
+ {
+  "dato": "Recordatorios pendientes de la obra, vencidos primero",
+  "funcion": "recordatoriosDeObra(sesion, obraId, limite = 5)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\notas.service.ts",
+  "devuelve": "Promise<RecordatorioNota[]|null> = { id: string; titulo: string; categoria: CategoriaNota; fechaRecordatorio: Date; vencida: boolean }[]; null = sin permiso (distinto de lista vacia)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Contesta 'que hay que atender antes del proximo corte' en cinco lineas, que es lo que se lee en una reunion de obra."
+ },
+ {
+  "dato": "Cuantas notas de la obra estan vencidas ahora mismo (y cuantas restricciones y semanas sin cerrar)",
+  "funcion": "avisosDeSeccion(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\obras.service.ts",
+  "devuelve": "Promise<AvisosSeccion> = { lookahead: number (restricciones abiertas con fecha compromiso pasada); planSemanal: number (semanas ABIERTAS con corte ya pasado); notas: number (notas pendientes con recordatorio vencido) }. Va en cache() por peticion y son solo counts con indice",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Tres numeros baratos que resumen la disciplina de la obra al corte: lo que se prometio y no se tuvo, lo que no se cerro y lo que se dejo pasar."
+ },
+ {
+  "dato": "La regla unica de 'nota vencida' (nunca se guarda en columna)",
+  "funcion": "esVencida(nota, ahora)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\notas.ts",
+  "devuelve": "boolean; nota = { atendida: boolean; fechaRecordatorio: Date|null }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Garantiza que el informe diga lo mismo que la pantalla: vencida se deriva contra la hora del informe, no contra una columna rancia."
+ },
+ {
+  "dato": "Las cuatro categorias fijas de la bitacora, con su etiqueta y su ayuda",
+  "funcion": "CATEGORIAS_NOTA",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\notas.ts",
+  "devuelve": "readonly { valor: \"FINANCIERO\"|\"LOGISTICA\"|\"OPERATIVO\"|\"LEGAL\"; titulo: string; icono: LucideIcon; ayuda: string }[]",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite agrupar la bitacora del informe por naturaleza del problema (dinero, logistica, operacion, legal) con las mismas etiquetas de la app."
+ },
+ {
+  "dato": "Los archivos colgados de una nota (contrato, factura escaneada, foto del hallazgo)",
+  "funcion": "archivoAdjuntoNota(sesion, adjuntoId) — el listado ya viaja dentro de listarNotas",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\notas.service.ts",
+  "devuelve": "Promise<{ contenido: Buffer; mimeType: string; nombreOriginal: string } | { error: \"no\" }>. Acepta JPG, PNG, WebP y PDF hasta 10 MB (TAMANO_MAXIMO_ADJUNTO)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Deja anexar al informe el documento que respalda una nota, en vez de citarla de oidas."
+ },
+ {
+  "dato": "Los hitos marcados de la obra, con su fecha, su ancla al presupuesto y quien responde",
+  "funcion": "listarHitos(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\hitos.service.ts",
+  "devuelve": "Promise<HitoListado[]> = { uid: number; nombre: string; fecha: string \"YYYY-MM-DD\" (del cronograma vigente); anclaCodigo: string|null; diasAviso: number; responsableClave: string|null (\"u:<id>\"/\"c:<id>\"); responsableNombre: string|null (null si esa persona causo baja) }[]",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Las fechas clave con nombre y apellidos al lado. Es el bloque que hoy le falta al informe entre 'avance' y 'alertas'."
+ },
+ {
+  "dato": "Estado de cada hito y cuantos dias se corrio contra la linea base",
+  "funcion": "filasHitos(vigentes, base, fechaCorte) — CALCULO SIN SERVICIO: hoy se compone dentro de la pagina del cronograma (lineas 125-140), cruzando obtenerCronograma + lineaBaseCronograma",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\hitos.ts (compuesto en c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\app\\(dashboard)\\obras\\[id]\\cronograma\\page.tsx)",
+  "devuelve": "FilaHito[] = { uid: number; nombre: string; finVigente: Date; finBase: Date|null; desviacionDias: number|null (positivo = se corrio a mas tarde); estado: \"cumplido\"|\"en_plazo\"|\"vencido\"; cumplido: boolean }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es el indicador de plazo que mas se entiende sin explicar nada: 'fin de estructuras se corrio 12 dias'. Para el informe habria que sacarlo de la pagina a un servicio."
+ },
+ {
+  "dato": "Que hitos merecen aviso hoy: se acercan o vencieron sin cumplirse",
+  "funcion": "avisosDeHitos(hitos, hoy, diasRecordatorio) — alimentado por hitosQueTocanHoy, que NO esta exportada (es privada de avisos-reloj.ts, lineas 525-592)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\avisos-hitos.ts (composicion en c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\avisos-reloj.ts)",
+  "devuelve": "AvisoDeHito[] = { uid: number; nombre: string; fecha: string; evento: \"HITO_CERCA\"|\"HITO_VENCIDO\"; diasParaLaFecha: number (0 = hoy, negativo = vencido); responsableClave: string|null }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da la seccion 'lo que se viene encima antes del proximo corte', que es exactamente para lo que se lee un informe de obra."
+ },
+ {
+  "dato": "El texto ya redactado de un hito, diciendo que se rompe si no se atiende",
+  "funcion": "textoDeHito(aviso) y textoSmsDeHito(obra, aviso)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\avisos-hitos.ts",
+  "devuelve": "textoDeHito: { titulo: string; cuerpo: string }; textoSmsDeHito: string de 160 caracteres como maximo, sin tildes ni enlaces",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "El informe puede reusar la misma frase que ya recibe la obra por correo y SMS, en vez de inventar una redaccion distinta que contradiga a la otra."
+ },
+ {
+  "dato": "Hitos que GCM propone marcar, con su motivo con cifra dentro",
+  "funcion": "hitosPropuestos(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\hitos-predictivos.service.ts",
+  "devuelve": "Promise<Prediccion> = { propuestas: { regla: Regla; uid: number; anclaCodigo: string|null; titulo: string; motivo: string (con la cifra: «sin avance desde el 12/08, 7 dias habiles»); fechaSugerida: \"YYYY-MM-DD\"; severidad: \"avisar\"|\"urgente\" }[]; sinDato: SinDato[] }. Solo LEE, no escribe ninguna fila",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Senala donde la obra se esta estancando aunque nadie haya marcado un hito ahi; los `sinDato` ademas explican que le falta a GCM para poder opinar."
+ },
+ {
+  "dato": "Quien puede responder de un hito: equipo de la obra primero, contactos externos despues",
+  "funcion": "personasParaResponsable(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\hitos.service.ts",
+  "devuelve": "Promise<PersonaPosible[]> = { clave: string (\"u:\"+userId o \"c:\"+contactoId); nombre: string; externo: boolean }[]. Solo gente viva (usuario ACTIVO, contacto activo)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Da la lista de a quien hay que perseguir por cada fecha clave, separando lo interno de lo que depende de terceros."
+ },
+ {
+  "dato": "Lo ultimo que ha pasado, en frases legibles (quien hizo que, cuando y en que obra)",
+  "funcion": "listarActividad(sesion, limite = 8)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\actividad.service.ts",
+  "devuelve": "Promise<ActividadReciente[]> = { id: string; cuando: Date; autor: string|null; obra: { id: string; nombre: string }|null; texto: string; tono: TonoChip }[]. OJO: no acepta obraId — filtra por empresa y por el alcance de obras de la sesion, y descarta LOGIN/LOGOUT/PASSWORD_*",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Es la cronologia de decisiones del periodo (ordenes aprobadas, revisiones, movimientos). Para el informe habria que anadirle un filtro por obra: AuditLog ya tiene indice (projectId, createdAt)."
+ },
+ {
+  "dato": "Traduccion de una fila de auditoria a una frase con color",
+  "funcion": "describirActividad(entrada)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\actividad.ts",
+  "devuelve": "{ texto: string; tono: TonoChip }; entrada = { entidad: string; accion: string; antes?: unknown; despues?: unknown }. Reconoce OrdenCompra, MovimientoPresupuestal, Project, Proveedor, Baseline, WbsItem, FormaPagoPlantilla, MensajeContratista, CompanyPermission y Nota, y distingue la anulacion mirando despues.estado",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Convierte el rastro tecnico en un parrafo que se lee: 'Orden 000123 aprobada', 'Revision 4 registrada'. Es logica pura y probada."
+ },
+ {
+  "dato": "Rastro de auditoria de ESTA obra en el periodo del informe (materia prima sin funcion)",
+  "funcion": "NO HAY funcion reutilizable: se consulta a mano con prisma.auditLog.findMany en actividad.service.ts (linea 50); el modelo ya tiene @@index([projectId, createdAt])",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\prisma\\schema.prisma (model AuditLog, lineas 2129-2153)",
+  "devuelve": "Filas AuditLog { id; companyId; userId: string|null; projectId: string|null; entidad: VarChar(60); entidadId: VarChar(40); accion: AuditAction; antes: Json?; despues: Json?; ip; userAgent; createdAt }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Permite un bloque 'que se decidio entre este corte y el anterior' con fecha y firma, sin anadir una sola tabla nueva."
+ },
+ {
+  "dato": "El equipo de GCM asignado a la obra y desde cuando",
+  "funcion": "listarEquipo(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\equipo.service.ts",
+  "devuelve": "Promise<MiembroObra[]> = { userId; nombre; email; role: Role; etiquetaRol: string; asignado: boolean; veTodo: boolean; desde: Date|null }[]. Devuelve [] sin permiso obra:asignar_equipo (ojo: ese permiso es de reparto, no de lectura)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Pone en la portada quien esta a cargo de la obra y desde cuando, que es la primera pregunta de quien recibe el informe."
+ },
+ {
+  "dato": "Personal de campo con pase, y cuantas fotos ha aportado cada uno",
+  "funcion": "listarPases(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\pase.service.ts",
+  "devuelve": "Promise<PaseLista[]> = { id; nombres; apellidos; cargo: string|null; empresa: string|null; celular: string|null; email: string|null; activo: boolean; createdAt: Date; fotos: number (_count de FotoEvidencia); conAcceso: boolean (tiene sesion viva) }[]",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Mide quien esta documentando de verdad en campo —incluidos subcontratistas sin cuenta— y de que empresa es cada uno."
+ },
+ {
+  "dato": "Ficha de la obra: correlativo, codigo, cliente, estado, plazo contractual, dia de corte y version de linea base",
+  "funcion": "obtenerObra(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\obras.service.ts",
+  "devuelve": "Promise<ObraDetalle|null> = { id; codigoObra: string|null; correlativo: string|null; nombreObra; ubicacion: string|null; cliente: string|null; estado: string; fechaInicio: Date; fechaFinProgramada: Date; diaCorteSemanal: number (ISO 1..7); lineaBaseVersion: number|null; motivoParalizacion: string|null; fechaEstimadaReanudacion: Date|null }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "El informe hoy solo se lleva nombreObra y ubicacion: correlativo, cliente, estado, plazo contractual y version de linea base son la cabecera que ahora falta."
+ },
+ {
+  "dato": "Por que esta parada la obra y cuando se espera reanudarla",
+  "funcion": "obtenerObra (campos motivoParalizacion y fechaEstimadaReanudacion); Project.paralizadaEn existe en base pero NO lo expone ninguna funcion",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\obras.service.ts (modelo en prisma\\schema.prisma, lineas 905-919)",
+  "devuelve": "motivoParalizacion: string|null (VarChar 300, obligatorio al paralizar); fechaEstimadaReanudacion: Date|null; paralizadaEn: DateTime|null (solo en base)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Explica un avance plano sin que nadie tenga que preguntarlo, y es el dato que convierte un informe malo en un informe honesto."
+ },
+ {
+  "dato": "Que fases del ciclo tiene ya cargadas la obra (presupuesto, cronograma, linea base, Lookahead, PTS, meta, equipo)",
+  "funcion": "hitosDeObra(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\obras.service.ts",
+  "devuelve": "Promise<HitosObra> = { presupuesto; cronograma; lineaBase; revision; lookahead; planSemanal; meta; metaCargada; equipo; equipoAsignable } — diez booleanos, siete findFirst que solo piden id, en cache() por peticion",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Dice de un vistazo si las cifras del informe se apoyan en algo: sin linea base el plazo se mide contra si mismo y todo parece ir al dia."
+ },
+ {
+  "dato": "Presupuesto, comprometido y partidas sobregiradas de la obra",
+  "funcion": "listarObras(sesion, filtros) — por pagina de obras; no hay una funcion 'resumen economico de UNA obra' en este archivo",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\obras.service.ts",
+  "devuelve": "Promise<Pagina<ObraResumen>>; ObraResumen = { id; codigoObra; correlativo; nombreObra; ubicacion; estado; fechaInicio; fechaFinProgramada; presupuestoTotal: string; totalPartidas: number; comprometido: string; partidasSobregiradas: number } — todos los importes como string decimal",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Pone el dinero al lado del avance fisico: el informe hoy mide plazo y no dice cuanto se lleva comprometido ni cuantas partidas se pasaron."
+ },
+ {
+  "dato": "Alertas vivas que tocan a la obra: partidas sobregiradas y plazo vencido, con el texto ya escrito",
+  "funcion": "listarAlertasEmpresa(sesion)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\obras.service.ts",
+  "devuelve": "Promise<AlertaEmpresa[]> = { obraId: string|null; obraNombre: string; clave: \"sobregiro\"|\"plazo\"|\"emisor-dormido\"|\"despliegue-pendiente\"; texto: string (p.ej. «El plazo vencio hace 12 dia(s)»); camino: string }[]. Comparte cache() de peticion con obtenerResumenEmpresa",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "El informe ya lleva alertas de ATRASO de tareas; estas son las de dinero y de plazo contractual, que son de otro tipo y hoy no aparecen."
+ },
+ {
+  "dato": "Cifras de la constructora: obras, obras en ejecucion, presupuesto, comprometido, saldo y plazos vencidos",
+  "funcion": "obtenerResumenEmpresa(sesion)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\obras.service.ts",
+  "devuelve": "Promise<ResumenEmpresa> = { obras: number; obrasEnEjecucion: number; presupuestoTotal: string; comprometido: string; saldo: string; partidasSobregiradas: number; obrasConPlazoVencido: number }. El dinero solo de ESTADOS_OBRA_CON_EXPOSICION (EN_EJECUCION + PARALIZADA)",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Sirve para encuadrar la obra dentro de la cartera —cuanto pesa— en un informe dirigido a gerencia y no al residente."
+ },
+ {
+  "dato": "Arbol del presupuesto con subtotales por capitulo y monto total por regla de hojas",
+  "funcion": "listarPartidas(sesion, obraId)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\obras.service.ts",
+  "devuelve": "Promise<ArbolPartidas> = { filas: { id; parentId; codigoPartida; tipo: CAPITULO|PARTIDA; modalidad: PRECIOS_UNITARIOS|SUMA_ALZADA|ALCANCE; descripcion; nivel; unidad; metrado; precioUnitario; parcial }[]; totalPartidas: number; montoTotal: string }. Los subtotales salen de subtotalesPorRama, el mismo algoritmo que decide el costo directo",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "El informe agrupa capitulos del CRONOGRAMA; esto da los mismos capitulos con su plata, para poner avance y dinero en la misma tabla."
+ },
+ {
+  "dato": "Que le falta a la obra para poder cerrarse, con la consecuencia de cerrarla sin eso",
+  "funcion": "requisitosParaCerrar(estado) y puedeCerrar(faltan) — los conteos que los alimentan se calculan hoy dentro de cambiarEstadoObra (obras.service.ts, lineas 1538-1573)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\obras.ts",
+  "devuelve": "RequisitoObra[] = { clave: \"valorizaciones\"|\"movimientos_borrador\"|\"pendientes_criticos\"; falta: string; consecuencia: string; bloqueante: boolean }; entrada = { valorizacionesPendientes: number; movimientosBorrador: number; pendientesCriticos: number }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "En una obra que termina, es la lista de cabos sueltos que impiden cerrarla; ya viene redactada con su consecuencia."
+ },
+ {
+  "dato": "Por que la obra no admite cambios (cerrada, paralizada, copia de respaldo o empresa en migracion)",
+  "funcion": "motivoNoAdmiteCambios(obra, opciones) y obraAdmiteCambios(obra, opciones)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\obras.ts",
+  "devuelve": "string|null con el motivo ya redactado (OBRA_CERRADA, OBRA_PARALIZADA, OBRA_ARCHIVADA, EMPRESA_EN_MIGRACION); obra = { estado: string; archivadaEn?: Date|null; empresaEnMigracion?: boolean }",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Deja marcar el informe como 'foto de una obra congelada' —o de una copia de auditoria— en vez de presentarlo como estado vivo."
+ },
+ {
+  "dato": "Como se escribe y de que color va el estado de la obra",
+  "funcion": "ETIQUETA_ESTADO_OBRA, TONO_ESTADO_OBRA, etiquetaTransicionObra(desde, hacia), formatearCorrelativoObra(numero)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\lib\\obras.ts",
+  "devuelve": "Record<EstadoObra, string> (\"En ejecucion\", \"Paralizada\"...); Record<EstadoObra, \"neutro\"|\"curso\"|\"exito\"|\"alerta\"|\"peligro\">; string; \"OB-000001\"",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Evita que el informe imprima EN_EJECUCION en crudo o pinte 'Cerrada' en rojo cuando es el final natural de una obra."
+ },
+ {
+  "dato": "Ficha fiscal y de contacto de la constructora: RUC, direccion, telefono, correo, representante legal y su cargo",
+  "funcion": "obtenerEmpresa(sesion)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\empresa.service.ts",
+  "devuelve": "Promise<DatosEmpresa|null> = { razonSocial: string; ruc: string; direccion: string|null; telefono: string|null; email: string|null; representanteLegal: string|null; cargoRepresentante: string|null; observacionesOrden: string|null }. componerInforme YA la llama pero descarta todo menos razonSocial",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "Un informe que sale a un tercero necesita cabecera con RUC y pie con quien firma; los datos ya estan cargados y hoy se tiran."
+ },
+ {
+  "dato": "El logo de la empresa listo para el papel",
+  "funcion": "bytesDelLogo(companyId) y logoDeEmpresa(sesion)",
+  "archivo": "c:\\Projects\\PROYECTO_CONSTRUCCION\\src\\services\\logo.service.ts",
+  "devuelve": "bytesDelLogo: Promise<{ contenido: Buffer; mime: \"image/png\"|\"image/jpeg\" }|null>; logoDeEmpresa: Promise<{ src: string (/api/logo?v=<hash>); alt: string; ancho: number; alto: number }|null> con el tamano REAL medido de los bytes",
+  "yaSaleEnElInforme": false,
+  "valorParaElInforme": "El PDF ya lo pide por su cuenta en la ruta de descarga, pero NO viaja dentro de InformeCompuesto: la pantalla y el correo del informe no lo tienen, y el ancho/alto real evita deformarlo."
+ }
+]

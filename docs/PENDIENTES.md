@@ -3,7 +3,84 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 21 de agosto de 2026.
+Ultima revision: 23 de agosto de 2026.
+
+## Plantillas del informe de obra (23 de agosto de 2026) — DISENO LISTO, CODIGO SIN EMPEZAR
+
+**Casi se pierde entero.** El trabajo se hizo la noche del 22 en una sesion que
+murio a mitad de la reparacion, y no estaba anotado en ninguna parte: hubo que
+rescatarlo rastreando transcripciones archivadas. Por eso ahora vive en
+`docs/informe-plantillas/`, versionado, y no solo en una carpeta temporal.
+
+**Que se pidio.** Que el informe de obra pueda generarse a partir de PLANTILLAS
+—mejorable, adaptable, configurable— con salida en PDF. Se propusieron cinco
+disenos; el usuario respondio senalando sus DOS informes reales de Larquitectura
+Studio: "asi y hasta mejor que estos quiero como plantillas", y despues
+"conserva lo que ya expone y propon mejoras adicionales".
+
+**Que hay hecho.** Cinco hojas A4 dibujadas sobre el corte real del 08/08/2026 de
+la obra CRIOCORD, publicadas en el artefacto
+`https://claude.ai/code/artifact/82b38cb0-e6c4-45e0-948d-e6ec4761fa01`:
+
+| Hoja | Origen | Veredicto del revisor |
+|---|---|---|
+| Portada | del cliente | listo con detalles |
+| Dashboard de control | del cliente | listo con detalles |
+| Cronograma tipo MS Project | del cliente | listo con detalles |
+| Bitacora fotografica diaria | del cliente | listo con detalles |
+| Control economico y Last Planner | **nueva, la aporta GCM** | listo con detalles (2a pasada) |
+
+Cada hoja paso por un revisor independiente que la comparo elemento por elemento
+contra el informe original. Todas las cifras son las reales del 08/08; ninguna
+queda del corte inventado del 22/08 de la primera version.
+
+**El catalogo, que es el hallazgo que sobrevive aunque se tire el diseno**
+(`docs/informe-plantillas/catalogo-datos.json`): **176 datos que GCM ya calcula,
+158 de ellos ausentes del informe actual** — EVM completo (SPI, CPI, EAC), Pareto
+de causas de incumplimiento, inventario de trabajo ejecutable, cuentas de
+encargos, cascada del presupuesto.
+
+**Tres decisiones que costaron una pasada entera y conviene no repetir:**
+
+- **La obra CRIOCORD no tiene NINGUNA semana de Last Planner cerrada al corte.**
+  No hay PPC, ni causas, ni Pareto. La primera version de la hoja de control lo
+  tapo dibujando un PPC de muestra, y por eso el revisor la reprobo. La version
+  buena dibuja esa mitad como ESTADO VACIO honesto: la estructura real que
+  tendra, con la marca "sin datos" y la explicacion de que se llenara sola al
+  cerrar la primera semana. **Regla: un dato que no existe no se rellena, se
+  dibuja vacio.**
+- **La hoja nueva no puede repetir la hoja 1.** La primera version duplicaba seis
+  bloques del dashboard. Lo que la justifica es el cruce que ninguna otra hoja
+  hace: **11 % de avance fisico contra 26.34 % de presupuesto comprometido**, los
+  15.34 puntos de distancia que GCM llama sobregiro proyectado.
+- **Cuatro datos son del cliente y GCM no los guarda en ningun campo**: RUC
+  20601689988, colegiatura CAP 32467 del residente, la direccion de Km 29.5 y el
+  nombre de programa "PROGRAMACION EP". Van marcados `data-manual="true"` en el
+  HTML. **Decision pendiente: se anaden al modelo o se teclean una vez.**
+
+**LO QUE FALTA, Y ES TODO EL CODIGO.** Hoy esto es HTML de diseno, no una
+funcionalidad. Para que salga como PDF de verdad:
+
+- GCM genera PDF en el servidor con `pdf-lib` (`lib/informe-pdf.ts`), a proposito:
+  el hosting no puede correr Chromium. El modelo de dibujo ya esta abstraido en
+  `ElementoPdf` (`lib/informe-documento.ts`).
+- Haria falta ampliar `ElementoPdf` con **arcos** (el donut de avance),
+  **rectangulos con color** e **imagenes** (las fotos de la bitacora), y anadir
+  **`@pdf-lib/fontkit`** si se quiere conservar la Montserrat ligera de los
+  titulos — hoy solo estan las catorce fuentes estandar de PDF.
+- El informe compuesto ya existe y no hay que rehacerlo: `componerInforme`
+  (`informe.service.ts`) alimenta las tres puertas actuales (pantalla que se
+  imprime, descarga PDF/Excel/CSV, envio por correo). Las plantillas serian una
+  forma nueva de PINTAR ese mismo informe, no una consulta nueva.
+- **Sin decidir**: si la plantilla se elige por empresa, por obra o por descarga;
+  y si las secciones se pueden apagar una a una.
+
+**Detalles menores que el revisor dejo anotados y no se arreglaron**: en la hoja
+de control, el estado vacio de Last Planner ocupa ~40 % del papel (honesto, pero
+mucho papel para cero informacion) y no hay cruce fisico-economico POR CAPITULO,
+solo global.
+
+---
 
 ## Lo que dejo la tarde del 21 de agosto: auditoria del tablero y la cola que sigue
 

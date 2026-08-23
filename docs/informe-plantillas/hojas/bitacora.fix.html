@@ -1,0 +1,322 @@
+<article class="hoja hoja-bitacora" style="width:794px;height:1123px">
+  <style>
+    .hoja-bitacora *{box-sizing:border-box;margin:0;padding:0}
+    .hoja-bitacora .lienzo{width:100%;height:100%;padding:24px 38px 16px;background:var(--papel);
+      font-family:"Plus Jakarta Sans",system-ui,sans-serif;color:var(--tinta);
+      -webkit-font-smoothing:antialiased;overflow:hidden}
+
+    /* ================= CABECERA (original) ================= */
+    .hoja-bitacora .regla-fuerte{height:2.5px;background:var(--tinta)}
+    .hoja-bitacora .regla-corrida{height:2.5px;background:var(--tinta);margin:9px 0 0 11%}
+    .hoja-bitacora .titulo{margin-top:11px;text-align:right}
+    .hoja-bitacora .titulo span{display:block;font-family:"Montserrat",system-ui,sans-serif;
+      font-weight:200;font-size:34px;line-height:37px;letter-spacing:.30em;margin-right:-.30em;
+      color:var(--tinta)}
+
+    /* El numero de semana va MONTADO a la altura de la regla corrida, en el
+       hueco que la regla deja libre a su izquierda: de ahi el margen negativo. */
+    .hoja-bitacora .cabecera{display:flex;align-items:flex-start;margin-top:-30px}
+    .hoja-bitacora .semana{width:11%;flex:0 0 11%;font-family:"Montserrat",system-ui,sans-serif;
+      font-weight:200;font-size:64px;line-height:.82;color:var(--tinta-3);letter-spacing:-.015em;
+      white-space:nowrap;overflow:hidden}
+    .hoja-bitacora .datos{padding-top:34px;min-width:0}
+    .hoja-bitacora .obra-serif{font-family:"Newsreader",Georgia,serif;font-style:italic;font-weight:400;
+      font-size:9px;line-height:1.35;letter-spacing:.20em;color:var(--tinta-2)}
+    .hoja-bitacora .dia-laboral{margin-top:4px;font-size:13px;line-height:1.15;font-weight:700;
+      letter-spacing:.02em;color:var(--tinta)}
+    .hoja-bitacora .ficha{margin-top:3px;font-size:10px;line-height:1.45;color:var(--tinta-2)}
+    .hoja-bitacora .ficha b{font-weight:500}
+
+    /* ====== MEJORA · situacion de la obra al corte de control ====== */
+    .hoja-bitacora .contexto{margin-top:10px;border-top:1px solid var(--linea);
+      border-bottom:1px solid var(--linea-suave);padding:5px 0 4px}
+    .hoja-bitacora .cx-fila{display:flex}
+    .hoja-bitacora .cx{flex:1 1 0;padding:0 10px;border-left:1px solid var(--linea-suave);min-width:0}
+    .hoja-bitacora .cx:first-child{flex:1.6 1 0;padding-left:0;border-left:0}
+    .hoja-bitacora .cx-r{display:block;font-size:7px;letter-spacing:.14em;text-transform:uppercase;
+      color:var(--tinta-2);line-height:1.4;white-space:nowrap}
+    .hoja-bitacora .cx-v{display:block;font-weight:600;font-size:11px;line-height:1.3;
+      color:var(--tinta);margin-top:2px;white-space:nowrap}
+    .hoja-bitacora .cx-v i{font-style:normal;color:var(--tinta-2);font-size:8.5px;font-weight:500}
+    .hoja-bitacora .cx-v.acento{color:var(--marca)}
+    /* Barra con la misma convencion que los capitulos del informe original:
+       relleno = REAL, marca vertical = PLANEADO. */
+    .hoja-bitacora .pista{position:relative;height:3px;background:var(--linea-suave);margin-top:7px}
+    .hoja-bitacora .pista .real{position:absolute;left:0;top:0;bottom:0;width:11%;background:var(--marca)}
+    .hoja-bitacora .pista .plan{position:absolute;left:11%;top:-3px;bottom:-3px;width:2px;
+      background:var(--tinta)}
+
+    /* ================= GALERIA (original) ================= */
+    .hoja-bitacora .galeria{margin-top:9px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .hoja-bitacora .foto{position:relative;aspect-ratio:4/3;border-radius:4px;overflow:hidden;
+      background:linear-gradient(158deg,#d8d3ca 0%,#bcb6ab 40%,#8d8981 74%,#6d6a64 100%)}
+    .hoja-bitacora .foto::after{content:"";position:absolute;inset:0;
+      background:repeating-linear-gradient(38deg,rgba(255,255,255,.06) 0 3px,rgba(0,0,0,.05) 3px 7px)}
+    .hoja-bitacora .foto.f2{background:linear-gradient(200deg,#cfcabf 0%,#a9a49a 45%,#7f7b74 78%,#5f5c57 100%)}
+    .hoja-bitacora .foto.f3{background:linear-gradient(172deg,#e2ded6 0%,#c6c0b4 42%,#9a958c 76%,#75726c 100%)}
+    .hoja-bitacora .foto.f4{background:linear-gradient(145deg,#cdc6b8 0%,#b0a897 44%,#867f70 76%,#635e53 100%)}
+    .hoja-bitacora .foto.f5{background:linear-gradient(190deg,#d5d1c9 0%,#b4afa5 40%,#88847c 72%,#65625d 100%)}
+    .hoja-bitacora .foto.f6{background:linear-gradient(160deg,#dcd6c9 0%,#bdb5a4 46%,#918a7c 78%,#6b665c 100%)}
+    .hoja-bitacora .geo{position:absolute;left:5px;bottom:5px;z-index:2;
+      background:color-mix(in srgb,var(--tinta) 62%,transparent);
+      color:var(--papel);padding:3px 5px;border-radius:2px;font-size:5px;line-height:1.55;
+      letter-spacing:.02em}
+    .hoja-bitacora .geo b{font-weight:600}
+
+    /* ================= TRABAJO REALIZADO (original) ================= */
+    .hoja-bitacora .trabajo{margin-top:11px}
+    .hoja-bitacora .rotulo-trabajo{font-size:11px;line-height:1.2;letter-spacing:.22em;
+      text-transform:uppercase;color:var(--tinta-2);font-weight:400}
+    .hoja-bitacora .vinetas{list-style:none;margin-top:5px}
+    .hoja-bitacora .vinetas li{position:relative;padding-left:12px;font-size:9px;line-height:1.65;
+      color:var(--tinta);margin-bottom:2px}
+    .hoja-bitacora .vinetas li::before{content:"\2022";position:absolute;left:1px;top:0;
+      color:var(--tinta-3)}
+
+    /* ====== MEJORA · partidas en ejecucion al corte ====== */
+    .hoja-bitacora .rotulo-min{display:block;font-size:8px;letter-spacing:.18em;text-transform:uppercase;
+      color:var(--tinta-2);font-weight:600;line-height:1.5}
+    .hoja-bitacora .partidas{margin-top:11px;border-top:1px solid var(--linea);padding-top:5px}
+    .hoja-bitacora .tabla{width:100%;border-collapse:collapse;margin-top:3px;table-layout:fixed}
+    .hoja-bitacora .tabla th{font-size:7.5px;letter-spacing:.06em;color:var(--tinta-2);
+      font-weight:400;text-align:left;padding:0 0 3px;border-bottom:1px solid var(--linea);
+      line-height:1.2}
+    .hoja-bitacora .tabla td{font-size:8.5px;line-height:1.25;color:var(--tinta);padding:3px 0;
+      border-bottom:1px solid var(--linea-suave);vertical-align:baseline;overflow:hidden;
+      white-space:nowrap;text-overflow:ellipsis}
+    .hoja-bitacora .tabla .der{text-align:right}
+    .hoja-bitacora .tabla .id{color:var(--tinta-3)}
+    .hoja-bitacora .tabla .fechas{color:var(--tinta-2)}
+    .hoja-bitacora .tabla .plan{text-align:right;color:var(--tinta-2)}
+    /* % Real: terracota cuando alcanza o supera al plan, negro negrita si va por debajo. */
+    .hoja-bitacora .tabla .real{text-align:right;font-weight:700;color:var(--marca)}
+    .hoja-bitacora .tabla .real.baja{color:var(--tinta)}
+
+    /* ====== MEJORA · alertas de atraso vigentes al corte ====== */
+    .hoja-bitacora .alertas{margin-top:10px}
+    .hoja-bitacora .cab-min{display:flex;align-items:center;gap:5px}
+    .hoja-bitacora .cab-min svg{flex:0 0 auto}
+    .hoja-bitacora .tarjetas{display:flex;gap:8px;margin-top:5px}
+    .hoja-bitacora .tarjeta{flex:1 1 0;min-width:0;background:var(--gris-caja);padding:8px 10px}
+    .hoja-bitacora .tarjeta .desc{font-size:8.5px;line-height:1.35;color:var(--tinta)}
+    .hoja-bitacora .tarjeta .pie{display:flex;justify-content:space-between;align-items:baseline;
+      gap:8px;margin-top:4px}
+    .hoja-bitacora .tarjeta .sev{font-size:7.5px;font-weight:700;letter-spacing:.10em;
+      text-transform:uppercase}
+    .hoja-bitacora .sev-critico{color:var(--peligro)}
+    .hoja-bitacora .sev-bajo{color:var(--alerta-tinta)}
+    .hoja-bitacora .tarjeta .desfase{font-size:9px;font-weight:700;color:var(--tinta)}
+
+    /* ====== MEJORA · cierre de conformidad de la jornada ====== */
+    .hoja-bitacora .conformidad{margin-top:11px;border-top:2.5px solid var(--tinta);padding-top:6px}
+    .hoja-bitacora .firmas{display:flex;gap:16px;margin-top:6px}
+    .hoja-bitacora .firma{flex:1 1 0;min-width:0}
+    .hoja-bitacora .firma .espacio{height:12px}
+    .hoja-bitacora .firma .raya{border-top:1px solid var(--tinta-2)}
+    .hoja-bitacora .firma .rol{font-size:7px;line-height:1.4;letter-spacing:.14em;text-transform:uppercase;
+      color:var(--tinta-2);margin-top:3px}
+    .hoja-bitacora .firma .nom{font-size:8.5px;line-height:1.4;font-weight:600;color:var(--tinta);
+      overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+    .hoja-bitacora .firma .sub{font-size:7.5px;line-height:1.4;color:var(--tinta-2)}
+    .hoja-bitacora .pie-hoja{margin-top:6px;border-top:1px solid var(--linea-suave);padding-top:3px;
+      display:flex;justify-content:space-between;gap:12px;font-size:7.5px;line-height:1.3;
+      letter-spacing:.10em;text-transform:uppercase;color:var(--tinta-3)}
+  </style>
+
+  <div class="lienzo">
+
+    <div class="regla-fuerte"></div>
+
+    <div class="titulo">
+      <span>I N F O R M E</span>
+      <span>D E &nbsp; O B R A</span>
+    </div>
+
+    <div class="regla-corrida"></div>
+
+    <div class="cabecera">
+      <div class="semana">S1</div>
+      <div class="datos">
+        <div class="obra-serif">OBRA LABORATORIOS INSTITUTO DE</div>
+        <div class="obra-serif">CRIOPRESERVACIÓN Y TERAPIA CELULAR</div>
+        <div class="dia-laboral">DÍA LABORAL 4 &nbsp; 04/08/2026</div>
+        <div class="ficha" data-manual="true"><b>Dirección :</b> Carretera Panamericana Sur Km 29.5, Lima</div>
+        <div class="ficha"><b>Fecha :</b> 31 de Julio al 08 de Agosto del 2026</div>
+      </div>
+    </div>
+
+    <!-- MEJORA: situacion de la obra al corte de control -->
+    <div class="contexto" data-nuevo="true">
+      <div class="cx-fila">
+        <div class="cx"><span class="cx-r">Plazo contractual</span><span class="cx-v">01.08.26 <i>al</i> 05.10.26</span></div>
+        <div class="cx"><span class="cx-r">Corte de control</span><span class="cx-v">08.08.26</span></div>
+        <div class="cx"><span class="cx-r">Avance real</span><span class="cx-v acento">11 <i>%</i></span></div>
+        <div class="cx"><span class="cx-r">Avance planeado</span><span class="cx-v">11 <i>%</i></span></div>
+        <div class="cx"><span class="cx-r">Desviación</span><span class="cx-v acento">+0.0 <i>%</i></span></div>
+      </div>
+      <div class="pista">
+        <div class="real"></div>
+        <div class="plan"></div>
+      </div>
+    </div>
+
+    <div class="galeria">
+
+      <div class="celda">
+        <div class="foto f1">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+      <div class="celda">
+        <div class="foto f2">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+      <div class="celda">
+        <div class="foto f3">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+      <div class="celda">
+        <div class="foto f4">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+      <div class="celda">
+        <div class="foto f5">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+      <div class="celda">
+        <div class="foto f6">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <section class="trabajo">
+      <div class="rotulo-trabajo">Trabajo realizado :</div>
+      <ul class="vinetas">
+        <li>Se ejecutó el tendido y la canalización de la red eléctrica, con tubería tipo conduit y cajas de paso, en la Zona 1 del primer nivel.</li>
+        <li>Se habilitó la carpintería metálica de la Zona 2 en taller externo; su llegada a obra se encuentra prevista para el 10/08.</li>
+        <li>Se habilitó la carpintería metálica de refuerzo de la Zona 1, segundo nivel, con llegada a obra prevista para el 14/08.</li>
+        <li>Se realizó la eliminación de desmonte de la contrata de drywall, con segregación y acopio de las baldosas reutilizables.</li>
+        <li>Se efectuó la excavación manual de zanjas de desagüe y el ensacado del material excedente.</li>
+        <li>Se efectuó el trazo y replanteo de la Zona 1, segundo nivel.</li>
+      </ul>
+    </section>
+
+    <!-- MEJORA: partidas en ejecucion al corte, con su planeado y su real -->
+    <section class="partidas" data-nuevo="true">
+      <span class="rotulo-min">Partidas activas al corte de control</span>
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th style="width:26px">ID</th>
+            <th>Descripción de Tarea</th>
+            <th style="width:88px">Fechas</th>
+            <th style="width:48px" class="der">% Plan</th>
+            <th style="width:48px" class="der">% Real</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="id">25</td>
+            <td>3.3 Eliminación de material excedente</td>
+            <td class="fechas">08/08 - 10/08</td>
+            <td class="plan">63%</td>
+            <td class="real">100%</td>
+          </tr>
+          <tr>
+            <td class="id">30</td>
+            <td>4.4 Solados para zapatas, acero corrugado y vaciado</td>
+            <td class="fechas">07/08 - 10/08</td>
+            <td class="plan">83%</td>
+            <td class="real baja">30%</td>
+          </tr>
+          <tr>
+            <td class="id">46</td>
+            <td>7.2 Nivelación cama de arena, entubado y rellenado</td>
+            <td class="fechas">06/08 - 10/08</td>
+            <td class="plan">88%</td>
+            <td class="real">100%</td>
+          </tr>
+          <tr>
+            <td class="id">47</td>
+            <td>7.3 Conexiones de TRONCAL principal desagüe</td>
+            <td class="fechas">07/08 - 10/08</td>
+            <td class="plan">81%</td>
+            <td class="real">81%</td>
+          </tr>
+          <tr>
+            <td class="id">48</td>
+            <td>7.3.1 Conexiones de agua y desagüe general</td>
+            <td class="fechas">10/08 - 15/08</td>
+            <td class="plan">0%</td>
+            <td class="real">10%</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- MEJORA: alertas de atraso vigentes al corte -->
+    <section class="alertas" data-nuevo="true">
+      <div class="cab-min">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--tinta-2)" stroke-width="1.2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9.2"/><path d="M12 7.6v5.2"/><path d="M12 16.4h.01"/>
+        </svg>
+        <span class="rotulo-min">Alertas de atraso</span>
+      </div>
+      <div class="tarjetas">
+        <div class="tarjeta">
+          <div class="desc">4.4 Solados para zapatas, acero corrugado y vaciado</div>
+          <div class="pie"><span class="sev sev-critico">Crítico</span><span class="desfase">-2 días</span></div>
+        </div>
+        <div class="tarjeta">
+          <div class="desc">2.4 Trazo y Replanteo</div>
+          <div class="pie"><span class="sev sev-bajo">Bajo</span><span class="desfase">-1 día</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MEJORA: cierre de conformidad, para que la hoja valga en un expediente -->
+    <section class="conformidad" data-nuevo="true">
+      <span class="rotulo-min">Conformidad de la jornada</span>
+      <div class="firmas">
+        <div class="firma">
+          <div class="espacio"></div>
+          <div class="raya"></div>
+          <div class="rol">Residente de obra</div>
+          <div class="nom">Arq. Eduardo Pérez</div>
+          <div class="sub" data-manual="true">CAP 32467</div>
+        </div>
+        <div class="firma">
+          <div class="espacio"></div>
+          <div class="raya"></div>
+          <div class="rol">Por la contratista</div>
+          <div class="nom">LARQUITECTURA STUDIO SAC</div>
+          <div class="sub" data-manual="true">RUC N° 20601689988</div>
+        </div>
+        <div class="firma">
+          <div class="espacio"></div>
+          <div class="raya"></div>
+          <div class="rol">Conformidad de la supervisión</div>
+          <div class="nom">Nombre y firma</div>
+          <div class="sub">Fecha ___ / ___ / 2026</div>
+        </div>
+      </div>
+      <div class="pie-hoja">
+        <span data-manual="true">Proyecto : PROGRAMACIÓN EP</span>
+        <span>Corte de control : 08 de Agosto, 2026</span>
+      </div>
+    </section>
+
+  </div>
+</article>

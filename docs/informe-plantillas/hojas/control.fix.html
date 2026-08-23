@@ -1,0 +1,351 @@
+<article class="hoja hoja-control" data-nuevo="true" style="width:1123px;height:794px">
+  <style>
+    .hoja-control { box-sizing: border-box; position: relative; overflow: hidden;
+      padding: 26px 32px 20px; background: var(--papel); color: var(--tinta);
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif; font-size: 8px; line-height: 1.35;
+      display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+    .hoja-control * { box-sizing: border-box; margin: 0; padding: 0; }
+    .hoja-control svg { display: block; }
+    .hoja-control .num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+    /* ───────── cabecera ───────── */
+    .hoja-control .cab { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; padding-bottom: 11px; }
+    .hoja-control .cab-obra { min-width: 0; }
+    .hoja-control .cab-empresa { font-size: 8.5px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-3); }
+    .hoja-control .cab-titulo { font-family: "Montserrat", "Plus Jakarta Sans", system-ui, sans-serif;
+      font-weight: 300; font-size: 30px; line-height: 1.06; letter-spacing: .012em; color: var(--tinta); margin-top: 6px; }
+    .hoja-control .cab-ficha { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 8px; color: var(--tinta-2); letter-spacing: .015em; }
+    .hoja-control .cab-ficha span { white-space: nowrap; }
+    .hoja-control .cab-sep { color: var(--linea); }
+    .hoja-control .cab-meta { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-top: 3px; }
+    .hoja-control .meta-linea { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--tinta-2); white-space: nowrap; }
+    .hoja-control .meta-linea svg { width: 11px; height: 11px; color: var(--tinta-3); flex: none; }
+    .hoja-control .meta-fuerte { color: var(--tinta); font-weight: 500; }
+    .hoja-control .regla-doc { flex: 0 0 auto; height: 1px; background: var(--linea); }
+
+    /* ───────── franja del nombre de hoja ───────── */
+    .hoja-control .tira { flex: 0 0 auto; padding-top: 10px; padding-bottom: 12px; display: flex; align-items: baseline; gap: 14px; }
+    .hoja-control .tira h2 { font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px; flex: none; }
+    .hoja-control .cuadro-marca { width: 6px; height: 6px; background: var(--marca); flex: none; }
+    .hoja-control .tira-nota { font-family: "Newsreader", Georgia, serif; font-style: italic; font-size: 10.5px; color: var(--tinta-2); }
+
+    /* ───────── cuerpo en dos mitades ───────── */
+    .hoja-control .cuerpo { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 600px 1fr; gap: 24px; }
+    .hoja-control .mitad { min-width: 0; display: flex; flex-direction: column; }
+    .hoja-control .mitad-lp { border-left: 1px solid var(--linea); padding-left: 24px; }
+
+    .hoja-control .rotulo { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      border-bottom: 1px solid var(--linea); padding-bottom: 5px; margin-bottom: 12px; }
+    .hoja-control .rotulo h3 { font-size: 9px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--tinta-2); }
+    .hoja-control .rotulo svg { width: 11px; height: 11px; color: var(--tinta-3); flex: none; }
+    .hoja-control .rotulo-marca h3 { color: var(--marca); }
+    .hoja-control .rotulo-marca svg { color: var(--marca); }
+    .hoja-control .rotulo-sep { margin-top: 22px; }
+
+    /* ───────── contraste fisico / economico ───────── */
+    .hoja-control .contraste { display: grid; grid-template-columns: 118px 1fr; column-gap: 14px; }
+    .hoja-control .co-cifra { font-family: "Montserrat", system-ui, sans-serif; font-weight: 300; font-size: 30px;
+      line-height: 1; letter-spacing: -.02em; text-align: right; align-self: end; font-variant-numeric: tabular-nums; }
+    .hoja-control .co-cifra-obra { color: var(--tinta); }
+    .hoja-control .co-cifra-dinero { color: var(--marca); }
+    .hoja-control .co-k { font-size: 8px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--tinta-3); }
+    .hoja-control .co-k .co-k-suave { font-weight: 400; letter-spacing: .02em; text-transform: none; color: var(--tinta-2); }
+    .hoja-control .co-pista { position: relative; height: 14px; margin-top: 6px; background: var(--linea-suave); }
+    .hoja-control .co-rell { position: absolute; left: 0; top: 0; bottom: 0; }
+    .hoja-control .co-rell-obra { background: var(--tinta); }
+    .hoja-control .co-rell-dinero { background: var(--marca); }
+
+    .hoja-control .co-brecha { position: relative; height: 58px; }
+    .hoja-control .co-zona { position: absolute; top: 0; bottom: 0; background: var(--marca-tenue); }
+    .hoja-control .co-borde { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--marca); }
+    .hoja-control .co-etiqueta { position: absolute; top: 50%; transform: translateY(-50%); max-width: 250px; }
+    .hoja-control .co-puntos { display: block; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 15px; font-weight: 600; color: var(--marca); font-variant-numeric: tabular-nums; }
+    .hoja-control .co-puntos-k { display: block; margin-top: 2px; font-size: 8px; font-weight: 600; line-height: 1.4; letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-2); }
+
+    .hoja-control .lectura { margin-top: 16px; font-family: "Newsreader", Georgia, serif; font-size: 11.5px; line-height: 1.5; color: var(--tinta-2); }
+    .hoja-control .lectura .destaca { color: var(--tinta); font-weight: 600; }
+
+    /* ───────── cuentas de la obra ───────── */
+    .hoja-control .cuentas { display: grid; grid-template-columns: repeat(4, 1fr); }
+    .hoja-control .cuenta { padding: 0 14px; border-left: 1px solid var(--linea); }
+    .hoja-control .cuenta:first-child { padding-left: 0; border-left: 0; }
+    .hoja-control .cuenta:last-child { padding-right: 0; }
+    .hoja-control .cuenta-k { font-size: 8px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--tinta-3); }
+    .hoja-control .cuenta-n { margin-top: 7px; font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 16px; font-weight: 500; letter-spacing: -.02em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .hoja-control .cuenta-n .sol { font-size: 9.5px; font-weight: 400; color: var(--tinta-3); margin-right: 2px; }
+    .hoja-control .cuenta-riesgo .cuenta-n { color: var(--peligro); }
+    .hoja-control .cuenta-barra { position: relative; height: 3px; margin-top: 8px; background: var(--linea-suave); }
+    .hoja-control .cuenta-barra .barra-rell { position: absolute; left: 0; top: 0; bottom: 0; background: var(--marca); }
+    .hoja-control .cuenta-barra .barra-rell-suave { background: var(--linea); }
+    .hoja-control .cuenta-sub { margin-top: 7px; font-size: 8px; line-height: 1.4; color: var(--tinta-2); }
+    .hoja-control .cuenta-sub .sub-fuerte { font-weight: 600; color: var(--tinta); }
+    .hoja-control .plazo { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--linea-suave);
+      display: flex; align-items: center; gap: 8px; font-size: 8px; color: var(--tinta-2); }
+    .hoja-control .plazo svg { width: 10px; height: 10px; color: var(--tinta-3); flex: none; }
+
+    /* ───────── notas de lectura ───────── */
+    .hoja-control .glosa { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .hoja-control .glosa-t { font-size: 8px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--tinta); }
+    .hoja-control .glosa-d { margin-top: 5px; font-size: 8px; line-height: 1.5; color: var(--tinta-2); }
+
+    /* ───────── mitad Last Planner: estado vacio ───────── */
+    .hoja-control .aviso { display: flex; gap: 10px; border-left: 2px solid var(--marca); padding: 2px 0 2px 11px; }
+    .hoja-control .aviso svg { width: 13px; height: 13px; color: var(--marca); flex: none; margin-top: 1px; }
+    .hoja-control .aviso-t { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta); }
+    .hoja-control .aviso-d { margin-top: 5px; font-size: 8.5px; line-height: 1.55; color: var(--tinta-2); }
+    .hoja-control .aviso-d .destaca { color: var(--tinta); font-weight: 600; }
+
+    .hoja-control .maq { margin-top: 18px; }
+    .hoja-control .maq-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+    .hoja-control .maq-t { font-size: 8.5px; font-weight: 700; letter-spacing: .05em; color: var(--tinta); }
+    .hoja-control .maq-e { font-size: 7.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-2); white-space: nowrap; }
+    .hoja-control .maq-d { margin-top: 3px; font-size: 8px; line-height: 1.45; color: var(--tinta-2); }
+    .hoja-control .maq-lienzo { margin-top: 8px; }
+    .hoja-control .maq-eje { font-size: 7.5px; fill: var(--tinta-2); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+    .hoja-control .maq-hueco { fill: none; stroke: var(--linea); stroke-width: 1; stroke-dasharray: 3 3; }
+    .hoja-control .maq-base { stroke: var(--linea); stroke-width: 1; }
+    .hoja-control .maq-guia { stroke: var(--linea-suave); stroke-width: 1; stroke-dasharray: 2 3; }
+
+    .hoja-control .swi { margin-top: 9px; display: grid; grid-template-columns: repeat(3, 1fr); border: 1px dashed var(--linea); }
+    .hoja-control .swi-c { padding: 9px 10px; border-left: 1px dashed var(--linea); }
+    .hoja-control .swi-c:first-child { border-left: 0; }
+    .hoja-control .swi-n { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 17px; font-weight: 400; color: var(--tinta-3); line-height: 1; }
+    .hoja-control .swi-k { margin-top: 6px; font-size: 7.5px; line-height: 1.35; letter-spacing: .05em; text-transform: uppercase; color: var(--tinta-2); }
+
+    .hoja-control .cierre { margin-top: auto; padding-top: 12px; font-size: 8px; line-height: 1.5; color: var(--tinta-3); }
+
+    /* ───────── pie ───────── */
+    .hoja-control .pie { flex: 0 0 auto; margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--linea);
+      text-align: center; font-size: 8px; letter-spacing: .18em; text-transform: uppercase; color: var(--tinta-3); }
+  </style>
+
+  <!-- ══════════════ CABECERA ══════════════ -->
+  <header class="cab">
+    <div class="cab-obra">
+      <p class="cab-empresa">LARQUITECTURA STUDIO SAC</p>
+      <h1 class="cab-titulo">LABORATORIO CRIOCORD - LURÍN</h1>
+      <div class="cab-ficha">
+        <span data-manual="true">RUC N° 20601689988</span>
+        <span class="cab-sep">·</span>
+        <span data-manual="true">Carretera Panamericana Sur Km 29.5, Lima</span>
+        <span class="cab-sep">·</span>
+        <span data-manual="true">Proyecto: PROGRAMACIÓN EP</span>
+      </div>
+    </div>
+    <div class="cab-meta">
+      <p class="meta-linea">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.6" width="12" height="10.6" rx="1"/><path d="M2 6.9h12"/><path d="M5.4 1.9v3"/><path d="M10.6 1.9v3"/></svg>
+        Corte de Control: <span class="meta-fuerte">08 de Agosto, 2026</span>
+      </p>
+      <p class="meta-linea" data-manual="true">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.6" r="2.8"/><path d="M2.9 14c0-2.9 2.3-4.7 5.1-4.7s5.1 1.8 5.1 4.7"/></svg>
+        Residente: <span class="meta-fuerte">ARQ. EDUARDO PÉREZ CAP 32467</span>
+      </p>
+    </div>
+  </header>
+  <div class="regla-doc"></div>
+
+  <div class="tira">
+    <h2><span class="cuadro-marca"></span>Control económico y Last Planner</h2>
+    <p class="tira-nota">Cuánto dinero lleva comprometido la obra frente a lo que lleva construido, y en qué estado está el sistema de planificación semanal.</p>
+  </div>
+
+  <!-- ══════════════ CUERPO ══════════════ -->
+  <div class="cuerpo">
+
+    <!-- ─────── MITAD ECONÓMICA ─────── -->
+    <section class="mitad mitad-eco">
+
+      <div class="rotulo rotulo-marca">
+        <h3>Sobregiro proyectado · obra construida frente a dinero comprometido</h3>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.8 12.4 6 6.9l3 2.6 5.2-6.1"/><path d="M14.2 3.4h-3.4"/><path d="M14.2 3.4v3.3"/></svg>
+      </div>
+
+      <div class="contraste">
+        <p class="co-cifra co-cifra-obra num">11%</p>
+        <div>
+          <p class="co-k">Avance físico ejecutado <span class="co-k-suave">— alcance de obra terminado al corte</span></p>
+          <div class="co-pista"><span class="co-rell co-rell-obra" style="width:11%"></span></div>
+        </div>
+
+        <div></div>
+        <div class="co-brecha">
+          <span class="co-zona" style="left:11%;width:15.34%"></span>
+          <span class="co-borde" style="left:11%"></span>
+          <span class="co-borde" style="left:26.34%"></span>
+          <span class="co-etiqueta" style="left:calc(26.34% + 12px)">
+            <span class="co-puntos">15.34 puntos</span>
+            <span class="co-puntos-k">de distancia entre lo construido y lo comprometido</span>
+          </span>
+        </div>
+
+        <p class="co-cifra co-cifra-dinero num">26.34%</p>
+        <div>
+          <p class="co-k">Presupuesto comprometido <span class="co-k-suave">— encargos y órdenes ya firmados</span></p>
+          <div class="co-pista"><span class="co-rell co-rell-dinero" style="width:26.34%"></span></div>
+        </div>
+      </div>
+
+      <p class="lectura">La obra ha construido el <span class="destaca">11%</span> de su alcance y ya tiene comprometido el <span class="destaca">26.34%</span> de su presupuesto. Esa distancia es lo que GCM llama <span class="destaca">sobregiro proyectado</span>: no es todavía un sobrecosto ejecutado, es el aviso que aparece antes de que lo sea, mientras aún se puede renegociar un encargo o reordenar una compra.</p>
+
+      <div class="rotulo rotulo-sep">
+        <h3>Las cuentas de la obra al corte</h3>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.2" y="2.6" width="11.6" height="10.8" rx="1"/><path d="M4.8 5.6h6.4"/><path d="M4.8 8.4h6.4"/><path d="M4.8 11.1h3.6"/></svg>
+      </div>
+
+      <div class="cuentas">
+        <div class="cuenta">
+          <p class="cuenta-k">Presupuesto total</p>
+          <p class="cuenta-n"><span class="sol">S/</span>745,553.36</p>
+          <div class="cuenta-barra"><span class="barra-rell barra-rell-suave" style="width:100%"></span></div>
+          <p class="cuenta-sub">Presupuesto vigente contra el que se mide todo lo demás.</p>
+        </div>
+        <div class="cuenta">
+          <p class="cuenta-k">Comprometido</p>
+          <p class="cuenta-n"><span class="sol">S/</span>196,400.50</p>
+          <div class="cuenta-barra"><span class="barra-rell" style="width:26.34%"></span></div>
+          <p class="cuenta-sub"><span class="sub-fuerte">26.34%</span> del presupuesto, ya con proveedor y firma.</p>
+        </div>
+        <div class="cuenta">
+          <p class="cuenta-k">Saldo</p>
+          <p class="cuenta-n"><span class="sol">S/</span>549,152.86</p>
+          <div class="cuenta-barra"><span class="barra-rell barra-rell-suave" style="width:73.66%"></span></div>
+          <p class="cuenta-sub"><span class="sub-fuerte">73.66%</span> todavía sin comprometer.</p>
+        </div>
+        <div class="cuenta cuenta-riesgo">
+          <p class="cuenta-k">Partidas sobregiradas</p>
+          <p class="cuenta-n">12</p>
+          <div class="cuenta-barra"><span class="barra-rell barra-rell-suave" style="width:100%"></span></div>
+          <p class="cuenta-sub">Partidas cuyo comprometido ya pasó su presupuesto.</p>
+        </div>
+      </div>
+
+      <p class="plazo">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.6V8l2.4 1.5"/></svg>
+        Plazo contractual de la obra: <span class="num">01/08/2026</span> al <span class="num">05/10/2026</span>.
+      </p>
+
+      <div class="rotulo rotulo-sep">
+        <h3>Cómo se leen estas tres cuentas</h3>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M6.4 6.2c.2-1 1-1.6 1.9-1.6 1 0 1.8.7 1.8 1.7 0 1.4-1.7 1.5-1.7 2.9"/><path d="M8.3 11.3v.1"/></svg>
+      </div>
+
+      <div class="glosa">
+        <div>
+          <p class="glosa-t">Comprometido</p>
+          <p class="glosa-d">Dinero que la obra ya no puede volver a usar: encargos vigentes repartidos por partida más órdenes sueltas aprobadas. Se cuenta al firmar, no al pagar.</p>
+        </div>
+        <div>
+          <p class="glosa-t">Saldo</p>
+          <p class="glosa-d">Lo que queda del presupuesto sin comprometer. Es el margen real de maniobra para lo que falta de obra, no el dinero disponible en caja.</p>
+        </div>
+        <div>
+          <p class="glosa-t">Partida sobregirada</p>
+          <p class="glosa-d">Partida cuyo comprometido superó su presupuesto vigente. Cada una es un exceso ya firmado que hay que compensar dentro del mismo total.</p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ─────── MITAD LAST PLANNER ─────── -->
+    <section class="mitad mitad-lp">
+
+      <div class="rotulo">
+        <h3>Last Planner · sin semanas cerradas al corte</h3>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.4" width="12" height="10.8" rx="1"/><path d="M2 6.7h12"/><path d="M5.3 1.8v3"/><path d="M10.7 1.8v3"/><path d="M6 10.4l1.4 1.4 2.7-2.9"/></svg>
+      </div>
+
+      <div class="aviso">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 5.1v.1"/><path d="M8 7.4v4"/></svg>
+        <div>
+          <p class="aviso-t">Todavía no hay nada que medir</p>
+          <p class="aviso-d">Al corte del 08 de agosto de 2026 la obra no tiene ninguna semana del plan cerrada. Por eso no hay PPC, ni causas de incumplimiento, ni restricciones registradas: esos datos no existen aún, y ninguno se ha estimado para rellenar el hueco. <span class="destaca">Esta mitad de la hoja se llenará sola en cuanto se cierre la primera semana del plan.</span></p>
+        </div>
+      </div>
+
+      <!-- maqueta 1: PPC semana a semana -->
+      <div class="maq">
+        <div class="maq-cab">
+          <p class="maq-t">PPC semana a semana</p>
+          <p class="maq-e">Estructura prevista · sin datos</p>
+        </div>
+        <p class="maq-d">Cada semana cerrada añadirá aquí su barra: compromisos hechos, compromisos cumplidos y el porcentaje de plan cumplido que sale de dividirlos, con su lectura en una frase.</p>
+        <svg class="maq-lienzo" viewBox="0 0 410 116" width="100%" height="116" role="img" aria-label="Marco vacío del gráfico de PPC semana a semana: al corte no hay ninguna semana cerrada">
+          <line class="maq-guia" x1="30" y1="10" x2="404" y2="10"/>
+          <line class="maq-guia" x1="30" y1="45" x2="404" y2="45"/>
+          <line class="maq-guia" x1="30" y1="80" x2="404" y2="80"/>
+          <line class="maq-base" x1="30" y1="96" x2="404" y2="96"/>
+          <text class="maq-eje" x="24" y="13" text-anchor="end">100</text>
+          <text class="maq-eje" x="24" y="48" text-anchor="end">50</text>
+          <text class="maq-eje" x="24" y="99" text-anchor="end">0</text>
+          <rect class="maq-hueco" x="40" y="14" width="52" height="82"/>
+          <rect class="maq-hueco" x="102" y="14" width="52" height="82"/>
+          <rect class="maq-hueco" x="164" y="14" width="52" height="82"/>
+          <rect class="maq-hueco" x="226" y="14" width="52" height="82"/>
+          <rect class="maq-hueco" x="288" y="14" width="52" height="82"/>
+          <rect class="maq-hueco" x="350" y="14" width="52" height="82"/>
+          <text class="maq-eje" x="66" y="110" text-anchor="middle">—</text>
+          <text class="maq-eje" x="128" y="110" text-anchor="middle">—</text>
+          <text class="maq-eje" x="190" y="110" text-anchor="middle">—</text>
+          <text class="maq-eje" x="252" y="110" text-anchor="middle">—</text>
+          <text class="maq-eje" x="314" y="110" text-anchor="middle">—</text>
+          <text class="maq-eje" x="376" y="110" text-anchor="middle">—</text>
+        </svg>
+      </div>
+
+      <!-- maqueta 2: Pareto de causas -->
+      <div class="maq">
+        <div class="maq-cab">
+          <p class="maq-t">Pareto de causas de incumplimiento</p>
+          <p class="maq-e">Estructura prevista · sin datos</p>
+        </div>
+        <p class="maq-d">Cuando haya compromisos incumplidos con causa, se ordenarán de la que más frena a la que menos, con su acumulado, para atacar primero las pocas que explican casi todo.</p>
+        <svg class="maq-lienzo" viewBox="0 0 410 76" width="100%" height="76" role="img" aria-label="Marco vacío del Pareto de causas: al corte no hay incumplimientos registrados">
+          <line class="maq-base" x1="30" y1="60" x2="404" y2="60"/>
+          <text class="maq-eje" x="24" y="63" text-anchor="end">0</text>
+          <rect class="maq-hueco" x="40" y="10" width="60" height="50"/>
+          <rect class="maq-hueco" x="110" y="10" width="60" height="50"/>
+          <rect class="maq-hueco" x="180" y="10" width="60" height="50"/>
+          <rect class="maq-hueco" x="250" y="10" width="60" height="50"/>
+          <rect class="maq-hueco" x="320" y="10" width="60" height="50"/>
+          <text class="maq-eje" x="70" y="72" text-anchor="middle">—</text>
+          <text class="maq-eje" x="140" y="72" text-anchor="middle">—</text>
+          <text class="maq-eje" x="210" y="72" text-anchor="middle">—</text>
+          <text class="maq-eje" x="280" y="72" text-anchor="middle">—</text>
+          <text class="maq-eje" x="350" y="72" text-anchor="middle">—</text>
+        </svg>
+      </div>
+
+      <!-- maqueta 3: inventario de trabajo ejecutable -->
+      <div class="maq">
+        <div class="maq-cab">
+          <p class="maq-t">Inventario de trabajo ejecutable</p>
+          <p class="maq-e">Estructura prevista · sin datos</p>
+        </div>
+        <p class="maq-d">El colchón de la obra: tareas ya liberadas de restricciones y todavía sin comprometer, que es de donde saldrá el plan de la semana siguiente.</p>
+        <div class="swi">
+          <div class="swi-c">
+            <p class="swi-n">—</p>
+            <p class="swi-k">Tareas listas para ejecutar</p>
+          </div>
+          <div class="swi-c">
+            <p class="swi-n">—</p>
+            <p class="swi-k">Disponibles sin comprometer</p>
+          </div>
+          <div class="swi-c">
+            <p class="swi-n">—</p>
+            <p class="swi-k">Colchón libre de la ventana</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="cierre">Ninguna cifra de esta mitad se ha estimado, proyectado ni tomado de otra obra: los recuadros punteados marcan el sitio exacto que ocupará cada dato en cuanto exista.</p>
+
+    </section>
+  </div>
+
+  <!-- ══════════════ PIE ══════════════ -->
+  <footer class="pie">Reporte generado el 08 de Agosto, 2026 • Control económico y Last Planner</footer>
+</article>

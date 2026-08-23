@@ -1,0 +1,116 @@
+<article class="hoja hoja-portada" style="width:794px;height:1123px">
+  <style>
+    .hoja-portada .lienzo{
+      box-sizing:border-box;
+      width:100%;
+      height:100%;
+      padding:56px 72px 44px;
+      display:flex;
+      flex-direction:column;
+      background:var(--papel);
+      color:var(--tinta);
+      font-family:"Plus Jakarta Sans", system-ui, sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+
+    /* ---------- cabecera: quien firma el papel y a que corte pertenece ---------- */
+    .hoja-portada .marca{flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;}
+    .hoja-portada .marca-izq{display:flex;align-items:stretch;}
+    .hoja-portada .marca-barra{width:2px;background:var(--marca);margin-right:12px;}
+    .hoja-portada .marca-nombre{font-family:"Montserrat", system-ui, sans-serif;font-weight:300;font-size:15px;line-height:1.05;letter-spacing:.36em;color:var(--tinta);}
+    .hoja-portada .marca-pie{font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:8px;font-weight:400;line-height:1.2;letter-spacing:.16em;color:var(--tinta-2);margin-top:8px;}
+    .hoja-portada .marca-der{text-align:right;padding-top:1px;}
+    .hoja-portada .marca-doc{font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:9px;font-weight:400;line-height:1.2;letter-spacing:.16em;color:var(--tinta);}
+    .hoja-portada .marca-ref{font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:8px;font-weight:400;line-height:1.2;letter-spacing:.16em;color:var(--tinta-2);margin-top:8px;}
+
+    /* ---------- aire: la hoja es sobre todo vacio ---------- */
+    .hoja-portada .aire-alto{flex:58 1 0px;}
+    .hoja-portada .aire-bajo{flex:42 1 0px;}
+
+    /* ---------- banda central: el gesto de la casa, intacto ---------- */
+    .hoja-portada .banda{flex:0 0 auto;text-align:center;}
+    .hoja-portada .regla{height:3px;background:var(--tinta);}
+    .hoja-portada .rotulo{
+      margin:0;
+      padding:34px 0 32px;
+      font-family:"Montserrat", system-ui, sans-serif;
+      font-weight:200;
+      font-size:48px;
+      line-height:1.34;
+      letter-spacing:.35em;
+      color:var(--tinta);
+    }
+    .hoja-portada .rotulo-l{display:block;text-indent:.35em;white-space:nowrap;}
+
+    .hoja-portada .obra{margin-top:46px;}
+    .hoja-portada .obra-et{margin:0 0 11px;font-size:11px;font-weight:700;line-height:1.2;letter-spacing:.34em;text-indent:.34em;color:var(--tinta);}
+    .hoja-portada .obra-n{margin:0;font-size:11px;font-weight:700;line-height:1.7;letter-spacing:.3em;text-indent:.3em;color:var(--tinta);}
+    .hoja-portada .obra-dir{margin:13px 0 0;font-size:9px;font-weight:400;line-height:1.5;letter-spacing:.16em;text-indent:.16em;color:var(--tinta-2);}
+
+    /* ---------- pie: tres datos de cabecera contractual, nada mas ---------- */
+    .hoja-portada .pie{flex:0 0 auto;}
+    .hoja-portada .pie-regla{height:1px;background:var(--linea);margin-bottom:14px;}
+    .hoja-portada .ficha{display:grid;grid-template-columns:repeat(3,1fr);column-gap:26px;}
+    .hoja-portada .f-et{margin:0 0 8px;font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:8px;font-weight:400;line-height:1;letter-spacing:.18em;color:var(--marca);}
+    .hoja-portada .f-v{margin:0;font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:9px;font-weight:400;line-height:1.4;letter-spacing:.04em;color:var(--tinta);}
+    .hoja-portada .f-s{margin:4px 0 0;font-size:8.5px;font-weight:400;line-height:1.45;letter-spacing:.01em;color:var(--tinta-2);}
+  </style>
+
+  <div class="lienzo">
+
+    <header class="marca" data-nuevo="true">
+      <div class="marca-izq">
+        <span class="marca-barra"></span>
+        <div>
+          <div class="marca-nombre">LARQUITECTURA</div>
+          <div class="marca-pie">STUDIO SAC &middot; <span data-manual="true">RUC 20601689988</span></div>
+        </div>
+      </div>
+      <div class="marca-der">
+        <div class="marca-doc">CORTE DE CONTROL 08.08.2026</div>
+        <div class="marca-ref">CRIOCORD</div>
+      </div>
+    </header>
+
+    <div class="aire-alto"></div>
+
+    <section class="banda">
+      <div class="regla"></div>
+      <h1 class="rotulo">
+        <span class="rotulo-l">I&nbsp;N&nbsp;F&nbsp;O&nbsp;R&nbsp;M&nbsp;E</span>
+        <span class="rotulo-l">D&nbsp;E&nbsp;&nbsp;&nbsp;O&nbsp;B&nbsp;R&nbsp;A</span>
+      </h1>
+      <div class="regla"></div>
+
+      <div class="obra">
+        <p class="obra-et">OBRA</p>
+        <p class="obra-n">LABORATORIOS INSTITUTO DE</p>
+        <p class="obra-n">CRIOPRESERVACI&Oacute;N Y TERAPIA CELULAR</p>
+        <p class="obra-dir" data-manual="true">Carretera Panamericana Sur Km 29.5, Lima</p>
+      </div>
+    </section>
+
+    <div class="aire-bajo"></div>
+
+    <footer class="pie" data-nuevo="true">
+      <div class="pie-regla"></div>
+      <div class="ficha">
+        <div>
+          <p class="f-et">DIRIGIDO A</p>
+          <p class="f-v">CRIOCORD</p>
+        </div>
+        <div>
+          <p class="f-et">EMITE</p>
+          <p class="f-v">LARQUITECTURA STUDIO SAC</p>
+          <p class="f-s">Residente: Arq. Eduardo P&eacute;rez</p>
+          <p class="f-s" data-manual="true">CAP 32467</p>
+        </div>
+        <div>
+          <p class="f-et">PLAZO DE OBRA</p>
+          <p class="f-v">01.08.2026 &ndash; 05.10.2026</p>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+</article>

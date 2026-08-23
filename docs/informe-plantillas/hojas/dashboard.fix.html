@@ -1,0 +1,469 @@
+<article class="hoja hoja-dashboard" style="width:1123px;height:794px">
+  <style>
+    .hoja-dashboard{
+      --tinta:#1c1c1c; --tinta-2:#6e6e6e; --tinta-3:#949490; --papel:#ffffff;
+      --linea:#e4e2dd; --linea-suave:#f1efeb; --gris-caja:#f7f7f7;
+      --marca:#b2551f; --marca-tenue:#f4e7de;
+      --exito:#1f8440; --alerta-tinta:#8f6210; --plan:#8f8f8a;
+      box-sizing:border-box; position:relative; overflow:hidden;
+      padding:26px 30px 20px; background:var(--papel); color:var(--tinta);
+      font-family:"Plus Jakarta Sans", system-ui, sans-serif;
+      display:flex; flex-direction:column;
+      -webkit-font-smoothing:antialiased;
+    }
+    .hoja-dashboard *{ box-sizing:border-box; margin:0; padding:0; }
+    .hoja-dashboard ul{ list-style:none; }
+    .hoja-dashboard svg{ display:block; }
+    .hoja-dashboard .db-num{ font-variant-numeric:tabular-nums; }
+
+    /* ---------- CABECERA ---------- */
+    .hoja-dashboard .db-cab{ display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding-bottom:11px; border-bottom:1px solid var(--linea); }
+    .hoja-dashboard .db-empresa{ font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); font-weight:500; }
+    .hoja-dashboard .db-titulo{ font-family:"Montserrat", "Plus Jakarta Sans", system-ui, sans-serif; font-weight:300; font-size:30px; line-height:1.06; letter-spacing:.012em; color:var(--tinta); margin-top:6px; }
+    .hoja-dashboard .db-ficha{ margin-top:8px; display:flex; align-items:center; flex-wrap:wrap; gap:7px; font-size:8px; color:var(--tinta-2); letter-spacing:.015em; }
+    .hoja-dashboard .db-ficha span{ white-space:nowrap; }
+    .hoja-dashboard .db-ficha .db-sep{ color:var(--linea); }
+    .hoja-dashboard .db-meta{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; padding-top:3px; }
+    .hoja-dashboard .db-meta-linea{ display:flex; align-items:center; gap:7px; font-size:10px; color:var(--tinta-2); }
+    .hoja-dashboard .db-meta-linea svg{ width:11px; height:11px; color:var(--tinta-3); flex:none; }
+
+    /* ---------- CUERPO / COLUMNAS ---------- */
+    .hoja-dashboard .db-cuerpo{ flex:1; min-height:0; display:grid; grid-template-columns:283px 1fr 273px; gap:26px; padding-top:14px; }
+    .hoja-dashboard .db-col{ min-width:0; }
+    .hoja-dashboard .db-rotulo{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:9px; font-weight:500; letter-spacing:.09em; text-transform:uppercase; color:var(--tinta-2); border-bottom:1px solid var(--linea); padding-bottom:5px; margin-bottom:11px; }
+    .hoja-dashboard .db-rotulo svg{ width:11px; height:11px; color:var(--tinta-3); flex:none; }
+    .hoja-dashboard .db-rotulo-marca{ color:var(--marca); }
+    .hoja-dashboard .db-rotulo-marca svg{ color:var(--marca); }
+    .hoja-dashboard .db-rotulo-sep{ margin-top:18px; }
+    .hoja-dashboard .db-estado{ font-size:7.5px; font-weight:700; letter-spacing:.14em; color:var(--exito); }
+
+    /* ---------- DONUT ---------- */
+    .hoja-dashboard .db-donut{ position:relative; width:108px; height:108px; margin:2px auto 8px; }
+    .hoja-dashboard .db-donut-centro{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .hoja-dashboard .db-donut-num{ font-size:26px; font-weight:400; color:var(--marca); letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-donut-lab{ font-size:8px; letter-spacing:.14em; text-transform:uppercase; color:var(--tinta-3); margin-top:3px; }
+    .hoja-dashboard .db-par{ display:flex; align-items:stretch; margin-bottom:12px; }
+    .hoja-dashboard .db-par-celda{ flex:1; text-align:center; }
+    .hoja-dashboard .db-par-celda + .db-par-celda{ border-left:1px solid var(--linea); }
+    .hoja-dashboard .db-par-num{ font-size:15px; font-weight:500; color:var(--tinta); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-par-num.db-marca{ color:var(--marca); }
+    .hoja-dashboard .db-par-lab{ font-size:8px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-top:4px; }
+
+    /* ---------- CAPITULOS ---------- */
+    .hoja-dashboard .db-cap{ margin-bottom:10px; }
+    .hoja-dashboard .db-cap:last-of-type{ margin-bottom:0; }
+    .hoja-dashboard .db-cap-fila{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:4px; }
+    .hoja-dashboard .db-cap-nom{ font-size:8.5px; font-weight:700; line-height:1.3; color:var(--tinta); letter-spacing:.005em; }
+    .hoja-dashboard .db-cap-pct{ white-space:nowrap; font-size:8px; color:var(--tinta-2); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-cap-pct .db-real{ color:var(--marca); font-weight:700; margin-left:6px; }
+    .hoja-dashboard .db-cap-barra{ position:relative; height:3px; background:var(--linea-suave); }
+    .hoja-dashboard .db-cap-relleno{ display:block; height:100%; background:var(--marca); }
+    .hoja-dashboard .db-cap-plan{ position:absolute; top:-3px; width:2px; height:9px; background:var(--tinta); margin-left:-1px; }
+
+    /* ---------- CURVA S ---------- */
+    .hoja-dashboard .db-grafico{ width:100%; height:auto; }
+    .hoja-dashboard .db-eje{ font-size:8px; fill:var(--tinta-3); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-anot-fecha{ font-size:8px; fill:var(--tinta); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-anot-txt{ font-size:7.4px; fill:var(--tinta-2); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-anot-real{ font-size:7.4px; fill:var(--marca); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-leyenda{ display:flex; align-items:center; justify-content:center; gap:22px; margin-top:7px; font-size:8px; color:var(--tinta-2); }
+    .hoja-dashboard .db-leyenda span{ display:flex; align-items:center; gap:6px; }
+    .hoja-dashboard .db-leyenda .db-lin{ width:20px; height:0; border-top:1.4px solid var(--marca); }
+    .hoja-dashboard .db-leyenda .db-pun{ width:20px; height:0; border-top:1.4px dotted var(--plan); }
+
+    /* ---------- TABLA PARTIDAS ACTIVAS ---------- */
+    .hoja-dashboard .db-tabla{ width:100%; border-collapse:collapse; }
+    .hoja-dashboard .db-tabla th{ font-size:8.5px; font-weight:400; color:var(--tinta-2); text-align:left; padding-bottom:6px; border-bottom:1px solid var(--linea); }
+    .hoja-dashboard .db-tabla th.db-th-num{ text-align:right; }
+    .hoja-dashboard .db-tabla td{ font-size:9px; color:var(--tinta); padding:5.5px 0; border-bottom:1px solid var(--linea-suave); vertical-align:middle; }
+    .hoja-dashboard .db-tabla tr:last-child td{ border-bottom:0; }
+    .hoja-dashboard .db-t-id{ font-size:8px; color:var(--tinta-3); width:34px; font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-t-fec{ font-size:8px; color:var(--tinta-2); width:82px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-t-num{ font-size:8.5px; text-align:right; width:46px; color:var(--tinta-2); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-t-real{ font-weight:700; color:var(--tinta); }
+    .hoja-dashboard .db-t-real.db-alcanza{ color:var(--marca); }
+
+    /* ---------- ALERTAS ---------- */
+    .hoja-dashboard .db-alerta{ background:var(--gris-caja); padding:10px; margin-bottom:6px; }
+    .hoja-dashboard .db-alerta-desc{ font-size:8.5px; line-height:1.35; color:var(--tinta); }
+    .hoja-dashboard .db-alerta-pie{ display:flex; align-items:baseline; justify-content:space-between; margin-top:6px; }
+    .hoja-dashboard .db-sev{ font-size:7.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+    .hoja-dashboard .db-sev-critico{ color:var(--marca); }
+    .hoja-dashboard .db-sev-bajo{ color:var(--alerta-tinta); }
+    .hoja-dashboard .db-dias{ font-size:9px; font-weight:700; color:var(--tinta); font-variant-numeric:tabular-nums; }
+
+    /* ---------- HITOS (mejora) ---------- */
+    .hoja-dashboard .db-hito{ display:flex; align-items:flex-start; gap:7px; padding:4px 0; border-bottom:1px solid var(--linea-suave); }
+    .hoja-dashboard .db-hito:last-of-type{ border-bottom:0; }
+    .hoja-dashboard .db-hito-pt{ width:5px; height:5px; margin-top:4px; flex:none; border:1px solid var(--tinta-3); border-radius:50%; background:var(--papel); }
+    .hoja-dashboard .db-hito.db-cumplido .db-hito-pt{ background:var(--exito); border-color:var(--exito); }
+    .hoja-dashboard .db-hito-cod{ font-size:8px; color:var(--tinta-3); flex:none; width:16px; font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-hito-nom{ font-size:8px; line-height:1.35; color:var(--tinta); flex:1; }
+    .hoja-dashboard .db-hito-fec{ font-size:8px; color:var(--tinta-2); flex:none; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-hito.db-cumplido .db-hito-fec{ color:var(--exito); }
+    .hoja-dashboard .db-hito-nota{ margin-top:7px; font-size:7.5px; line-height:1.45; color:var(--tinta-2); }
+
+    /* ---------- PIE ---------- */
+    .hoja-dashboard .db-pie{ margin-top:12px; padding-top:9px; border-top:1px solid var(--linea); text-align:center; font-size:8px; letter-spacing:.18em; text-transform:uppercase; color:var(--tinta-3); }
+  </style>
+
+  <!-- ================= CABECERA ================= -->
+  <header class="db-cab">
+    <div>
+      <p class="db-empresa">LARQUITECTURA STUDIO SAC</p>
+      <h1 class="db-titulo">LABORATORIO CRIOCORD - LURÍN</h1>
+      <div class="db-ficha" data-nuevo="true">
+        <span data-manual="true">RUC N° 20601689988</span>
+        <span class="db-sep">·</span>
+        <span data-manual="true">Carretera Panamericana Sur Km 29.5, Lima</span>
+        <span class="db-sep">·</span>
+        <span data-manual="true">Proyecto: PROGRAMACIÓN EP</span>
+      </div>
+    </div>
+    <div class="db-meta">
+      <p class="db-meta-linea">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.6" width="12" height="10.6" rx="1"/><path d="M2 6.9h12"/><path d="M5.4 1.9v3"/><path d="M10.6 1.9v3"/></svg>
+        Corte de Control: 08 de Agosto, 2026
+      </p>
+      <p class="db-meta-linea" data-manual="true">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.6" r="2.8"/><path d="M2.9 14c0-2.9 2.3-4.7 5.1-4.7s5.1 1.8 5.1 4.7"/></svg>
+        Residente: ARQ. EDUARDO PÉREZ CAP 32467
+      </p>
+    </div>
+  </header>
+
+  <!-- ================= CUERPO ================= -->
+  <div class="db-cuerpo">
+
+    <!-- ---------- COLUMNA IZQUIERDA ---------- -->
+    <div class="db-col">
+      <p class="db-rotulo">Avance de obra
+        <span class="db-estado" data-nuevo="true">AL DÍA</span>
+      </p>
+
+      <div class="db-donut">
+        <svg viewBox="0 0 108 108" width="108" height="108">
+          <circle cx="54" cy="54" r="47" fill="none" stroke="var(--linea-suave)" stroke-width="14"/>
+          <circle cx="54" cy="54" r="47" fill="none" stroke="var(--marca)" stroke-width="14"
+                  stroke-dasharray="32.5 262.8" transform="rotate(-90 54 54)"/>
+        </svg>
+        <div class="db-donut-centro">
+          <p class="db-donut-num">11%</p>
+          <p class="db-donut-lab">Real</p>
+        </div>
+      </div>
+
+      <div class="db-par">
+        <div class="db-par-celda">
+          <p class="db-par-num">11%</p>
+          <p class="db-par-lab">Planeado</p>
+        </div>
+        <div class="db-par-celda">
+          <p class="db-par-num db-marca">+0.0%</p>
+          <p class="db-par-lab">Desviación</p>
+        </div>
+      </div>
+
+      <p class="db-rotulo">Control de capítulos
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.1 14.6 5.6 8 9.1 1.4 5.6Z"/><path d="M1.4 9.6 8 13.1l6.6-3.5"/></svg>
+      </p>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo I: Gestión, Seguridad y Costos Indirectos</span>
+          <span class="db-cap-pct">P: 100%<span class="db-real">R: 100%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:100%"></span><span class="db-cap-plan" style="left:100%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo II: Trabajos Preliminares</span>
+          <span class="db-cap-pct">P: 100%<span class="db-real">R: 97%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:97%"></span><span class="db-cap-plan" style="left:100%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo III: Demoliciones y Desmontajes</span>
+          <span class="db-cap-pct">P: 94%<span class="db-real">R: 100%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:100%"></span><span class="db-cap-plan" style="left:94%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo IV: Movimiento de Tierra y Cimentaciones</span>
+          <span class="db-cap-pct">P: 64%<span class="db-real">R: 66%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:66%"></span><span class="db-cap-plan" style="left:64%"></span></div>
+      </div>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo V: Estructuras Metálicas y Losas</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo VI: ACI (Agua Contra Incendios)</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo VII: Instalaciones Sanitarias</span>
+          <span class="db-cap-pct">P: 16%<span class="db-real">R: 22%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:22%"></span><span class="db-cap-plan" style="left:16%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo VIII: Instalaciones Eléctricas y Comunicaciones</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 2%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:2%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo IX: DACI (Detección y Alarma)</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo X: HVAC</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo XI: Arquitectura y Acabados</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo XII: Cierre, Pruebas Integrales y Entrega</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+    </div>
+
+    <!-- ---------- COLUMNA CENTRO ---------- -->
+    <div class="db-col">
+      <p class="db-rotulo">Curva S - Proyección</p>
+
+      <svg class="db-grafico" viewBox="0 0 455 199" preserveAspectRatio="xMidYMid meet">
+        <!-- rejilla: TODAS punteadas, incluida la del 0 -->
+        <line x1="34" y1="8" x2="450" y2="8" stroke="var(--linea-suave)" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="34" y1="50" x2="450" y2="50" stroke="var(--linea-suave)" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="34" y1="92" x2="450" y2="92" stroke="var(--linea-suave)" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="34" y1="134" x2="450" y2="134" stroke="var(--linea-suave)" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="34" y1="176" x2="450" y2="176" stroke="var(--linea-suave)" stroke-width="1" stroke-dasharray="2 3"/>
+
+        <!-- eje Y -->
+        <text class="db-eje" x="27" y="11" text-anchor="end">100</text>
+        <text class="db-eje" x="27" y="53" text-anchor="end">75</text>
+        <text class="db-eje" x="27" y="95" text-anchor="end">50</text>
+        <text class="db-eje" x="27" y="137" text-anchor="end">25</text>
+        <text class="db-eje" x="27" y="179" text-anchor="end">0</text>
+
+        <!-- serie planeado -->
+        <polyline points="34,176 85.4,172.6 136.8,165.9 188.1,157.5 239.5,132.3 290.9,88.6 342.3,51.7 393.6,21.4 445,8"
+                  fill="none" stroke="var(--plan)" stroke-width="1.1" stroke-dasharray="3 3"/>
+        <g fill="var(--plan)">
+          <circle cx="34" cy="176" r="2"/><circle cx="85.4" cy="172.6" r="2"/><circle cx="136.8" cy="165.9" r="2"/>
+          <circle cx="188.1" cy="157.5" r="2"/><circle cx="239.5" cy="132.3" r="2"/><circle cx="290.9" cy="88.6" r="2"/>
+          <circle cx="342.3" cy="51.7" r="2"/><circle cx="393.6" cy="21.4" r="2"/><circle cx="445" cy="8" r="2"/>
+        </g>
+
+        <!-- serie real: solo hasta la fecha de corte -->
+        <polyline points="34,176 85.4,170.9 188.1,157.5"
+                  fill="none" stroke="var(--marca)" stroke-width="1.5"/>
+        <g fill="var(--marca)">
+          <circle cx="34" cy="176" r="2.2"/><circle cx="85.4" cy="170.9" r="2.2"/><circle cx="188.1" cy="157.5" r="2.2"/>
+        </g>
+
+        <!-- linea de corte y anotacion -->
+        <line x1="188.1" y1="8" x2="188.1" y2="176" stroke="var(--tinta-3)" stroke-width="0.8"/>
+        <rect x="197" y="12" width="112" height="46" fill="var(--papel)" stroke="var(--tinta)" stroke-width="0.8"/>
+        <text class="db-anot-fecha" x="205" y="26">08/08</text>
+        <text class="db-anot-txt" x="205" y="38">Avance Planeado : 11</text>
+        <text class="db-anot-real" x="205" y="50">Avance Real : 11</text>
+
+        <!-- eje X -->
+        <text class="db-eje" x="34" y="192" text-anchor="start">01/08</text>
+        <text class="db-eje" x="85.4" y="192" text-anchor="middle">03/08</text>
+        <text class="db-eje" x="136.8" y="192" text-anchor="middle">05/08</text>
+        <text class="db-eje" x="188.1" y="192" text-anchor="middle">08/08</text>
+        <text class="db-eje" x="239.5" y="192" text-anchor="middle">15/08</text>
+        <text class="db-eje" x="290.9" y="192" text-anchor="middle">30/08</text>
+        <text class="db-eje" x="342.3" y="192" text-anchor="middle">15/09</text>
+        <text class="db-eje" x="393.6" y="192" text-anchor="middle">30/09</text>
+        <text class="db-eje" x="445" y="192" text-anchor="middle">22/10</text>
+      </svg>
+
+      <div class="db-leyenda">
+        <span><i class="db-pun"></i>Avance Planeado</span>
+        <span><i class="db-lin"></i>Avance Real</span>
+      </div>
+
+      <p class="db-rotulo db-rotulo-sep">Partidas activas destacadas
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8.4h3.3l2-4.6 2.5 8.8 2-4.2h3.2"/></svg>
+      </p>
+
+      <table class="db-tabla">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Descripción de Tarea</th>
+            <th>Fechas</th>
+            <th class="db-th-num">% Plan</th>
+            <th class="db-th-num">% Real</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="db-t-id">25</td>
+            <td>3.3 Eliminación de material excedente</td>
+            <td class="db-t-fec">08/08 - 10/08</td>
+            <td class="db-t-num">63</td>
+            <td class="db-t-num db-t-real db-alcanza">100</td>
+          </tr>
+          <tr>
+            <td class="db-t-id">30</td>
+            <td>4.4 Solados para zapatas, acero corrugado y vaciado</td>
+            <td class="db-t-fec">07/08 - 10/08</td>
+            <td class="db-t-num">83</td>
+            <td class="db-t-num db-t-real">30</td>
+          </tr>
+          <tr>
+            <td class="db-t-id">46</td>
+            <td>7.2 Nivelación cama de arena, entubado y rellenado</td>
+            <td class="db-t-fec">06/08 - 10/08</td>
+            <td class="db-t-num">88</td>
+            <td class="db-t-num db-t-real db-alcanza">100</td>
+          </tr>
+          <tr>
+            <td class="db-t-id">47</td>
+            <td>7.3 Conexiones de TRONCAL principal desagüe</td>
+            <td class="db-t-fec">07/08 - 10/08</td>
+            <td class="db-t-num">81</td>
+            <td class="db-t-num db-t-real db-alcanza">81</td>
+          </tr>
+          <tr>
+            <td class="db-t-id">48</td>
+            <td>7.3.1 Conexiones de agua y desagüe general</td>
+            <td class="db-t-fec">10/08 - 15/08</td>
+            <td class="db-t-num">0</td>
+            <td class="db-t-num db-t-real db-alcanza">10</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ---------- COLUMNA DERECHA ---------- -->
+    <div class="db-col">
+      <p class="db-rotulo db-rotulo-marca">Alertas de atraso
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.4v4"/><path d="M8 4.9v.6"/></svg>
+      </p>
+
+      <div class="db-alerta">
+        <p class="db-alerta-desc">4.4 Solados para zapatas, acero corrugado y vaciado</p>
+        <div class="db-alerta-pie">
+          <span class="db-sev db-sev-critico">Crítico</span>
+          <span class="db-dias">−2 días</span>
+        </div>
+      </div>
+
+      <div class="db-alerta">
+        <p class="db-alerta-desc">2.4 Trazo y Replanteo</p>
+        <div class="db-alerta-pie">
+          <span class="db-sev db-sev-bajo">Bajo</span>
+          <span class="db-dias">−1 día</span>
+        </div>
+      </div>
+
+      <section data-nuevo="true">
+        <p class="db-rotulo db-rotulo-sep">Hitos del proyecto
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14V2.4"/><path d="M4 3.1h8.4l-2 2.7 2 2.7H4"/></svg>
+        </p>
+
+        <div class="db-hito db-cumplido">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.1</span>
+          <span class="db-hito-nom">Inicio de Obra y Entrega del almacén A-12 MEGACENTRO LURÍN</span>
+          <span class="db-hito-fec">01/08</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.2</span>
+          <span class="db-hito-nom">Fin de Trabajos Preliminares y Demoliciones</span>
+          <span class="db-hito-fec">10/08</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.3</span>
+          <span class="db-hito-nom">Fin de Cimentaciones y Estructura Metálica</span>
+          <span class="db-hito-fec">28/08</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.4</span>
+          <span class="db-hito-nom">Fin de Trabajos de proveedores Criocord (CO2 y demás instalaciones)</span>
+          <span class="db-hito-fec">16/09</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.5</span>
+          <span class="db-hito-nom">Cierre de Tabiquería Drywall</span>
+          <span class="db-hito-fec">19/09</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.6</span>
+          <span class="db-hito-nom">Fin de Instalaciones Electromecánicas</span>
+          <span class="db-hito-fec">18/09</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.7</span>
+          <span class="db-hito-nom">Fin de Acabados generales</span>
+          <span class="db-hito-fec">05/10</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.8</span>
+          <span class="db-hito-nom">Comisionamiento y Pruebas Generales</span>
+          <span class="db-hito-fec">18/09</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.9</span>
+          <span class="db-hito-nom">Recepción Final de la Obra</span>
+          <span class="db-hito-fec">05/10</span>
+        </div>
+        <p class="db-hito-nota">Punto verde: hito ya alcanzado a la fecha de corte.</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- ================= PIE ================= -->
+  <footer class="db-pie">Reporte generado el 08 de Agosto, 2026 • Dashboard de Control de Obra</footer>
+</article>

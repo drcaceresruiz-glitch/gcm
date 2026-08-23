@@ -1,0 +1,1808 @@
+<title>Informes al Corte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:ital,wght@1,400;1,500&display=swap" rel="stylesheet">
+
+<style>
+/* ===================== ESCRITORIO (alrededor del papel) ===================== */
+:root{
+  --esc-fondo:#eceae5; --esc-panel:#ffffff; --esc-tinta:#1b1c1e; --esc-tinta-2:#5f6167;
+  --esc-borde:#dcd9d2; --esc-marca:#b2551f; --esc-marca-tinta:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --esc-fondo:#141416; --esc-panel:#1c1d20; --esc-tinta:#eeece8; --esc-tinta-2:#a4a6ac;
+    --esc-borde:#2e2f33; --esc-marca:#d4762f; --esc-marca-tinta:#17181a;
+  }
+}
+:root[data-theme="dark"]{
+  --esc-fondo:#141416; --esc-panel:#1c1d20; --esc-tinta:#eeece8; --esc-tinta-2:#a4a6ac;
+  --esc-borde:#2e2f33; --esc-marca:#d4762f; --esc-marca-tinta:#17181a;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--esc-fondo); color:var(--esc-tinta);
+  font-family:"Plus Jakarta Sans", system-ui, sans-serif; -webkit-font-smoothing:antialiased;
+}
+.escritorio{ max-width:1220px; margin:0 auto; padding:2.6rem 1.4rem 5rem; }
+
+.intro h1{ font-weight:800; font-size:clamp(1.5rem,3vw,2.05rem); letter-spacing:-0.015em; margin:0 0 .7rem; text-wrap:balance; }
+.intro p{ max-width:68ch; color:var(--esc-tinta-2); line-height:1.65; font-size:.95rem; margin:0 0 .7rem; }
+.intro p b{ color:var(--esc-tinta); font-weight:600; }
+.fichas{ display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1rem; }
+.ficha{ display:inline-flex; align-items:center; gap:.45rem; font-size:.76rem; color:var(--esc-tinta-2);
+  border:1px solid var(--esc-borde); border-radius:999px; padding:.34rem .8rem; background:var(--esc-panel); }
+.ficha b{ color:var(--esc-tinta); font-weight:600; }
+.ficha .pip{ width:7px; height:7px; border-radius:50%; background:var(--esc-marca); flex:none; }
+
+/* ===================== PESTAÑAS Y CONTROLES ===================== */
+.doc-root{ margin-top:2.2rem; }
+.doc-root > input{ position:absolute; opacity:0; pointer-events:none; }
+.barra{ display:flex; flex-wrap:wrap; gap:.4rem; align-items:center; }
+.barra label.tab{ cursor:pointer; user-select:none; padding:.5rem .95rem; border-radius:9px; font-size:.83rem;
+  font-weight:600; color:var(--esc-tinta-2); border:1px solid var(--esc-borde); background:var(--esc-panel); }
+.barra label.tab .n{ font-family:"IBM Plex Mono", monospace; font-weight:500; opacity:.55; margin-right:.42em; }
+.barra label.tab:hover{ color:var(--esc-tinta); }
+.barra label.tab:focus-visible{ outline:2px solid var(--esc-marca); outline-offset:2px; }
+#h1:checked ~ .barra label[for="h1"], #h2:checked ~ .barra label[for="h2"],
+#h3:checked ~ .barra label[for="h3"], #h4:checked ~ .barra label[for="h4"],
+#h5:checked ~ .barra label[for="h5"]{
+  color:var(--esc-marca-tinta); border-color:var(--esc-marca); background:var(--esc-marca);
+}
+
+.utiles{ display:flex; flex-wrap:wrap; gap:1rem; align-items:center; justify-content:space-between;
+  margin:1.1rem 0 1.6rem; padding-bottom:1.1rem; border-bottom:1px solid var(--esc-borde); }
+label.interruptor{ cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:.55rem;
+  font-size:.82rem; font-weight:600; color:var(--esc-tinta-2); }
+label.interruptor .pista{ width:34px; height:19px; border-radius:999px; background:var(--esc-borde);
+  position:relative; flex:none; transition:background .15s ease; }
+label.interruptor .pista::after{ content:""; position:absolute; top:2.5px; left:2.5px; width:14px; height:14px;
+  border-radius:50%; background:var(--esc-panel); transition:transform .15s ease; }
+#mejoras:checked ~ .utiles label.interruptor{ color:var(--esc-tinta); }
+#mejoras:checked ~ .utiles label.interruptor .pista{ background:var(--esc-marca); }
+#mejoras:checked ~ .utiles label.interruptor .pista::after{ transform:translateX(15px); }
+.pista-nota{ font-size:.76rem; color:var(--esc-tinta-2); font-weight:400; }
+
+/* ===================== HOJAS ===================== */
+.hojas > section{ display:none; }
+#h1:checked ~ .hojas #s1, #h2:checked ~ .hojas #s2, #h3:checked ~ .hojas #s3,
+#h4:checked ~ .hojas #s4, #h5:checked ~ .hojas #s5{ display:block; }
+
+.pie-hoja{ max-width:74ch; margin:0 auto 1.1rem; text-align:center; color:var(--esc-tinta-2);
+  font-size:.87rem; line-height:1.6; }
+.pie-hoja b{ color:var(--esc-tinta); font-weight:600; }
+
+.marco{ overflow-x:auto; padding-bottom:.6rem; }
+.marco-centro{ display:flex; justify-content:flex-start; min-width:min-content; }
+@media (min-width:1240px){ .marco-centro{ justify-content:center; } }
+
+/*
+  El papel. Los tokens NO cambian con el tema del lector: una hoja impresa es
+  blanca, y el informe tiene que verse igual en pantalla que en la impresora.
+  Los valores de color estan verificados contra papel blanco: el gris del
+  planeado (#8f8f8a) llega a 3.25:1 —el #9c9c97 del original se quedaba en
+  2.76 y no se lee—, y el amarillo de severidad se parte en dos: relleno para
+  barras y una tinta bronce para el texto pequeno, que a 7.5px es ilegible en
+  amarillo puro.
+*/
+.hoja{
+  --tinta:#1c1c1c; --tinta-2:#6e6e6e; --tinta-3:#a3a3a0;
+  --papel:#ffffff; --linea:#e4e2dd; --linea-suave:#f1efeb; --gris-caja:#f7f6f4;
+  --marca:#b2551f; --marca-claro:#c4692f; --marca-tenue:#f7ece5;
+  --exito:#1f8440; --exito-fill:#2e9e4f;
+  --alerta:#c78a06; --alerta-tinta:#8f6210;
+  --peligro:#b23b28;
+  --plan:#8f8f8a;
+  background:var(--papel); color:var(--tinta); color-scheme:light;
+  box-shadow:0 1px 3px rgba(0,0,0,.13), 0 20px 50px -22px rgba(0,0,0,.35);
+  flex:none; position:relative; overflow:hidden;
+}
+
+/* Resaltar lo que no existia en el informe original */
+#mejoras:checked ~ .hojas [data-nuevo]{
+  outline:1.5px dashed var(--marca); outline-offset:2px;
+  background-color:color-mix(in oklab, var(--marca) 5%, transparent);
+}
+
+/* ===================== IMPRESION ===================== */
+@page vertical{ size:A4 portrait; margin:0; }
+@page apaisado{ size:A4 landscape; margin:0; }
+@media print{
+  body{ background:#fff; }
+  .escritorio{ max-width:none; padding:0; }
+  .intro, .barra, .utiles, .pie-hoja{ display:none !important; }
+  .hojas > section{ display:block !important; }
+  .marco{ overflow:visible; }
+  .hoja{ box-shadow:none; break-after:page; }
+  .hoja--v{ page:vertical; }
+  .hoja--h{ page:apaisado; }
+}
+@media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+
+<div class="escritorio">
+  <header class="intro">
+    <h1>Informe de Obra CRIOCORD &mdash; corte del 08 de agosto</h1>
+    <p>
+      Esto no es un diseño nuevo: es <b>el informe que Larquitectura Studio ya
+      entrega</b>, reconstruido hoja por hoja con sus mismas cifras del corte,
+      y con lo que le faltaba injertado encima. Cada elemento del original se
+      conservó en su sitio; lo añadido está marcado y se puede resaltar con el
+      interruptor de abajo.
+    </p>
+    <p>
+      Las mejoras no son decoración: cada una se llena con un dato que
+      <b>GCM ya calcula hoy</b> a partir del cronograma, el presupuesto y el
+      plan semanal que la obra ya tiene cargados.
+    </p>
+    <div class="fichas">
+      <span class="ficha"><span class="pip"></span><b>Corte:</b>&nbsp;08 ago 2026</span>
+      <span class="ficha"><b>Avance real:</b>&nbsp;11%</span>
+      <span class="ficha"><b>Plazo:</b>&nbsp;01/08 &ndash; 05/10/2026</span>
+      <span class="ficha"><b>Residente:</b>&nbsp;Arq. Eduardo Pérez, CAP 32467</span>
+    </div>
+  </header>
+
+  <nav class="doc-root">
+    <input type="radio" name="hoja" id="h1" checked>
+    <input type="radio" name="hoja" id="h2">
+    <input type="radio" name="hoja" id="h3">
+    <input type="radio" name="hoja" id="h4">
+    <input type="radio" name="hoja" id="h5">
+    <input type="checkbox" id="mejoras">
+
+    <div class="barra" role="tablist">
+      <label class="tab" for="h1" tabindex="0"><span class="n">01</span>Portada</label>
+      <label class="tab" for="h2" tabindex="0"><span class="n">02</span>Dashboard de control</label>
+      <label class="tab" for="h3" tabindex="0"><span class="n">03</span>Cronograma</label>
+      <label class="tab" for="h4" tabindex="0"><span class="n">04</span>Bitácora diaria</label>
+      <label class="tab" for="h5" tabindex="0"><span class="n">05</span>Control económico</label>
+    </div>
+
+    <div class="utiles">
+      <label class="interruptor" for="mejoras">
+        <span class="pista"></span>
+        Resaltar lo añadido
+        <span class="pista-nota">&mdash; marca lo que no estaba en el informe original</span>
+      </label>
+      <span class="pista-nota">Para PDF: imprimir desde el navegador (Ctrl&nbsp;+&nbsp;P) &mdash; cada hoja sale en su orientación.</span>
+    </div>
+
+    <div class="hojas">
+      <section id="s1">
+        <p class="pie-hoja"><b>Portada.</b> Se conserva el gesto que la define — las dos reglas negras abrazando el rótulo en Montserrat ligero, y el silencio blanco alrededor. Lo añadido va al pie, sin invadir el centro.</p>
+        <div class="marco"><div class="marco-centro"><article class="hoja hoja-portada hoja--v" style="width:794px;height:1123px">
+  <style>
+    .hoja-portada .lienzo{
+      box-sizing:border-box;
+      width:100%;
+      height:100%;
+      padding:56px 72px 44px;
+      display:flex;
+      flex-direction:column;
+      background:var(--papel);
+      color:var(--tinta);
+      font-family:"Plus Jakarta Sans", system-ui, sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+
+    /* ---------- cabecera: quien firma el papel y a que corte pertenece ---------- */
+    .hoja-portada .marca{flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;}
+    .hoja-portada .marca-izq{display:flex;align-items:stretch;}
+    .hoja-portada .marca-barra{width:2px;background:var(--marca);margin-right:12px;}
+    .hoja-portada .marca-nombre{font-family:"Montserrat", system-ui, sans-serif;font-weight:300;font-size:15px;line-height:1.05;letter-spacing:.36em;color:var(--tinta);}
+    .hoja-portada .marca-pie{font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:8px;font-weight:400;line-height:1.2;letter-spacing:.16em;color:var(--tinta-2);margin-top:8px;}
+    .hoja-portada .marca-der{text-align:right;padding-top:1px;}
+    .hoja-portada .marca-doc{font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:9px;font-weight:400;line-height:1.2;letter-spacing:.16em;color:var(--tinta);}
+    .hoja-portada .marca-ref{font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:8px;font-weight:400;line-height:1.2;letter-spacing:.16em;color:var(--tinta-2);margin-top:8px;}
+
+    /* ---------- aire: la hoja es sobre todo vacio ---------- */
+    .hoja-portada .aire-alto{flex:58 1 0px;}
+    .hoja-portada .aire-bajo{flex:42 1 0px;}
+
+    /* ---------- banda central: el gesto de la casa, intacto ---------- */
+    .hoja-portada .banda{flex:0 0 auto;text-align:center;}
+    .hoja-portada .regla{height:3px;background:var(--tinta);}
+    .hoja-portada .rotulo{
+      margin:0;
+      padding:34px 0 32px;
+      font-family:"Montserrat", system-ui, sans-serif;
+      font-weight:200;
+      font-size:48px;
+      line-height:1.34;
+      letter-spacing:.35em;
+      color:var(--tinta);
+    }
+    .hoja-portada .rotulo-l{display:block;text-indent:.35em;white-space:nowrap;}
+
+    .hoja-portada .obra{margin-top:46px;}
+    .hoja-portada .obra-et{margin:0 0 11px;font-size:11px;font-weight:700;line-height:1.2;letter-spacing:.34em;text-indent:.34em;color:var(--tinta);}
+    .hoja-portada .obra-n{margin:0;font-size:11px;font-weight:700;line-height:1.7;letter-spacing:.3em;text-indent:.3em;color:var(--tinta);}
+    .hoja-portada .obra-dir{margin:13px 0 0;font-size:9px;font-weight:400;line-height:1.5;letter-spacing:.16em;text-indent:.16em;color:var(--tinta-2);}
+
+    /* ---------- pie: tres datos de cabecera contractual, nada mas ---------- */
+    .hoja-portada .pie{flex:0 0 auto;}
+    .hoja-portada .pie-regla{height:1px;background:var(--linea);margin-bottom:14px;}
+    .hoja-portada .ficha{display:grid;grid-template-columns:repeat(3,1fr);column-gap:26px;}
+    .hoja-portada .f-et{margin:0 0 8px;font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:8px;font-weight:400;line-height:1;letter-spacing:.18em;color:var(--marca);}
+    .hoja-portada .f-v{margin:0;font-family:"IBM Plex Mono", ui-monospace, monospace;font-size:9px;font-weight:400;line-height:1.4;letter-spacing:.04em;color:var(--tinta);}
+    .hoja-portada .f-s{margin:4px 0 0;font-size:8.5px;font-weight:400;line-height:1.45;letter-spacing:.01em;color:var(--tinta-2);}
+  </style>
+
+  <div class="lienzo">
+
+    <header class="marca" data-nuevo="true">
+      <div class="marca-izq">
+        <span class="marca-barra"></span>
+        <div>
+          <div class="marca-nombre">LARQUITECTURA</div>
+          <div class="marca-pie">STUDIO SAC &middot; <span data-manual="true">RUC 20601689988</span></div>
+        </div>
+      </div>
+      <div class="marca-der">
+        <div class="marca-doc">CORTE DE CONTROL 08.08.2026</div>
+        <div class="marca-ref">CRIOCORD</div>
+      </div>
+    </header>
+
+    <div class="aire-alto"></div>
+
+    <section class="banda">
+      <div class="regla"></div>
+      <h1 class="rotulo">
+        <span class="rotulo-l">I&nbsp;N&nbsp;F&nbsp;O&nbsp;R&nbsp;M&nbsp;E</span>
+        <span class="rotulo-l">D&nbsp;E&nbsp;&nbsp;&nbsp;O&nbsp;B&nbsp;R&nbsp;A</span>
+      </h1>
+      <div class="regla"></div>
+
+      <div class="obra">
+        <p class="obra-et">OBRA</p>
+        <p class="obra-n">LABORATORIOS INSTITUTO DE</p>
+        <p class="obra-n">CRIOPRESERVACI&Oacute;N Y TERAPIA CELULAR</p>
+        <p class="obra-dir" data-manual="true">Carretera Panamericana Sur Km 29.5, Lima</p>
+      </div>
+    </section>
+
+    <div class="aire-bajo"></div>
+
+    <footer class="pie" data-nuevo="true">
+      <div class="pie-regla"></div>
+      <div class="ficha">
+        <div>
+          <p class="f-et">DIRIGIDO A</p>
+          <p class="f-v">CRIOCORD</p>
+        </div>
+        <div>
+          <p class="f-et">EMITE</p>
+          <p class="f-v">LARQUITECTURA STUDIO SAC</p>
+          <p class="f-s">Residente: Arq. Eduardo P&eacute;rez</p>
+          <p class="f-s" data-manual="true">CAP 32467</p>
+        </div>
+        <div>
+          <p class="f-et">PLAZO DE OBRA</p>
+          <p class="f-v">01.08.2026 &ndash; 05.10.2026</p>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+</article></div></div>
+      </section>
+      <section id="s2">
+        <p class="pie-hoja"><b>Dashboard de control.</b> La hoja que más había que respetar: donut, par planeado/desviación, capítulos con su marca negra del planeado, curva S con su anotación en el corte, alertas y partidas activas. Las cifras son las suyas del 08/08.</p>
+        <div class="marco"><div class="marco-centro"><article class="hoja hoja-dashboard hoja--h" style="width:1123px;height:794px">
+  <style>
+    .hoja-dashboard{
+      --tinta:#1c1c1c; --tinta-2:#6e6e6e; --tinta-3:#949490; --papel:#ffffff;
+      --linea:#e4e2dd; --linea-suave:#f1efeb; --gris-caja:#f7f7f7;
+      --marca:#b2551f; --marca-tenue:#f4e7de;
+      --exito:#1f8440; --alerta-tinta:#8f6210; --plan:#8f8f8a;
+      box-sizing:border-box; position:relative; overflow:hidden;
+      padding:26px 30px 20px; background:var(--papel); color:var(--tinta);
+      font-family:"Plus Jakarta Sans", system-ui, sans-serif;
+      display:flex; flex-direction:column;
+      -webkit-font-smoothing:antialiased;
+    }
+    .hoja-dashboard *{ box-sizing:border-box; margin:0; padding:0; }
+    .hoja-dashboard ul{ list-style:none; }
+    .hoja-dashboard svg{ display:block; }
+    .hoja-dashboard .db-num{ font-variant-numeric:tabular-nums; }
+
+    /* ---------- CABECERA ---------- */
+    .hoja-dashboard .db-cab{ display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding-bottom:11px; border-bottom:1px solid var(--linea); }
+    .hoja-dashboard .db-empresa{ font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); font-weight:500; }
+    .hoja-dashboard .db-titulo{ font-family:"Montserrat", "Plus Jakarta Sans", system-ui, sans-serif; font-weight:300; font-size:30px; line-height:1.06; letter-spacing:.012em; color:var(--tinta); margin-top:6px; }
+    .hoja-dashboard .db-ficha{ margin-top:8px; display:flex; align-items:center; flex-wrap:wrap; gap:7px; font-size:8px; color:var(--tinta-2); letter-spacing:.015em; }
+    .hoja-dashboard .db-ficha span{ white-space:nowrap; }
+    .hoja-dashboard .db-ficha .db-sep{ color:var(--linea); }
+    .hoja-dashboard .db-meta{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; padding-top:3px; }
+    .hoja-dashboard .db-meta-linea{ display:flex; align-items:center; gap:7px; font-size:10px; color:var(--tinta-2); }
+    .hoja-dashboard .db-meta-linea svg{ width:11px; height:11px; color:var(--tinta-3); flex:none; }
+
+    /* ---------- CUERPO / COLUMNAS ---------- */
+    .hoja-dashboard .db-cuerpo{ flex:1; min-height:0; display:grid; grid-template-columns:283px 1fr 273px; gap:26px; padding-top:14px; }
+    .hoja-dashboard .db-col{ min-width:0; }
+    .hoja-dashboard .db-rotulo{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:9px; font-weight:500; letter-spacing:.09em; text-transform:uppercase; color:var(--tinta-2); border-bottom:1px solid var(--linea); padding-bottom:5px; margin-bottom:11px; }
+    .hoja-dashboard .db-rotulo svg{ width:11px; height:11px; color:var(--tinta-3); flex:none; }
+    .hoja-dashboard .db-rotulo-marca{ color:var(--marca); }
+    .hoja-dashboard .db-rotulo-marca svg{ color:var(--marca); }
+    .hoja-dashboard .db-rotulo-sep{ margin-top:18px; }
+    .hoja-dashboard .db-estado{ font-size:7.5px; font-weight:700; letter-spacing:.14em; color:var(--exito); }
+
+    /* ---------- DONUT ---------- */
+    .hoja-dashboard .db-donut{ position:relative; width:108px; height:108px; margin:2px auto 8px; }
+    .hoja-dashboard .db-donut-centro{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .hoja-dashboard .db-donut-num{ font-size:26px; font-weight:400; color:var(--marca); letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-donut-lab{ font-size:8px; letter-spacing:.14em; text-transform:uppercase; color:var(--tinta-3); margin-top:3px; }
+    .hoja-dashboard .db-par{ display:flex; align-items:stretch; margin-bottom:12px; }
+    .hoja-dashboard .db-par-celda{ flex:1; text-align:center; }
+    .hoja-dashboard .db-par-celda + .db-par-celda{ border-left:1px solid var(--linea); }
+    .hoja-dashboard .db-par-num{ font-size:15px; font-weight:500; color:var(--tinta); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-par-num.db-marca{ color:var(--marca); }
+    .hoja-dashboard .db-par-lab{ font-size:8px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-top:4px; }
+
+    /* ---------- CAPITULOS ---------- */
+    .hoja-dashboard .db-cap{ margin-bottom:10px; }
+    .hoja-dashboard .db-cap:last-of-type{ margin-bottom:0; }
+    .hoja-dashboard .db-cap-fila{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:4px; }
+    .hoja-dashboard .db-cap-nom{ font-size:8.5px; font-weight:700; line-height:1.3; color:var(--tinta); letter-spacing:.005em; }
+    .hoja-dashboard .db-cap-pct{ white-space:nowrap; font-size:8px; color:var(--tinta-2); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-cap-pct .db-real{ color:var(--marca); font-weight:700; margin-left:6px; }
+    .hoja-dashboard .db-cap-barra{ position:relative; height:3px; background:var(--linea-suave); }
+    .hoja-dashboard .db-cap-relleno{ display:block; height:100%; background:var(--marca); }
+    .hoja-dashboard .db-cap-plan{ position:absolute; top:-3px; width:2px; height:9px; background:var(--tinta); margin-left:-1px; }
+
+    /* ---------- CURVA S ---------- */
+    .hoja-dashboard .db-grafico{ width:100%; height:auto; }
+    .hoja-dashboard .db-eje{ font-size:8px; fill:var(--tinta-3); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-anot-fecha{ font-size:8px; fill:var(--tinta); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-anot-txt{ font-size:7.4px; fill:var(--tinta-2); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-anot-real{ font-size:7.4px; fill:var(--marca); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-leyenda{ display:flex; align-items:center; justify-content:center; gap:22px; margin-top:7px; font-size:8px; color:var(--tinta-2); }
+    .hoja-dashboard .db-leyenda span{ display:flex; align-items:center; gap:6px; }
+    .hoja-dashboard .db-leyenda .db-lin{ width:20px; height:0; border-top:1.4px solid var(--marca); }
+    .hoja-dashboard .db-leyenda .db-pun{ width:20px; height:0; border-top:1.4px dotted var(--plan); }
+
+    /* ---------- TABLA PARTIDAS ACTIVAS ---------- */
+    .hoja-dashboard .db-tabla{ width:100%; border-collapse:collapse; }
+    .hoja-dashboard .db-tabla th{ font-size:8.5px; font-weight:400; color:var(--tinta-2); text-align:left; padding-bottom:6px; border-bottom:1px solid var(--linea); }
+    .hoja-dashboard .db-tabla th.db-th-num{ text-align:right; }
+    .hoja-dashboard .db-tabla td{ font-size:9px; color:var(--tinta); padding:5.5px 0; border-bottom:1px solid var(--linea-suave); vertical-align:middle; }
+    .hoja-dashboard .db-tabla tr:last-child td{ border-bottom:0; }
+    .hoja-dashboard .db-t-id{ font-size:8px; color:var(--tinta-3); width:34px; font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-t-fec{ font-size:8px; color:var(--tinta-2); width:82px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-t-num{ font-size:8.5px; text-align:right; width:46px; color:var(--tinta-2); font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-t-real{ font-weight:700; color:var(--tinta); }
+    .hoja-dashboard .db-t-real.db-alcanza{ color:var(--marca); }
+
+    /* ---------- ALERTAS ---------- */
+    .hoja-dashboard .db-alerta{ background:var(--gris-caja); padding:10px; margin-bottom:6px; }
+    .hoja-dashboard .db-alerta-desc{ font-size:8.5px; line-height:1.35; color:var(--tinta); }
+    .hoja-dashboard .db-alerta-pie{ display:flex; align-items:baseline; justify-content:space-between; margin-top:6px; }
+    .hoja-dashboard .db-sev{ font-size:7.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+    .hoja-dashboard .db-sev-critico{ color:var(--marca); }
+    .hoja-dashboard .db-sev-bajo{ color:var(--alerta-tinta); }
+    .hoja-dashboard .db-dias{ font-size:9px; font-weight:700; color:var(--tinta); font-variant-numeric:tabular-nums; }
+
+    /* ---------- HITOS (mejora) ---------- */
+    .hoja-dashboard .db-hito{ display:flex; align-items:flex-start; gap:7px; padding:4px 0; border-bottom:1px solid var(--linea-suave); }
+    .hoja-dashboard .db-hito:last-of-type{ border-bottom:0; }
+    .hoja-dashboard .db-hito-pt{ width:5px; height:5px; margin-top:4px; flex:none; border:1px solid var(--tinta-3); border-radius:50%; background:var(--papel); }
+    .hoja-dashboard .db-hito.db-cumplido .db-hito-pt{ background:var(--exito); border-color:var(--exito); }
+    .hoja-dashboard .db-hito-cod{ font-size:8px; color:var(--tinta-3); flex:none; width:16px; font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-hito-nom{ font-size:8px; line-height:1.35; color:var(--tinta); flex:1; }
+    .hoja-dashboard .db-hito-fec{ font-size:8px; color:var(--tinta-2); flex:none; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .hoja-dashboard .db-hito.db-cumplido .db-hito-fec{ color:var(--exito); }
+    .hoja-dashboard .db-hito-nota{ margin-top:7px; font-size:7.5px; line-height:1.45; color:var(--tinta-2); }
+
+    /* ---------- PIE ---------- */
+    .hoja-dashboard .db-pie{ margin-top:12px; padding-top:9px; border-top:1px solid var(--linea); text-align:center; font-size:8px; letter-spacing:.18em; text-transform:uppercase; color:var(--tinta-3); }
+  </style>
+
+  <!-- ================= CABECERA ================= -->
+  <header class="db-cab">
+    <div>
+      <p class="db-empresa">LARQUITECTURA STUDIO SAC</p>
+      <h1 class="db-titulo">LABORATORIO CRIOCORD - LURÍN</h1>
+      <div class="db-ficha" data-nuevo="true">
+        <span data-manual="true">RUC N° 20601689988</span>
+        <span class="db-sep">·</span>
+        <span data-manual="true">Carretera Panamericana Sur Km 29.5, Lima</span>
+        <span class="db-sep">·</span>
+        <span data-manual="true">Proyecto: PROGRAMACIÓN EP</span>
+      </div>
+    </div>
+    <div class="db-meta">
+      <p class="db-meta-linea">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.6" width="12" height="10.6" rx="1"/><path d="M2 6.9h12"/><path d="M5.4 1.9v3"/><path d="M10.6 1.9v3"/></svg>
+        Corte de Control: 08 de Agosto, 2026
+      </p>
+      <p class="db-meta-linea" data-manual="true">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.6" r="2.8"/><path d="M2.9 14c0-2.9 2.3-4.7 5.1-4.7s5.1 1.8 5.1 4.7"/></svg>
+        Residente: ARQ. EDUARDO PÉREZ CAP 32467
+      </p>
+    </div>
+  </header>
+
+  <!-- ================= CUERPO ================= -->
+  <div class="db-cuerpo">
+
+    <!-- ---------- COLUMNA IZQUIERDA ---------- -->
+    <div class="db-col">
+      <p class="db-rotulo">Avance de obra
+        <span class="db-estado" data-nuevo="true">AL DÍA</span>
+      </p>
+
+      <div class="db-donut">
+        <svg viewBox="0 0 108 108" width="108" height="108">
+          <circle cx="54" cy="54" r="47" fill="none" stroke="var(--linea-suave)" stroke-width="14"/>
+          <circle cx="54" cy="54" r="47" fill="none" stroke="var(--marca)" stroke-width="14"
+                  stroke-dasharray="32.5 262.8" transform="rotate(-90 54 54)"/>
+        </svg>
+        <div class="db-donut-centro">
+          <p class="db-donut-num">11%</p>
+          <p class="db-donut-lab">Real</p>
+        </div>
+      </div>
+
+      <div class="db-par">
+        <div class="db-par-celda">
+          <p class="db-par-num">11%</p>
+          <p class="db-par-lab">Planeado</p>
+        </div>
+        <div class="db-par-celda">
+          <p class="db-par-num db-marca">+0.0%</p>
+          <p class="db-par-lab">Desviación</p>
+        </div>
+      </div>
+
+      <p class="db-rotulo">Control de capítulos
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.1 14.6 5.6 8 9.1 1.4 5.6Z"/><path d="M1.4 9.6 8 13.1l6.6-3.5"/></svg>
+      </p>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo I: Gestión, Seguridad y Costos Indirectos</span>
+          <span class="db-cap-pct">P: 100%<span class="db-real">R: 100%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:100%"></span><span class="db-cap-plan" style="left:100%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo II: Trabajos Preliminares</span>
+          <span class="db-cap-pct">P: 100%<span class="db-real">R: 97%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:97%"></span><span class="db-cap-plan" style="left:100%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo III: Demoliciones y Desmontajes</span>
+          <span class="db-cap-pct">P: 94%<span class="db-real">R: 100%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:100%"></span><span class="db-cap-plan" style="left:94%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo IV: Movimiento de Tierra y Cimentaciones</span>
+          <span class="db-cap-pct">P: 64%<span class="db-real">R: 66%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:66%"></span><span class="db-cap-plan" style="left:64%"></span></div>
+      </div>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo V: Estructuras Metálicas y Losas</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo VI: ACI (Agua Contra Incendios)</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo VII: Instalaciones Sanitarias</span>
+          <span class="db-cap-pct">P: 16%<span class="db-real">R: 22%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:22%"></span><span class="db-cap-plan" style="left:16%"></span></div>
+      </div>
+
+      <div class="db-cap">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo VIII: Instalaciones Eléctricas y Comunicaciones</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 2%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:2%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo IX: DACI (Detección y Alarma)</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo X: HVAC</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo XI: Arquitectura y Acabados</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+
+      <div class="db-cap" data-nuevo="true">
+        <div class="db-cap-fila">
+          <span class="db-cap-nom">Capítulo XII: Cierre, Pruebas Integrales y Entrega</span>
+          <span class="db-cap-pct">P: 0%<span class="db-real">R: 0%</span></span>
+        </div>
+        <div class="db-cap-barra"><span class="db-cap-relleno" style="width:0%"></span><span class="db-cap-plan" style="left:0%"></span></div>
+      </div>
+    </div>
+
+    <!-- ---------- COLUMNA CENTRO ---------- -->
+    <div class="db-col">
+      <p class="db-rotulo">Curva S - Proyección</p>
+
+      <svg class="db-grafico" viewBox="0 0 455 199" preserveAspectRatio="xMidYMid meet">
+        <!-- rejilla: TODAS punteadas, incluida la del 0 -->
+        <line x1="34" y1="8" x2="450" y2="8" stroke="var(--linea-suave)" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="34" y1="50" x2="450" y2="50" stroke="var(--linea-suave)" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="34" y1="92" x2="450" y2="92" stroke="var(--linea-suave)" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="34" y1="134" x2="450" y2="134" stroke="var(--linea-suave)" stroke-width="1" stroke-dasharray="2 3"/>
+        <line x1="34" y1="176" x2="450" y2="176" stroke="var(--linea-suave)" stroke-width="1" stroke-dasharray="2 3"/>
+
+        <!-- eje Y -->
+        <text class="db-eje" x="27" y="11" text-anchor="end">100</text>
+        <text class="db-eje" x="27" y="53" text-anchor="end">75</text>
+        <text class="db-eje" x="27" y="95" text-anchor="end">50</text>
+        <text class="db-eje" x="27" y="137" text-anchor="end">25</text>
+        <text class="db-eje" x="27" y="179" text-anchor="end">0</text>
+
+        <!-- serie planeado -->
+        <polyline points="34,176 85.4,172.6 136.8,165.9 188.1,157.5 239.5,132.3 290.9,88.6 342.3,51.7 393.6,21.4 445,8"
+                  fill="none" stroke="var(--plan)" stroke-width="1.1" stroke-dasharray="3 3"/>
+        <g fill="var(--plan)">
+          <circle cx="34" cy="176" r="2"/><circle cx="85.4" cy="172.6" r="2"/><circle cx="136.8" cy="165.9" r="2"/>
+          <circle cx="188.1" cy="157.5" r="2"/><circle cx="239.5" cy="132.3" r="2"/><circle cx="290.9" cy="88.6" r="2"/>
+          <circle cx="342.3" cy="51.7" r="2"/><circle cx="393.6" cy="21.4" r="2"/><circle cx="445" cy="8" r="2"/>
+        </g>
+
+        <!-- serie real: solo hasta la fecha de corte -->
+        <polyline points="34,176 85.4,170.9 188.1,157.5"
+                  fill="none" stroke="var(--marca)" stroke-width="1.5"/>
+        <g fill="var(--marca)">
+          <circle cx="34" cy="176" r="2.2"/><circle cx="85.4" cy="170.9" r="2.2"/><circle cx="188.1" cy="157.5" r="2.2"/>
+        </g>
+
+        <!-- linea de corte y anotacion -->
+        <line x1="188.1" y1="8" x2="188.1" y2="176" stroke="var(--tinta-3)" stroke-width="0.8"/>
+        <rect x="197" y="12" width="112" height="46" fill="var(--papel)" stroke="var(--tinta)" stroke-width="0.8"/>
+        <text class="db-anot-fecha" x="205" y="26">08/08</text>
+        <text class="db-anot-txt" x="205" y="38">Avance Planeado : 11</text>
+        <text class="db-anot-real" x="205" y="50">Avance Real : 11</text>
+
+        <!-- eje X -->
+        <text class="db-eje" x="34" y="192" text-anchor="start">01/08</text>
+        <text class="db-eje" x="85.4" y="192" text-anchor="middle">03/08</text>
+        <text class="db-eje" x="136.8" y="192" text-anchor="middle">05/08</text>
+        <text class="db-eje" x="188.1" y="192" text-anchor="middle">08/08</text>
+        <text class="db-eje" x="239.5" y="192" text-anchor="middle">15/08</text>
+        <text class="db-eje" x="290.9" y="192" text-anchor="middle">30/08</text>
+        <text class="db-eje" x="342.3" y="192" text-anchor="middle">15/09</text>
+        <text class="db-eje" x="393.6" y="192" text-anchor="middle">30/09</text>
+        <text class="db-eje" x="445" y="192" text-anchor="middle">22/10</text>
+      </svg>
+
+      <div class="db-leyenda">
+        <span><i class="db-pun"></i>Avance Planeado</span>
+        <span><i class="db-lin"></i>Avance Real</span>
+      </div>
+
+      <p class="db-rotulo db-rotulo-sep">Partidas activas destacadas
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8.4h3.3l2-4.6 2.5 8.8 2-4.2h3.2"/></svg>
+      </p>
+
+      <table class="db-tabla">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Descripción de Tarea</th>
+            <th>Fechas</th>
+            <th class="db-th-num">% Plan</th>
+            <th class="db-th-num">% Real</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="db-t-id">25</td>
+            <td>3.3 Eliminación de material excedente</td>
+            <td class="db-t-fec">08/08 - 10/08</td>
+            <td class="db-t-num">63</td>
+            <td class="db-t-num db-t-real db-alcanza">100</td>
+          </tr>
+          <tr>
+            <td class="db-t-id">30</td>
+            <td>4.4 Solados para zapatas, acero corrugado y vaciado</td>
+            <td class="db-t-fec">07/08 - 10/08</td>
+            <td class="db-t-num">83</td>
+            <td class="db-t-num db-t-real">30</td>
+          </tr>
+          <tr>
+            <td class="db-t-id">46</td>
+            <td>7.2 Nivelación cama de arena, entubado y rellenado</td>
+            <td class="db-t-fec">06/08 - 10/08</td>
+            <td class="db-t-num">88</td>
+            <td class="db-t-num db-t-real db-alcanza">100</td>
+          </tr>
+          <tr>
+            <td class="db-t-id">47</td>
+            <td>7.3 Conexiones de TRONCAL principal desagüe</td>
+            <td class="db-t-fec">07/08 - 10/08</td>
+            <td class="db-t-num">81</td>
+            <td class="db-t-num db-t-real db-alcanza">81</td>
+          </tr>
+          <tr>
+            <td class="db-t-id">48</td>
+            <td>7.3.1 Conexiones de agua y desagüe general</td>
+            <td class="db-t-fec">10/08 - 15/08</td>
+            <td class="db-t-num">0</td>
+            <td class="db-t-num db-t-real db-alcanza">10</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ---------- COLUMNA DERECHA ---------- -->
+    <div class="db-col">
+      <p class="db-rotulo db-rotulo-marca">Alertas de atraso
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.4v4"/><path d="M8 4.9v.6"/></svg>
+      </p>
+
+      <div class="db-alerta">
+        <p class="db-alerta-desc">4.4 Solados para zapatas, acero corrugado y vaciado</p>
+        <div class="db-alerta-pie">
+          <span class="db-sev db-sev-critico">Crítico</span>
+          <span class="db-dias">−2 días</span>
+        </div>
+      </div>
+
+      <div class="db-alerta">
+        <p class="db-alerta-desc">2.4 Trazo y Replanteo</p>
+        <div class="db-alerta-pie">
+          <span class="db-sev db-sev-bajo">Bajo</span>
+          <span class="db-dias">−1 día</span>
+        </div>
+      </div>
+
+      <section data-nuevo="true">
+        <p class="db-rotulo db-rotulo-sep">Hitos del proyecto
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14V2.4"/><path d="M4 3.1h8.4l-2 2.7 2 2.7H4"/></svg>
+        </p>
+
+        <div class="db-hito db-cumplido">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.1</span>
+          <span class="db-hito-nom">Inicio de Obra y Entrega del almacén A-12 MEGACENTRO LURÍN</span>
+          <span class="db-hito-fec">01/08</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.2</span>
+          <span class="db-hito-nom">Fin de Trabajos Preliminares y Demoliciones</span>
+          <span class="db-hito-fec">10/08</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.3</span>
+          <span class="db-hito-nom">Fin de Cimentaciones y Estructura Metálica</span>
+          <span class="db-hito-fec">28/08</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.4</span>
+          <span class="db-hito-nom">Fin de Trabajos de proveedores Criocord (CO2 y demás instalaciones)</span>
+          <span class="db-hito-fec">16/09</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.5</span>
+          <span class="db-hito-nom">Cierre de Tabiquería Drywall</span>
+          <span class="db-hito-fec">19/09</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.6</span>
+          <span class="db-hito-nom">Fin de Instalaciones Electromecánicas</span>
+          <span class="db-hito-fec">18/09</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.7</span>
+          <span class="db-hito-nom">Fin de Acabados generales</span>
+          <span class="db-hito-fec">05/10</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.8</span>
+          <span class="db-hito-nom">Comisionamiento y Pruebas Generales</span>
+          <span class="db-hito-fec">18/09</span>
+        </div>
+        <div class="db-hito">
+          <span class="db-hito-pt"></span>
+          <span class="db-hito-cod">0.9</span>
+          <span class="db-hito-nom">Recepción Final de la Obra</span>
+          <span class="db-hito-fec">05/10</span>
+        </div>
+        <p class="db-hito-nota">Punto verde: hito ya alcanzado a la fecha de corte.</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- ================= PIE ================= -->
+  <footer class="db-pie">Reporte generado el 08 de Agosto, 2026 • Dashboard de Control de Obra</footer>
+</article></div></div>
+      </section>
+      <section id="s3">
+        <p class="pie-hoja"><b>Cronograma.</b> El volcado de MS&nbsp;Project, pero legible: se conserva la tabla con sus columnas y el Gantt con su escala, y se hace visible lo que ahí importa — ruta crítica, atrasos y la fecha de corte.</p>
+        <div class="marco"><div class="marco-centro"><article class="hoja hoja-cronograma hoja--h" style="width:1123px;height:794px">
+<style>
+.hoja-cronograma{box-sizing:border-box;position:relative;padding:14px 19px 12px;background:var(--papel);color:var(--tinta);font-family:"Plus Jakarta Sans",system-ui,sans-serif;overflow:hidden}
+.hoja-cronograma *{box-sizing:border-box}
+
+/* ---------------- cabecera ---------------- */
+.hoja-cronograma .cab{display:flex;align-items:flex-start;justify-content:space-between;height:46px}
+.hoja-cronograma .logo{width:74px;height:40px;border:0.7px solid var(--linea);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;flex:0 0 74px}
+.hoja-cronograma .logo b{font-family:"Montserrat",system-ui,sans-serif;font-weight:200;font-size:8.6px;letter-spacing:.22em;text-indent:.22em;color:var(--tinta)}
+.hoja-cronograma .logo i{font-style:normal;font-family:"Montserrat",system-ui,sans-serif;font-weight:500;font-size:5px;letter-spacing:.32em;text-indent:.32em;color:var(--marca)}
+
+.hoja-cronograma .membrete{text-align:right;font-size:7px;line-height:1.45;color:var(--tinta-2)}
+.hoja-cronograma .membrete .m1{font-weight:600;color:var(--tinta);font-size:7.2px;letter-spacing:.03em}
+.hoja-cronograma .membrete .mono{font-family:"IBM Plex Mono",monospace;font-size:6.8px}
+.hoja-cronograma .membrete .pct{font-family:"IBM Plex Mono",monospace;font-size:8.8px;font-weight:600;color:var(--tinta);line-height:1.2}
+.hoja-cronograma .membrete .corte{margin-top:2px;padding-top:2.5px;border-top:0.7px solid var(--linea);font-family:"IBM Plex Mono",monospace;font-size:6.5px;color:var(--tinta-2)}
+.hoja-cronograma .membrete .corte b{font-weight:600;color:var(--marca)}
+.hoja-cronograma .membrete .corte .neu{color:var(--tinta);font-weight:600}
+
+/* ---------------- plano ---------------- */
+.hoja-cronograma .plano{display:flex;margin-top:8px;border:0.7px solid var(--linea)}
+.hoja-cronograma .tabla{width:523.6px;flex:0 0 523.6px;border-right:0.7px solid var(--tinta-3)}
+.hoja-cronograma .gantt{width:560px;flex:0 0 560px;position:relative}
+
+.hoja-cronograma .th-tit{height:24px;display:flex;align-items:center;justify-content:space-between;padding:0 6px;border-bottom:0.5px solid var(--linea-suave)}
+.hoja-cronograma .th-tit .t{font-size:7px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.hoja-cronograma .th-tit .s{font-family:"IBM Plex Mono",monospace;font-size:6px;color:var(--tinta-2)}
+
+.hoja-cronograma .fila,.hoja-cronograma .th-cols{display:grid;grid-template-columns:18px 26px 190px 42px 54px 54px 58px 37px 40px;align-items:center;padding:0 2px}
+.hoja-cronograma .th-cols{height:22px;border-top:0.7px solid var(--linea);border-bottom:0.7px solid var(--tinta-3);font-size:5.4px;line-height:1.16;font-weight:600;letter-spacing:.03em;color:var(--tinta-2);text-transform:uppercase}
+.hoja-cronograma .th-cols>span{padding:0 3px}
+.hoja-cronograma .th-cols>span:nth-child(2){padding:0 1px;text-align:center;font-size:4.8px}
+.hoja-cronograma .th-cols>span:nth-child(4),.hoja-cronograma .th-cols>span:nth-child(8),.hoja-cronograma .th-cols>span:nth-child(9){text-align:right}
+
+.hoja-cronograma .fila{height:16px;font-size:6.6px;border-bottom:0.5px solid var(--linea-suave)}
+.hoja-cronograma .fila>span{padding:0 3px;white-space:nowrap;overflow:hidden}
+.hoja-cronograma .fila>span:nth-child(1){font-family:"IBM Plex Mono",monospace;font-size:6.1px;color:var(--tinta-2);text-align:right}
+.hoja-cronograma .fila>span:nth-child(2){display:flex;align-items:center;justify-content:center;padding:0}
+.hoja-cronograma .fila>span:nth-child(3){text-overflow:ellipsis}
+.hoja-cronograma .fila>span:nth-child(4){font-family:"IBM Plex Mono",monospace;font-size:6px;text-align:right;padding:0 2px;color:var(--tinta-2)}
+.hoja-cronograma .fila>span:nth-child(5),.hoja-cronograma .fila>span:nth-child(6){font-family:"IBM Plex Mono",monospace;font-size:6.1px;color:var(--tinta-2);padding:0 2px}
+.hoja-cronograma .fila>span:nth-child(7){font-family:"IBM Plex Mono",monospace;font-size:5.9px;color:var(--tinta-2);padding:0 2px}
+.hoja-cronograma .fila>span:nth-child(8){font-family:"IBM Plex Mono",monospace;font-size:6.2px;text-align:right;color:var(--plan)}
+.hoja-cronograma .fila>span:nth-child(9){font-family:"IBM Plex Mono",monospace;font-size:6.2px;text-align:right;font-weight:600}
+
+.hoja-cronograma .mo{width:8px;height:8px;fill:none;stroke:var(--tinta-3);stroke-width:1.1;stroke-linecap:round;stroke-linejoin:round}
+
+.hoja-cronograma .f-proy{background:var(--marca);border-bottom:0.7px solid var(--marca)}
+.hoja-cronograma .f-proy>span{color:var(--papel)!important;font-weight:700}
+.hoja-cronograma .f-proy .mo{stroke:var(--papel)}
+.hoja-cronograma .f-cap{background:var(--marca-tenue);font-weight:700}
+.hoja-cronograma .f-cap>span:nth-child(3){font-size:6.5px}
+.hoja-cronograma .f-cap>span:nth-child(8){color:var(--tinta-2)}
+.hoja-cronograma .f-hito>span:nth-child(3){font-size:6px;grid-column:span 2}
+.hoja-cronograma .f-hito>span:nth-child(4),.hoja-cronograma .f-hito>span:nth-child(5){font-family:"IBM Plex Mono",monospace;font-size:6.1px;text-align:left;color:var(--tinta-2);padding:0 2px}
+.hoja-cronograma .sang{padding-left:11px!important}
+.hoja-cronograma .ok{color:var(--marca)!important}
+.hoja-cronograma .bajo{color:var(--tinta)!important}
+
+/* ---------------- escala ---------------- */
+.hoja-cronograma .esc-mes{height:13px;display:flex;border-bottom:0.5px solid var(--linea-suave);position:relative;z-index:2;background:var(--papel)}
+.hoja-cronograma .esc-mes div{border-right:0.7px solid var(--linea);display:flex;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;font-size:6.2px;color:var(--tinta-2);letter-spacing:.06em}
+.hoja-cronograma .esc-sem{height:15px;display:flex;border-bottom:0.7px solid var(--tinta-3);position:relative;z-index:2;background:var(--papel)}
+.hoja-cronograma .esc-sem div{width:40px;flex:0 0 40px;border-right:0.5px solid var(--linea-suave);display:flex;align-items:center;justify-content:center;font-family:"IBM Plex Mono",monospace;font-size:6.2px;color:var(--tinta-2)}
+.hoja-cronograma .esc-sem div.mes{border-right:0.7px solid var(--linea)}
+.hoja-cronograma .esc-marcas{height:18px;position:relative;z-index:3;background:var(--papel)}
+.hoja-cronograma .chip-corte{position:absolute;top:4px;right:calc(100% - 160px);height:10px;padding:0 4px;background:var(--marca);color:var(--papel);font-family:"IBM Plex Mono",monospace;font-size:5.6px;line-height:10px;letter-spacing:.03em;white-space:nowrap}
+
+/* ---------------- rejilla y barras ---------------- */
+.hoja-cronograma .rejilla{position:relative;z-index:2;background-image:repeating-linear-gradient(to right,var(--linea-suave) 0 0.5px,transparent 0.5px 40px)}
+.hoja-cronograma .meses-linea{position:absolute;inset:0;pointer-events:none;z-index:1;background-image:linear-gradient(to right,transparent 0 119.5px,var(--linea) 119.5px 120px,transparent 120px 319.5px,var(--linea) 319.5px 320px,transparent 320px 479.5px,var(--linea) 479.5px 480px,transparent 480px)}
+.hoja-cronograma .corte-lin{position:absolute;top:28px;bottom:0;left:159.3px;width:1.4px;background:var(--marca);z-index:6}
+.hoja-cronograma .g-fila{height:16px;position:relative;border-bottom:0.5px solid var(--linea-suave);z-index:2}
+
+.hoja-cronograma .b{position:absolute;top:4.7px;height:6.6px}
+.hoja-cronograma .b.tarea{background:var(--plan)}
+.hoja-cronograma .b.tarea.tarde{background:repeating-linear-gradient(135deg,var(--plan) 0 2px,var(--gris-caja) 2px 3.7px)}
+.hoja-cronograma .b.res{background:var(--tinta);top:5.5px;height:4px}
+.hoja-cronograma .b.res::before,.hoja-cronograma .b.res::after{content:"";position:absolute;top:4px;border-left:3.2px solid transparent;border-right:3.2px solid transparent;border-top:4px solid var(--tinta)}
+.hoja-cronograma .b.res::before{left:0}
+.hoja-cronograma .b.res::after{right:0}
+.hoja-cronograma .b .pg{position:absolute;left:0;top:2.6px;height:1.4px;background:var(--tinta)}
+.hoja-cronograma .b.res .pg{top:1.3px;height:1.4px;background:var(--tinta)}
+.hoja-cronograma .b .di,.hoja-cronograma .b .df{position:absolute;top:0;font-family:"IBM Plex Mono",monospace;font-size:5.6px;color:var(--tinta-2);line-height:6.6px}
+.hoja-cronograma .b .di{right:100%;margin-right:2.5px}
+.hoja-cronograma .b .df{left:100%;margin-left:2.5px}
+.hoja-cronograma .b.res .di,.hoja-cronograma .b.res .df{line-height:4px}
+.hoja-cronograma .hito-g{position:absolute;top:5px;width:6px;height:6px;background:var(--tinta);transform:rotate(45deg)}
+.hoja-cronograma .hito-f{position:absolute;top:4.9px;font-family:"IBM Plex Mono",monospace;font-size:5.6px;line-height:6.6px;color:var(--tinta-2)}
+
+/* ---------------- pie ---------------- */
+.hoja-cronograma .pie{margin-top:9px;display:flex;gap:14px;align-items:flex-start}
+.hoja-cronograma .pie .bl{flex:1;min-width:0;border-top:1px solid var(--tinta);padding-top:4px}
+.hoja-cronograma .pie .bl.alertas{flex:0 0 215px;border-top:1px solid var(--marca)}
+.hoja-cronograma .pie h4{margin:0 0 4px;font-size:5.7px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--tinta)}
+.hoja-cronograma .pie .bl.alertas h4{color:var(--marca)}
+
+.hoja-cronograma .leg{display:grid;grid-template-columns:repeat(4,1fr);column-gap:10px;row-gap:2.4px}
+.hoja-cronograma .leg div{display:flex;align-items:center;gap:4px;font-size:5.6px;color:var(--tinta-2);white-space:nowrap;overflow:hidden}
+.hoja-cronograma .leg i{flex:0 0 22px;height:6px;position:relative;font-style:normal}
+.hoja-cronograma .leg i.tar{background:var(--plan)}
+.hoja-cronograma .leg i.div{background:repeating-linear-gradient(to right,var(--plan) 0 3px,transparent 3px 5px)}
+.hoja-cronograma .leg i.res{background:var(--tinta);height:4px;margin-top:-1px}
+.hoja-cronograma .leg i.res::before,.hoja-cronograma .leg i.res::after{content:"";position:absolute;top:4px;border-left:3px solid transparent;border-right:3px solid transparent;border-top:3.6px solid var(--tinta)}
+.hoja-cronograma .leg i.res::before{left:0}
+.hoja-cronograma .leg i.res::after{right:0}
+.hoja-cronograma .leg i.res.gris{background:var(--tinta-3)}
+.hoja-cronograma .leg i.res.gris::before,.hoja-cronograma .leg i.res.gris::after{border-top-color:var(--tinta-3)}
+.hoja-cronograma .leg i.res.roja{background:var(--peligro)}
+.hoja-cronograma .leg i.res.roja::before,.hoja-cronograma .leg i.res.roja::after{border-top-color:var(--peligro)}
+.hoja-cronograma .leg i.res.hueca{background:var(--papel);border:0.6px solid var(--tinta-3);height:4.5px}
+.hoja-cronograma .leg i.res.hueca::before,.hoja-cronograma .leg i.res.hueca::after{border-top-color:var(--tinta-3)}
+.hoja-cronograma .leg i.hit::before{content:"";position:absolute;left:8px;top:0;width:6px;height:6px;background:var(--tinta);transform:rotate(45deg)}
+.hoja-cronograma .leg i.hit.gris::before{background:var(--tinta-3)}
+.hoja-cronograma .leg i.hit.hueco::before{background:var(--papel);border:0.6px solid var(--tinta-2)}
+.hoja-cronograma .leg i.cri{background:var(--peligro)}
+.hoja-cronograma .leg i.ext{background:var(--tinta-3)}
+.hoja-cronograma .leg i.ina{background:var(--papel);border:0.6px solid var(--tinta-3)}
+.hoja-cronograma .leg i.man{background:var(--gris-caja);border:0.6px solid var(--tinta-3)}
+.hoja-cronograma .leg i.dur::before,.hoja-cronograma .leg i.dur::after{content:"";position:absolute;top:0;width:1.2px;height:6px;background:var(--tinta-2)}
+.hoja-cronograma .leg i.dur::before{left:0}
+.hoja-cronograma .leg i.dur::after{right:0}
+.hoja-cronograma .leg i.dur{background:linear-gradient(to bottom,transparent 2.4px,var(--tinta-3) 2.4px 3.6px,transparent 3.6px)}
+.hoja-cronograma .leg i.ini::before{content:"";position:absolute;left:0;top:0;width:1.4px;height:6px;background:var(--tinta-2)}
+.hoja-cronograma .leg i.fin::before{content:"";position:absolute;right:0;top:0;width:1.4px;height:6px;background:var(--tinta-2)}
+.hoja-cronograma .leg i.lim::before{content:"";position:absolute;left:8px;top:0;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:6px solid var(--tinta-2)}
+.hoja-cronograma .leg i.pro{background:var(--linea)}
+.hoja-cronograma .leg i.pro::before{content:"";position:absolute;left:0;top:2.3px;width:14px;height:1.4px;background:var(--tinta)}
+.hoja-cronograma .leg i.eje{background:var(--plan)}
+.hoja-cronograma .leg i.eje::before{content:"";position:absolute;left:0;top:2.3px;width:11px;height:1.4px;background:var(--tinta)}
+.hoja-cronograma .leg i.com{background:var(--exito)}
+.hoja-cronograma .leg i.cor::before{content:"";position:absolute;left:10px;top:-1.5px;width:1.4px;height:9px;background:var(--marca)}
+.hoja-cronograma .leg i.tarde{background:repeating-linear-gradient(135deg,var(--plan) 0 2px,var(--gris-caja) 2px 3.7px)}
+
+.hoja-cronograma .alerta-f{display:flex;align-items:flex-start;gap:5px;background:var(--gris-caja);padding:4px 5px;margin-bottom:3px}
+.hoja-cronograma .alerta-f svg{width:9px;height:9px;fill:none;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 9px;margin-top:0.5px}
+.hoja-cronograma .alerta-f .cr svg,.hoja-cronograma .alerta-f svg.cr{stroke:var(--peligro)}
+.hoja-cronograma .alerta-f svg.bj{stroke:var(--alerta-tinta)}
+.hoja-cronograma .alerta-f .tx{flex:1;min-width:0;font-size:5.9px;line-height:1.3;color:var(--tinta)}
+.hoja-cronograma .alerta-f .sv{display:block;margin-top:1px;font-size:5.6px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.hoja-cronograma .alerta-f .sv.cr{color:var(--peligro)}
+.hoja-cronograma .alerta-f .sv.bj{color:var(--alerta-tinta)}
+.hoja-cronograma .alerta-f .dd{font-family:"IBM Plex Mono",monospace;font-size:6.4px;font-weight:700;color:var(--tinta);flex:0 0 auto;align-self:center}
+
+.hoja-cronograma .firma{margin-top:8px;border-top:0.7px solid var(--linea);padding-top:4px;font-family:"IBM Plex Mono",monospace;font-size:6.2px;color:var(--tinta-2);line-height:1.5}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="cro-mt" viewBox="0 0 10 10"><rect x="1.4" y="2.2" width="7.2" height="6.4" rx="0.8"/><path d="M1.4 4.3h7.2M3.4 1.2v2M6.6 1.2v2"/></symbol>
+  <symbol id="cro-al" viewBox="0 0 10 10"><path d="M5 1.5 9.2 8.6H0.8z"/><path d="M5 4.3v1.9M5 7.4v.1"/></symbol>
+</defs></svg>
+
+<!-- ======================= CABECERA ======================= -->
+<div class="cab">
+  <div class="logo"><b>LARQ</b><i>STUDIO</i></div>
+  <div class="membrete">
+    <div class="m1">LABORATORIO INSTITUTO DE CRIOPRESERVACIÓN Y TERAPIA CELULAR</div>
+    <div data-manual="true">Carretera Panamericana Sur Km 29.5, Lima</div>
+    <div data-manual="true">LARQUITECTURA STUDIO SAC&nbsp; / &nbsp;RUC N° 20601689988</div>
+    <div class="mono">sáb 08/08/26</div>
+    <div class="pct">11%</div>
+    <div class="corte" data-nuevo="true">Corte <b>sáb 08/08/26</b> &nbsp;·&nbsp; real <b>11%</b> &nbsp;·&nbsp; planeado <span class="neu">11%</span> &nbsp;·&nbsp; desviación <b>+0.0%</b></div>
+  </div>
+</div>
+
+<!-- ======================= PLANO ======================= -->
+<div class="plano">
+
+  <!-- ------------------- TABLA ------------------- -->
+  <div class="tabla">
+    <div class="th-tit">
+      <div class="t">Tareas del cronograma</div>
+      <div class="s">PROGRAMACION EP &nbsp;·&nbsp; sáb 08/08/26</div>
+    </div>
+    <div class="th-cols">
+      <span>Id</span><span>Modo de tarea</span><span>Nombre de tarea</span><span>Duración</span><span>Comienzo</span><span>Fin</span><span>Predecesoras</span><span>% Planeado</span><span>% completado</span>
+    </div>
+
+    <div class="fila f-proy"><span>0</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span data-manual="true">PROGRAMACION EP</span><span>51 días</span><span>sáb 01/08/26</span><span>lun 05/10/26</span><span></span><span>11%</span><span>11%</span></div>
+
+    <div class="fila f-hito"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>0.1 Inicio de Obra y Entrega del almacén A-12 MEGACENTRO LURÍN</span><span>sáb 01/08/26</span><span>sáb 01/08/26</span><span></span><span></span><span class="ok">100%</span></div>
+    <div class="fila f-hito"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>0.2 Fin de Trabajos Preliminares y Demoliciones</span><span>lun 10/08/26</span><span>lun 10/08/26</span><span></span><span></span><span></span></div>
+    <div class="fila f-hito"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>0.3 Fin de Cimentaciones y Estructura Metálica</span><span>vie 28/08/26</span><span>vie 28/08/26</span><span></span><span></span><span></span></div>
+    <div class="fila f-hito"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>0.4 Fin de Trabajos de proveedores Criocord (CO2 y demás instalaciones)</span><span>mié 16/09/26</span><span>mié 16/09/26</span><span></span><span></span><span></span></div>
+    <div class="fila f-hito"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>0.5 Cierre de Tabiquería Drywall</span><span>sáb 19/09/26</span><span>sáb 19/09/26</span><span></span><span></span><span></span></div>
+    <div class="fila f-hito"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>0.6 Fin de Instalaciones Electromecánicas</span><span>vie 18/09/26</span><span>vie 18/09/26</span><span></span><span></span><span></span></div>
+    <div class="fila f-hito"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>0.7 Fin de Acabados generales</span><span>lun 05/10/26</span><span>lun 05/10/26</span><span></span><span></span><span></span></div>
+    <div class="fila f-hito"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>0.8 Comisionamiento y Pruebas Generales</span><span>vie 18/09/26</span><span>vie 18/09/26</span><span></span><span></span><span></span></div>
+    <div class="fila f-hito"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>0.9 Recepción Final de la Obra</span><span>lun 05/10/26</span><span>lun 05/10/26</span><span></span><span></span><span></span></div>
+
+    <div class="fila f-cap"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>I &nbsp;GESTIÓN, SEGURIDAD Y COSTOS INDIRECTOS</span><span></span><span></span><span></span><span></span><span>100%</span><span class="ok">100%</span></div>
+
+    <div class="fila f-cap"><span>16</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>II &nbsp;TRABAJOS PRELIMINARES</span><span>5 días</span><span>lun 03/08/26</span><span>vie 07/08/26</span><span></span><span>100%</span><span class="bajo">97%</span></div>
+    <div class="fila"><span>17</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span class="sang">2.1 Movilización y desmovilización</span><span>1 día</span><span>lun 03/08/26</span><span>lun 03/08/26</span><span></span><span>100%</span><span class="ok">100%</span></div>
+    <div class="fila"><span>18</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span class="sang">2.2 Instalaciones provisionales (Almacén, oficina)</span><span>2 días</span><span>lun 03/08/26</span><span>mar 04/08/26</span><span></span><span>100%</span><span class="ok">100%</span></div>
+    <div class="fila"><span>19</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span class="sang">2.3 Cerramientos y señalización de área de trabajo</span><span>1 día</span><span>mié 05/08/26</span><span>mié 05/08/26</span><span>18</span><span>100%</span><span class="ok">100%</span></div>
+    <div class="fila"><span>20</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span class="sang">2.4 Trazo y Replanteo de ejes y niveles</span><span>2 días</span><span>jue 06/08/26</span><span>vie 07/08/26</span><span>19</span><span>100%</span><span class="bajo">95%</span></div>
+    <div class="fila"><span>21</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span class="sang">2.5 Habilitación de redes eléctricas prov. e internet</span><span>1 día</span><span>lun 03/08/26</span><span>lun 03/08/26</span><span></span><span>100%</span><span class="bajo">90%</span></div>
+
+    <div class="fila f-cap"><span>22</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>III &nbsp;DEMOLICIONES Y DESMONTAJES</span><span>6 días</span><span>lun 03/08/26</span><span>lun 10/08/26</span><span></span><span>94%</span><span class="ok">100%</span></div>
+    <div class="fila"><span>25</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span class="sang">3.3 Eliminación de material excedente</span><span>1 día</span><span>sáb 08/08/26</span><span>lun 10/08/26</span><span>24FC+3 días</span><span>63%</span><span class="ok">100%</span></div>
+
+    <div class="fila f-cap"><span>26</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>IV &nbsp;MOVIMIENTO DE TIERRA Y CIMENTACIONES</span><span>8.8 días</span><span>lun 03/08/26</span><span>jue 13/08/26</span><span></span><span>64%</span><span class="ok">66%</span></div>
+    <div class="fila"><span>29</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span class="sang">4.3 Excavación para zapatas (4.25 m3)</span><span>1 día</span><span>mar 04/08/26</span><span>vie 07/08/26</span><span>28</span><span>100%</span><span class="ok">100%</span></div>
+    <div class="fila"><span>30</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span class="sang">4.4 Solados para zapatas, acero corrugado y vaciado</span><span>1 día</span><span>vie 07/08/26</span><span>lun 10/08/26</span><span>29</span><span>83%</span><span class="bajo">30%</span></div>
+    <div class="fila"><span>31</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span class="sang">4.5 Curado de concreto en zapatas</span><span>3 días</span><span>lun 10/08/26</span><span>jue 13/08/26</span><span>30</span><span>0%</span><span class="ok">0%</span></div>
+
+    <div class="fila f-cap"><span>33</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>V &nbsp;ESTRUCTURAS METÁLICAS Y LOSAS</span><span>15 días</span><span>lun 10/08/26</span><span>vie 28/08/26</span><span></span><span>0%</span><span class="ok">0%</span></div>
+
+    <div class="fila f-cap"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>VI &nbsp;ACI — AGUA CONTRA INCENDIOS</span><span></span><span></span><span></span><span></span><span>0%</span><span class="ok">0%</span></div>
+
+    <div class="fila f-cap"><span>44</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>VII &nbsp;INSTALACIONES SANITARIAS</span><span>35 días</span><span>lun 03/08/26</span><span>mar 15/09/26</span><span></span><span>16%</span><span class="ok">22%</span></div>
+    <div class="fila"><span>47</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span class="sang">7.3 Conexiones de TRONCAL principal desagüe piso 1</span><span>2 días</span><span>vie 07/08/26</span><span>lun 10/08/26</span><span>46FC-2 días</span><span>81%</span><span class="ok">81%</span></div>
+
+    <div class="fila f-cap"><span>54</span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>VIII &nbsp;INSTALACIONES ELÉCTRICAS Y COMUNICACIONES</span><span>36 días</span><span>jue 20/08/26</span><span>lun 05/10/26</span><span></span><span>0%</span><span class="ok">2%</span></div>
+
+    <div class="fila f-cap"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>IX &nbsp;DACI — DETECCIÓN Y ALARMA</span><span></span><span></span><span></span><span></span><span>0%</span><span class="ok">0%</span></div>
+    <div class="fila f-cap"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>X &nbsp;HVAC</span><span></span><span></span><span></span><span></span><span>0%</span><span class="ok">0%</span></div>
+    <div class="fila f-cap"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>XI &nbsp;ARQUITECTURA Y ACABADOS</span><span></span><span></span><span></span><span></span><span>0%</span><span class="ok">0%</span></div>
+    <div class="fila f-cap"><span></span><span><svg class="mo" viewBox="0 0 10 10"><use href="#cro-mt"/></svg></span><span>XII &nbsp;CIERRE, PRUEBAS INTEGRALES Y ENTREGA</span><span></span><span></span><span></span><span></span><span>0%</span><span class="ok">0%</span></div>
+  </div>
+
+  <!-- ------------------- GANTT ------------------- -->
+  <div class="gantt">
+    <div class="esc-mes">
+      <div style="width:120px;flex:0 0 120px">jul '26</div>
+      <div style="width:200px;flex:0 0 200px">ago '26</div>
+      <div style="width:160px;flex:0 0 160px">sep '26</div>
+      <div style="width:80px;flex:0 0 80px;border-right:0">oct '26</div>
+    </div>
+    <div class="esc-sem">
+      <div>12</div><div>19</div><div class="mes">26</div>
+      <div>02</div><div>09</div><div>16</div><div>23</div><div class="mes">30</div>
+      <div>06</div><div>13</div><div>20</div><div class="mes">27</div>
+      <div>04</div><div style="border-right:0">11</div>
+    </div>
+
+    <div class="esc-marcas">
+      <div class="chip-corte" data-nuevo="true">CORTE sáb 08/08/26</div>
+    </div>
+
+    <div class="rejilla">
+      <div class="meses-linea"></div>
+
+      <!-- proyecto -->
+      <div class="g-fila"><div class="b res" style="left:114.29px;width:377.14px"><span class="di">01/08</span><div class="pg" style="width:11%"></div><span class="df">05/10</span></div></div>
+
+      <!-- hitos -->
+      <div class="g-fila"><div class="hito-g" style="left:114.29px"></div><div class="hito-f" style="left:124px">01/08</div></div>
+      <div class="g-fila"><div class="hito-g" style="left:165.71px"></div><div class="hito-f" style="left:175.4px">10/08</div></div>
+      <div class="g-fila"><div class="hito-g" style="left:268.57px"></div><div class="hito-f" style="left:278.3px">28/08</div></div>
+      <div class="g-fila"><div class="hito-g" style="left:377.14px"></div><div class="hito-f" style="left:386.9px">16/09</div></div>
+      <div class="g-fila"><div class="hito-g" style="left:394.29px"></div><div class="hito-f" style="left:404px">19/09</div></div>
+      <div class="g-fila"><div class="hito-g" style="left:388.57px"></div><div class="hito-f" style="left:398.3px">18/09</div></div>
+      <div class="g-fila"><div class="hito-g" style="left:485.71px"></div><div class="hito-f" style="left:495.4px">05/10</div></div>
+      <div class="g-fila"><div class="hito-g" style="left:388.57px"></div><div class="hito-f" style="left:398.3px">18/09</div></div>
+      <div class="g-fila"><div class="hito-g" style="left:485.71px"></div><div class="hito-f" style="left:495.4px">05/10</div></div>
+
+      <!-- I: sin fechas en el corte -->
+      <div class="g-fila"></div>
+
+      <!-- II -->
+      <div class="g-fila"><div class="b res" style="left:125.71px;width:28.57px"><span class="di">03/08</span><div class="pg" style="width:97%"></div><span class="df">07/08</span></div></div>
+      <div class="g-fila"><div class="b tarea" style="left:125.71px;width:5.71px"><span class="di">03/08</span><div class="pg" style="width:100%"></div><span class="df">03/08</span></div></div>
+      <div class="g-fila"><div class="b tarea" style="left:125.71px;width:11.43px"><span class="di">03/08</span><div class="pg" style="width:100%"></div><span class="df">04/08</span></div></div>
+      <div class="g-fila"><div class="b tarea" style="left:137.14px;width:5.71px"><span class="di">05/08</span><div class="pg" style="width:100%"></div><span class="df">05/08</span></div></div>
+      <div class="g-fila"><div class="b tarea tarde" style="left:142.86px;width:11.43px"><span class="di">06/08</span><div class="pg" style="width:95%"></div><span class="df">07/08</span></div></div>
+      <div class="g-fila"><div class="b tarea tarde" style="left:125.71px;width:5.71px"><span class="di">03/08</span><div class="pg" style="width:90%"></div><span class="df">03/08</span></div></div>
+
+      <!-- III -->
+      <div class="g-fila"><div class="b res" style="left:125.71px;width:45.71px"><span class="di">03/08</span><div class="pg" style="width:100%"></div><span class="df">10/08</span></div></div>
+      <div class="g-fila"><div class="b tarea" style="left:154.29px;width:17.14px"><span class="di">08/08</span><div class="pg" style="width:100%"></div><span class="df">10/08</span></div></div>
+
+      <!-- IV -->
+      <div class="g-fila"><div class="b res" style="left:125.71px;width:62.86px"><span class="di">03/08</span><div class="pg" style="width:66%"></div><span class="df">13/08</span></div></div>
+      <div class="g-fila"><div class="b tarea" style="left:131.43px;width:22.86px"><span class="di">04/08</span><div class="pg" style="width:100%"></div><span class="df">07/08</span></div></div>
+      <div class="g-fila"><div class="b tarea tarde" style="left:148.57px;width:22.86px"><span class="di">07/08</span><div class="pg" style="width:30%"></div><span class="df">10/08</span></div></div>
+      <div class="g-fila"><div class="b tarea" style="left:165.71px;width:22.86px"><span class="di">10/08</span><span class="df">13/08</span></div></div>
+
+      <!-- V -->
+      <div class="g-fila"><div class="b res" style="left:165.71px;width:108.57px"><span class="di">10/08</span><span class="df">28/08</span></div></div>
+
+      <!-- VI: sin fechas en el corte -->
+      <div class="g-fila"></div>
+
+      <!-- VII -->
+      <div class="g-fila"><div class="b res" style="left:125.71px;width:251.43px"><span class="di">03/08</span><div class="pg" style="width:22%"></div><span class="df">15/09</span></div></div>
+      <div class="g-fila"><div class="b tarea" style="left:148.57px;width:22.86px"><span class="di">07/08</span><div class="pg" style="width:81%"></div><span class="df">10/08</span></div></div>
+
+      <!-- VIII -->
+      <div class="g-fila"><div class="b res" style="left:222.86px;width:268.57px"><span class="di">20/08</span><div class="pg" style="width:2%"></div><span class="df">05/10</span></div></div>
+
+      <!-- IX a XII: sin fechas en el corte -->
+      <div class="g-fila"></div>
+      <div class="g-fila"></div>
+      <div class="g-fila"></div>
+      <div class="g-fila" style="border-bottom:0"></div>
+    </div>
+
+    <div class="corte-lin" data-nuevo="true"></div>
+  </div>
+</div>
+
+<!-- ======================= PIE ======================= -->
+<div class="pie">
+
+  <div class="bl">
+    <h4>Leyenda</h4>
+    <div class="leg">
+      <div><i class="tar"></i>Tarea</div>
+      <div><i class="div"></i>División</div>
+      <div><i class="hit"></i>Hito</div>
+      <div><i class="res"></i>Resumen</div>
+      <div><i class="res"></i>Resumen del proyecto</div>
+      <div><i class="res gris"></i>Agrupar por síntesis</div>
+      <div><i class="ext"></i>Tarea resumida</div>
+      <div><i class="res roja"></i>Tarea crítica resumida</div>
+      <div><i class="hit gris"></i>Hito resumido</div>
+      <div><i class="pro"></i>Progreso resumido</div>
+      <div><i class="ext"></i>Tareas externas</div>
+      <div><i class="hit hueco"></i>Hito externo</div>
+      <div><i class="ina"></i>Tarea inactiva</div>
+      <div><i class="hit hueco"></i>Hito inactivo</div>
+      <div><i class="res hueca"></i>Resumen inactivo</div>
+      <div><i class="man"></i>Tarea manual</div>
+      <div><i class="dur"></i>solo duración</div>
+      <div><i class="res hueca"></i>Informe de resumen manual</div>
+      <div><i class="res hueca"></i>Resumen manual</div>
+      <div><i class="ini"></i>solo el comienzo</div>
+      <div><i class="fin"></i>solo fin</div>
+      <div><i class="lim"></i>Fecha límite</div>
+      <div><i class="cri"></i>Tarea crítica</div>
+      <div><i class="pro"></i>Progreso</div>
+      <div><i class="eje"></i>Tareas en ejecución</div>
+      <div><i class="com"></i>Tareas completadas</div>
+      <div data-nuevo="true"><i class="cor"></i>Fecha de corte</div>
+      <div data-nuevo="true"><i class="tarde"></i>Va por detrás del plan</div>
+    </div>
+  </div>
+
+  <div class="bl alertas" data-nuevo="true">
+    <h4>Alertas de atraso al corte</h4>
+    <div class="alerta-f">
+      <svg class="cr" viewBox="0 0 10 10"><use href="#cro-al"/></svg>
+      <span class="tx">4.4 Solados para zapatas, acero corrugado y vaciado<span class="sv cr">Crítico</span></span>
+      <span class="dd">−2 días</span>
+    </div>
+    <div class="alerta-f">
+      <svg class="bj" viewBox="0 0 10 10"><use href="#cro-al"/></svg>
+      <span class="tx">2.4 Trazo y Replanteo<span class="sv bj">Bajo</span></span>
+      <span class="dd">−1 día</span>
+    </div>
+  </div>
+</div>
+
+<div class="firma">
+  <div data-manual="true">Proyecto: PROGRAMACION EP</div>
+  <div>Fecha: sáb 08/08/26</div>
+</div>
+
+</article></div></div>
+      </section>
+      <section id="s4">
+        <p class="pie-hoja"><b>Bitácora diaria.</b> Intacta en su identidad: regla superior, rótulo a la derecha, semana gigante en gris, cuadrícula 2×3 con sello de geolocalización y el bloque de trabajo realizado.</p>
+        <div class="marco"><div class="marco-centro"><article class="hoja hoja-bitacora hoja--v" style="width:794px;height:1123px">
+  <style>
+    .hoja-bitacora *{box-sizing:border-box;margin:0;padding:0}
+    .hoja-bitacora .lienzo{width:100%;height:100%;padding:24px 38px 16px;background:var(--papel);
+      font-family:"Plus Jakarta Sans",system-ui,sans-serif;color:var(--tinta);
+      -webkit-font-smoothing:antialiased;overflow:hidden}
+
+    /* ================= CABECERA (original) ================= */
+    .hoja-bitacora .regla-fuerte{height:2.5px;background:var(--tinta)}
+    .hoja-bitacora .regla-corrida{height:2.5px;background:var(--tinta);margin:9px 0 0 11%}
+    .hoja-bitacora .titulo{margin-top:11px;text-align:right}
+    .hoja-bitacora .titulo span{display:block;font-family:"Montserrat",system-ui,sans-serif;
+      font-weight:200;font-size:34px;line-height:37px;letter-spacing:.30em;margin-right:-.30em;
+      color:var(--tinta)}
+
+    /* El numero de semana va MONTADO a la altura de la regla corrida, en el
+       hueco que la regla deja libre a su izquierda: de ahi el margen negativo. */
+    .hoja-bitacora .cabecera{display:flex;align-items:flex-start;margin-top:-30px}
+    .hoja-bitacora .semana{width:11%;flex:0 0 11%;font-family:"Montserrat",system-ui,sans-serif;
+      font-weight:200;font-size:64px;line-height:.82;color:var(--tinta-3);letter-spacing:-.015em;
+      white-space:nowrap;overflow:hidden}
+    .hoja-bitacora .datos{padding-top:34px;min-width:0}
+    .hoja-bitacora .obra-serif{font-family:"Newsreader",Georgia,serif;font-style:italic;font-weight:400;
+      font-size:9px;line-height:1.35;letter-spacing:.20em;color:var(--tinta-2)}
+    .hoja-bitacora .dia-laboral{margin-top:4px;font-size:13px;line-height:1.15;font-weight:700;
+      letter-spacing:.02em;color:var(--tinta)}
+    .hoja-bitacora .ficha{margin-top:3px;font-size:10px;line-height:1.45;color:var(--tinta-2)}
+    .hoja-bitacora .ficha b{font-weight:500}
+
+    /* ====== MEJORA · situacion de la obra al corte de control ====== */
+    .hoja-bitacora .contexto{margin-top:10px;border-top:1px solid var(--linea);
+      border-bottom:1px solid var(--linea-suave);padding:5px 0 4px}
+    .hoja-bitacora .cx-fila{display:flex}
+    .hoja-bitacora .cx{flex:1 1 0;padding:0 10px;border-left:1px solid var(--linea-suave);min-width:0}
+    .hoja-bitacora .cx:first-child{flex:1.6 1 0;padding-left:0;border-left:0}
+    .hoja-bitacora .cx-r{display:block;font-size:7px;letter-spacing:.14em;text-transform:uppercase;
+      color:var(--tinta-2);line-height:1.4;white-space:nowrap}
+    .hoja-bitacora .cx-v{display:block;font-weight:600;font-size:11px;line-height:1.3;
+      color:var(--tinta);margin-top:2px;white-space:nowrap}
+    .hoja-bitacora .cx-v i{font-style:normal;color:var(--tinta-2);font-size:8.5px;font-weight:500}
+    .hoja-bitacora .cx-v.acento{color:var(--marca)}
+    /* Barra con la misma convencion que los capitulos del informe original:
+       relleno = REAL, marca vertical = PLANEADO. */
+    .hoja-bitacora .pista{position:relative;height:3px;background:var(--linea-suave);margin-top:7px}
+    .hoja-bitacora .pista .real{position:absolute;left:0;top:0;bottom:0;width:11%;background:var(--marca)}
+    .hoja-bitacora .pista .plan{position:absolute;left:11%;top:-3px;bottom:-3px;width:2px;
+      background:var(--tinta)}
+
+    /* ================= GALERIA (original) ================= */
+    .hoja-bitacora .galeria{margin-top:9px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .hoja-bitacora .foto{position:relative;aspect-ratio:4/3;border-radius:4px;overflow:hidden;
+      background:linear-gradient(158deg,#d8d3ca 0%,#bcb6ab 40%,#8d8981 74%,#6d6a64 100%)}
+    .hoja-bitacora .foto::after{content:"";position:absolute;inset:0;
+      background:repeating-linear-gradient(38deg,rgba(255,255,255,.06) 0 3px,rgba(0,0,0,.05) 3px 7px)}
+    .hoja-bitacora .foto.f2{background:linear-gradient(200deg,#cfcabf 0%,#a9a49a 45%,#7f7b74 78%,#5f5c57 100%)}
+    .hoja-bitacora .foto.f3{background:linear-gradient(172deg,#e2ded6 0%,#c6c0b4 42%,#9a958c 76%,#75726c 100%)}
+    .hoja-bitacora .foto.f4{background:linear-gradient(145deg,#cdc6b8 0%,#b0a897 44%,#867f70 76%,#635e53 100%)}
+    .hoja-bitacora .foto.f5{background:linear-gradient(190deg,#d5d1c9 0%,#b4afa5 40%,#88847c 72%,#65625d 100%)}
+    .hoja-bitacora .foto.f6{background:linear-gradient(160deg,#dcd6c9 0%,#bdb5a4 46%,#918a7c 78%,#6b665c 100%)}
+    .hoja-bitacora .geo{position:absolute;left:5px;bottom:5px;z-index:2;
+      background:color-mix(in srgb,var(--tinta) 62%,transparent);
+      color:var(--papel);padding:3px 5px;border-radius:2px;font-size:5px;line-height:1.55;
+      letter-spacing:.02em}
+    .hoja-bitacora .geo b{font-weight:600}
+
+    /* ================= TRABAJO REALIZADO (original) ================= */
+    .hoja-bitacora .trabajo{margin-top:11px}
+    .hoja-bitacora .rotulo-trabajo{font-size:11px;line-height:1.2;letter-spacing:.22em;
+      text-transform:uppercase;color:var(--tinta-2);font-weight:400}
+    .hoja-bitacora .vinetas{list-style:none;margin-top:5px}
+    .hoja-bitacora .vinetas li{position:relative;padding-left:12px;font-size:9px;line-height:1.65;
+      color:var(--tinta);margin-bottom:2px}
+    .hoja-bitacora .vinetas li::before{content:"\2022";position:absolute;left:1px;top:0;
+      color:var(--tinta-3)}
+
+    /* ====== MEJORA · partidas en ejecucion al corte ====== */
+    .hoja-bitacora .rotulo-min{display:block;font-size:8px;letter-spacing:.18em;text-transform:uppercase;
+      color:var(--tinta-2);font-weight:600;line-height:1.5}
+    .hoja-bitacora .partidas{margin-top:11px;border-top:1px solid var(--linea);padding-top:5px}
+    .hoja-bitacora .tabla{width:100%;border-collapse:collapse;margin-top:3px;table-layout:fixed}
+    .hoja-bitacora .tabla th{font-size:7.5px;letter-spacing:.06em;color:var(--tinta-2);
+      font-weight:400;text-align:left;padding:0 0 3px;border-bottom:1px solid var(--linea);
+      line-height:1.2}
+    .hoja-bitacora .tabla td{font-size:8.5px;line-height:1.25;color:var(--tinta);padding:3px 0;
+      border-bottom:1px solid var(--linea-suave);vertical-align:baseline;overflow:hidden;
+      white-space:nowrap;text-overflow:ellipsis}
+    .hoja-bitacora .tabla .der{text-align:right}
+    .hoja-bitacora .tabla .id{color:var(--tinta-3)}
+    .hoja-bitacora .tabla .fechas{color:var(--tinta-2)}
+    .hoja-bitacora .tabla .plan{text-align:right;color:var(--tinta-2)}
+    /* % Real: terracota cuando alcanza o supera al plan, negro negrita si va por debajo. */
+    .hoja-bitacora .tabla .real{text-align:right;font-weight:700;color:var(--marca)}
+    .hoja-bitacora .tabla .real.baja{color:var(--tinta)}
+
+    /* ====== MEJORA · alertas de atraso vigentes al corte ====== */
+    .hoja-bitacora .alertas{margin-top:10px}
+    .hoja-bitacora .cab-min{display:flex;align-items:center;gap:5px}
+    .hoja-bitacora .cab-min svg{flex:0 0 auto}
+    .hoja-bitacora .tarjetas{display:flex;gap:8px;margin-top:5px}
+    .hoja-bitacora .tarjeta{flex:1 1 0;min-width:0;background:var(--gris-caja);padding:8px 10px}
+    .hoja-bitacora .tarjeta .desc{font-size:8.5px;line-height:1.35;color:var(--tinta)}
+    .hoja-bitacora .tarjeta .pie{display:flex;justify-content:space-between;align-items:baseline;
+      gap:8px;margin-top:4px}
+    .hoja-bitacora .tarjeta .sev{font-size:7.5px;font-weight:700;letter-spacing:.10em;
+      text-transform:uppercase}
+    .hoja-bitacora .sev-critico{color:var(--peligro)}
+    .hoja-bitacora .sev-bajo{color:var(--alerta-tinta)}
+    .hoja-bitacora .tarjeta .desfase{font-size:9px;font-weight:700;color:var(--tinta)}
+
+    /* ====== MEJORA · cierre de conformidad de la jornada ====== */
+    .hoja-bitacora .conformidad{margin-top:11px;border-top:2.5px solid var(--tinta);padding-top:6px}
+    .hoja-bitacora .firmas{display:flex;gap:16px;margin-top:6px}
+    .hoja-bitacora .firma{flex:1 1 0;min-width:0}
+    .hoja-bitacora .firma .espacio{height:12px}
+    .hoja-bitacora .firma .raya{border-top:1px solid var(--tinta-2)}
+    .hoja-bitacora .firma .rol{font-size:7px;line-height:1.4;letter-spacing:.14em;text-transform:uppercase;
+      color:var(--tinta-2);margin-top:3px}
+    .hoja-bitacora .firma .nom{font-size:8.5px;line-height:1.4;font-weight:600;color:var(--tinta);
+      overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+    .hoja-bitacora .firma .sub{font-size:7.5px;line-height:1.4;color:var(--tinta-2)}
+    .hoja-bitacora .pie-hoja{margin-top:6px;border-top:1px solid var(--linea-suave);padding-top:3px;
+      display:flex;justify-content:space-between;gap:12px;font-size:7.5px;line-height:1.3;
+      letter-spacing:.10em;text-transform:uppercase;color:var(--tinta-3)}
+  </style>
+
+  <div class="lienzo">
+
+    <div class="regla-fuerte"></div>
+
+    <div class="titulo">
+      <span>I N F O R M E</span>
+      <span>D E &nbsp; O B R A</span>
+    </div>
+
+    <div class="regla-corrida"></div>
+
+    <div class="cabecera">
+      <div class="semana">S1</div>
+      <div class="datos">
+        <div class="obra-serif">OBRA LABORATORIOS INSTITUTO DE</div>
+        <div class="obra-serif">CRIOPRESERVACIÓN Y TERAPIA CELULAR</div>
+        <div class="dia-laboral">DÍA LABORAL 4 &nbsp; 04/08/2026</div>
+        <div class="ficha" data-manual="true"><b>Dirección :</b> Carretera Panamericana Sur Km 29.5, Lima</div>
+        <div class="ficha"><b>Fecha :</b> 31 de Julio al 08 de Agosto del 2026</div>
+      </div>
+    </div>
+
+    <!-- MEJORA: situacion de la obra al corte de control -->
+    <div class="contexto" data-nuevo="true">
+      <div class="cx-fila">
+        <div class="cx"><span class="cx-r">Plazo contractual</span><span class="cx-v">01.08.26 <i>al</i> 05.10.26</span></div>
+        <div class="cx"><span class="cx-r">Corte de control</span><span class="cx-v">08.08.26</span></div>
+        <div class="cx"><span class="cx-r">Avance real</span><span class="cx-v acento">11 <i>%</i></span></div>
+        <div class="cx"><span class="cx-r">Avance planeado</span><span class="cx-v">11 <i>%</i></span></div>
+        <div class="cx"><span class="cx-r">Desviación</span><span class="cx-v acento">+0.0 <i>%</i></span></div>
+      </div>
+      <div class="pista">
+        <div class="real"></div>
+        <div class="plan"></div>
+      </div>
+    </div>
+
+    <div class="galeria">
+
+      <div class="celda">
+        <div class="foto f1">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+      <div class="celda">
+        <div class="foto f2">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+      <div class="celda">
+        <div class="foto f3">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+      <div class="celda">
+        <div class="foto f4">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+      <div class="celda">
+        <div class="foto f5">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+      <div class="celda">
+        <div class="foto f6">
+          <div class="geo"><b>OBRA CRIOCORD</b><br>Perú<br>Departamento de Lima<br>31 jul. 2026 11:59:21 a. m.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <section class="trabajo">
+      <div class="rotulo-trabajo">Trabajo realizado :</div>
+      <ul class="vinetas">
+        <li>Se ejecutó el tendido y la canalización de la red eléctrica, con tubería tipo conduit y cajas de paso, en la Zona 1 del primer nivel.</li>
+        <li>Se habilitó la carpintería metálica de la Zona 2 en taller externo; su llegada a obra se encuentra prevista para el 10/08.</li>
+        <li>Se habilitó la carpintería metálica de refuerzo de la Zona 1, segundo nivel, con llegada a obra prevista para el 14/08.</li>
+        <li>Se realizó la eliminación de desmonte de la contrata de drywall, con segregación y acopio de las baldosas reutilizables.</li>
+        <li>Se efectuó la excavación manual de zanjas de desagüe y el ensacado del material excedente.</li>
+        <li>Se efectuó el trazo y replanteo de la Zona 1, segundo nivel.</li>
+      </ul>
+    </section>
+
+    <!-- MEJORA: partidas en ejecucion al corte, con su planeado y su real -->
+    <section class="partidas" data-nuevo="true">
+      <span class="rotulo-min">Partidas activas al corte de control</span>
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th style="width:26px">ID</th>
+            <th>Descripción de Tarea</th>
+            <th style="width:88px">Fechas</th>
+            <th style="width:48px" class="der">% Plan</th>
+            <th style="width:48px" class="der">% Real</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="id">25</td>
+            <td>3.3 Eliminación de material excedente</td>
+            <td class="fechas">08/08 - 10/08</td>
+            <td class="plan">63%</td>
+            <td class="real">100%</td>
+          </tr>
+          <tr>
+            <td class="id">30</td>
+            <td>4.4 Solados para zapatas, acero corrugado y vaciado</td>
+            <td class="fechas">07/08 - 10/08</td>
+            <td class="plan">83%</td>
+            <td class="real baja">30%</td>
+          </tr>
+          <tr>
+            <td class="id">46</td>
+            <td>7.2 Nivelación cama de arena, entubado y rellenado</td>
+            <td class="fechas">06/08 - 10/08</td>
+            <td class="plan">88%</td>
+            <td class="real">100%</td>
+          </tr>
+          <tr>
+            <td class="id">47</td>
+            <td>7.3 Conexiones de TRONCAL principal desagüe</td>
+            <td class="fechas">07/08 - 10/08</td>
+            <td class="plan">81%</td>
+            <td class="real">81%</td>
+          </tr>
+          <tr>
+            <td class="id">48</td>
+            <td>7.3.1 Conexiones de agua y desagüe general</td>
+            <td class="fechas">10/08 - 15/08</td>
+            <td class="plan">0%</td>
+            <td class="real">10%</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- MEJORA: alertas de atraso vigentes al corte -->
+    <section class="alertas" data-nuevo="true">
+      <div class="cab-min">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--tinta-2)" stroke-width="1.2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9.2"/><path d="M12 7.6v5.2"/><path d="M12 16.4h.01"/>
+        </svg>
+        <span class="rotulo-min">Alertas de atraso</span>
+      </div>
+      <div class="tarjetas">
+        <div class="tarjeta">
+          <div class="desc">4.4 Solados para zapatas, acero corrugado y vaciado</div>
+          <div class="pie"><span class="sev sev-critico">Crítico</span><span class="desfase">-2 días</span></div>
+        </div>
+        <div class="tarjeta">
+          <div class="desc">2.4 Trazo y Replanteo</div>
+          <div class="pie"><span class="sev sev-bajo">Bajo</span><span class="desfase">-1 día</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MEJORA: cierre de conformidad, para que la hoja valga en un expediente -->
+    <section class="conformidad" data-nuevo="true">
+      <span class="rotulo-min">Conformidad de la jornada</span>
+      <div class="firmas">
+        <div class="firma">
+          <div class="espacio"></div>
+          <div class="raya"></div>
+          <div class="rol">Residente de obra</div>
+          <div class="nom">Arq. Eduardo Pérez</div>
+          <div class="sub" data-manual="true">CAP 32467</div>
+        </div>
+        <div class="firma">
+          <div class="espacio"></div>
+          <div class="raya"></div>
+          <div class="rol">Por la contratista</div>
+          <div class="nom">LARQUITECTURA STUDIO SAC</div>
+          <div class="sub" data-manual="true">RUC N° 20601689988</div>
+        </div>
+        <div class="firma">
+          <div class="espacio"></div>
+          <div class="raya"></div>
+          <div class="rol">Conformidad de la supervisión</div>
+          <div class="nom">Nombre y firma</div>
+          <div class="sub">Fecha ___ / ___ / 2026</div>
+        </div>
+      </div>
+      <div class="pie-hoja">
+        <span data-manual="true">Proyecto : PROGRAMACIÓN EP</span>
+        <span>Corte de control : 08 de Agosto, 2026</span>
+      </div>
+    </section>
+
+  </div>
+</article></div></div>
+      </section>
+      <section id="s5">
+        <p class="pie-hoja"><b>Control económico y Last Planner.</b> La hoja que hoy no existe. El informe actual cuenta el avance físico en detalle y calla el dinero y la confiabilidad del plan — que es justo lo que GCM ya sabe calcular.</p>
+        <div class="marco"><div class="marco-centro"><article class="hoja hoja-control hoja--h" data-nuevo="true" style="width:1123px;height:794px">
+  <style>
+    .hoja-control { box-sizing: border-box; position: relative; overflow: hidden;
+      padding: 26px 32px 20px; background: var(--papel); color: var(--tinta);
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif; font-size: 8px; line-height: 1.35;
+      display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+    .hoja-control * { box-sizing: border-box; margin: 0; padding: 0; }
+    .hoja-control svg { display: block; }
+    .hoja-control .num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+    /* ───────── cabecera ───────── */
+    .hoja-control .cab { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; padding-bottom: 11px; }
+    .hoja-control .cab-obra { min-width: 0; }
+    .hoja-control .cab-empresa { font-size: 8.5px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-3); }
+    .hoja-control .cab-titulo { font-family: "Montserrat", "Plus Jakarta Sans", system-ui, sans-serif;
+      font-weight: 300; font-size: 30px; line-height: 1.06; letter-spacing: .012em; color: var(--tinta); margin-top: 6px; }
+    .hoja-control .cab-ficha { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 8px; color: var(--tinta-2); letter-spacing: .015em; }
+    .hoja-control .cab-ficha span { white-space: nowrap; }
+    .hoja-control .cab-sep { color: var(--linea); }
+    .hoja-control .cab-meta { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-top: 3px; }
+    .hoja-control .meta-linea { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--tinta-2); white-space: nowrap; }
+    .hoja-control .meta-linea svg { width: 11px; height: 11px; color: var(--tinta-3); flex: none; }
+    .hoja-control .meta-fuerte { color: var(--tinta); font-weight: 500; }
+    .hoja-control .regla-doc { flex: 0 0 auto; height: 1px; background: var(--linea); }
+
+    /* ───────── franja del nombre de hoja ───────── */
+    .hoja-control .tira { flex: 0 0 auto; padding-top: 10px; padding-bottom: 12px; display: flex; align-items: baseline; gap: 14px; }
+    .hoja-control .tira h2 { font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px; flex: none; }
+    .hoja-control .cuadro-marca { width: 6px; height: 6px; background: var(--marca); flex: none; }
+    .hoja-control .tira-nota { font-family: "Newsreader", Georgia, serif; font-style: italic; font-size: 10.5px; color: var(--tinta-2); }
+
+    /* ───────── cuerpo en dos mitades ───────── */
+    .hoja-control .cuerpo { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 600px 1fr; gap: 24px; }
+    .hoja-control .mitad { min-width: 0; display: flex; flex-direction: column; }
+    .hoja-control .mitad-lp { border-left: 1px solid var(--linea); padding-left: 24px; }
+
+    .hoja-control .rotulo { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      border-bottom: 1px solid var(--linea); padding-bottom: 5px; margin-bottom: 12px; }
+    .hoja-control .rotulo h3 { font-size: 9px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--tinta-2); }
+    .hoja-control .rotulo svg { width: 11px; height: 11px; color: var(--tinta-3); flex: none; }
+    .hoja-control .rotulo-marca h3 { color: var(--marca); }
+    .hoja-control .rotulo-marca svg { color: var(--marca); }
+    .hoja-control .rotulo-sep { margin-top: 22px; }
+
+    /* ───────── contraste fisico / economico ───────── */
+    .hoja-control .contraste { display: grid; grid-template-columns: 118px 1fr; column-gap: 14px; }
+    .hoja-control .co-cifra { font-family: "Montserrat", system-ui, sans-serif; font-weight: 300; font-size: 30px;
+      line-height: 1; letter-spacing: -.02em; text-align: right; align-self: end; font-variant-numeric: tabular-nums; }
+    .hoja-control .co-cifra-obra { color: var(--tinta); }
+    .hoja-control .co-cifra-dinero { color: var(--marca); }
+    .hoja-control .co-k { font-size: 8px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--tinta-3); }
+    .hoja-control .co-k .co-k-suave { font-weight: 400; letter-spacing: .02em; text-transform: none; color: var(--tinta-2); }
+    .hoja-control .co-pista { position: relative; height: 14px; margin-top: 6px; background: var(--linea-suave); }
+    .hoja-control .co-rell { position: absolute; left: 0; top: 0; bottom: 0; }
+    .hoja-control .co-rell-obra { background: var(--tinta); }
+    .hoja-control .co-rell-dinero { background: var(--marca); }
+
+    .hoja-control .co-brecha { position: relative; height: 58px; }
+    .hoja-control .co-zona { position: absolute; top: 0; bottom: 0; background: var(--marca-tenue); }
+    .hoja-control .co-borde { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--marca); }
+    .hoja-control .co-etiqueta { position: absolute; top: 50%; transform: translateY(-50%); max-width: 250px; }
+    .hoja-control .co-puntos { display: block; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 15px; font-weight: 600; color: var(--marca); font-variant-numeric: tabular-nums; }
+    .hoja-control .co-puntos-k { display: block; margin-top: 2px; font-size: 8px; font-weight: 600; line-height: 1.4; letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-2); }
+
+    .hoja-control .lectura { margin-top: 16px; font-family: "Newsreader", Georgia, serif; font-size: 11.5px; line-height: 1.5; color: var(--tinta-2); }
+    .hoja-control .lectura .destaca { color: var(--tinta); font-weight: 600; }
+
+    /* ───────── cuentas de la obra ───────── */
+    .hoja-control .cuentas { display: grid; grid-template-columns: repeat(4, 1fr); }
+    .hoja-control .cuenta { padding: 0 14px; border-left: 1px solid var(--linea); }
+    .hoja-control .cuenta:first-child { padding-left: 0; border-left: 0; }
+    .hoja-control .cuenta:last-child { padding-right: 0; }
+    .hoja-control .cuenta-k { font-size: 8px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--tinta-3); }
+    .hoja-control .cuenta-n { margin-top: 7px; font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 16px; font-weight: 500; letter-spacing: -.02em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .hoja-control .cuenta-n .sol { font-size: 9.5px; font-weight: 400; color: var(--tinta-3); margin-right: 2px; }
+    .hoja-control .cuenta-riesgo .cuenta-n { color: var(--peligro); }
+    .hoja-control .cuenta-barra { position: relative; height: 3px; margin-top: 8px; background: var(--linea-suave); }
+    .hoja-control .cuenta-barra .barra-rell { position: absolute; left: 0; top: 0; bottom: 0; background: var(--marca); }
+    .hoja-control .cuenta-barra .barra-rell-suave { background: var(--linea); }
+    .hoja-control .cuenta-sub { margin-top: 7px; font-size: 8px; line-height: 1.4; color: var(--tinta-2); }
+    .hoja-control .cuenta-sub .sub-fuerte { font-weight: 600; color: var(--tinta); }
+    .hoja-control .plazo { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--linea-suave);
+      display: flex; align-items: center; gap: 8px; font-size: 8px; color: var(--tinta-2); }
+    .hoja-control .plazo svg { width: 10px; height: 10px; color: var(--tinta-3); flex: none; }
+
+    /* ───────── notas de lectura ───────── */
+    .hoja-control .glosa { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .hoja-control .glosa-t { font-size: 8px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--tinta); }
+    .hoja-control .glosa-d { margin-top: 5px; font-size: 8px; line-height: 1.5; color: var(--tinta-2); }
+
+    /* ───────── mitad Last Planner: estado vacio ───────── */
+    .hoja-control .aviso { display: flex; gap: 10px; border-left: 2px solid var(--marca); padding: 2px 0 2px 11px; }
+    .hoja-control .aviso svg { width: 13px; height: 13px; color: var(--marca); flex: none; margin-top: 1px; }
+    .hoja-control .aviso-t { font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta); }
+    .hoja-control .aviso-d { margin-top: 5px; font-size: 8.5px; line-height: 1.55; color: var(--tinta-2); }
+    .hoja-control .aviso-d .destaca { color: var(--tinta); font-weight: 600; }
+
+    .hoja-control .maq { margin-top: 18px; }
+    .hoja-control .maq-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+    .hoja-control .maq-t { font-size: 8.5px; font-weight: 700; letter-spacing: .05em; color: var(--tinta); }
+    .hoja-control .maq-e { font-size: 7.5px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--tinta-2); white-space: nowrap; }
+    .hoja-control .maq-d { margin-top: 3px; font-size: 8px; line-height: 1.45; color: var(--tinta-2); }
+    .hoja-control .maq-lienzo { margin-top: 8px; }
+    .hoja-control .maq-eje { font-size: 7.5px; fill: var(--tinta-2); font-family: "IBM Plex Mono", ui-monospace, monospace; }
+    .hoja-control .maq-hueco { fill: none; stroke: var(--linea); stroke-width: 1; stroke-dasharray: 3 3; }
+    .hoja-control .maq-base { stroke: var(--linea); stroke-width: 1; }
+    .hoja-control .maq-guia { stroke: var(--linea-suave); stroke-width: 1; stroke-dasharray: 2 3; }
+
+    .hoja-control .swi { margin-top: 9px; display: grid; grid-template-columns: repeat(3, 1fr); border: 1px dashed var(--linea); }
+    .hoja-control .swi-c { padding: 9px 10px; border-left: 1px dashed var(--linea); }
+    .hoja-control .swi-c:first-child { border-left: 0; }
+    .hoja-control .swi-n { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 17px; font-weight: 400; color: var(--tinta-3); line-height: 1; }
+    .hoja-control .swi-k { margin-top: 6px; font-size: 7.5px; line-height: 1.35; letter-spacing: .05em; text-transform: uppercase; color: var(--tinta-2); }
+
+    .hoja-control .cierre { margin-top: auto; padding-top: 12px; font-size: 8px; line-height: 1.5; color: var(--tinta-3); }
+
+    /* ───────── pie ───────── */
+    .hoja-control .pie { flex: 0 0 auto; margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--linea);
+      text-align: center; font-size: 8px; letter-spacing: .18em; text-transform: uppercase; color: var(--tinta-3); }
+  </style>
+
+  <!-- ══════════════ CABECERA ══════════════ -->
+  <header class="cab">
+    <div class="cab-obra">
+      <p class="cab-empresa">LARQUITECTURA STUDIO SAC</p>
+      <h1 class="cab-titulo">LABORATORIO CRIOCORD - LURÍN</h1>
+      <div class="cab-ficha">
+        <span data-manual="true">RUC N° 20601689988</span>
+        <span class="cab-sep">·</span>
+        <span data-manual="true">Carretera Panamericana Sur Km 29.5, Lima</span>
+        <span class="cab-sep">·</span>
+        <span data-manual="true">Proyecto: PROGRAMACIÓN EP</span>
+      </div>
+    </div>
+    <div class="cab-meta">
+      <p class="meta-linea">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.6" width="12" height="10.6" rx="1"/><path d="M2 6.9h12"/><path d="M5.4 1.9v3"/><path d="M10.6 1.9v3"/></svg>
+        Corte de Control: <span class="meta-fuerte">08 de Agosto, 2026</span>
+      </p>
+      <p class="meta-linea" data-manual="true">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.6" r="2.8"/><path d="M2.9 14c0-2.9 2.3-4.7 5.1-4.7s5.1 1.8 5.1 4.7"/></svg>
+        Residente: <span class="meta-fuerte">ARQ. EDUARDO PÉREZ CAP 32467</span>
+      </p>
+    </div>
+  </header>
+  <div class="regla-doc"></div>
+
+  <div class="tira">
+    <h2><span class="cuadro-marca"></span>Control económico y Last Planner</h2>
+    <p class="tira-nota">Cuánto dinero lleva comprometido la obra frente a lo que lleva construido, y en qué estado está el sistema de planificación semanal.</p>
+  </div>
+
+  <!-- ══════════════ CUERPO ══════════════ -->
+  <div class="cuerpo">
+
+    <!-- ─────── MITAD ECONÓMICA ─────── -->
+    <section class="mitad mitad-eco">
+
+      <div class="rotulo rotulo-marca">
+        <h3>Sobregiro proyectado · obra construida frente a dinero comprometido</h3>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.8 12.4 6 6.9l3 2.6 5.2-6.1"/><path d="M14.2 3.4h-3.4"/><path d="M14.2 3.4v3.3"/></svg>
+      </div>
+
+      <div class="contraste">
+        <p class="co-cifra co-cifra-obra num">11%</p>
+        <div>
+          <p class="co-k">Avance físico ejecutado <span class="co-k-suave">— alcance de obra terminado al corte</span></p>
+          <div class="co-pista"><span class="co-rell co-rell-obra" style="width:11%"></span></div>
+        </div>
+
+        <div></div>
+        <div class="co-brecha">
+          <span class="co-zona" style="left:11%;width:15.34%"></span>
+          <span class="co-borde" style="left:11%"></span>
+          <span class="co-borde" style="left:26.34%"></span>
+          <span class="co-etiqueta" style="left:calc(26.34% + 12px)">
+            <span class="co-puntos">15.34 puntos</span>
+            <span class="co-puntos-k">de distancia entre lo construido y lo comprometido</span>
+          </span>
+        </div>
+
+        <p class="co-cifra co-cifra-dinero num">26.34%</p>
+        <div>
+          <p class="co-k">Presupuesto comprometido <span class="co-k-suave">— encargos y órdenes ya firmados</span></p>
+          <div class="co-pista"><span class="co-rell co-rell-dinero" style="width:26.34%"></span></div>
+        </div>
+      </div>
+
+      <p class="lectura">La obra ha construido el <span class="destaca">11%</span> de su alcance y ya tiene comprometido el <span class="destaca">26.34%</span> de su presupuesto. Esa distancia es lo que GCM llama <span class="destaca">sobregiro proyectado</span>: no es todavía un sobrecosto ejecutado, es el aviso que aparece antes de que lo sea, mientras aún se puede renegociar un encargo o reordenar una compra.</p>
+
+      <div class="rotulo rotulo-sep">
+        <h3>Las cuentas de la obra al corte</h3>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.2" y="2.6" width="11.6" height="10.8" rx="1"/><path d="M4.8 5.6h6.4"/><path d="M4.8 8.4h6.4"/><path d="M4.8 11.1h3.6"/></svg>
+      </div>
+
+      <div class="cuentas">
+        <div class="cuenta">
+          <p class="cuenta-k">Presupuesto total</p>
+          <p class="cuenta-n"><span class="sol">S/</span>745,553.36</p>
+          <div class="cuenta-barra"><span class="barra-rell barra-rell-suave" style="width:100%"></span></div>
+          <p class="cuenta-sub">Presupuesto vigente contra el que se mide todo lo demás.</p>
+        </div>
+        <div class="cuenta">
+          <p class="cuenta-k">Comprometido</p>
+          <p class="cuenta-n"><span class="sol">S/</span>196,400.50</p>
+          <div class="cuenta-barra"><span class="barra-rell" style="width:26.34%"></span></div>
+          <p class="cuenta-sub"><span class="sub-fuerte">26.34%</span> del presupuesto, ya con proveedor y firma.</p>
+        </div>
+        <div class="cuenta">
+          <p class="cuenta-k">Saldo</p>
+          <p class="cuenta-n"><span class="sol">S/</span>549,152.86</p>
+          <div class="cuenta-barra"><span class="barra-rell barra-rell-suave" style="width:73.66%"></span></div>
+          <p class="cuenta-sub"><span class="sub-fuerte">73.66%</span> todavía sin comprometer.</p>
+        </div>
+        <div class="cuenta cuenta-riesgo">
+          <p class="cuenta-k">Partidas sobregiradas</p>
+          <p class="cuenta-n">12</p>
+          <div class="cuenta-barra"><span class="barra-rell barra-rell-suave" style="width:100%"></span></div>
+          <p class="cuenta-sub">Partidas cuyo comprometido ya pasó su presupuesto.</p>
+        </div>
+      </div>
+
+      <p class="plazo">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.6V8l2.4 1.5"/></svg>
+        Plazo contractual de la obra: <span class="num">01/08/2026</span> al <span class="num">05/10/2026</span>.
+      </p>
+
+      <div class="rotulo rotulo-sep">
+        <h3>Cómo se leen estas tres cuentas</h3>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M6.4 6.2c.2-1 1-1.6 1.9-1.6 1 0 1.8.7 1.8 1.7 0 1.4-1.7 1.5-1.7 2.9"/><path d="M8.3 11.3v.1"/></svg>
+      </div>
+
+      <div class="glosa">
+        <div>
+          <p class="glosa-t">Comprometido</p>
+          <p class="glosa-d">Dinero que la obra ya no puede volver a usar: encargos vigentes repartidos por partida más órdenes sueltas aprobadas. Se cuenta al firmar, no al pagar.</p>
+        </div>
+        <div>
+          <p class="glosa-t">Saldo</p>
+          <p class="glosa-d">Lo que queda del presupuesto sin comprometer. Es el margen real de maniobra para lo que falta de obra, no el dinero disponible en caja.</p>
+        </div>
+        <div>
+          <p class="glosa-t">Partida sobregirada</p>
+          <p class="glosa-d">Partida cuyo comprometido superó su presupuesto vigente. Cada una es un exceso ya firmado que hay que compensar dentro del mismo total.</p>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ─────── MITAD LAST PLANNER ─────── -->
+    <section class="mitad mitad-lp">
+
+      <div class="rotulo">
+        <h3>Last Planner · sin semanas cerradas al corte</h3>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.4" width="12" height="10.8" rx="1"/><path d="M2 6.7h12"/><path d="M5.3 1.8v3"/><path d="M10.7 1.8v3"/><path d="M6 10.4l1.4 1.4 2.7-2.9"/></svg>
+      </div>
+
+      <div class="aviso">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 5.1v.1"/><path d="M8 7.4v4"/></svg>
+        <div>
+          <p class="aviso-t">Todavía no hay nada que medir</p>
+          <p class="aviso-d">Al corte del 08 de agosto de 2026 la obra no tiene ninguna semana del plan cerrada. Por eso no hay PPC, ni causas de incumplimiento, ni restricciones registradas: esos datos no existen aún, y ninguno se ha estimado para rellenar el hueco. <span class="destaca">Esta mitad de la hoja se llenará sola en cuanto se cierre la primera semana del plan.</span></p>
+        </div>
+      </div>
+
+      <!-- maqueta 1: PPC semana a semana -->
+      <div class="maq">
+        <div class="maq-cab">
+          <p class="maq-t">PPC semana a semana</p>
+          <p class="maq-e">Estructura prevista · sin datos</p>
+        </div>
+        <p class="maq-d">Cada semana cerrada añadirá aquí su barra: compromisos hechos, compromisos cumplidos y el porcentaje de plan cumplido que sale de dividirlos, con su lectura en una frase.</p>
+        <svg class="maq-lienzo" viewBox="0 0 410 116" width="100%" height="116" role="img" aria-label="Marco vacío del gráfico de PPC semana a semana: al corte no hay ninguna semana cerrada">
+          <line class="maq-guia" x1="30" y1="10" x2="404" y2="10"/>
+          <line class="maq-guia" x1="30" y1="45" x2="404" y2="45"/>
+          <line class="maq-guia" x1="30" y1="80" x2="404" y2="80"/>
+          <line class="maq-base" x1="30" y1="96" x2="404" y2="96"/>
+          <text class="maq-eje" x="24" y="13" text-anchor="end">100</text>
+          <text class="maq-eje" x="24" y="48" text-anchor="end">50</text>
+          <text class="maq-eje" x="24" y="99" text-anchor="end">0</text>
+          <rect class="maq-hueco" x="40" y="14" width="52" height="82"/>
+          <rect class="maq-hueco" x="102" y="14" width="52" height="82"/>
+          <rect class="maq-hueco" x="164" y="14" width="52" height="82"/>
+          <rect class="maq-hueco" x="226" y="14" width="52" height="82"/>
+          <rect class="maq-hueco" x="288" y="14" width="52" height="82"/>
+          <rect class="maq-hueco" x="350" y="14" width="52" height="82"/>
+          <text class="maq-eje" x="66" y="110" text-anchor="middle">—</text>
+          <text class="maq-eje" x="128" y="110" text-anchor="middle">—</text>
+          <text class="maq-eje" x="190" y="110" text-anchor="middle">—</text>
+          <text class="maq-eje" x="252" y="110" text-anchor="middle">—</text>
+          <text class="maq-eje" x="314" y="110" text-anchor="middle">—</text>
+          <text class="maq-eje" x="376" y="110" text-anchor="middle">—</text>
+        </svg>
+      </div>
+
+      <!-- maqueta 2: Pareto de causas -->
+      <div class="maq">
+        <div class="maq-cab">
+          <p class="maq-t">Pareto de causas de incumplimiento</p>
+          <p class="maq-e">Estructura prevista · sin datos</p>
+        </div>
+        <p class="maq-d">Cuando haya compromisos incumplidos con causa, se ordenarán de la que más frena a la que menos, con su acumulado, para atacar primero las pocas que explican casi todo.</p>
+        <svg class="maq-lienzo" viewBox="0 0 410 76" width="100%" height="76" role="img" aria-label="Marco vacío del Pareto de causas: al corte no hay incumplimientos registrados">
+          <line class="maq-base" x1="30" y1="60" x2="404" y2="60"/>
+          <text class="maq-eje" x="24" y="63" text-anchor="end">0</text>
+          <rect class="maq-hueco" x="40" y="10" width="60" height="50"/>
+          <rect class="maq-hueco" x="110" y="10" width="60" height="50"/>
+          <rect class="maq-hueco" x="180" y="10" width="60" height="50"/>
+          <rect class="maq-hueco" x="250" y="10" width="60" height="50"/>
+          <rect class="maq-hueco" x="320" y="10" width="60" height="50"/>
+          <text class="maq-eje" x="70" y="72" text-anchor="middle">—</text>
+          <text class="maq-eje" x="140" y="72" text-anchor="middle">—</text>
+          <text class="maq-eje" x="210" y="72" text-anchor="middle">—</text>
+          <text class="maq-eje" x="280" y="72" text-anchor="middle">—</text>
+          <text class="maq-eje" x="350" y="72" text-anchor="middle">—</text>
+        </svg>
+      </div>
+
+      <!-- maqueta 3: inventario de trabajo ejecutable -->
+      <div class="maq">
+        <div class="maq-cab">
+          <p class="maq-t">Inventario de trabajo ejecutable</p>
+          <p class="maq-e">Estructura prevista · sin datos</p>
+        </div>
+        <p class="maq-d">El colchón de la obra: tareas ya liberadas de restricciones y todavía sin comprometer, que es de donde saldrá el plan de la semana siguiente.</p>
+        <div class="swi">
+          <div class="swi-c">
+            <p class="swi-n">—</p>
+            <p class="swi-k">Tareas listas para ejecutar</p>
+          </div>
+          <div class="swi-c">
+            <p class="swi-n">—</p>
+            <p class="swi-k">Disponibles sin comprometer</p>
+          </div>
+          <div class="swi-c">
+            <p class="swi-n">—</p>
+            <p class="swi-k">Colchón libre de la ventana</p>
+          </div>
+        </div>
+      </div>
+
+      <p class="cierre">Ninguna cifra de esta mitad se ha estimado, proyectado ni tomado de otra obra: los recuadros punteados marcan el sitio exacto que ocupará cada dato en cuanto exista.</p>
+
+    </section>
+  </div>
+
+  <!-- ══════════════ PIE ══════════════ -->
+  <footer class="pie">Reporte generado el 08 de Agosto, 2026 • Control económico y Last Planner</footer>
+</article></div></div>
+      </section>
+    </div>
+  </nav>
+</div>
