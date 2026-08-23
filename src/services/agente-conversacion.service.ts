@@ -463,6 +463,15 @@ export async function iniciarTurno(
 
   await prisma.$transaction(async (tx) => {
     if (!convId) {
+      // "Nueva conversación" no es solo dejar de mostrar la anterior: el
+      // usuario pidió explícitamente que no quede viva en la base. Como
+      // hoy no hay pantalla que liste conversaciones pasadas -"una
+      // conversación activa basta", ver el comentario de
+      // `conversacionReciente`-, no hay nada que perder al borrarlas: el
+      // cascade de MensajeAgente se encarga de sus mensajes.
+      await tx.conversacionAgente.deleteMany({
+        where: { companyId: sesion.companyId, userId: sesion.userId },
+      });
       const nueva = await tx.conversacionAgente.create({
         data: { companyId: sesion.companyId, userId: sesion.userId },
         select: { id: true },

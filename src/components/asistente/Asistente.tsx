@@ -286,11 +286,10 @@ export function Asistente({
 
   const hayPropuestaPendiente = mensajes.some((m) => m.propuestaPendiente);
 
-  // No borra nada de la base -las filas viejas se quedan, historicas,
-  // igual que cualquier otro registro de GCM-: solo deja de mostrarlas y
-  // hace que el proximo envio abra una conversacion nueva. Es lo mismo
-  // que ya pasa sola al recargar la pagina despues de un rato, solo que
-  // sin recargar.
+  // Limpia la pantalla de inmediato; el servidor borra la conversacion
+  // VIEJA de la base recien con el proximo envio -`iniciarTurno` con
+  // `conversacionId: null`-, no antes: si nadie vuelve a escribir, no
+  // hay nada que perder por dejarla un rato mas.
   function nuevaConversacion() {
     setMensajes([]);
     setPendienteId(null);

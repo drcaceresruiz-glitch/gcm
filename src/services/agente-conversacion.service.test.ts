@@ -191,6 +191,23 @@ vi.mock("@/lib/prisma", () => {
         estado.conversaciones.push(fila);
         return Promise.resolve({ id: fila.id });
       },
+      // Mismo cascade que la base real: borrar la conversacion se lleva
+      // sus mensajes. Acotado por companyId/userId, igual que el resto de
+      // las consultas -nunca toca la conversacion de otra persona-.
+      deleteMany: (args: { where: { companyId: string; userId: string } }) => {
+        const w = args.where;
+        const idsABorrar = estado.conversaciones
+          .filter((c) => c.companyId === w.companyId && c.userId === w.userId)
+          .map((c) => c.id);
+        const count = idsABorrar.length;
+        estado.conversaciones = estado.conversaciones.filter(
+          (c) => !idsABorrar.includes(c.id),
+        );
+        estado.mensajes = estado.mensajes.filter(
+          (m) => !idsABorrar.includes(m.conversacionId),
+        );
+        return Promise.resolve({ count });
+      },
     };
 
     const mensajeAgente = {
@@ -442,6 +459,52 @@ describe("iniciarTurno", () => {
     const r = await iniciarTurno(CON_PERMISO, "ajena", "hola");
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.conversacionId).not.toBe("ajena");
+  });
+
+  it("una conversacion nueva borra la anterior de la base, no solo deja de mostrarla", async () => {
+    const primero = await iniciarTurno(CON_PERMISO, null, "uno");
+    if (!primero.ok) throw new Error("deberia haber funcionado");
+    await esperarTurno();
+    expect(estado.conversaciones).toHaveLength(1);
+    expect(estado.mensajes.length).toBeGreaterThan(0);
+
+    // `conversacionId: null` es justo lo que manda "Nueva conversación".
+    const segundo = await iniciarTurno(CON_PERMISO, null, "dos");
+    if (!segundo.ok) throw new Error("deberia haber funcionado");
+
+    expect(segundo.conversacionId).not.toBe(primero.conversacionId);
+    expect(estado.conversaciones).toHaveLength(1);
+    expect(estado.conversaciones[0]?.id).toBe(segundo.conversacionId);
+    // Ningun mensaje de la conversacion vieja sobrevive -el cascade se
+    // llevo tambien sus filas de `MensajeAgente`-.
+    expect(estado.mensajes.every((m) => m.conversacionId === segundo.conversacionId)).toBe(
+      true,
+    );
+  });
+
+  it("borrar al empezar de nuevo nunca toca la conversacion de otra empresa o usuario", async () => {
+    estado.conversaciones.push({
+      id: "de-otra-empresa",
+      companyId: "otra-empresa",
+      userId: "otro-user",
+      createdAt: new Date(),
+    });
+    estado.mensajes.push({
+      id: "msg-ajeno",
+      conversacionId: "de-otra-empresa",
+      rol: "USUARIO",
+      contenido: "no me deben borrar",
+      herramientas: null,
+      iniciadoAt: new Date(),
+      terminadoAt: new Date(),
+      error: null,
+    });
+
+    const r = await iniciarTurno(CON_PERMISO, null, "hola");
+    expect(r.ok).toBe(true);
+
+    expect(estado.conversaciones.some((c) => c.id === "de-otra-empresa")).toBe(true);
+    expect(estado.mensajes.some((m) => m.id === "msg-ajeno")).toBe(true);
   });
 });
 
