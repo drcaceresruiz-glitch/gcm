@@ -94,6 +94,61 @@ solo se puede evitar que se descubra tarde. Dos pruebas nuevas: que la ULTIMA
 fila preparada trae sus dos formulas —no solo las primeras— y que caben las 368
 partidas de la obra real.
 
+### Los sueldos y las polizas son lineas de la meta, no una hoja aparte
+
+El costo total decia S/ 600 y no contaba el sueldo del residente, que estaba
+escrito en la hoja de gastos generales del Excel y se veia en ella. Eran 700:
+la obra no perdia 200 sino 300, y el recargo minimo no era 50 % sino 75 %.
+
+**La causa no era la que parecia.** Los gastos generales salieron de la meta el
+20/08 y volvieron el 23/08. Al sacarlos quedo en `crearMeta` una linea que
+ponia sus entradas a `[]` fijo; al restaurarlos, esa linea SOBREVIVIO. Las
+filas volvian a guardarse en su tabla y se pintaban en pantalla, pero el total
+valia cero. Un solo renglon entre dos listas.
+
+Se podia arreglar ese renglon. Se quito la FORMA del fallo: con dos listas y
+dos sumas, una siempre puede quedarse en cero sin que nada chirrie —bastaba con
+que la hoja no estuviera, y el lector devolvia cero sin un solo error—.
+
+**Un sueldo ya se sabia escribir.** Un gasto variable es `meses x monto
+mensual`, que es exactamente `metrado x precioUnitario` con la unidad en «mes».
+No hacia falta un concepto nuevo: hacia falta dejar de tener dos. Fuera la hoja
+del Excel, su parser (`excel-meta.ts` entero), la tabla `gastos_generales_meta`
+y el campo `gastosGenerales`.
+
+`lib/costo-meta.ts` saca TODAS las cifras de UNA pasada sobre UNA lista: costo
+directo (con codigo), costo propio (sin codigo), costo total y el coste mensual
+del atraso. La usan igual `crearMeta`, la edicion en la app y el PDF.
+
+Tres cosas que aparecieron al mirar:
+
+- **Editar un sueldo dentro de la app ahora mueve el costo total.** Antes era
+  imposible: solo se podian cambiar volviendo al Excel.
+- **`esCapituloCodigo("")` devolvia `true`** —un codigo vacio no lleva punto—
+  asi que la plantilla escribia los costos propios como capitulos: en negrita,
+  en verde y con la formula del contractual encima.
+- **`bolsaNeta` y `bolsaTotal` pasaban a valer lo mismo**, y se dejo una. Y
+  `costoDirectoMeta` ya no incluye lo que no es partida.
+
+Y **lo que cuesta cada mes de atraso**, que se calculaba desde siempre y no se
+enseñaba en ninguna pantalla, sale ya en el PDF de la meta. Solo si hay lineas
+en «mes» de donde sacarlo: un cero diria que alargarse sale gratis.
+
+Sin migracion de datos, pedido asi. La lista vieja queda en `audit_log`.
+
+### Pegar una fila en el Excel no va, insertarla si
+
+Un dia despues de decir «copia una fila vacia y pegala», la captura: «La celda
+o el grafico que intenta cambiar estan en una hoja protegida». Insertar filas YA
+estaba permitido —el archivo escribe `insertRows="0"`—; lo que falla es PEGAR,
+que escribe sobre las celdas de formula, y esas estan bloqueadas. Pegar e
+insertar no son la misma operacion, y ningun permiso arregla eso.
+
+La leyenda y las instrucciones nombran ya el menu exacto —**«Insertar celdas
+copiadas»**, con clic en el NUMERO de la fila— y avisan de que la hoja se
+desprotege sin contraseña. Una proteccion de la que no se sabe salir deja de ser
+una red y pasa a ser un muro.
+
 ### La meta se corrige dentro de la app
 
 `meta-edicion.service`: editar una linea, anadir una partida, quitar la que
