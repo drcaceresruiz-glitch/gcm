@@ -196,6 +196,43 @@ Una linea SIN codigo sigue sin poder recargarse: no hay codigo con el que
 nombrarla. En el Excel su celda se queda gris con la nota que lo explica, para
 que no parezca un descuido.
 
+### Los adicionales del contratista: dos firmas y una bolsa que si baja
+
+A mitad de obra el contratista se percata de alcances que su orden aprobada no
+recogia. La unica forma de registrarlo era subir `montoContratado` a mano, que
+borraba lo pactado y revaluaba hacia atras lo ya valorizado.
+
+**La bolsa no baja por la meta.** Si un adicional del contratista subiera el
+costo de la meta, la bolsa bajaria y con ella DESAPARECERIA la desviacion: el
+plan se habria reescrito para encajar con la realidad. Mismo motivo por el que
+la meta se congela. Lo que faltaba era la segunda lectura:
+
+- **Bolsa prevista** = contractual − meta. El plan. No se toca nunca.
+- **Bolsa comprometida** = la prevista menos las desviaciones de los contratos
+  firmados. Lo que queda de verdad, y la que baja con cada adenda aprobada.
+
+`AdendaEncargo` con importe **con signo** (positivo adicional, negativo
+deductivo), y el signo no lo teclea nadie: el formulario pregunta la clase y el
+importe va en positivo. Circuito de **dos firmas**: `adenda:crear` (RESIDENTE,
+ADMIN_OBRA) y `adenda:aprobar` (ADMIN). Nace PENDIENTE siempre, sin atajo.
+RECHAZADA existe para que un «no» deje rastro, con motivo obligatorio.
+
+`adenda:aprobar` NO es innegociable —los innegociables son actos
+contractuales—, asi que se reparte desde Empresa > Permisos. **Ojo**: el rol
+GERENTE de GCM solo LEE, asi que el gerente general que firma es hoy ADMIN.
+
+**Un fallo que ya estaba y que esto habria disparado.** La valorizacion
+guardaba solo el porcentaje y el importe se recalculaba contra el monto de hoy.
+Con el contrato inmutable no se notaba; con adendas, el 60 % de un contrato de
+50.000 (30.000, ya pagados) pasa a valer 22.800 tras un deductivo de −12.000, y
+el sistema dice que se pagaron 7.200 de mas. Ahora el corte **congela** su
+importe; las anteriores nacen NULL y caen al calculo antiguo contra el
+contratado.
+
+Y la ficha del encargo exigia `encargo:gestionar`, que el RESIDENTE —quien
+registra las adendas— no tiene: habria dejado fuera justo a quien va dirigida.
+Ahora la puerta es `encargo:leer` y cada bloque decide que enseña.
+
 ### La meta se corrige dentro de la app
 
 `meta-edicion.service`: editar una linea, anadir una partida, quitar la que
