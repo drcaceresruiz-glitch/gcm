@@ -7,6 +7,7 @@ import {
   calcularBolsa,
   desfaseDeMeta,
   resumenGastosGenerales,
+  totalDeGasto,
   type Bolsa,
   type Desfase,
   type EntradaGasto,
@@ -656,6 +657,45 @@ export async function crearMeta(
     });
 
 
+    /**
+     * La LISTA de gastos generales, no solo su total.
+     *
+     * El total ya se guarda en la meta y es lo que gobierna la bolsa neta,
+     * pero sin las filas no se puede ensenar el desglose -que es justo lo que
+     * distingue un gasto que crece con el plazo de uno que no- ni saber
+     * cuanto cuesta cada mes de atraso. Se guardaba a medias desde que la
+     * hoja salio de la plantilla.
+     *
+     * `montoTotal` se persiste ya calculado, como dice el modelo: asi un FIJO
+     * y un VARIABLE se suman sin preguntar de que tipo son.
+     */
+    if (datos.gastosGenerales.length > 0) {
+      await tx.gastoGeneralMeta.createMany({
+        data: datos.gastosGenerales.flatMap((g, orden) => {
+          const total = totalDeGasto({
+            tipo: g.tipo,
+            montoMensual: g.montoMensual ?? null,
+            meses: g.meses ?? null,
+            montoFijo: g.montoFijo ?? null,
+          });
+          // Una linea incompleta ya se rechazo arriba con su mensaje; si aun
+          // asi llegara sin total, no se guarda a medias.
+          if (total === null) return [];
+          return [
+            {
+              presupuestoMetaId: meta.id,
+              concepto: g.concepto,
+              tipo: g.tipo,
+              montoMensual: g.tipo === "VARIABLE" ? (g.montoMensual ?? null) : null,
+              meses: g.tipo === "VARIABLE" ? (g.meses ?? null) : null,
+              montoTotal: total,
+              orden,
+            },
+          ];
+        }),
+      });
+    }
+
     await tx.auditLog.create({
       data: {
         companyId: sesion.companyId,
@@ -681,6 +721,47 @@ export async function crearMeta(
   });
 
   return { ok: true, id: creada.id, version, costoTotal };
+}
+
+export interface GastoGeneralDeLaMeta {
+  concepto: string;
+  tipo: "FIJO" | "VARIABLE";
+  montoMensual: string | null;
+  meses: string | null;
+  montoTotal: string;
+}
+
+/**
+ * El desglose de gastos generales de la meta que manda.
+ *
+ * Aparte de `compararConContractual` a proposito: la bolsa se mira siempre y
+ * esto solo cuando alguien despliega el detalle. Meterlo en la comparacion
+ * cargaria una tabla mas en cada visita a la pantalla para algo que casi
+ * nunca se abre.
+ */
+export async function gastosGeneralesDeLaMeta(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<GastoGeneralDeLaMeta[]> {
+  if (!puede(sesion, "meta:leer")) return [];
+
+  const meta = await metaQueManda(sesion.companyId, obraId);
+  if (!meta) return [];
+
+  const filas = await prisma.gastoGeneralMeta.findMany({
+    where: { presupuestoMetaId: meta.id },
+    orderBy: { orden: "asc" },
+  });
+
+  return filas.map((g) => ({
+    concepto: g.concepto,
+    tipo: g.tipo as "FIJO" | "VARIABLE",
+    // Mismo criterio que el resto del proyecto para leer un `Decimal`: a
+    // texto, nunca a `number`.
+    montoMensual: g.montoMensual?.toString() ?? null,
+    meses: g.meses?.toString() ?? null,
+    montoTotal: g.montoTotal.toString(),
+  }));
 }
 
 class YaAprobada extends Error {}
