@@ -26,6 +26,7 @@ import {
   curvaPlaneada,
   fechasSemanales,
   planeadoEnFecha,
+  ponderar,
   ponderarPorDuracion,
   proyectar,
   serieCurvaS,
@@ -33,6 +34,13 @@ import {
   type PuntoCurva,
   type PuntoDiario,
 } from "@/lib/curva-s";
+import {
+  criterioDePeso,
+  importePorTarea,
+  pesoDeTarea,
+  type CriterioPeso,
+} from "@/lib/pesos-tarea";
+import { cobertura } from "@/lib/mapeo-partidas";
 import type { ResultadoAnalisisCronograma } from "@/lib/msproject-xml";
 import {
   formaCanonicaDeArchivo,
@@ -1748,6 +1756,16 @@ export interface DatosCurva {
   planeadoBaseEnCorte: number | null;
   /// La version marcada como base y cuando se fijo. null si no hay.
   lineaBase: { version: number; fijadaEn: Date | null } | null;
+  /**
+   * Con que se pesaron las DOS lineas: por duracion o por dinero.
+   *
+   * Se publica porque cambia lo que la curva significa. La misma obra pesada
+   * por dias y por soles cuenta dos historias distintas, y la unica forma de
+   * que quien la lee sepa cual esta leyendo es decirselo.
+   */
+  criterioPeso: CriterioPeso;
+  /// Tareas que no cuentan por no tener partida mapeada. Solo con DINERO.
+  tareasSinPeso: number;
   /// La linea real muestreada POR SEMANA (cadencia Last Planner). Vacia sin plan.
   realSemanal: PuntoDiario[];
   /// Dia ISO de corte semanal (1..7) configurado en la obra.
@@ -1775,6 +1793,7 @@ export async function datosCurvaS(
     cortes: [], plan: [], proyeccion: [],
     factor: 1, ritmoMedible: false, terminoProyectado: null, inicio: null, fin: null,
     fuentePlan: "vigente", planeadoBaseEnCorte: null, lineaBase: null,
+    criterioPeso: "DURACION", tareasSinPeso: 0,
     realSemanal: [], diaCorteSemanal: 5,
     cadencia: { ultimoCorteEsperado: null, semanaPendiente: false },
     puntoActual: null,
@@ -1872,14 +1891,52 @@ export async function datosCurvaS(
     conDuracion[0]!.fin,
   );
 
-  const plan = curvaPlaneada(planificadas, inicio, fin);
+  /**
+   * El peso de esta obra: por dinero si el mapeo cubre lo bastante, y si no
+   * por duracion. Se decide UNA vez y se pasa a las dos lineas -el plan y el
+   * real- porque lo unico que se lee en una curva S es la distancia entre
+   * ellas, y pesarlas distinto la vuelve ilegible.
+   */
+  const [enlaces, partidasObra] = await Promise.all([
+    prisma.mapeoTareaPartida.findMany({
+      where: { projectId: obraId, project: { companyId: sesion.companyId } },
+      select: { uid: true, codigoPartida: true },
+    }),
+    prisma.wbsItem.findMany({
+      where: {
+        projectId: obraId,
+        project: { companyId: sesion.companyId },
+        tipo: "PARTIDA",
+      },
+      select: { codigoPartida: true, parcial: true },
+    }),
+  ]);
+
+  const partidasMapeables = partidasObra.map((p) => ({
+    codigo: p.codigoPartida,
+    // `cobertura` la pide por firma pero no la mira: solo suma importes.
+    descripcion: "",
+    parcial: p.parcial?.toString() ?? null,
+  }));
+
+  const criterioCurva =
+    enlaces.length === 0
+      ? ("DURACION" as const)
+      : criterioDePeso(cobertura(enlaces, partidasMapeables).porcentaje);
+  const pesoCurva = pesoDeTarea(
+    criterioCurva,
+    importePorTarea(enlaces, partidasMapeables),
+    planificadas,
+  );
+
+  const plan = curvaPlaneada(planificadas, inicio, fin, pesoCurva.peso);
 
   const ultimo = serie[serie.length - 1]!;
 
   // El PV puntual contra la base: el % planeado a la fecha del ultimo corte
   // segun el plan congelado. Sin base es null y el EVM cae al % del archivo.
   const planeadoBaseEnCorte = base
-    ? planeadoEnFecha(planificadas, ultimo.fecha)
+    ? planeadoEnFecha(planificadas, ultimo.fecha, pesoCurva.peso)
     : null;
 
   // La linea real medida: se muestrea el avance desde el inicio del plan hasta
@@ -1922,7 +1979,12 @@ export async function datosCurvaS(
   }
   marcas.set(hastaMuestreo.getTime(), hastaMuestreo);
   const fechasReal = [...marcas.values()].sort((a, b) => a.getTime() - b.getTime());
-  const realSemanal = serieRealPorFechas(tareasCurva, reportes, fechasReal);
+  const realSemanal = serieRealPorFechas(
+    tareasCurva,
+    reportes,
+    fechasReal,
+    pesoCurva.peso,
+  );
 
   // La cadencia: el ultimo corte esperado que ya paso, y si falta reporte (el
   // ultimo avance es anterior a ese corte, o no hay ninguno todavia).
@@ -1956,7 +2018,7 @@ export async function datosCurvaS(
   const puntoActual = {
     fecha: anclaReal.fecha,
     real: anclaReal.valor,
-    planeado: Number(planeadoEnFecha(planificadas, anclaReal.fecha)),
+    planeado: Number(planeadoEnFecha(planificadas, anclaReal.fecha, pesoCurva.peso)),
   };
 
   return {
@@ -1969,6 +2031,8 @@ export async function datosCurvaS(
     inicio,
     fin,
     fuentePlan,
+    criterioPeso: pesoCurva.criterio,
+    tareasSinPeso: pesoCurva.sinPeso,
     planeadoBaseEnCorte,
     lineaBase,
     realSemanal,
@@ -1982,6 +2046,17 @@ export interface AvanceFisico {
   real: string;
   planeado: string;
   desfase: string;
+  /**
+   * Con que se peso: por DURACION o por DINERO.
+   *
+   * Viaja hasta la pantalla porque cambia lo que significa la cifra. Un 40 %
+   * pesado por dias y un 40 % pesado por soles son dos afirmaciones
+   * distintas sobre la misma obra, y quien la lee tiene derecho a saber cual
+   * esta leyendo.
+   */
+  criterio: CriterioPeso;
+  /// Tareas que no cuentan por no tener partida mapeada. Solo con DINERO.
+  tareasSinPeso: number;
   fechaCorte: Date;
   /// Fin de obra SEGUN EL CRONOGRAMA, que puede no ser el de la ficha: las
   /// fechas de la ficha las teclea alguien al dar de alta la obra y se quedan
@@ -2041,7 +2116,26 @@ export async function avanceFisicoPorObra(
   const idsVigentes = [...vigentes.values()].map((v) => v.id);
   const proyectosConPlan = [...vigentes.keys()];
 
-  const [tareas, avances] = await Promise.all([
+  /**
+   * El mapeo tarea-partida, para poder pesar por DINERO.
+   *
+   * Se pide PRIMERO y solo, y las partidas despues y solo de las obras que
+   * tengan mapeo. La inmensa mayoria de las obras no lo tiene, y cargar el
+   * presupuesto entero de todas las del panel para descubrirlo seria pagar el
+   * precio mas caro justo en la pantalla que la regla de coste de este
+   * proyecto protege.
+   */
+  const mapeos = await prisma.mapeoTareaPartida.findMany({
+    where: {
+      projectId: { in: proyectosConPlan },
+      project: { companyId: sesion.companyId },
+    },
+    select: { projectId: true, uid: true, codigoPartida: true },
+  });
+
+  const conMapeo = [...new Set(mapeos.map((m) => m.projectId))];
+
+  const [tareas, avances, partidas] = await Promise.all([
     prisma.tareaCronograma.findMany({
       where: { cronogramaId: { in: idsVigentes } },
       select: {
@@ -2066,6 +2160,16 @@ export async function avanceFisicoPorObra(
         fecha: true, createdAt: true, reportadoPor: true, nota: true,
       },
     }),
+    conMapeo.length === 0
+      ? Promise.resolve([])
+      : prisma.wbsItem.findMany({
+          where: {
+            projectId: { in: conMapeo },
+            project: { companyId: sesion.companyId },
+            tipo: "PARTIDA",
+          },
+          select: { projectId: true, codigoPartida: true, parcial: true },
+        }),
   ]);
 
   const porCronograma = new Map<string, typeof tareas>();
@@ -2090,7 +2194,39 @@ export async function avanceFisicoPorObra(
         .map((a) => ({ ...a, porcentaje: a.porcentaje.toString() })),
     );
 
+    /**
+     * El CRITERIO de peso de esta obra, decidido una vez y aplicado a los dos
+     * lados.
+     *
+     * `cobertura` mide que parte del PRESUPUESTO tiene tarea mapeada, y a
+     * partir del 60 % el importe describe la obra lo bastante como para pesar
+     * con el. Por debajo se sigue con la duracion: cambiar una aproximacion
+     * honesta por una precision falsa es peor que la aproximacion.
+     */
+    const partidasDeLaObra = partidas
+      .filter((p) => p.projectId === projectId)
+      .map((p) => ({
+        codigo: p.codigoPartida,
+        // `cobertura` pide la descripcion por su firma, pero no la mira: solo
+        // suma importes. Se pasa vacia en vez de traer una columna mas del
+        // presupuesto de todas las obras del panel.
+        descripcion: "",
+        parcial: p.parcial?.toString() ?? null,
+      }));
+    const enlacesDeLaObra = mapeos
+      .filter((m) => m.projectId === projectId)
+      .map((m) => ({ uid: m.uid, codigoPartida: m.codigoPartida }));
+
+    const criterio =
+      enlacesDeLaObra.length === 0
+        ? "DURACION"
+        : criterioDePeso(cobertura(enlacesDeLaObra, partidasDeLaObra).porcentaje);
+
+    const importes = importePorTarea(enlacesDeLaObra, partidasDeLaObra);
+    const peso = pesoDeTarea(criterio, importes, suyas);
+
     const medibles = suyas.map((t) => ({
+      uid: t.uid,
       esResumen: t.esResumen,
       duracionDias: t.duracionDias.toString(),
       real: ultimos.get(t.uid)?.porcentaje ?? t.porcentajeArchivo.toString(),
@@ -2121,13 +2257,21 @@ export async function avanceFisicoPorObra(
     // `planeadoEnFecha` trabaja en coma flotante a proposito —son coordenadas
     // de una curva, no dinero—, asi que se fija a dos decimales al cruzar a
     // texto, que es como viaja el resto de cifras del sistema.
-    const planeado = planeadoEnFecha(planificadas, hoyPanel).toFixed(2);
-    const real = ponderarPorDuracion(medibles, (t) => t.real);
+    // EL MISMO peso en los dos. Es la regla que hace que la resta signifique
+    // algo: un plan por dias contra un real por soles no se puede restar.
+    const planeado = planeadoEnFecha(planificadas, hoyPanel, peso.peso).toFixed(2);
+    const real = ponderar(
+      medibles.filter((t) => !t.esResumen),
+      peso.peso,
+      (t) => t.real,
+    );
 
     resultado.set(projectId, {
       real,
       planeado,
       desfase: restar(real, planeado) ?? "0.00",
+      criterio: peso.criterio,
+      tareasSinPeso: peso.sinPeso,
       fechaCorte: hoyPanel,
       finPlan: suyas.reduce((m, t) => (t.fin > m ? t.fin : m), suyas[0]!.fin),
     });

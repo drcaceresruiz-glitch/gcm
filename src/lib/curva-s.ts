@@ -10,12 +10,16 @@ import { ultimoAvancePorTarea, type AvanceReportado } from "@/lib/cronograma";
  * de porcentajes hace que terminar una partida de un dia pese lo mismo que
  * terminar una de veinte, y la curva sale bonita mintiendo.
  *
- * SEGUNDA: se pondera por DURACION, y es una decision provisional que hay que
- * saber. Lo correcto es ponderar por dinero, pero eso necesita el mapeo
- * tarea-partida, que se confirma a mano. Mientras tanto la duracion es el
- * unico peso que el propio archivo trae —no lleva ni `<Cost>` ni `<Work>`— y
- * es ademas con lo que Project hace sus propios totales. Es una aproximacion
- * declarada, no un dato economico.
+ * SEGUNDA: el PESO llega de fuera, no se decide aqui. Por defecto es la
+ * DURACION —el unico peso que el propio archivo trae, porque no lleva ni
+ * `<Cost>` ni `<Work>`, y con el que Project hace sus propios totales— y desde
+ * el 23 de agosto de 2026 puede ser el IMPORTE de la partida mapeada, cuando
+ * el mapeo cubre lo bastante del presupuesto (ver `lib/pesos-tarea`).
+ *
+ * Que el peso sea un parametro y no una constante es lo que hace posible la
+ * regla que gobierna todo esto: el PLAN y el REAL se pesan IGUAL. Una curva
+ * cuyas dos lineas se pesan distinto no se puede leer, porque lo unico que se
+ * mira en ella es la distancia entre las dos.
  *
  * Las dos lineas se calculan IGUAL. Que sean comparables entre si importa mas
  * que parecerse al total interno de Project, que usa su propio metodo.
@@ -76,11 +80,12 @@ export function ponderarPorDuracion<T extends Ponderable>(
 /**
  * Media ponderada exacta con el peso que se le diga.
  *
- * Generica a proposito: recibe el peso, no lo decide. Hoy el unico peso que
- * se usa en todo el sistema es la duracion (`ponderarPorDuracion`, abajo);
- * no existe un `ponderarPorDinero`. Que la funcion admita cualquier peso es
- * lo que evitaria, el dia que se decida ponderar por dinero, tener que
- * escribir una segunda cuenta que redondeara distinto y diera dos cifras de
+ * Generica a proposito: recibe el peso, no lo decide. Desde el 23 de agosto de
+ * 2026 hay DOS pesos —la duracion y el importe de la partida mapeada, ver
+ * `lib/pesos-tarea`— y esta funcion sirve a los dos sin cambiar una linea.
+ *
+ * Era exactamente lo que este comentario anticipaba: no hizo falta escribir
+ * una segunda cuenta que redondeara distinto y acabara dando dos cifras de
  * avance para la misma obra.
  */
 export function ponderar<T>(
@@ -175,13 +180,18 @@ export function serieRealPorFechas(
   tareas: readonly TareaParaCurva[],
   avances: readonly AvanceReportado[],
   fechas: readonly Date[],
+  /// El MISMO peso con el que se dibuja el plan. Ver `planeadoEnFecha`: si las
+  /// dos lineas de la curva no se pesan igual, la distancia entre ellas -que
+  /// es lo unico que se mira en una curva S- no significa nada.
+  pesoDe: (t: TareaParaCurva) => string = (t) => t.duracionDias,
 ): PuntoDiario[] {
   return fechas.map((fecha) => {
     const vigentes = ultimoAvancePorTarea(
       avances.filter((a) => a.fecha.getTime() <= fecha.getTime()),
     );
-    const real = ponderarPorDuracion(
-      tareas,
+    const real = ponderar(
+      tareas.filter((t) => !t.esResumen),
+      pesoDe,
       (t) => vigentes.get(t.uid)?.porcentaje ?? t.porcentajeArchivo,
     );
     return { fecha, valor: Number(real) || 0 };
@@ -237,10 +247,22 @@ function fraccion(t: TareaPlanificada, fecha: number): number {
   return (fecha - inicio) / (fin - inicio);
 }
 
-/** % planeado acumulado en una fecha concreta. */
+/**
+ * % planeado acumulado en una fecha concreta.
+ *
+ * `pesoDe` decide con que cuenta cada tarea. Por defecto la DURACION, que es
+ * como funciono siempre; con el mapeo tarea-partida suficiente se le pasa el
+ * importe y la curva pasa a medir dinero planeado en vez de dias planeados.
+ *
+ * El peso llega de fuera y no se decide aqui porque el PLAN y el REAL tienen
+ * que pesarse igual: un plan por duracion contra un real por dinero da una
+ * desviacion que no significa nada, y separar esa decision de las dos cuentas
+ * es lo unico que garantiza que no se puedan mezclar.
+ */
 export function planeadoEnFecha(
   tareas: readonly TareaPlanificada[],
   fecha: Date,
+  pesoDe: (t: TareaPlanificada) => string = (t) => t.duracionDias,
 ): number {
   const hojas = tareas.filter((t) => !t.esResumen);
 
@@ -248,7 +270,7 @@ export function planeadoEnFecha(
   let avance = 0;
 
   for (const t of hojas) {
-    const p = Number(t.duracionDias) || 0;
+    const p = Number(pesoDe(t)) || 0;
     if (p <= 0) continue;
     peso += p;
     avance += p * fraccion(t, fecha.getTime());
@@ -268,6 +290,8 @@ export function curvaPlaneada(
   tareas: readonly TareaPlanificada[],
   desde: Date,
   hasta: Date,
+  /// El mismo peso con el que se mide el real. Ver `planeadoEnFecha`.
+  pesoDe?: (t: TareaPlanificada) => string,
 ): PuntoDiario[] {
   const dias = Math.max(1, Math.round((hasta.getTime() - desde.getTime()) / DIA_MS));
   const paso = Math.max(1, Math.ceil(dias / 400));
@@ -276,13 +300,13 @@ export function curvaPlaneada(
 
   for (let d = 0; d <= dias; d += paso) {
     const fecha = new Date(desde.getTime() + d * DIA_MS);
-    puntos.push({ fecha, valor: planeadoEnFecha(tareas, fecha) });
+    puntos.push({ fecha, valor: planeadoEnFecha(tareas, fecha, pesoDe) });
   }
 
   // El ultimo dia siempre entra, aunque el paso no caiga justo en el.
   const ultimo = puntos[puntos.length - 1];
   if (!ultimo || ultimo.fecha.getTime() < hasta.getTime()) {
-    puntos.push({ fecha: hasta, valor: planeadoEnFecha(tareas, hasta) });
+    puntos.push({ fecha: hasta, valor: planeadoEnFecha(tareas, hasta, pesoDe) });
   }
 
   return puntos;

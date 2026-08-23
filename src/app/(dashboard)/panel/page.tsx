@@ -576,6 +576,7 @@ export default async function PanelPage({
                           real: Number(fisico.real),
                           planeado: Number(fisico.planeado),
                           corte: fechaCorta(fisico.fechaCorte),
+                          porDinero: fisico.criterio === "DINERO",
                         }
                       : undefined
                   }

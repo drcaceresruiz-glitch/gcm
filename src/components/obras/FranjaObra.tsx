@@ -29,6 +29,15 @@ export interface AvanceFisicoObra {
   planeado: number;
   /// Fecha del corte del que sale la cifra, ya formateada.
   corte: string;
+  /**
+   * Si la cifra esta pesada por DINERO en vez de por duracion.
+   *
+   * Solo se dice cuando es por dinero, y a proposito: es la excepcion -exige
+   * que el mapeo tarea-partida cubra el 60 % del presupuesto- y es la que
+   * cambia lo que el numero significa. Rotular tambien el caso normal
+   * llenaria el panel de una etiqueta que nadie necesita leer.
+   */
+  porDinero?: boolean;
 }
 
 interface Props {
@@ -76,7 +85,9 @@ export function FranjaObra({
             <Barra
               etiqueta="Avance físico"
               valor={avanceFisico.real}
-              detalle={`${avanceFisico.real.toFixed(1)}% de ${avanceFisico.planeado.toFixed(1)}%`}
+              detalle={`${avanceFisico.real.toFixed(1)}% de ${avanceFisico.planeado.toFixed(1)}%${
+                avanceFisico.porDinero ? " · por dinero" : ""
+              }`}
               // Verde solo si llega a lo previsto. Es la misma lectura que en
               // la tabla del cronograma: la barra alcanza la marca o no.
               color={

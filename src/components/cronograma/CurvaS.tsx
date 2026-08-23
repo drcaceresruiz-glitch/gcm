@@ -541,6 +541,23 @@ export function CurvaS({
           </p>
         )}
 
+        {/* Con que se pesaron las dos lineas. Solo se dice cuando es por
+            DINERO: es la excepcion -exige que el mapeo cubra el 60 % del
+            presupuesto- y es la que cambia lo que la curva significa. */}
+        {datos.criterioPeso === "DINERO" && (
+          <p className="text-xs opacity-70">
+            Esta curva está <strong>ponderada por dinero</strong>: cada tarea
+            pesa lo que vale su partida, no lo que dura.
+            {datos.tareasSinPeso > 0 && (
+              <>
+                {" "}
+                {datos.tareasSinPeso} tarea(s) no cuentan por no tener partida
+                mapeada.
+              </>
+            )}
+          </p>
+        )}
+
         <p className="text-sm">
           {enCorte ? "Al corte del " : "Al "}
           <strong>{fechaCorta(medida.fecha)}</strong>: real{" "}
