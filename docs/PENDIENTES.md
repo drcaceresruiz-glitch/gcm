@@ -68,6 +68,32 @@ de las partidas, y esta descuenta la estructura. En rojo cuando se la come.
 - Y propone el **recargo minimo** que los cubre (`r >= gastos / costo`),
   aplicable a todos los capitulos de un clic. Redondeado hacia arriba.
 
+### La bolsa se mide contra TODO lo que hay que pagar
+
+La vista previa comparaba el contractual con las lineas RECARGABLES, asi que el
+sueldo del residente y el resto de gastos generales quedaban fuera: la bolsa
+salia mas gorda de lo que era. Ahora se mide contra el `costoTotal` de la meta
+—costo directo (partidas + costos propios sin codigo) **mas** gastos generales—,
+que es lo que de verdad se paga. Si no alcanza, la tarjeta dice **Perdida** y va
+en rojo. La hoja de gastos generales NO se elimino: eliminarla habria escondido
+el problema en vez de resolverlo; lo que se arreglo es que su importe entre en
+la cuenta.
+
+### La plantilla trae 400 filas, no 60
+
+Sesenta parecian de sobra hasta mirar un presupuesto real: CRIOCORD tiene 368
+partidas. Quien pasaba de la fila 64 anadia filas a mano, y **una fila escrita a
+mano nace sin formulas** —ni Parcial ni Contractual—, asi que el presupuesto
+salia corto sin que nada lo avisara. Ese era el fallo caro: no que faltaran
+filas, sino que la columna dejara de sumar en silencio.
+
+400 filas cuestan 50 KB mas (de 24 a 73 KB). Y para quien necesite todavia mas,
+la plantilla lo dice donde se lee —leyenda y hoja de instrucciones—: hay que
+COPIAR una fila vacia entera y pegarla. No se puede impedir desde el archivo;
+solo se puede evitar que se descubra tarde. Dos pruebas nuevas: que la ULTIMA
+fila preparada trae sus dos formulas —no solo las primeras— y que caben las 368
+partidas de la obra real.
+
 ### La meta se corrige dentro de la app
 
 `meta-edicion.service`: editar una linea, anadir una partida, quitar la que
