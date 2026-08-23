@@ -110,6 +110,13 @@ function contractualEjemplo(f: FilaCosto): number {
  *
  * Es para que se VEA en la hoja. Al importar, GCM recalcula el contractual
  * por su cuenta: el archivo muestra, el importador manda.
+ *
+ * **`IF(ISNUMBER(rango),rango,0)` y no `N(rango)`**, aunque `N` sea mas
+ * corto. `N` solo se evalua como matriz en Excel; Google Sheets y LibreOffice
+ * la colapsan a la primera celda, con lo que el producto entero sale CERO y
+ * la columna Contractual aparece a 0,00 -que es exactamente como se vio-. La
+ * plantilla se abre en lo que cada constructora tenga, no en lo que nosotros
+ * suponemos.
  */
 function formulaContractual(
   fila: number,
@@ -121,7 +128,8 @@ function formulaContractual(
   return (
     `IF($G${fila}="","",` +
     `SUMPRODUCT((LEFT($A$${primera}:$A$${ultima},LEN(${pfx}))=${pfx})` +
-    `*N($F$${primera}:$F$${ultima}))*(1+$G${fila}/100))`
+    `*IF(ISNUMBER($F$${primera}:$F$${ultima}),$F$${primera}:$F$${ultima},0))` +
+    `*(1+$G${fila}/100))`
   );
 }
 
@@ -524,7 +532,8 @@ export async function generarPlantillaMeta(
     result: totalHojas,
     formula:
       `SUMPRODUCT((RIGHT($A$${primeraFila}:$A$${ultimaFila},2)<>".0")*` +
-      `($A$${primeraFila}:$A$${ultimaFila}<>"")*N($F$${primeraFila}:$F$${ultimaFila}))`,
+      `($A$${primeraFila}:$A$${ultimaFila}<>"")*` +
+      `IF(ISNUMBER($F$${primeraFila}:$F$${ultimaFila}),$F$${primeraFila}:$F$${ultimaFila},0))`,
   };
 
   // El contractual total: la suma de los capitulos ya recargados. Solo los

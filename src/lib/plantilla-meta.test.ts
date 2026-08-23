@@ -95,6 +95,46 @@ describe("la hoja de costo directo de la plantilla meta", () => {
   });
 });
 
+describe("las formulas de la plantilla se abren en cualquier programa", () => {
+  it("no usan N() sobre un rango: solo Excel la evalua como matriz", async () => {
+    /*
+     * Con `N(rango)` dentro de un SUMPRODUCT, Google Sheets y LibreOffice
+     * colapsan el rango a su primera celda y el producto entero sale CERO:
+     * la columna Contractual aparecia a 0,00 en la hoja descargada. La
+     * plantilla se abre en lo que cada constructora tenga.
+     */
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const hoja = libro.worksheets[0]!;
+
+    const formulas: string[] = [];
+    hoja.eachRow((fila) => {
+      fila.eachCell((celda) => {
+        const v = celda.value;
+        if (v && typeof v === "object" && "formula" in v) {
+          formulas.push((v as { formula: string }).formula);
+        }
+      });
+    });
+
+    expect(formulas.length).toBeGreaterThan(0);
+    expect(formulas.filter((f) => /N\(\$?[A-Z]+\$?\d+:/.test(f))).toEqual([]);
+    expect(formulas.some((f) => f.includes("ISNUMBER("))).toBe(true);
+  });
+
+  it("las celdas calculadas traen su resultado, para que se vean sin recalcular", async () => {
+    // Un visor que no recalcula -una vista previa de correo, el explorador-
+    // ensena la celda vacia si el archivo no trae el valor cacheado.
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const hoja = libro.worksheets[0]!;
+
+    // Fila 5 es el primer capitulo del ejemplo, con su 18 % de recargo.
+    const contractual = hoja.getRow(5).getCell("H").value as { result?: number };
+    expect(contractual.result).toBeCloseTo(2312.8, 2);
+  });
+});
+
 describe("lo que el analizador de gastos rechaza, y como lo dice", () => {
   it("un VARIABLE sin meses no se cuela como si costara su mensual", async () => {
     const r = await analizarGastosGenerales(
