@@ -16,23 +16,13 @@ interface ItemGuardado {
   porcentajeRecargo: string | null;
 }
 
-interface GastoGuardado {
-  concepto: string;
-  tipo: "FIJO" | "VARIABLE";
-  montoMensual: { toString: () => string } | null;
-  meses: { toString: () => string } | null;
-  montoTotal: { toString: () => string };
-  orden: number;
-}
-
 interface Estado {
   aprobada: boolean;
-  gastos: GastoGuardado[];
   items: ItemGuardado[];
   escrituras: { id: string; porcentajeRecargo: string | null }[];
 }
 
-const estado: Estado = { aprobada: false, gastos: [], items: [], escrituras: [] };
+const estado: Estado = { aprobada: false, items: [], escrituras: [] };
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -63,9 +53,6 @@ vi.mock("@/lib/prisma", () => ({
         estado.escrituras.push({ id: where.id, porcentajeRecargo: data.porcentajeRecargo });
         return { id: where.id };
       },
-    },
-    gastoGeneralMeta: {
-      findMany: async () => estado.gastos,
     },
     $transaction: async (ops: unknown[]) => ops,
   },
@@ -160,53 +147,5 @@ describe("ajustarRecargosDeLaMeta", () => {
     const r = await ajustar({});
     expect(r.ok).toBe(true);
     expect(estado.escrituras).toHaveLength(0);
-  });
-});
-
-
-describe("gastosGeneralesDeLaMeta", () => {
-  /*
-   * El desglose no se guardaba: `crearMeta` escribia solo el TOTAL en la meta
-   * y las filas se perdian, asi que no habia forma de ensenar que parte es
-   * fija y que parte crece con el plazo -que es justo la diferencia que se
-   * paga en dinero por cada mes de atraso-.
-   */
-  const gasto = (
-    concepto: string,
-    tipo: "FIJO" | "VARIABLE",
-    total: string,
-    mensual: string | null = null,
-    meses: string | null = null,
-  ): GastoGuardado => ({
-    concepto,
-    tipo,
-    montoMensual: mensual === null ? null : { toString: () => mensual },
-    meses: meses === null ? null : { toString: () => meses },
-    montoTotal: { toString: () => total },
-    orden: 0,
-  });
-
-  it("devuelve las filas con sus importes como TEXTO, nunca como number", async () => {
-    estado.gastos = [
-      gasto("Residente", "VARIABLE", "52000.00", "6500.00", "8.00"),
-      gasto("Póliza CAR", "FIJO", "4200.00"),
-    ];
-    const meta = await import("@/services/meta.service");
-    const r = await meta.gastosGeneralesDeLaMeta(sesion, "obra-1");
-
-    expect(r).toHaveLength(2);
-    expect(r[0]!.montoTotal).toBe("52000.00");
-    expect(r[0]!.montoMensual).toBe("6500.00");
-    // Un FIJO no lleva mensual ni meses: no se inventan.
-    expect(r[1]!.montoMensual).toBeNull();
-    expect(r[1]!.meses).toBeNull();
-  });
-
-  it("sin permiso de meta no devuelve nada", async () => {
-    estado.gastos = [gasto("Residente", "VARIABLE", "52000.00", "6500.00", "8.00")];
-    const sinPermiso = { ...(sesion as object), permisos: [] } as never;
-    const meta = await import("@/services/meta.service");
-
-    expect(await meta.gastosGeneralesDeLaMeta(sinPermiso, "obra-1")).toEqual([]);
   });
 });

@@ -60,8 +60,8 @@ export function FormularioMeta({
 }: {
   obraId: string;
   fechaHoy: string;
-  /// Meses entre las fechas de la obra. Se PROPONE, no se impone: los gastos
-  /// generales pueden presupuestarse para un plazo distinto del contractual.
+  /// Meses entre las fechas de la obra. Se PROPONE, no se impone: lo que se
+  /// paga por mes puede presupuestarse para un plazo distinto del contractual.
   mesesSugeridos: string;
 }) {
   const [estado, accion] = useActionState<EstadoMeta, FormData>(

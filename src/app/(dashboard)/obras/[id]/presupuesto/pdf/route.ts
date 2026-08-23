@@ -12,7 +12,7 @@ import {
  *
  * - `contractual`: el que se firma con el cliente. Sin una sola cifra de
  *   costo.
- * - `meta`: interno. Lo que cuesta construir, con sus gastos generales.
+ * - `meta`: interno. Lo que cuesta construir, sueldos y polizas incluidos.
  * - `comparativa`: los dos enfrentados, con la bolsa. Interno.
  *
  * Se generan al vuelo y no se guarda ningun archivo: un presupuesto es lo que

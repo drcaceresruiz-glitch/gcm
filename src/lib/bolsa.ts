@@ -1,7 +1,6 @@
 import {
   sumar,
   restar,
-  multiplicar,
   esPositivo,
   esNegativo,
 } from "@/lib/decimal";
@@ -210,36 +209,38 @@ export interface DatosBolsa {
   /// Utilidad del contractual. Viaja para poder ensenarla al lado de la
   /// bolsa; NUNCA se suma a ella.
   utilidadContractual: string;
-  /// Gastos generales de la meta, ya sumados. Opcional: una meta cargada sin
-  /// la hoja de gastos no los tiene, y ahi la bolsa neta es la bruta.
-  gastosGeneralesMeta?: string;
 }
 
 export interface Bolsa {
   porLinea: readonly LineaBolsa[];
 
   costoDirectoContractual: string;
+  /// Solo las lineas de la meta CON codigo: las que tienen contraparte en el
+  /// contrato. Los sueldos y alquileres no estan aqui, estan en
+  /// `costoPropioMeta`.
   costoDirectoMeta: string;
   /// Costo directo contractual - costo directo meta.
   bolsaProduccion: string;
 
-  /// La bolsa que gestiona la obra ANTES de sus gastos generales. Es la que
-  /// se compara linea a linea con el contrato, y por eso se conserva con este
-  /// nombre: media docena de sitios la leen asi.
+  /**
+   * Lo que la obra puede gestionar de verdad: produccion MENOS costos
+   * propios.
+   *
+   * Hasta el 23 de agosto de 2026 habia dos cifras, `bolsaTotal` y
+   * `bolsaNeta`, porque los costos propios llegaban de una tabla aparte que
+   * podia venir vacia. Ahora viajan en la misma lista, asi que las dos
+   * valdrian siempre lo mismo y se dejo una sola: dos nombres para un numero
+   * es como se acaba enseñando el que no toca.
+   */
   bolsaTotal: string;
 
-  /// Los gastos generales de la meta: personal indirecto, polizas, todo lo
-  /// que la obra cuesta sin ser una partida. Cero si la meta no los trae.
-  gastosGeneralesMeta: string;
-
-  /**
-   * Lo que de verdad queda: la bolsa menos los gastos generales.
-   *
-   * Es la cifra INTERNA, la que dice si la obra deja algo. La de arriba mide
-   * el margen de las partidas; esta descuenta ademas el residente, el maestro
-   * y la camioneta, que se pagan igual aunque todas las partidas cuadren.
-   */
-  bolsaNeta: string;
+  /// Las lineas de la meta SIN codigo: personal indirecto, alquileres,
+  /// polizas, fianzas. Todo lo que la obra cuesta sin ser una partida.
+  ///
+  /// NO se recibe de fuera: se deriva de la misma lista que el costo directo.
+  /// Hasta el 23 de agosto de 2026 llegaba como parametro desde una tabla
+  /// aparte, y llegaba en cero sin que nada avisara.
+  costoPropioMeta: string;
 
   /// Aparte y etiquetada. No es bolsa: es el margen ofertado.
   utilidadContractual: string;
@@ -273,21 +274,29 @@ export function calcularBolsa(datos: DatosBolsa): Bolsa {
   const costoDirectoContractual = sumar(
     datos.contractual.map((c) => c.importe),
   );
-  const costoDirectoMeta = sumar(datos.meta.map((m) => m.importe));
+  // El corte es el CODIGO, y por eso las dos cifras salen de la misma lista:
+  // lo que tiene contraparte en el contrato se compara con el contrato, y lo
+  // que no la tiene se descuenta despues. Antes el segundo sumando llegaba de
+  // una tabla aparte y podia venir en cero sin que nada chirriara.
+  const costoDirectoMeta = sumar(
+    datos.meta.filter((m) => m.codigoRef !== null).map((m) => m.importe),
+  );
+  const costoPropioMeta = sumar(
+    datos.meta.filter((m) => m.codigoRef === null).map((m) => m.importe),
+  );
 
+  // Produccion mide SOLO el margen de las partidas. Lo que se paga sin ser
+  // partida -residente, maestro, alquileres, polizas- se descuenta despues:
+  // se paga igual aunque todas las partidas cuadren.
   const bolsaProduccion =
     restar(costoDirectoContractual, costoDirectoMeta) ?? "0.00";
-  const bolsaTotal = bolsaProduccion;
-
-  const gastosGeneralesMeta = datos.gastosGeneralesMeta ?? "0.00";
-  const bolsaNeta = restar(bolsaTotal, gastosGeneralesMeta) ?? bolsaTotal;
+  const bolsaTotal = restar(bolsaProduccion, costoPropioMeta) ?? bolsaProduccion;
 
   return {
     porLinea: union.filas,
     costoDirectoContractual,
     costoDirectoMeta,
-    gastosGeneralesMeta,
-    bolsaNeta,
+    costoPropioMeta,
     bolsaProduccion,
     bolsaTotal,
     utilidadContractual: datos.utilidadContractual,
@@ -325,71 +334,5 @@ export function desfaseDeMeta(
     movimientos: posteriores.length,
     importe: sumar(posteriores.map((m) => m.importeNeto)),
     hay: posteriores.length > 0,
-  };
-}
-
-export type TipoGasto = "FIJO" | "VARIABLE";
-
-export interface EntradaGasto {
-  tipo: TipoGasto;
-  /// VARIABLE: lo que cuesta cada mes. FIJO: null.
-  montoMensual: string | null;
-  /// VARIABLE: cuantos meses se sostiene. FIJO: null.
-  meses: string | null;
-  /// FIJO: el importe tal cual. VARIABLE: null.
-  montoFijo: string | null;
-}
-
-/**
- * El total de un gasto general, o null si la fila no tiene forma valida.
- *
- * Es la validacion que la base de datos NO puede expresar: que un VARIABLE
- * lleve mensual y meses, y que un FIJO lleve su importe. Devolver null en vez
- * de cero es deliberado —un cero se suma sin ruido y desaparece del total—.
- */
-export function totalDeGasto(g: EntradaGasto): string | null {
-  if (g.tipo === "FIJO") {
-    return g.montoFijo === null ? null : sumar([g.montoFijo]);
-  }
-
-  if (g.montoMensual === null || g.meses === null) return null;
-  return multiplicar(g.montoMensual, g.meses, 2);
-}
-
-export interface ResumenGastosGenerales {
-  /// Suma de todos los gastos generales de la meta.
-  total: string;
-  /// Solo los que no dependen del plazo.
-  fijos: string;
-  /// Solo los que se pagan por mes.
-  variables: string;
-  /// Lo que cuesta CADA MES de atraso: la suma de los mensuales de los
-  /// variables. Es la cifra que convierte "vamos tres semanas tarde" en
-  /// dinero, y la razon de guardar el mensual en vez de un total ciego.
-  costeMensualDelAtraso: string;
-  /// Cuantas filas no tienen forma valida y quedaron fuera de la suma.
-  invalidas: number;
-}
-
-/** Las cuentas de la lista de gastos generales de la meta. */
-export function resumenGastosGenerales(
-  gastos: readonly EntradaGasto[],
-): ResumenGastosGenerales {
-  const totales = gastos.map((g) => ({ g, total: totalDeGasto(g) }));
-  const validos = totales.filter((t) => t.total !== null);
-
-  const de = (tipo: TipoGasto) =>
-    sumar(validos.filter((t) => t.g.tipo === tipo).map((t) => t.total!));
-
-  return {
-    total: sumar(validos.map((t) => t.total!)),
-    fijos: de("FIJO"),
-    variables: de("VARIABLE"),
-    costeMensualDelAtraso: sumar(
-      gastos
-        .filter((g) => g.tipo === "VARIABLE" && g.montoMensual !== null)
-        .map((g) => g.montoMensual!),
-    ),
-    invalidas: totales.length - validos.length,
   };
 }

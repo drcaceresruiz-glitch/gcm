@@ -727,19 +727,46 @@ const META = (
       </p>
     </S>
 
-    <S titulo="Los gastos generales no son de la obra">
+    <S titulo="Los sueldos también son costo de la obra">
       <p>
-        La meta de la obra es <strong>costo directo</strong>: las partidas que
-        se ejecutan. Los <strong>gastos generales</strong> y la
-        <strong>utilidad</strong> no entran en ella —los reconoce el contrato
-        como un porcentaje y los gestiona la empresa—, así que la obra
-        gestiona <strong>una sola bolsa</strong>: lo que se gana ejecutando
-        por debajo de la meta.
+        La meta es <strong>todo lo que hay que pagar</strong>: las partidas que
+        se ejecutan y también lo que cuesta la obra sin ser una partida —el
+        residente, el maestro, la camioneta, las cartas fianza, las pólizas—.
+        Van en la misma hoja, en las filas <strong>sin Ítem</strong>, y por eso
+        no se le desglosan al cliente: el contrato los reconoce englobados, no
+        sueldo a sueldo. Cuestan igual, y la bolsa se mide contra el total.
       </p>
       <p>
-        Por eso la plantilla del real ya no trae hoja de gastos generales. Si
-        cargas un Excel antiguo que la traiga, GCM lo dice al importar en vez
-        de guardarla por su cuenta.
+        Hasta el 23 de agosto de 2026 vivían en una hoja aparte, y esa hoja
+        podía valer cero sin que nada avisara: una obra que perdía S/ 300 decía
+        perder S/ 200, porque el sueldo del residente estaba escrito en el
+        Excel y no contaba. Una sola lista y una sola suma; no hay dos cuentas
+        que puedan discrepar.
+      </p>
+      <p>
+        La <strong>utilidad</strong> sigue sin entrar, y eso no cambia: no es
+        un costo que se pueda gastar, es el resultado.
+      </p>
+    </S>
+
+    <S titulo="Lo que se paga por mes va en «mes»">
+      <p>
+        Una fila sin Ítem con la unidad en <strong>mes</strong> le dice a GCM
+        que ese costo <strong>crece si la obra se alarga</strong>: el metrado
+        son los meses y el precio unitario es lo que cuesta cada mes. De ahí
+        sale la única cifra que convierte «vamos tres semanas tarde» en dinero.
+      </p>
+      <p>
+        Un sueldo escrito como <strong>8 × 6 500</strong> dice lo que cuesta
+        estirarse. Escrito como <strong>52 000</strong> a secas no dice nada, y
+        un importe cerrado no se puede repartir hacia atrás. Lo que no depende
+        del plazo —fianzas, pólizas, licencias— va con unidad
+        <strong>glb</strong>.
+      </p>
+      <p>
+        Los meses son <strong>por línea</strong>, no el plazo de la obra: nadie
+        está en obra todo el plazo. Con un único número global el costo saldría
+        siempre de más.
       </p>
     </S>
 
@@ -748,7 +775,7 @@ const META = (
         pasos={[
           <>
             <strong>Cargar el presupuesto meta</strong> con la plantilla
-            oficial, y revisar los totales: costo directo, gastos generales y
+            oficial, y revisar los totales: costo directo, costos propios y
             plazo en meses. Es el PRIMER paso de la obra: ya no hace falta
             tener un contractual aprobado antes, porque el contractual sale
             justo de aquí.
@@ -788,13 +815,14 @@ const META = (
             ),
           },
           {
-            hace: "Prometer gastos generales más largos que el plazo",
+            hace: "Escribir un sueldo como un importe cerrado",
             pasa: (
               <p>
-                Un gasto mensual que dura más meses que la obra es plata
-                comprometida sobre un plazo que no existe. GCM cruza las
-                líneas de gasto contra el plazo y señala las que se pasan,
-                antes de que lo descubra el cierre.
+                Poner «Residente — 52 000» en vez de «8 meses × 6 500» suma
+                igual, pero deja a GCM sin saber qué cuesta cada mes de más. El
+                día que la obra se estira, el sobrecosto no aparece por ninguna
+                parte y solo se descubre en el cierre. Unidad «mes», metrado =
+                meses, precio = lo que se paga al mes.
               </p>
             ),
           },
@@ -2674,7 +2702,7 @@ export const CAPITULOS: CapituloManual[] = [
     paraQuien: "Gerencia y residencia.",
     resumen:
       "El presupuesto meta y el contractual que sale de él: la bolsa " +
-      "operativa, por qué los gastos generales no son de la obra y por qué la meta sí " +
+      "operativa, por qué los sueldos y las pólizas también son costo de la obra y por qué la meta sí " +
       "se puede re-fijar.",
     contenido: META,
   },

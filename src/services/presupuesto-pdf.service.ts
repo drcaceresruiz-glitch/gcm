@@ -1,7 +1,8 @@
 import "server-only";
 import { PDFDocument } from "pdf-lib";
 
-import { sumar } from "@/lib/decimal";
+import { esCero, sumar } from "@/lib/decimal";
+import { cifrasDeLaMeta } from "@/lib/costo-meta";
 import { soles } from "@/utils/formato";
 import {
   A4_VERTICAL,
@@ -13,7 +14,7 @@ import {
 import { aWinAnsi } from "@/lib/pdf-texto";
 import { listarPartidas, obtenerObra, type PartidaFila } from "@/services/obras.service";
 import { obtenerEmpresa } from "@/services/empresa.service";
-import { gastosGeneralesDeLaMeta, metaQueManda } from "@/services/meta.service";
+import { metaQueManda } from "@/services/meta.service";
 import { lineasDelBorrador } from "@/services/meta-edicion.service";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
@@ -222,10 +223,7 @@ async function datosMeta(
   const meta = await metaQueManda(sesion.companyId, obraId);
   if (!meta) return null;
 
-  const [borrador, gastos] = await Promise.all([
-    lineasDelBorrador(sesion, obraId),
-    gastosGeneralesDeLaMeta(sesion, obraId),
-  ]);
+  const borrador = await lineasDelBorrador(sesion, obraId);
 
   /**
    * Las lineas salen del borrador cuando lo hay, y de la meta aprobada
@@ -261,38 +259,52 @@ async function datosMeta(
           parcial: i.parcial?.toString() ?? null,
         }));
 
-  const variables = gastos.filter((g) => g.tipo === "VARIABLE");
-  const fijos = gastos.filter((g) => g.tipo === "FIJO");
+  /*
+   * El pie desglosa la MISMA lista que la tabla de arriba: lo que tiene
+   * codigo y lo que no. No hay un tercer sumando que venga de otro sitio, que
+   * es como se llego a imprimir un costo total al que le faltaba la nomina.
+   */
+  const cifras = cifrasDeLaMeta(
+    lineas.map((l) => ({
+      codigoRef: l.codigo,
+      unidad: l.unidad,
+      precioUnitario: l.precioUnitario,
+      parcial: l.parcial,
+    })),
+  );
 
   const totales: { etiqueta: string; importe: string; destacado?: boolean }[] = [
-    { etiqueta: "Costo directo", importe: soles(meta.costoDirecto.toString()) },
+    { etiqueta: "Costo directo", importe: soles(cifras.costoDirecto) },
   ];
 
-  if (variables.length > 0) {
+  if (!esCero(cifras.costoPropio)) {
     totales.push({
-      etiqueta: "Gastos generales variables",
-      importe: soles(sumar(variables.map((g) => g.montoTotal))),
-    });
-  }
-  if (fijos.length > 0) {
-    totales.push({
-      etiqueta: "Gastos generales fijos",
-      importe: soles(sumar(fijos.map((g) => g.montoTotal))),
+      etiqueta: "Costos propios (no van al contrato)",
+      importe: soles(cifras.costoPropio),
     });
   }
 
   totales.push({
     etiqueta: "COSTO TOTAL DE LA OBRA",
-    importe: soles(meta.costoTotal.toString()),
+    importe: soles(cifras.costoTotal),
     destacado: true,
   });
+
+  // Lo que cuesta cada mes de mas. Solo si hay de donde sacarlo: un cero
+  // aqui diria que alargarse sale gratis.
+  if (cifras.lineasPorMes > 0 && !esCero(cifras.costeMensualDelAtraso)) {
+    totales.push({
+      etiqueta: "Cada mes de atraso cuesta",
+      importe: soles(cifras.costeMensualDelAtraso),
+    });
+  }
 
   return {
     ...comun,
     titulo: `PRESUPUESTO META v${meta.version}`,
     subtitulo:
       "DOCUMENTO INTERNO. Es lo que a la empresa le cuesta construir la obra, " +
-      "con sus gastos generales. No se envía al cliente.",
+      "sueldos y pólizas incluidos. No se envía al cliente.",
     lineas,
     totales,
     soloInterno: true,

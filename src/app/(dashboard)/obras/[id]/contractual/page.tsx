@@ -52,7 +52,6 @@ export default async function ContractualPage({
     metaVersion,
     metaAprobada,
     reales,
-    gastosGeneralesPrevistos,
     costoTotalMeta,
     costoPropioMeta,
   } = previa.previa;
@@ -94,7 +93,6 @@ export default async function ContractualPage({
         puedeGenerar={puede(sesion, "partida:importar")}
         puedeAjustar={puedeAjustar}
         motivoNoAjustable={motivoNoAjustable}
-        gastosGeneralesPrevistos={gastosGeneralesPrevistos}
         costoTotalMeta={costoTotalMeta}
         costoPropioMeta={costoPropioMeta}
       />

@@ -3795,16 +3795,6 @@ enum ModoPresupuestoMeta {
 }
 
 /// Las dos clases de gasto general, que se comportan al reves ante un atraso.
-enum TipoGastoGeneral {
-  /// No depende del plazo: cartas fianza, licencias, polizas, gastos de
-  /// licitacion. Un mes mas de obra no los mueve.
-  FIJO
-  /// Por mes: staff, oficina, camioneta, servicios. Son los que sangran
-  /// cuando la obra se estira, y por eso se guardan con su monto mensual y
-  /// sus meses en vez de con un total ciego.
-  VARIABLE
-}
-
 /// El presupuesto meta de una obra: lo que la empresa se compromete a gastar.
 ///
 /// Versionado y congelable como `Baseline`, y por el mismo motivo: si la meta
@@ -3833,24 +3823,38 @@ model PresupuestoMeta {
   // y se ensena aparte, etiquetada como lo que es. Si alguien viene a anadirla
   // aqui "por completitud", esto es lo que tiene que leer antes.
   //
-  // Tampoco hay un porcentaje de gastos generales: en la meta son una lista
-  // con plazo (`GastoGeneralMeta`), porque escalan con los MESES y no con la
-  // produccion. Un porcentaje sobre el costo directo esconde justo el modo de
-  // falla mas caro: la obra que se estira con todas sus partidas en meta.
+  // Tampoco hay un porcentaje de gastos generales, y desde el 23 de agosto de
+  // 2026 tampoco hay una TABLA de gastos generales. Los sueldos, alquileres,
+  // fianzas y polizas son items de la meta sin `codigoRef`, con la unidad en
+  // «mes» cuando se pagan por mes: un gasto variable es `meses x monto
+  // mensual`, que es exactamente `metrado x precioUnitario`. Escalan con los
+  // MESES y no con la produccion, y eso se sigue viendo -ver
+  // `costeMensualDelAtraso` en `lib/costo-meta.ts`-.
+  //
+  // Habia una segunda lista con su propio parser y su propia suma, y se
+  // quedaba en cero sin que nada chirriara: una meta mostraba 600 de costo
+  // cuando eran 700, con el sueldo del residente escrito en el Excel y valiendo
+  // cero en la cuenta. La causa concreta se cerro; la FORMA de la causa se
+  // quito entera. Si alguien viene a anadir otra tabla de costos aparte, esto
+  // es lo que tiene que leer antes.
+  //
+  // Las tres salen de `cifrasDeLaMeta`, de UNA pasada sobre UNA lista: no se
+  // pueden desincronizar entre si.
 
-  /// Suma de los items de la meta.
+  /// Suma de los items CON codigo: el costo directo en el sentido del oficio,
+  /// lo que el contrato desglosa partida a partida.
   costoDirecto Decimal @db.Decimal(14, 2)
 
-  /// Suma de `GastoGeneralMeta`. Derivada, se persiste para no recalcular la
-  /// lista en cada consulta de tablero.
-  gastosGenerales Decimal @db.Decimal(14, 2)
+  /// Suma de los items SIN codigo: sueldos, alquileres, polizas, fianzas.
+  /// Cuesta igual, pero no se le desglosa al cliente linea a linea.
+  costoPropio Decimal @db.Decimal(14, 2)
 
-  /// costoDirecto + gastosGenerales. El COSTO al que se compromete la obra,
-  /// que es la cifra que se compara con el presupuesto de venta.
+  /// costoDirecto + costoPropio. El COSTO al que se compromete la obra, que
+  /// es la cifra contra la que se mide la bolsa operativa.
   costoTotal Decimal @db.Decimal(14, 2)
 
-  /// Plazo en meses con el que se presupuestaron los gastos generales
-  /// variables.
+  /// Plazo en meses con el que se presupuestaron las lineas que se pagan por
+  /// mes. Es el metrado que la app PROPONE para una linea en «mes».
   ///
   /// Se GUARDA, no se deriva de `Project.fechaFinProgramada`. Si se derivara,
   /// atrasar la obra reescribiria la meta hacia atras: los gastos generales
@@ -3887,7 +3891,6 @@ model PresupuestoMeta {
 
   project              Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   items                PresupuestoMetaItem[]
-  gastosGeneralesLista GastoGeneralMeta[]
 
   @@unique([projectId, version])
   @@index([projectId])
@@ -3992,30 +3995,6 @@ model MetaItemPartida {
 /// Guardar el mensual y los meses por separado —en vez de un total ciego— es
 /// lo que permite decir cuanto cuesta CADA MES de atraso, que es la pregunta
 /// que se hace en obra cuando el plazo se va.
-model GastoGeneralMeta {
-  id                String @id @default(cuid())
-  presupuestoMetaId String
-
-  concepto String           @db.VarChar(200)
-  tipo     TipoGastoGeneral
-
-  /// Solo en VARIABLE. En FIJO van en null.
-  montoMensual Decimal? @db.Decimal(14, 2)
-  meses        Decimal? @db.Decimal(5, 2)
-
-  /// En VARIABLE, montoMensual * meses. En FIJO, el importe tal cual. Se
-  /// persiste para no tener que multiplicar en cada suma y para que un FIJO y
-  /// un VARIABLE se puedan sumar sin preguntar de que tipo son.
-  montoTotal Decimal @db.Decimal(14, 2)
-
-  orden Int @default(0)
-
-  meta PresupuestoMeta @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
-
-  @@index([presupuestoMetaId, orden])
-  @@map("gastos_generales_meta")
-}
-
 // ---------------------------------------------------------------------------
 // Notas y recordatorios: la bitacora libre de la obra
 // ---------------------------------------------------------------------------

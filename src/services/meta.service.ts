@@ -1,16 +1,14 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { normalizarDecimal, sumar, esPositivo, esCero } from "@/lib/decimal";
+import { normalizarDecimal, esPositivo, esCero } from "@/lib/decimal";
 import { subtotalesPorRama } from "@/lib/jerarquia-partidas";
+import { cifrasDeLaMeta } from "@/lib/costo-meta";
 import {
   calcularBolsa,
   desfaseDeMeta,
-  resumenGastosGenerales,
-  totalDeGasto,
   type Bolsa,
   type Desfase,
-  type EntradaGasto,
   type LineaContractual,
   type LineaMeta,
   type ModoMeta,
@@ -43,7 +41,7 @@ export interface MetaResumen {
   modo: ModoMeta;
   fechaMeta: Date;
   costoDirecto: string;
-  gastosGenerales: string;
+  costoPropio: string;
   costoTotal: string;
   mesesPlazo: string;
   /// null si la meta nacio antes que el contractual: no se fijo contra nada.
@@ -76,7 +74,7 @@ export async function listarMetas(
     modo: m.modo as ModoMeta,
     fechaMeta: m.fechaMeta,
     costoDirecto: m.costoDirecto.toString(),
-    gastosGenerales: m.gastosGenerales.toString(),
+    costoPropio: m.costoPropio.toString(),
     costoTotal: m.costoTotal.toString(),
     mesesPlazo: m.mesesPlazo.toString(),
     baselineVersion: m.baselineVersion,
@@ -317,10 +315,11 @@ export async function compararConContractual(
     })),
   }));
 
+  // El costo interno que no es partida —sueldos, alquileres, polizas— ya
+  // viaja DENTRO de `lineasMeta`, con `codigoRef` en null. `calcularBolsa` lo
+  // separa por ahi: va a la bolsa NETA, no a la de produccion, porque la de
+  // arriba mide el margen de las partidas.
   const bolsa = calcularBolsa({
-    // El costo interno de la obra que no es partida. Va a la bolsa NETA, no a
-    // la de produccion: la de arriba mide el margen de las partidas.
-    gastosGeneralesMeta: meta.gastosGenerales.toString(),
     modo,
     contractual: await lineasContractuales(modo, obraId, vigente.partidas),
     meta: lineasMeta,
@@ -348,7 +347,7 @@ export async function compararConContractual(
         modo,
         fechaMeta: meta.fechaMeta,
         costoDirecto: meta.costoDirecto.toString(),
-        gastosGenerales: meta.gastosGenerales.toString(),
+        costoPropio: meta.costoPropio.toString(),
         costoTotal: meta.costoTotal.toString(),
         mesesPlazo: mesesMeta,
         baselineVersion: meta.baselineVersion,
@@ -394,25 +393,12 @@ export interface EntradaItemMeta {
   fechaFin?: string | null;
 }
 
-export interface EntradaGastoMeta {
-  concepto: string;
-  tipo: "FIJO" | "VARIABLE";
-  /// VARIABLE.
-  montoMensual?: string | null;
-  /// VARIABLE. Puede ser distinto del plazo de la obra: un topografo esta
-  /// tres meses de los ocho, y por eso se pide por linea.
-  meses?: string | null;
-  /// FIJO.
-  montoFijo?: string | null;
-}
-
 export interface DatosMeta {
   modo: ModoMeta;
   fechaMeta: string;
   mesesPlazo: string;
   notas?: string | null;
   items: EntradaItemMeta[];
-  gastosGenerales: EntradaGastoMeta[];
 }
 
 export type ResultadoMeta =
@@ -575,30 +561,22 @@ export async function crearMeta(
     };
   }
 
-  // LOS GASTOS GENERALES YA NO SON DE LA META (20/08/2026).
-  //
-  // La lista se sigue leyendo del Excel para poder AVISAR de que viene, pero
-  // no entra en la meta ni en la bolsa: los gastos generales los reconoce el
-  // contrato como un porcentaje y los gestiona la empresa. La tabla queda
-  // dormida en el esquema para no perder lo que ya cargaron las metas viejas.
-  const entradasGasto: EntradaGasto[] = [];
-
-  const resumenGG = resumenGastosGenerales(entradasGasto);
-  if (resumenGG.invalidas > 0) {
-    return {
-      ok: false,
-      error:
-        `${resumenGG.invalidas} gasto(s) general(es) estan incompletos: los ` +
-        `variables necesitan monto mensual y meses; los fijos, su importe.`,
-    };
-  }
-
-  const costoDirecto = sumar(
-    datos.items
-      .map((i) => i.parcial)
-      .filter((p): p is string => p !== null && p !== ""),
-  );
-  const costoTotal = sumar([costoDirecto, resumenGG.total]);
+  /**
+   * Las tres cifras, de UNA pasada sobre UNA lista.
+   *
+   * Aqui vivio el fallo mas caro de esta pantalla. Habia una segunda lista
+   * -la hoja «Gastos Generales»- y, cuando esa hoja se retiro el 20 de agosto
+   * de 2026, quedo una linea que ponia sus entradas a `[]` fijo. Al
+   * restaurarla el 23 esa linea SOBREVIVIO: las filas volvian a guardarse en
+   * su tabla y se veian en pantalla, pero el total valia cero. Una meta
+   * enseñaba 600 de costo cuando eran 700, con el sueldo del residente
+   * escrito en el Excel y sin contar. La obra no perdia 200, perdia 300.
+   *
+   * Ya no hay dos listas que sincronizar. Un sueldo es un item sin
+   * `codigoRef` con la unidad en «mes», y `cifrasDeLaMeta` lo cuenta igual
+   * que a cualquier otro.
+   */
+  const cifras = cifrasDeLaMeta(datos.items);
 
   const [ultima, movimientos] = await Promise.all([
     prisma.presupuestoMeta.findFirst({
@@ -624,9 +602,9 @@ export async function crearMeta(
         modo: datos.modo,
         fechaMeta: new Date(datos.fechaMeta),
         notas: datos.notas?.trim() || null,
-        costoDirecto,
-        gastosGenerales: resumenGG.total,
-        costoTotal,
+        costoDirecto: cifras.costoDirecto,
+        costoPropio: cifras.costoPropio,
+        costoTotal: cifras.costoTotal,
         mesesPlazo,
         baselineVersion: base?.version ?? null,
         movimientosAlFijar: movimientos,
@@ -657,45 +635,6 @@ export async function crearMeta(
     });
 
 
-    /**
-     * La LISTA de gastos generales, no solo su total.
-     *
-     * El total ya se guarda en la meta y es lo que gobierna la bolsa neta,
-     * pero sin las filas no se puede ensenar el desglose -que es justo lo que
-     * distingue un gasto que crece con el plazo de uno que no- ni saber
-     * cuanto cuesta cada mes de atraso. Se guardaba a medias desde que la
-     * hoja salio de la plantilla.
-     *
-     * `montoTotal` se persiste ya calculado, como dice el modelo: asi un FIJO
-     * y un VARIABLE se suman sin preguntar de que tipo son.
-     */
-    if (datos.gastosGenerales.length > 0) {
-      await tx.gastoGeneralMeta.createMany({
-        data: datos.gastosGenerales.flatMap((g, orden) => {
-          const total = totalDeGasto({
-            tipo: g.tipo,
-            montoMensual: g.montoMensual ?? null,
-            meses: g.meses ?? null,
-            montoFijo: g.montoFijo ?? null,
-          });
-          // Una linea incompleta ya se rechazo arriba con su mensaje; si aun
-          // asi llegara sin total, no se guarda a medias.
-          if (total === null) return [];
-          return [
-            {
-              presupuestoMetaId: meta.id,
-              concepto: g.concepto,
-              tipo: g.tipo,
-              montoMensual: g.tipo === "VARIABLE" ? (g.montoMensual ?? null) : null,
-              meses: g.tipo === "VARIABLE" ? (g.meses ?? null) : null,
-              montoTotal: total,
-              orden,
-            },
-          ];
-        }),
-      });
-    }
-
     await tx.auditLog.create({
       data: {
         companyId: sesion.companyId,
@@ -707,9 +646,9 @@ export async function crearMeta(
         despues: {
           version,
           modo: datos.modo,
-          costoDirecto,
-          gastosGenerales: resumenGG.total,
-          costoTotal,
+          costoDirecto: cifras.costoDirecto,
+          costoPropio: cifras.costoPropio,
+          costoTotal: cifras.costoTotal,
           mesesPlazo,
           baselineVersion: base?.version ?? null,
           lineas: datos.items.length,
@@ -720,48 +659,7 @@ export async function crearMeta(
     return meta;
   });
 
-  return { ok: true, id: creada.id, version, costoTotal };
-}
-
-export interface GastoGeneralDeLaMeta {
-  concepto: string;
-  tipo: "FIJO" | "VARIABLE";
-  montoMensual: string | null;
-  meses: string | null;
-  montoTotal: string;
-}
-
-/**
- * El desglose de gastos generales de la meta que manda.
- *
- * Aparte de `compararConContractual` a proposito: la bolsa se mira siempre y
- * esto solo cuando alguien despliega el detalle. Meterlo en la comparacion
- * cargaria una tabla mas en cada visita a la pantalla para algo que casi
- * nunca se abre.
- */
-export async function gastosGeneralesDeLaMeta(
-  sesion: SesionActiva,
-  obraId: string,
-): Promise<GastoGeneralDeLaMeta[]> {
-  if (!puede(sesion, "meta:leer")) return [];
-
-  const meta = await metaQueManda(sesion.companyId, obraId);
-  if (!meta) return [];
-
-  const filas = await prisma.gastoGeneralMeta.findMany({
-    where: { presupuestoMetaId: meta.id },
-    orderBy: { orden: "asc" },
-  });
-
-  return filas.map((g) => ({
-    concepto: g.concepto,
-    tipo: g.tipo as "FIJO" | "VARIABLE",
-    // Mismo criterio que el resto del proyecto para leer un `Decimal`: a
-    // texto, nunca a `number`.
-    montoMensual: g.montoMensual?.toString() ?? null,
-    meses: g.meses?.toString() ?? null,
-    montoTotal: g.montoTotal.toString(),
-  }));
+  return { ok: true, id: creada.id, version, costoTotal: cifras.costoTotal };
 }
 
 class YaAprobada extends Error {}

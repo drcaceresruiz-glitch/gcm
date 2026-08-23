@@ -7,7 +7,6 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import {
   compararConContractual,
-  gastosGeneralesDeLaMeta,
   listarMetas,
 } from "@/services/meta.service";
 import { puede } from "@/lib/rbac";
@@ -16,7 +15,6 @@ import { soles } from "@/utils/formato";
 import { Mascota } from "@/components/ui/Mascota";
 import { PanelBolsa } from "@/components/meta/PanelBolsa";
 import { TablaBolsa } from "@/components/meta/TablaBolsa";
-import { TablaGastosGenerales } from "@/components/meta/TablaGastosGenerales";
 import { TablaMetaEditable } from "@/components/meta/TablaMetaEditable";
 import { lineasDelBorrador } from "@/services/meta-edicion.service";
 import { FormularioMeta } from "@/components/meta/FormularioMeta";
@@ -92,13 +90,11 @@ export default async function MetaPage({
    */
   let metas: Awaited<ReturnType<typeof listarMetas>>;
   let comparacion: Awaited<ReturnType<typeof compararConContractual>>;
-  let gastos: Awaited<ReturnType<typeof gastosGeneralesDeLaMeta>>;
   let borrador: Awaited<ReturnType<typeof lineasDelBorrador>>;
   try {
-    [metas, comparacion, gastos, borrador] = await Promise.all([
+    [metas, comparacion, borrador] = await Promise.all([
       listarMetas(sesion, id),
       compararConContractual(sesion, id),
-      gastosGeneralesDeLaMeta(sesion, id),
       lineasDelBorrador(sesion, id),
     ]);
   } catch (e) {
@@ -170,7 +166,6 @@ export default async function MetaPage({
       {comparacion.ok ? (
         <>
           <PanelBolsa c={comparacion.comparacion} />
-          <TablaGastosGenerales gastos={gastos} mesesDeLaObra={mesesSugeridos} />
           <TablaBolsa lineas={comparacion.comparacion.bolsa.porLinea} />
         </>
       ) : (

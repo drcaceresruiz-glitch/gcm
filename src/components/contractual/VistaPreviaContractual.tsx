@@ -36,7 +36,6 @@ export function VistaPreviaContractual({
   puedeGenerar,
   puedeAjustar,
   motivoNoAjustable,
-  gastosGeneralesPrevistos,
   costoTotalMeta,
   costoPropioMeta,
 }: {
@@ -50,7 +49,6 @@ export function VistaPreviaContractual({
   /// unos campos apagados sin explicacion.
   motivoNoAjustable: string | null;
   /// Lo que la meta preve gastar en estructura. "0.00" si no lo trae.
-  gastosGeneralesPrevistos: string;
   /// TODO lo que la obra va a costar. Es contra esto contra lo que hay bolsa.
   costoTotalMeta: string;
   /// Los costos propios de la meta, que el contrato no desglosa.
@@ -91,9 +89,9 @@ export function VistaPreviaContractual({
    *
    * `resultado.bolsa` no sirve como titular, y es facil no darse cuenta:
    * `totalReal` suma solo las lineas CON codigo, que son las unicas que se
-   * recargan. Quedan fuera dos cosas que se pagan igual —los costos propios
-   * de la meta (un andamio alquilado) y los gastos generales (el residente)—
-   * y con ellas fuera la bolsa sale de mas.
+   * recargan. Queda fuera todo lo que se paga sin ser partida —el residente,
+   * la camioneta, un andamio alquilado, las polizas— y con ello fuera la
+   * bolsa sale de mas.
    *
    * Visto en una obra real: real 400, contractual 440, bolsa «40»… con 200 de
    * costos propios sin contar. La obra no ganaba 40, perdia 160.
@@ -106,20 +104,19 @@ export function VistaPreviaContractual({
   const bolsaAntes = restar(original.totalContractual, costoTotalMeta) ?? "0.00";
   const cambio = hayCambios && bolsaReal !== bolsaAntes;
 
+  /// Lo que no se recarga porque no tiene codigo -sueldos, alquileres,
+  /// polizas-: la parte del costo que solo puede salir del recargo de las
+  /// demas. Antes venia en dos trozos y uno de ellos llegaba en cero.
   const hayPropios = !esCero(costoPropioMeta);
-  const hayGastos = !esCero(gastosGeneralesPrevistos);
-  /// Lo que no se recarga porque no tiene codigo: la parte del costo que solo
-  /// puede salir del recargo de las demas.
-  const haySobrecoste = hayPropios || hayGastos;
 
   /**
    * El recargo UNIFORME mas bajo que cubre toda la estructura.
    *
-   * Si la obra no puede gastar de los gastos generales -porque son de la
-   * empresa y no suyos-, el recargo no se elige a ojo: tiene que salir de la
-   * cuenta. Con un recargo igual en todos los capitulos, el contractual es
+   * Los costos propios no se recargan -no tienen capitulo al que colgarse-,
+   * asi que el recargo no se elige a ojo: tiene que salir de la cuenta. Con
+   * un recargo igual en todos los capitulos, el contractual es
    * `costo x (1 + r)` y la bolsa es `costo x r`, asi que para cubrir la
-   * estructura hace falta `r >= gastos / costo`.
+   * estructura hace falta `r >= propios / recargable`.
    *
    * Se redondea HACIA ARRIBA al centesimo: un recargo redondeado a la baja
    * deja la obra corta por unos soles, que es exactamente lo que se intenta
@@ -159,11 +156,11 @@ export function VistaPreviaContractual({
           <p className="text-lg font-semibold">{soles(costoTotalMeta)}</p>
           {/* El desglose, porque la diferencia con «lo recargable» es justo lo
               que antes desaparecia de la cuenta. */}
-          {haySobrecoste && (
+          {hayPropios && (
             <p className="mt-1 text-xs text-slate-600">
-              {soles(resultado.totalReal)} en partidas
-              {hayPropios && <> · {soles(costoPropioMeta)} en costos propios</>}
-              {hayGastos && <> · {soles(gastosGeneralesPrevistos)} en generales</>}
+              {soles(resultado.totalReal)} en partidas ·{" "}
+              {soles(costoPropioMeta)} en costos propios (sueldos, alquileres,
+              pólizas)
             </p>
           )}
         </div>
@@ -219,12 +216,12 @@ export function VistaPreviaContractual({
             <strong>Con estos recargos la obra pierde dinero.</strong> Se cobra{" "}
             {soles(resultado.totalContractual)} y hay que pagar{" "}
             {soles(costoTotalMeta)}
-            {haySobrecoste && (
+            {hayPropios && (
               <>
                 {" "}
-                —de los que {soles(restar(costoTotalMeta, resultado.totalReal) ?? "0.00")}{" "}
-                no se le factura al cliente linea a linea: los costos propios y
-                los gastos generales salen del recargo del resto—
+                —de los que {soles(costoPropioMeta)} no se le factura al cliente
+                linea a linea: los sueldos, alquileres y polizas salen del
+                recargo del resto—
               </>
             )}
             . Sube el recargo, recorta costo, o asúmelo a sabiendas.

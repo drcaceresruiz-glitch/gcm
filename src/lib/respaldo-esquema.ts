@@ -187,7 +187,7 @@ export const TABLAS: readonly TablaRespaldo[] = [
     refs: [{ campo: "projectId", a: "projects" }],
     decimales: {
       costoDirecto: 2,
-      gastosGenerales: 2,
+      costoPropio: 2,
       costoTotal: 2,
       mesesPlazo: 2,
     },
@@ -213,12 +213,6 @@ export const TABLAS: readonly TablaRespaldo[] = [
       { campo: "metaItemId", a: "presupuesto_meta_items" },
     ],
     decimales: { fraccion: 3 },
-  },
-  {
-    tabla: "gastos_generales_meta",
-    modelo: "gastoGeneralMeta",
-    refs: [{ campo: "presupuestoMetaId", a: "presupuestos_meta" }],
-    decimales: { montoMensual: 2, meses: 2, montoTotal: 2 },
   },
   {
     tabla: "proveedor_partidas",
@@ -570,7 +564,6 @@ export const RELACION_A_LA_OBRA: Readonly<
   /// el que tiene `projectId`.
   comprobantes_pago: ["pago", "encargo"],
   presupuesto_meta_items: "meta",
-  gastos_generales_meta: "meta",
   /// Por la PARTIDA y no por el item: ver el comentario de la tabla. Es la
   /// unica de las tres que no llega por su padre natural.
   meta_item_partidas: "partida",

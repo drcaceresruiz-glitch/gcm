@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
-import { HOJA_GASTOS } from "@/lib/excel-meta";
+
+import { esPorMes } from "@/lib/costo-meta";
 
 
 /**
@@ -81,8 +82,19 @@ function marcarEditable(celda: ExcelJS.Cell): void {
   celda.protection = { locked: false };
 }
 
-/** Un codigo de capitulo: termina en ".0" o no lleva punto. */
+/**
+ * Un codigo de capitulo: termina en ".0" o no lleva punto.
+ *
+ * EL VACIO NO ES UN CAPITULO, y olvidarlo costo caro. Una fila sin codigo es
+ * un COSTO PROPIO de la meta -un sueldo, un alquiler, una poliza-, pero
+ * `!"".includes(".")` es cierto, asi que hasta el 23 de agosto de 2026 la
+ * plantilla las escribia como capitulos: en negrita, en verde y con la
+ * formula del contractual. El importador las leia como titulos y se dejaba su
+ * importe por el camino, de modo que la plantilla que GCM regala no
+ * sobrevivia a su propio importador.
+ */
 function esCapituloCodigo(f: FilaCosto): boolean {
+  if (f.codigo === "") return false;
   return f.codigo.endsWith(".0") || !f.codigo.includes(".");
 }
 
@@ -159,42 +171,8 @@ const CABECERAS_COSTO = [
 ] as const;
 
 
-const CABECERAS_GASTOS = [
-  "Concepto",
-  "Tipo",
-  "Monto mensual",
-  "Meses",
-  "Importe fijo",
-  "Subtotal",
-] as const;
 
-/// El subtotal de una linea de gasto: mensual x meses si es VARIABLE, o el
-/// importe fijo. Se calcula en la hoja para que no haya que multiplicarlo a
-/// mano y que nada avise si el resultado no cuadra con lo tecleado.
-function formulaSubtotal(fila: number): string {
-  return `IF($A${fila}="","",IF($B${fila}="VARIABLE",$C${fila}*$D${fila},$E${fila}))`;
-}
 
-/**
- * Los meses de ejemplo, recortados al plazo real de la obra.
- *
- * Sin esto la plantilla de una obra de dos meses propone ocho meses de
- * residente, y quien la rellena deprisa se lleva un gasto general cuatro
- * veces mayor que su obra. Se recorta y no se reparte: los meses son un dato
- * de cada linea -nadie esta en obra todo el plazo- y ajustarlos con una regla
- * mas fina seria inventarle al usuario cuanto va a estar cada uno.
- */
-function recortarAlPlazo(
-  filas: readonly FilaGasto[],
-  mesesObra: number | null,
-): FilaGasto[] {
-  if (mesesObra === null || mesesObra <= 0) return [...filas];
-  return filas.map((f) =>
-    f.meses !== undefined && f.meses > mesesObra
-      ? { ...f, meses: Math.round(mesesObra * 100) / 100 }
-      : f,
-  );
-}
 
 interface FilaCosto {
   /// Vacio = COSTO PROPIO DE LA META: cuesta de verdad, pero el contrato no
@@ -278,15 +256,77 @@ export const FILAS_COSTO: readonly FilaCosto[] = [
    * con el recargo del resto. El generador del contractual los deja fuera y
    * avisa de cuanto suman.
    *
-   * El ejemplo son alquileres de equipo compartido, y NO mano de obra: los
-   * ayudantes de una partida van dentro de su precio unitario, y el personal
-   * indirecto -residente, almacenero, prevencionista- va en los gastos
-   * generales, que no son de la meta. Ponerlos aqui invita a contar el mismo
+   * AQUI VA TODO LO QUE SE PAGA Y NO SE FACTURA LINEA A LINEA, y desde el 23
+   * de agosto de 2026 eso incluye al personal indirecto. Antes el residente,
+   * el almacenero y la camioneta vivian en una hoja «Gastos Generales»
+   * aparte, y esa hoja podia valer cero sin que nada avisara: una meta
+   * enseñaba 600 de costo cuando eran 700. Se quito la hoja y sus filas
+   * bajaron aqui.
+   *
+   * LO QUE SIGUE SIN IR AQUI son los ayudantes de una partida: esos van
+   * dentro de su precio unitario. Ponerlos tambien aqui es contar el mismo
    * costo dos veces.
+   *
+   * La unidad «mes» no es decorativa: `esPorMes` (`lib/costo-meta.ts`) la lee
+   * para saber que cuesta cada mes de atraso. Un sueldo escrito como
+   * 8 x 6.500 dice lo que cuesta estirarse; escrito como 52.000 a secas, no.
    */
   {
     codigo: "",
     descripcion: "COSTOS PROPIOS DE LA META — sin Ítem: no van al contrato",
+  },
+  {
+    codigo: "",
+    descripcion: "Residente de obra",
+    unidad: "mes",
+    metrado: 8,
+    precioUnitario: 6500,
+    parcial: 52000,
+  },
+  {
+    codigo: "",
+    descripcion: "Maestro de obra",
+    unidad: "mes",
+    metrado: 8,
+    precioUnitario: 4200,
+    parcial: 33600,
+  },
+  {
+    // Seis meses de los ocho del plazo, y es deliberado: los meses van POR
+    // LINEA porque nadie esta en obra todo el plazo. Con un plazo global el
+    // numero saldria siempre de mas.
+    codigo: "",
+    descripcion: "Almacenero",
+    unidad: "mes",
+    metrado: 6,
+    precioUnitario: 2000,
+    parcial: 12000,
+  },
+  {
+    codigo: "",
+    descripcion: "Camioneta y combustible",
+    unidad: "mes",
+    metrado: 8,
+    precioUnitario: 1800,
+    parcial: 14400,
+  },
+  {
+    // Los que NO dependen del plazo llevan «glb»: un mes mas de obra no los
+    // mueve, y por eso no entran en el coste del atraso.
+    codigo: "",
+    descripcion: "Carta fianza de fiel cumplimiento",
+    unidad: "glb",
+    metrado: 1,
+    precioUnitario: 9500,
+    parcial: 9500,
+  },
+  {
+    codigo: "",
+    descripcion: "Póliza CAR",
+    unidad: "glb",
+    metrado: 1,
+    precioUnitario: 4200,
+    parcial: 4200,
   },
   {
     codigo: "",
@@ -307,7 +347,7 @@ export const FILAS_COSTO: readonly FilaCosto[] = [
 ] as const;
 
 /** Suma de las filas de ejemplo, para que el test la fije. */
-export const TOTAL_COSTO_EJEMPLO = "15478.00";
+export const TOTAL_COSTO_EJEMPLO = "141178.00";
 
 /**
  * El total CONTRACTUAL que produce este mismo ejemplo al generarse.
@@ -325,42 +365,14 @@ export const TOTAL_COSTO_EJEMPLO = "15478.00";
  */
 export const TOTAL_CONTRACTUAL_EJEMPLO = "18146.90";
 
-interface FilaGasto {
-  concepto: string;
-  tipo: "FIJO" | "VARIABLE";
-  montoMensual?: number;
-  meses?: number;
-  montoFijo?: number;
-}
 
-/**
- * Los ejemplos de gastos generales.
- *
- * El almacenero lleva 6 meses de los 8 del plazo, y eso es deliberado: los
- * meses se piden POR LINEA porque nadie esta en obra todo el plazo, y con un
- * unico plazo global el numero saldria siempre de mas.
- */
-export const FILAS_GASTOS: readonly FilaGasto[] = [
-  { concepto: "Residente de obra", tipo: "VARIABLE", montoMensual: 6500, meses: 8 },
-  { concepto: "Maestro de obra", tipo: "VARIABLE", montoMensual: 4200, meses: 8 },
-  { concepto: "Almacenero", tipo: "VARIABLE", montoMensual: 2000, meses: 6 },
-  {
-    concepto: "Camioneta y combustible",
-    tipo: "VARIABLE",
-    montoMensual: 1800,
-    meses: 8,
-  },
-  {
-    concepto: "Carta fianza de fiel cumplimiento",
-    tipo: "FIJO",
-    montoFijo: 9500,
-  },
-  { concepto: "Póliza CAR", tipo: "FIJO", montoFijo: 4200 },
-] as const;
 
 /** Totales de los ejemplos, fijados por el test. */
-export const TOTAL_GASTOS_EJEMPLO = "125700.00";
-export const COSTE_MENSUAL_EJEMPLO = "14500.00";
+
+/// Lo que suman las filas SIN Item: sueldos, alquileres, fianzas, polizas.
+export const COSTO_PROPIO_EJEMPLO = "129820.00";
+/// Lo que cuesta cada mes de mas: los precios unitarios de las filas en «mes».
+export const COSTE_MENSUAL_EJEMPLO = "14880.00";
 
 const INSTRUCCIONES: readonly (readonly [string, string])[] = [
   ["Cómo llenar el presupuesto meta", ""],
@@ -411,37 +423,64 @@ function pintarCabecera(fila: ExcelJS.Row, titulos: readonly string[]) {
 
 
 /**
- * @param mesesObra Plazo real de la obra. Si viene, los ejemplos se ajustan a
- *   el; si no, se generan con los meses de siempre (y el test de ida y vuelta
- *   sigue fijando los mismos totales).
- */
-/**
- * Las instrucciones de la hoja de gastos generales.
+ * Los meses de ejemplo, recortados al plazo real de la obra.
  *
- * Separadas de las del costo directo porque van despues y porque son la
- * leccion que mas cuesta: que los gastos generales NO son un porcentaje.
+ * Sin esto la plantilla de una obra de dos meses propone ocho meses de
+ * residente, y quien la rellena deprisa se lleva un costo cuatro veces mayor
+ * que su obra. Se recorta y no se reparte: los meses son un dato de cada
+ * linea -nadie esta en obra todo el plazo- y ajustarlos con una regla mas
+ * fina seria inventarle al usuario cuanto va a estar cada uno.
+ *
+ * Solo toca las filas medidas en MESES. Una carta fianza no dura menos
+ * porque la obra sea corta.
+ */
+function recortarAlPlazo(
+  filas: readonly FilaCosto[],
+  mesesObra: number | null,
+): FilaCosto[] {
+  if (mesesObra === null || mesesObra <= 0) return [...filas];
+  const tope = Math.round(mesesObra * 100) / 100;
+
+  return filas.map((f) => {
+    if (!esPorMes(f.unidad ?? null)) return f;
+    if (f.metrado === undefined || f.metrado <= tope) return f;
+    // El parcial se rehace: dejarlo con el de ocho meses seria peor que no
+    // recortar, porque la fila diria una cosa y su importe otra.
+    const parcial =
+      f.precioUnitario === undefined
+        ? f.parcial
+        : Math.round(tope * f.precioUnitario * 100) / 100;
+    return { ...f, metrado: tope, parcial };
+  });
+}
+
+/**
+ * Las instrucciones de los costos propios.
+ *
+ * Separadas de las del costo directo porque son la leccion que mas cuesta:
+ * que lo que se paga por mes no es un porcentaje del costo directo.
  */
 const INSTRUCCIONES_GASTOS: readonly (readonly [string, string])[] = [
   ["", ""],
   [
-    "5. Hoja «Gastos Generales»",
-    "Aquí NO se pide un porcentaje, se pide una lista. Los gastos generales no crecen con la producción: crecen con los MESES. Un porcentaje sobre el costo directo esconde el sobrecosto más caro que tiene una obra, que es la que se estira con todas sus partidas en meta.",
+    "5. Los sueldos y las pólizas van en la MISMA hoja",
+    "Hasta el 23 de agosto de 2026 había una hoja «Gastos Generales» aparte. Ya no: el residente, el maestro, la camioneta, las cartas fianza y las pólizas son filas del costo directo SIN Ítem, igual que los alquileres. Una sola lista y una sola suma. Con dos listas, una podía quedarse en cero sin que nada avisara —y pasó: una meta enseñaba S/ 600 de costo cuando eran S/ 700, con el sueldo del residente escrito en el Excel y valiendo cero en la cuenta—.",
   ],
   [
-    "6. VARIABLE contra FIJO",
-    "VARIABLE es lo que se paga por mes (residente, maestro, camioneta, oficina): llena «Monto mensual» y «Meses», y deja «Importe fijo» vacío. FIJO es lo que no se mueve aunque la obra se alargue (cartas fianza, pólizas, licencias): llena solo «Importe fijo».",
+    "6. Aquí NO se pide un porcentaje",
+    "Se pide una lista. Lo que se paga por mes no crece con la producción: crece con los MESES. Un porcentaje sobre el costo directo esconde el sobrecosto más caro que tiene una obra, que es la que se estira con todas sus partidas en meta.",
   ],
   [
-    "7. Los meses son por línea",
-    "El almacenero del ejemplo está 6 meses de los 8 del plazo. Nadie está en obra todo el plazo, y con un único número global el gasto saldría siempre de más.",
+    "7. La unidad «mes» no es decorativa",
+    "Una fila sin Ítem con unidad «mes» le dice a GCM que ese costo crece si la obra se alarga: metrado = meses, precio unitario = lo que cuesta cada mes. De ahí sale lo que cuesta cada mes de atraso —en el ejemplo, S/ 14 880 al mes—, y eso no se recupera trabajando mejor, solo terminando antes. Un sueldo escrito como 8 × 6 500 dice lo que cuesta estirarse; escrito como 52 000 a secas, no dice nada. Lo que no depende del plazo (fianzas, pólizas, licencias) va con unidad «glb».",
   ],
   [
-    "8. Esto NO se le desglosa al cliente",
-    "El contrato reconoce los gastos generales englobados, no sueldo a sueldo. Por eso viven aquí, en tu presupuesto interno: no aparecen en el contractual ni se convierten en tareas del cronograma.",
+    "8. Los meses son por línea",
+    "El almacenero del ejemplo está 6 meses de los 8 del plazo. Nadie está en obra todo el plazo, y con un único número global el costo saldría siempre de más.",
   ],
   [
-    "9. Para qué sirve separarlos",
-    "De los VARIABLES sale lo que cuesta cada mes de atraso. En el ejemplo son S/ 14 500 al mes: eso es lo que pierdes por cada mes de más, y no se recupera trabajando mejor, solo terminando antes.",
+    "9. Esto NO se le desglosa al cliente",
+    "Las filas sin Ítem no van al contractual ni se convierten en tareas del cronograma: el contrato las reconoce englobadas, no sueldo a sueldo. Cuestan igual, y por eso tienen que estar aquí: la bolsa operativa se mide contra TODO lo que hay que pagar.",
   ],
   ["", ""],
   [
@@ -450,6 +489,11 @@ const INSTRUCCIONES_GASTOS: readonly (readonly [string, string])[] = [
   ],
 ];
 
+/**
+ * @param mesesObra Plazo real de la obra. Si viene, los ejemplos medidos en
+ *   meses se ajustan a el; si no, se generan con los meses de siempre (y el
+ *   test de ida y vuelta sigue fijando los mismos totales).
+ */
 export async function generarPlantillaMeta(
   mesesObra: number | null = null,
 ): Promise<ArrayBuffer> {
@@ -498,7 +542,7 @@ export async function generarPlantillaMeta(
   const ultimaFila = FILA_CABECERA + FILAS_PREPARADAS;
 
   let n = FILA_CABECERA;
-  for (const f of FILAS_COSTO) {
+  for (const f of recortarAlPlazo(FILAS_COSTO, mesesObra)) {
     n++;
     const fila = costo.getRow(n);
     fila.getCell(1).value = f.codigo;
@@ -641,135 +685,12 @@ export async function generarPlantillaMeta(
 
 
   /**
-   * La hoja de GASTOS GENERALES: el presupuesto interno.
-   *
-   * Aqui va lo que la obra cuesta sin ser una partida -residente, maestro,
-   * almacenero, camioneta, polizas-. Nada de esto se le desglosa al cliente:
-   * el contrato los reconoce englobados, asi que viven en la meta y no
-   * aparecen en el contractual ni en el cronograma.
-   *
-   * NO se pide un porcentaje, se pide una lista con plazo. Los gastos
-   * generales no crecen con la produccion: crecen con los MESES, y un
-   * porcentaje sobre el costo directo esconde el sobrecosto mas caro que
-   * tiene una obra, que es la que se estira con todas sus partidas en meta.
-   */
-  const gastos = libro.addWorksheet(HOJA_GASTOS);
-  gastos.columns = [
-    { width: 44 }, { width: 12 }, { width: 16 }, { width: 10 }, { width: 16 },
-    { width: 16 },
-  ];
-
-  gastos.getCell("A1").value = "PRESUPUESTO META - GASTOS GENERALES";
-  gastos.getCell("A1").font = { bold: true, size: 14 };
-  gastos.getCell("A2").value =
-    "No es un porcentaje: es una lista con plazo. Crecen con los MESES, no con la producción. " +
-    "No se le desglosan al cliente: son tu costo interno.";
-  gastos.getCell("A2").font = { italic: true, color: { argb: "FF667788" } };
-
-  pintarCabecera(gastos.getRow(FILA_CABECERA), CABECERAS_GASTOS);
-
-  gastos.getCell(`B${FILA_CABECERA}`).note =
-    "VARIABLE es lo que se paga POR MES (residente, maestro, camioneta): llena " +
-    "«Monto mensual» y «Meses». FIJO es lo que no cambia aunque la obra se " +
-    "alargue (cartas fianza, pólizas): llena solo «Importe fijo».";
-  gastos.getCell(`D${FILA_CABECERA}`).note =
-    "Los meses son POR LÍNEA, no el plazo de la obra: nadie está en obra todo " +
-    "el plazo. El almacenero del ejemplo está 6 de los 8 meses.";
-
-  let g = FILA_CABECERA;
-  // Los tres totales del pie se acumulan con los MISMOS numeros que van en
-  // las filas. ExcelJS no calcula: una formula sin `result` se lee como celda
-  // vacia si el archivo no se abre en Excel antes de subirlo, y el pie de la
-  // hoja saldria en blanco justo en las tres cifras que se miran primero.
-  let totalGG = 0;
-  let totalVariable = 0;
-  let totalFijo = 0;
-
-  for (const f of recortarAlPlazo(FILAS_GASTOS, mesesObra)) {
-    g++;
-    const fila = gastos.getRow(g);
-    fila.getCell(1).value = f.concepto;
-    fila.getCell(2).value = f.tipo;
-    if (f.montoMensual !== undefined) fila.getCell(3).value = f.montoMensual;
-    if (f.meses !== undefined) fila.getCell(4).value = f.meses;
-    if (f.montoFijo !== undefined) fila.getCell(5).value = f.montoFijo;
-
-    fila.getCell(2).alignment = { horizontal: "center" };
-    fila.getCell(3).numFmt = "#,##0.00";
-    fila.getCell(4).alignment = { horizontal: "center" };
-    fila.getCell(5).numFmt = "#,##0.00";
-
-    const subtotal =
-      f.tipo === "VARIABLE"
-        ? (f.montoMensual ?? 0) * (f.meses ?? 0)
-        : (f.montoFijo ?? 0);
-
-    totalGG += subtotal;
-    if (f.tipo === "VARIABLE") totalVariable += subtotal;
-    else totalFijo += subtotal;
-
-    fila.getCell(6).value = { formula: formulaSubtotal(g), result: subtotal };
-    fila.getCell(6).numFmt = "#,##0.00";
-    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
-    marcarCalculada(
-      fila.getCell(6),
-      "Se calcula solo: mensual x meses si es VARIABLE, o el importe fijo.",
-    );
-  }
-
-  // Igual que en el costo directo: filas preparadas para las que cada obra
-  // necesite, y totales que abarcan todo el bloque.
-  const primerGasto = FILA_CABECERA + 1;
-  const ultimoGasto = FILA_CABECERA + FILAS_PREPARADAS;
-
-  for (let f = g + 1; f <= ultimoGasto; f++) {
-    const fila = gastos.getRow(f);
-    fila.getCell(2).alignment = { horizontal: "center" };
-    fila.getCell(3).numFmt = "#,##0.00";
-    fila.getCell(4).alignment = { horizontal: "center" };
-    fila.getCell(5).numFmt = "#,##0.00";
-    fila.getCell(6).value = { formula: formulaSubtotal(f), result: "" };
-    fila.getCell(6).numFmt = "#,##0.00";
-    for (const col of [1, 2, 3, 4, 5]) marcarEditable(fila.getCell(col));
-    marcarCalculada(
-      fila.getCell(6),
-      "Se calcula solo: mensual x meses si es VARIABLE, o el importe fijo.",
-    );
-  }
-
-  const filaTotalGG = ultimoGasto + 2;
-  const rangoGG = `$F$${primerGasto}:$F$${ultimoGasto}`;
-  const tipos = `$B$${primerGasto}:$B$${ultimoGasto}`;
-
-  const pie: readonly [string, string, number][] = [
-    ["TOTAL GASTOS GENERALES", `SUM(${rangoGG})`, totalGG],
-    [
-      "GG Variables (crecen con el plazo)",
-      `SUMIF(${tipos},"VARIABLE",${rangoGG})`,
-      totalVariable,
-    ],
-    ["GG Fijos (no dependen del plazo)", `SUMIF(${tipos},"FIJO",${rangoGG})`, totalFijo],
-  ];
-
-  pie.forEach(([etiqueta, formula, resultado], i) => {
-    const fila = gastos.getRow(filaTotalGG + i);
-    fila.getCell(1).value = etiqueta;
-    fila.getCell(1).font = { bold: i === 0 };
-    // Redondeado a centimos: sumar decimales en coma flotante deja colas como
-    // 0.30000000000000004, y eso se escribiria tal cual en la celda.
-    fila.getCell(6).value = { formula, result: Math.round(resultado * 100) / 100 };
-    fila.getCell(6).numFmt = "#,##0.00";
-    fila.getCell(6).font = { bold: i === 0 };
-  });
-
-
-  /**
-   * La leyenda, arriba del todo y en las dos hojas.
+   * La leyenda, arriba del todo.
    *
    * El gris no significa nada por si solo: hay que decir que quiere decir, y
    * decirlo DONDE se ve, no en la hoja de instrucciones que se lee una vez.
    */
-  for (const hoja of [costo, gastos]) {
+  for (const hoja of [costo]) {
     const leyenda = hoja.getCell("A3");
     leyenda.value =
       "Las celdas en gris se calculan solas y están bloqueadas. Escribe solo en las blancas. " +

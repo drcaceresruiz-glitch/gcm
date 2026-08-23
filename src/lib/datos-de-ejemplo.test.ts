@@ -6,7 +6,7 @@ import {
   pareceMetaDeEjemplo,
 } from "@/lib/datos-de-ejemplo";
 import {
-  TOTAL_COSTO_EJEMPLO,
+  COSTO_PROPIO_EJEMPLO,
   TOTAL_CONTRACTUAL_EJEMPLO,
 } from "@/lib/plantilla-meta";
 
@@ -25,12 +25,24 @@ describe("reconocer los datos de ejemplo de las plantillas", () => {
     expect(pareceContractualDeEjemplo(TOTAL_CONTRACTUAL_EJEMPLO)).toBe(true);
   });
 
-  it("caza la meta de ejemplo por su costo directo", () => {
+  it("caza la meta de ejemplo sumando sus dos mitades", () => {
+    // Partidas mas costos propios. Mirar solo el costo directo dejaria de
+    // reconocerla: los sueldos son el 92 % del total del ejemplo.
     expect(
       pareceMetaDeEjemplo({
-        costoDirectoMeta: TOTAL_COSTO_EJEMPLO,
+        costoDirectoMeta: "11358.00",
+        costoPropioMeta: COSTO_PROPIO_EJEMPLO,
       }),
     ).toBe(true);
+  });
+
+  it("y no la caza si solo coincide una de las dos", () => {
+    expect(
+      pareceMetaDeEjemplo({
+        costoDirectoMeta: "11358.00",
+        costoPropioMeta: "0.00",
+      }),
+    ).toBe(false);
   });
 
   it("una obra de verdad no salta", () => {
@@ -40,6 +52,7 @@ describe("reconocer los datos de ejemplo de las plantillas", () => {
       origenDeEjemplo({
         costoDirectoContractual: "735255.61",
         costoDirectoMeta: "612000.00",
+        costoPropioMeta: "48000.00",
       }),
     ).toEqual({ contractual: false, meta: false, hay: false });
   });
@@ -51,6 +64,7 @@ describe("reconocer los datos de ejemplo de las plantillas", () => {
       origenDeEjemplo({
         costoDirectoContractual: TOTAL_CONTRACTUAL_EJEMPLO,
         costoDirectoMeta: "612000.00",
+        costoPropioMeta: "48000.00",
       }),
     ).toEqual({ contractual: true, meta: false, hay: true });
   });
@@ -59,7 +73,8 @@ describe("reconocer los datos de ejemplo de las plantillas", () => {
     expect(
       origenDeEjemplo({
         costoDirectoContractual: TOTAL_CONTRACTUAL_EJEMPLO,
-        costoDirectoMeta: TOTAL_COSTO_EJEMPLO,
+        costoDirectoMeta: "11358.00",
+        costoPropioMeta: COSTO_PROPIO_EJEMPLO,
       }),
     ).toEqual({ contractual: true, meta: true, hay: true });
   });

@@ -51,7 +51,7 @@ export function DescargarPresupuestos({
         <>
           <Documento
             titulo="Presupuesto meta"
-            nota="Interno. Lo que cuesta construir la obra, con sus gastos generales."
+            nota="Interno. Lo que cuesta construir la obra, sueldos y pólizas incluidos."
             interno
             icono={<FileText className="size-4" aria-hidden="true" />}
             href={`${base}?doc=meta`}

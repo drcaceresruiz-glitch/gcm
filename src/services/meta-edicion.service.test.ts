@@ -17,6 +17,8 @@ interface Fila {
   codigoRef: string | null;
   tipo: "CAPITULO" | "PARTIDA";
   descripcion: string;
+  unidad?: string | null;
+  precioUnitario?: { toString: () => string } | null;
   parcial: { toString: () => string } | null;
 }
 
@@ -63,7 +65,6 @@ const tx = {
     },
   },
   presupuestoMeta: {
-    findUniqueOrThrow: async () => ({ gastosGenerales: importe("1000.00") }),
     update: async ({ data }: { data: Record<string, unknown> }) => {
       estado.costoGuardado = data;
       return { id: "meta-1" };
@@ -142,7 +143,22 @@ beforeEach(() => {
       codigoRef: "1.1",
       tipo: "PARTIDA",
       descripcion: "Cartel de obra",
+      unidad: "und",
+      precioUnitario: importe("700.00"),
       parcial: importe("700.00"),
+    },
+    {
+      // Un costo propio: sin codigo. Antes vivia en otra tabla y esta
+      // edicion no lo tocaba; hoy es una linea mas y se puede corregir sin
+      // volver al Excel.
+      id: "res",
+      presupuestoMetaId: "meta-1",
+      codigoRef: null,
+      tipo: "PARTIDA",
+      descripcion: "Residente de obra",
+      unidad: "mes",
+      precioUnitario: importe("500.00"),
+      parcial: importe("1000.00"),
     },
   ];
 });
@@ -188,10 +204,36 @@ describe("editar una linea de la meta", () => {
       parcial: "700",
     });
 
-    // 700 de la unica linea con importe, mas los 1000 de gastos generales.
+    // 700 de la partida y 1000 del residente. Las tres cifras salen de la
+    // MISMA lista: antes el total le sumaba unos gastos generales que venian
+    // de otra tabla, y esa suma era la que podia llegar en cero.
     expect(estado.costoGuardado).toEqual({
       costoDirecto: "700.00",
+      costoPropio: "1000.00",
       costoTotal: "1700.00",
+    });
+  });
+
+  it("corregir un sueldo dentro de la app SI mueve el costo total", async () => {
+    // Lo que antes era imposible: los gastos generales solo se podian cambiar
+    // volviendo al Excel y recargando la meta entera.
+    estado.filas = estado.filas.map((f) =>
+      f.id === "res"
+        ? { ...f, precioUnitario: importe("800.00"), parcial: importe("1600.00") }
+        : f,
+    );
+
+    await editarLineaDeMeta(sesion, "obra-1", "res", {
+      descripcion: "Residente de obra",
+      unidad: "mes",
+      metrado: "2",
+      precioUnitario: "800",
+    });
+
+    expect(estado.costoGuardado).toEqual({
+      costoDirecto: "700.00",
+      costoPropio: "1600.00",
+      costoTotal: "2300.00",
     });
   });
 

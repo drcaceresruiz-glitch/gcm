@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   calcularBolsa,
   desfaseDeMeta,
-  resumenGastosGenerales,
-  totalDeGasto,
   type DatosBolsa,
   type LineaContractual,
   type LineaMeta,
@@ -68,8 +66,15 @@ describe("la bolsa sale del costo directo", () => {
     const b = calcularBolsa(BASE);
 
     expect(b.costoDirectoContractual).toBe("100000.00");
-    expect(b.costoDirectoMeta).toBe("79000.00");
-    expect(b.bolsaProduccion).toBe("21000.00");
+    // 45.000 + 31.000. El andamio NO esta aqui: no es costo directo, es un
+    // costo propio, y mezclarlos era lo que hacia que la resta con el
+    // contractual no significara nada.
+    expect(b.costoDirectoMeta).toBe("76000.00");
+    expect(b.costoPropioMeta).toBe("3000.00");
+
+    expect(b.bolsaProduccion).toBe("24000.00");
+    // Y la que se mira: produccion menos lo que se paga sin ser partida.
+    expect(b.bolsaTotal).toBe("21000.00");
   });
 
   it("un sobrecosto de produccion se ve entero, sin nada que lo tape", () => {
@@ -100,8 +105,9 @@ describe("lo que la meta no cubre no es margen", () => {
     const b = calcularBolsa(BASE);
 
     expect(b.contractualSinMeta).toBe("20000.00");
-    // De los 21.000 de bolsa, 20.000 son una partida que nadie presupuesto.
-    expect(b.bolsaProduccionCubierta).toBe("1000.00");
+    // De los 24.000 de produccion, 20.000 son una partida que nadie
+    // presupuesto.
+    expect(b.bolsaProduccionCubierta).toBe("4000.00");
   });
 
   it("una meta completa deja el hueco en cero", () => {
@@ -122,8 +128,11 @@ describe("las lineas cuadran con el total", () => {
     sumar(b.porLinea.map((f) => f.bolsa));
 
   it("en modo PARTIDA", () => {
+    // Contra `bolsaTotal` y no contra la de produccion: la tabla PINTA
+    // tambien las lineas propias -el andamio sale con bolsa negativa- asi
+    // que su suma es la de despues de descontarlas.
     const b = calcularBolsa(BASE);
-    expect(suman(b)).toBe(b.bolsaProduccion);
+    expect(suman(b)).toBe(b.bolsaTotal);
   });
 
   it("en modo CAPITULO", () => {
@@ -140,7 +149,7 @@ describe("las lineas cuadran con el total", () => {
       ],
     });
 
-    expect(suman(b)).toBe(b.bolsaProduccion);
+    expect(suman(b)).toBe(b.bolsaTotal);
   });
 });
 
@@ -235,7 +244,7 @@ describe("modo FRENTE: la contraparte sale del reparto", () => {
     // 100.000 de contrato - 65.000 repartidos.
     expect(resto.descripcion).toBe("Partidas sin frente asignado");
     expect(resto.contractual).toBe("35000.00");
-    expect(sumar(b.porLinea.map((f) => f.bolsa))).toBe(b.bolsaProduccion);
+    expect(sumar(b.porLinea.map((f) => f.bolsa))).toBe(b.bolsaTotal);
   });
 
   it("y avisa cuando los frentes suman mas presupuesto del que hay", () => {
@@ -284,7 +293,10 @@ describe("aritmetica de dinero", () => {
       ],
     });
 
-    expect(b.bolsaProduccion).toBe("0.00");
+    // 0,30 de contrato menos 0,10 de partida = 0,20 de produccion, y el
+    // costo propio de 0,20 se la lleva entera.
+    expect(b.bolsaProduccion).toBe("0.20");
+    expect(b.bolsaTotal).toBe("0.00");
   });
 });
 
@@ -320,128 +332,84 @@ describe("el desfase de la meta", () => {
 
     const d = desfaseDeMeta([{ importeNeto: "20000.00" }]);
 
-    expect(despues.bolsaProduccion).toBe("41000.00");
-    expect(antes.bolsaProduccion).toBe("21000.00");
+    expect(despues.bolsaProduccion).toBe("44000.00");
+    expect(antes.bolsaProduccion).toBe("24000.00");
     expect(d.importe).toBe("20000.00");
   });
 });
 
-describe("los gastos generales de la meta", () => {
-  it("un fijo vale su importe; un variable, mensual por meses", () => {
-    expect(
-      totalDeGasto({ tipo: "FIJO", montoMensual: null, meses: null, montoFijo: "5000.00" }),
-    ).toBe("5000.00");
-
-    expect(
-      totalDeGasto({ tipo: "VARIABLE", montoMensual: "1200.00", meses: "6", montoFijo: null }),
-    ).toBe("7200.00");
-  });
-
-  it("una fila mal formada devuelve null, no cero", () => {
-    // Un cero se suma sin ruido y desaparece del total; un null se puede
-    // contar y ensenar. Es la validacion que la base de datos no sabe hacer.
-    expect(
-      totalDeGasto({ tipo: "VARIABLE", montoMensual: null, meses: "6", montoFijo: null }),
-    ).toBeNull();
-
-    expect(
-      totalDeGasto({ tipo: "VARIABLE", montoMensual: "1200.00", meses: null, montoFijo: null }),
-    ).toBeNull();
-
-    expect(
-      totalDeGasto({ tipo: "FIJO", montoMensual: null, meses: null, montoFijo: null }),
-    ).toBeNull();
-  });
-
-  it("admite medio mes, que es como acaban muchos plazos", () => {
-    expect(
-      totalDeGasto({ tipo: "VARIABLE", montoMensual: "1200.00", meses: "6.50", montoFijo: null }),
-    ).toBe("7800.00");
-  });
-});
-
-describe("el precio de cada mes de atraso", () => {
-  const GASTOS = [
-    { tipo: "FIJO" as const, montoMensual: null, meses: null, montoFijo: "5000.00" },
-    { tipo: "VARIABLE" as const, montoMensual: "1200.00", meses: "6", montoFijo: null },
-    { tipo: "VARIABLE" as const, montoMensual: "800.00", meses: "6", montoFijo: null },
-  ];
-
-  it("solo cuentan los variables: los fijos no se mueven con el plazo", () => {
-    // Es la razon entera de guardar el mensual en vez de un total ciego. Una
-    // carta fianza no cuesta mas porque la obra se estire; el residente si.
-    const r = resumenGastosGenerales(GASTOS);
-
-    expect(r.costeMensualDelAtraso).toBe("2000.00");
-    expect(r.fijos).toBe("5000.00");
-    expect(r.variables).toBe("12000.00");
-    expect(r.total).toBe("17000.00");
-    expect(r.invalidas).toBe(0);
-  });
-
-  it("las filas invalidas se cuentan y quedan fuera de la suma", () => {
-    const r = resumenGastosGenerales([
-      ...GASTOS,
-      { tipo: "VARIABLE" as const, montoMensual: null, meses: "3", montoFijo: null },
-    ]);
-
-    expect(r.invalidas).toBe(1);
-    expect(r.total).toBe("17000.00");
-    expect(r.costeMensualDelAtraso).toBe("2000.00");
-  });
-
-  it("sin gastos, todo en cero y nada invalido", () => {
-    const r = resumenGastosGenerales([]);
-
-    expect(r.total).toBe("0.00");
-    expect(r.costeMensualDelAtraso).toBe("0.00");
-    expect(r.invalidas).toBe(0);
-  });
-});
-
-describe("la bolsa neta: lo que queda despues de los gastos generales", () => {
+describe("la bolsa descuenta lo que no es partida", () => {
   /*
-   * La bolsa de produccion mide el margen de las PARTIDAS. Los gastos
-   * generales -residente, maestro, camioneta, polizas- se pagan igual aunque
-   * todas las partidas cuadren, asi que la cifra que dice si la obra deja
-   * algo es la de despues de restarlos.
+   * La bolsa de PRODUCCION mide el margen de las partidas. Los sueldos, los
+   * alquileres y las polizas se pagan igual aunque todas las partidas
+   * cuadren, asi que la cifra que dice si la obra deja algo es la de despues
+   * de restarlos.
+   *
+   * Desde el 23 de agosto de 2026 esos costos viajan en la MISMA lista que
+   * las partidas, distinguidos por no tener codigo. Antes llegaban de una
+   * tabla aparte, y llegaban en cero: una obra que perdia 300 decia perder
+   * 200.
    */
-  const datos = (gastosGeneralesMeta?: string) => ({
+  const datos = (propio?: string): DatosBolsa => ({
     modo: "PARTIDA" as const,
     contractual: [{ codigo: "1.1", descripcion: "Zapatas", importe: "10000.00" }],
-    meta: [{ codigoRef: "1.1", descripcion: "Zapatas", importe: "7000.00" }],
+    meta: [
+      { codigoRef: "1.1", descripcion: "Zapatas", importe: "7000.00" },
+      ...(propio === undefined
+        ? []
+        : [
+            {
+              codigoRef: null,
+              descripcion: "Residente de obra",
+              importe: propio,
+            },
+          ]),
+    ],
     utilidadContractual: "0.00",
-    ...(gastosGeneralesMeta === undefined ? {} : { gastosGeneralesMeta }),
   });
 
-  it("resta los gastos generales de la bolsa", () => {
+  it("resta los costos propios de la bolsa", () => {
     const b = calcularBolsa(datos("1200.00"));
 
-    expect(b.bolsaTotal).toBe("3000.00");
-    expect(b.gastosGeneralesMeta).toBe("1200.00");
-    expect(b.bolsaNeta).toBe("1800.00");
+    expect(b.bolsaProduccion).toBe("3000.00");
+    expect(b.costoPropioMeta).toBe("1200.00");
+    expect(b.bolsaTotal).toBe("1800.00");
   });
 
-  it("una meta sin gastos generales deja la neta igual que la bruta", () => {
-    // Es el caso de una meta cargada sin la hoja: no se inventa un gasto.
+  it("el costo directo de la meta NO incluye lo que no es partida", () => {
+    // Es la razon de que las dos cifras existan por separado: llamar «costo
+    // directo» al sueldo del residente es lo que hacia que la resta con el
+    // contractual no significara nada.
+    const b = calcularBolsa(datos("1200.00"));
+
+    expect(b.costoDirectoMeta).toBe("7000.00");
+    expect(b.costoPropioMeta).toBe("1200.00");
+  });
+
+  it("una meta sin costos propios deja la bolsa igual que la produccion", () => {
     const b = calcularBolsa(datos());
 
-    expect(b.gastosGeneralesMeta).toBe("0.00");
-    expect(b.bolsaNeta).toBe(b.bolsaTotal);
+    expect(b.costoPropioMeta).toBe("0.00");
+    expect(b.bolsaTotal).toBe(b.bolsaProduccion);
   });
 
-  it("unos gastos generales mayores que la bolsa la dejan NEGATIVA, y se ve", () => {
+  it("unos costos propios mayores que la bolsa la dejan NEGATIVA, y se ve", () => {
     // Es justo el caso que hay que poder ver: las partidas cuadran y la obra
     // pierde dinero igual, porque la estructura se la come.
     const b = calcularBolsa(datos("4500.00"));
 
-    expect(b.bolsaTotal).toBe("3000.00");
-    expect(b.bolsaNeta).toBe("-1500.00");
+    expect(b.bolsaProduccion).toBe("3000.00");
+    expect(b.bolsaTotal).toBe("-1500.00");
   });
 
-  it("la bolsa de produccion NO cambia: la miran media docena de sitios", () => {
-    expect(calcularBolsa(datos("9999.00")).bolsaTotal).toBe(
-      calcularBolsa(datos()).bolsaTotal,
-    );
+  it("el margen esperado parte de la bolsa YA neta", () => {
+    // Si partiera de la de produccion, la pantalla prometeria un margen que
+    // todavia tiene que pagar la nomina.
+    const b = calcularBolsa({
+      ...datos("1200.00"),
+      utilidadContractual: "500.00",
+    });
+
+    expect(b.margenEsperado).toBe("2300.00");
   });
 });

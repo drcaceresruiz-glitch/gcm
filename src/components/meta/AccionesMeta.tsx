@@ -119,8 +119,8 @@ export function AccionesMeta({
               icono={Trash2}
               peligro
               confirmacion={
-                `Se eliminará el borrador v${version} con todas sus líneas y ` +
-                `sus gastos generales. ¿Continuar?`
+                `Se eliminará el borrador v${version} con todas sus líneas, ` +
+                `sueldos y pólizas incluidos. ¿Continuar?`
               }
             />
           </form>

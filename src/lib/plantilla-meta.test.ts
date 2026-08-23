@@ -4,11 +4,11 @@ import ExcelJS from "exceljs";
 import {
   generarPlantillaMeta,
   TOTAL_COSTO_EJEMPLO,
-  TOTAL_GASTOS_EJEMPLO,
+  COSTO_PROPIO_EJEMPLO,
   COSTE_MENSUAL_EJEMPLO,
 } from "./plantilla-meta";
 import { analizarExcel } from "./excel-presupuesto";
-import { analizarGastosGenerales, HOJA_GASTOS } from "./excel-meta";
+import { cifrasDeLaMeta } from "./costo-meta";
 
 /**
  * El contrato de la plantilla de la meta: lo que GCM regala para descargar,
@@ -18,26 +18,6 @@ import { analizarGastosGenerales, HOJA_GASTOS } from "./excel-meta";
  */
 
 /** Un libro con solo la hoja de gastos, para los casos que fallan. */
-async function libroDeGastos(
-  filas: (string | number | null)[][],
-  opciones: { cabecera?: string[]; ocultar?: number[] } = {},
-): Promise<ArrayBuffer> {
-  const libro = new ExcelJS.Workbook();
-  // La primera hoja se deja vacia a proposito: aqui solo se prueba la otra.
-  libro.addWorksheet("Costo Directo");
-  const hoja = libro.addWorksheet(HOJA_GASTOS);
-
-  hoja.addRow(["GASTOS GENERALES"]);
-  hoja.addRow(
-    opciones.cabecera ?? ["Concepto", "Tipo", "Monto mensual", "Meses", "Importe fijo"],
-  );
-  for (const f of filas) hoja.addRow(f);
-
-  for (const n of opciones.ocultar ?? []) hoja.getRow(n).hidden = true;
-
-  return (await libro.xlsx.writeBuffer()) as ArrayBuffer;
-}
-
 describe("la hoja de costo directo de la plantilla meta", () => {
   it("la lee el MISMO importador que el presupuesto, sin un solo error", async () => {
     // Es la razon de que esta hoja vaya la primera y con las mismas columnas:
@@ -68,12 +48,19 @@ describe("la hoja de costo directo de la plantilla meta", () => {
     const r = await analizarExcel(await generarPlantillaMeta(), { propiasDeLaMeta: true });
 
     expect(r.propiasDeLaMeta.map((f) => f.descripcion)).toEqual([
+      "Residente de obra",
+      "Maestro de obra",
+      "Almacenero",
+      "Camioneta y combustible",
+      "Carta fianza de fiel cumplimiento",
+      "Póliza CAR",
       "Andamio metálico en alquiler",
       "Encofrado metálico en alquiler (varias partidas)",
     ]);
-    expect(r.propiasDeLaMeta.map((f) => f.parcial)).toEqual(["1520.00", "2600.00"]);
 
-    // Y ninguno aparece entre las filas con codigo.
+    // Y ninguno aparece entre las filas con codigo: si el residente entrara
+    // al contrato con su linea, el cliente veria su sueldo.
+    expect(r.filas.some((f) => f.descripcion.includes("Residente"))).toBe(false);
     expect(r.filas.some((f) => f.descripcion.includes("Andamio"))).toBe(false);
   });
 
@@ -84,7 +71,7 @@ describe("la hoja de costo directo de la plantilla meta", () => {
     const r = await analizarExcel(await generarPlantillaMeta());
 
     expect(r.propiasDeLaMeta).toEqual([]);
-    expect(r.filas.some((f) => f.descripcion.includes("Andamio"))).toBe(false);
+    expect(r.filas.some((f) => f.descripcion.includes("Residente"))).toBe(false);
   });
 
   it("suma lo esperado y no estrena al usuario con el aviso de repetidos", async () => {
@@ -100,50 +87,98 @@ describe("la hoja de costo directo de la plantilla meta", () => {
   });
 });
 
-describe("la hoja de gastos generales de la plantilla", () => {
+describe("los sueldos y las polizas, ya dentro de la misma hoja", () => {
   /*
-   * Volvio a la plantilla el 23 de agosto. Salio el 21 con el argumento de
-   * que "los reconoce el contrato y los gestiona la empresa": cierto de cara
-   * al CLIENTE -el contrato los reconoce englobados- pero no de cara a la
-   * empresa, que paga al residente igual. Sin ellos la meta no es lo que la
-   * obra cuesta, solo lo que cuestan sus partidas.
+   * Bajaron aqui el 23 de agosto de 2026. Vivian en una hoja «Gastos
+   * Generales» aparte con su propio parser y su propia suma, y esa suma podia
+   * llegar en cero sin que nada avisara: una meta enseñaba 600 de costo
+   * cuando eran 700, con el sueldo del residente escrito en el Excel y
+   * valiendo cero. Se quito la segunda lista en vez de vigilarla.
    */
-  it("la lee su propio analizador, sin un error", async () => {
-    const r = await analizarGastosGenerales(await generarPlantillaMeta());
-
-    expect(r.errores).toEqual([]);
-    expect(r.total).toBe(TOTAL_GASTOS_EJEMPLO);
-    // La cifra que convierte "vamos un mes tarde" en dinero.
-    expect(r.costeMensualDelAtraso).toBe(COSTE_MENSUAL_EJEMPLO);
-  });
-
-  it("los meses de ejemplo se recortan al plazo real de la obra", async () => {
-    // Sin esto, la plantilla de una obra de dos meses propone ocho meses de
-    // residente y quien la rellena deprisa se lleva un gasto general cuatro
-    // veces mayor que su obra.
-    const r = await analizarGastosGenerales(await generarPlantillaMeta(2));
-
-    expect(r.errores).toEqual([]);
-    for (const f of r.filas) {
-      if (f.tipo === "VARIABLE" && f.meses !== null) {
-        expect(Number(f.meses)).toBeLessThanOrEqual(2);
-      }
-    }
-  });
-
-  it("el costo directo NO se contamina con los gastos generales", async () => {
-    // Van en hojas distintas y por analizadores distintos a proposito: si un
-    // sueldo entrara como partida, acabaria en el contrato del cliente y en
-    // el cronograma como una tarea.
+  const cifras = async () => {
     const r = await analizarExcel(await generarPlantillaMeta(), {
       propiasDeLaMeta: true,
     });
+    return cifrasDeLaMeta([
+      ...r.filas.map((f) => ({
+        codigoRef: f.codigo as string | null,
+        unidad: f.unidad,
+        precioUnitario: f.precioUnitario,
+        parcial: f.parcial,
+      })),
+      ...r.propiasDeLaMeta.map((f) => ({
+        codigoRef: null,
+        unidad: f.unidad,
+        precioUnitario: f.precioUnitario,
+        parcial: f.parcial,
+      })),
+    ]);
+  };
 
-    expect(r.montoTotal).toBe(TOTAL_COSTO_EJEMPLO);
-    expect(r.filas.some((f) => f.descripcion.includes("Residente"))).toBe(false);
-    expect(r.propiasDeLaMeta.some((f) => f.descripcion.includes("Residente"))).toBe(
-      false,
-    );
+  it("ya no hay una segunda hoja que pueda quedarse en cero", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+
+    expect(libro.worksheets.map((h) => h.name)).toEqual([
+      "Costo Directo",
+      "Instrucciones",
+    ]);
+  });
+
+  it("el sueldo del residente cuenta en el costo total", async () => {
+    // LA prueba de este archivo. Si algun dia vuelve a haber dos listas, esto
+    // es lo que se rompe primero.
+    const c = await cifras();
+
+    expect(c.costoPropio).toBe(COSTO_PROPIO_EJEMPLO);
+    expect(c.costoTotal).toBe(TOTAL_COSTO_EJEMPLO);
+    expect(c.costoTotal).not.toBe(c.costoDirecto);
+  });
+
+  it("un sueldo va por MESES, y de ahi sale lo que cuesta el atraso", async () => {
+    // Escrito como 8 x 6.500 dice lo que cuesta estirarse. Escrito como
+    // 52.000 a secas no dice nada, y esa es la razon de pedir la unidad.
+    const c = await cifras();
+
+    expect(c.costeMensualDelAtraso).toBe(COSTE_MENSUAL_EJEMPLO);
+    // Residente, maestro, almacenero, camioneta y andamio.
+    expect(c.lineasPorMes).toBe(5);
+  });
+
+  it("lo que no depende del plazo no entra en el coste del atraso", async () => {
+    // Una carta fianza no cuesta mas porque la obra se alargue: va en «glb».
+    const r = await analizarExcel(await generarPlantillaMeta(), {
+      propiasDeLaMeta: true,
+    });
+    const fianza = r.propiasDeLaMeta.find((f) =>
+      f.descripcion.startsWith("Carta fianza"),
+    )!;
+
+    expect(fianza.unidad).toBe("glb");
+  });
+
+  it("los meses se recortan al plazo real de la obra", async () => {
+    /*
+     * Sin esto, la plantilla de una obra de dos meses propone ocho meses de
+     * residente y quien la rellena deprisa se lleva un costo cuatro veces
+     * mayor que su obra. Y el parcial se rehace: dejarlo con el de ocho meses
+     * seria peor que no recortar.
+     */
+    const r = await analizarExcel(await generarPlantillaMeta(2), {
+      propiasDeLaMeta: true,
+    });
+    const residente = r.propiasDeLaMeta.find(
+      (f) => f.descripcion === "Residente de obra",
+    )!;
+
+    expect(residente.metrado).toBe("2.0000");
+    expect(residente.parcial).toBe("13000.00");
+
+    // La fianza no se toca: no se mide en meses.
+    const fianza = r.propiasDeLaMeta.find((f) =>
+      f.descripcion.startsWith("Carta fianza"),
+    )!;
+    expect(fianza.parcial).toBe("9500.00");
   });
 });
 
@@ -194,7 +229,8 @@ describe("la proteccion deja salir", () => {
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(await generarPlantillaMeta());
 
-    for (const hoja of libro.worksheets.slice(0, 2)) {
+    // Solo la hoja de datos: «Instrucciones» es texto y no se protege.
+    for (const hoja of [libro.worksheets[0]!]) {
       // `sheetProtection` existe al cargar pero los tipos de ExcelJS no lo
       // declaran; de ahi el puente.
       const p = (
@@ -261,80 +297,6 @@ describe("las formulas de la plantilla se abren en cualquier programa", () => {
     // Fila 5 es el primer capitulo del ejemplo, con su 18 % de recargo.
     const contractual = hoja.getRow(5).getCell("H").value as { result?: number };
     expect(contractual.result).toBeCloseTo(2312.8, 2);
-  });
-});
-
-describe("lo que el analizador de gastos rechaza, y como lo dice", () => {
-  it("un VARIABLE sin meses no se cuela como si costara su mensual", async () => {
-    const r = await analizarGastosGenerales(
-      await libroDeGastos([["Residente", "VARIABLE", 6500, null, null]]),
-    );
-
-    expect(r.filas).toEqual([]);
-    expect(r.errores).toHaveLength(1);
-    expect(r.errores[0]!.mensaje).toContain("necesita monto mensual y meses");
-    // Y sobre todo: no suma nada. Un gasto a medias no es medio gasto.
-    expect(r.total).toBe("0.00");
-  });
-
-  it("un FIJO sin importe tampoco", async () => {
-    const r = await analizarGastosGenerales(
-      await libroDeGastos([["Carta fianza", "FIJO", null, null, null]]),
-    );
-
-    expect(r.filas).toEqual([]);
-    expect(r.errores[0]!.mensaje).toContain("necesita su importe");
-  });
-
-  it("un tipo que no es ni FIJO ni VARIABLE se senala con su fila", async () => {
-    const r = await analizarGastosGenerales(
-      await libroDeGastos([["Andamios", "MENSUAL", 400, 3, null]]),
-    );
-
-    expect(r.errores).toHaveLength(1);
-    expect(r.errores[0]!.fila).toBe(3);
-    expect(r.errores[0]!.columna).toBe("Tipo");
-  });
-});
-
-describe("tolerancia del analizador de gastos", () => {
-  it("una fila oculta se deja fuera, como en el presupuesto", async () => {
-    // Es la forma habitual de retirar un concepto sin borrarlo.
-    const r = await analizarGastosGenerales(
-      await libroDeGastos(
-        [
-          ["Residente", "VARIABLE", 6500, 8, null],
-          ["Topografo", "VARIABLE", 3000, 2, null],
-        ],
-        { ocultar: [4] },
-      ),
-    );
-
-    expect(r.filas.map((f) => f.concepto)).toEqual(["Residente"]);
-    expect(r.total).toBe("52000.00");
-  });
-
-  it("acepta que renombren las columnas", async () => {
-    const r = await analizarGastosGenerales(
-      await libroDeGastos([["Residente", "variable", 6500, 8, null]], {
-        cabecera: ["Descripción", "Tipo", "Costo mensual", "N° meses", "Importe"],
-      }),
-    );
-
-    expect(r.errores).toEqual([]);
-    expect(r.total).toBe("52000.00");
-  });
-
-  it("sin hoja de gastos no hay error: una meta puede no tenerlos aun", async () => {
-    const libro = new ExcelJS.Workbook();
-    libro.addWorksheet("Costo Directo");
-    const solo = (await libro.xlsx.writeBuffer()) as ArrayBuffer;
-
-    const r = await analizarGastosGenerales(solo);
-
-    expect(r.errores).toEqual([]);
-    expect(r.filas).toEqual([]);
-    expect(r.total).toBe("0.00");
   });
 });
 

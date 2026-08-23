@@ -2,6 +2,7 @@ import {
   TOTAL_COSTO_EJEMPLO,
   TOTAL_CONTRACTUAL_EJEMPLO,
 } from "@/lib/plantilla-meta";
+import { sumar } from "@/lib/decimal";
 
 /**
  * Reconoce las cifras que trae la PLANTILLA como ejemplo.
@@ -39,11 +40,22 @@ export function pareceContractualDeEjemplo(costoDirecto: string): boolean {
   return costoDirecto === TOTAL_CONTRACTUAL_EJEMPLO;
 }
 
-/** La meta son las filas de ejemplo de su plantilla. */
+/**
+ * La meta son las filas de ejemplo de su plantilla.
+ *
+ * Se compara la SUMA de las dos mitades -las partidas y los costos propios-
+ * porque `TOTAL_COSTO_EJEMPLO` es el total de la plantilla entera. Mirar solo
+ * el costo directo dejaria de reconocer el ejemplo desde que los sueldos
+ * bajaron al bloque sin Item (23/08/2026): son el 92 % de la cifra.
+ */
 export function pareceMetaDeEjemplo(datos: {
   costoDirectoMeta: string;
+  costoPropioMeta: string;
 }): boolean {
-  return datos.costoDirectoMeta === TOTAL_COSTO_EJEMPLO;
+  return (
+    sumar([datos.costoDirectoMeta, datos.costoPropioMeta]) ===
+    TOTAL_COSTO_EJEMPLO
+  );
 }
 
 /**
@@ -63,6 +75,7 @@ export interface OrigenDeEjemplo {
 export function origenDeEjemplo(datos: {
   costoDirectoContractual: string;
   costoDirectoMeta: string;
+  costoPropioMeta: string;
 }): OrigenDeEjemplo {
   const contractual = pareceContractualDeEjemplo(datos.costoDirectoContractual);
   const meta = pareceMetaDeEjemplo(datos);

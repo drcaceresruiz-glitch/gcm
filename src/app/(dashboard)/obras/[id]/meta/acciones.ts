@@ -6,13 +6,11 @@ import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { puede } from "@/lib/rbac";
 import { analizarExcel } from "@/lib/excel-presupuesto";
-import { analizarGastosGenerales } from "@/lib/excel-meta";
 import { esPositivo, normalizarDecimal } from "@/lib/decimal";
 import {
   aprobarMeta,
   crearMeta,
   eliminarBorrador,
-  type EntradaGastoMeta,
   type EntradaItemMeta,
 } from "@/services/meta.service";
 import type { ModoMeta } from "@/lib/bolsa";
@@ -20,9 +18,14 @@ import type { ModoMeta } from "@/lib/bolsa";
 /**
  * Carga del presupuesto meta desde el Excel de la plantilla.
  *
- * El archivo trae las DOS hojas, asi que aqui se leen las dos y se juntan en
- * una sola llamada a `crearMeta`: media meta guardada —el costo directo sin
- * sus gastos generales— daria una bolsa que exagera justo en lo que falta.
+ * UNA sola hoja y UNA sola lectura. Hasta el 23 de agosto de 2026 el libro
+ * traia dos —costo directo y gastos generales— y se leian por separado;
+ * media meta guardada, el costo directo sin sus sueldos, daba una bolsa que
+ * exageraba justo en lo que faltaba. Y eso fue lo que paso: el total de la
+ * segunda hoja llegaba en cero al guardar.
+ *
+ * Los sueldos, alquileres y polizas son ahora filas de la misma hoja, sin
+ * Item. No hay dos cuentas que puedan discrepar porque no hay dos cuentas.
  */
 
 const EXTENSIONES = [".xlsx", ".xlsm", ".xls"];
@@ -79,7 +82,11 @@ export async function accionImportarMeta(
 
   const mesesPlazo = normalizarDecimal(String(datos.get("mesesPlazo") ?? ""), 2);
   if (mesesPlazo === null || !esPositivo(mesesPlazo)) {
-    return { error: "Indica el plazo en meses con el que presupuestas los gastos generales." };
+    return {
+      error:
+        "Indica el plazo en meses con el que presupuestas las lineas que se " +
+        "pagan por mes.",
+    };
   }
 
   const fechaMeta = String(datos.get("fechaMeta") ?? "");
@@ -92,34 +99,18 @@ export async function accionImportarMeta(
 
   const contenido = await validacion.archivo.arrayBuffer();
 
-  let costo, gastos;
+  let costo;
   try {
-    // Las dos hojas del MISMO libro. `analizarExcel` lee la primera; el otro
-    // busca la suya por nombre.
-    [costo, gastos] = await Promise.all([
-      // `propiasDeLaMeta`: en la hoja de la meta, una fila con importe y sin
-      // codigo no es una nota, es un costo real que el contrato no desglosa.
-      analizarExcel(contenido, { propiasDeLaMeta: true }),
-      analizarGastosGenerales(contenido),
-    ]);
+    // `propiasDeLaMeta`: en la hoja de la meta, una fila con importe y sin
+    // codigo no es una nota, es un costo real que el contrato no desglosa.
+    // Ahi viven tambien el residente, la camioneta y las polizas.
+    costo = await analizarExcel(contenido, { propiasDeLaMeta: true });
   } catch {
     // No se expone el error interno: un archivo corrupto no debe revelar
     // detalles de la libreria ni del servidor.
     return { error: "No se pudo leer el archivo. Comprueba que sea un Excel valido." };
   }
 
-  /*
-   * Los gastos generales VUELVEN a la meta, y a proposito.
-   *
-   * El 21 de agosto se sacaron de aqui con el argumento de que "los reconoce
-   * el contrato y los gestiona la empresa". Es cierto de cara al CLIENTE -el
-   * contrato los reconoce englobados, no sueldo a sueldo- pero no de cara a
-   * la empresa: el residente, el maestro y la camioneta cuestan, y sin ellos
-   * la meta no es lo que la obra cuesta, solo lo que cuestan sus partidas.
-   *
-   * Siguen sin salir en el contractual ni en el cronograma: viven en su
-   * propia tabla y el contractual se genera desde los ITEMS de la meta.
-   */
   if (costo.errores.length > 0) {
     const primero = costo.errores[0]!;
     return {
@@ -131,16 +122,6 @@ export async function accionImportarMeta(
     };
   }
 
-  if (gastos.errores.length > 0) {
-    const primero = gastos.errores[0]!;
-    return {
-      error:
-        `Hoja de gastos generales, fila ${primero.fila}: ${primero.mensaje}` +
-        (gastos.errores.length > 1
-          ? ` (y ${gastos.errores.length - 1} error(es) mas)`
-          : ""),
-    };
-  }
 
   if (costo.filas.length === 0) {
     return { error: "La hoja de costo directo no tiene ni una linea valida." };
@@ -200,21 +181,12 @@ export async function accionImportarMeta(
     };
   });
 
-  const gastosGenerales: EntradaGastoMeta[] = gastos.filas.map((g) => ({
-    concepto: g.concepto,
-    tipo: g.tipo,
-    montoMensual: g.montoMensual,
-    meses: g.meses,
-    montoFijo: g.montoFijo,
-  }));
-
   const resultado = await crearMeta(sesion, obraId, {
     modo,
     fechaMeta,
     mesesPlazo,
     notas: String(datos.get("notas") ?? "").trim() || null,
     items,
-    gastosGenerales,
   });
 
   if (!resultado.ok) return { error: resultado.error };

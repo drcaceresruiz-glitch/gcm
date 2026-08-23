@@ -6,8 +6,8 @@ import {
   esPositivo,
   multiplicar,
   normalizarDecimal,
-  sumar,
 } from "@/lib/decimal";
+import { cifrasDeLaMeta } from "@/lib/costo-meta";
 import { metaQueManda } from "@/services/meta.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
@@ -124,33 +124,38 @@ type Transaccion = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
  * total se recalculara aparte, un fallo entre medias dejaria una meta cuyas
  * lineas no suman lo que dice su cabecera, y esa cifra gobierna la bolsa.
  *
- * El costo directo es la suma llana de los parciales -la MISMA cuenta que
- * hace `crearMeta`- y el total le anade los gastos generales, que esta
- * edicion no toca.
+ * Es la MISMA funcion que usa `crearMeta` -`cifrasDeLaMeta`- sobre la misma
+ * lista. Antes esta edicion sumaba por su cuenta y le anadia unos gastos
+ * generales que no tocaba; ahora no hay dos cuentas que puedan discrepar, y
+ * por eso editar un sueldo aqui SI mueve el costo total, cosa que antes era
+ * imposible: los gastos generales solo se podian cambiar volviendo al Excel.
  */
 async function recalcularCosto(tx: Transaccion, metaId: string): Promise<void> {
-  const [lineas, meta] = await Promise.all([
-    tx.presupuestoMetaItem.findMany({
-      where: { presupuestoMetaId: metaId },
-      select: { parcial: true },
-    }),
-    tx.presupuestoMeta.findUniqueOrThrow({
-      where: { id: metaId },
-      select: { gastosGenerales: true },
-    }),
-  ]);
+  const lineas = await tx.presupuestoMetaItem.findMany({
+    where: { presupuestoMetaId: metaId },
+    select: {
+      codigoRef: true,
+      unidad: true,
+      precioUnitario: true,
+      parcial: true,
+    },
+  });
 
-  const costoDirecto = sumar(
-    lineas
-      .map((l) => l.parcial?.toString() ?? null)
-      .filter((p): p is string => p !== null),
+  const cifras = cifrasDeLaMeta(
+    lineas.map((l) => ({
+      codigoRef: l.codigoRef,
+      unidad: l.unidad,
+      precioUnitario: l.precioUnitario?.toString() ?? null,
+      parcial: l.parcial?.toString() ?? null,
+    })),
   );
 
   await tx.presupuestoMeta.update({
     where: { id: metaId },
     data: {
-      costoDirecto,
-      costoTotal: sumar([costoDirecto, meta.gastosGenerales.toString()]),
+      costoDirecto: cifras.costoDirecto,
+      costoPropio: cifras.costoPropio,
+      costoTotal: cifras.costoTotal,
     },
   });
 }
