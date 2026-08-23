@@ -2078,61 +2078,51 @@ Lo que SI se hara, en este orden:
      tarjeta de Confirmar/Cancelar nunca se vio disparar en vivo, solo en
      las pruebas mockeadas.
 
-   ~~**Pedido el 22 de agosto de 2026: que el agente tenga cara — un
-   avatar 3D animado en el navegador, llamado "Mike".**~~ **HECHO el 22
-   de agosto de 2026, pero no como se pidio al principio.** El pedido
-   original queria 3D de verdad, animado en el navegador, embebido en la
-   pantalla del Asistente. Dos intentos con eso NO sirvieron:
+   **Pedido el 22 de agosto de 2026: que el agente tenga cara — un
+   avatar 3D animado en el navegador, llamado "Mike".** Tres intentos el
+   mismo dia, los tres revertidos:
    - **Primer intento**: `CesiumMan.glb`, el astronauta de muestra de
      Khronos (CC-BY 4.0), con Three.js/`react-three-fiber`/drei
-     (`ssr:false`, solo `/asistente` paga ese peso). Probado en vivo,
-     funcionaba tecnicamente -camara, animacion, chat sin romperse- pero
-     el usuario lo rechazo de plano: "ESO SE VE HORRIBLE... SINO LO
-     PUEDES MEJORAR Y QUE SEA REALISTA, COMO UN CONSTRUCTOR". Con razon:
-     un astronauta generico no tiene nada que ver con GCM.
+     (`ssr:false`, solo `/asistente` pagaria ese peso). Rechazado: "ESO
+     SE VE HORRIBLE... SINO LO PUEDES MEJORAR Y QUE SEA REALISTA, COMO UN
+     CONSTRUCTOR" -un astronauta generico no tiene nada que ver con GCM-.
    - **Segundo intento**: `Worker` de Quaternius (CC0, via poly.pizza) -
-     casco, chaleco reflectante, botas, 24 animaciones- con el encuadre
-     de camara resuelto por `<Bounds fit clip observe>` de drei en vez de
-     numeros a mano. Mejor asset, pero **el usuario senalo algo mas
-     importante**: GCM YA TIENE su propia mascota -"el maestro de obra"
-     en `public/mascota/` (`Mascota.tsx`), cuatro poses WebP en uso desde
-     antes en media docena de pantallas- y un modelo 3D generico de
-     internet, por bueno que sea, nunca se le va a parecer. Pidio que la
-     cara del asistente fuera ESA mascota, no una nueva, y que apareciera
-     "libre" -como el widget "Dormi" de drcaceresruiz.com (otro proyecto
-     del mismo usuario)-, no encerrada dentro de la tarjeta del chat.
+     casco, chaleco reflectante, botas, 24 animaciones-, encuadre de
+     camara resuelto con `<Bounds fit clip observe>` de drei. Mejor asset,
+     pero el usuario señalo algo mas importante: GCM YA TIENE su propia
+     mascota -"el maestro de obra" en `public/mascota/` (`Mascota.tsx`),
+     en uso desde antes en media docena de pantallas- y un modelo nuevo
+     de internet, por bueno que sea, nunca se le iba a parecer. Pidio esa
+     mascota, no una nueva, "libre" -como el widget "Dormi" de
+     drcaceresruiz.com (otro proyecto del mismo usuario)-, no encerrada
+     dentro de la tarjeta del chat.
+   - **Tercer intento**: se saco WebGL del todo y se monto la mascota
+     existente como lanzador flotante (`LanzadorAsistente.tsx`) en
+     `(dashboard)/layout.tsx` -burbuja fija, visible en cualquier pantalla
+     del area privada, abre un panel con el mismo componente `Asistente`
+     de siempre al hacer clic-. Typecheck/lint/tests/build en verde,
+     **pero sin verificacion visual real** -las herramientas de navegador
+     seguian desconectadas- y el usuario, ya viendolo en produccion, lo
+     rechazo tambien: "no me parece que lo dejaste funcionando bien"
+     -sin precisar que fallaba exactamente-. Revertido por completo:
+     `LanzadorAsistente.tsx` fuera, `Asistente.tsx`/`acciones.ts`/
+     `layout.tsx` de vuelta a como estaban antes de tocar nada de esto
+     (commit `c8f424c`). El chat de texto solo, sin ningun avatar, sigue
+     funcionando igual.
 
-   **Version final**: se saco WebGL del todo -`AvatarMike.tsx`, el GLB,
-   las dependencias de three.js- y en su lugar:
-   - `LanzadorAsistente.tsx`: una burbuja fija (`fixed bottom-4 right-4`)
-     con la mascota existente (pose `saludando`), montada UNA vez en
-     `(dashboard)/layout.tsx` -visible en cualquier pantalla del area
-     privada, no solo en `/asistente`-, gated por el mismo
-     `puede(sesion, "agente_ia:usar")` que ya condiciona el enlace de
-     navegacion. Al hacer clic abre un panel flotante con el mismo
-     componente `<Asistente>` de siempre -sin duplicar logica de envio ni
-     sondeo-, cargando la conversacion reciente la PRIMERA vez que se
-     abre (Server Action nueva, `accionConversacionReciente`), no en cada
-     pagina: eso habria pagado esa consulta en toda el area privada la
-     abra alguien o no.
-   - `Asistente` gano una prop opcional `alCambiarActividad`, para que el
-     lanzador refleje "pensando" (pose `pensando` de la mascota) en su
-     propia burbuja mientras el turno sigue en curso, sin duplicar el
-     sondeo.
-   - La pagina dedicada `/asistente` (a pantalla completa) se queda tal
-     cual estaba -util para una sesion de preguntas larga-; el lanzador
-     se oculta solo ahi (`usePathname`) para no flotar sobre si mismo.
-
-   Typecheck/lint/2637 pruebas/build en verde. **Sin confirmar todavia
-   visualmente en un navegador real**: las herramientas de navegador se
-   desconectaron a mitad de esta sesion y no se pudieron reconectar.
-   Falta ese ultimo paso -ver la burbuja, abrir el panel, mandar un
-   mensaje- antes de darlo por bueno del todo.
+   **Leccion para el proximo intento**: dos de los tres intentos se
+   construyeron y desplegaron SIN que nadie -ni el usuario, ni una
+   verificacion visual real de mi parte, porque las herramientas de
+   navegador estuvieron caidas gran parte de la sesion- los viera
+   funcionando antes de darlos por buenos. La proxima vez que se retome
+   esto, verificar en vivo ANTES de comitear -o, si el navegador no esta
+   disponible, decirlo explicito y esperar confirmacion antes de seguir
+   construyendo encima-, en vez de iterar a ciegas sobre lo mismo.
 
    La investigacion original de Mixamo/Quaternius/Three.js (licencias,
-   versiones exactas, notas de Turbopack) queda sin usar por ahora, pero
-   disponible en la transcripcion de esta sesion si algun dia se decide
-   igual construir un "Mike" 3D de verdad en vez de la mascota 2D.
+   versiones exactas, notas de Turbopack) queda sin usar, pero disponible
+   en la transcripcion de esta sesion si algun dia se decide construir un
+   "Mike" 3D de verdad.
 
    ~~**Dictado por voz en el Asistente.**~~ **Investigado el 22 de agosto
    de 2026** (mismo workflow, en paralelo con lo de Mike), sin empezar el

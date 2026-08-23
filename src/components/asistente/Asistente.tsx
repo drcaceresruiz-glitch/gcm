@@ -162,13 +162,8 @@ function Burbuja({
 
 export function Asistente({
   conversacionInicial,
-  alCambiarActividad,
 }: {
   conversacionInicial: { id: string; mensajes: MensajeAgenteResumen[] } | null;
-  /** Para quien monta el chat desde afuera -el lanzador flotante-, y quiere
-   * reflejar "pensando" en su propia burbuja sin tener que duplicar el
-   * sondeo aqui dentro. */
-  alCambiarActividad?: (activo: boolean) => void;
 }) {
   const [mensajes, setMensajes] = useState<MensajeAgenteResumen[]>(
     conversacionInicial?.mensajes ?? [],
@@ -288,10 +283,6 @@ export function Asistente({
       previos.map((m) => (m.id === id ? { ...m, contenido, propuestaPendiente: false } : m)),
     );
   }
-
-  useEffect(() => {
-    alCambiarActividad?.(pendienteId !== null);
-  }, [pendienteId, alCambiarActividad]);
 
   const hayPropuestaPendiente = mensajes.some((m) => m.propuestaPendiente);
 
