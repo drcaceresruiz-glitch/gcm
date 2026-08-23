@@ -276,12 +276,75 @@ function valorCelda(celda: ExcelJS.Cell | undefined): unknown {
  * UTC cae en las 19:00 del dia anterior, y `getDate()` devolveria ese dia
  * de menos.
  */
-function leerFecha(valor: unknown): string | null {
-  if (!(valor instanceof Date) || Number.isNaN(valor.getTime())) return null;
-  const anio = valor.getUTCFullYear();
-  const mes = String(valor.getUTCMonth() + 1).padStart(2, "0");
-  const dia = String(valor.getUTCDate()).padStart(2, "0");
-  return `${anio}-${mes}-${dia}`;
+type LecturaFecha =
+  | { estado: "vacia" }
+  | { estado: "ok"; fecha: string }
+  /// Habia algo escrito y no se pudo entender como fecha. NO se ignora.
+  | { estado: "ilegible"; escrito: string };
+
+/// dd/mm/aaaa y d-m-aaaa, con barra, guion o punto. Es como se escribe una
+/// fecha en obra; el ano de dos cifras se rechaza a proposito, porque "10/08/26"
+/// puede ser 1926 o 2026 y adivinarlo en un contrato no es aceptable.
+const FECHA_TECLEADA = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/;
+
+/// aaaa-mm-dd, que es lo que sale al exportar de casi cualquier sistema.
+const FECHA_ISO = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
+
+function armar(anio: number, mes: number, dia: number): string | null {
+  // Se reconstruye y se compara: asi un 31 de febrero no se convierte en
+  // marzo sin que nadie se entere.
+  const d = new Date(Date.UTC(anio, mes - 1, dia));
+  if (
+    d.getUTCFullYear() !== anio ||
+    d.getUTCMonth() !== mes - 1 ||
+    d.getUTCDate() !== dia
+  ) {
+    return null;
+  }
+  const mm = String(mes).padStart(2, "0");
+  const dd = String(dia).padStart(2, "0");
+  return `${anio}-${mm}-${dd}`;
+}
+
+function leerFechaDetallada(valor: unknown): LecturaFecha {
+  if (valor instanceof Date && !Number.isNaN(valor.getTime())) {
+    const anio = valor.getUTCFullYear();
+    const mes = String(valor.getUTCMonth() + 1).padStart(2, "0");
+    const dia = String(valor.getUTCDate()).padStart(2, "0");
+    return { estado: "ok", fecha: `${anio}-${mes}-${dia}` };
+  }
+
+  if (valor === null || valor === undefined) return { estado: "vacia" };
+
+  /**
+   * Una fecha ESCRITA COMO TEXTO tambien vale.
+   *
+   * Pasa constantemente: se pega desde otro archivo, o la columna quedo con
+   * formato de texto y Excel guarda "01/08/2026" como cadena. Hasta hoy eso
+   * se descartaba EN SILENCIO -la partida entraba sin fechas y nadie se
+   * enteraba hasta ver la EDT sin programar-, que es la peor forma de fallar:
+   * el usuario cree que las cargo.
+   */
+  const texto = String(valor).trim();
+  if (texto === "") return { estado: "vacia" };
+
+  const tecleada = FECHA_TECLEADA.exec(texto);
+  if (tecleada) {
+    const fecha = armar(
+      Number(tecleada[3]),
+      Number(tecleada[2]),
+      Number(tecleada[1]),
+    );
+    return fecha ? { estado: "ok", fecha } : { estado: "ilegible", escrito: texto };
+  }
+
+  const iso = FECHA_ISO.exec(texto);
+  if (iso) {
+    const fecha = armar(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+    return fecha ? { estado: "ok", fecha } : { estado: "ilegible", escrito: texto };
+  }
+
+  return { estado: "ilegible", escrito: texto };
 }
 
 /**
@@ -657,8 +720,37 @@ export async function analizarExcel(
      */
     const colInicio = mapa.get("fechaInicio");
     const colFin = mapa.get("fechaFin");
-    const fechaInicio = colInicio ? leerFecha(valorCelda(fila.getCell(colInicio))) : null;
-    const fechaFin = colFin ? leerFecha(valorCelda(fila.getCell(colFin))) : null;
+    const leidaInicio: LecturaFecha = colInicio
+      ? leerFechaDetallada(valorCelda(fila.getCell(colInicio)))
+      : { estado: "vacia" };
+    const leidaFin: LecturaFecha = colFin
+      ? leerFechaDetallada(valorCelda(fila.getCell(colFin)))
+      : { estado: "vacia" };
+
+    // Algo escrito que no se entiende NO se descarta callando. Antes se
+    // ignoraba y la partida entraba sin fechas: el usuario creia haberlas
+    // cargado y solo se enteraba al ver la EDT entera sin programar.
+    const ilegible =
+      leidaInicio.estado === "ilegible"
+        ? { cual: "fecha inicio", escrito: leidaInicio.escrito }
+        : leidaFin.estado === "ilegible"
+          ? { cual: "fecha fin", escrito: leidaFin.escrito }
+          : null;
+
+    if (ilegible) {
+      errores.push({
+        fila: n,
+        columna: ilegible.cual,
+        mensaje:
+          `La partida ${codigo} tiene "${ilegible.escrito}" en ${ilegible.cual}, ` +
+          `y no se entiende como fecha. Escribela como 01/08/2026 o 2026-08-01, ` +
+          `o deja la celda vacia.`,
+      });
+      continue;
+    }
+
+    const fechaInicio = leidaInicio.estado === "ok" ? leidaInicio.fecha : null;
+    const fechaFin = leidaFin.estado === "ok" ? leidaFin.fecha : null;
 
     if ((fechaInicio === null) !== (fechaFin === null)) {
       errores.push({

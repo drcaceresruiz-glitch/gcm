@@ -399,10 +399,13 @@ export async function generarPlantillaMeta(
   costo.getCell(`I${FILA_CABECERA}`).note =
     "Opcional. Si la pones, la EDT sale con esta partida ya programada en " +
     "vez de pendiente. Si la dejas en blanco, todo sigue igual que hoy: se " +
-    "programa después, en la tabla del cronograma.";
+    "programa después, en la tabla del cronograma. " +
+    "Escríbela 01/08/2026 (o 2026-08-01). Va en las PARTIDAS, no en los " +
+    "capítulos: la fecha del capítulo se calcula sola, desde la primera y la " +
+    "última de las partidas que cuelgan de él.";
   costo.getCell(`J${FILA_CABECERA}`).note =
     "Opcional, pero si pones la fecha de inicio también hace falta esta: " +
-    "las dos van juntas o ninguna.";
+    "las dos van juntas o ninguna. Y no puede ser anterior al inicio.";
 
   // Se declaran aqui arriba porque la formula del contractual, que ya se
   // escribe en las filas de ejemplo, necesita el rango completo.
@@ -562,7 +565,9 @@ export async function generarPlantillaMeta(
     const leyenda = hoja.getCell("A3");
     leyenda.value =
       "Las celdas en gris se calculan solas y están bloqueadas. Escribe solo en las blancas. " +
-      "Hay " + FILAS_PREPARADAS + " filas listas con sus fórmulas: rellena las que necesites y deja el resto vacías.";
+      "Hay " + FILAS_PREPARADAS + " filas listas con sus fórmulas: rellena las que necesites y deja el resto vacías. " +
+      "Las filas SIN Ítem son costos propios de la meta: cuestan, pero no se le facturan al cliente línea a línea. " +
+      "Las fechas son opcionales, van en las partidas (01/08/2026) y las dos o ninguna.";
     leyenda.font = { italic: true, size: 10, color: { argb: "FF667788" } };
 
     /**

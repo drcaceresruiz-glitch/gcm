@@ -209,6 +209,93 @@ describe("tolerancia del analizador de gastos", () => {
   });
 });
 
+describe("una fecha escrita como TEXTO", () => {
+  /**
+   * Pasa constantemente: se pega desde otro archivo, o la columna quedo con
+   * formato de texto y Excel guarda "01/08/2026" como cadena en vez de como
+   * fecha. Hasta hoy eso se descartaba EN SILENCIO y la partida entraba sin
+   * fechas: el usuario creia haberlas cargado y solo se enteraba al ver la
+   * EDT entera sin programar.
+   */
+  async function conTextoEnLasFechas(
+    codigo: string,
+    inicio: unknown,
+    fin: unknown,
+  ): Promise<ArrayBuffer> {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const hoja = libro.worksheets[0]!;
+
+    let filaPartida: ExcelJS.Row | null = null;
+    hoja.eachRow((fila) => {
+      if (fila.getCell(1).value === codigo) filaPartida = fila;
+    });
+    if (!filaPartida) throw new Error(`No se encontro la partida ${codigo}.`);
+
+    (filaPartida as ExcelJS.Row).getCell(9).value = inicio as never;
+    (filaPartida as ExcelJS.Row).getCell(10).value = fin as never;
+
+    return (await libro.xlsx.writeBuffer()) as ArrayBuffer;
+  }
+
+  const analizar = async (inicio: unknown, fin: unknown) =>
+    analizarExcel(await conTextoEnLasFechas("1.1", inicio, fin), {
+      propiasDeLaMeta: true,
+    });
+
+  it("dd/mm/aaaa se entiende, que es como se escribe en obra", async () => {
+    const r = await analizar("01/08/2026", "15/08/2026");
+    const p = r.filas.find((f) => f.codigo === "1.1");
+
+    expect(r.errores).toEqual([]);
+    expect(p?.fechaInicio).toBe("2026-08-01");
+    expect(p?.fechaFin).toBe("2026-08-15");
+  });
+
+  it("con guiones o puntos tambien", async () => {
+    const r = await analizar("1-8-2026", "15.8.2026");
+    const p = r.filas.find((f) => f.codigo === "1.1");
+
+    expect(r.errores).toEqual([]);
+    expect(p?.fechaInicio).toBe("2026-08-01");
+  });
+
+  it("aaaa-mm-dd tambien, que es lo que exporta cualquier sistema", async () => {
+    const r = await analizar("2026-08-01", "2026-08-15");
+    expect(r.filas.find((f) => f.codigo === "1.1")?.fechaInicio).toBe("2026-08-01");
+  });
+
+  it("lo que no se entiende da ERROR, no se ignora callando", async () => {
+    const r = await analizar("agosto", "15/08/2026");
+
+    expect(r.errores).toHaveLength(1);
+    expect(r.errores[0]!.mensaje).toContain("agosto");
+    expect(r.errores[0]!.mensaje).toContain("no se entiende como fecha");
+    // Y la partida no entra a medias: se para y se dice cual es.
+    expect(r.filas.some((f) => f.codigo === "1.1")).toBe(false);
+  });
+
+  it("un 31 de febrero no se convierte en marzo sin avisar", async () => {
+    const r = await analizar("31/02/2026", "15/03/2026");
+
+    expect(r.errores).toHaveLength(1);
+    expect(r.errores[0]!.columna).toBe("fecha inicio");
+  });
+
+  it("el ano de dos cifras se rechaza: 26 puede ser 1926", async () => {
+    // Adivinar el siglo en un contrato no es aceptable.
+    const r = await analizar("01/08/26", "15/08/26");
+    expect(r.errores).toHaveLength(1);
+  });
+
+  it("una celda vacia sigue siendo una partida sin fechas, sin error", async () => {
+    const r = await analizar(null, null);
+
+    expect(r.errores).toEqual([]);
+    expect(r.filas.find((f) => f.codigo === "1.1")?.fechaInicio).toBeNull();
+  });
+});
+
 describe("las fechas opcionales de la plantilla meta", () => {
   /**
    * La plantilla no trae fechas de ejemplo a proposito (demuestra que son
