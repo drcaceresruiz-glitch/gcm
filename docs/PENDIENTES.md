@@ -134,6 +134,23 @@ como los casos aprendidos de CRIOCORD—. Se cambio solo lo visible.
 de desarrollo, incluida la nueva `/obras/[id]/presupuesto/pdf`, que devuelve
 200 -o sea que genera el PDF de verdad, no solo compila-.
 
+### Los hallazgos de la auditoria del tablero, revisados el 23 de agosto
+
+Se comprobaron uno a uno en el codigo, porque la lista del punto 2 de este
+documento es de antes y no decia cuales se habian cerrado:
+
+- ~~El modulo EVM del tablero usa `presupuesto.total` como BAC~~ **ARREGLADO**:
+  `tablero.service.ts:326` llama a `bacDeObra(obraId)`.
+- ~~EAC y VAC calculados y nunca mostrados~~ **ARREGLADO**: salen en el modulo
+  (`modulos.tsx`).
+- ~~`pendientesDeLaObra` no filtra `restriccion` por `companyId`~~ **ARREGLADO**:
+  filtra por `tarea.project.companyId`.
+- **La ponderacion por DINERO sigue sin existir.** `ponderarPorDuracion` es la
+  unica funcion de ponderacion que se llama en todo el repo: avance fisico,
+  curva y capitulos pesan siempre por duracion, con o sin mapeo completo,
+  aunque el manual y los comentarios prometan otra cosa cuando el mapeo pase
+  del 60 %. Es el ultimo hallazgo de esa auditoria que queda vivo.
+
 ---
 
 ## Plantillas del informe de obra (23 de agosto de 2026) — DISENO LISTO, CODIGO SIN EMPEZAR
@@ -189,22 +206,23 @@ encargos, cascada del presupuesto.
   nombre de programa "PROGRAMACION EP". Van marcados `data-manual="true"` en el
   HTML. **Decision pendiente: se anaden al modelo o se teclean una vez.**
 
-**LO QUE FALTA, Y ES TODO EL CODIGO.** Hoy esto es HTML de diseno, no una
-funcionalidad. Para que salga como PDF de verdad:
+**YA NO FALTA EL CODIGO: se construyo el 23 de agosto.** Lo que aqui abajo se
+apuntaba como pendiente esta hecho, y conviene leerlo como historia y no como
+tarea:
 
-- GCM genera PDF en el servidor con `pdf-lib` (`lib/informe-pdf.ts`), a proposito:
-  el hosting no puede correr Chromium. El modelo de dibujo ya esta abstraido en
-  `ElementoPdf` (`lib/informe-documento.ts`).
-- Haria falta ampliar `ElementoPdf` con **arcos** (el donut de avance),
-  **rectangulos con color** e **imagenes** (las fotos de la bitacora), y anadir
-  **`@pdf-lib/fontkit`** si se quiere conservar la Montserrat ligera de los
-  titulos — hoy solo estan las catorce fuentes estandar de PDF.
-- El informe compuesto ya existe y no hay que rehacerlo: `componerInforme`
-  (`informe.service.ts`) alimenta las tres puertas actuales (pantalla que se
-  imprime, descarga PDF/Excel/CSV, envio por correo). Las plantillas serian una
-  forma nueva de PINTAR ese mismo informe, no una consulta nueva.
-- **Sin decidir**: si la plantilla se elige por empresa, por obra o por descarga;
-  y si las secciones se pueden apagar una a una.
+- `ElementoPdf` gano **arcos**, **rectangulos con color** e **imagenes**, mas
+  una paleta de TINTAS por su papel. El pintor se extrajo a
+  `pdf-pintor.service` para que el informe y los presupuestos no tengan dos
+  paletas.
+- Se decidio NO anadir `@pdf-lib/fontkit`: los titulos van en Helvetica. La
+  Montserrat fina del diseno costaba una dependencia y unos .ttf dentro de cada
+  PDF generado, y el usuario eligio no pagarlo.
+- Cuatro hojas nuevas en el informe -resumen, cronograma, control economico y
+  bitacora fotografica-, todas alimentadas por el mismo `componerInforme` que
+  ya existia.
+- **Decidido y construido**: la plantilla se elige POR EMPRESA con override POR
+  OBRA, y las secciones se apagan una a una. Ver la seccion «El dinero de la
+  obra, de punta a punta» de mas arriba.
 
 **Detalles menores que el revisor dejo anotados y no se arreglaron**: en la hoja
 de control, el estado vacio de Last Planner ocupa ~40 % del papel (honesto, pero
