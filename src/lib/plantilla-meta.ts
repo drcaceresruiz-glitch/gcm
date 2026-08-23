@@ -382,8 +382,8 @@ const INSTRUCCIONES: readonly (readonly [string, string])[] = [
     "Puedes añadir costos que el contrato no desglosa: andamio alquilado, cuadrilla de apoyo, encofrado metálico (capítulo 3 del ejemplo). Ponles un código que NO exista en el contrato. Consumen bolsa, que es exactamente lo que hacen en la obra.",
   ],
   [
-    "3b. Si te quedas sin filas",
-    "Hay 400 filas listas con sus fórmulas. Si necesitas más, no escribas en una fila nueva: selecciona una fila VACÍA entera (clic en su número), cópiala y pégala donde la necesites. Una fila escrita a mano nace sin fórmulas —el Parcial y el Contractual se quedan en blanco— y el presupuesto sale corto sin que nada lo avise.",
+    "3b. Añadir filas",
+    "Hay 400 filas listas con sus fórmulas, así que para añadir al final NO hace falta nada: escribe en la primera vacía. Para meter una partida EN MEDIO: clic en el NÚMERO de una fila vacía para seleccionarla entera, Ctrl+C, luego botón derecho sobre el número de la fila donde la quieres y elige «Insertar celdas copiadas». Con «Pegar» a secas Excel avisa de que la hoja está protegida y no lo hace: pegar sobrescribe las celdas de fórmula, que están bloqueadas; insertar crea la fila nueva y no machaca ninguna. Y si insertas una fila en blanco (botón derecho > Insertar), nace SIN fórmulas: el Parcial y el Contractual se quedan vacíos y el presupuesto sale corto sin que nada lo avise. Si prefieres trabajar sin red: Revisar > Desproteger hoja, no pide contraseña.",
   ],
   [
     "4. Lo que NO pongas se nota",
@@ -774,7 +774,8 @@ export async function generarPlantillaMeta(
     leyenda.value =
       "Las celdas en gris se calculan solas y están bloqueadas. Escribe solo en las blancas. " +
       "Hay " + FILAS_PREPARADAS + " filas listas con sus fórmulas: rellena las que necesites y deja el resto vacías. " +
-      "Si necesitas más, COPIA una fila vacía entera y pégala; escribir en una fila nueva a mano la deja sin fórmulas. " +
+      "Para añadir una en medio: copia una fila vacía (clic en su NÚMERO) y en la fila destino usa botón derecho > «Insertar celdas copiadas». Con «Pegar» no va: sobrescribe las celdas bloqueadas y Excel lo impide. " +
+      "Si Excel se pone pesado: Revisar > Desproteger hoja, no tiene contraseña. " +
       "Las filas SIN Ítem son costos propios de la meta: cuestan, pero no se le facturan al cliente línea a línea. " +
       "Las fechas son opcionales, van en las partidas (01/08/2026) y las dos o ninguna.";
     leyenda.font = { italic: true, size: 10, color: { argb: "FF667788" } };
@@ -787,7 +788,19 @@ export async function generarPlantillaMeta(
      * del bloque, Excel copia la formula de la fila de arriba y ajusta solo
      * el rango de los totales.
      *
-     * Sin contraseña: esto evita el accidente, no es seguridad.
+     * OJO CON LO QUE «PERMITIR INSERTAR» NO ARREGLA, que costo un reporte el
+     * 23 de agosto de 2026: PEGAR una fila encima de otra sigue fallando, y
+     * seguira fallando siempre. Pegar ESCRIBE sobre las celdas de destino, y
+     * las de formula (Parcial y Contractual) estan bloqueadas; Excel corta
+     * con «La celda o el gráfico que intenta cambiar están en una hoja
+     * protegida». No es un permiso que falte: es que pegar y insertar son
+     * operaciones distintas. La que funciona es «Insertar celdas copiadas»,
+     * que crea la fila en vez de machacar una. Por eso la leyenda nombra el
+     * menu exacto —decir «copia y pega» mandaba justo a la que falla—.
+     *
+     * Sin contraseña: esto evita el accidente, no es seguridad. Y se dice en
+     * la leyenda, porque una proteccion de la que no se sabe salir deja de
+     * ser una red y pasa a ser un muro.
      */
     hoja.protect("", {
       selectLockedCells: true,

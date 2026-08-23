@@ -179,6 +179,51 @@ describe("cuantas filas vienen listas, y con que", () => {
   });
 });
 
+describe("la proteccion deja salir", () => {
+  /*
+   * Reportado el 23 de agosto de 2026 con captura: copiar una fila y darle a
+   * Pegar sale «La celda o el gráfico que intenta cambiar están en una hoja
+   * protegida». No es un permiso que falte -insertar SI esta permitido-: es
+   * que pegar ESCRIBE sobre las celdas de formula, que estan bloqueadas. La
+   * operacion que funciona es «Insertar celdas copiadas».
+   *
+   * Lo que se fija aqui es lo unico que puede regresar en silencio: que
+   * insertar siga permitido y que no aparezca una contraseña.
+   */
+  it("permite insertar filas y no pide contraseña", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+
+    for (const hoja of libro.worksheets.slice(0, 2)) {
+      // `sheetProtection` existe al cargar pero los tipos de ExcelJS no lo
+      // declaran; de ahi el puente.
+      const p = (
+        hoja as unknown as {
+          sheetProtection?: {
+            insertRows?: boolean;
+            deleteRows?: boolean;
+            spinCount?: number;
+          };
+        }
+      ).sheetProtection;
+      expect(p?.insertRows).toBe(true);
+      expect(p?.deleteRows).toBe(true);
+      // Una hoja protegida CON contraseña no se puede desbloquear, y entonces
+      // el aviso de Excel no tiene salida.
+      expect(p?.spinCount).toBeUndefined();
+    }
+  });
+
+  it("la leyenda nombra el menu que de verdad funciona, no «pegar»", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const leyenda = String(libro.worksheets[0]!.getCell("A3").value);
+
+    expect(leyenda).toContain("Insertar celdas copiadas");
+    expect(leyenda).toContain("Desproteger hoja");
+  });
+});
+
 describe("las formulas de la plantilla se abren en cualquier programa", () => {
   it("no usan N() sobre un rango: solo Excel la evalua como matriz", async () => {
     /*
