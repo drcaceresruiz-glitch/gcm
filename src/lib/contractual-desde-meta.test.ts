@@ -115,6 +115,44 @@ describe("de que capitulo sale el recargo", () => {
     expect(m.get("3.2")?.parcial).toBe("110.00");
     expect(m.get("3.2")?.codigoDelRecargo).toBe("3.0");
   });
+
+  it("el de la PROPIA partida gana al de su capitulo", () => {
+    /*
+     * No todas las partidas de un capitulo se margenan igual: una subcontrata
+     * ya cerrada no admite el mismo recargo que la mano de obra propia.
+     *
+     * El motor siempre lo supo -`recargoDe` empieza por el codigo de la
+     * propia linea y solo sube si esa no lo trae-, pero hasta el 23 de agosto
+     * de 2026 el servicio se negaba a guardarlo y la pantalla no lo ofrecia.
+     * Se fija aqui porque ahora la UI depende de ello.
+     */
+    const r = generarContractual([
+      cap("1.0", "20.000", 0),
+      { ...par("1.1", 1, { parcial: "100.00" }), porcentajeRecargo: "5.000" },
+      par("1.2", 2, { parcial: "100.00" }),
+    ]);
+    const m = porCodigo(r);
+
+    expect(m.get("1.1")?.parcial).toBe("105.00");
+    expect(m.get("1.1")?.codigoDelRecargo).toBe("1.1");
+
+    // Y la de al lado sigue con el del capitulo: no se contagia.
+    expect(m.get("1.2")?.parcial).toBe("120.00");
+    expect(m.get("1.2")?.codigoDelRecargo).toBe("1.0");
+  });
+
+  it("una partida puede llevar CERO aunque su capitulo recargue", () => {
+    // Cero no es «hereda»: es «esta entra a precio de costo, y lo se». Es la
+    // unica forma de decirlo, y por eso el vacio y el cero tienen que
+    // significar cosas distintas hasta el final.
+    const r = generarContractual([
+      cap("1.0", "20.000", 0),
+      { ...par("1.1", 1, { parcial: "100.00" }), porcentajeRecargo: "0.000" },
+    ]);
+
+    expect(porCodigo(r).get("1.1")?.parcial).toBe("100.00");
+    expect(porCodigo(r).get("1.1")?.codigoDelRecargo).toBe("1.1");
+  });
 });
 
 describe("lo que NO se puede recargar se avisa, no se inventa", () => {

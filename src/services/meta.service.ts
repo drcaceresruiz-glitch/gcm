@@ -424,7 +424,8 @@ export type ResultadoMeta =
 export async function ajustarRecargosDeLaMeta(
   sesion: SesionActiva,
   obraId: string,
-  /// Codigo de capitulo -> porcentaje, como texto. "18" son 18%.
+  /// Codigo -> porcentaje, como texto. "18" son 18%. Vale para un capitulo
+  /// y para una partida suelta: ver el comentario de la consulta.
   recargos: Readonly<Record<string, string>>,
 ): Promise<{ ok: true; cambiados: number } | { ok: false; error: string }> {
   if (!puede(sesion, "meta:crear")) {
@@ -462,31 +463,46 @@ export async function ajustarRecargosDeLaMeta(
   for (const [codigo, crudo] of Object.entries(recargos)) {
     const pct = normalizarDecimal(String(crudo ?? ""), 3);
     if (pct === null) {
-      return { ok: false, error: `El recargo del capitulo ${codigo} no es un numero.` };
+      return { ok: false, error: `El recargo de ${codigo} no es un numero.` };
     }
     if (!esPositivo(pct) && !esCero(pct)) {
-      return { ok: false, error: `El recargo del capitulo ${codigo} no puede ser negativo.` };
+      return { ok: false, error: `El recargo de ${codigo} no puede ser negativo.` };
     }
     if (Number(pct) > 999) {
-      return { ok: false, error: `El recargo del capitulo ${codigo} pasa del 999 %.` };
+      return { ok: false, error: `El recargo de ${codigo} pasa del 999 %.` };
     }
     validados.set(codigo, pct);
   }
 
-  // Solo capitulos, y solo de ESTA meta: el recargo de una partida suelta no
-  // existe -lo hereda de su capitulo- y escribirlo ahi seria un dato muerto
-  // que ademas cambiaria el calculo sin que nadie lo hubiera pedido.
+  /**
+   * CAPITULOS Y PARTIDAS, no solo capitulos.
+   *
+   * Hasta el 23 de agosto de 2026 esto filtraba `tipo: "CAPITULO"` con el
+   * argumento de que «el recargo de una partida suelta no existe, lo hereda
+   * de su capitulo». Era falso desde el principio: `generarContractual`
+   * resuelve el recargo empezando por el codigo de la PROPIA linea y solo
+   * sube al padre si esa no lo trae -es la regla 2 de
+   * `contractual-desde-meta.ts`-. El motor ya sabia recargar una partida; lo
+   * unico que faltaba era dejar guardarlo.
+   *
+   * Y hace falta: no todas las partidas de un capitulo se margenan igual. Una
+   * subcontrata que ya viene cerrada no admite el mismo recargo que la mano
+   * de obra propia, y obligar a un porcentaje unico por capitulo es pedir que
+   * el margen se invente en la media.
+   *
+   * Sigue sin poder recargarse una linea SIN codigo -un sueldo no se le
+   * factura al cliente-, y eso lo garantiza `codigoRef: { in: ... }`.
+   */
   const items = await prisma.presupuestoMetaItem.findMany({
     where: {
       presupuestoMetaId: meta.id,
-      tipo: "CAPITULO",
       codigoRef: { in: [...validados.keys()] },
     },
     select: { id: true, codigoRef: true },
   });
 
   if (items.length === 0) {
-    return { ok: false, error: "Ninguno de esos codigos es un capitulo de la meta." };
+    return { ok: false, error: "Ninguno de esos codigos esta en la meta." };
   }
 
   await prisma.$transaction(

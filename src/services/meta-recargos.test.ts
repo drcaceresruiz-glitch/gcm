@@ -38,10 +38,12 @@ vi.mock("@/lib/prisma", () => ({
       findMany: async ({
         where,
       }: {
-        where: { tipo: string; codigoRef: { in: string[] } };
+        where: { tipo?: string; codigoRef: { in: string[] } };
       }) =>
         estado.items.filter(
-          (i) => i.tipo === where.tipo && where.codigoRef.in.includes(i.codigoRef ?? ""),
+          (i) =>
+            (where.tipo === undefined || i.tipo === where.tipo) &&
+            where.codigoRef.in.includes(i.codigoRef ?? ""),
         ),
       update: ({
         where,
@@ -83,6 +85,8 @@ beforeEach(() => {
     { id: "i1", codigoRef: "1.0", tipo: "CAPITULO", porcentajeRecargo: "20.000" },
     { id: "i2", codigoRef: "2.0", tipo: "CAPITULO", porcentajeRecargo: "20.000" },
     { id: "i3", codigoRef: "1.1", tipo: "PARTIDA", porcentajeRecargo: null },
+    // Un costo propio: sin codigo, nunca recargable.
+    { id: "i4", codigoRef: null, tipo: "PARTIDA", porcentajeRecargo: null },
   ];
 });
 
@@ -91,6 +95,26 @@ describe("ajustarRecargosDeLaMeta", () => {
     const r = await ajustar({ "1.0": "28" });
     expect(r.ok).toBe(true);
     expect(estado.escrituras).toEqual([{ id: "i1", porcentajeRecargo: "28.000" }]);
+  });
+
+  it("guarda tambien el de una PARTIDA suelta", async () => {
+    /*
+     * No todas las partidas de un capitulo se margenan igual: una subcontrata
+     * ya cerrada no admite el mismo recargo que la mano de obra propia.
+     * `generarContractual` siempre supo aplicarlo -resuelve empezando por el
+     * codigo de la propia linea-; lo que faltaba era dejar guardarlo.
+     */
+    const r = await ajustar({ "1.1": "5" });
+
+    expect(r.ok).toBe(true);
+    expect(estado.escrituras).toEqual([{ id: "i3", porcentajeRecargo: "5.000" }]);
+  });
+
+  it("un capitulo y una partida suya, en la misma pasada", async () => {
+    const r = await ajustar({ "1.0": "28", "1.1": "5" });
+
+    expect(r.ok).toBe(true);
+    expect(estado.escrituras).toHaveLength(2);
   });
 
   it("no toca los capitulos que nadie movio", async () => {
@@ -128,10 +152,23 @@ describe("ajustarRecargosDeLaMeta", () => {
     expect(estado.escrituras).toHaveLength(0);
   });
 
-  it("solo escribe en CAPITULOS: una partida hereda el de su capitulo", async () => {
-    // Escribir un recargo en una partida seria un dato muerto que ademas
-    // cambiaria el calculo sin que nadie lo hubiera pedido.
-    const r = await ajustar({ "1.1": "30" });
+  it("un sueldo NO se puede recargar: no tiene codigo con el que pedirlo", async () => {
+    /*
+     * La garantia que queda en pie ahora que las partidas si se recargan. Una
+     * linea sin codigo -el residente, una poliza- no se le factura al cliente
+     * linea a linea, asi que recargarla no significa nada. El filtro
+     * `codigoRef: { in: [...] }` la deja fuera por construccion: no hay clave
+     * con la que nombrarla.
+     */
+    const r = await ajustar({ "Residente de obra": "30" });
+
+    expect(r.ok).toBe(false);
+    expect(estado.escrituras).toHaveLength(0);
+  });
+
+  it("un codigo que no esta en la meta no escribe nada", async () => {
+    const r = await ajustar({ "9.9": "30" });
+
     expect(r.ok).toBe(false);
     expect(estado.escrituras).toHaveLength(0);
   });

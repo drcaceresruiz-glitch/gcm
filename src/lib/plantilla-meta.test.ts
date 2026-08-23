@@ -182,6 +182,62 @@ describe("los sueldos y las polizas, ya dentro de la misma hoja", () => {
   });
 });
 
+describe("la columna de recargo, y donde se puede escribir", () => {
+  /*
+   * `generarContractual` siempre supo recargar una PARTIDA -resuelve
+   * empezando por el codigo de la propia linea y solo sube al padre si esa no
+   * lo trae- pero hasta el 23 de agosto de 2026 esta celda quedaba bloqueada
+   * en las partidas y el servicio filtraba `tipo: "CAPITULO"`. El motor sabia
+   * hacerlo y no habia por donde pedirlo.
+   */
+  const hoja = async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    return libro.worksheets[0]!;
+  };
+
+  /// La fila de un ejemplo, buscada por su descripcion.
+  const filaDe = (h: ExcelJS.Worksheet, texto: string): number => {
+    for (let f = 5; f <= 30; f++) {
+      if (String(h.getRow(f).getCell(2).value ?? "").startsWith(texto)) return f;
+    }
+    throw new Error(`No se encontro la fila de ${texto}`);
+  };
+
+  it("una PARTIDA acepta su propio recargo", async () => {
+    const h = await hoja();
+    const g = h.getRow(filaDe(h, "Cartel de identificación")).getCell(7);
+
+    expect(g.protection?.locked).toBe(false);
+  });
+
+  it("un CAPITULO tambien, como siempre", async () => {
+    const h = await hoja();
+    const g = h.getRow(filaDe(h, "OBRAS PROVISIONALES")).getCell(7);
+
+    expect(g.protection?.locked).toBe(false);
+  });
+
+  it("un SUELDO no: no se le factura al cliente, no hay que recargar", async () => {
+    // No es un descuido que este bloqueada. Una linea sin Item no tiene
+    // codigo con el que nombrarla, y el servicio la rechaza igual.
+    const h = await hoja();
+    const g = h.getRow(filaDe(h, "Residente de obra")).getCell(7);
+
+    // `locked: true` es el valor por defecto de Excel y el archivo no lo
+    // escribe, asi que al releer viene `undefined`. Lo que se comprueba es
+    // que NO este desbloqueada, y la nota -que si viaja- prueba que la celda
+    // esta asi a proposito y no por descuido.
+    expect(g.protection?.locked).not.toBe(false);
+    expect(String(g.note ?? "")).toContain("no se recarga");
+  });
+
+  it("las filas vacias tambien la aceptan, sean lo que sean", async () => {
+    const h = await hoja();
+    expect(h.getRow(200).getCell(7).protection?.locked).toBe(false);
+  });
+});
+
 describe("cuantas filas vienen listas, y con que", () => {
   /*
    * Hasta el 23 de agosto de 2026 eran SESENTA, y parecian de sobra hasta que

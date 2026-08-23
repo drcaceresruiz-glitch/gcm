@@ -391,7 +391,11 @@ const INSTRUCCIONES: readonly (readonly [string, string])[] = [
   ],
   [
     "3. Líneas propias de la meta",
-    "Puedes añadir costos que el contrato no desglosa: andamio alquilado, cuadrilla de apoyo, encofrado metálico (capítulo 3 del ejemplo). Ponles un código que NO exista en el contrato. Consumen bolsa, que es exactamente lo que hacen en la obra.",
+    "Todo lo que se paga y el contrato no desglosa línea a línea: el residente, el maestro, la camioneta, las cartas fianza, las pólizas, un andamio alquilado. Van SIN Ítem —deja la primera columna vacía— y por eso no aparecen en el presupuesto del cliente ni se convierten en tareas del cronograma. Consumen bolsa, que es exactamente lo que hacen en la obra.",
+  ],
+  [
+    "3a. El recargo va por capítulo, y por partida cuando haga falta",
+    "Escribe 15 para 15%. Puesto en el CAPÍTULO lo heredan todas sus partidas, y con eso basta casi siempre. Pero puedes ponerlo también en una PARTIDA suelta, y entonces gana el suyo: sirve para la que lleve un margen distinto —una subcontrata que ya viene cerrada no admite el mismo que la mano de obra propia—. Un 0 NO es lo mismo que dejarlo vacío: 0 significa «esta entra a precio de costo, y lo sé»; vacío significa «que herede». Las filas sin Ítem no se recargan: su costo se cubre con el recargo del resto.",
   ],
   [
     "3b. Añadir filas",
@@ -520,8 +524,12 @@ export async function generarPlantillaMeta(
   // Se explica DONDE se usa: una nota en la cabecera se lee justo cuando
   // hace falta, y la hoja de instrucciones se lee una vez y se olvida.
   costo.getCell(`G${FILA_CABECERA}`).note =
-    "Solo en los capítulos. Escribe 15 para 15%: cuánto se recarga este " +
-    "capítulo del presupuesto meta para llegar al contractual.";
+    "Escribe 15 para 15%: cuánto se recarga para llegar al contractual. " +
+    "Ponlo en el CAPÍTULO y lo heredan todas sus partidas. Puedes ponerlo " +
+    "también en una PARTIDA suelta, y entonces gana el suyo: sirve para la " +
+    "que lleve un margen distinto, como una subcontrata ya cerrada. Un 0 no " +
+    "es lo mismo que dejarlo vacío: 0 es «entra a precio de costo», vacío " +
+    "es «hereda». Las filas sin Ítem no se recargan.";
   costo.getCell(`H${FILA_CABECERA}`).note =
     "Se calcula solo: el subtotal real del capítulo más su recargo. " +
     "La suma de esta columna es el presupuesto contractual.";
@@ -577,6 +585,31 @@ export async function generarPlantillaMeta(
       "Se calcula solo: metrado x precio unitario. No escribas aquí.",
     );
 
+    /*
+     * EL RECARGO SE PUEDE PONER EN UNA PARTIDA, no solo en su capitulo.
+     *
+     * `generarContractual` siempre supo aplicarlo -resuelve empezando por el
+     * codigo de la propia linea y solo sube al padre si esa no lo trae- pero
+     * hasta el 23 de agosto de 2026 esta celda quedaba BLOQUEADA en las
+     * partidas, asi que no habia forma de escribirlo. Y hace falta: una
+     * subcontrata ya cerrada no admite el mismo margen que la mano de obra
+     * propia, y un porcentaje unico por capitulo obliga a inventarse la
+     * media.
+     *
+     * Una fila SIN Item se queda bloqueada, y no por descuido: no se le
+     * factura al cliente linea a linea, asi que no hay nada que recargar.
+     */
+    if (f.codigo !== "") {
+      fila.getCell(7).numFmt = "#,##0.00";
+      marcarEditable(fila.getCell(7));
+    } else {
+      marcarCalculada(
+        fila.getCell(7),
+        "Una línea sin Ítem no se le factura al cliente línea a línea, así " +
+          "que no se recarga: su costo se cubre con el recargo del resto.",
+      );
+    }
+
     fila.getCell(3).alignment = { horizontal: "center" };
     fila.getCell(4).numFmt = "#,##0.00";
     fila.getCell(5).numFmt = "#,##0.00";
@@ -593,9 +626,7 @@ export async function generarPlantillaMeta(
         formula: formulaContractual(n, primeraFila, ultimaFila),
         result: contractualEjemplo(f),
       };
-      fila.getCell(7).numFmt = "#,##0.00";
       fila.getCell(8).numFmt = "#,##0.00";
-      marcarEditable(fila.getCell(7));
       marcarCalculada(
         fila.getCell(8),
         "Se calcula solo: el subtotal real del capítulo más su recargo.",

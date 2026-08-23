@@ -6,6 +6,7 @@ import {
   generarContractual,
   type LineaReal,
 } from "@/lib/contractual-desde-meta";
+import { codigoPadre } from "@/lib/jerarquia-partidas";
 import { dividir, esCero, esNegativo, esPositivo, multiplicar, restar } from "@/lib/decimal";
 import { soles } from "@/utils/formato";
 import { ConfirmarContractual, type Riesgo } from "./ConfirmarContractual";
@@ -57,10 +58,52 @@ export function VistaPreviaContractual({
   /// Codigo de capitulo -> porcentaje tecleado. Solo los que se han tocado.
   const [tocados, setTocados] = useState<Record<string, string>>({});
 
+  /// Que capitulos tienen sus partidas a la vista. Cerrado por defecto: quien
+  /// solo quiere un margen por capitulo ve la pantalla de siempre.
+  const [abiertos, setAbiertos] = useState<Record<string, boolean>>({});
+
   const capitulos = useMemo(
     () => reales.filter((l) => l.tipo === "CAPITULO" && l.codigo),
     [reales],
   );
+
+  /**
+   * Las partidas colgadas de cada capitulo.
+   *
+   * Se agrupa subiendo por `codigoPadre` -la MISMA funcion que usa
+   * `generarContractual` para heredar el recargo- y no por el orden de las
+   * filas. Si la pantalla agrupara de una forma y el calculo heredara de
+   * otra, la pantalla estaria mintiendo justo donde se decide el margen.
+   */
+  const partidasDe = useMemo(() => {
+    const conCodigo = reales.filter(
+      (l): l is LineaReal & { codigo: string } => !!l.codigo,
+    );
+    const codigos = new Set(conCodigo.map((l) => l.codigo));
+    const esCapitulo = new Set(
+      conCodigo.filter((l) => l.tipo === "CAPITULO").map((l) => l.codigo),
+    );
+
+    const grupos = new Map<string, (LineaReal & { codigo: string })[]>();
+    for (const l of conCodigo) {
+      if (l.tipo === "CAPITULO") continue;
+
+      // El capitulo ancestro mas cercano. `vistos` corta cualquier ciclo: un
+      // codigo mal escrito no puede colgar la pantalla.
+      let actual = codigoPadre(l.codigo, codigos);
+      const vistos = new Set<string>();
+      while (actual !== null && !vistos.has(actual) && !esCapitulo.has(actual)) {
+        vistos.add(actual);
+        actual = codigoPadre(actual, codigos);
+      }
+      if (actual === null) continue;
+
+      const suyas = grupos.get(actual) ?? [];
+      suyas.push(l);
+      grupos.set(actual, suyas);
+    }
+    return grupos;
+  }, [reales]);
 
   /**
    * Las lineas con los recargos de ahora mismo.
@@ -79,8 +122,40 @@ export function VistaPreviaContractual({
     [reales, tocados],
   );
 
+  /**
+   * Lo que hay escrito en la casilla de una linea.
+   *
+   * Lo tecleado manda sobre lo guardado, incluso si es cadena vacia: borrar
+   * un recargo es una decision -«que herede»- y tiene que poder hacerse.
+   */
+  const valorDe = (l: LineaReal): string =>
+    l.codigo !== null && l.codigo in tocados
+      ? tocados[l.codigo]!
+      : (l.porcentajeRecargo ?? "");
+
+  const teclear = (codigo: string, valor: string) =>
+    setTocados((t) => ({ ...t, [codigo]: valor }));
+
   const original = useMemo(() => generarContractual(reales), [reales]);
   const resultado = useMemo(() => generarContractual(conAjustes), [conAjustes]);
+
+  /**
+   * Que porcentaje acaba llevando cada linea, y de donde sale.
+   *
+   * No se deduce en la pantalla: se lee del resultado que YA calculo
+   * `generarContractual`. Es lo que permite enseñar en gris lo que una
+   * partida hereda sin arriesgarse a que la pantalla y el calculo discrepen.
+   */
+  const aplicadoPorCodigo = useMemo(
+    () =>
+      new Map(
+        resultado.lineas.map((l) => [
+          l.codigo,
+          { pct: l.porcentajeAplicado, origen: l.codigoDelRecargo },
+        ]),
+      ),
+    [resultado],
+  );
 
   const hayCambios = Object.keys(tocados).length > 0;
 
@@ -250,44 +325,116 @@ export function VistaPreviaContractual({
 
       <section className="space-y-3">
         <div>
-          <h2 className="text-sm font-semibold">Recargo por capítulo</h2>
+          <h2 className="text-sm font-semibold">Recargo por capítulo y partida</h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
             {puedeAjustar
-              ? "Es lo que se le carga al cliente sobre el costo real de cada capítulo. Muévelo y mira cómo cambia la bolsa: nada se guarda hasta que confirmes abajo."
+              ? "Es lo que se le carga al cliente sobre el costo real. Ponlo por capítulo, y abre «Por partida» cuando alguna lleve un margen distinto —una subcontrata ya cerrada no admite el mismo que la mano de obra propia—. Muévelo y mira cómo cambia la bolsa: nada se guarda hasta que confirmes abajo."
               : (motivoNoAjustable ??
                 "Los recargos vienen del Excel del presupuesto meta.")}
           </p>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-2">
           {capitulos.map((c) => {
-            const valor = c.codigo! in tocados
-              ? tocados[c.codigo!]!
-              : (c.porcentajeRecargo ?? "");
+            const codigo = c.codigo!;
+            const suyas = partidasDe.get(codigo) ?? [];
+            const abierto = abiertos[codigo] === true;
+            /// Cuantas de sus partidas llevan uno propio. Se dice SIN abrir:
+            /// si no, un recargo suelto queda escondido detras de un boton y
+            /// el margen del capitulo se lee mal.
+            const propios = suyas.filter((x) => valorDe(x) !== "").length;
+
             return (
-              <label
-                key={c.codigo}
-                className="flex items-center gap-3 rounded-lg border p-3 text-sm"
-              >
-                <span className="min-w-0 flex-1 truncate" title={c.descripcion}>
-                  <span className="font-medium">{c.codigo}</span>{" "}
-                  <span className="text-slate-600">{c.descripcion}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-1">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={valor}
-                    disabled={!puedeAjustar}
-                    onChange={(e) =>
-                      setTocados((t) => ({ ...t, [c.codigo!]: e.target.value }))
-                    }
-                    className="w-20 rounded border px-2 py-1 text-right tabular-nums disabled:bg-slate-100 disabled:text-slate-500"
-                    aria-label={`Recargo del capítulo ${c.codigo}`}
-                  />
-                  <span className="text-slate-500">%</span>
-                </span>
-              </label>
+              <div key={codigo} className="rounded-lg border">
+                <div className="flex items-center gap-3 p-3 text-sm">
+                  <span className="min-w-0 flex-1 truncate" title={c.descripcion}>
+                    <span className="font-medium">{codigo}</span>{" "}
+                    <span className="text-slate-600">{c.descripcion}</span>
+                  </span>
+
+                  {suyas.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAbiertos((a) => ({ ...a, [codigo]: !abierto }))
+                      }
+                      className="shrink-0 rounded border px-2 py-1 text-xs text-slate-600"
+                      aria-expanded={abierto}
+                    >
+                      {abierto ? "Ocultar" : "Por partida"} ({suyas.length})
+                      {propios > 0 && (
+                        <span className="ml-1 font-semibold text-amber-700">
+                          {" · "}
+                          {propios} propio{propios === 1 ? "" : "s"}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  <span className="flex shrink-0 items-center gap-1">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={valorDe(c)}
+                      disabled={!puedeAjustar}
+                      onChange={(e) => teclear(codigo, e.target.value)}
+                      className="w-20 rounded border px-2 py-1 text-right tabular-nums disabled:bg-slate-100 disabled:text-slate-500"
+                      aria-label={`Recargo del capítulo ${codigo}`}
+                    />
+                    <span className="text-slate-500">%</span>
+                  </span>
+                </div>
+
+                {abierto && (
+                  <div className="space-y-1 border-t bg-slate-50 p-3">
+                    {suyas.map((x) => {
+                      const heredado = aplicadoPorCodigo.get(x.codigo);
+                      return (
+                        <label
+                          key={x.codigo}
+                          className="flex items-center gap-3 text-sm"
+                        >
+                          <span
+                            className="min-w-0 flex-1 truncate"
+                            title={x.descripcion}
+                          >
+                            <span className="font-medium">{x.codigo}</span>{" "}
+                            <span className="text-slate-600">{x.descripcion}</span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={valorDe(x)}
+                              disabled={!puedeAjustar}
+                              /* Vacio NO es cero: es «que herede». El
+                                 marcador de posicion enseña en gris lo que se
+                                 le aplicaria sin tocar nada. */
+                              placeholder={
+                                heredado?.origen != null &&
+                                heredado.origen !== x.codigo &&
+                                heredado.pct != null
+                                  ? String(Number(heredado.pct))
+                                  : "—"
+                              }
+                              onChange={(e) => teclear(x.codigo, e.target.value)}
+                              className="w-20 rounded border bg-white px-2 py-1 text-right tabular-nums placeholder:text-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
+                              aria-label={`Recargo de la partida ${x.codigo}`}
+                            />
+                            <span className="text-slate-500">%</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                    <p className="pt-1 text-xs text-slate-500">
+                      En gris, lo que hereda del capítulo. Escribe solo las
+                      que lleven un margen distinto. Un <strong>0</strong>{" "}
+                      significa «esta entra a precio de costo», que no es lo
+                      mismo que dejarla vacía.
+                    </p>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
