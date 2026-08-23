@@ -35,8 +35,16 @@ const FILA_CABECERA = 4;
  * salta. Y como los totales del pie cubren todo el bloque, insertar filas
  * dentro no rompe nada —Excel ajusta el rango solo— y añadir al final
  * tampoco, porque el rango ya llega hasta abajo.
+ *
+ * CUATROCIENTAS, y no las sesenta que hubo hasta el 23 de agosto de 2026.
+ * Sesenta parecian de sobra hasta que se miro un presupuesto de verdad: la
+ * obra CRIOCORD tiene 368 partidas. Quien pasaba de la fila 64 tenia que
+ * anadir filas a mano, y una fila escrita a mano nace SIN formulas —ni el
+ * parcial ni el contractual— asi que el presupuesto salia corto sin que nada
+ * lo dijera. Cuatrocientas filas cuestan 50 KB mas en el archivo; una columna
+ * que no suma cuesta mucho mas.
  */
-const FILAS_PREPARADAS = 60;
+const FILAS_PREPARADAS = 400;
 
 /**
  * El subtotal de una linea de gasto: mensual x meses si es VARIABLE, y su
@@ -372,6 +380,10 @@ const INSTRUCCIONES: readonly (readonly [string, string])[] = [
   [
     "3. Líneas propias de la meta",
     "Puedes añadir costos que el contrato no desglosa: andamio alquilado, cuadrilla de apoyo, encofrado metálico (capítulo 3 del ejemplo). Ponles un código que NO exista en el contrato. Consumen bolsa, que es exactamente lo que hacen en la obra.",
+  ],
+  [
+    "3b. Si te quedas sin filas",
+    "Hay 400 filas listas con sus fórmulas. Si necesitas más, no escribas en una fila nueva: selecciona una fila VACÍA entera (clic en su número), cópiala y pégala donde la necesites. Una fila escrita a mano nace sin fórmulas —el Parcial y el Contractual se quedan en blanco— y el presupuesto sale corto sin que nada lo avise.",
   ],
   [
     "4. Lo que NO pongas se nota",
@@ -762,6 +774,7 @@ export async function generarPlantillaMeta(
     leyenda.value =
       "Las celdas en gris se calculan solas y están bloqueadas. Escribe solo en las blancas. " +
       "Hay " + FILAS_PREPARADAS + " filas listas con sus fórmulas: rellena las que necesites y deja el resto vacías. " +
+      "Si necesitas más, COPIA una fila vacía entera y pégala; escribir en una fila nueva a mano la deja sin fórmulas. " +
       "Las filas SIN Ítem son costos propios de la meta: cuestan, pero no se le facturan al cliente línea a línea. " +
       "Las fechas son opcionales, van en las partidas (01/08/2026) y las dos o ninguna.";
     leyenda.font = { italic: true, size: 10, color: { argb: "FF667788" } };

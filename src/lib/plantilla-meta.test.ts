@@ -147,6 +147,38 @@ describe("la hoja de gastos generales de la plantilla", () => {
   });
 });
 
+describe("cuantas filas vienen listas, y con que", () => {
+  /*
+   * Hasta el 23 de agosto de 2026 eran SESENTA, y parecian de sobra hasta que
+   * se miro un presupuesto de verdad: CRIOCORD tiene 368 partidas. Quien
+   * pasaba de la fila 64 anadia filas a mano, y una fila a mano nace sin
+   * formulas: el Parcial y el Contractual se quedan en blanco y el
+   * presupuesto sale corto sin que nada lo avise.
+   */
+  it("la ultima fila preparada tiene sus dos formulas, igual que la primera", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const hoja = libro.worksheets[0]!;
+
+    // Cabecera en la 4, asi que la ultima preparada es la 404.
+    const ultima = hoja.getRow(404);
+    const parcial = ultima.getCell(6).value as { formula?: string };
+    const contractual = ultima.getCell(8).value as { formula?: string };
+
+    expect(parcial?.formula).toContain("D404*E404");
+    expect(contractual?.formula).toContain("SUMPRODUCT");
+  });
+
+  it("caben las 368 partidas de una obra real, con sitio de sobra", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const hoja = libro.worksheets[0]!;
+
+    const fila368 = hoja.getRow(4 + 368);
+    expect((fila368.getCell(6).value as { formula?: string })?.formula).toBeTruthy();
+  });
+});
+
 describe("las formulas de la plantilla se abren en cualquier programa", () => {
   it("no usan N() sobre un rango: solo Excel la evalua como matriz", async () => {
     /*
