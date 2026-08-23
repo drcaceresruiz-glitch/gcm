@@ -149,6 +149,40 @@ copiadas»**, con clic en el NUMERO de la fila— y avisan de que la hoja se
 desprotege sin contraseña. Una proteccion de la que no se sabe salir deja de ser
 una red y pasa a ser un muro.
 
+### El recargo se pone por partida, no solo por capitulo
+
+El motor YA sabia hacerlo y nadie lo habia notado: `generarContractual`
+resuelve empezando por el codigo de la PROPIA linea y solo sube al padre si esa
+no lo trae (regla 2 de `contractual-desde-meta.ts`). Lo que faltaba era por
+donde pedirlo, y estaba cerrado en los tres sitios: la pantalla solo pintaba
+una casilla por capitulo, `ajustarRecargosDeLaMeta` filtraba `tipo: "CAPITULO"`
+—con un comentario que afirmaba que «el recargo de una partida suelta no
+existe», falso— y en el Excel la celda quedaba bloqueada en las filas de
+partida.
+
+Hace falta porque no todas las partidas se margenan igual: una subcontrata ya
+cerrada no admite el mismo recargo que la mano de obra propia, y un porcentaje
+unico por capitulo obliga a inventarse la media.
+
+Cada capitulo trae un boton **«Por partida (n)»** que despliega sus partidas con
+su casilla. Cerrado por defecto; quien solo quiere margen por capitulo ve la
+pantalla de siempre. Si alguna lleva uno propio, el boton lo dice **sin abrir**:
+un recargo escondido detras de un boton hace que el margen del capitulo se lea
+mal.
+
+**Vacio no es cero**, y la casilla lo enseña: en gris aparece lo que heredaria
+sin tocar nada. `0` es «entra a precio de costo, y lo se»; vacio es «que
+herede». Misma tecla, decisiones opuestas.
+
+Las partidas se agrupan subiendo por `codigoPadre` —la MISMA funcion con la que
+el calculo hereda— y lo gris sale de `porcentajeAplicado` del resultado ya
+calculado. Si la pantalla agrupara de una forma y el calculo heredara de otra,
+mentiria justo donde se decide el margen.
+
+Una linea SIN codigo sigue sin poder recargarse: no hay codigo con el que
+nombrarla. En el Excel su celda se queda gris con la nota que lo explica, para
+que no parezca un descuido.
+
 ### La meta se corrige dentro de la app
 
 `meta-edicion.service`: editar una linea, anadir una partida, quitar la que
