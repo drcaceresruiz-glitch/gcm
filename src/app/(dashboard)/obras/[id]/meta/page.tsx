@@ -17,6 +17,8 @@ import { Mascota } from "@/components/ui/Mascota";
 import { PanelBolsa } from "@/components/meta/PanelBolsa";
 import { TablaBolsa } from "@/components/meta/TablaBolsa";
 import { TablaGastosGenerales } from "@/components/meta/TablaGastosGenerales";
+import { TablaMetaEditable } from "@/components/meta/TablaMetaEditable";
+import { lineasDelBorrador } from "@/services/meta-edicion.service";
 import { FormularioMeta } from "@/components/meta/FormularioMeta";
 import { AccionesMeta } from "@/components/meta/AccionesMeta";
 
@@ -91,11 +93,13 @@ export default async function MetaPage({
   let metas: Awaited<ReturnType<typeof listarMetas>>;
   let comparacion: Awaited<ReturnType<typeof compararConContractual>>;
   let gastos: Awaited<ReturnType<typeof gastosGeneralesDeLaMeta>>;
+  let borrador: Awaited<ReturnType<typeof lineasDelBorrador>>;
   try {
-    [metas, comparacion, gastos] = await Promise.all([
+    [metas, comparacion, gastos, borrador] = await Promise.all([
       listarMetas(sesion, id),
       compararConContractual(sesion, id),
       gastosGeneralesDeLaMeta(sesion, id),
+      lineasDelBorrador(sesion, id),
     ]);
   } catch (e) {
     const detalle = e instanceof Error ? e.message : String(e);
@@ -136,7 +140,7 @@ export default async function MetaPage({
   const puedeCrear = puede(sesion, "meta:crear");
   const puedeAprobar = puede(sesion, "meta:aprobar");
 
-  const borrador = metas.find((m) => !m.aprobada) ?? null;
+  const borradorMeta = metas.find((m) => !m.aprobada) ?? null;
   const mesesSugeridos = mesesEntre(obra.fechaInicio, obra.fechaFinProgramada);
 
   return (
@@ -203,24 +207,36 @@ export default async function MetaPage({
         </section>
       )}
 
-      {borrador && (puedeAprobar || puedeCrear) && (
+      {/* Las lineas del borrador, corregibles. Van ANTES del bloque de
+          aprobar: primero se revisa lo que se va a congelar, y despues se
+          congela. Al reves invita a aprobar y luego mirar. */}
+      {borrador && (
+        <TablaMetaEditable
+          obraId={id}
+          version={borrador.version}
+          lineas={borrador.lineas}
+          puedeEditar={puedeCrear}
+        />
+      )}
+
+      {borradorMeta && (puedeAprobar || puedeCrear) && (
         <section
           className="rounded-xl border p-5"
           style={{ borderColor: "var(--borde)" }}
         >
           <h2 className="text-sm font-semibold">
-            Borrador v{borrador.version} sin congelar
+            Borrador v{borradorMeta.version} sin congelar
           </h2>
           <p className="mt-1 mb-4 max-w-2xl text-sm text-pretty opacity-70">
             Mientras siga en borrador se puede rehacer, pero tampoco gobierna la
             bolsa de la obra: para eso hay que aprobarlo. Costo meta{" "}
-            {soles(borrador.costoTotal)} en {borrador.totalItems} líneas.
+            {soles(borradorMeta.costoTotal)} en {borradorMeta.totalItems} líneas.
           </p>
 
           <AccionesMeta
             obraId={id}
-            metaId={borrador.id}
-            version={borrador.version}
+            metaId={borradorMeta.id}
+            version={borradorMeta.version}
             puedeAprobar={puedeAprobar}
             puedeEliminar={puedeCrear}
           />
