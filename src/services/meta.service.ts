@@ -120,9 +120,38 @@ export interface ComparacionMeta {
   desfase: Desfase;
 }
 
+/**
+ * Por que no hay bolsa, cuando no la hay.
+ *
+ * Va como CODIGO y no solo como frase porque la pantalla tiene que ofrecer un
+ * camino distinto en cada caso, y elegirlo buscando palabras dentro del
+ * mensaje ya salio mal una vez: cuando faltaba el contractual, el texto decia
+ * «linea base» y la pantalla mandaba a Revisiones —que sirve para congelar un
+ * contractual que todavia no existe—. El usuario se quedaba dando vueltas
+ * entre dos pantallas sin poder avanzar.
+ */
+export type MotivoSinBolsa =
+  | "sin-permiso"
+  | "sin-obra"
+  | "sin-meta"
+  /// Hay meta, pero no hay presupuesto contractual contra el que compararla.
+  /// El paso siguiente es GENERARLO, no congelar nada.
+  | "sin-contractual"
+  /**
+   * Se puede ver la meta pero no el presupuesto contractual, que es la otra
+   * mitad de la resta.
+   *
+   * Le pasa hoy a RESIDENTE y a ADMIN_OBRA: tienen `meta:leer` y
+   * `movimiento:crear`, pero no `movimiento:leer`. Hasta que esto se
+   * distinguio, la pantalla se caia con el error crudo de permiso dentro de
+   * una caja roja de «no se pudo calcular la bolsa», que parece una averia y
+   * no una cuestion de permisos.
+   */
+  | "sin-permiso-contractual";
+
 export type ResultadoComparacion =
   | { ok: true; comparacion: ComparacionMeta }
-  | { ok: false; error: string };
+  | { ok: false; motivo: MotivoSinBolsa; error: string };
 
 /**
  * El lado contractual, al nivel que pide el modo.
@@ -196,7 +225,11 @@ export async function compararConContractual(
   obraId: string,
 ): Promise<ResultadoComparacion> {
   if (!puede(sesion, "meta:leer")) {
-    return { ok: false, error: "No tienes permiso para ver el presupuesto meta." };
+    return {
+      ok: false,
+      motivo: "sin-permiso",
+      error: "No tienes permiso para ver el presupuesto meta.",
+    };
   }
 
   const obra = await prisma.project.findFirst({
@@ -208,11 +241,31 @@ export async function compararConContractual(
         metaIncluyeGastosGenerales: true,
       },
   });
-  if (!obra) return { ok: false, error: "Obra no encontrada." };
+  if (!obra) {
+    return { ok: false, motivo: "sin-obra", error: "Obra no encontrada." };
+  }
 
   const meta = await metaQueManda(sesion.companyId, obraId);
   if (!meta) {
-    return { ok: false, error: "Esta obra todavia no tiene presupuesto meta." };
+    return {
+      ok: false,
+      motivo: "sin-meta",
+      error: "Esta obra todavia no tiene presupuesto meta.",
+    };
+  }
+
+  // Se comprueba ANTES de llamar, y no cazando la excepcion: el permiso que
+  // falta es un dato conocido, no un accidente que haya que interceptar por
+  // el texto de su mensaje.
+  if (!puede(sesion, "movimiento:leer")) {
+    return {
+      ok: false,
+      motivo: "sin-permiso-contractual",
+      error:
+        "Puedes ver el presupuesto meta, pero no el contractual, y la bolsa " +
+        "es la diferencia entre los dos. Pidele a un administrador el permiso " +
+        "de lectura de movimientos si necesitas ver la bolsa.",
+    };
   }
 
   let vigente;
@@ -222,9 +275,11 @@ export async function compararConContractual(
     if (e instanceof SinLineaBaseError) {
       return {
         ok: false,
+        motivo: "sin-contractual",
         error:
-          "La obra no tiene linea base aprobada: sin presupuesto contractual " +
-          "no hay contra que comparar la meta.",
+          "Todavia no existe el presupuesto contractual, que es contra lo que " +
+          "se compara la meta. Sale del real inflando cada capitulo: es el " +
+          "paso siguiente, y no hay que teclearlo.",
       };
     }
     throw e;

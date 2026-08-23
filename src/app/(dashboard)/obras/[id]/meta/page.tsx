@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CheckCircle2 } from "lucide-react";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
@@ -173,12 +173,23 @@ export default async function MetaPage({
               {comparacion.error}
             </p>
           </div>
-          {comparacion.error.includes("línea base") && (
+          {/*
+            El camino sale del MOTIVO, no de buscar palabras en el mensaje.
+
+            Antes se enlazaba a Revisiones en cuanto el texto decia «linea
+            base», y ese era justo el caso en que falta el CONTRACTUAL:
+            Revisiones sirve para congelar un contractual que todavia no
+            existe, asi que quien acababa de cargar la meta iba alli, no
+            encontraba nada que hacer, volvia, y le seguian pidiendo lo mismo.
+          */}
+          {comparacion.motivo === "sin-contractual" && (
             <Link
-              href={`/obras/${id}/revisiones`}
-              className="text-sm font-medium underline"
+              href={`/obras/${id}/contractual`}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: "var(--color-marca-600)" }}
             >
-              Ir a revisiones del presupuesto
+              Generar el presupuesto contractual
+              <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
           )}
         </section>
