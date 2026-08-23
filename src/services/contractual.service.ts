@@ -10,7 +10,7 @@ import {
   type LineaReal,
   type ResultadoContractual,
 } from "@/lib/contractual-desde-meta";
-import { multiplicar } from "@/lib/decimal";
+import { multiplicar, sumar } from "@/lib/decimal";
 
 /**
  * Generar el presupuesto contractual a partir del real.
@@ -53,6 +53,18 @@ export interface PreviaContractual {
    * el contractual ya generado.
    */
   gastosGeneralesPrevistos: string;
+  /**
+   * TODO lo que la obra va a costar: costo directo -incluidas las lineas sin
+   * codigo- mas los gastos generales.
+   *
+   * Es lo que hay que cubrir, y no coincide con `resultado.totalReal`: ese
+   * suma solo las lineas CON codigo, que son las unicas que se recargan. La
+   * diferencia entre los dos es exactamente el dinero que la bolsa tiene que
+   * pagar sin que nadie lo haya facturado linea a linea.
+   */
+  costoTotalMeta: string;
+  /// Los costos propios de la meta: lo que cuesta y el contrato no desglosa.
+  costoPropioMeta: string;
 }
 
 export type ResultadoPrevia =
@@ -121,6 +133,13 @@ export async function previsualizarContractual(
       resultado: generarContractual(reales),
       reales,
       gastosGeneralesPrevistos: meta.gastosGenerales.toString(),
+      costoTotalMeta: meta.costoTotal.toString(),
+      costoPropioMeta: sumar(
+        items
+          .filter((i) => i.codigoRef === null)
+          .map((i) => i.parcial?.toString() ?? null)
+          .filter((v): v is string => v !== null),
+      ),
     },
   };
 }

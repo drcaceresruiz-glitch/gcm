@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { generarContractual, type LineaReal } from "./contractual-desde-meta";
+import { restar } from "./decimal";
 
 function cap(codigo: string, recargo: string | null, orden: number): LineaReal {
   return {
@@ -165,5 +166,70 @@ describe("lo que NO se puede recargar se avisa, no se inventa", () => {
     const r = generarContractual([par("1.0.0", 0, { parcial: "50.00" })]);
 
     expect(r.totalContractual).toBe("50.00");
+  });
+});
+
+describe("lo que la bolsa tiene que cubrir", () => {
+  /*
+   * EL CASO REAL, visto en pantalla el 23 de agosto de 2026: real 400,
+   * contractual 440, «bolsa 40»… con 200 de costos propios sin contar. La
+   * obra no ganaba 40, perdia 160.
+   *
+   * `totalReal` suma SOLO las lineas con codigo, que son las unicas que se
+   * recargan. Estas pruebas fijan esa frontera para que quede claro que la
+   * bolsa NO se calcula con ella: se calcula contra el costo total de la
+   * meta, que ademas incluye los gastos generales.
+   */
+  const sinCodigo = (descripcion: string, parcial: string): LineaReal => ({
+    codigo: null,
+    descripcion,
+    tipo: "PARTIDA",
+    nivel: 1,
+    orden: 9,
+    unidad: "glb",
+    metrado: null,
+    precioUnitario: null,
+    parcial,
+    porcentajeRecargo: null,
+    fechaInicio: null,
+    fechaFin: null,
+  });
+
+  const conPropios = () =>
+    generarContractual([
+      cap("1.0", "10.000", 0),
+      par("1.1", 1, { parcial: "400.00" }),
+      sinCodigo("Andamio metálico en alquiler", "150.00"),
+      sinCodigo("Encofrado metálico en alquiler", "50.00"),
+    ]);
+
+  it("el total REAL deja fuera lo que no se recarga, y por eso no es el costo", () => {
+    const r = conPropios();
+
+    expect(r.totalReal).toBe("400.00");
+    expect(r.totalContractual).toBe("440.00");
+    // Esta es la cifra enganosa si se lee como «lo que gana la obra».
+    expect(r.bolsa).toBe("40.00");
+  });
+
+  it("y lo que queda fuera se avisa con su importe, para poder restarlo", () => {
+    const aviso = conPropios().avisos.find((a) => a.motivo === "SIN_CODIGO");
+
+    expect(aviso?.importe).toBe("200.00");
+    // 440 cobrados contra 400 + 200 de costo: la obra pierde 160.
+    expect(restar("440.00", "600.00")).toBe("-160.00");
+  });
+
+  it("el recargo que SI cubriria ese costo es del 50 %, no del 10 %", () => {
+    // Solo se recargan las lineas con codigo, asi que el recargo tiene que
+    // sacar de 400 los 600 que cuesta la obra: 600/400 - 1 = 50 %.
+    const r = generarContractual([
+      cap("1.0", "50.000", 0),
+      par("1.1", 1, { parcial: "400.00" }),
+      sinCodigo("Andamio metálico en alquiler", "150.00"),
+      sinCodigo("Encofrado metálico en alquiler", "50.00"),
+    ]);
+
+    expect(r.totalContractual).toBe("600.00");
   });
 });

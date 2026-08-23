@@ -37,6 +37,8 @@ export function VistaPreviaContractual({
   puedeAjustar,
   motivoNoAjustable,
   gastosGeneralesPrevistos,
+  costoTotalMeta,
+  costoPropioMeta,
 }: {
   obraId: string;
   reales: LineaReal[];
@@ -49,6 +51,10 @@ export function VistaPreviaContractual({
   motivoNoAjustable: string | null;
   /// Lo que la meta preve gastar en estructura. "0.00" si no lo trae.
   gastosGeneralesPrevistos: string;
+  /// TODO lo que la obra va a costar. Es contra esto contra lo que hay bolsa.
+  costoTotalMeta: string;
+  /// Los costos propios de la meta, que el contrato no desglosa.
+  costoPropioMeta: string;
 }) {
   /// Codigo de capitulo -> porcentaje tecleado. Solo los que se han tocado.
   const [tocados, setTocados] = useState<Record<string, string>>({});
@@ -79,19 +85,32 @@ export function VistaPreviaContractual({
   const resultado = useMemo(() => generarContractual(conAjustes), [conAjustes]);
 
   const hayCambios = Object.keys(tocados).length > 0;
-  const cambio = hayCambios && resultado.bolsa !== original.bolsa;
 
   /**
-   * Lo que queda DESPUES de pagar la estructura.
+   * LA BOLSA DE VERDAD: lo que se cobra menos TODO lo que hay que pagar.
    *
-   * La bolsa mide lo que dejan las partidas; el residente, el maestro y las
-   * polizas se pagan igual. Si el recargo no llega para cubrirlos, la obra
-   * pierde dinero aunque todas las partidas cuadren, y ese es justo el
-   * momento -este, antes de confirmar- en el que se puede corregir.
+   * `resultado.bolsa` no sirve como titular, y es facil no darse cuenta:
+   * `totalReal` suma solo las lineas CON codigo, que son las unicas que se
+   * recargan. Quedan fuera dos cosas que se pagan igual —los costos propios
+   * de la meta (un andamio alquilado) y los gastos generales (el residente)—
+   * y con ellas fuera la bolsa sale de mas.
+   *
+   * Visto en una obra real: real 400, contractual 440, bolsa «40»… con 200 de
+   * costos propios sin contar. La obra no ganaba 40, perdia 160.
    */
+  const bolsaReal = restar(resultado.totalContractual, costoTotalMeta) ?? "0.00";
+  const enPerdida = esNegativo(bolsaReal);
+
+  /// La bolsa de ANTES de tocar los recargos, para poder ver el efecto de lo
+  /// que se acaba de mover. Solo se enseña si de verdad cambio.
+  const bolsaAntes = restar(original.totalContractual, costoTotalMeta) ?? "0.00";
+  const cambio = hayCambios && bolsaReal !== bolsaAntes;
+
+  const hayPropios = !esCero(costoPropioMeta);
   const hayGastos = !esCero(gastosGeneralesPrevistos);
-  const queda = restar(resultado.bolsa, gastosGeneralesPrevistos) ?? resultado.bolsa;
-  const noCubre = hayGastos && esNegativo(queda);
+  /// Lo que no se recarga porque no tiene codigo: la parte del costo que solo
+  /// puede salir del recargo de las demas.
+  const haySobrecoste = hayPropios || hayGastos;
 
   /**
    * El recargo UNIFORME mas bajo que cubre toda la estructura.
@@ -107,15 +126,17 @@ export function VistaPreviaContractual({
    * evitar.
    */
   const recargoMinimo = useMemo(() => {
-    if (!hayGastos || !esPositivo(resultado.totalReal)) return null;
-    const proporcion = dividir(gastosGeneralesPrevistos, resultado.totalReal, 6);
+    if (!esPositivo(resultado.totalReal)) return null;
+    // Solo las lineas CON codigo se recargan, asi que el recargo tiene que
+    // sacar de ellas TODO lo que cuesta la obra: r >= costoTotal/recargable - 1.
+    const proporcion = dividir(costoTotalMeta, resultado.totalReal, 6);
     if (proporcion === null) return null;
     const enPorciento = multiplicar(proporcion, "100", 4);
     if (enPorciento === null) return null;
-    const n = Number(enPorciento);
-    if (!Number.isFinite(n)) return null;
+    const n = Number(enPorciento) - 100;
+    if (!Number.isFinite(n) || n <= 0) return null;
     return (Math.ceil(n * 100) / 100).toFixed(2);
-  }, [hayGastos, gastosGeneralesPrevistos, resultado.totalReal]);
+  }, [costoTotalMeta, resultado.totalReal]);
 
   /// Igualar todos los capitulos al minimo. Es un punto de partida, no una
   /// orden: despues se puede subir el de un capitulo y bajar el de otro.
@@ -132,8 +153,19 @@ export function VistaPreviaContractual({
     <div className="space-y-6">
       <section className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-lg border p-4">
-          <p className="text-xs uppercase text-slate-500">Real (lo que cuesta)</p>
-          <p className="text-lg font-semibold">{soles(resultado.totalReal)}</p>
+          <p className="text-xs uppercase text-slate-500">
+            Costo total (lo que hay que pagar)
+          </p>
+          <p className="text-lg font-semibold">{soles(costoTotalMeta)}</p>
+          {/* El desglose, porque la diferencia con «lo recargable» es justo lo
+              que antes desaparecia de la cuenta. */}
+          {haySobrecoste && (
+            <p className="mt-1 text-xs text-slate-600">
+              {soles(resultado.totalReal)} en partidas
+              {hayPropios && <> · {soles(costoPropioMeta)} en costos propios</>}
+              {hayGastos && <> · {soles(gastosGeneralesPrevistos)} en generales</>}
+            </p>
+          )}
         </div>
         <div className="rounded-lg border p-4">
           <p className="text-xs uppercase text-slate-500">
@@ -141,67 +173,67 @@ export function VistaPreviaContractual({
           </p>
           <p className="text-lg font-semibold">{soles(resultado.totalContractual)}</p>
         </div>
-        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4">
-          <p className="text-xs uppercase text-emerald-700">Bolsa operativa</p>
-          <p className="text-lg font-semibold text-emerald-800">
-            {soles(resultado.bolsa)}
+        <div
+          className={`rounded-lg border p-4 ${
+            enPerdida ? "border-red-300 bg-red-50" : "border-emerald-300 bg-emerald-50"
+          }`}
+        >
+          <p
+            className={`text-xs uppercase ${enPerdida ? "text-red-700" : "text-emerald-700"}`}
+          >
+            {enPerdida ? "Pérdida" : "Bolsa operativa"}
+          </p>
+          <p
+            className={`text-lg font-semibold ${
+              enPerdida ? "text-red-800" : "text-emerald-800"
+            }`}
+          >
+            {soles(bolsaReal)}
+          </p>
+          <p className={`mt-1 text-xs ${enPerdida ? "text-red-900" : "text-emerald-900"}`}>
+            {enPerdida
+              ? "Se cobra menos de lo que cuesta."
+              : "Lo que queda después de pagarlo todo."}
           </p>
           {/* Solo cuando de verdad cambia: repetir la cifra de antes cuando es
               la misma es ruido, y aqui el ruido tapa lo unico que importa. */}
           {cambio && (
-            <p className="mt-1 text-xs text-emerald-900">
-              Antes: {soles(original.bolsa)}
+            <p className={`mt-1 text-xs ${enPerdida ? "text-red-900" : "text-emerald-900"}`}>
+              Antes: {soles(bolsaAntes)}
             </p>
           )}
         </div>
       </section>
 
-      {hayGastos && (
+      {/*
+        El aviso, cuando lo que se cobra no llega a lo que cuesta.
+        Va aparte de la tarjeta porque ahi solo cabe la cifra, y lo que hace
+        falta aqui es decir POR QUE y que se puede hacer.
+      */}
+      {enPerdida && (
         <section
           className="rounded-lg border p-4"
-          style={{
-            borderColor: noCubre ? "var(--color-peligro)" : "var(--borde)",
-          }}
+          style={{ borderColor: "var(--color-peligro)" }}
         >
-          <div className="flex flex-wrap items-baseline justify-between gap-3 text-sm">
-            <span className="text-slate-600">
-              Gastos generales previstos en la meta
-            </span>
-            <span className="tabular-nums">− {soles(gastosGeneralesPrevistos)}</span>
-          </div>
-          <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3 border-t pt-2 font-semibold">
-            <span>Queda después de la estructura</span>
-            <span
-              className="tabular-nums"
-              style={noCubre ? { color: "var(--color-peligro)" } : undefined}
-            >
-              {soles(queda)}
-            </span>
-          </div>
+          <p className="text-sm text-pretty" style={{ color: "var(--color-peligro)" }}>
+            <strong>Con estos recargos la obra pierde dinero.</strong> Se cobra{" "}
+            {soles(resultado.totalContractual)} y hay que pagar{" "}
+            {soles(costoTotalMeta)}
+            {haySobrecoste && (
+              <>
+                {" "}
+                —de los que {soles(restar(costoTotalMeta, resultado.totalReal) ?? "0.00")}{" "}
+                no se le factura al cliente linea a linea: los costos propios y
+                los gastos generales salen del recargo del resto—
+              </>
+            )}
+            . Sube el recargo, recorta costo, o asúmelo a sabiendas.
+          </p>
 
-          {noCubre ? (
-            <p
-              className="mt-2 text-sm text-pretty"
-              style={{ color: "var(--color-peligro)" }}
-            >
-              <strong>El recargo no cubre la estructura.</strong> Con estos
-              porcentajes la obra pierde {soles(queda).replace("-", "")} aunque
-              todas las partidas cuadren: el residente, el maestro y las
-              pólizas se pagan igual. Sube el recargo, recorta gastos
-              generales, o asúmelo a sabiendas.
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-slate-600">
-              El recargo cubre los gastos generales y deja esto para la obra.
-            </p>
-          )}
-
-          {/* La cuenta, no el ojo. Si la obra no puede gastar de los gastos
-              generales, el recargo minimo es un dato, no una intuicion. */}
           {recargoMinimo !== null && (
             <div className="mt-3 flex flex-wrap items-center gap-3 border-t pt-3 text-sm">
               <span>
-                Recargo mínimo para cubrir toda la estructura:{" "}
+                Recargo mínimo para cubrirlo todo:{" "}
                 <strong className="tabular-nums">{recargoMinimo} %</strong>
               </span>
               {puedeAjustar && (
