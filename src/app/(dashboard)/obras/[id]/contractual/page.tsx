@@ -48,7 +48,8 @@ export default async function ContractualPage({
     );
   }
 
-  const { metaVersion, metaAprobada, reales } = previa.previa;
+  const { metaVersion, metaAprobada, reales, gastosGeneralesPrevistos } =
+    previa.previa;
 
   // Que se llevaria por delante un reemplazo. Decirlo en numeros, y separando
   // las escritas a mano, es la diferencia entre "se borraran 360 partidas" y
@@ -87,6 +88,7 @@ export default async function ContractualPage({
         puedeGenerar={puede(sesion, "partida:importar")}
         puedeAjustar={puedeAjustar}
         motivoNoAjustable={motivoNoAjustable}
+        gastosGeneralesPrevistos={gastosGeneralesPrevistos}
       />
     </main>
   );

@@ -6,6 +6,7 @@ import {
   generarContractual,
   type LineaReal,
 } from "@/lib/contractual-desde-meta";
+import { esCero, esNegativo, restar } from "@/lib/decimal";
 import { soles } from "@/utils/formato";
 import { ConfirmarContractual, type Riesgo } from "./ConfirmarContractual";
 
@@ -35,6 +36,7 @@ export function VistaPreviaContractual({
   puedeGenerar,
   puedeAjustar,
   motivoNoAjustable,
+  gastosGeneralesPrevistos,
 }: {
   obraId: string;
   reales: LineaReal[];
@@ -45,6 +47,8 @@ export function VistaPreviaContractual({
   /// Por que no se puede tocar, cuando no se puede. Se dice en vez de dejar
   /// unos campos apagados sin explicacion.
   motivoNoAjustable: string | null;
+  /// Lo que la meta preve gastar en estructura. "0.00" si no lo trae.
+  gastosGeneralesPrevistos: string;
 }) {
   /// Codigo de capitulo -> porcentaje tecleado. Solo los que se han tocado.
   const [tocados, setTocados] = useState<Record<string, string>>({});
@@ -77,6 +81,18 @@ export function VistaPreviaContractual({
   const hayCambios = Object.keys(tocados).length > 0;
   const cambio = hayCambios && resultado.bolsa !== original.bolsa;
 
+  /**
+   * Lo que queda DESPUES de pagar la estructura.
+   *
+   * La bolsa mide lo que dejan las partidas; el residente, el maestro y las
+   * polizas se pagan igual. Si el recargo no llega para cubrirlos, la obra
+   * pierde dinero aunque todas las partidas cuadren, y ese es justo el
+   * momento -este, antes de confirmar- en el que se puede corregir.
+   */
+  const hayGastos = !esCero(gastosGeneralesPrevistos);
+  const queda = restar(resultado.bolsa, gastosGeneralesPrevistos) ?? resultado.bolsa;
+  const noCubre = hayGastos && esNegativo(queda);
+
   const partidas = resultado.lineas.filter((l) => l.tipo === "PARTIDA");
 
   return (
@@ -106,6 +122,48 @@ export function VistaPreviaContractual({
           )}
         </div>
       </section>
+
+      {hayGastos && (
+        <section
+          className="rounded-lg border p-4"
+          style={{
+            borderColor: noCubre ? "var(--color-peligro)" : "var(--borde)",
+          }}
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-3 text-sm">
+            <span className="text-slate-600">
+              Gastos generales previstos en la meta
+            </span>
+            <span className="tabular-nums">− {soles(gastosGeneralesPrevistos)}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3 border-t pt-2 font-semibold">
+            <span>Queda después de la estructura</span>
+            <span
+              className="tabular-nums"
+              style={noCubre ? { color: "var(--color-peligro)" } : undefined}
+            >
+              {soles(queda)}
+            </span>
+          </div>
+
+          {noCubre ? (
+            <p
+              className="mt-2 text-sm text-pretty"
+              style={{ color: "var(--color-peligro)" }}
+            >
+              <strong>El recargo no cubre la estructura.</strong> Con estos
+              porcentajes la obra pierde {soles(queda).replace("-", "")} aunque
+              todas las partidas cuadren: el residente, el maestro y las
+              pólizas se pagan igual. Sube el recargo, recorta gastos
+              generales, o asúmelo a sabiendas.
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-slate-600">
+              El recargo cubre los gastos generales y deja esto para la obra.
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="space-y-3">
         <div>

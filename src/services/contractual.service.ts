@@ -43,6 +43,16 @@ export interface PreviaContractual {
    * confirmar se vuelve a calcular en el servidor, desde la base.
    */
   reales: LineaReal[];
+  /**
+   * Los gastos generales que la meta preve, para poder decir AQUI si el
+   * recargo los cubre.
+   *
+   * Es el momento en que se decide el margen, y hasta ahora se decidia a
+   * ciegas: el recargo se elegia mirando solo las partidas, y si no llegaba
+   * para pagar al residente eso no se veia hasta la pantalla de la meta, con
+   * el contractual ya generado.
+   */
+  gastosGeneralesPrevistos: string;
 }
 
 export type ResultadoPrevia =
@@ -110,6 +120,7 @@ export async function previsualizarContractual(
       metaAprobada: meta.aprobadaAt !== null,
       resultado: generarContractual(reales),
       reales,
+      gastosGeneralesPrevistos: meta.gastosGenerales.toString(),
     },
   };
 }
