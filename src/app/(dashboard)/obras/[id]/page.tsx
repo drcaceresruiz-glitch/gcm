@@ -115,7 +115,20 @@ export default async function ObraPage({
 
   return (
     <div className="space-y-6">
-      {puedeImportar && obra.lineaBaseVersion === null && (
+      {/*
+        Solo cuando YA hay partidas.
+
+        Mientras la obra esta vacia, esta misma accion la ofrecen ya el aviso
+        de «siguiente paso» del riel -con su explicacion de los dos tramos- y
+        el bloque vacio de aqui abajo. Los tres a la vez salian como dos
+        botones identicos pegados, uno encima de otro, y el usuario pregunto
+        con razon por que se repetia el mismo boton dos veces.
+
+        Con partidas cargadas el aviso ya se ha movido al paso siguiente, asi
+        que aqui deja de duplicar nada: es la forma de recargar el real
+        mientras el contractual no este congelado.
+      */}
+      {puedeImportar && obra.lineaBaseVersion === null && filas.length > 0 && (
         <div className="flex justify-end">
           <Link
             href={`/obras/${id}/meta`}
