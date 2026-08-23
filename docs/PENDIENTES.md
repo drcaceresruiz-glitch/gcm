@@ -164,11 +164,24 @@ Hace falta porque no todas las partidas se margenan igual: una subcontrata ya
 cerrada no admite el mismo recargo que la mano de obra propia, y un porcentaje
 unico por capitulo obliga a inventarse la media.
 
-Cada capitulo trae un boton **«Por partida (n)»** que despliega sus partidas con
-su casilla. Cerrado por defecto; quien solo quiere margen por capitulo ve la
-pantalla de siempre. Si alguna lleva uno propio, el boton lo dice **sin abrir**:
-un recargo escondido detras de un boton hace que el margen del capitulo se lea
-mal.
+**Se teclea en la fila del detalle.** El primer intento fue un desplegable por
+capitulo encima de la tabla, y el sitio estaba mal: el margen de una partida se
+decide MIRANDO su metrado, su precio y su parcial, y esos numeros estan en la
+fila. Ahora la columna «Recargo» de esa tabla se escribe y el parcial de al lado
+cambia solo. La tarjeta del capitulo se queda para el margen general y avisa de
+cuantas partidas suyas llevan uno propio, para que no quede enterrado.
+
+**Estaba cerrado en TRES sitios, no en dos.** La celda del Excel, el servicio
+que guarda y —el que se me paso— el IMPORTADOR: `analizarExcel` ponia
+`porcentajeRecargo: null` fijo en la rama de partida, asi que un 10 % escrito en
+la fila de la 1.1 desaparecia sin un solo aviso. Abrir dos de tres no sirvio de
+nada porque el dato moria en la tercera. La prueba nueva recorre el camino
+entero —escribir en G6, importar, generar— por eso mismo.
+
+**Vaciar una casilla ya no es un error.** Salia «El recargo de 1.1 no es un
+numero». Vacio significa «que herede» (un `null`); `0` significa «entra a precio
+de costo». Misma tecla, decisiones opuestas, y una de las dos no se podia
+expresar sin recargar la meta desde el Excel.
 
 **Vacio no es cero**, y la casilla lo enseña: en gris aparece lo que heredaria
 sin tocar nada. `0` es «entra a precio de costo, y lo se»; vacio es «que
