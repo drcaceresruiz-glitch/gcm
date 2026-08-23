@@ -67,7 +67,7 @@ export function ConfirmarContractual({
       {recargos && (
         <p className="text-sm text-slate-700">
           Se guardarán también los {Object.keys(recargos).length} recargo(s) que
-          has cambiado, en el presupuesto real.
+          has cambiado, en el presupuesto meta.
         </p>
       )}
 

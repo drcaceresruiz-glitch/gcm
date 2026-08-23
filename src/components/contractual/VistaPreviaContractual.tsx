@@ -226,7 +226,7 @@ export function VistaPreviaContractual({
             {puedeAjustar
               ? "Es lo que se le carga al cliente sobre el costo real de cada capítulo. Muévelo y mira cómo cambia la bolsa: nada se guarda hasta que confirmes abajo."
               : (motivoNoAjustable ??
-                "Los recargos vienen del Excel del presupuesto real.")}
+                "Los recargos vienen del Excel del presupuesto meta.")}
           </p>
         </div>
 

@@ -3,7 +3,129 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 23 de agosto de 2026.
+Ultima revision: 23 de agosto de 2026 (segunda tanda).
+
+## El dinero de la obra, de punta a punta (23 de agosto de 2026)
+
+Veinte commits en una sesion, casi todos nacidos de que el usuario recorrio
+la app en vivo y fue senalando lo que no cuadraba. El hilo conductor: el
+presupuesto meta era el punto ciego del sistema —solo entraba por Excel, no se
+podia corregir, y lo que costaba de verdad la obra no se veia en ningun sitio—.
+
+### El ciclo que impedia avanzar (lo mas grave)
+
+«Subo la meta, me sigue pidiendo lo mismo, es un ciclo y no logro avanzar.» La
+pantalla de la meta elegia a donde mandar al usuario **buscando las palabras
+«linea base» dentro del texto del error**, y ese mensaje aparecia justo cuando
+lo que faltaba era el CONTRACTUAL: ofrecia «Ir a revisiones», que sirve para
+congelar un contractual que todavia no existe. A `/contractual` no enlazaba
+nadie. Ahora `compararConContractual` devuelve un MOTIVO ademas de la frase y
+la pantalla elige el camino con el.
+
+**Leccion, y vale para todo el proyecto**: si una pantalla tiene que decidir
+algo a partir de un error, el servicio devuelve un codigo. Decidir leyendo el
+texto del mensaje es acoplarse a la redaccion.
+
+### Lo que se descubrio mirando la plantilla de Excel
+
+- **El capitulo «3.0 COSTOS PROPIOS DE LA META» llevaba codigo**, y con codigo
+  entraba al contractual recargado y de ahi al arbol de partidas, desde donde
+  se puede mapear en el cronograma. Un andamio alquilado no es una tarea. El
+  modelo llevaba desde el principio preparado para esto (`codigoRef` nulo) y el
+  generador ya las dejaba fuera avisando; lo que faltaba era la puerta de
+  entrada: **el importador descartaba en silencio toda fila sin codigo**.
+- **Las formulas salian a 0,00 fuera de Excel.** Usaban `N(rango)` dentro de un
+  SUMPRODUCT, que solo Excel evalua como matriz; Google Sheets y LibreOffice la
+  colapsan. Cambiado a `IF(ISNUMBER(rango),rango,0)`, con una prueba que
+  prohibe que vuelva.
+- **Una fecha escrita como TEXTO se perdia sin decir nada.** Ahora se aceptan
+  `01/08/2026`, `1-8-2026`, `15.8.2026` y `2026-08-01`, y lo ilegible da error
+  con su fila. Se rechazan a proposito el ano de dos cifras y el 31 de febrero.
+- **El precio del contractual salia con cuatro decimales** y el parcial se
+  calculaba con ellos, asi que metrado x precio no daba el parcial impreso.
+  Ahora el redondeo ocurre ANTES de multiplicar.
+
+### Los gastos generales vuelven, y con la cifra que faltaba
+
+Salieron de la meta el 21/08 con el argumento de que «los reconoce el contrato
+y los gestiona la empresa». Cierto de cara al CLIENTE —el contrato los reconoce
+englobados— pero no de cara a la empresa: el residente se paga igual.
+
+El modelo y el servicio nunca se tocaron; solo se habia quitado la hoja de la
+plantilla y se rechazaba su carga. Vuelven las dos cosas, **se guarda ademas el
+DESGLOSE** (la tabla `GastoGeneralMeta` llevaba desde el principio sin que nadie
+escribiera en ella) y aparece la **BOLSA NETA**: la de produccion mide el margen
+de las partidas, y esta descuenta la estructura. En rojo cuando se la come.
+
+### El margen se decide viendo, no a ojo
+
+- Los **recargos se mueven en la vista previa** y las tres cifras se recalculan
+  al teclear, con la MISMA `generarContractual` que corre en el servidor —no
+  hay formula «de pantalla»—. Al confirmar viajan los PORCENTAJES, nunca los
+  importes: se guardan en la meta y el dinero se recalcula desde la base.
+- La vista previa dice si el recargo **cubre los gastos generales**, y cuanto
+  se pierde si no.
+- Y propone el **recargo minimo** que los cubre (`r >= gastos / costo`),
+  aplicable a todos los capitulos de un clic. Redondeado hacia arriba.
+
+### La meta se corrige dentro de la app
+
+`meta-edicion.service`: editar una linea, anadir una partida, quitar la que
+sobre. Tres reglas con prueba: el importe se CALCULA en el servidor (no se
+acepta el del formulario), una meta APROBADA no se toca, y el id de la linea se
+ata a esta meta antes de escribir.
+
+### Los tres presupuestos en papel
+
+Contractual (para el cliente, sin una cifra de costo), meta (interno) y la
+comparativa. Los dos internos van rotulados en rojo. **Del correo solo sale el
+contractual, y no es un parametro**: no hay desplegable y el servicio no acepta
+otro. Se extrajo el PINTOR de dentro del informe (`pdf-pintor.service`) para no
+tener dos paletas; el informe quedo en 249 lineas de las 390 que tenia, sin
+cambiar su salida.
+
+### El informe al corte, rediseñado
+
+Cuatro hojas nuevas sobre las plantillas que se rescataron (ver la seccion de
+arriba): resumen con anillo de avance, cronograma con Gantt y linea de corte,
+bitacora fotografica —las fotos de evidencia no salian en ningun documento— y
+control economico con Last Planner. `ElementoPdf` gano arcos, rectangulos con
+color, imagenes y una paleta de TINTAS por su papel.
+
+### Arrancar la obra
+
+La regla existia pero el servicio pasaba `tieneCronograma: true` y
+`tieneLineaBase: true` A MANO, «porque la pantalla ya avisa» —y no avisaba—.
+Ahora se comprueban, se enseña lo que falta y hay que confirmarlo. Sin partidas
+sigue bloqueado, sin casilla que valga.
+
+### Un nombre, no tres
+
+El menu decia «Meta», el boton «presupuesto real» y la pantalla «Presupuesto
+meta»: tres nombres para el mismo documento, y el usuario pregunto literalmente
+«¿que es?». **Elegido por el: presupuesto META**, y unificado en todo lo que se
+ve —los dos botones, el paso siguiente del riel, la vista previa del
+contractual, los mensajes de error del servicio, la plantilla de Excel y los
+cuatro sitios del manual—. El riel sigue diciendo «Meta» a secas porque es una
+columna estrecha, pero ya no hay ningun «presupuesto real» en pantalla.
+
+Ojo al tocar esto: `grep "presupuesto real"` da muchos resultados que NO son el
+documento —comentarios donde significa «el presupuesto de una obra de verdad»,
+como los casos aprendidos de CRIOCORD—. Se cambio solo lo visible.
+
+### SIN CERRAR
+
+- **Ningun PDF se ha visto impreso.** Esta maquina no rasteriza PDF (sin
+  `pdftoppm` ni ImageMagick). Las pruebas afirman que nada se sale del papel,
+  pero la comparativa lleva una columna mas y es donde menos margen hay.
+- **Los cuatro datos `data-manual`** (RUC, colegiatura CAP del residente,
+  direccion, «PROGRAMACION EP»): el usuario pidio anadirlos al modelo y no se
+  ha hecho.
+- **Todo el codigo de las PLANTILLAS del informe** sigue sin empezar mas alla
+  de las cuatro hojas citadas: elegir plantilla por empresa con override por
+  obra, y apagar secciones una a una. Los dos estan decididos, no construidos.
+
+---
 
 ## Plantillas del informe de obra (23 de agosto de 2026) — DISENO LISTO, CODIGO SIN EMPEZAR
 

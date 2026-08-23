@@ -146,8 +146,8 @@ export function siguientePaso(
         gravedad: "sugerencia",
         titulo: "Esta obra todavía no tiene presupuesto",
         consecuencia:
-          "Son dos pasos: primero entra el presupuesto real con la plantilla, y de él se genera el contractual.",
-        accion: "Cargar el presupuesto real",
+          "Son dos pasos: primero entra el presupuesto meta con la plantilla, y de él se genera el contractual.",
+        accion: "Cargar el presupuesto meta",
         camino: "/meta",
         despues: { accion: "Generar el contractual", camino: "/contractual" },
       };

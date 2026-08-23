@@ -150,8 +150,8 @@ export default async function MetaPage({
           Presupuesto meta
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-pretty opacity-70">
-          Aquí entra el presupuesto <strong>real</strong>: lo que la empresa
-          se compromete a gastar. Es el primer paso, y de él se genera después
+          Aquí entra el presupuesto <strong>meta</strong>: lo que a la empresa
+          le cuesta construir la obra, y lo que se compromete a no superar. Es el primer paso, y de él se genera después
           el contractual inflando cada capítulo. Cuando existen los dos, la
           diferencia es la <strong>bolsa</strong>: lo que la obra puede
           gestionar. La utilidad se muestra aparte, porque es el resultado

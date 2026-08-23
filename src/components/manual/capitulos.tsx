@@ -307,7 +307,7 @@ const PRESUPUESTO = (
     <S titulo="El contractual sale del real, no al revés">
       <p>
         Desde agosto de 2026 el orden es este: primero entra el{" "}
-        <strong>presupuesto real</strong> —lo que de verdad cuesta ejecutar
+        <strong>presupuesto meta</strong> —lo que de verdad cuesta ejecutar
         la obra— y de él se <strong>genera</strong> el contractual, inflando
         cada capítulo por un porcentaje de recargo. Antes se hacía al revés,
         y obligaba a tener un contractual aprobado para poder empezar.
@@ -340,7 +340,7 @@ const PRESUPUESTO = (
             <strong>Crear la obra</strong> con sus fechas y datos de ficha.
           </>,
           <>
-            <strong>Cargar el presupuesto real</strong> en Meta, con su
+            <strong>Cargar el presupuesto meta</strong>, con su
             plantilla oficial. En esa misma hoja va el{" "}
             <strong>% de recargo</strong> de cada capítulo.
           </>,
@@ -747,7 +747,7 @@ const META = (
       <Recorrido
         pasos={[
           <>
-            <strong>Cargar el presupuesto real</strong> con la plantilla
+            <strong>Cargar el presupuesto meta</strong> con la plantilla
             oficial, y revisar los totales: costo directo, gastos generales y
             plazo en meses. Es el PRIMER paso de la obra: ya no hace falta
             tener un contractual aprobado antes, porque el contractual sale
@@ -2673,7 +2673,7 @@ export const CAPITULOS: CapituloManual[] = [
     pregunta: "cuánto queremos gastar",
     paraQuien: "Gerencia y residencia.",
     resumen:
-      "El presupuesto real y el contractual que sale de él: la bolsa " +
+      "El presupuesto meta y el contractual que sale de él: la bolsa " +
       "operativa, por qué los gastos generales no son de la obra y por qué la meta sí " +
       "se puede re-fijar.",
     contenido: META,

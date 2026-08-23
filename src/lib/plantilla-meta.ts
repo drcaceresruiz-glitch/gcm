@@ -465,7 +465,7 @@ export async function generarPlantillaMeta(
   // hace falta, y la hoja de instrucciones se lee una vez y se olvida.
   costo.getCell(`G${FILA_CABECERA}`).note =
     "Solo en los capítulos. Escribe 15 para 15%: cuánto se recarga este " +
-    "capítulo del presupuesto real para llegar al contractual.";
+    "capítulo del presupuesto meta para llegar al contractual.";
   costo.getCell(`H${FILA_CABECERA}`).note =
     "Se calcula solo: el subtotal real del capítulo más su recargo. " +
     "La suma de esta columna es el presupuesto contractual.";

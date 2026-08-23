@@ -42,7 +42,7 @@ export default async function ContractualPage({
           {previa.error}
         </p>
         <Link href={`/obras/${id}/meta`} className="mt-4 inline-block underline">
-          Ir al presupuesto real
+          Ir al presupuesto meta
         </Link>
       </main>
     );
@@ -65,9 +65,9 @@ export default async function ContractualPage({
    */
   const puedeAjustar = puede(sesion, "meta:crear") && !metaAprobada;
   const motivoNoAjustable = metaAprobada
-    ? `El presupuesto real v${metaVersion} está aprobado y congelado: su margen ya no se retoca. Para cambiarlo se carga una versión nueva.`
+    ? `El presupuesto meta v${metaVersion} está aprobado y congelado: su margen ya no se retoca. Para cambiarlo se carga una versión nueva.`
     : !puede(sesion, "meta:crear")
-      ? "No tienes permiso para cambiar el presupuesto real, así que los recargos se muestran como están."
+      ? "No tienes permiso para cambiar el presupuesto meta, así que los recargos se muestran como están."
       : null;
 
   return (
@@ -75,7 +75,7 @@ export default async function ContractualPage({
       <div>
         <h1 className="text-xl font-semibold">Generar presupuesto contractual</h1>
         <p className="text-sm text-slate-600">
-          Sale del presupuesto real v{metaVersion}
+          Sale del presupuesto meta v{metaVersion}
           {metaAprobada ? " (aprobado)" : " (aun sin aprobar)"}, recargando cada
           capitulo. Todavia no se ha guardado nada.
         </p>

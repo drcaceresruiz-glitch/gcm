@@ -137,7 +137,7 @@ export default async function ObraPage({
             style={{ backgroundColor: "var(--color-marca-600)" }}
           >
             <FileSpreadsheet className="size-4" aria-hidden="true" />
-            Cargar el presupuesto real
+            Cargar el presupuesto meta
           </Link>
         </div>
       )}

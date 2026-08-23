@@ -156,7 +156,7 @@ const PASOS: readonly Definicion[] = [
     accion: "Abrir las obras",
     camino: "/obras",
     plantilla: {
-      titulo: "Plantilla del presupuesto real",
+      titulo: "Plantilla del presupuesto meta",
       href: "/plantilla-meta",
     },
   },

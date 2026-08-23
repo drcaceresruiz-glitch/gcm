@@ -72,7 +72,7 @@ export async function previsualizarContractual(
   obraId: string,
 ): Promise<ResultadoPrevia> {
   if (!puede(sesion, "meta:leer")) {
-    return { ok: false, error: "No tienes permiso para ver el presupuesto real." };
+    return { ok: false, error: "No tienes permiso para ver el presupuesto meta." };
   }
 
   const obra = await prisma.project.findFirst({
@@ -86,7 +86,7 @@ export async function previsualizarContractual(
     return {
       ok: false,
       error:
-        "Esta obra todavia no tiene presupuesto real. Cargalo primero: el " +
+        "Esta obra todavia no tiene presupuesto meta. Cargalo primero: el " +
         "contractual sale de el.",
     };
   }
