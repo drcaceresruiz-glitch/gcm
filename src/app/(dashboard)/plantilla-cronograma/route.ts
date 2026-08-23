@@ -1,6 +1,8 @@
 import { obtenerSesion } from "@/services/sesion.service";
 import { puede } from "@/lib/rbac";
 import { generarPlantillaCronograma } from "@/lib/plantilla-cronograma";
+import { nombreDeArchivo } from "@/lib/nombre-archivo";
+import { obtenerEmpresa } from "@/services/empresa.service";
 
 /**
  * Descarga de la plantilla del cronograma.
@@ -23,12 +25,21 @@ export async function GET() {
 
   const buffer = await generarPlantillaCronograma();
 
+  // Esta es la plantilla EN BLANCO, no la de una obra concreta -esa sale de
+  // `/obras/[id]/cronograma/plantilla`, ya con su EDT dentro-. Se nombra por
+  // la empresa porque no pertenece a ninguna obra.
+  const empresa = await obtenerEmpresa(sesion);
+  const nombre = nombreDeArchivo({
+    ambito: empresa?.razonSocial ?? "plantilla",
+    documento: "cronograma-en-blanco",
+    extension: "xlsx",
+  });
+
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition":
-        'attachment; filename="plantilla-cronograma-gcm.xlsx"',
+      "Content-Disposition": `attachment; filename="${nombre}"`,
       "Cache-Control": "no-store",
     },
   });

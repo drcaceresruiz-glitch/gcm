@@ -298,10 +298,26 @@ describe("filasDelInformeCsv - curva S", () => {
 });
 
 describe("nombreArchivoInformeCsv", () => {
+  /*
+   * Desde el 23 de agosto de 2026 la forma la pone `lib/nombre-archivo`, que
+   * es la MISMA para todo lo que GCM deja descargar: sistema, obra, documento
+   * y fecha. Antes cada descarga inventaba la suya y tres de ellas salian con
+   * un nombre fijo, sin obra: bajarlas para tres obras daba «(1)», «(2)» y
+   * «(3)». Lo que se prueba aqui es lo propio del informe -que su fecha es la
+   * del CORTE, no la del dia en que se descarga-.
+   */
   it("quita tildes y espacios: el nombre viaja en una cabecera HTTP", () => {
     expect(nombreArchivoInformeCsv("Ampliación Clínica", dia("2026-08-08"))).toBe(
-      "informe-ampliacion-clinica-2026-08-08.csv",
+      "GCM_ampliacion-clinica_informe_2026-08-08.csv",
     );
+  });
+
+  it("lleva la FECHA DEL CORTE, no la de hoy", () => {
+    // Un informe al 08/08 descargado en septiembre sigue siendo el del 08/08.
+    // Con la fecha de descarga, dos cortes distintos bajados el mismo dia se
+    // pisarian el nombre.
+    const n = nombreArchivoInformeCsv("Obra", dia("2026-08-08"));
+    expect(n).toContain("2026-08-08");
   });
 
   it("fecha en ISO, para que la carpeta ordene por nombre y salga en orden", () => {
@@ -312,13 +328,13 @@ describe("nombreArchivoInformeCsv", () => {
 
   it("aguanta un nombre que no deja ni una letra utilizable", () => {
     expect(nombreArchivoInformeCsv("///", dia("2026-08-08"))).toBe(
-      "informe-obra-2026-08-08.csv",
+      "GCM_sin-nombre_informe_2026-08-08.csv",
     );
   });
 
   it("recorta los nombres largos sin dejar un guion colgando", () => {
     const nombre = nombreArchivoInformeCsv("A".repeat(80), dia("2026-08-08"));
-    expect(nombre.endsWith("-2026-08-08.csv")).toBe(true);
+    expect(nombre.endsWith("_2026-08-08.csv")).toBe(true);
     expect(nombre).not.toContain("--");
   });
 });

@@ -4,6 +4,7 @@ import { PDFDocument } from "pdf-lib";
 import { esCero, sumar } from "@/lib/decimal";
 import { cifrasDeLaMeta } from "@/lib/costo-meta";
 import { soles } from "@/utils/formato";
+import { nombreDeArchivo } from "@/lib/nombre-archivo";
 import {
   A4_VERTICAL,
   bolsaDeLinea,
@@ -185,12 +186,20 @@ export async function generarPresupuestoPdf(
       `${aWinAnsi(obra.nombreObra)}${marca ? ` · ${marca}` : ""} · Página ${indice + 1} de ${total}`,
   );
 
-  const nombre = `${documento}-${obra.nombreObra}`
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-
-  return { ok: true, bytes: await pdf.save(), nombre: `${nombre}.pdf` };
+  return {
+    ok: true,
+    bytes: await pdf.save(),
+    // La obra PRIMERO y el documento despues: al ordenar la carpeta por
+    // nombre quedan juntos los papeles de una misma obra, que es como se
+    // buscan. Al reves quedarian juntos todos los contractuales de obras
+    // distintas, que no le sirve a nadie.
+    nombre: nombreDeArchivo({
+      ambito: obra.nombreObra,
+      documento,
+      fecha: new Date(),
+      extension: "pdf",
+    }),
+  };
 }
 
 type Comun = Pick<

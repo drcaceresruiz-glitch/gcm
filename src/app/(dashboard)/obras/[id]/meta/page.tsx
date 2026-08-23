@@ -348,7 +348,7 @@ export default async function MetaPage({
               importador no puede ver.
             </p>
             <a
-              href={`/plantilla-meta?meses=${mesesSugeridos}`}
+              href={`/plantilla-meta?meses=${mesesSugeridos}&obra=${id}`}
               className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-white"
               style={{ backgroundColor: "var(--color-marca-600)" }}
             >

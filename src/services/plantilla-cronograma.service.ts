@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { nombreDeArchivo } from "@/lib/nombre-archivo";
 import { puede } from "@/lib/rbac";
 import { alcanzaObra } from "@/lib/alcance-obras";
 import { hoy as hoyCalendario } from "@/utils/fechas";
@@ -181,9 +182,15 @@ export async function plantillaCronogramaDeObra(
   return {
     ok: true,
     contenido,
-    // `codigoObra` es opcional: sin el, el nombre cae al identificador, que
-    // siempre existe. Un archivo llamado "cronograma-null.xlsx" seria peor.
-    nombreArchivo: `cronograma-${base.obra.codigoObra ?? obraId}.xlsx`,
+    // El NOMBRE de la obra, no su codigo: el codigo es opcional y, cuando
+    // falta, el nombre caia al identificador interno -«cronograma-cmt61ef02
+    // .xlsx»-, que no le dice nada a nadie en el explorador de archivos.
+    nombreArchivo: nombreDeArchivo({
+      ambito: base.obra.nombreObra,
+      documento: "cronograma",
+      fecha: new Date(),
+      extension: "xlsx",
+    }),
   };
 }
 
@@ -211,6 +218,11 @@ export async function cronogramaXmlDeObra(
   return {
     ok: true,
     contenido,
-    nombreArchivo: `cronograma-${base.obra.codigoObra ?? obraId}.xml`,
+    nombreArchivo: nombreDeArchivo({
+      ambito: base.obra.nombreObra,
+      documento: "cronograma-project",
+      fecha: new Date(),
+      extension: "xml",
+    }),
   };
 }

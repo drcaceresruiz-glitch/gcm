@@ -3,6 +3,7 @@ import "server-only";
 import { ZipArchive } from "archiver";
 
 import { prisma } from "@/lib/prisma";
+import { nombreDeArchivo } from "@/lib/nombre-archivo";
 import { puede } from "@/lib/rbac";
 import { env } from "@/lib/env";
 import { generarCsv } from "@/lib/csv";
@@ -248,12 +249,24 @@ export async function generarRespaldoDeObra(
 
   void zip.finalize();
 
-  const marca = new Date().toISOString().slice(0, 10);
-  const nombre = obra.correlativo ?? obra.id.slice(0, 8);
-
+  /*
+   * El nombre lleva el correlativo Y la obra.
+   *
+   * Solo con el correlativo -«OB-000001-respaldo-...»- hay que abrir el
+   * archivo o consultar GCM para saber de que obra es, y un respaldo se
+   * guarda justo para el dia en que GCM no esta a mano.
+   */
   return {
     ok: true,
-    respaldo: { archivo: zip, nombreArchivo: `${nombre}-respaldo-${marca}.zip` },
+    respaldo: {
+      archivo: zip,
+      nombreArchivo: nombreDeArchivo({
+        ambito: `${obra.correlativo ?? obra.id.slice(0, 8)} ${obra.nombreObra}`,
+        documento: "respaldo",
+        fecha: new Date(),
+        extension: "zip",
+      }),
+    },
   };
 }
 

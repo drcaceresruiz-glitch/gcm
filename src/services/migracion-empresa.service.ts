@@ -3,6 +3,7 @@ import "server-only";
 import { ZipArchive } from "archiver";
 
 import { prisma } from "@/lib/prisma";
+import { nombreDeArchivo } from "@/lib/nombre-archivo";
 import { puede } from "@/lib/rbac";
 import { generarCsv } from "@/lib/csv";
 import { adjuntarArchivos } from "@/lib/respaldo-archivos";
@@ -245,14 +246,20 @@ export async function exportarEmpresa(
 
   void zip.finalize();
 
-  const marca = new Date().toISOString().slice(0, 10);
   const nombre = (empresa.ruc ?? empresa.id.slice(0, 8)).replace(/\W/g, "");
 
   return {
     ok: true,
     migracion: {
       archivo: zip,
-      nombreArchivo: `${nombre}-migracion-${marca}.zip`,
+      // El RUC y no la razon social: este archivo viaja entre instalaciones
+      // y tiene que identificar a la constructora sin ambiguedad.
+      nombreArchivo: nombreDeArchivo({
+        ambito: nombre,
+        documento: "migracion",
+        fecha: new Date(),
+        extension: "zip",
+      }),
     },
   };
 }

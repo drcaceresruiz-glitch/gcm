@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { obtenerSesion } from "@/services/sesion.service";
+import { nombreDeArchivo } from "@/lib/nombre-archivo";
 import { obtenerPropuesta } from "@/services/propuesta.service";
 import {
   aplicarDetalle,
@@ -121,12 +122,14 @@ export async function POST(
     texto(datos, "observaciones"),
   );
 
-  const nombre =
-    "propuesta-" +
-    archivo(propuesta.obra.nombreObra) +
-    "-rev" +
-    String(propuesta.revision.version) +
-    ".xlsx";
+  // La revision va en el documento: de una misma obra salen varias propuestas
+  // y lo que las distingue es su numero, no la fecha en que se descargaron.
+  const nombre = nombreDeArchivo({
+    ambito: propuesta.obra.nombreObra,
+    documento: `propuesta-rev${propuesta.revision.version}`,
+    fecha: new Date(),
+    extension: "xlsx",
+  });
 
   return new Response(new Uint8Array(buffer), {
     headers: {
@@ -138,20 +141,6 @@ export async function POST(
   });
 }
 
-/// Nombre de archivo en ASCII: una cabecera Content-Disposition con tildes
-/// llega rota a algunos navegadores.
-function archivo(nombre: string): string {
-  const limpio = nombre
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+/, "")
-    .replace(/-+$/, "")
-    .toLowerCase()
-    .slice(0, 40);
-
-  return limpio === "" ? "obra" : limpio;
-}
 
 type Propuesta = NonNullable<Awaited<ReturnType<typeof obtenerPropuesta>>>;
 type Cascada = ReturnType<typeof calcularCascadaComercial>;

@@ -1,6 +1,8 @@
 import { obtenerSesion } from "@/services/sesion.service";
 import { puede } from "@/lib/rbac";
 import { generarPlantillaProveedores } from "@/services/proveedores-excel.service";
+import { nombreDeArchivo } from "@/lib/nombre-archivo";
+import { obtenerEmpresa } from "@/services/empresa.service";
 
 /**
  * La plantilla del catalogo, en blanco.
@@ -23,11 +25,19 @@ export async function GET() {
 
   const libro = await generarPlantillaProveedores();
 
+  // El catalogo es de la EMPRESA, no de una obra: se nombra por ella.
+  const empresa = await obtenerEmpresa(sesion);
+  const nombre = nombreDeArchivo({
+    ambito: empresa?.razonSocial ?? "plantilla",
+    documento: "proveedores",
+    extension: "xlsx",
+  });
+
   return new Response(libro, {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": 'attachment; filename="proveedores-gcm.xlsx"',
+      "Content-Disposition": `attachment; filename="${nombre}"`,
       "Cache-Control": "no-store",
     },
   });

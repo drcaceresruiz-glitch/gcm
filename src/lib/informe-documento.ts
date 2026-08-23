@@ -1,4 +1,5 @@
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
+import { nombreDeArchivo } from "@/lib/nombre-archivo";
 import type { CeldaCsv } from "./csv";
 import {
   capitulosDelInforme,
@@ -480,10 +481,6 @@ function curva(c: CurvaCsv): SeccionInforme {
   };
 }
 
-/// Mas largo que esto el nombre no aporta y empieza a estorbar en el
-/// explorador de archivos.
-const MAX_NOMBRE_OBRA = 40;
-
 /**
  * Como se llama el archivo que se descarga o se adjunta.
  *
@@ -502,19 +499,14 @@ export function nombreArchivoInforme(
   fechaCorte: Date,
   extension: string,
 ): string {
-  const limpio = obra
-    .normalize("NFD")
-    // Las marcas que NFD acaba de separar de su letra. Se nombran por su
-    // categoria Unicode y no por un rango de caracteres literales: esos son
-    // invisibles en el codigo y el primer editor que toque el archivo puede
-    // llevarselos sin que nadie lo note.
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, MAX_NOMBRE_OBRA)
-    .replace(/-+$/, "");
-
-  const iso = fechaCorte.toISOString().slice(0, 10);
-  return `informe-${limpio === "" ? "obra" : limpio}-${iso}.${extension}`;
+  // La forma y el limpiado los pone `nombreDeArchivo`, que es el unico sitio
+  // donde se decide como se llama lo que GCM deja descargar. Este envoltorio
+  // se queda porque el informe tiene una particularidad: su fecha es la del
+  // CORTE, no la del dia en que se descarga.
+  return nombreDeArchivo({
+    ambito: obra,
+    documento: "informe",
+    fecha: fechaCorte,
+    extension,
+  });
 }
