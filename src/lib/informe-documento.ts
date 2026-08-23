@@ -5,6 +5,7 @@ import {
   type AlertaAtraso,
   type Capitulo,
   type PartidaActiva,
+  type TareaControlada,
 } from "./control-avance";
 import { ETIQUETA_CNC, type FilaPareto, type PuntoPpc } from "./plan-semanal";
 import type { PuntoDiario } from "./curva-s";
@@ -81,6 +82,14 @@ export interface DatosCsvInforme {
   periodo: PeriodoCsv;
   curva: CurvaCsv;
   capitulos: readonly Capitulo[];
+  /**
+   * El cronograma entero, para quien sepa DIBUJARLO.
+   *
+   * Mismo criterio que el `grafico` de una seccion: la hoja de calculo lo
+   * ignora —alli las tablas por capitulo ya son el dato— y el PDF lo usa para
+   * la hoja del Gantt. Opcional porque el informe se compone igual sin el.
+   */
+  tareas?: readonly TareaControlada[];
   alertas: readonly AlertaAtraso[];
   activas: readonly PartidaActiva[];
   lastPlanner: LastPlannerCsv | null;

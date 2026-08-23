@@ -50,6 +50,26 @@ const datos = (parcial: Partial<DatosBitacora> = {}): DatosBitacora => ({
 const textos = (elementos: readonly ElementoPdf[]) =>
   elementos.filter((e) => e.tipo === "texto").map((e) => e.texto);
 
+/// El rectangulo que ocupa un elemento en la hoja.
+const caja = (e: ElementoPdf) => {
+  if (e.tipo === "linea" || e.tipo === "trazo") {
+    return {
+      izquierda: Math.min(e.x1, e.x2),
+      derecha: Math.max(e.x1, e.x2),
+      abajo: Math.min(e.y1, e.y2),
+      arriba: Math.max(e.y1, e.y2),
+    };
+  }
+  if (e.tipo === "arco") {
+    const r = e.radio + e.grosor / 2;
+    return { izquierda: e.cx - r, derecha: e.cx + r, abajo: e.cy - r, arriba: e.cy + r };
+  }
+  if (e.tipo === "fondo" || e.tipo === "imagen") {
+    return { izquierda: e.x, derecha: e.x + e.ancho, abajo: e.y, arriba: e.y + e.alto };
+  }
+  return { izquierda: e.x, derecha: e.x, abajo: e.y, arriba: e.y + e.tam };
+};
+
 const imagenes = (elementos: readonly ElementoPdf[]) =>
   elementos.filter((e) => e.tipo === "imagen");
 
@@ -209,30 +229,11 @@ describe("hojasBitacora", () => {
     )[0]!.elementos;
 
     for (const e of el) {
-      const izquierda = e.tipo === "linea" || e.tipo === "trazo" ? Math.min(e.x1, e.x2) : e.tipo === "arco" ? e.cx - e.radio : e.x;
-      const derecha =
-        e.tipo === "linea" || e.tipo === "trazo"
-          ? Math.max(e.x1, e.x2)
-          : e.tipo === "arco"
-            ? e.cx + e.radio
-            : e.tipo === "fondo" || e.tipo === "imagen"
-              ? e.x + e.ancho
-              : e.x;
-      const abajo = e.tipo === "linea" || e.tipo === "trazo" ? Math.min(e.y1, e.y2) : e.tipo === "arco" ? e.cy - e.radio : e.y;
-      const arriba =
-        e.tipo === "linea" || e.tipo === "trazo"
-          ? Math.max(e.y1, e.y2)
-          : e.tipo === "arco"
-            ? e.cy + e.radio
-            : e.tipo === "fondo" || e.tipo === "imagen"
-              ? e.y + e.alto
-              : e.tipo === "texto"
-                ? e.y + e.tam
-                : e.y;
-      expect(izquierda).toBeGreaterThanOrEqual(0);
-      expect(derecha).toBeLessThanOrEqual(A4_APAISADO.ancho);
-      expect(abajo).toBeGreaterThanOrEqual(0);
-      expect(arriba).toBeLessThanOrEqual(A4_APAISADO.alto);
+      const c = caja(e);
+      expect(c.izquierda).toBeGreaterThanOrEqual(0);
+      expect(c.derecha).toBeLessThanOrEqual(A4_APAISADO.ancho);
+      expect(c.abajo).toBeGreaterThanOrEqual(0);
+      expect(c.arriba).toBeLessThanOrEqual(A4_APAISADO.alto);
     }
   });
 });

@@ -4,6 +4,7 @@ import { documentoDelInforme, fechaCsv } from "@/lib/informe-documento";
 import type { DatosCsvInforme } from "@/lib/informe-documento";
 import { hojaDashboard } from "@/lib/informe-hoja-dashboard";
 import { hojasBitacora, type DatosBitacora } from "@/lib/informe-hoja-bitacora";
+import { hojaCronograma } from "@/lib/informe-hoja-cronograma";
 import { A4_APAISADO, paginasDelInforme, type TintaPdf } from "@/lib/informe-pdf";
 import { aWinAnsi } from "@/lib/pdf-texto";
 import { encajarEnCaja } from "@/lib/imagen";
@@ -124,8 +125,28 @@ export async function generarInformePdf(
     medir,
   );
 
+  /**
+   * El cronograma va DESPUES del resumen y ANTES de las tablas: el resumen
+   * dice como va la obra, el Gantt dice cuando pasa cada cosa, y las tablas
+   * dan el detalle de las dos. Sin `tareas` -el informe se compone igual sin
+   * ellas- simplemente no hay hoja.
+   */
+  const cronograma = d.tareas
+    ? hojaCronograma(
+        {
+          obra: d.obra,
+          empresa: d.empresa,
+          fechaCorte: d.fechaCorte,
+          tareas: d.tareas,
+        },
+        A4_APAISADO,
+        medir,
+      )
+    : [];
+
   const paginas = [
     hojaDashboard(d, A4_APAISADO, medir),
+    ...cronograma,
     ...paginasDelInforme(
       secciones,
       `Informe de obra — ${d.obra}`,

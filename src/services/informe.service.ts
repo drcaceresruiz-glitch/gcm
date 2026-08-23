@@ -16,6 +16,7 @@ import {
   type AlertaAtraso,
   type Capitulo,
   type PartidaActiva,
+  type TareaControlada,
 } from "@/lib/control-avance";
 import { puede } from "@/lib/rbac";
 import type { SesionActiva } from "./sesion.service";
@@ -53,6 +54,9 @@ export interface InformeCompuesto {
   periodo: PeriodoInforme;
   curva: DatosCurva;
   capitulos: Capitulo[];
+  /// El cronograma entero: lo pide la hoja del Gantt del PDF. La hoja de
+  /// calculo lo ignora.
+  tareas: TareaControlada[];
   alertas: AlertaAtraso[];
   activas: PartidaActiva[];
   /// Fotos de cada partida activa, por su uid. Vacio = sin fotos.
@@ -129,6 +133,9 @@ export async function componerInforme(
       periodo: informe.periodo,
       curva,
       capitulos: agruparPorCapitulo(informe.tareas),
+      // El cronograma entero viaja para que el PDF pueda dibujar su Gantt. La
+      // hoja de calculo lo ignora, igual que ignora los graficos.
+      tareas: informe.tareas,
       alertas: alertasDeAtraso(informe.tareas, informe.fechaCorte),
       activas,
       fotosPorUid,
