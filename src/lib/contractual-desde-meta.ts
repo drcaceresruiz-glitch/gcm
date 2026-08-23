@@ -24,8 +24,23 @@ import { codigoPadre } from "@/lib/jerarquia-partidas";
  *    no un accidente, y quien la firma tiene que verla.
  */
 
-/// El precio unitario lleva 4 decimales en la base; el importe, 2.
-const DECIMALES_PRECIO = 4;
+/**
+ * DOS decimales tambien en el precio unitario del contractual.
+ *
+ * La base guarda cuatro y el presupuesto REAL los usa: ahi un precio con mas
+ * cifras es informacion legitima que sale de un analisis de costos.
+ *
+ * Pero el contractual es el documento que se firma con el cliente, y ahi el
+ * precio se imprime a dos decimales. Si se calculara con cuatro, la cuenta
+ * que cualquiera hace con el papel delante -metrado x precio unitario- NO
+ * daria el parcial impreso: el acero del ejemplo salia a 5.8650 y su parcial
+ * a S/ 5,747.70, cuando 980 x 5.87 son S/ 5,752.60. Un presupuesto que no
+ * cuadra consigo mismo es un presupuesto que alguien va a discutir.
+ *
+ * Asi que el redondeo ocurre ANTES de multiplicar por el metrado, no despues:
+ * el parcial sale del mismo precio que se lee.
+ */
+const DECIMALES_PRECIO = 2;
 const DECIMALES_IMPORTE = 2;
 
 /// Escala de trabajo del factor. Se calcula con mas cifras de las que se

@@ -29,6 +29,22 @@ const porCodigo = (r: ReturnType<typeof generarContractual>) =>
   new Map(r.lineas.map((l) => [l.codigo, l]));
 
 describe("el contractual que sale del real", () => {
+  it("el precio del contrato lleva DOS decimales, no cuatro", () => {
+    // El contractual es el papel que se firma: metrado x precio unitario
+    // tiene que dar el parcial impreso. Con cuatro decimales en el precio, la
+    // cuenta que cualquiera hace con el documento delante no cuadraba.
+    const r = generarContractual([
+      cap("1.0", "15.000", 0),
+      par("1.1", 1, { metrado: "980", pu: "5.10" }),
+    ]);
+    const l = porCodigo(r).get("1.1");
+
+    // 5.10 x 1.15 = 5.865, que se redondea ANTES de multiplicar por el
+    // metrado: 980 x 5.87 = 5752.60, y no los 5747.70 de antes.
+    expect(l?.precioUnitario).toBe("5.87");
+    expect(l?.parcial).toBe("5752.60");
+  });
+
   it("recarga el PRECIO y recalcula el importe", () => {
     const r = generarContractual([
       cap("1.0", "20.000", 0),
@@ -38,7 +54,7 @@ describe("el contractual que sale del real", () => {
 
     // El contrato lleva el mismo metrado a otro precio.
     expect(l?.metrado).toBe("10");
-    expect(l?.precioUnitario).toBe("120.0000");
+    expect(l?.precioUnitario).toBe("120.00");
     expect(l?.parcial).toBe("1200.00");
     expect(l?.porcentajeAplicado).toBe("20.000");
     expect(l?.codigoDelRecargo).toBe("1.0");
