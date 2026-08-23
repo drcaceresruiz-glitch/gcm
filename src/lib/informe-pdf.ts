@@ -47,10 +47,75 @@ export const A4_APAISADO: OpcionesPdf = {
   relleno: 3,
 };
 
+/**
+ * Los colores del informe, POR SU PAPEL y no por su valor.
+ *
+ * Este modulo decide QUE se dibuja y DONDE; que sea terracota o azul es cosa
+ * del pintor, que es el unico que conoce la marca de la constructora. Por eso
+ * aqui se nombra el papel —"esto es una alerta"— y nunca el color.
+ *
+ * Es la misma disciplina que ya siguen las hojas de diseno en
+ * `docs/informe-plantillas/`, que solo usan `var(--token)` y tienen prohibido
+ * el hex crudo: un color suelto en la capa de maquetacion es un color que
+ * nadie encuentra el dia que la empresa cambia de identidad.
+ */
+export type TintaPdf =
+  | "tinta"
+  | "tinta-suave"
+  | "linea"
+  | "marca"
+  | "plan"
+  | "exito"
+  | "alerta"
+  | "peligro";
+
 export type ElementoPdf =
-  | { tipo: "texto"; x: number; y: number; texto: string; tam: number; negrita: boolean; gris: boolean }
-  | { tipo: "linea"; x1: number; y1: number; x2: number; y2: number }
-  | { tipo: "fondo"; x: number; y: number; ancho: number; alto: number }
+  | {
+      tipo: "texto";
+      x: number;
+      y: number;
+      texto: string;
+      tam: number;
+      negrita: boolean;
+      gris: boolean;
+      /// Gana sobre `gris` cuando esta puesta. `gris` se queda por las
+      /// decenas de llamadas que ya lo usan y no necesitan mas de dos tintas.
+      tinta?: TintaPdf;
+    }
+  | { tipo: "linea"; x1: number; y1: number; x2: number; y2: number; tinta?: TintaPdf; grosor?: number }
+  | {
+      tipo: "fondo";
+      x: number;
+      y: number;
+      ancho: number;
+      alto: number;
+      /// Sin tinta es el gris de cabecera de tabla de toda la vida.
+      tinta?: TintaPdf;
+    }
+  /**
+   * Un tramo de anillo, para el donut de avance.
+   *
+   * Los angulos van en GRADOS y en sentido horario desde las 12, que es como
+   * se lee un porcentaje en un anillo: 0 arriba, 90 a la derecha, 180 abajo.
+   * No es el convenio de la trigonometria —antihorario desde las 3— y por eso
+   * se dice aqui: el pintor hace la conversion, nadie mas.
+   */
+  | {
+      tipo: "arco";
+      cx: number;
+      cy: number;
+      radio: number;
+      grosor: number;
+      desde: number;
+      hasta: number;
+      tinta: TintaPdf;
+    }
+  /**
+   * Una imagen ya colocada. Viaja por CLAVE, no por contenido: la maquetacion
+   * es codigo puro que se prueba sin tocar disco, y un Buffer aqui dentro
+   * obligaria a cargar las fotos para comprobar donde cae una caja.
+   */
+  | { tipo: "imagen"; x: number; y: number; ancho: number; alto: number; clave: string }
   /// Un tramo de curva. Se emite uno por cada par de puntos consecutivos, para
   /// que quien dibuje no tenga que saber nada de series ni de escalas.
   | {
@@ -151,7 +216,7 @@ export function paginasDelInforme(
   const lienzo = new Lienzo(o);
   const anchoUtil = o.ancho - o.margen * 2;
 
-  // Portada del documento, arriba de la primera pagina.
+  // Portada del documento, arriba de la primera pagina de tablas.
   lienzo.texto(o.margen, titulo, o.tamTituloDocumento, { negrita: true });
   lienzo.y -= o.tamTituloDocumento + 6;
   lienzo.texto(o.margen, subtitulo, o.tamTexto, { gris: true });

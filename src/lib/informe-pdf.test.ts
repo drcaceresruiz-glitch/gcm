@@ -15,6 +15,15 @@ const tabla = (n: number): SeccionInforme => ({
   siNoHay: "No hay.",
 });
 
+/// El punto mas bajo que ocupa un elemento. El anillo baja media pluma por
+/// debajo de su circunferencia, y ese medio grosor es justo lo que se sale de
+/// la hoja si nadie lo cuenta.
+const bordeInferior = (e: PaginaPdf["elementos"][number]): number => {
+  if (e.tipo === "linea" || e.tipo === "trazo") return Math.min(e.y1, e.y2);
+  if (e.tipo === "arco") return e.cy - e.radio - e.grosor / 2;
+  return e.y;
+};
+
 const textos = (p: PaginaPdf) =>
   p.elementos.filter((e) => e.tipo === "texto").map((e) => e.texto);
 
@@ -33,8 +42,7 @@ describe("paginasDelInforme", () => {
     // fuera del papel.
     for (const pagina of paginas([tabla(300)])) {
       for (const e of pagina.elementos) {
-        const y = e.tipo === "linea" || e.tipo === "trazo" ? e.y1 : e.y;
-        expect(y).toBeGreaterThanOrEqual(0);
+        expect(bordeInferior(e)).toBeGreaterThanOrEqual(0);
       }
     }
   });
