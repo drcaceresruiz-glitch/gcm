@@ -67,6 +67,31 @@ export interface LastPlannerCsv {
   pareto: readonly FilaPareto[];
 }
 
+/**
+ * El dinero de la obra al corte.
+ *
+ * Vive aqui, con el resto de la forma del informe, y no en el servicio que lo
+ * compone: quien lo dibuja es la maquetacion, y una hoja de PDF no tiene por
+ * que importar nada de `services/`.
+ */
+export interface EconomiaDelInforme {
+  /// Contra lo que se mide: la base mas los adicionales aprobados de la linea
+  /// base vigente. Sale de `bacDeObra`, no del total del arbol vivo.
+  presupuesto: string;
+  comprometido: string;
+  /**
+   * `null` si la resta no se pudo hacer con datos reales.
+   *
+   * Es la regla del dinero de este proyecto: un importe que miente es peor que
+   * no tener el importe. La hoja que lo pinta dice que falta, no escribe un
+   * cero.
+   */
+  saldo: string | null;
+  /// Sin linea base aprobada no hay adicionales que sumar, y conviene decirlo
+  /// antes de que alguien compare esta cifra con la del contractual.
+  conLineaBase: boolean;
+}
+
 export interface DatosCsvInforme {
   empresa: string;
   obra: string;
@@ -93,6 +118,9 @@ export interface DatosCsvInforme {
   alertas: readonly AlertaAtraso[];
   activas: readonly PartidaActiva[];
   lastPlanner: LastPlannerCsv | null;
+  /// El dinero al corte. La hoja de calculo lo ignora; la hoja de control
+  /// economica del PDF lo dibuja. `null` sin permiso de ordenes.
+  economia?: EconomiaDelInforme | null;
   generadoPor: string;
 }
 

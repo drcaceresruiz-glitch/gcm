@@ -19,6 +19,10 @@ import {
   type TareaControlada,
 } from "@/lib/control-avance";
 import { puede } from "@/lib/rbac";
+import { restar } from "@/lib/decimal";
+import type { EconomiaDelInforme } from "@/lib/informe-documento";
+import { bacDeObra } from "./presupuesto-obra";
+import { desgloseComprometidoDeObra } from "./ordenes.service";
 import type { SesionActiva } from "./sesion.service";
 import { fotosDeTareas, type FotoResumen } from "./evidencia.service";
 
@@ -62,6 +66,12 @@ export interface InformeCompuesto {
   /// Fotos de cada partida activa, por su uid. Vacio = sin fotos.
   fotosPorUid: Record<number, FotoResumen[]>;
   lastPlanner: LastPlannerAlCorte | null;
+  /**
+   * El dinero de la obra al corte. `null` cuando quien pide el informe no
+   * puede leer ordenes: se dice que no se puede mostrar, en vez de imprimir
+   * un cero que se leeria como «no hay nada comprometido».
+   */
+  economia: EconomiaDelInforme | null;
   generadoPor: string;
   /// Las fechas que el selector puede ofrecer. Solo la pantalla las usa.
   cortes: CorteDisponible[];
@@ -93,10 +103,16 @@ export async function componerInforme(
   const obra = await obtenerObra(sesion, obraId);
   if (!obra) return { estado: "sin-obra" };
 
-  const [informe, curva, empresa] = await Promise.all([
+  const [informe, curva, empresa, bac, comprometido] = await Promise.all([
     informeAlCorte(sesion, obraId, corteISO),
     datosCurvaS(sesion, obraId),
     obtenerEmpresa(sesion),
+    // `bacDeObra` no filtra por empresa porque no recibe la sesion: se llama
+    // DESPUES de `obtenerObra`, que es quien ata la obra a la empresa de quien
+    // mira. Mismo orden que en `evm.service`.
+    bacDeObra(obraId),
+    // Devuelve null sin permiso de ordenes, y ese null viaja hasta el informe.
+    desgloseComprometidoDeObra(sesion, obraId),
   ]);
 
   if (!informe) return { estado: "sin-cronograma" };
@@ -139,6 +155,15 @@ export async function componerInforme(
       alertas: alertasDeAtraso(informe.tareas, informe.fechaCorte),
       activas,
       fotosPorUid,
+      economia:
+        comprometido === null
+          ? null
+          : {
+              presupuesto: bac.bac,
+              comprometido: comprometido.total,
+              saldo: restar(bac.bac, comprometido.total),
+              conLineaBase: bac.conLineaBase,
+            },
       lastPlanner,
       generadoPor: `${sesion.nombres} ${sesion.apellidos}`.trim(),
       cortes: informe.cortes,

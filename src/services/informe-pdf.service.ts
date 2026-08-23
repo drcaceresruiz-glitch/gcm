@@ -5,6 +5,7 @@ import type { DatosCsvInforme } from "@/lib/informe-documento";
 import { hojaDashboard } from "@/lib/informe-hoja-dashboard";
 import { hojasBitacora, type DatosBitacora } from "@/lib/informe-hoja-bitacora";
 import { hojaCronograma } from "@/lib/informe-hoja-cronograma";
+import { hojaControl } from "@/lib/informe-hoja-control";
 import { A4_APAISADO, paginasDelInforme, type TintaPdf } from "@/lib/informe-pdf";
 import { aWinAnsi } from "@/lib/pdf-texto";
 import { encajarEnCaja } from "@/lib/imagen";
@@ -144,9 +145,28 @@ export async function generarInformePdf(
       )
     : [];
 
+  /**
+   * El control economico va detras del cronograma: primero como va la obra,
+   * luego cuando pasa cada cosa, y despues cuanto cuesta. Es la hoja que GCM
+   * aporta y que el informe del cliente no tenia.
+   */
+  const control = hojaControl(
+    {
+      obra: d.obra,
+      empresa: d.empresa,
+      fechaCorte: d.fechaCorte,
+      real: d.real,
+      economia: d.economia ?? null,
+      lastPlanner: d.lastPlanner,
+    },
+    A4_APAISADO,
+    medir,
+  );
+
   const paginas = [
     hojaDashboard(d, A4_APAISADO, medir),
     ...cronograma,
+    ...control,
     ...paginasDelInforme(
       secciones,
       `Informe de obra — ${d.obra}`,
