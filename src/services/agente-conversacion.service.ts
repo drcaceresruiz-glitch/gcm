@@ -3,8 +3,6 @@ import "server-only";
 import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { sumar } from "@/lib/decimal";
-import { soles } from "@/utils/formato";
 import { SIN_PROVEEDOR_ACTIVO } from "@/lib/agente-conversacion";
 import {
   conversar,
@@ -24,11 +22,7 @@ import {
   sobregiroProyectadoDeCartera,
   confiabilidadDeCartera,
 } from "@/services/gerencia.service";
-import {
-  obtenerPresupuestoVigente,
-  crearMovimiento,
-  type DatosMovimiento,
-} from "@/services/movimientos.service";
+import { obtenerPresupuestoVigente } from "@/services/movimientos.service";
 import { obtenerCronograma, registrarAvance } from "@/services/cronograma.service";
 import { crearNota, type DatosNota } from "@/services/notas.service";
 import type { SesionActiva } from "@/services/sesion.service";
@@ -91,8 +85,8 @@ function construirSistema(puedeEscribir: boolean): string {
   ];
   if (puedeEscribir) {
     base.push(
-      "Puedes PROPONER una escritura (crear un movimiento presupuestal en borrador, registrar un avance, crear una nota) con la herramienta proponer_accion, nunca de otra forma.",
-      "Antes de proponer, usa listar_obras/partidas_de_obra/tareas_de_obra para conseguir los ids reales que la propuesta necesita -nunca inventes un wbsItemId, un uid ni un obraId-.",
+      "Puedes PROPONER una escritura (registrar un avance de una tarea, crear una nota de bitácora) con la herramienta proponer_accion, nunca de otra forma. No puedes crear ni modificar movimientos presupuestales bajo ninguna circunstancia.",
+      "Antes de proponer, usa listar_obras/tareas_de_obra para conseguir los ids reales que la propuesta necesita -nunca inventes un uid ni un obraId-.",
       "Al llamar a proponer_accion tu turno TERMINA ahí: nunca digas que ya hiciste el cambio, nunca sigas conversando en el mismo turno. La confirma o cancela un humano en la pantalla, no tú.",
     );
   }
@@ -204,10 +198,6 @@ const HERRAMIENTAS: HerramientaAgente[] = [
 // click humano, con el `datos` YA guardado, nunca uno nuevo.
 // ---------------------------------------------------------------------------
 
-interface DatosCrearMovimientoAgente extends DatosMovimiento {
-  obraId: string;
-}
-
 interface DatosRegistrarAvanceAgente {
   obraId: string;
   uid: number;
@@ -221,103 +211,6 @@ interface DatosCrearNotaAgente extends DatosNota {
 }
 
 const HERRAMIENTAS_ESCRITURA: HerramientaEscritura[] = [
-  {
-    nombre: "crear_movimiento",
-    descripcion:
-      "Propone crear un movimiento presupuestal en BORRADOR (RECONVERSION, ADICIONAL o DEDUCTIVO). No se ejecuta hasta que un humano confirme, y aun confirmado queda pendiente de que un administrador lo apruebe aparte -nunca afecta el presupuesto por sí solo-.",
-    esquema: {
-      type: "object",
-      required: ["obraId", "tipo", "fecha", "concepto", "motivo", "lineas"],
-      properties: {
-        obraId: { type: "string", description: "Id de la obra, de listar_obras." },
-        tipo: { type: "string", enum: ["RECONVERSION", "ADICIONAL", "DEDUCTIVO"] },
-        fecha: { type: "string", description: "YYYY-MM-DD, del documento que respalda el movimiento." },
-        concepto: { type: "string" },
-        motivo: {
-          type: "string",
-          description: "Por qué procede: la cláusula del contrato o el hecho que lo justifica.",
-        },
-        referencia: { type: "string" },
-        lineas: {
-          type: "array",
-          minItems: 1,
-          items: {
-            oneOf: [
-              {
-                description: "Ajuste sobre una partida que ya existe, de partidas_de_obra.",
-                type: "object",
-                required: ["wbsItemId", "importe"],
-                properties: {
-                  wbsItemId: { type: "string", description: "De partidas_de_obra." },
-                  importe: {
-                    type: "string",
-                    description: "Positivo entra, negativo sale, texto decimal, nunca cero.",
-                  },
-                  justificacion: { type: "string" },
-                },
-              },
-              {
-                description: "Alta de partida nueva. Solo válido si tipo=ADICIONAL.",
-                type: "object",
-                required: ["parentId", "codigoPartida", "descripcion", "importe"],
-                properties: {
-                  parentId: {
-                    type: "string",
-                    description: "wbsItemId de un CAPITULO, de partidas_de_obra.",
-                  },
-                  codigoPartida: {
-                    type: "string",
-                    description: "Formato 1, 2.03, 7.02.01 -no puede chocar con uno existente.",
-                  },
-                  descripcion: { type: "string" },
-                  unidad: { type: "string" },
-                  metrado: { type: "string" },
-                  precioUnitario: { type: "string" },
-                  modalidad: {
-                    type: "string",
-                    enum: ["PRECIOS_UNITARIOS", "SUMA_ALZADA", "ALCANCE"],
-                  },
-                  importe: { type: "string" },
-                  justificacion: { type: "string" },
-                },
-              },
-            ],
-          },
-        },
-      },
-    },
-    resumen: async (sesion, datosSinTipar) => {
-      const datos = datosSinTipar as DatosCrearMovimientoAgente;
-      const [nombreObra, presupuesto] = await Promise.all([
-        nombreDeObra(sesion.companyId, datos.obraId),
-        obtenerPresupuestoVigente(sesion, datos.obraId),
-      ]);
-      const porCodigo = new Map(presupuesto.partidas.map((p) => [p.wbsItemId, p]));
-
-      const lineas = datos.lineas.map((l) => {
-        if ("wbsItemId" in l) {
-          const partida = porCodigo.get(l.wbsItemId);
-          const etiqueta = partida ? `${partida.codigoPartida} (${partida.descripcion})` : l.wbsItemId;
-          return `${etiqueta}: ${soles(l.importe)}`;
-        }
-        return `NUEVA partida ${l.codigoPartida} (${l.descripcion}): ${soles(l.importe)}`;
-      });
-      const neto = sumar(datos.lineas.map((l) => l.importe));
-
-      return (
-        `¿Confirmas crear un movimiento ${datos.tipo} en la obra "${nombreObra}"?\n` +
-        `${lineas.join("\n")}\n` +
-        `Total neto: ${soles(neto)}. Motivo: "${datos.motivo}".\n` +
-        `Quedará en BORRADOR: no se descuenta del presupuesto hasta que un administrador lo apruebe aparte.`
-      );
-    },
-    ejecutarEscritura: async (sesion, datosSinTipar) => {
-      const { obraId, ...datos } = datosSinTipar as DatosCrearMovimientoAgente;
-      const r = await crearMovimiento(sesion, obraId, datos);
-      if (!r.ok) return { ok: false, error: r.error };
-      return { ok: true, mensaje: `Movimiento #${r.numero} creado en BORRADOR.` };
-    },
-  },
   {
     nombre: "registrar_avance",
     descripcion:

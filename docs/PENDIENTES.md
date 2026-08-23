@@ -2033,16 +2033,19 @@ Lo que SI se hara, en este orden:
      -a diferencia de `HerramientaAgente`-, asi que meterla por error en
      el arreglo que el bucle dispara solo es un error de COMPILACION, no
      una convencion que alguien tiene que recordar.
-   - **Tres herramientas de escritura**: `crear_movimiento` (BORRADOR,
-     nunca compromete el presupuesto por si solo — sigue pendiente de que
-     un administrador con `movimiento:aprobar` lo apruebe aparte, fuera
-     del alcance del agente), `registrar_avance` (un reporte NUEVO en la
-     serie historica, nunca sobrescribe uno viejo) y `crear_nota`. Cada
-     una envuelve la funcion de servicio real que ya existia
-     (`crearMovimiento`, `registrarAvance`, `crearNota`) — nunca Prisma
-     directo. Dos herramientas de LECTURA nuevas, `partidas_de_obra` y
-     `tareas_de_obra`, para que el modelo consiga wbsItemId/uid reales en
-     vez de inventarlos.
+   - **Dos herramientas de escritura**: `registrar_avance` (un reporte
+     NUEVO en la serie historica, nunca sobrescribe uno viejo) y
+     `crear_nota`. Cada una envuelve la funcion de servicio real que ya
+     existia (`registrarAvance`, `crearNota`) — nunca Prisma directo. Dos
+     herramientas de LECTURA nuevas, `partidas_de_obra` y `tareas_de_obra`,
+     para que el modelo consiga ids reales en vez de inventarlos.
+     ~~`crear_movimiento`~~ **sacada del todo el 22 de agosto de 2026**,
+     decision explicita del usuario: el agente no debe poder tocar
+     movimientos presupuestales bajo ninguna circunstancia, ni siquiera en
+     BORRADOR. Se quito la herramienta, su interfaz de datos, y las
+     importaciones que solo ella usaba (`crearMovimiento`, `sumar`,
+     `soles`); `partidas_de_obra` se queda como herramienta de LECTURA
+     general -sigue sirviendo para preguntas sobre el presupuesto vigente-.
    - **Confirmar o cancelar**: `confirmarPropuestaAgente` reclama la
      propuesta con un `updateMany` condicionado (`propuestaResueltaAt:
      null`) ANTES de ejecutar -si dos clicks llegan a la vez, solo uno de
@@ -2078,6 +2081,34 @@ Lo que SI se hara, en este orden:
      tarjeta de Confirmar/Cancelar nunca se vio disparar en vivo, solo en
      las pruebas mockeadas.
 
+   **Pedido el 22 de agosto de 2026: que el agente pueda generar un
+   reporte ejecutivo de obra, completo y ordenado, segun corte.**
+   Investigado, sin construir todavia. **Buena noticia: GCM ya tiene
+   exactamente esto**, no hay que construirlo desde cero:
+   `componerInforme` (`informe.service.ts`) ya arma un informe de obra a
+   una fecha de corte -real vs. planeado, desviacion, curva S, capitulos
+   con alertas de atraso, partidas activas CON SUS FOTOS de evidencia, y
+   el PPC de Last Planner al mismo corte-, compuesto UNA vez y reusado por
+   las tres puertas que ya existen: la pantalla que se imprime
+   (`/obras/[id]/cronograma/informe`), la descarga en PDF/Excel/CSV
+   (`informe-pdf.service.ts`, `lib/informe-csv.ts`), y el envio por correo
+   con el PDF adjunto (`enviarInformePorCorreo`, en
+   `informe-envio.service.ts`).
+   - **Lo que faltaria, y es chico**: una herramienta de LECTURA nueva
+     -mismo patron que las demas, un envoltorio delgado sobre
+     `componerInforme`- para que el agente pueda RESUMIR ese informe en el
+     chat ("¿cómo va la obra X al corte de ayer?"). Aparte, y ya como
+     ESCRITURA (mismo patron de proponer-y-confirmar de Fase 2b, no
+     ejecucion directa): una herramienta que proponga `enviarInformePorCorreo`
+     -"te propongo mandar el informe de la obra X, al corte de hoy, al
+     correo Y"-, para que el agente pueda disparar el envio real solo tras
+     confirmacion humana.
+   - **Sin decidir todavia**: si el resumen en el chat basta, o si
+     tambien se quiere la propuesta de envio por correo -esta ultima
+     ampliaria el alcance de escritura que recien se acoto a solo avance y
+     notas, asi que necesita su propia decision explicita, no venir
+     incluida por default-.
+
    ~~**Dictado por voz en el Asistente.**~~ **Investigado el 22 de agosto
    de 2026** (mismo workflow, en paralelo con lo de Mike), sin empezar el
    codigo todavia. Decision ya tomada por el usuario: Web Speech API
@@ -2097,17 +2128,17 @@ Lo que SI se hara, en este orden:
    Investigacion, no codigo. Siete herramientas de LECTURA, siempre
    disponibles con `agente_ia:usar` (`listar_obras`, `resumen_empresa`,
    `semaforo_cartera`, `sobregiro_cartera`, `confiabilidad_cartera`,
-   `partidas_de_obra`, `tareas_de_obra`) y tres de ESCRITURA
-   (`crear_movimiento`, `registrar_avance`, `crear_nota`), estas ultimas
-   SOLO detras de `proponer_accion` -el agente nunca las ejecuta directo,
-   siempre propone y un humano confirma en pantalla-, y solo visibles para
-   quien tiene el permiso aparte `agente_ia:escribir` (hoy: RESIDENTE y
-   ADMIN_OBRA). Detalle completo de cada herramienta y las salvaguardas
-   del lado de escritura -resumen calculado por el servidor nunca por el
-   modelo, doble-click atomico, expiracion a 24h- en la seccion "Fase 2b"
-   de aqui arriba. **Sigue sin decidirse** si la escritura se deja activa,
-   se restringe mas, o se quita del todo -este catalogo es el insumo para
-   esa decision, no la decision en si-.
+   `partidas_de_obra`, `tareas_de_obra`) y dos de ESCRITURA
+   (`registrar_avance`, `crear_nota` -`crear_movimiento` se saco del todo
+   el mismo dia, ver "Fase 2b" arriba-), estas ultimas SOLO detras de
+   `proponer_accion` -el agente nunca las ejecuta directo, siempre propone
+   y un humano confirma en pantalla-, y solo visibles para quien tiene el
+   permiso aparte `agente_ia:escribir` (hoy: RESIDENTE y ADMIN_OBRA).
+   Detalle completo de cada herramienta y las salvaguardas del lado de
+   escritura -resumen calculado por el servidor nunca por el modelo,
+   doble-click atomico, expiracion a 24h- en la seccion "Fase 2b" de aqui
+   arriba. **Decidido el 22 de agosto**: sin movimientos presupuestales,
+   solo avance y notas.
 
 ---
 
