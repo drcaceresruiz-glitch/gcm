@@ -190,13 +190,20 @@ export function siguientePaso(
     };
   }
 
+  /*
+   * ESTA es la linea base del PRESUPUESTO, no la del cronograma.
+   *
+   * Las dos existen y las dos se llaman igual. Este aviso y el de requisitos
+   * (`requisitosParaEjecutar`) salen en la misma pantalla, asi que ninguno de
+   * los dos puede decir «linea base» a secas: hay que nombrar cual.
+   */
   if (!alta.lineaBase && puede.lineaBase) {
     return {
       clave: "alta-linea-base",
       gravedad: "sugerencia",
-      titulo: "El presupuesto sigue siendo un borrador",
+      titulo: "El presupuesto contractual sigue siendo un borrador",
       consecuencia:
-        "Es la referencia contra la que se miden los movimientos y el valor ganado, y fijarla tarde deja un atraso que siempre parecerá pequeño.",
+        "Aprobarlo lo congela como línea base del PRESUPUESTO: la referencia contra la que se miden los adicionales y el valor ganado. Mientras siga en borrador se puede seguir tocando, y lo que se mide cambia con él.",
       accion: "Ver revisiones",
       camino: "/revisiones",
     };

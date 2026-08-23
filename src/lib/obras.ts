@@ -132,7 +132,7 @@ export interface RequisitoObra {
   clave:
     | "presupuesto"
     | "cronograma"
-    | "linea_base"
+    | "linea_base_cronograma"
     | "valorizaciones"
     | "movimientos_borrador"
     | "pendientes_criticos";
@@ -176,11 +176,21 @@ export function requisitosParaEjecutar(
       bloqueante: false,
     });
   } else if (!estado.tieneLineaBase) {
-    // Solo se menciona si HAY cronograma: decirle a alguien que no ha cargado
-    // el plan que ademas no lo ha congelado es ruido.
+    /*
+     * DICE «DEL CRONOGRAMA», y no es un adorno.
+     *
+     * En GCM hay DOS lineas base y las dos se llaman igual: la del
+     * PRESUPUESTO (`Baseline.aprobadaAt`, que congela contra que se miden los
+     * adicionales) y la del CRONOGRAMA (`Cronograma.lineaBaseAt`, que congela
+     * contra que se mide el plazo). Hasta el 23 de agosto de 2026 este aviso
+     * decia «linea base» a secas y salia en la MISMA pantalla que el anclaje
+     * de continuidad, que con esas dos palabras se refiere a la otra. Quien
+     * lo leia no sabia cual de las dos le faltaba, y desde ahi ya no hay
+     * forma de entender el orden de nada.
+     */
     faltan.push({
-      clave: "linea_base",
-      falta: "El cronograma no tiene linea base fijada.",
+      clave: "linea_base_cronograma",
+      falta: "El cronograma no tiene su linea base fijada.",
       consecuencia:
         "El plazo se medira contra el ultimo corte cargado, es decir, contra " +
         "si mismo: siempre parecera que la obra va al dia.",

@@ -129,13 +129,13 @@ describe("requisitos para poner una obra en marcha", () => {
       tieneCronograma: false,
       tieneLineaBase: false,
     });
-    expect(faltan.some((r) => r.clave === "linea_base")).toBe(false);
+    expect(faltan.some((r) => r.clave === "linea_base_cronograma")).toBe(false);
   });
 
   it("con cronograma pero sin congelar, se avisa de la linea base", () => {
     const faltan = requisitosParaEjecutar({ ...completa, tieneLineaBase: false });
     expect(puedeArrancar(faltan)).toBe(true);
-    expect(faltan.map((r) => r.clave)).toEqual(["linea_base"]);
+    expect(faltan.map((r) => r.clave)).toEqual(["linea_base_cronograma"]);
   });
 
   it("acumula lo bloqueante y lo que solo avisa", () => {
