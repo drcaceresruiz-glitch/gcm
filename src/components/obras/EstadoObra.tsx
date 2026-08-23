@@ -38,6 +38,7 @@ export function EstadoObra({
   puedeReabrir,
   motivoParalizacion,
   fechaEstimadaReanudacion,
+  faltaParaArrancar,
 }: {
   obraId: string;
   nombreObra: string;
@@ -46,6 +47,14 @@ export function EstadoObra({
   puedeReabrir: boolean;
   motivoParalizacion: string | null;
   fechaEstimadaReanudacion: Date | null;
+  /**
+   * Lo que la obra no tiene todavia y deberia tener para arrancar.
+   *
+   * Sale de `requisitosParaEjecutar`, la MISMA regla que aplica el servidor,
+   * y llega ya calculada desde el layout -que ya pide los hitos para el riel-.
+   * Vacio = todo listo.
+   */
+  faltaParaArrancar: readonly { falta: string; consecuencia: string; bloqueante: boolean }[];
 }) {
   const [respuesta, accion] = useActionState<RespuestaEdicion, FormData>(
     accionCambiarEstadoObra,
@@ -76,6 +85,23 @@ export function EstadoObra({
 
           if (esParalizar) {
             return <FormularioParalizar key={destino} obraId={obraId} accion={accion} />;
+          }
+
+          // Arrancar con cosas sin hacer se puede, pero se firma: se enseña
+          // que falta y hay que confirmarlo. Si no falta nada, es un boton.
+          if (
+            estado === "PLANIFICACION" &&
+            destino === "EN_EJECUCION" &&
+            faltaParaArrancar.length > 0
+          ) {
+            return (
+              <FormularioArrancar
+                key={destino}
+                obraId={obraId}
+                falta={faltaParaArrancar}
+                accion={accion}
+              />
+            );
           }
 
           return (
@@ -343,6 +369,121 @@ function FormularioParalizar({
         </button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Arrancar la obra cuando algo minimo no esta hecho.
+ *
+ * Mismo patron de revelar que `FormularioParalizar`, y por el mismo motivo:
+ * la decision se toma leyendo lo que falta, no pulsando un boton de paso.
+ *
+ * Lo que falta y por que importa NO se escribe aqui: llega de
+ * `requisitosParaEjecutar`, que es la misma regla que aplica el servidor. Si
+ * se redactara en la pantalla, el dia que cambie el criterio habria dos
+ * versiones de que es una obra lista para arrancar.
+ *
+ * Lo BLOQUEANTE -no hay ni una partida- no trae casilla: ahi no hay nada que
+ * confirmar, el servidor lo va a rechazar igual y ofrecer la casilla seria
+ * prometer algo que no se puede cumplir.
+ */
+function FormularioArrancar({
+  obraId,
+  falta,
+  accion,
+}: {
+  obraId: string;
+  falta: readonly { falta: string; consecuencia: string; bloqueante: boolean }[];
+  accion: (datos: FormData) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const bloqueado = falta.some((f) => f.bloqueante);
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <Play className="size-3.5" aria-hidden="true" />
+        Iniciar ejecución
+      </button>
+    );
+  }
+
+  return (
+    <form
+      action={accion}
+      className="w-full max-w-lg space-y-2.5 rounded-lg border p-3"
+      style={{ borderColor: "var(--color-alerta)" }}
+    >
+      <input type="hidden" name="id" value={obraId} />
+      <input type="hidden" name="estado" value="EN_EJECUCION" />
+
+      <p className="flex items-start gap-1.5 text-xs font-medium">
+        <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+        {bloqueado
+          ? "Esta obra todavía no puede arrancar:"
+          : "Esta obra arrancaría con cosas sin hacer:"}
+      </p>
+
+      <ul className="space-y-2">
+        {falta.map((f) => (
+          <li key={f.falta} className="text-xs">
+            <span className="font-medium">{f.falta}</span>
+            <span className="block opacity-70">{f.consecuencia}</span>
+          </li>
+        ))}
+      </ul>
+
+      {!bloqueado && (
+        <label className="flex items-start gap-2 text-xs">
+          <input
+            type="checkbox"
+            name="confirmarSinRequisitos"
+            required
+            className="mt-0.5"
+          />
+          <span>
+            Lo he leído y quiero arrancar igual. Sé que hasta que se complete,
+            la obra medirá su avance contra sí misma.
+          </span>
+        </label>
+      )}
+
+      <div className="flex items-center gap-3">
+        {!bloqueado && <BotonConfirmarArranque />}
+        <button
+          type="button"
+          onClick={() => setAbierto(false)}
+          className="text-xs font-medium underline opacity-70"
+        >
+          Cancelar
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function BotonConfirmarArranque() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+      style={{ backgroundColor: "var(--color-marca-600)" }}
+    >
+      {pending ? (
+        <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+      ) : (
+        <Play className="size-3.5" aria-hidden="true" />
+      )}
+      Arrancar de todos modos
+    </button>
   );
 }
 

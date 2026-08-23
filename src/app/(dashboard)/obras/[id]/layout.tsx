@@ -15,7 +15,7 @@ import { constaRespaldoReciente } from "@/services/obra-borrado.service";
 import { MenuObra, type FaseMenu } from "@/components/obras/MenuObra";
 import { PublicarEtiqueta } from "@/components/navegacion/PublicarEtiqueta";
 import { EstadoObra } from "@/components/obras/EstadoObra";
-import type { EstadoObra as EstadoObraTipo } from "@/lib/obras";
+import { requisitosParaEjecutar, type EstadoObra as EstadoObraTipo } from "@/lib/obras";
 
 /**
  * Marco comun de una obra.
@@ -398,6 +398,18 @@ export default async function ObraLayout({
               puedeReabrir={puede(sesion, "obra:reabrir")}
               motivoParalizacion={obra.motivoParalizacion}
               fechaEstimadaReanudacion={obra.fechaEstimadaReanudacion}
+              /* La MISMA regla que aplica el servidor, con los MISMOS hitos
+                 que ya se pidieron para el riel: la pantalla no puede decir
+                 una cosa y el servidor decidir otra. */
+              faltaParaArrancar={
+                obra.estado === "PLANIFICACION"
+                  ? requisitosParaEjecutar({
+                      partidas: hitos.presupuesto ? 1 : 0,
+                      tieneCronograma: hitos.cronograma,
+                      tieneLineaBase: hitos.lineaBaseCronograma,
+                    })
+                  : []
+              }
             />
           </div>
 

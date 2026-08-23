@@ -333,6 +333,9 @@ export async function accionCambiarEstadoObra(
             : undefined,
         }
       : undefined,
+    // Solo se mira al arrancar, y solo hace falta si algo de lo minimo no
+    // esta hecho: la pantalla enseña que falta y pide confirmarlo.
+    datos.get("confirmarSinRequisitos") === "on",
   );
   if (!r.ok) return { ok: false, error: r.error };
 

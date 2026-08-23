@@ -887,6 +887,14 @@ export interface HitosObra {
    */
   metaCargada: boolean;
   /**
+   * El cronograma tiene un corte fijado como linea base.
+   *
+   * Es OTRA cosa que `lineaBase`, que es la del presupuesto. Esta gobierna el
+   * plazo: sin ella el avance se mide contra el ultimo corte cargado, o sea
+   * contra si mismo, y la obra siempre parece ir al dia.
+   */
+  lineaBaseCronograma: boolean;
+  /**
    * Hay alguien asignado a la obra.
    *
    * NO alimenta el riel del menu —no hay seccion «Equipo» en las fases del
@@ -922,6 +930,7 @@ export const hitosDeObra = cache(async function hitosDeObra(
       planSemanal: false,
       meta: false,
       metaCargada: false,
+      lineaBaseCronograma: false,
       equipo: false,
       equipoAsignable: false,
     };
@@ -936,6 +945,7 @@ export const hitosDeObra = cache(async function hitosDeObra(
   const [
     partida,
     cronograma,
+    cronogramaBase,
     base,
     revision,
     lookahead,
@@ -948,6 +958,10 @@ export const hitosDeObra = cache(async function hitosDeObra(
     await Promise.all([
     prisma.wbsItem.findFirst({ where: deLaObra, select: { id: true } }),
     prisma.cronograma.findFirst({ where: deLaObra, select: { id: true } }),
+    prisma.cronograma.findFirst({
+      where: { ...deLaObra, lineaBaseAt: { not: null } },
+      select: { id: true },
+    }),
     prisma.baseline.findFirst({
       where: { ...deLaObra, aprobadaAt: { not: null } },
       select: { id: true },
@@ -994,6 +1008,7 @@ export const hitosDeObra = cache(async function hitosDeObra(
     planSemanal: plan !== null,
     meta: meta !== null,
     metaCargada: metaCargada !== null,
+    lineaBaseCronograma: cronogramaBase !== null,
     equipo: miembro !== null,
     equipoAsignable: asignables > 0,
   };
@@ -1440,6 +1455,9 @@ export async function cambiarEstadoObra(
   /// Solo se usa (y se exige el motivo) al paralizar. `fechaEstimada` es
   /// opcional: a veces de verdad no se sabe cuando se reanuda.
   detallePausa?: { motivo: string; fechaEstimada?: string | null },
+  /// Solo se mira al pasar de PLANIFICACION a EN_EJECUCION, y solo hace falta
+  /// si algo de lo minimo no esta hecho. Ver `faltaParaEjecutar`.
+  confirmarSinRequisitos?: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!puede(sesion, "obra:editar")) {
     return { ok: false, error: "No tienes permiso para cambiar el estado de la obra." };
@@ -1497,30 +1515,78 @@ export async function cambiarEstadoObra(
     }
   }
 
-  // Arrancar POR PRIMERA VEZ exige presupuesto. Reanudar una obra paralizada
-  // no: esa ya paso por aqui, y volver a exigirselo bloquearia una obra en
-  // marcha por un requisito que cumplio hace meses.
+  /**
+   * Arrancar POR PRIMERA VEZ tiene minimos. Reanudar una obra paralizada no:
+   * esa ya paso por aqui, y volver a exigirselo bloquearia una obra en marcha
+   * por un requisito que cumplio hace meses.
+   *
+   * Dos niveles, que es lo que `requisitosParaEjecutar` ya distingue:
+   *
+   * - **Sin partidas se BLOQUEA.** Una obra en ejecucion sin presupuesto deja
+   *   el control economico entero sin suelo.
+   * - **Sin cronograma o sin linea base NO se bloquea, pero se firma.** En
+   *   obra real a veces se arranca antes que el papeleo, y un muro solo
+   *   consigue que se ponga en ejecucion con datos inventados o que se
+   *   trabaje fuera del sistema. Lo que se exige es que la decision sea
+   *   explicita, igual que al paralizar hay que escribir el motivo.
+   *
+   * Hasta hoy los dos ultimos se pasaban a mano como `true` -"la pantalla ya
+   * los avisa antes de llegar"-, y la pantalla NO los avisaba: se podia
+   * arrancar una obra sin cronograma y sin linea base sin que nada lo dijera
+   * en ningun momento.
+   */
   if (nuevoEstado === "EN_EJECUCION" && obra.estado === "PLANIFICACION") {
-    const partidas = await prisma.wbsItem.count({
-      where: { projectId: obraId, tipo: "PARTIDA" },
+    /**
+     * Se consulta aqui y no con `hitosDeObra`, aunque el layout use ese.
+     *
+     * `hitosDeObra` exige `obra:leer` y LANZA si falta; esta transicion solo
+     * pide `obra:editar`, y hacerla depender de otro permiso convertiria un
+     * "no puedes" en una excepcion. La REGLA -que es lo que de verdad no
+     * puede duplicarse- es la misma en los dos sitios:
+     * `requisitosParaEjecutar`.
+     *
+     * Ojo con la linea base: la que pide este requisito es la del CRONOGRAMA
+     * -habla de plazo- y no la del presupuesto, que es otra cosa.
+     */
+    const [partidas, cronograma, cronogramaBase] = await Promise.all([
+      prisma.wbsItem.count({ where: { projectId: obraId, tipo: "PARTIDA" } }),
+      prisma.cronograma.findFirst({
+        where: { projectId: obraId, project: { companyId: sesion.companyId } },
+        select: { id: true },
+      }),
+      prisma.cronograma.findFirst({
+        where: {
+          projectId: obraId,
+          project: { companyId: sesion.companyId },
+          lineaBaseAt: { not: null },
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    const faltan = requisitosParaEjecutar({
+      partidas,
+      tieneCronograma: cronograma !== null,
+      tieneLineaBase: cronogramaBase !== null,
     });
 
     // Se comprueba en el servidor y no solo en la pantalla: la accion se puede
-    // invocar directamente, y una obra en ejecucion sin presupuesto deja el
-    // control economico entero sin suelo.
-    const faltan = requisitosParaEjecutar({
-      partidas,
-      // Cronograma y linea base no bloquean, asi que no hace falta
-      // consultarlos aqui: la pantalla ya los avisa antes de llegar.
-      tieneCronograma: true,
-      tieneLineaBase: true,
-    });
-
+    // invocar directamente.
     if (!puedeArrancar(faltan)) {
       const bloqueante = faltan.find((r) => r.bloqueante);
       return {
         ok: false,
         error: `${bloqueante?.falta ?? "Faltan requisitos."} ${bloqueante?.consecuencia ?? ""}`.trim(),
+      };
+    }
+
+    if (faltan.length > 0 && !confirmarSinRequisitos) {
+      return {
+        ok: false,
+        error:
+          "Esta obra arrancaria con cosas sin hacer: " +
+          faltan.map((f) => f.falta).join(" ") +
+          " Se puede arrancar igual, pero hay que confirmarlo.",
       };
     }
   }
