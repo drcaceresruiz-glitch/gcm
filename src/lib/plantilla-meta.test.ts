@@ -1,11 +1,7 @@
 import { describe, it, expect } from "vitest";
 import ExcelJS from "exceljs";
 
-import {
-  generarPlantillaMeta,
-  FILAS_COSTO,
-  TOTAL_COSTO_EJEMPLO,
-} from "./plantilla-meta";
+import { generarPlantillaMeta, TOTAL_COSTO_EJEMPLO } from "./plantilla-meta";
 import { analizarExcel } from "./excel-presupuesto";
 import { analizarGastosGenerales, HOJA_GASTOS } from "./excel-meta";
 
@@ -41,33 +37,61 @@ describe("la hoja de costo directo de la plantilla meta", () => {
   it("la lee el MISMO importador que el presupuesto, sin un solo error", async () => {
     // Es la razon de que esta hoja vaya la primera y con las mismas columnas:
     // no hay un segundo importador que mantener.
-    const r = await analizarExcel(await generarPlantillaMeta());
+    const r = await analizarExcel(await generarPlantillaMeta(), { propiasDeLaMeta: true });
 
     expect(r.errores).toEqual([]);
     expect(r.filaCabecera).not.toBeNull();
   });
 
-  it("clasifica capitulos y partidas, incluido el capitulo propio de la meta", async () => {
-    const r = await analizarExcel(await generarPlantillaMeta());
+  it("clasifica capitulos y partidas", async () => {
+    const r = await analizarExcel(await generarPlantillaMeta(), { propiasDeLaMeta: true });
     const porCodigo = new Map(r.filas.map((f) => [f.codigo, f]));
 
-    expect(r.totalCapitulos).toBe(3);
-    expect(r.totalPartidas).toBe(FILAS_COSTO.length - 3);
-
+    expect(r.totalCapitulos).toBe(2);
     expect(porCodigo.get("1.0")?.tipo).toBe("CAPITULO");
     expect(porCodigo.get("1.1")?.tipo).toBe("PARTIDA");
-    // El capitulo 3 son los costos que el contrato no desglosa.
-    expect(porCodigo.get("3.0")?.tipo).toBe("CAPITULO");
-    expect(porCodigo.get("3.1")?.tipo).toBe("PARTIDA");
+  });
+
+  it("los costos propios de la meta salen SIN codigo, y por eso no van al contrato", async () => {
+    /*
+     * Es la mitad importante de lo que ensena la plantilla. Con codigo, un
+     * andamio alquilado entraria al presupuesto del cliente como una linea
+     * mas -y de ahi al cronograma, como una tarea que alguien tendria que
+     * ejecutar-. Sin codigo cuesta igual, cuenta en la meta y en la bolsa, y
+     * su dinero se cubre con el recargo del resto.
+     */
+    const r = await analizarExcel(await generarPlantillaMeta(), { propiasDeLaMeta: true });
+
+    expect(r.propiasDeLaMeta.map((f) => f.descripcion)).toEqual([
+      "Andamio metálico en alquiler",
+      "Encofrado metálico en alquiler (varias partidas)",
+    ]);
+    expect(r.propiasDeLaMeta.map((f) => f.parcial)).toEqual(["1520.00", "2600.00"]);
+
+    // Y ninguno aparece entre las filas con codigo.
+    expect(r.filas.some((f) => f.descripcion.includes("Andamio"))).toBe(false);
+  });
+
+  it("sin la opcion, el importador del contrato las sigue ignorando", async () => {
+    // La opcion es SOLO de la hoja de la meta: en el importador del
+    // presupuesto contractual una fila sin codigo es una nota o un subtitulo,
+    // y recogerla meteria texto suelto en el arbol de partidas.
+    const r = await analizarExcel(await generarPlantillaMeta());
+
+    expect(r.propiasDeLaMeta).toEqual([]);
+    expect(r.filas.some((f) => f.descripcion.includes("Andamio"))).toBe(false);
   });
 
   it("suma lo esperado y no estrena al usuario con el aviso de repetidos", async () => {
-    const r = await analizarExcel(await generarPlantillaMeta());
+    const r = await analizarExcel(await generarPlantillaMeta(), { propiasDeLaMeta: true });
 
     expect(r.montoTotal).toBe(TOTAL_COSTO_EJEMPLO);
     expect(r.gruposRepetidos).toEqual([]);
     expect(r.filasOcultas).toBe(0);
-    expect(r.filasTextoOmitidas).toBe(0);
+    // Una: el subtitulo del bloque de costos propios, que es texto y nada
+    // mas. La fila de TOTAL del final no cuenta porque queda fuera de la
+    // tabla, que es donde tiene que quedarse.
+    expect(r.filasTextoOmitidas).toBe(1);
   });
 });
 
@@ -192,7 +216,7 @@ describe("las fechas opcionales de la plantilla meta", () => {
   });
 
   it("una partida sin fecha (el ejemplo tal cual) sale con null, no con error", async () => {
-    const r = await analizarExcel(await generarPlantillaMeta());
+    const r = await analizarExcel(await generarPlantillaMeta(), { propiasDeLaMeta: true });
     const porCodigo = new Map(r.filas.map((f) => [f.codigo, f]));
 
     expect(r.errores).toEqual([]);
@@ -220,12 +244,13 @@ describe("las fechas opcionales de la plantilla meta", () => {
 
 describe("el recargo que genera el presupuesto contractual", () => {
   it("llega al importador, y solo en los capitulos", async () => {
-    const r = await analizarExcel(await generarPlantillaMeta());
+    const r = await analizarExcel(await generarPlantillaMeta(), { propiasDeLaMeta: true });
     const porCodigo = new Map(r.filas.map((f) => [f.codigo, f]));
 
     expect(porCodigo.get("1.0")?.porcentajeRecargo).toBe("18.00");
     expect(porCodigo.get("2.0")?.porcentajeRecargo).toBe("15.00");
-    expect(porCodigo.get("3.0")?.porcentajeRecargo).toBe("22.00");
+    // El bloque de costos propios NO lleva recargo: no va al contrato, asi
+    // que no hay nada que recargar.
 
     // El recargo es del capitulo entero: una partida no lo lleva.
     expect(porCodigo.get("1.1")?.porcentajeRecargo).toBeNull();
@@ -240,7 +265,7 @@ describe("el recargo que genera el presupuesto contractual", () => {
      * esos podria quedarse con la columna del importe real, y el presupuesto
      * entraria inflado sin que nada avisara.
      */
-    const r = await analizarExcel(await generarPlantillaMeta());
+    const r = await analizarExcel(await generarPlantillaMeta(), { propiasDeLaMeta: true });
 
     expect(r.columnasDetectadas["parcial"]).toBe("Parcial");
     expect(r.montoTotal).toBe(TOTAL_COSTO_EJEMPLO);

@@ -51,6 +51,22 @@ export interface ErrorImportacion {
   mensaje: string;
 }
 
+/**
+ * Un costo propio de la meta: tiene importe pero no codigo contractual.
+ *
+ * No es una `FilaImportada` recortada: le faltan a proposito el codigo, el
+ * tipo y el nivel, que son lo que ubica una partida en el arbol. Esta no va
+ * a ningun arbol.
+ */
+export interface FilaPropiaDeLaMeta {
+  fila: number;
+  descripcion: string;
+  unidad: string | null;
+  metrado: string | null;
+  precioUnitario: string | null;
+  parcial: string | null;
+}
+
 export interface ResultadoAnalisis {
   filas: FilaImportada[];
   errores: ErrorImportacion[];
@@ -65,6 +81,20 @@ export interface ResultadoAnalisis {
   gruposRepetidos: GrupoRepetido[];
   /// Filas de texto sin codigo: notas, subtitulos y clausulas del contrato.
   filasTextoOmitidas: number;
+  /**
+   * Costos con cifras pero SIN codigo, para la hoja de la meta.
+   *
+   * Solo se rellena con `opciones.propiasDeLaMeta`. Son los costos reales que
+   * el contrato no desglosa -un andamio alquilado, un encofrado metalico
+   * compartido por varias partidas-: cuentan en lo que cuesta la obra, pero no
+   * tienen linea propia en el presupuesto del cliente.
+   *
+   * Van APARTE de `filas` a proposito. `FilaImportada.codigo` es obligatorio
+   * porque el arbol del presupuesto se ordena y se anida por el; estas no
+   * entran en ese arbol, y hacerlo nullable obligaria a que cada consumidor
+   * del importador se preguntara que hacer con una partida sin sitio.
+   */
+  propiasDeLaMeta: FilaPropiaDeLaMeta[];
   /// Partidas ocultas en el Excel: quedaron fuera de alcance y no se importan.
   filasOcultas: number;
   /// Importe que suman esas partidas ocultas, para que se vea que se dejo fuera.
@@ -351,8 +381,20 @@ function clasificarCodigo(
   return { tipo: "PARTIDA", nivel };
 }
 
+export interface OpcionesAnalisis {
+  /**
+   * Recoger las filas con cifras y sin codigo en vez de descartarlas.
+   *
+   * Se enciende SOLO para la hoja de la meta. En el importador del
+   * presupuesto contractual una fila sin codigo sigue siendo una nota o un
+   * subtitulo, y recogerla ahi meteria texto suelto en el arbol de partidas.
+   */
+  propiasDeLaMeta?: boolean;
+}
+
 export async function analizarExcel(
   contenido: ArrayBuffer,
+  opciones: OpcionesAnalisis = {},
 ): Promise<ResultadoAnalisis> {
   const libro = new ExcelJS.Workbook();
   await libro.xlsx.load(contenido);
@@ -365,7 +407,7 @@ export async function analizarExcel(
       filas: [], errores: [{ fila: 0, mensaje: "El archivo no contiene ninguna hoja." }],
       filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0,
       totalPartidas: 0, montoTotal: "0.00", montoSinRepetidos: "0.00",
-      gruposRepetidos: [], filasTextoOmitidas: 0,
+      gruposRepetidos: [], filasTextoOmitidas: 0, propiasDeLaMeta: [],
       filasOcultas: 0, importeOculto: "0.00",
     };
   }
@@ -383,7 +425,7 @@ export async function analizarExcel(
       }],
       filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0,
       totalPartidas: 0, montoTotal: "0.00", montoSinRepetidos: "0.00",
-      gruposRepetidos: [], filasTextoOmitidas: 0,
+      gruposRepetidos: [], filasTextoOmitidas: 0, propiasDeLaMeta: [],
       filasOcultas: 0, importeOculto: "0.00",
     };
   }
@@ -397,6 +439,7 @@ export async function analizarExcel(
   const codigosVistos = new Map<string, number>();
 
   let filasTextoOmitidas = 0;
+  const propiasDeLaMeta: FilaPropiaDeLaMeta[] = [];
   let filasOcultas = 0;
   const importesOcultos: string[] = [];
 
@@ -418,10 +461,41 @@ export async function analizarExcel(
    * perder presupuesto en silencio.
    */
   const colCodigo = mapa.get("codigo")!;
+  const colParcial = mapa.get("parcial");
   let ultimaFila = filaCabecera;
   for (let n = filaCabecera + 1; n <= hoja.rowCount; n++) {
     const c = textoCelda(hoja.getRow(n).getCell(colCodigo));
-    if (c && CODIGO_VALIDO.test(c)) ultimaFila = n;
+    if (c && CODIGO_VALIDO.test(c)) {
+      ultimaFila = n;
+      continue;
+    }
+
+    /**
+     * Con `propiasDeLaMeta`, una fila CON IMPORTE tambien cierra tabla mas
+     * abajo aunque no tenga codigo.
+     *
+     * Sin esto, el bloque de costos propios -que en la plantilla va al final,
+     * detras de la ultima partida con codigo- quedaba fuera del recorrido y
+     * su dinero desaparecia sin que nada lo dijera. Se exige el IMPORTE, no
+     * solo la descripcion: asi las clausulas y los parrafos legales del
+     * final siguen sin alargar la tabla, que es lo que este corte protege.
+     */
+    if (opciones.propiasDeLaMeta && colParcial) {
+      const filaN = hoja.getRow(n);
+      const importe = normalizarDecimal(valorCelda(filaN.getCell(colParcial)), 2);
+      const colUnidad = mapa.get("unidad");
+      const colMetrado = mapa.get("metrado");
+      // Se exige ademas unidad o metrado: es lo que distingue un costo de la
+      // fila de TOTAL del final, que tambien tiene importe y tampoco codigo.
+      // Sin esta condicion la tabla se alargaba hasta el total y arrastraba
+      // con ella el texto legal que va detras.
+      const medible =
+        (colUnidad ? textoCelda(filaN.getCell(colUnidad)) : "") !== "" ||
+        (colMetrado
+          ? normalizarDecimal(valorCelda(filaN.getCell(colMetrado)), 4) !== null
+          : false);
+      if (importe !== null && medible) ultimaFila = n;
+    }
   }
 
   // Si no hay ningun codigo valido se recorre la hoja entera igualmente.
@@ -459,6 +533,56 @@ export async function analizarExcel(
     if (!codigo && !descripcion) continue;
 
     if (!codigo) {
+      /**
+       * Una fila SIN codigo pero CON importe, en la hoja de la meta, es un
+       * costo propio: algo que cuesta de verdad y que el contrato no
+       * desglosa. Antes se descartaba con el resto del texto, asi que ese
+       * dinero desaparecia sin decir nada -y el modelo lleva desde el
+       * principio preparado para guardarlo (`codigoRef` nulo)-.
+       */
+      if (opciones.propiasDeLaMeta) {
+        const leer = (campo: string, decimales: number) => {
+          const col = mapa.get(campo);
+          return col ? normalizarDecimal(valorCelda(fila.getCell(col)), decimales) : null;
+        };
+        const parcial = leer("parcial", 2);
+        const metrado = leer("metrado", 4);
+        const precioUnitario = leer("precioUnitario", 4);
+
+        const colUnidad = mapa.get("unidad");
+        const unidad = colUnidad
+          ? textoCelda(fila.getCell(colUnidad)) || null
+          : null;
+
+        /**
+         * Un costo, no un total.
+         *
+         * La fila «TOTAL COSTO DIRECTO» del final tambien tiene importe y
+         * tampoco tiene codigo, y colarla habria duplicado el presupuesto
+         * entero en una sola linea. Se distingue por la FORMA y no por su
+         * texto: un costo se mide -lleva unidad, o metrado y precio-, y un
+         * total no lleva ninguna de las dos cosas. Mirar la palabra "TOTAL"
+         * seria adivinar, y en el Excel de cada empresa se escribe distinto.
+         */
+        const esCosto =
+          (metrado !== null && precioUnitario !== null) ||
+          (parcial !== null && unidad !== null);
+
+        if (esCosto) {
+          propiasDeLaMeta.push({
+            fila: n,
+            descripcion,
+            unidad,
+            metrado,
+            precioUnitario,
+            // Sin parcial escrito se calcula, igual que en cualquier partida:
+            // el importe no puede quedarse en null teniendo con que sacarlo.
+            parcial: parcial ?? multiplicar(metrado!, precioUnitario!, 2),
+          });
+          continue;
+        }
+      }
+
       // Texto sin codigo: notas, subtitulos, filas de totales y clausulas
       // contractuales, que en los presupuestos reales aparecen intercaladas
       // entre capitulos. Se omiten en silencio y solo se cuentan.
@@ -597,7 +721,21 @@ export async function analizarExcel(
     totalPartidas: filas.filter((f) => f.tipo === "PARTIDA").length,
     // Solo las hojas: si un grupo lleva importe propio y sus hijas tambien,
     // sumar ambos contaria el mismo dinero dos veces.
-    montoTotal: sumarHojas(filas),
+    /**
+     * El total cuenta TAMBIEN los costos propios de la meta.
+     *
+     * Es lo que cuesta la obra, y esos costos cuestan. Dejarlos fuera del
+     * total del importador enseñaria una cifra distinta de la que despues
+     * guarda la meta -que si los suma-, y dos cifras del mismo dinero en dos
+     * pantallas es como empieza a no cuadrar nada.
+     */
+    montoTotal: sumar(
+      [
+        sumarHojas(filas),
+        ...propiasDeLaMeta.map((f) => f.parcial).filter((v): v is string => v !== null),
+      ],
+      2,
+    ),
     montoSinRepetidos: sumarHojas(
       filas.map((f) =>
         filasRepetidas.has(f.fila) ? { ...f, parcial: null } : f,
@@ -605,6 +743,7 @@ export async function analizarExcel(
     ),
     gruposRepetidos: repetidos,
     filasTextoOmitidas,
+    propiasDeLaMeta,
     filasOcultas,
     importeOculto: sumar(importesOcultos),
   };

@@ -97,7 +97,9 @@ export async function accionImportarMeta(
     // Las dos hojas del MISMO libro. `analizarExcel` lee la primera; el otro
     // busca la suya por nombre.
     [costo, gastos] = await Promise.all([
-      analizarExcel(contenido),
+      // `propiasDeLaMeta`: en la hoja de la meta, una fila con importe y sin
+      // codigo no es una nota, es un costo real que el contrato no desglosa.
+      analizarExcel(contenido, { propiasDeLaMeta: true }),
       analizarGastosGenerales(contenido),
     ]);
   } catch {
@@ -144,7 +146,39 @@ export async function accionImportarMeta(
     return { error: "La hoja de costo directo no tiene ni una linea valida." };
   }
 
-  const items: EntradaItemMeta[] = costo.filas.map((f) => ({
+  /**
+   * Las lineas del Excel, EN EL ORDEN DEL DOCUMENTO.
+   *
+   * Las que tienen codigo y las propias de la meta llegan en dos listas -son
+   * cosas distintas para el importador-, pero en el papel iban entremezcladas
+   * y asi es como su autor las lee. Se vuelven a unir por su numero de fila.
+   */
+  const enOrden = [
+    ...costo.filas.map((f) => ({ fila: f.fila, conCodigo: f, propia: null })),
+    ...costo.propiasDeLaMeta.map((p) => ({ fila: p.fila, conCodigo: null, propia: p })),
+  ].sort((a, b) => a.fila - b.fila);
+
+  const items: EntradaItemMeta[] = enOrden.map(({ conCodigo, propia }) => {
+    if (propia !== null) {
+      return {
+        // Sin codigo: es lo que la marca como propia de la meta y lo que hace
+        // que no aparezca en el contractual ni, por tanto, en el cronograma.
+        codigoRef: null,
+        descripcion: propia.descripcion,
+        tipo: "PARTIDA" as const,
+        nivel: 1,
+        unidad: propia.unidad,
+        metrado: propia.metrado,
+        precioUnitario: propia.precioUnitario,
+        parcial: propia.parcial,
+        porcentajeRecargo: null,
+        fechaInicio: null,
+        fechaFin: null,
+      };
+    }
+
+    const f = conCodigo!;
+    return {
     // El codigo del Excel ES la referencia al contractual. Si no existe alla,
     // el calculo lo tratara como linea propia de la meta y lo dira: no hace
     // falta que el usuario marque nada.
@@ -161,9 +195,10 @@ export async function accionImportarMeta(
     // presupuesto contractual. Se perdia justo aqui: el importador ya lo
     // leia, pero este mapeo no lo copiaba y nunca llegaba a la base.
     porcentajeRecargo: f.porcentajeRecargo,
-    fechaInicio: f.fechaInicio,
-    fechaFin: f.fechaFin,
-  }));
+      fechaInicio: f.fechaInicio,
+      fechaFin: f.fechaFin,
+    };
+  });
 
   const gastosGenerales: EntradaGastoMeta[] = gastos.filas.map((g) => ({
     concepto: g.concepto,

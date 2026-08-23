@@ -143,6 +143,8 @@ const CABECERAS_COSTO = [
 
 
 interface FilaCosto {
+  /// Vacio = COSTO PROPIO DE LA META: cuesta de verdad, pero el contrato no
+  /// lo desglosa y por tanto no tiene codigo contractual al que apuntar.
   codigo: string;
   descripcion: string;
   unidad?: string;
@@ -212,13 +214,28 @@ export const FILAS_COSTO: readonly FilaCosto[] = [
     precioUnitario: 5.1,
     parcial: 4998,
   },
+  /**
+   * El bloque SIN codigo: los costos propios de la meta.
+   *
+   * Van sin Item a proposito, y es la mitad importante de la leccion. Un
+   * costo con codigo entra al presupuesto del cliente como una linea mas -y
+   * de ahi al cronograma, como una tarea que alguien tendria que ejecutar-.
+   * Estos no: cuestan, cuentan en tu meta y en tu bolsa, y su dinero se cubre
+   * con el recargo del resto. El generador del contractual los deja fuera y
+   * avisa de cuanto suman.
+   *
+   * El ejemplo son alquileres de equipo compartido, y NO mano de obra: los
+   * ayudantes de una partida van dentro de su precio unitario, y el personal
+   * indirecto -residente, almacenero, prevencionista- va en los gastos
+   * generales, que no son de la meta. Ponerlos aqui invita a contar el mismo
+   * costo dos veces.
+   */
   {
-    codigo: "3.0",
-    recargo: 22,
-    descripcion: "COSTOS PROPIOS DE LA META (el contrato no los desglosa)",
+    codigo: "",
+    descripcion: "COSTOS PROPIOS DE LA META — sin Ítem: no van al contrato",
   },
   {
-    codigo: "3.1",
+    codigo: "",
     descripcion: "Andamio metálico en alquiler",
     unidad: "mes",
     metrado: 4,
@@ -226,8 +243,8 @@ export const FILAS_COSTO: readonly FilaCosto[] = [
     parcial: 1520,
   },
   {
-    codigo: "3.2",
-    descripcion: "Cuadrilla de apoyo (ayudantes de obra)",
+    codigo: "",
+    descripcion: "Encofrado metálico en alquiler (varias partidas)",
     unidad: "glb",
     metrado: 1,
     precioUnitario: 2600,
