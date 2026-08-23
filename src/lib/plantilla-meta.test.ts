@@ -315,6 +315,97 @@ describe("un recargo escrito en una PARTIDA llega hasta el contractual", () => {
   });
 });
 
+describe("una fila metida a mano, sin formulas, entra igual", () => {
+  /*
+   * Es lo que hace que anadir filas sea facil, y no se sabia: el importador
+   * calcula el parcial con el metrado y el precio cuando la celda viene
+   * vacia -«Sin subtotal en el archivo, se calcula», en
+   * `excel-presupuesto.ts`-. O sea que insertar una fila en blanco y escribir
+   * SIEMPRE funciono; lo que sobraba era el procedimiento que la plantilla
+   * enseñaba.
+   *
+   * Se fija aqui porque toda la simplificacion del texto depende de ello: si
+   * algun dia el importador dejara de calcular, la instruccion pasaria a ser
+   * un consejo que hace perder dinero.
+   */
+  const conFilaAMano = async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const hoja = libro.worksheets[0]!;
+
+    const f = hoja.getRow(25);
+    f.getCell(1).value = "1.3";
+    f.getCell(2).value = "Partida escrita a mano";
+    f.getCell(3).value = "m2";
+    f.getCell(4).value = 10;
+    f.getCell(5).value = 25;
+    // Sin formula en Parcial: asi nace una fila insertada en blanco.
+    f.getCell(6).value = null;
+
+    const salida = await libro.xlsx.writeBuffer();
+    return analizarExcel(
+      new Uint8Array(salida as unknown as Uint8Array).buffer as ArrayBuffer,
+      { propiasDeLaMeta: true },
+    );
+  };
+
+  it("su importe se calcula, y sin un solo error", async () => {
+    const r = await conFilaAMano();
+    const nueva = r.filas.find((x) => x.codigo === "1.3")!;
+
+    expect(nueva.parcial).toBe("250.00");
+    expect(r.errores).toEqual([]);
+  });
+
+  it("y suma al total, no se pierde por el camino", async () => {
+    const r = await conFilaAMano();
+    expect(r.montoTotal).toBe("141428.00");
+  });
+});
+
+describe("el TOTAL del pie cuenta lo mismo que GCM", () => {
+  /*
+   * La formula exigia `$A<>""`, o sea que solo sumaba las filas CON codigo.
+   * El dia que los sueldos bajaron al bloque sin Item eso dejo fuera 129.820
+   * soles: la hoja enseñaba un total y GCM importaba otro, y el total del pie
+   * es justo lo que se mira antes de subir el archivo.
+   */
+  it("incluye los costos propios, no solo las partidas", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const celda = libro.worksheets[0]!.getRow(406).getCell(6).value as {
+      formula?: string;
+      result?: number;
+    };
+
+    expect(celda.result).toBe(Number(TOTAL_COSTO_EJEMPLO));
+    // La condicion que los excluia ya no esta.
+    expect(celda.formula).not.toContain('<>""');
+  });
+
+  it("y cuenta tambien una fila sin formula, por su metrado y precio", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const f = libro.worksheets[0]!.getRow(406).getCell(6).value as {
+      formula?: string;
+    };
+
+    // El segundo sumando: las filas cuyo Parcial NO es un numero se cuentan
+    // por D x E, que es lo mismo que hace el importador.
+    expect(f.formula).toContain("1-IF(ISNUMBER($F$5:$F$404),1,0)");
+  });
+
+  it("sin `N(rango)`, que solo funciona dentro de Excel", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const f = libro.worksheets[0]!.getRow(406).getCell(6).value as {
+      formula?: string;
+    };
+
+    expect(f.formula).not.toMatch(/\bN\(/);
+  });
+});
+
 describe("cuantas filas vienen listas, y con que", () => {
   /*
    * Hasta el 23 de agosto de 2026 eran SESENTA, y parecian de sobra hasta que
@@ -383,13 +474,27 @@ describe("la proteccion deja salir", () => {
     }
   });
 
-  it("la leyenda nombra el menu que de verdad funciona, no «pegar»", async () => {
+  it("la leyenda dice lo simple: insertar y escribir", async () => {
+    /*
+     * Ayer decia «copia una fila vacia y usa Insertar celdas copiadas». Era
+     * cierto y era innecesario: el importador YA calcula el parcial con el
+     * metrado y el precio cuando la celda viene vacia, asi que una fila
+     * insertada en blanco entra bien. Se estaba enseñando un procedimiento de
+     * tres pasos para un problema que no existia, y el usuario lo dijo: «no
+     * me queda claro como agregar filas, se me hace dificil».
+     *
+     * El truco de copiar la fila sigue documentado en la hoja de
+     * instrucciones, donde toca: sirve para VER el parcial en Excel, no para
+     * que el presupuesto salga bien.
+     */
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(await generarPlantillaMeta());
     const leyenda = String(libro.worksheets[0]!.getCell("A3").value);
 
-    expect(leyenda).toContain("Insertar celdas copiadas");
-    expect(leyenda).toContain("Desproteger hoja");
+    expect(leyenda).toContain("Insertar");
+    expect(leyenda).toContain("GCM lo calcula");
+    // Y no vuelve a pedir el rodeo como si fuera obligatorio.
+    expect(leyenda).not.toContain("Insertar celdas copiadas");
   });
 });
 

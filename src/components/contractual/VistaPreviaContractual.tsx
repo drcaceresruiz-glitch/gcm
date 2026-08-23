@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 
 import {
   generarContractual,
@@ -389,6 +390,21 @@ export function VistaPreviaContractual({
               </p>
               <p className="text-amber-900">{a.mensaje}</p>
               <p className="mt-1 text-xs text-slate-600">{a.codigos.join(", ")}</p>
+
+              {/*
+                El aviso decia QUE pasa y no DONDE se arregla, y esta pantalla
+                no es el sitio: aqui se decide el margen, los costos se editan
+                en la meta. Duplicar ahi el editor seria tener dos formularios
+                que escriben lo mismo; basta con no dejar a nadie buscando.
+              */}
+              {a.motivo === "SIN_CODIGO" && (
+                <Link
+                  href={`/obras/${obraId}/meta`}
+                  className="mt-2 inline-block text-xs font-medium text-amber-900 underline"
+                >
+                  Añadir o quitar costos propios en el presupuesto meta
+                </Link>
+              )}
             </div>
           ))}
         </section>

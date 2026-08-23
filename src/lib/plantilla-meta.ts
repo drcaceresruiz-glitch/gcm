@@ -398,8 +398,8 @@ const INSTRUCCIONES: readonly (readonly [string, string])[] = [
     "Escribe 15 para 15%. Puesto en el CAPÍTULO lo heredan todas sus partidas, y con eso basta casi siempre. Pero puedes ponerlo también en una PARTIDA suelta, y entonces gana el suyo: sirve para la que lleve un margen distinto —una subcontrata que ya viene cerrada no admite el mismo que la mano de obra propia—. Un 0 NO es lo mismo que dejarlo vacío: 0 significa «esta entra a precio de costo, y lo sé»; vacío significa «que herede». Las filas sin Ítem no se recargan: su costo se cubre con el recargo del resto.",
   ],
   [
-    "3b. Añadir filas",
-    "Hay 400 filas listas con sus fórmulas, así que para añadir al final NO hace falta nada: escribe en la primera vacía. Para meter una partida EN MEDIO: clic en el NÚMERO de una fila vacía para seleccionarla entera, Ctrl+C, luego botón derecho sobre el número de la fila donde la quieres y elige «Insertar celdas copiadas». Con «Pegar» a secas Excel avisa de que la hoja está protegida y no lo hace: pegar sobrescribe las celdas de fórmula, que están bloqueadas; insertar crea la fila nueva y no machaca ninguna. Y si insertas una fila en blanco (botón derecho > Insertar), nace SIN fórmulas: el Parcial y el Contractual se quedan vacíos y el presupuesto sale corto sin que nada lo avise. Si prefieres trabajar sin red: Revisar > Desproteger hoja, no pide contraseña.",
+    "3b. Añadir filas (es más fácil de lo que parece)",
+    "Al final: escribe en la primera fila vacía, ya hay 400 listas. En medio: botón derecho sobre el número de la fila > Insertar, y escribe. Ya está. Aunque la fila nueva salga sin fórmula y el Parcial se quede en blanco, GCM lo calcula al importar con el metrado y el precio unitario, y el TOTAL del pie también la cuenta. Si además quieres ver el Parcial en la pantalla de Excel, copia antes una fila vacía (clic en su número, Ctrl+C) y usa «Insertar celdas copiadas» en vez de «Insertar»: así la fórmula viaja con ella. Y si Excel se pone pesado con que la hoja está protegida: Revisar > Desproteger hoja, no pide contraseña.",
   ],
   [
     "4. Lo que NO pongas se nota",
@@ -684,19 +684,53 @@ export async function generarPlantillaMeta(
   const total = costo.getRow(filaTotal);
   total.getCell(2).value = "TOTAL COSTO DIRECTO";
   total.getCell(2).font = { bold: true };
-  // Suma solo las HOJAS: los capitulos ya suman a las suyas, y contarlos
-  // otra vez duplicaria la obra entera. Se distinguen porque su codigo
-  // termina en ".0", asi que se suma por el codigo con SUMPRODUCT.
-  const totalHojas = FILAS_COSTO.filter(
-    (f) => f.metrado !== undefined && f.precioUnitario !== undefined,
-  ).reduce((s, f) => s + (f.metrado ?? 0) * (f.precioUnitario ?? 0), 0);
+  /**
+   * El TOTAL suma todo lo que cuesta, y sobrevive a una fila escrita a mano.
+   *
+   * DOS COSAS QUE ARREGLA, las dos del 23 de agosto de 2026:
+   *
+   * 1. Antes exigia `$A<>""`, o sea que solo contaba las filas CON codigo. El
+   *    dia que los sueldos y las polizas bajaron al bloque sin Item, esa
+   *    condicion dejo fuera 129.820 soles: la hoja enseñaba un total y GCM
+   *    importaba otro. Ahora el unico excluido es el CAPITULO, que no se
+   *    cuenta porque ya suman sus hijas.
+   *
+   * 2. El segundo sumando cubre las filas SIN formula en Parcial, que es como
+   *    nace una fila insertada a mano. Se usan su metrado y su precio, que es
+   *    exactamente lo que hace el importador cuando la celda viene vacia
+   *    (`excel-presupuesto.ts`: «Sin subtotal en el archivo, se calcula»). Con
+   *    esto la hoja y GCM dicen el mismo numero pase lo que pase, y anadir una
+   *    fila deja de tener trampa: insertala y escribe.
+   *
+   * `IF(ISNUMBER(rango),rango,0)` y no `N(rango)`: el segundo solo evalua como
+   * matriz dentro de Excel y da 0,00 en cualquier otro programa. La
+   * multiplicacion en vez de `NOT(...)` por lo mismo, para no depender de que
+   * una funcion logica se evalue por matriz.
+   */
+  const esCapitulo = (f: FilaCosto) => f.codigo.endsWith(".0");
+  const totalHojas = FILAS_COSTO.filter((f) => !esCapitulo(f)).reduce(
+    (acc, f) =>
+      acc +
+      (f.parcial ??
+        (f.metrado !== undefined && f.precioUnitario !== undefined
+          ? f.metrado * f.precioUnitario
+          : 0)),
+    0,
+  );
+
+  const rango = (col: string) =>
+    `$${col}$${primeraFila}:$${col}$${ultimaFila}`;
+  const numero = (col: string) =>
+    `IF(ISNUMBER(${rango(col)}),${rango(col)},0)`;
+  /// Un capitulo no se cuenta: sus hijas ya estan en la suma.
+  const noEsCapitulo = `(RIGHT(${rango("A")},2)<>".0")`;
 
   total.getCell(6).value = {
-    result: totalHojas,
+    result: Math.round(totalHojas * 100) / 100,
     formula:
-      `SUMPRODUCT((RIGHT($A$${primeraFila}:$A$${ultimaFila},2)<>".0")*` +
-      `($A$${primeraFila}:$A$${ultimaFila}<>"")*` +
-      `IF(ISNUMBER($F$${primeraFila}:$F$${ultimaFila}),$F$${primeraFila}:$F$${ultimaFila},0))`,
+      `SUMPRODUCT(${noEsCapitulo}*${numero("F")})+` +
+      `SUMPRODUCT(${noEsCapitulo}*(1-IF(ISNUMBER(${rango("F")}),1,0))*` +
+      `${numero("D")}*${numero("E")})`,
   };
 
   // El contractual total: la suma de los capitulos ya recargados. Solo los
@@ -724,11 +758,10 @@ export async function generarPlantillaMeta(
   for (const hoja of [costo]) {
     const leyenda = hoja.getCell("A3");
     leyenda.value =
-      "Las celdas en gris se calculan solas y están bloqueadas. Escribe solo en las blancas. " +
-      "Hay " + FILAS_PREPARADAS + " filas listas con sus fórmulas: rellena las que necesites y deja el resto vacías. " +
-      "Para añadir una en medio: copia una fila vacía (clic en su NÚMERO) y en la fila destino usa botón derecho > «Insertar celdas copiadas». Con «Pegar» no va: sobrescribe las celdas bloqueadas y Excel lo impide. " +
-      "Si Excel se pone pesado: Revisar > Desproteger hoja, no tiene contraseña. " +
-      "Las filas SIN Ítem son costos propios de la meta: cuestan, pero no se le facturan al cliente línea a línea. " +
+      "Las celdas en gris se calculan solas. Escribe solo en las blancas. " +
+      "Hay " + FILAS_PREPARADAS + " filas listas: usa las que necesites y deja el resto vacías. " +
+      "¿Te falta una en medio? Insértala como siempre (botón derecho sobre el número de fila > Insertar) y escribe: aunque el Parcial se quede en blanco, GCM lo calcula con el metrado y el precio. " +
+      "Las filas SIN Ítem son costos propios (sueldos, alquileres, pólizas): cuestan, pero no se le facturan al cliente línea a línea. " +
       "Las fechas son opcionales, van en las partidas (01/08/2026) y las dos o ninguna.";
     leyenda.font = { italic: true, size: 10, color: { argb: "FF667788" } };
 
