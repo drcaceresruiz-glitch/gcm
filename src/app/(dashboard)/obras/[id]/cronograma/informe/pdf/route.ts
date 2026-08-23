@@ -3,6 +3,8 @@ import { componerInforme } from "@/services/informe.service";
 import { generarInformePdf } from "@/services/informe-pdf.service";
 import { nombreArchivoInforme } from "@/lib/informe-documento";
 import { bytesDelLogo } from "@/services/logo.service";
+import { archivoEvidencia } from "@/services/evidencia.service";
+import { clavesDeLaBitacora } from "@/lib/informe-hoja-bitacora";
 
 /**
  * El informe al corte en PDF, completo.
@@ -39,12 +41,41 @@ export async function GET(
   }
 
   const datos = informe.datos;
-  // El logo se lee del disco aqui, no dentro del generador: asi el modulo del
-  // PDF no necesita saber nada de la sesion ni de la base.
+
+  /**
+   * Las fotos de la bitacora, leidas AQUI y no dentro del generador.
+   *
+   * Mismo reparto que el logo: el modulo del PDF no sabe nada de la sesion ni
+   * del disco. Y se leen SOLO las que la bitacora va a dibujar —de eso
+   * responde `clavesDeLaBitacora`, que sale de la misma funcion que decide la
+   * maquetacion—: una obra con seiscientas fotos no puede leerlas todas de
+   * disco para acabar imprimiendo dieciocho.
+   *
+   * Cada lectura pasa por `archivoEvidencia`, con su filtro de empresa y su
+   * permiso: que la foto salga en un PDF no la saca del control de acceso.
+   */
+  const claves = clavesDeLaBitacora({
+    obra: datos.obra,
+    empresa: datos.empresa,
+    fechaCorte: datos.fechaCorte,
+    activas: datos.activas,
+    fotosPorUid: datos.fotosPorUid,
+  });
+
+  const bytes = new Map<string, { contenido: Buffer; mime: string }>();
+  for (const clave of claves) {
+    const archivo = await archivoEvidencia(sesion, clave);
+    // Una foto purgada o sin permiso simplemente no viaja: el informe sale
+    // igual y su marco queda vacio, que es mas honesto que no generar nada.
+    if ("error" in archivo) continue;
+    bytes.set(clave, { contenido: archivo.contenido, mime: archivo.mimeType });
+  }
+
   const pdf = await generarInformePdf(
     datos,
     new Date(),
     await bytesDelLogo(sesion.companyId),
+    { fotosPorUid: datos.fotosPorUid, bytes },
   );
   const nombre = nombreArchivoInforme(datos.obra, datos.fechaCorte, "pdf");
 

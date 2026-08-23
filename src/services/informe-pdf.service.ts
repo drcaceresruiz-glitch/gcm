@@ -3,6 +3,7 @@ import { LineCapStyle, PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { documentoDelInforme, fechaCsv } from "@/lib/informe-documento";
 import type { DatosCsvInforme } from "@/lib/informe-documento";
 import { hojaDashboard } from "@/lib/informe-hoja-dashboard";
+import { hojasBitacora, type DatosBitacora } from "@/lib/informe-hoja-bitacora";
 import { A4_APAISADO, paginasDelInforme, type TintaPdf } from "@/lib/informe-pdf";
 import { aWinAnsi } from "@/lib/pdf-texto";
 import { encajarEnCaja } from "@/lib/imagen";
@@ -70,12 +71,20 @@ export async function generarInformePdf(
   /// logo es un informe; uno que revienta por no encontrarlo, no.
   logo?: { contenido: Buffer; mime: string } | null,
   /**
-   * Las fotos que las hojas piden POR CLAVE (la bitagora fotografica, cuando
-   * llegue). Vacio mientras ninguna hoja pida ninguna: la maquetacion ya sabe
-   * pedirlas y el pintor ya sabe ponerlas, asi que anadir la hoja que las use
-   * no toca ni una linea de aqui.
+   * La bitacora fotografica, si quien llama la quiere y ha podido cargar las
+   * fotos.
+   *
+   * Los dos datos viajan JUNTOS a proposito: las fotos por partida deciden que
+   * se dibuja y los bytes son lo que se dibuja. Poder pasar uno sin el otro
+   * seria poder pedir una bitacora que sale con seis marcos vacios.
+   *
+   * Opcional porque el informe tiene que salir igual sin ella: el envio por
+   * correo, por ejemplo, no arrastra las fotos.
    */
-  fotos?: ReadonlyMap<string, { contenido: Buffer; mime: string }>,
+  bitacora?: {
+    fotosPorUid: DatosBitacora["fotosPorUid"];
+    bytes: ReadonlyMap<string, { contenido: Buffer; mime: string }>;
+  },
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle(`Informe de obra - ${aWinAnsi(d.obra)}`);
@@ -96,6 +105,25 @@ export async function generarInformePdf(
    * `DatosCsvInforme`, asi que no pueden contradecirse: la primera pagina es
    * la lectura rapida de lo que las siguientes detallan.
    */
+  /**
+   * La bitacora va al FINAL, despues de las tablas.
+   *
+   * Es el anexo: quien audita el informe quiere primero las cifras, y quien
+   * solo quiere ver la obra va derecho a las fotos. Ponerla en medio parte la
+   * lectura de las dos maneras a la vez.
+   */
+  const hojasDeLaBitacora = hojasBitacora(
+    {
+      obra: d.obra,
+      empresa: d.empresa,
+      fechaCorte: d.fechaCorte,
+      activas: d.activas,
+      fotosPorUid: bitacora?.fotosPorUid ?? {},
+    },
+    A4_APAISADO,
+    medir,
+  );
+
   const paginas = [
     hojaDashboard(d, A4_APAISADO, medir),
     ...paginasDelInforme(
@@ -105,6 +133,7 @@ export async function generarInformePdf(
       A4_APAISADO,
       medir,
     ),
+    ...hojasDeLaBitacora,
   ];
 
   const o = A4_APAISADO;
@@ -172,7 +201,7 @@ export async function generarInformePdf(
   /// Incrustadas una sola vez, aunque una foto se repita en dos hojas. La que
   /// no se pueda leer se queda fuera y el informe sale igual, como el logo.
   const imagenes = new Map<string, Awaited<ReturnType<typeof pdf.embedPng>>>();
-  for (const [clave, foto] of fotos ?? []) {
+  for (const [clave, foto] of bitacora?.bytes ?? []) {
     try {
       imagenes.set(
         clave,
@@ -263,7 +292,21 @@ export async function generarInformePdf(
         // informe: simplemente no se dibuja. Mismo criterio que el logo.
         const img = imagenes.get(e.clave);
         if (img) {
-          hoja.drawImage(img, { x: e.x, y: e.y, width: e.ancho, height: e.alto });
+          /**
+           * La maquetacion da la CAJA; la proporcion la pone aqui.
+           *
+           * Es el mismo reparto que con el logo, y por el mismo motivo: solo
+           * este modulo sabe cuantos pixeles mide la imagen de verdad. Una
+           * foto de obra estirada para llenar su celda es una foto que
+           * miente sobre lo que se ve en ella.
+           */
+          const medida = encajarEnCaja(img.width, img.height, e.ancho, e.alto);
+          hoja.drawImage(img, {
+            x: e.x + (e.ancho - medida.ancho) / 2,
+            y: e.y + (e.alto - medida.alto) / 2,
+            width: medida.ancho,
+            height: medida.alto,
+          });
         }
         continue;
       }

@@ -111,9 +111,14 @@ export type ElementoPdf =
       tinta: TintaPdf;
     }
   /**
-   * Una imagen ya colocada. Viaja por CLAVE, no por contenido: la maquetacion
-   * es codigo puro que se prueba sin tocar disco, y un Buffer aqui dentro
-   * obligaria a cargar las fotos para comprobar donde cae una caja.
+   * La CAJA donde va una imagen. Viaja por CLAVE, no por contenido: la
+   * maquetacion es codigo puro que se prueba sin tocar disco, y un Buffer
+   * aqui dentro obligaria a cargar las fotos para comprobar donde cae una
+   * caja.
+   *
+   * `ancho` y `alto` son el limite, NO la forma final: el pintor encaja la
+   * imagen dentro conservando su proporcion y la centra, igual que hace con
+   * el logo. Aqui no se puede saber cuantos pixeles mide de verdad.
    */
   | { tipo: "imagen"; x: number; y: number; ancho: number; alto: number; clave: string }
   /// Un tramo de curva. Se emite uno por cada par de puntos consecutivos, para
