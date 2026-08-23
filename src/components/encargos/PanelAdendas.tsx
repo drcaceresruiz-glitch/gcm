@@ -150,13 +150,28 @@ export function PanelAdendas({
             backgroundColor: "color-mix(in oklab, var(--color-alerta) 15%, transparent)",
           }}
         >
-          {/* «Hay tres pendientes» no mueve a nadie; «hay 30.000 esperando tu
-              firma» sí. */}
+          {/*
+            «Hay tres pendientes» no mueve a nadie; «hay 30.000 esperando tu
+            firma» sí. Y a quien PUEDE firmar hay que decirle que es él y
+            donde: el aviso decia «esperan la firma de gerencia» tambien al
+            gerente, que se quedaba buscando la pantalla donde firmar cuando
+            los botones estaban tres centimetros mas abajo.
+          */}
           <strong>
             {resumen.pendientes} adenda{resumen.pendientes === 1 ? "" : "s"} por{" "}
             {soles(resumen.importePendiente)}
           </strong>{" "}
-          {resumen.pendientes === 1 ? "espera" : "esperan"} la firma de gerencia.
+          {puedeAprobar ? (
+            <>
+              {resumen.pendientes === 1 ? "espera tu firma" : "esperan tu firma"}.
+              Cada una tiene su botón <strong>Aprobar</strong> aquí abajo.
+            </>
+          ) : (
+            <>
+              {resumen.pendientes === 1 ? "espera" : "esperan"} la firma de
+              gerencia.
+            </>
+          )}{" "}
           Todavía no cuenta{resumen.pendientes === 1 ? "" : "n"} en lo que se
           paga.
         </p>

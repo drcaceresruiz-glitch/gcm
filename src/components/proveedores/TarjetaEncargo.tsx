@@ -91,6 +91,34 @@ export function TarjetaEncargo({
             {encargo.proveedor.razonSocial} · RUC {encargo.proveedor.ruc} ·{" "}
             {encargo.partidas} partida(s)
           </p>
+
+          {/*
+            EL AVISO VA EN LA LISTA, no solo dentro del encargo.
+
+            Quien firma no sabe en que contrato hay algo esperando: sin esto
+            habria que abrir los encargos uno a uno para encontrarlo, y una
+            firma que hay que ir a buscar es una firma que se queda sin dar.
+            Se dice el IMPORTE y no solo que hay algo: «una adenda pendiente»
+            no mueve a nadie, «S/ 8.000 esperando tu firma» si.
+          */}
+          {encargo.adendasPendientes > 0 && (
+            <p
+              className="mt-1.5 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium"
+              style={{
+                // Mezclado con la tinta y no un color inventado: los tonos
+                // del semaforo se definen en `globals.css` y hay una prueba
+                // que caza cualquier variable que no exista.
+                color: "color-mix(in oklab, var(--color-alerta) 70%, var(--tinta))",
+                backgroundColor:
+                  "color-mix(in oklab, var(--color-alerta) 22%, transparent)",
+              }}
+            >
+              <Pencil className="size-3" aria-hidden="true" />
+              {encargo.adendasPendientes} adenda
+              {encargo.adendasPendientes === 1 ? "" : "s"} por{" "}
+              {soles(encargo.importeAdendasPendientes)} sin firmar
+            </p>
+          )}
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">

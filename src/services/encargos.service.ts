@@ -68,6 +68,16 @@ export interface EncargoResumen {
   fechaInicio: Date | null;
   fechaFin: Date | null;
   partidas: number;
+  /**
+   * Adendas de este contrato que esperan la firma de gerencia, y cuanto suman.
+   *
+   * Viaja hasta la LISTA y no solo hasta la ficha porque quien firma no sabe
+   * en que contrato hay algo esperando: sin esto habria que abrir los
+   * encargos uno a uno para encontrarlo, y una firma que hay que ir a buscar
+   * es una firma que se queda sin dar.
+   */
+  adendasPendientes: number;
+  importeAdendasPendientes: string;
   /// Fecha de la ultima valorizacion, si hay.
   ultimaValorizacion: Date | null;
   /**
@@ -245,6 +255,9 @@ export async function listarEncargos(
       fechaInicio: e.fechaInicio,
       fechaFin: e.fechaFin,
       partidas: e.partidas.length,
+      adendasPendientes: adendas.get(e.id)?.resumen.pendientes ?? 0,
+      importeAdendasPendientes:
+        adendas.get(e.id)?.resumen.importePendiente ?? "0.00",
       ultimaValorizacion: vigente ? vigente.fecha : null,
       numeroObra: vigente ? vigente.numeroObra : null,
       numeroEncargo: vigente ? vigente.numeroEncargo : null,
