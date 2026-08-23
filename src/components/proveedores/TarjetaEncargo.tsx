@@ -126,14 +126,25 @@ export function TarjetaEncargo({
             </Link>
           )}
 
-          {puedeGestionar && !anulado && (
+          {/*
+            El enlace ya NO depende de `puedeGestionar`, y el texto cambia con
+            lo que cada uno puede hacer ahi dentro.
+
+            Desde que existen las adendas, esa pantalla es tambien donde el
+            RESIDENTE registra los adicionales del contratista, y el residente
+            no tiene `encargo:gestionar` -no pacta montos-. Con el enlace
+            escondido, la persona a la que va dirigida la funcion no tenia por
+            donde llegar. Quien solo lee entra igual: la ficha es la unica
+            vista completa del contrato.
+          */}
+          {!anulado && (
             <Link
               href={`/obras/${obraId}/proveedores/${encargo.id}`}
               className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs"
               style={{ borderColor: "var(--borde)" }}
             >
               <Pencil className="size-3.5" aria-hidden="true" />
-              Editar
+              {puedeGestionar ? "Editar" : "Ver contrato"}
             </Link>
           )}
         </div>

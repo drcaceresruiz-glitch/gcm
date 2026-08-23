@@ -97,7 +97,7 @@ describe("los innegociables no se pueden reconfigurar", () => {
  * GERENTE se DERIVA de PERMISOS (`TODO_LO_QUE_SE_LEE`), no se enumera a
  * mano. Esta prueba fija la regla en si, no una lista: si algun dia se anade
  * un permiso de lectura nuevo, tiene que seguir cumpliendola sin que nadie
- * toque `MATRIZ.GERENTE`.
+ * toque `permisosDe("GERENTE")`.
  */
 describe("GERENTE: ve todo lo que se lee, administra y aprueba nada", () => {
   const permisos = permisosDe("GERENTE");
@@ -197,5 +197,45 @@ describe("filas que la base puede traer y el codigo ya no reconoce", () => {
     );
 
     expect(permisos).toEqual(ordenados);
+  });
+});
+
+describe("las dos firmas de una adenda de contratista", () => {
+  /*
+   * El circuito solo existe si los dos permisos estan en manos distintas por
+   * defecto. Si un mismo rol naciera con los dos, la separacion seria una
+   * costumbre y no una regla, y bastaria con que alguien no se fijara.
+   */
+  it("el residente registra pero NO firma", () => {
+    expect(permisosDe("RESIDENTE")).toContain("adenda:crear");
+    expect(permisosDe("RESIDENTE")).not.toContain("adenda:aprobar");
+  });
+
+  it("el administrador de obra tampoco firma", () => {
+    // Muchas adendas llegan por la via administrativa, asi que registra; pero
+    // aprobar lo que uno mismo tramita es el agujero que esto cierra.
+    expect(permisosDe("ADMIN_OBRA")).toContain("adenda:crear");
+    expect(permisosDe("ADMIN_OBRA")).not.toContain("adenda:aprobar");
+  });
+
+  it("el ADMIN si firma: es quien hace de gerencia", () => {
+    expect(permisosDe("ADMIN")).toContain("adenda:aprobar");
+  });
+
+  it("el GERENTE solo lee, tambien aqui", () => {
+    // El rol GERENTE de GCM es de lectura: «ve el negocio entero pero no
+    // administra ni aprueba nada». Si el gerente general de una constructora
+    // tiene que firmar, se le da el permiso desde Empresa > Permisos -por eso
+    // NO es innegociable- o se le pone ADMIN.
+    expect(permisosDe("GERENTE")).not.toContain("adenda:crear");
+    expect(permisosDe("GERENTE")).not.toContain("adenda:aprobar");
+  });
+
+  it("aprobar una adenda SE PUEDE repartir, a diferencia de los contractuales", () => {
+    // Aprobar una linea base, un movimiento o la meta son actos contractuales
+    // y son de ADMIN pase lo que pase. Una adenda mueve costo interno, y quien
+    // la firma cambia de una empresa a otra.
+    expect(INNEGOCIABLES).not.toContain("adenda:aprobar");
+    expect(INNEGOCIABLES).toContain("movimiento:aprobar");
   });
 });

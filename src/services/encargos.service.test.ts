@@ -33,8 +33,20 @@ const estado: {
   /// El `where` con el que el servicio pidio los encargos ya asignados. Es
   /// lo unico observable del filtro por estado desde aqui.
   filtroEncargos: Record<string, unknown> | null;
-  /// El encargo que se va a valorizar, o null si no es de esta obra/empresa.
-  encargo: { id: string; estado: string } | null;
+  /**
+   * El encargo que se va a valorizar, o null si no es de esta obra/empresa.
+   *
+   * Lleva `montoContratado` y `adendas` porque el corte CONGELA su importe, y
+   * lo congela contra el vigente: sin esos dos campos el doble no se parece a
+   * lo que devuelve Prisma y las pruebas fallarian por algo que no es lo que
+   * comprueban.
+   */
+  encargo: {
+    id: string;
+    estado: string;
+    montoContratado: { toString: () => string };
+    adendas: { importe: { toString: () => string } }[];
+  } | null;
   /// Los cortes escritos. Append-only: aqui solo se puede acumular.
   valorizaciones: Record<string, unknown>[];
   /// Freno para provocar el solape: si esta puesta, el calculo del correlativo
@@ -48,7 +60,12 @@ const estado: {
   cerrada: null,
   creados: [],
   filtroEncargos: null,
-  encargo: { id: "enc-1", estado: "VIGENTE" },
+  encargo: {
+    id: "enc-1",
+    estado: "VIGENTE",
+    montoContratado: { toString: () => "50000.00" },
+    adendas: [],
+  },
   valorizaciones: [],
   puerta: null,
 };
@@ -214,7 +231,12 @@ beforeEach(() => {
   estado.cerrada = null;
   estado.creados = [];
   estado.filtroEncargos = null;
-  estado.encargo = { id: "enc-1", estado: "VIGENTE" };
+  estado.encargo = {
+    id: "enc-1",
+    estado: "VIGENTE",
+    montoContratado: { toString: () => "50000.00" },
+    adendas: [],
+  };
   estado.valorizaciones = [];
   estado.puerta = null;
 });
@@ -623,7 +645,12 @@ describe("valorizarEncargo: quien puede y sobre que", () => {
   it("un encargo anulado no se valoriza", async () => {
     // Anulado quiere decir que ese contrato ya no rige. Reconocerle avance
     // seria reconocer trabajo contra algo que no existe.
-    estado.encargo = { id: "enc-1", estado: "ANULADO" };
+    estado.encargo = {
+      id: "enc-1",
+      estado: "ANULADO",
+      montoContratado: { toString: () => "50000.00" },
+      adendas: [],
+    };
     const r = await valorizarEncargo(
       sesion(["encargo:valorizar"]),
       "obra-1",

@@ -14,6 +14,8 @@ import { hoy } from "@/utils/fechas";
 import { soles } from "@/utils/formato";
 import { Mascota } from "@/components/ui/Mascota";
 import { PanelBolsa } from "@/components/meta/PanelBolsa";
+import { BolsaComprometida } from "@/components/meta/BolsaComprometida";
+import { bolsaComprometidaDeObra } from "@/services/adendas.service";
 import { TablaBolsa } from "@/components/meta/TablaBolsa";
 import { TablaMetaEditable } from "@/components/meta/TablaMetaEditable";
 import { lineasDelBorrador } from "@/services/meta-edicion.service";
@@ -139,6 +141,23 @@ export default async function MetaPage({
   const borradorMeta = metas.find((m) => !m.aprobada) ?? null;
   const mesesSugeridos = mesesEntre(obra.fechaInicio, obra.fechaFinProgramada);
 
+  /*
+   * La bolsa comprometida se calcula APARTE y DESPUES, con la prevista ya
+   * resuelta como entrada.
+   *
+   * No se recalcula la prevista aqui dentro: si las dos salieran de cuentas
+   * distintas, la pantalla podria enseñar una resta que no cuadra con sus
+   * propios sumandos. Y va fuera del `Promise.all` de arriba porque depende
+   * de su resultado.
+   */
+  const comprometida = comparacion.ok
+    ? await bolsaComprometidaDeObra(
+        sesion,
+        id,
+        comparacion.comparacion.bolsa.bolsaTotal,
+      )
+    : null;
+
   return (
     <div className="space-y-8">
       <div>
@@ -166,6 +185,9 @@ export default async function MetaPage({
       {comparacion.ok ? (
         <>
           <PanelBolsa c={comparacion.comparacion} />
+          {comprometida && (
+            <BolsaComprometida cuentas={comprometida} obraId={id} />
+          )}
           <TablaBolsa lineas={comparacion.comparacion.bolsa.porLinea} />
         </>
       ) : (

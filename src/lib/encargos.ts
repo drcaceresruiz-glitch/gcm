@@ -1,3 +1,4 @@
+import { montoVigente } from "@/lib/adendas";
 import {
   sumar,
   restar,
@@ -96,15 +97,30 @@ export function importeValorizado(
 }
 
 export interface DatosResumen {
+  /// Lo FIRMADO. Se conserva aparte del vigente a proposito: si se
+  /// sobrescribiera con cada adenda, nadie podria saber despues si el
+  /// contrato siempre valio eso o si el contratista se paso un 20 %.
   montoContratado: string;
+  /// Las adendas APROBADAS, con signo. Vacio si no hay ninguna.
+  adendas?: readonly string[];
   presupuestoFrente: string;
   comprometido: string;
+  /// El importe ya valorizado, congelado corte a corte. Si no viaja, se cae
+  /// al calculo antiguo -porcentaje x monto- que revalua el pasado cada vez
+  /// que cambia el contrato. Ver `lib/adendas.ts`.
+  valorizadoAcumulado?: string | null;
   /// % de avance vigente del proveedor, o null si no ha valorizado.
   avancePorcentaje: string | null;
 }
 
 export interface ResumenEncargo {
+  /// Lo FIRMADO, sin adendas. Se conserva para poder ver cuanto se movio.
   montoContratado: string;
+  /// Lo firmado mas las adendas APROBADAS: lo que de verdad hay que pagar.
+  /// Es contra esto contra lo que van todas las cuentas de abajo.
+  montoVigente: string;
+  /// Cuanto suman las adendas aprobadas, con signo. Cero si no hay ninguna.
+  adendas: string;
   presupuestoFrente: string;
   comprometido: string;
   /// Contratado menos presupuesto. Positivo = el proveedor cobra mas de lo que
@@ -131,11 +147,21 @@ export interface ResumenEncargo {
  * rompe en silencio. En dinero, siempre `restar`.
  */
 export function resumenEncargo(datos: DatosResumen): ResumenEncargo {
-  const contraPresupuesto =
-    restar(datos.montoContratado, datos.presupuestoFrente) ?? "0.00";
+  /*
+   * TODAS las cuentas van contra el monto VIGENTE, no contra el firmado.
+   *
+   * Un adicional aprobado es plata que hay que pagar: si el «por comprometer»
+   * o el «contra presupuesto» siguieran mirando el monto original, un
+   * contratista con adendas apareceria como si le quedara margen cuando ya se
+   * lo comio. El firmado se conserva y se enseña aparte, que es lo que
+   * permite ver CUANTO se movio.
+   */
+  const vigente = montoVigente(datos.montoContratado, (datos.adendas ?? []).map((importe) => ({ importe })));
 
-  const diferenciaContrato =
-    restar(datos.montoContratado, datos.comprometido) ?? "0.00";
+  const contraPresupuesto =
+    restar(vigente, datos.presupuestoFrente) ?? "0.00";
+
+  const diferenciaContrato = restar(vigente, datos.comprometido) ?? "0.00";
 
   // Si el comprometido supera el contrato, `porComprometer` es cero y el
   // exceso se reporta aparte: mezclarlos daria un "por comprometer" negativo
@@ -144,17 +170,30 @@ export function resumenEncargo(datos: DatosResumen): ResumenEncargo {
 
   return {
     montoContratado: datos.montoContratado,
+    montoVigente: vigente,
+    adendas: restar(vigente, datos.montoContratado) ?? "0.00",
     presupuestoFrente: datos.presupuestoFrente,
     comprometido: datos.comprometido,
     contraPresupuesto,
     porComprometer: excedido ? "0.00" : diferenciaContrato,
     excesoComprometido: excedido
-      ? (restar(datos.comprometido, datos.montoContratado) ?? "0.00")
+      ? (restar(datos.comprometido, vigente) ?? "0.00")
       : "0.00",
+    /*
+     * Lo valorizado sale de la SUMA DE LOS CORTES, no de un porcentaje por el
+     * monto de hoy. Con el contrato inmutable las dos cuentas daban lo mismo;
+     * en cuanto entra una adenda, la segunda revalua el pasado -un deductivo
+     * hacia abajo, un adicional hacia arriba- y el sistema empieza a decir
+     * que se pago de mas o de menos sin que nadie tocara nada.
+     *
+     * `valorizadoAcumulado` solo falta en las llamadas que aun no lo pasan;
+     * entonces se cae al calculo antiguo, que es lo que habia.
+     */
     valorizado:
-      datos.avancePorcentaje === null
+      datos.valorizadoAcumulado ??
+      (datos.avancePorcentaje === null
         ? "0.00"
-        : importeValorizado(datos.montoContratado, datos.avancePorcentaje),
+        : importeValorizado(datos.montoContratado, datos.avancePorcentaje)),
     avancePorcentaje: datos.avancePorcentaje,
   };
 }

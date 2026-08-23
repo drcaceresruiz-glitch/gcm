@@ -99,6 +99,22 @@ export const PERMISOS = [
   "encargo:leer",
   "encargo:gestionar",
   "encargo:valorizar",
+  /// Registrar un adicional o un deductivo del contratista. Es de OBRA: quien
+  /// se percata de que faltaba alcance es el residente, no la oficina.
+  "adenda:crear",
+  /**
+   * La segunda firma. Va aparte de `crear` a proposito: el que pide el
+   * adicional no puede ser el que lo aprueba, y esa separacion es la razon de
+   * ser del circuito. Es plata que sale del margen de la obra.
+   *
+   * NO esta en `INNEGOCIABLES`, y es deliberado. Los innegociables son actos
+   * CONTRACTUALES -aprobar una linea base, un movimiento, la meta- que solo
+   * el ADMIN puede firmar pase lo que pase. Una adenda mueve costo interno, y
+   * quien la firma cambia de una constructora a otra: en unas es el gerente
+   * general, en otras el jefe de proyectos. Dejarlo negociable permite
+   * asignarlo desde Empresa > Permisos sin tocar codigo.
+   */
+  "adenda:aprobar",
 
   "orden:leer",
   "orden:crear",
@@ -338,6 +354,11 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// es administracion, y va en ADMIN_OBRA.
     "encargo:leer",
     "encargo:valorizar",
+    /// REGISTRA los adicionales del contratista, y no los aprueba. Es quien
+    /// se percata en obra de que faltaba alcance, asi que es quien lo levanta
+    /// y le da el primer visto bueno; la firma que suelta el dinero es de
+    /// gerencia. El que pide no puede ser el que aprueba.
+    "adenda:crear",
     /// La bitacora de la obra: anota y marca atendido/reabre. Es trabajo de
     /// campo reversible, igual que valorizar un encargo. Reescribir o borrar
     /// lo ya anotado (`nota:gestionar`) se queda en ADMIN_OBRA.
@@ -386,6 +407,10 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     "encargo:leer",
     "encargo:gestionar",
     "encargo:valorizar",
+    /// Tambien levanta adendas: muchas llegan por la via administrativa —el
+    /// contratista manda su carta a oficina— y no por el residente. Aprobarla
+    /// sigue sin ser suyo.
+    "adenda:crear",
     "plan_semanal:gestionar",
     "lookahead:gestionar",
     /// La galeria completa, y la decision de que ve el cliente: publicar una

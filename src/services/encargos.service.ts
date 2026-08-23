@@ -12,6 +12,8 @@ import {
   type ResumenEncargo,
   type Cobertura,
 } from "@/lib/encargos";
+import { importeSobre, montoVigente } from "@/lib/adendas";
+import { adendasPorEncargo } from "@/services/adendas.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { totalDeObra } from "@/services/presupuesto-obra";
 import type { SesionActiva } from "@/services/sesion.service";
@@ -114,7 +116,7 @@ export async function listarEncargos(
   });
   if (!obra) return vacio;
 
-  const [encargos, imputaciones, presupuesto] = await Promise.all([
+  const [encargos, imputaciones, presupuesto, adendas] = await Promise.all([
     prisma.encargoProveedor.findMany({
       where: { projectId: obraId },
       orderBy: { numero: "asc" },
@@ -143,6 +145,8 @@ export async function listarEncargos(
             createdAt: true,
             numeroObra: true,
             numeroEncargo: true,
+            // El valorizado congelado del corte. Ver `lib/adendas.ts`.
+            importe: true,
           },
         },
       },
@@ -167,6 +171,9 @@ export async function listarEncargos(
     // por tipo cuenta dos veces los grupos a suma alzada con hijas costeadas,
     // y la cobertura saldria artificialmente baja.
     totalDeObra(obraId),
+    // Las adendas de todos los encargos de golpe: una consulta por fila seria
+    // veinte viajes a la base en una obra con veinte contratistas.
+    adendasPorEncargo(sesion, obraId),
   ]);
 
   // Comprometido por encargo: la orden ya dice de que contrato es.
@@ -192,20 +199,39 @@ export async function listarEncargos(
     // Comprometido = lo pedido en ordenes emitidas CONTRA este encargo.
     const comprometido = sumar(comprometidoPorEncargo.get(e.id) ?? []);
 
-    const vigente = avanceVigente(
-      e.valorizaciones.map((v) => ({
-        fecha: v.fecha,
-        porcentaje: v.porcentaje.toString(),
-        createdAt: v.createdAt,
-        numeroObra: v.numeroObra,
-        numeroEncargo: v.numeroEncargo,
-      })),
-    );
+    const cortes = e.valorizaciones.map((v) => ({
+      fecha: v.fecha,
+      porcentaje: v.porcentaje.toString(),
+      createdAt: v.createdAt,
+      numeroObra: v.numeroObra,
+      numeroEncargo: v.numeroEncargo,
+    }));
+    const vigente = avanceVigente(cortes);
+
+    /*
+     * EL VALORIZADO SALE DEL ULTIMO CORTE, no de recalcular su porcentaje.
+     *
+     * El corte guarda lo que valia el dia que se firmo. Recalcularlo contra
+     * el monto de hoy -que es lo que se hacia- revalua el pasado en cuanto
+     * entra una adenda: un deductivo baja retroactivamente lo ya pagado y un
+     * adicional lo sube. Ver `lib/adendas.ts`.
+     *
+     * Es el ACUMULADO y por eso basta con el ultimo: el porcentaje de una
+     * valorizacion es acumulado, no incremental.
+     */
+    const ultimo = [...e.valorizaciones].sort(
+      (a, b) => a.numeroEncargo - b.numeroEncargo,
+    ).at(-1);
 
     const cuentas = resumenEncargo({
       montoContratado: e.montoContratado.toString(),
+      adendas: adendas.get(e.id)?.aprobadas ?? [],
       presupuestoFrente,
       comprometido,
+      valorizadoAcumulado:
+        ultimo?.importe !== undefined && ultimo?.importe !== null
+          ? ultimo.importe.toString()
+          : null,
       avancePorcentaje: vigente ? vigente.porcentaje : null,
     });
 
@@ -971,12 +997,46 @@ export async function valorizarEncargo(
       projectId: obraId,
       project: { companyId: sesion.companyId },
     },
-    select: { id: true, estado: true },
+    select: {
+      id: true,
+      estado: true,
+      montoContratado: true,
+      // Solo las APROBADAS: una adenda pendiente es una peticion del
+      // contratista, y valorizar sobre ella seria reconocerle un dinero que
+      // gerencia todavia puede rechazar.
+      adendas: {
+        where: { estado: "APROBADA" },
+        select: { importe: true },
+      },
+    },
   });
   if (!encargo) return { ok: false, error: "Encargo no encontrado." };
   if (encargo.estado === "ANULADO") {
     return { ok: false, error: "Un encargo anulado no se valoriza." };
   }
+
+  /**
+   * El importe se CONGELA al firmar el corte.
+   *
+   * Antes solo se guardaba el porcentaje y el importe se recalculaba contra
+   * el monto de hoy. Con el contrato inmutable daba igual; en cuanto puede
+   * cambiar -que es lo que introducen las adendas- el pasado se mueve solo:
+   * un deductivo baja retroactivamente lo ya pagado, un adicional lo sube, y
+   * el sistema empieza a decir que se pago de mas sin que nadie tocara la
+   * valorizacion.
+   *
+   * Se congela contra el VIGENTE del momento, no contra el contratado: si un
+   * adicional ya esta aprobado, el contratista esta ejecutando el alcance
+   * ampliado y su avance vale sobre el contrato ampliado.
+   */
+  const vigenteDelContrato = montoVigente(
+    encargo.montoContratado.toString(),
+    encargo.adendas.map((a) => ({ importe: a.importe.toString() })),
+  );
+  const importeDelCorte = importeSobre(
+    vigenteDelContrato,
+    normalizarDecimal(datos.porcentaje, 3) ?? "0",
+  );
 
   // La escritura va CAPTURADA. Hasta ahora no podia fallar por datos y se
   // llamaba a pelo; con los correlativos si puede: dos personas valorizando en
@@ -1021,6 +1081,7 @@ export async function valorizarEncargo(
           numeroEncargo,
           fecha: new Date(`${datos.fecha}T00:00:00Z`),
           porcentaje: normalizarDecimal(datos.porcentaje, 3) ?? "0",
+          importe: importeDelCorte,
           nota: datos.nota?.trim() || null,
           registradoPor: quien(sesion),
         },
@@ -1039,6 +1100,10 @@ export async function valorizarEncargo(
             encargoId,
             fecha: datos.fecha,
             porcentaje: datos.porcentaje,
+            importe: importeDelCorte,
+            // Contra que monto se calculo: sin esto, una revision futura no
+            // podria reconstruir por que el corte vale lo que vale.
+            montoVigente: vigenteDelContrato,
             numeroObra,
             numeroEncargo,
           },

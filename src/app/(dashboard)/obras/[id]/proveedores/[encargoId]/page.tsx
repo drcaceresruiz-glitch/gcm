@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
+import { adendasDelEncargo } from "@/services/adendas.service";
+import { PanelAdendas } from "@/components/encargos/PanelAdendas";
 import { obtenerObra } from "@/services/obras.service";
 import { listarProveedores } from "@/services/proveedores.service";
 import {
@@ -34,19 +36,36 @@ export default async function EditarEncargoPage({
   const obra = await obtenerObra(sesion, id);
   if (!obra) notFound();
 
-  if (!puede(sesion, "encargo:gestionar")) {
+  /*
+   * LA PUERTA ES `encargo:leer`, y no `encargo:gestionar` como hasta el 23 de
+   * agosto de 2026.
+   *
+   * Desde que existen las adendas, esta pantalla ya no es solo «editar el
+   * encargo»: es tambien donde se registran los adicionales del contratista.
+   * Y quien los registra es el RESIDENTE, que tiene `encargo:leer` y
+   * `adenda:crear` pero NO `encargo:gestionar` -no reparte alcances ni pacta
+   * montos, eso es de ADMIN_OBRA-. Con la puerta anterior, la persona a la
+   * que va dirigida la funcion no podia ni llegar a ella.
+   *
+   * El formulario de edicion sigue detras de su permiso, mas abajo. La puerta
+   * deja pasar a leer; cada bloque decide que enseña.
+   */
+  if (!puede(sesion, "encargo:leer")) {
     return (
       <p className="text-sm opacity-70">
-        No tienes permiso para editar encargos en esta obra.
+        No tienes permiso para ver los encargos de esta obra.
       </p>
     );
   }
 
-  const [encargo, proveedores, partidas, capitulos] = await Promise.all([
+  const puedeGestionar = puede(sesion, "encargo:gestionar");
+
+  const [encargo, proveedores, partidas, capitulos, adendas] = await Promise.all([
     obtenerEncargo(sesion, id, encargoId),
     listarProveedores(sesion),
     partidasAsignables(sesion, id),
     capitulosConPartidas(sesion, id),
+    adendasDelEncargo(sesion, id, encargoId),
   ]);
 
   if (!encargo) notFound();
@@ -66,6 +85,14 @@ export default async function EditarEncargoPage({
         <p className="mt-0.5 text-sm opacity-70">{encargo.descripcion}</p>
       </div>
 
+      {!puedeGestionar && (
+        <p className="text-sm opacity-70">
+          Puedes ver este contrato y registrar adendas. Cambiar lo pactado
+          —proveedor, monto o partidas— es del administrador de obra.
+        </p>
+      )}
+
+      {puedeGestionar && (
       <Tarjeta>
         <FormularioEncargo
           obraId={id}
@@ -89,6 +116,25 @@ export default async function EditarEncargoPage({
               fraccion: p.fraccion,
             })),
           }}
+        />
+      </Tarjeta>
+      )}
+
+      {/*
+        Las adendas van DESPUES del contrato y no dentro del formulario: el
+        formulario edita lo que se pacto, y una adenda no es una correccion de
+        eso sino un documento nuevo encima. Mezclarlos invitaria a resolver un
+        adicional subiendo el monto contratado, que es justo lo que esto
+        sustituye.
+      */}
+      <Tarjeta>
+        <PanelAdendas
+          obraId={id}
+          encargoId={encargoId}
+          montoContratado={encargo.montoContratado}
+          adendas={adendas}
+          puedeRegistrar={puede(sesion, "adenda:crear")}
+          puedeAprobar={puede(sesion, "adenda:aprobar")}
         />
       </Tarjeta>
 

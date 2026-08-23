@@ -1017,6 +1017,7 @@ model Project {
   ajustesAvisos        AjustesAvisosObra?
   presupuestosMeta     PresupuestoMeta[]
   valorizaciones       ValorizacionEncargo[]
+  adendasEncargo       AdendaEncargo[]
   notas                Nota[]
   adjuntosNota         AdjuntoNota[]
 
@@ -2309,6 +2310,24 @@ enum EstadoEncargo {
   ANULADO
 }
 
+/// Por donde va una adenda de contratista.
+///
+/// DOS FIRMAS, y por eso no basta con BORRADOR/APROBADA como en los
+/// movimientos del cliente. Quien detecta el alcance que faltaba es el
+/// residente, que esta en obra: la registra y le da su visto bueno, y con eso
+/// queda PENDIENTE. Aprobarla es de gerencia, porque es plata que sale del
+/// margen de la obra y quien la firma no es quien la pide.
+///
+/// RECHAZADA existe para que un «no» deje rastro. Sin ese estado, la unica
+/// forma de decir que no es borrar la adenda, y entonces la conversacion
+/// -que a veces dura semanas y acaba en una negociacion con el cliente-
+/// desaparece del sistema.
+enum EstadoAdenda {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+}
+
 enum EstadoPlanSemanal {
   ABIERTO
   CERRADO
@@ -2434,6 +2453,8 @@ model EncargoProveedor {
   pagos              PagoEncargo[]
   /// Las ordenes emitidas CONTRA este encargo, que lo formalizan por partes.
   ordenes            OrdenCompra[]
+  /// Los adicionales y deductivos pactados DESPUES de firmar.
+  adendas            AdendaEncargo[]
 
   @@unique([projectId, numero])
   @@index([projectId, estado])
@@ -2474,6 +2495,80 @@ model EncargoPartida {
 /// corte con su fecha, y la vigente es la mas reciente. Guardar la serie —y no
 /// sobrescribir un unico porcentaje— es lo que permite ver el ritmo del
 /// proveedor y saber quien reporto que, y cuando.
+/// Un adicional o un deductivo pactado con el contratista DESPUES de firmar.
+///
+/// NACE DE UN CASO DE OBRA: a mitad de ejecucion el contratista se percata de
+/// alcances que su orden de compra aprobada no recogia, y presenta un
+/// adicional. Hasta el 23 de agosto de 2026 la unica forma de registrarlo era
+/// editar `montoContratado` y subirlo, lo que borraba lo pactado —nadie podia
+/// saber despues si el contrato siempre fue de esa cifra o si el contratista
+/// se paso un 20 %— y ademas revaluaba hacia atras lo ya valorizado.
+///
+/// POR QUE NO ES UN `MovimientoPresupuestal`. Aquel vive del lado del CLIENTE:
+/// cuelga de una `Baseline` y su referencia es la carta con la que el cliente
+/// autoriza. Sube lo que se COBRA. Esto sube lo que se PAGA, y las dos cosas
+/// son independientes a proposito: el caso caro —y el mas frecuente— es
+/// justamente el adicional de contratista que el cliente no reconoce, y si
+/// uno implicara al otro ese caso no se podria ni escribir.
+///
+/// EL IMPORTE PUEDE SER NEGATIVO. Un deductivo es alcance que al final no
+/// ejecuta: el cliente lo quita, se le da a otro o se hace con personal
+/// propio. Se admite con signo en vez de con un campo `tipo` porque las
+/// cuentas de aguas abajo son una suma, y un tipo obligaria a cada consumidor
+/// a acordarse de restar los de una clase.
+model AdendaEncargo {
+  id        String @id @default(cuid())
+  encargoId String
+  /// La obra, DESNORMALIZADA por el mismo motivo que en `ValorizacionEncargo`:
+  /// sin columna no hay indice, y el correlativo por obra necesita uno.
+  projectId String
+
+  /// Correlativo dentro del ENCARGO: "la 2.a adenda de este contratista". No
+  /// hay serie de obra porque una adenda es un documento del contrato, no de
+  /// la obra: se cita como "Adenda 2 al encargo E-004".
+  numero Int
+
+  /// Fecha del documento que la respalda, no la del alta en el sistema.
+  fecha DateTime @db.Date
+
+  /// Sin IGV, como `montoContratado`, para poder sumarse con el. POSITIVO en
+  /// un adicional, NEGATIVO en un deductivo.
+  importe Decimal @db.Decimal(14, 2)
+
+  concepto String @db.VarChar(300)
+  /// Por que procede. En un adicional es donde se explica que alcance
+  /// faltaba y por que no estaba en la orden.
+  motivo   String @db.Text
+  /// La carta, acta o presupuesto del contratista que la sustenta.
+  referencia String? @db.VarChar(120)
+
+  estado EstadoAdenda @default(PENDIENTE)
+
+  /// Quien la registro, que es quien le da el primer visto bueno. En obra es
+  /// el residente: se guarda su nombre como en el resto de firmas del
+  /// sistema, para que el acta se pueda leer sin cruzar tablas.
+  registradaPor String   @db.VarChar(150)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  /// La segunda firma. Aprobar es irreversible: una adenda aprobada se
+  /// corrige con otra de signo contrario, no deshaciendola. Mismo criterio
+  /// que un movimiento presupuestal aprobado.
+  resueltaAt  DateTime?
+  resueltaPor String?   @db.VarChar(150)
+  /// Por que se rechazo. Solo en RECHAZADA: un «no» sin motivo no sirve para
+  /// negociar con el contratista despues.
+  motivoRechazo String? @db.Text
+
+  encargo EncargoProveedor @relation(fields: [encargoId], references: [id], onDelete: Cascade)
+  project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([encargoId, numero])
+  @@index([projectId, estado])
+  @@index([encargoId, estado])
+  @@map("adendas_encargo")
+}
+
 model ValorizacionEncargo {
   id        String @id @default(cuid())
   encargoId String
@@ -2514,6 +2609,31 @@ model ValorizacionEncargo {
   /// Acumulado y no incremental: es como se lee una valorizacion ("vamos al
   /// 45 %"), y restar dos cortes da el avance del periodo.
   porcentaje Decimal @db.Decimal(6, 3)
+
+  /**
+   * Lo que ese porcentaje valia EL DIA DEL CORTE, en soles y sin IGV.
+   *
+   * NACE DE UN FALLO REAL, encontrado el 23 de agosto de 2026 al abrir las
+   * adendas. Hasta ese dia la valorizacion guardaba solo el porcentaje y el
+   * importe se recalculaba SIEMPRE contra el `montoContratado` de hoy
+   * (`importeValorizado` en `lib/encargos.ts`). Con el monto fijo eso no se
+   * notaba; en cuanto el contrato puede cambiar —que es justo lo que
+   * introducen las adendas— revalua hacia atras:
+   *
+   *   Valorizo el 60 % de un contrato de 50.000 -> 30.000, y se le pago.
+   *   Entra un deductivo de -12.000 -> ese MISMO 60 % pasa a valer 22.800.
+   *   Sin que nadie toque esa valorizacion, el sistema empieza a decir que
+   *   se le pagaron 7.200 de mas.
+   *
+   * Congelado aqui, una valorizacion vale lo que valia cuando se firmo, y las
+   * siguientes se calculan sobre el monto vigente en SU momento. Es el mismo
+   * criterio que `PresupuestoMeta.mesesPlazo`: lo que se congela es lo que
+   * permite que la desviacion se vea.
+   *
+   * Nullable solo por las que existieran antes de esta columna: quien las lea
+   * cae al calculo antiguo. Las nuevas lo escriben siempre.
+   */
+  importe Decimal? @db.Decimal(14, 2)
 
   nota String? @db.Text
 

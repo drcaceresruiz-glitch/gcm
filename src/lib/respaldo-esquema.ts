@@ -402,7 +402,20 @@ export const TABLAS: readonly TablaRespaldo[] = [
       { campo: "encargoId", a: "encargos_proveedor" },
       { campo: "projectId", a: "projects" },
     ],
-    decimales: { porcentaje: 3 },
+    // `importe` es el valorizado CONGELADO del corte. Viaja en el respaldo
+    // como cualquier otro importe: sin el, restaurar una obra revaluaria todo
+    // su historico contra el monto de hoy.
+    decimales: { porcentaje: 3, importe: 2 },
+    fechas: ["fecha"],
+  },
+  {
+    tabla: "adendas_encargo",
+    modelo: "adendaEncargo",
+    refs: [
+      { campo: "encargoId", a: "encargos_proveedor" },
+      { campo: "projectId", a: "projects" },
+    ],
+    decimales: { importe: 2 },
     fechas: ["fecha"],
   },
   {
@@ -558,6 +571,7 @@ export const RELACION_A_LA_OBRA: Readonly<
   dependencias_tarea: "cronograma",
   encargo_partidas: "encargo",
   valorizaciones_encargo: "encargo",
+  adendas_encargo: "encargo",
   fechas_valorizacion: "encargo",
   pagos_encargo: "encargo",
   /// Dos niveles: el comprobante cuelga del pago y el pago del encargo, que es
