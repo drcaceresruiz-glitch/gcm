@@ -107,10 +107,44 @@ export async function generarPresupuestoPdf(
     listarPartidas(sesion, obraId),
   ]);
 
+  /**
+   * El membrete y la firma: los cuatro datos que el papel del cliente lleva y
+   * GCM no ensenaba, aunque tres de ellos ya estuvieran en el modelo.
+   *
+   * El residente sale de la pertenencia a la obra, no de quien descarga: el
+   * que firma un presupuesto es el que responde por el, y casi nunca es quien
+   * pulsa el boton.
+   */
+  const [residente, cronograma] = await Promise.all([
+    prisma.projectMembership.findFirst({
+      where: {
+        projectId: obraId,
+        project: { companyId: sesion.companyId },
+        user: { role: "RESIDENTE", estado: "ACTIVO" },
+      },
+      select: {
+        user: { select: { nombres: true, apellidos: true, colegiatura: true } },
+      },
+    }),
+    prisma.cronograma.findFirst({
+      where: { projectId: obraId, project: { companyId: sesion.companyId } },
+      orderBy: { version: "desc" },
+      select: { nombreProyecto: true },
+    }),
+  ]);
+
   const comun = {
     empresa: empresa?.razonSocial ?? "",
+    ruc: empresa?.ruc ?? null,
     obra: obra.nombreObra,
     ubicacion: obra.ubicacion,
+    programa: cronograma?.nombreProyecto ?? null,
+    residente: residente
+      ? {
+          nombre: `${residente.user.nombres} ${residente.user.apellidos}`.trim(),
+          colegiatura: residente.user.colegiatura,
+        }
+      : null,
   };
 
   const datos =
@@ -158,7 +192,10 @@ export async function generarPresupuestoPdf(
   return { ok: true, bytes: await pdf.save(), nombre: `${nombre}.pdf` };
 }
 
-type Comun = { empresa: string; obra: string; ubicacion: string | null };
+type Comun = Pick<
+  DatosPresupuesto,
+  "empresa" | "ruc" | "obra" | "ubicacion" | "programa" | "residente"
+>;
 
 async function datosContractual(
   comun: Comun,

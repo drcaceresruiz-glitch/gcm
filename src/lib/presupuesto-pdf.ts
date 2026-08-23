@@ -51,8 +51,19 @@ export interface LineaPresupuesto {
 
 export interface DatosPresupuesto {
   empresa: string;
+  /// El RUC de la constructora. Un presupuesto sin el no identifica a quien
+  /// lo emite, y es lo primero que mira quien lo recibe.
+  ruc: string | null;
   obra: string;
   ubicacion: string | null;
+  /// El nombre del programa del cronograma, si la obra ya lo tiene cargado.
+  programa: string | null;
+  /**
+   * Quien firma. Su colegiatura va DEBAJO del nombre porque es lo que hace
+   * que el documento valga como documento profesional, no como una lista de
+   * precios.
+   */
+  residente: { nombre: string; colegiatura: string | null } | null;
   /// Lo que se imprime arriba: "PRESUPUESTO CONTRACTUAL", etc.
   titulo: string;
   /// Una linea que explica de que documento se trata y para quien es.
@@ -179,8 +190,18 @@ export function paginasDelPresupuesto(
       texto(izq, d.obra, 9, { negrita: true });
 
       y -= 10;
-      const pie = [d.empresa, d.ubicacion].filter(Boolean).join("  ·  ");
-      texto(izq, pie, 8, { tinta: "tinta-suave" });
+      const membrete = [
+        d.ruc ? `${d.empresa} · RUC ${d.ruc}` : d.empresa,
+        d.ubicacion,
+        d.programa,
+      ]
+        .filter(Boolean)
+        .join("  ·  ");
+      for (const linea of partirEnLineas(membrete, der - izq, 8, medir)) {
+        texto(izq, linea, 8, { tinta: "tinta-suave" });
+        y -= 10;
+      }
+      y += 10;
 
       y -= 11;
       for (const linea of partirEnLineas(d.subtitulo, der - izq, 8, medir)) {
@@ -275,6 +296,34 @@ export function paginasDelPresupuesto(
       tinta: esNegativoTexto(t.importe) ? "peligro" : "tinta",
     });
     y -= t.destacado ? 18 : 14;
+  }
+
+  /**
+   * La linea de firma, solo si se sabe quien firma.
+   *
+   * No se dibuja una raya con «Residente de obra» debajo cuando la obra no
+   * tiene uno asignado: un hueco para firmar sin nombre invita a que lo
+   * rellene cualquiera a mano, y entonces el documento dice algo que GCM no
+   * puede respaldar.
+   */
+  if (d.residente !== null) {
+    if (y - 60 < o.margen + o.altoPie) nuevaPagina(false);
+
+    y -= 34;
+    elementos.push({
+      tipo: "linea",
+      x1: izq,
+      y1: y + 8,
+      x2: izq + 200,
+      y2: y + 8,
+      tinta: "tinta",
+    });
+    texto(izq, d.residente.nombre, 8, { negrita: true });
+    y -= 10;
+    const cargo = d.residente.colegiatura
+      ? `Residente de obra · ${d.residente.colegiatura}`
+      : "Residente de obra";
+    texto(izq, cargo, 7, { tinta: "tinta-suave" });
   }
 
   paginas.push({ elementos });

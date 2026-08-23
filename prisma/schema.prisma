@@ -612,6 +612,15 @@ model User {
   tipoDoc   String  @db.VarChar(10)
   numDoc    String  @db.VarChar(20)
   cargo     String? @db.VarChar(100)
+  /**
+   * Numero de colegiatura profesional (CAP, CIP).
+   *
+   * Lo pide el papel, no la aplicacion: un presupuesto o un informe firmado
+   * por el residente lleva su colegiatura debajo del nombre, y sin ella el
+   * documento no vale como el del ejemplo del cliente. Opcional porque no
+   * todos los usuarios son colegiados -un administrativo no lo es-.
+   */
+  colegiatura String? @db.VarChar(30)
   celular   String? @db.VarChar(30)
   /// UNICO POR EMPRESA, no en toda la instalacion. Ver `@@unique` al final.
   email     String  @db.VarChar(150)

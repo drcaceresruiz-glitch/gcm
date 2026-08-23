@@ -28,8 +28,11 @@ const partida = (
 
 const datos = (parcial: Partial<DatosPresupuesto> = {}): DatosPresupuesto => ({
   empresa: "LARQUITECTURA STUDIO SAC",
+  ruc: "20601689988",
   obra: "LABORATORIO CRIOCORD - LURÍN",
   ubicacion: "Carretera Panamericana Sur Km 29.5, Lima",
+  programa: "PROGRAMACION EP",
+  residente: { nombre: "ARQ. EDUARDO PÉREZ", colegiatura: "CAP 32467" },
   titulo: "PRESUPUESTO CONTRACTUAL",
   subtitulo: "Partidas, metrados y precios pactados.",
   lineas: [
@@ -205,5 +208,50 @@ describe("bolsaDeLinea", () => {
     // Una partida que no esta en la meta no tiene bolsa cero: no tiene bolsa.
     expect(bolsaDeLinea("826.00", null)).toBeNull();
     expect(bolsaDeLinea(null, "700.00")).toBeNull();
+  });
+});
+
+describe("el membrete y la firma", () => {
+  it("el membrete lleva el RUC, la ubicación y el programa", () => {
+    // Los cuatro datos que el papel del cliente ya tenia y GCM no ensenaba.
+    const t = textos(hojas(datos())[0]!.elementos).join(" ");
+
+    expect(t).toContain("20601689988");
+    expect(t).toContain("Km 29.5");
+    expect(t).toContain("PROGRAMACION EP");
+  });
+
+  it("la firma lleva la colegiatura debajo del nombre", () => {
+    // Es lo que hace que el documento valga como documento profesional y no
+    // como una lista de precios.
+    const t = textos(hojas(datos())[0]!.elementos);
+
+    expect(t).toContain("ARQ. EDUARDO PÉREZ");
+    expect(t.some((x) => x.includes("CAP 32467"))).toBe(true);
+  });
+
+  it("un residente sin colegiatura firma igual, sin inventarse una", () => {
+    const t = textos(
+      hojas(datos({ residente: { nombre: "ING. LUZ RAMOS", colegiatura: null } }))[0]!
+        .elementos,
+    );
+
+    expect(t).toContain("ING. LUZ RAMOS");
+    expect(t).toContain("Residente de obra");
+  });
+
+  it("sin residente asignado NO se dibuja una raya para firmar", () => {
+    // Un hueco de firma sin nombre invita a que lo rellene cualquiera a mano,
+    // y entonces el documento dice algo que GCM no puede respaldar.
+    const t = textos(hojas(datos({ residente: null }))[0]!.elementos);
+
+    expect(t.some((x) => x.includes("Residente de obra"))).toBe(false);
+  });
+
+  it("una empresa sin RUC no imprime «RUC null»", () => {
+    const t = textos(hojas(datos({ ruc: null }))[0]!.elementos).join(" ");
+
+    expect(t).not.toContain("RUC");
+    expect(t).toContain("LARQUITECTURA");
   });
 });

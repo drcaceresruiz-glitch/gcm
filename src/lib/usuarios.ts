@@ -81,6 +81,7 @@ export interface DatosAltaUsuario {
   tipoDoc: string;
   numDoc: string;
   cargo: string;
+  colegiatura?: string;
   celular: string;
   role: string;
 }
@@ -93,6 +94,8 @@ export interface AltaUsuarioLimpia {
   tipoDoc: string;
   numDoc: string;
   cargo: string | null;
+  /// Colegiatura profesional (CAP, CIP). Opcional: no todo el mundo lo es.
+  colegiatura: string | null;
   celular: string | null;
   role: Role;
 }
@@ -165,6 +168,7 @@ export function validarAltaUsuario(d: DatosAltaUsuario): ValidacionAlta {
   if (!rolValido(d.role)) return { ok: false, error: "El rol no es valido." };
 
   const cargo = d.cargo.trim();
+  const colegiatura = (d.colegiatura ?? "").trim();
   const celular = d.celular.trim();
 
   return {
@@ -176,6 +180,7 @@ export function validarAltaUsuario(d: DatosAltaUsuario): ValidacionAlta {
       tipoDoc,
       numDoc,
       cargo: cargo === "" ? null : cargo.slice(0, 100),
+      colegiatura: colegiatura === "" ? null : colegiatura.slice(0, 30),
       celular: celular === "" ? null : celular.slice(0, 30),
       role: d.role as Role,
     },

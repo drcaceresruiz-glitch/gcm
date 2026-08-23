@@ -47,6 +47,7 @@ export async function accionCrearUsuario(
     tipoDoc: texto(datos, "tipoDoc"),
     numDoc: texto(datos, "numDoc"),
     cargo: texto(datos, "cargo"),
+    colegiatura: texto(datos, "colegiatura"),
     celular: texto(datos, "celular"),
     role: texto(datos, "role"),
   });
@@ -74,6 +75,7 @@ export async function accionEditarUsuario(
     apellidos: texto(datos, "apellidos"),
     email: texto(datos, "email"),
     cargo: texto(datos, "cargo"),
+    colegiatura: texto(datos, "colegiatura"),
     tipoDoc: texto(datos, "tipoDoc"),
     numDoc: texto(datos, "numDoc"),
     celular: texto(datos, "celular"),

@@ -171,6 +171,18 @@ function PanelAlta({ alCerrar }: { alCerrar: () => void }) {
               <CampoTexto id="celular" name="celular" type="tel" etiqueta="Celular" ayuda="Opcional." maxLength={30} />
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* La colegiatura la pide el PAPEL: un presupuesto o un informe
+                  firmados por el residente la llevan debajo del nombre. */}
+              <CampoTexto
+                id="colegiatura"
+                name="colegiatura"
+                etiqueta="Colegiatura (CAP, CIP)"
+                ayuda="Opcional. Sale en los documentos que firma."
+                maxLength={30}
+              />
+            </div>
+
             <SelectorRol actual="CONSULTOR" />
           </SeccionTarjeta>
 
@@ -310,6 +322,14 @@ function FormEdicion({
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <CampoTexto id={`c-${usuario.id}`} name="cargo" etiqueta="Cargo" defaultValue={usuario.cargo ?? ""} maxLength={100} />
+        <CampoTexto
+          id={`col-${usuario.id}`}
+          name="colegiatura"
+          etiqueta="Colegiatura (CAP, CIP)"
+          ayuda="Sale en los documentos que firma."
+          defaultValue={usuario.colegiatura ?? ""}
+          maxLength={30}
+        />
         <CampoTexto id={`cel-${usuario.id}`} name="celular" type="tel" etiqueta="Celular" defaultValue={usuario.celular ?? ""} maxLength={30} />
       </div>
 

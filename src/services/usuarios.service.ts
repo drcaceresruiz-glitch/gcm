@@ -100,6 +100,9 @@ export interface UsuarioLista {
   apellidos: string;
   email: string;
   cargo: string | null;
+  /// Colegiatura profesional (CAP, CIP). La firma de un residente en un
+  /// documento la lleva debajo del nombre.
+  colegiatura: string | null;
   celular: string | null;
   tipoDoc: string;
   numDoc: string;
@@ -133,6 +136,7 @@ export async function listarUsuarios(
       apellidos: true,
       email: true,
       cargo: true,
+      colegiatura: true,
       celular: true,
       tipoDoc: true,
       numDoc: true,
@@ -151,6 +155,7 @@ export async function listarUsuarios(
     apellidos: u.apellidos,
     email: u.email,
     cargo: u.cargo,
+    colegiatura: u.colegiatura,
     celular: u.celular,
     tipoDoc: u.tipoDoc,
     numDoc: u.numDoc,
@@ -242,6 +247,7 @@ export async function crearUsuario(
         tipoDoc: d.tipoDoc,
         numDoc: d.numDoc,
         cargo: d.cargo,
+        colegiatura: d.colegiatura?.trim() || null,
         celular: d.celular,
         role: d.role,
         passwordHash,
@@ -298,6 +304,8 @@ export interface CambiosUsuario {
    */
   email: string;
   cargo: string;
+  /// Opcional: no todo el mundo es colegiado.
+  colegiatura?: string;
   tipoDoc: string;
   numDoc: string;
   celular: string;
@@ -439,6 +447,7 @@ export async function editarUsuario(
     apellidos,
     email,
     cargo: cambios.cargo.trim() === "" ? null : cambios.cargo.trim().slice(0, 100),
+    colegiatura: (cambios.colegiatura ?? "").trim() || null,
     tipoDoc,
     numDoc,
     celular: celular === "" ? null : celular.slice(0, 30),
