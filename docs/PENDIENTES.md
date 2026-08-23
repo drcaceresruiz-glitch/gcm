@@ -2182,10 +2182,38 @@ Lo que SI se hara, en este orden:
      mesa los assets genericos de muestra y obliga a Mixamo/Quaternius
      con un personaje elegido a proposito, o a un encargo de diseno.
 
-     Sin empezar todavia el codigo (de nuevo). Reporte completo del
-     workflow (licencias con enlaces, flujo exacto de exportacion, plan
-     de archivos) disponible en la transcripcion de esta sesion si hace
-     falta revisarlo de nuevo antes de construir.
+     **Segundo intento, mismo dia**: el usuario empujo a no rendirse
+     ("O SEA, LO SACAS Y YA? ERES IMPOTENTE DE HACER ALGO REALMENTE
+     BUENO?") y aclaro que el avatar va DENTRO de la pantalla del
+     Asistente, no aparte. Se busco un modelo que si fuera un obrero de
+     verdad: `Worker` de Quaternius (CC0, dominio publico, via
+     poly.pizza), un personaje con casco amarillo, chaleco reflectante
+     naranja/gris, pantalon de trabajo con rodilleras y botas -exactamente
+     el tipo de personaje que el primer intento no tenia-. Trae 24 clips
+     de animacion (Idle, Walk, Run, Wave, Interact, etc.), muy por encima
+     del unico ciclo de caminar de CesiumMan: ahora "pensando" usa el
+     clip `Wave` y en reposo usa `Idle`, dos animaciones de verdad en vez
+     de una sola a distinta velocidad.
+
+     **Cambio de ingenieria, no solo de asset**: el encuadre de camara ya
+     no usa numeros de escala/posicion a mano (lo que en el primer intento
+     hizo que el personaje desapareciera sin error alguno al cambiar tres
+     numeros a la vez) -ahora usa `<Bounds fit clip observe>` de drei, que
+     calcula el recuadro real del modelo cargado y ajusta la camara sola.
+     El dia que llegue el diseno final de "Mike" y se reemplace el GLB,
+     el encuadre no deberia romperse.
+
+     Typecheck/lint/tests/build en verde, servidor de desarrollo
+     confirma que la ruta `/asistente` y el archivo `.glb` cargan sin
+     error 500. **Sin confirmar todavia visualmente en un navegador
+     real**: las herramientas de navegador se desconectaron a mitad de
+     esta sesion y no se pudieron reconectar. Falta ese ultimo paso antes
+     de darlo por bueno del todo.
+
+     Reporte completo del workflow original (licencias con enlaces, flujo
+     exacto de exportacion, plan de archivos) disponible en la
+     transcripcion de esta sesion si hace falta revisarlo de nuevo antes
+     de construir el diseno final.
 
    ~~**Dictado por voz en el Asistente.**~~ **Investigado el 22 de agosto
    de 2026** (mismo workflow, en paralelo con lo de Mike), sin empezar el
