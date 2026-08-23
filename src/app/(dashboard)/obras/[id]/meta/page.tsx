@@ -170,7 +170,7 @@ export default async function MetaPage({
       {comparacion.ok ? (
         <>
           <PanelBolsa c={comparacion.comparacion} />
-          <TablaGastosGenerales gastos={gastos} />
+          <TablaGastosGenerales gastos={gastos} mesesDeLaObra={mesesSugeridos} />
           <TablaBolsa lineas={comparacion.comparacion.bolsa.porLinea} />
         </>
       ) : (

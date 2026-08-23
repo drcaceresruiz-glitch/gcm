@@ -6,7 +6,7 @@ import {
   generarContractual,
   type LineaReal,
 } from "@/lib/contractual-desde-meta";
-import { esCero, esNegativo, restar } from "@/lib/decimal";
+import { dividir, esCero, esNegativo, esPositivo, multiplicar, restar } from "@/lib/decimal";
 import { soles } from "@/utils/formato";
 import { ConfirmarContractual, type Riesgo } from "./ConfirmarContractual";
 
@@ -93,6 +93,39 @@ export function VistaPreviaContractual({
   const queda = restar(resultado.bolsa, gastosGeneralesPrevistos) ?? resultado.bolsa;
   const noCubre = hayGastos && esNegativo(queda);
 
+  /**
+   * El recargo UNIFORME mas bajo que cubre toda la estructura.
+   *
+   * Si la obra no puede gastar de los gastos generales -porque son de la
+   * empresa y no suyos-, el recargo no se elige a ojo: tiene que salir de la
+   * cuenta. Con un recargo igual en todos los capitulos, el contractual es
+   * `costo x (1 + r)` y la bolsa es `costo x r`, asi que para cubrir la
+   * estructura hace falta `r >= gastos / costo`.
+   *
+   * Se redondea HACIA ARRIBA al centesimo: un recargo redondeado a la baja
+   * deja la obra corta por unos soles, que es exactamente lo que se intenta
+   * evitar.
+   */
+  const recargoMinimo = useMemo(() => {
+    if (!hayGastos || !esPositivo(resultado.totalReal)) return null;
+    const proporcion = dividir(gastosGeneralesPrevistos, resultado.totalReal, 6);
+    if (proporcion === null) return null;
+    const enPorciento = multiplicar(proporcion, "100", 4);
+    if (enPorciento === null) return null;
+    const n = Number(enPorciento);
+    if (!Number.isFinite(n)) return null;
+    return (Math.ceil(n * 100) / 100).toFixed(2);
+  }, [hayGastos, gastosGeneralesPrevistos, resultado.totalReal]);
+
+  /// Igualar todos los capitulos al minimo. Es un punto de partida, no una
+  /// orden: despues se puede subir el de un capitulo y bajar el de otro.
+  const igualarAlMinimo = () => {
+    if (recargoMinimo === null) return;
+    setTocados(
+      Object.fromEntries(capitulos.map((c) => [c.codigo!, recargoMinimo])),
+    );
+  };
+
   const partidas = resultado.lineas.filter((l) => l.tipo === "PARTIDA");
 
   return (
@@ -161,6 +194,27 @@ export function VistaPreviaContractual({
             <p className="mt-2 text-sm text-slate-600">
               El recargo cubre los gastos generales y deja esto para la obra.
             </p>
+          )}
+
+          {/* La cuenta, no el ojo. Si la obra no puede gastar de los gastos
+              generales, el recargo minimo es un dato, no una intuicion. */}
+          {recargoMinimo !== null && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 border-t pt-3 text-sm">
+              <span>
+                Recargo mínimo para cubrir toda la estructura:{" "}
+                <strong className="tabular-nums">{recargoMinimo} %</strong>
+              </span>
+              {puedeAjustar && (
+                <button
+                  type="button"
+                  onClick={igualarAlMinimo}
+                  className="rounded-lg border px-3 py-1 text-sm font-medium"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  Igualar todos los capítulos a {recargoMinimo} %
+                </button>
+              )}
+            </div>
           )}
         </section>
       )}

@@ -16,8 +16,11 @@ import type { GastoGeneralDeLaMeta } from "@/services/meta.service";
  */
 export function TablaGastosGenerales({
   gastos,
+  mesesDeLaObra,
 }: {
   gastos: readonly GastoGeneralDeLaMeta[];
+  /// El plazo contractual, para poder contrastarlo con los meses previstos.
+  mesesDeLaObra: string;
 }) {
   if (gastos.length === 0) return null;
 
@@ -32,6 +35,13 @@ export function TablaGastosGenerales({
   const porMes = sumar(
     variables.map((g) => g.montoMensual).filter((m): m is string => m !== null),
   );
+
+  /// El gasto que mas tiempo cubre. Comparado con el plazo dice si los meses
+  /// se presupuestaron contra este plazo o contra uno anterior.
+  const mesesMasLargo = variables.reduce((mayor, g) => {
+    const n = Number(g.meses ?? "0");
+    return Number.isFinite(n) && n > mayor ? n : mayor;
+  }, 0);
 
   return (
     <section className="space-y-3">
@@ -120,12 +130,27 @@ export function TablaGastosGenerales({
       </div>
 
       {variables.length > 0 && (
-        <p className="text-sm text-pretty opacity-70">
-          Cada mes de atraso cuesta{" "}
-          <strong className="tabular-nums">{soles(porMes)}</strong> solo en
-          gastos generales. No se recupera trabajando mejor: solo terminando
-          antes.
-        </p>
+        <div className="space-y-1 text-sm text-pretty opacity-70">
+          <p>
+            Cada mes de atraso cuesta{" "}
+            <strong className="tabular-nums">{soles(porMes)}</strong> solo en
+            gastos generales. No se recupera trabajando mejor: solo terminando
+            antes.
+          </p>
+          {/*
+            El contraste con el plazo, dicho y no juzgado.
+            Que un gasto dure menos que la obra es NORMAL -nadie esta en obra
+            todo el plazo-, asi que avisar seria ruido. Lo que hace falta es
+            poder verlo: si el mas largo se queda corto, casi siempre es que
+            se presupuestaron los meses de una version anterior del plazo.
+          */}
+          <p>
+            El plazo de la obra es de{" "}
+            <strong className="tabular-nums">{mesesDeLaObra}</strong> meses; el
+            gasto variable más largo cubre{" "}
+            <strong className="tabular-nums">{mesesMasLargo}</strong>.
+          </p>
+        </div>
       )}
     </section>
   );
