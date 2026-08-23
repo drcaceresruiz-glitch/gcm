@@ -116,6 +116,21 @@ enum AuditAction {
 model Company {
   id          String  @id @default(cuid())
   razonSocial String  @db.VarChar(200)
+  /**
+   * Que lleva el informe de obra de esta constructora.
+   *
+   * `plantillaInforme` es un nombre para un conjunto de hojas (COMPLETA,
+   * EJECUTIVA, OBRA) y `seccionesInformeOff` las que se apagan encima, por su
+   * clave y separadas por comas. Se guarda lo APAGADO y no lo encendido: asi
+   * una seccion nueva aparece por defecto en los informes de todo el mundo en
+   * vez de quedarse invisible hasta que cada empresa la descubra.
+   *
+   * Texto y no enum de Prisma para la plantilla: anadir una plantilla nueva
+   * seria una migracion, y las reglas viven en `lib/plantilla-informe.ts`, que
+   * ya descarta lo que no reconoce.
+   */
+  plantillaInforme    String? @db.VarChar(20)
+  seccionesInformeOff String? @db.VarChar(200)
   ruc         String  @unique @db.VarChar(11)
   direccion   String? @db.VarChar(255)
   telefono    String? @db.VarChar(30)
@@ -881,6 +896,15 @@ model Project {
   correlativo String? @db.VarChar(20)
 
   ubicacion String? @db.VarChar(255)
+  /**
+   * Lo mismo que en la empresa, para esta obra en concreto.
+   *
+   * NULL = hereda lo de la empresa, que es el caso normal. Cuando la obra
+   * elige, manda ENTERA: su plantilla y sus apagadas, sin mezclar con las de
+   * la empresa. Mezclarlas daria combinaciones que nadie eligio.
+   */
+  plantillaInforme    String? @db.VarChar(20)
+  seccionesInformeOff String? @db.VarChar(200)
 
   /// Si los gastos generales de la meta cuentan en la BOLSA OPERATIVA.
   ///

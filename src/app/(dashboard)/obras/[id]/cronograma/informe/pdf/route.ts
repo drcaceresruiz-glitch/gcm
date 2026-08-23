@@ -5,6 +5,7 @@ import { nombreArchivoInforme } from "@/lib/informe-documento";
 import { bytesDelLogo } from "@/services/logo.service";
 import { archivoEvidencia } from "@/services/evidencia.service";
 import { clavesDeLaBitacora } from "@/lib/informe-hoja-bitacora";
+import { eleccionDeInforme } from "@/services/plantilla-informe.service";
 
 /**
  * El informe al corte en PDF, completo.
@@ -71,11 +72,15 @@ export async function GET(
     bytes.set(clave, { contenido: archivo.contenido, mime: archivo.mimeType });
   }
 
+  // Que hojas lleva: lo que haya elegido la obra, y si no la empresa.
+  const seleccion = await eleccionDeInforme(sesion, id);
+
   const pdf = await generarInformePdf(
     datos,
     new Date(),
     await bytesDelLogo(sesion.companyId),
     { fotosPorUid: datos.fotosPorUid, bytes },
+    seleccion,
   );
   const nombre = nombreArchivoInforme(datos.obra, datos.fechaCorte, "pdf");
 

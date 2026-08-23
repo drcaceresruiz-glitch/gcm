@@ -11,6 +11,11 @@ import { BotonImprimir } from "@/components/cronograma/BotonImprimir";
 import { EnviarInforme } from "@/components/cronograma/EnviarInforme";
 import { EnviarInformeSms } from "@/components/cronograma/EnviarInformeSms";
 import { InformeSemanal } from "@/components/cronograma/InformeSemanal";
+import { puede } from "@/lib/rbac";
+import { eleccionDeInforme } from "@/services/plantilla-informe.service";
+import { ElegirPlantillaInforme } from "@/components/informe/ElegirPlantillaInforme";
+import { ETIQUETA_PLANTILLA } from "@/lib/plantilla-informe";
+import { accionPlantillaInformeObra } from "../../acciones-informe";
 import { hayCanalSms } from "@/services/sms.service";
 import {
   enlaceWhatsApp,
@@ -62,6 +67,11 @@ export default async function InformePage({
   const paraWhatsApp = enlaceWhatsApp(textoWhatsApp(datos));
   const paraSms = textoSms(datos);
   const canalSms = await hayCanalSms(sesion.companyId);
+
+  // Que hojas lleva, y de donde sale esa decision. Se enseña junto a los
+  // botones que producen el documento, no en una pantalla de ajustes aparte.
+  const seleccion = await eleccionDeInforme(sesion, id);
+  const puedeEditarObra = puede(sesion, "obra:editar");
 
   return (
     <div className="space-y-4">
@@ -117,6 +127,37 @@ export default async function InformePage({
           <BotonImprimir />
         </div>
       </div>
+
+      {/* Que hojas lleva ESTA obra. Va aqui, junto a los botones que producen
+          el documento, y no en una pantalla de ajustes aparte: se decide
+          mirando lo que se va a mandar. Tambien fuera del papel al imprimir. */}
+      {puedeEditarObra && (
+        <details className="rounded-lg border p-3 print:hidden" style={{ borderColor: "var(--borde)" }}>
+          <summary className="cursor-pointer text-sm font-medium">
+            Qué lleva este informe
+            <span className="ml-2 font-normal opacity-70">
+              {ETIQUETA_PLANTILLA[seleccion.plantilla]}
+              {seleccion.origen === "empresa" ? " (de la constructora)" : " (solo esta obra)"}
+              {seleccion.apagadas.length > 0
+                ? ` · ${seleccion.apagadas.length} sección(es) apagada(s)`
+                : ""}
+            </span>
+          </summary>
+          <div className="mt-3">
+            <ElegirPlantillaInforme
+              accion={accionPlantillaInformeObra}
+              obraId={id}
+              plantillaActual={seleccion.origen === "obra" ? seleccion.plantilla : null}
+              apagadasActuales={seleccion.origen === "obra" ? seleccion.apagadas : []}
+              puedeHeredar
+              heredado={{
+                plantilla: seleccion.plantilla,
+                apagadas: seleccion.apagadas.length,
+              }}
+            />
+          </div>
+        </details>
+      )}
 
       {/* El selector de semana. Enlaces y no un desplegable con JavaScript:
           esta pagina no manda ni un byte al cliente salvo el boton de

@@ -4,6 +4,7 @@ import { componerInforme } from "./informe.service";
 import { correoInformeObra, enviarCorreo } from "./mailer.service";
 import { generarInformePdf } from "./informe-pdf.service";
 import { bytesDelLogo } from "./logo.service";
+import { eleccionDeInforme } from "./plantilla-informe.service";
 import { generarCsv } from "@/lib/csv";
 import {
   filasDelInformeCsv,
@@ -71,7 +72,10 @@ export async function enviarInformePorCorreo(
   // contenido para cruzarlo con lo de cada uno. Quien recibe el correo no
   // tiene por que saber cual necesita antes de abrirlo.
   const logo = await bytesDelLogo(sesion.companyId);
-  const pdf = await generarInformePdf(d, generadoEl, logo);
+  // El informe que se manda lleva las MISMAS hojas que el que se descarga:
+  // dos versiones del mismo documento seria lo peor de las dos opciones.
+  const seleccion = await eleccionDeInforme(sesion, obraId);
+  const pdf = await generarInformePdf(d, generadoEl, logo, undefined, seleccion);
   const csv = generarCsv(filasDelInformeCsv(d, generadoEl));
 
   const cuerpo = correoInformeObra({

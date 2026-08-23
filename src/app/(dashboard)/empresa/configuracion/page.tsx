@@ -15,6 +15,9 @@ import { RemitenteCorreo } from "@/components/empresa/RemitenteCorreo";
 import { PlantillasMensaje } from "@/components/empresa/PlantillasMensaje";
 import { VistaPreviaRoles } from "@/components/empresa/VistaPreviaRoles";
 import { listarPlantillas } from "@/services/plantillas-mensaje.service";
+import { eleccionDeInforme } from "@/services/plantilla-informe.service";
+import { ElegirPlantillaInforme } from "@/components/informe/ElegirPlantillaInforme";
+import { accionPlantillaInformeEmpresa } from "./acciones-informe";
 import { leerRemitente } from "@/services/remitente-correo.service";
 import { hayBuzonCompartido } from "@/services/mailer.service";
 import { listarProveedoresIa } from "@/services/agente-ia.service";
@@ -39,12 +42,16 @@ export default async function ConfiguracionPage() {
 
   if (!puede(sesion, "configuracion:editar")) redirect("/panel");
 
-  const [emisores, remitente, plantillas, proveedoresIa] = await Promise.all([
-    listarEmisores(sesion),
-    leerRemitente(sesion),
-    listarPlantillas(sesion),
-    listarProveedoresIa(sesion),
-  ]);
+  const [emisores, remitente, plantillas, proveedoresIa, informe] =
+    await Promise.all([
+      listarEmisores(sesion),
+      leerRemitente(sesion),
+      listarPlantillas(sesion),
+      listarProveedoresIa(sesion),
+      // Sin obra: aqui interesa la eleccion de la EMPRESA, y la funcion
+      // resuelve la de la empresa cuando la obra no existe o no eligio.
+      eleccionDeInforme(sesion, ""),
+    ]);
   const proveedorIaActivo = proveedoresIa.find((p) => p.activo) ?? null;
 
   return (
@@ -168,6 +175,25 @@ export default async function ConfiguracionPage() {
           >
             Configurar proveedores de IA
           </Link>
+        </SeccionTarjeta>
+      </Tarjeta>
+
+      {/* Que lleva el informe de obra. Va en la configuracion de la EMPRESA
+          porque es su documento: una constructora elige una vez y todos sus
+          informes salen igual. Cada obra puede pisarlo desde su pantalla de
+          informe. */}
+      <Tarjeta>
+        <SeccionTarjeta
+          primera
+          titulo="El informe de obra"
+          nota="Qué hojas lleva el informe que se descarga y se envía. Cada obra puede usar otra desde su propia pantalla."
+        >
+          <ElegirPlantillaInforme
+            accion={accionPlantillaInformeEmpresa}
+            plantillaActual={informe.plantilla}
+            apagadasActuales={informe.apagadas}
+            puedeHeredar={false}
+          />
         </SeccionTarjeta>
       </Tarjeta>
 

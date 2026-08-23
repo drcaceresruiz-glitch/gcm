@@ -6,6 +6,10 @@ import { hojaDashboard } from "@/lib/informe-hoja-dashboard";
 import { hojasBitacora, type DatosBitacora } from "@/lib/informe-hoja-bitacora";
 import { hojaCronograma } from "@/lib/informe-hoja-cronograma";
 import { hojaControl } from "@/lib/informe-hoja-control";
+import {
+  SECCIONES_INFORME,
+  type SeccionInformeClave,
+} from "@/lib/plantilla-informe";
 import { A4_APAISADO, paginasDelInforme } from "@/lib/informe-pdf";
 import {
   cargarFuentes,
@@ -58,6 +62,14 @@ export async function generarInformePdf(
   bitacora?: {
     fotosPorUid: DatosBitacora["fotosPorUid"];
     bytes: ReadonlyMap<string, { contenido: Buffer; mime: string }>;
+  },
+  /**
+   * Que hojas lleva este informe. Sin ella salen todas, que es como se
+   * comportaba antes de que se pudiera elegir.
+   */
+  seleccion?: {
+    incluidas: readonly SeccionInformeClave[];
+    apagadas: readonly SeccionInformeClave[];
   },
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
@@ -132,18 +144,29 @@ export async function generarInformePdf(
     medir,
   );
 
+  /// Sin seleccion, todas: es como se comportaba antes de poder elegir.
+  const incluidas = seleccion?.incluidas ?? SECCIONES_INFORME;
+  const lleva = (s: SeccionInformeClave) => incluidas.includes(s);
+
+  /**
+   * El resumen va SIEMPRE y no se puede apagar.
+   *
+   * Lleva el avance y las alertas de atraso. Un informe del que se puede
+   * quitar el atraso no es un informe: quien lo recibe no tiene forma de
+   * saber que se lo quitaron.
+   */
   const paginas = [
     hojaDashboard(d, A4_APAISADO, medir),
-    ...cronograma,
-    ...control,
-    ...paginasDelInforme(
+    ...(lleva("cronograma") ? cronograma : []),
+    ...(lleva("control") ? control : []),
+    ...(lleva("tablas") ? paginasDelInforme(
       secciones,
       `Informe de obra — ${d.obra}`,
       `${d.empresa}${d.ubicacion ? ` · ${d.ubicacion}` : ""} · Corte del ${fechaCsv(d.fechaCorte)}`,
       A4_APAISADO,
       medir,
-    ),
-    ...hojasDeLaBitacora,
+    ) : []),
+    ...(lleva("bitacora") ? hojasDeLaBitacora : []),
   ];
 
   const o = A4_APAISADO;
@@ -229,8 +252,22 @@ export async function generarInformePdf(
     paginas,
     o,
     fuentes,
-    (indice, total) =>
-      `${aWinAnsi(d.obra)} · Corte ${fechaCsv(d.fechaCorte)} · Generado por ${aWinAnsi(d.generadoPor)} · Página ${indice + 1} de ${total}`,
+    (indice, total) => {
+      /**
+       * El pie CONFIESA lo que no lleva.
+       *
+       * Un informe recortado que no lo dice es indistinguible de uno completo
+       * para quien lo recibe, y ahi es donde una preferencia se convierte en
+       * una omision. Se dice el numero, no la lista: la lista no cabe y el
+       * numero ya basta para preguntar.
+       */
+      const omitidas = seleccion?.apagadas.length ?? 0;
+      const nota =
+        omitidas > 0
+          ? ` · ${omitidas} sección(es) omitida(s) por configuración`
+          : "";
+      return `${aWinAnsi(d.obra)} · Corte ${fechaCsv(d.fechaCorte)} · Generado por ${aWinAnsi(d.generadoPor)}${nota} · Página ${indice + 1} de ${total}`;
+    },
     {
       imagenes,
       marcaPrimeraPagina: grafico
