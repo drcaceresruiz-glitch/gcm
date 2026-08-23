@@ -728,6 +728,53 @@ export function correoCurvaAvance(datos: {
  * un informe de obra puede llevar al cliente y al contratista a la vez, y
  * ninguno tiene por que ver al otro.
  */
+/**
+ * El presupuesto contractual, camino del cliente.
+ *
+ * Solo el CONTRACTUAL se manda por aqui, y el servicio que lo llama no acepta
+ * otro: el meta y la comparativa llevan el costo y la bolsa, y un correo es
+ * exactamente la forma mas facil de que salgan de la empresa por descuido.
+ *
+ * El correo no repite las cifras del presupuesto. Un total en el cuerpo y otro
+ * en el adjunto son dos numeros que alguien tendra que cuadrar el dia que no
+ * coincidan; el documento firmado es el PDF, y el correo solo lo presenta.
+ */
+export function correoPresupuestoContractual(datos: {
+  obra: string;
+  total: string;
+  nota?: string;
+  remitente: string;
+  adjunto: string;
+}): Omit<Correo, "para"> {
+  const texto = [
+    `Presupuesto — ${datos.obra}`,
+    ``,
+    `Adjunto el presupuesto contractual de la obra, por ${datos.total}.`,
+    ...(datos.nota ? ["", `Nota: ${datos.nota}`] : []),
+    ``,
+    `Adjunto:`,
+    `- ${datos.adjunto}`,
+    ``,
+    `Enviado por ${datos.remitente} desde ${MARCA}.`,
+  ].join("\n");
+
+  // Todo lo que entra aqui se escapa: el nombre de la obra sale de lo que
+  // teclea el usuario y la nota la escribe quien envia. Un enlace colado ahi
+  // se convertiria en un enlace de verdad dentro de un correo con el membrete
+  // de la empresa.
+  const html = plantilla(
+    `Presupuesto — ${esc(datos.obra)}`,
+    `<p style="font-size:15px;">Adjunto el presupuesto contractual de la obra, por
+       <strong>${esc(datos.total)}</strong>.</p>
+     ${datos.nota ? `<p style="background:#f1f5f6;border-radius:8px;padding:10px 12px;margin:12px 0;">${esc(datos.nota)}</p>` : ""}
+     <p style="color:#6b7a82;font-size:13px;margin-top:16px;">
+       Adjunto: ${esc(datos.adjunto)}
+     </p>`,
+  );
+
+  return { asunto: `Presupuesto — ${datos.obra}`, texto, html };
+}
+
 export function correoInformeObra(datos: {
   obra: string;
   corte: string;

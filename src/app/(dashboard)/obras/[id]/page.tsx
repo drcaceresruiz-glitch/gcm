@@ -14,6 +14,7 @@ import { Mascota } from "@/components/ui/Mascota";
 import { PanelAyuda, type PuntoAyuda } from "@/components/ui/PanelAyuda";
 import { FisicoVsEconomico } from "@/components/partidas/FisicoVsEconomico";
 import { cruceDeObra } from "@/services/fisico-economico.service";
+import { DescargarPresupuestos } from "@/components/presupuesto/DescargarPresupuestos";
 
 export const metadata: Metadata = { title: "Presupuesto de la obra" };
 
@@ -184,6 +185,16 @@ export default async function ObraPage({
           ni por que importa. La explicacion va aqui, donde se lee esa palabra,
           y no en otra pantalla. */}
       <Explicacion texto={CONGELAR_PRESUPUESTO} />
+
+      {/* Los tres documentos, debajo de las cifras y antes de la tabla: se
+          imprimen cuando ya se ha mirado el numero, no antes. */}
+      {filas.length > 0 && (
+        <DescargarPresupuestos
+          obraId={id}
+          puedeVerCosto={puede(sesion, "meta:leer")}
+          puedeEnviar={puede(sesion, "obra:editar")}
+        />
+      )}
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Presupuesto por partidas</h2>
