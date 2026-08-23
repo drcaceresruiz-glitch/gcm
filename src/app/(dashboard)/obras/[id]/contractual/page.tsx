@@ -7,8 +7,7 @@ import { obtenerObra } from "@/services/obras.service";
 import { previsualizarContractual } from "@/services/contractual.service";
 import { analizarRiesgoDeReemplazo } from "@/services/importacion.service";
 import { puede } from "@/lib/rbac";
-import { soles } from "@/utils/formato";
-import { ConfirmarContractual } from "@/components/contractual/ConfirmarContractual";
+import { VistaPreviaContractual } from "@/components/contractual/VistaPreviaContractual";
 
 export const metadata: Metadata = { title: "Generar contractual" };
 
@@ -49,14 +48,26 @@ export default async function ContractualPage({
     );
   }
 
-  const { metaVersion, metaAprobada, resultado } = previa.previa;
-  const partidas = resultado.lineas.filter((l) => l.tipo === "PARTIDA");
+  const { metaVersion, metaAprobada, reales } = previa.previa;
 
   // Que se llevaria por delante un reemplazo. Decirlo en numeros, y separando
   // las escritas a mano, es la diferencia entre "se borraran 360 partidas" y
   // saber que dentro van doce que costaron una tarde teclear.
   const riesgo = await analizarRiesgoDeReemplazo(sesion, id);
 
+  /**
+   * Los recargos solo se tocan sobre una meta en BORRADOR.
+   *
+   * Una meta aprobada esta congelada, y si su margen se pudiera retocar
+   * despues «congelada» no querria decir nada. Se explica en la pantalla en
+   * vez de dejar los campos apagados sin motivo.
+   */
+  const puedeAjustar = puede(sesion, "meta:crear") && !metaAprobada;
+  const motivoNoAjustable = metaAprobada
+    ? `El presupuesto real v${metaVersion} está aprobado y congelado: su margen ya no se retoca. Para cambiarlo se carga una versión nueva.`
+    : !puede(sesion, "meta:crear")
+      ? "No tienes permiso para cambiar el presupuesto real, así que los recargos se muestran como están."
+      : null;
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-6">
@@ -69,79 +80,14 @@ export default async function ContractualPage({
         </p>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border p-4">
-          <p className="text-xs uppercase text-slate-500">Real (lo que cuesta)</p>
-          <p className="text-lg font-semibold">{soles(resultado.totalReal)}</p>
-        </div>
-        <div className="rounded-lg border p-4">
-          <p className="text-xs uppercase text-slate-500">Contractual (lo que se cobra)</p>
-          <p className="text-lg font-semibold">{soles(resultado.totalContractual)}</p>
-        </div>
-        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4">
-          <p className="text-xs uppercase text-emerald-700">Bolsa operativa</p>
-          <p className="text-lg font-semibold text-emerald-800">
-            {soles(resultado.bolsa)}
-          </p>
-        </div>
-      </section>
-
-      {resultado.avisos.length > 0 && (
-        <section className="space-y-3">
-          {resultado.avisos.map((a) => (
-            <div key={a.motivo} className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm">
-              <p className="font-semibold text-amber-900">
-                {a.codigos.length} linea(s) &middot; {soles(a.importe)}
-              </p>
-              <p className="text-amber-900">{a.mensaje}</p>
-              <p className="mt-1 text-xs text-slate-600">{a.codigos.join(", ")}</p>
-            </div>
-          ))}
-        </section>
-      )}
-
-      <ConfirmarContractual
+      <VistaPreviaContractual
         obraId={id}
-        partidas={partidas.length}
+        reales={reales}
         riesgo={riesgo}
         puedeGenerar={puede(sesion, "partida:importar")}
+        puedeAjustar={puedeAjustar}
+        motivoNoAjustable={motivoNoAjustable}
       />
-
-      <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase text-slate-500">
-          Detalle
-        </h2>
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <tr>
-                <th className="p-2">Item</th>
-                <th className="p-2">Descripcion</th>
-                <th className="p-2 text-right">Metrado</th>
-                <th className="p-2 text-right">P. contractual</th>
-                <th className="p-2 text-right">Recargo</th>
-                <th className="p-2 text-right">Parcial</th>
-              </tr>
-            </thead>
-            <tbody>
-              {resultado.lineas.map((l) => (
-                <tr key={l.codigo} className={l.tipo === "CAPITULO" ? "bg-slate-50 font-semibold" : ""}>
-                  <td className="p-2">{l.codigo}</td>
-                  <td className="p-2">{l.descripcion}</td>
-                  <td className="p-2 text-right">{l.metrado ?? ""}</td>
-                  <td className="p-2 text-right">{l.precioUnitario ?? ""}</td>
-                  <td className="p-2 text-right">
-                    {l.porcentajeAplicado ? `${l.porcentajeAplicado}%` : ""}
-                  </td>
-                  <td className="p-2 text-right">
-                    {l.parcial ? soles(l.parcial) : ""}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </main>
   );
 }

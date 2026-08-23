@@ -14,7 +14,7 @@ import {
  * el arbol de partidas de una obra no se puede deshacer con el boton de
  * atras, asi que se pide un gesto deliberado y no un clic de mas.
  */
-interface Riesgo {
+export interface Riesgo {
   creadasAMano: { codigo: string; descripcion: string }[];
   corregidasAMano: { codigo: string; descripcion: string }[];
   totalPartidas: number;
@@ -25,6 +25,7 @@ export function ConfirmarContractual({
   partidas,
   riesgo,
   puedeGenerar,
+  recargos,
 }: {
   obraId: string;
   partidas: number;
@@ -33,6 +34,14 @@ export function ConfirmarContractual({
   /// ya exige la pantalla entera: sin el, mostrar el boton solo lleva a un
   /// rechazo silencioso al pulsarlo.
   puedeGenerar: boolean;
+  /**
+   * Los recargos que se han movido en la vista previa, o null si ninguno.
+   *
+   * Son PORCENTAJES, no importes: se guardan en la meta antes de generar y el
+   * dinero lo recalcula el servidor desde la base. Ver el comentario largo de
+   * la accion, que es donde vive esa regla.
+   */
+  recargos?: Readonly<Record<string, string>> | null;
 }) {
   const [estado, accion, pendiente] = useActionState<EstadoContractual, FormData>(
     accionGenerarContractual,
@@ -51,6 +60,16 @@ export function ConfirmarContractual({
   return (
     <form action={accion} className="space-y-3 rounded-lg border bg-slate-50 p-4">
       <input type="hidden" name="obraId" value={obraId} />
+      {recargos && (
+        <input type="hidden" name="recargos" value={JSON.stringify(recargos)} />
+      )}
+
+      {recargos && (
+        <p className="text-sm text-slate-700">
+          Se guardarán también los {Object.keys(recargos).length} recargo(s) que
+          has cambiado, en el presupuesto real.
+        </p>
+      )}
 
       {riesgo.totalPartidas > 0 && (
         <label className="flex items-start gap-2 text-sm">

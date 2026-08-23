@@ -30,6 +30,19 @@ export interface PreviaContractual {
   metaVersion: number;
   metaAprobada: boolean;
   resultado: ResultadoContractual;
+  /**
+   * Las lineas del real, tal cual entran al calculo.
+   *
+   * Viajan a la pantalla para que pueda recalcular EN VIVO lo que pasaria al
+   * mover un recargo, llamando a la MISMA `generarContractual` que corre
+   * aqui. Si la vista previa tuviera su propia formula, el numero que se ve
+   * antes de confirmar y el que se guarda despues podrian no coincidir, y ese
+   * numero es el margen de la obra.
+   *
+   * Son datos de entrada, no cifras de dinero calculadas: lo que se guarda al
+   * confirmar se vuelve a calcular en el servidor, desde la base.
+   */
+  reales: LineaReal[];
 }
 
 export type ResultadoPrevia =
@@ -96,6 +109,7 @@ export async function previsualizarContractual(
       metaVersion: meta.version,
       metaAprobada: meta.aprobadaAt !== null,
       resultado: generarContractual(reales),
+      reales,
     },
   };
 }

@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { normalizarDecimal, sumar, esPositivo } from "@/lib/decimal";
+import { normalizarDecimal, sumar, esPositivo, esCero } from "@/lib/decimal";
 import { subtotalesPorRama } from "@/lib/jerarquia-partidas";
 import {
   calcularBolsa,
@@ -414,6 +414,102 @@ export interface DatosMeta {
 export type ResultadoMeta =
   | { ok: true; id: string; version: number; costoTotal: string }
   | { ok: false; error: string };
+
+/**
+ * Cambiar el recargo de uno o varios capitulos de la meta, desde la app.
+ *
+ * Es el unico dato de la meta que se puede corregir sin volver al Excel, y a
+ * proposito: el recargo NO es un costo, es la decision de margen —cuanto se
+ * le carga al cliente sobre lo que cuesta— y es justo lo que se quiere poder
+ * mover mirando la bolsa antes de firmar. Los costos siguen entrando por la
+ * plantilla, que es donde se cuadran con los contratistas.
+ *
+ * Solo sobre un BORRADOR. Una meta aprobada esta congelada: si se pudiera
+ * retocar su margen despues, «congelada» no querria decir nada. Para cambiarla
+ * se crea una version nueva, que es como funciona el resto de la meta.
+ *
+ * El importe no viaja nunca: aqui entra un porcentaje y el dinero lo vuelve a
+ * calcular el servidor a partir de el.
+ */
+export async function ajustarRecargosDeLaMeta(
+  sesion: SesionActiva,
+  obraId: string,
+  /// Codigo de capitulo -> porcentaje, como texto. "18" son 18%.
+  recargos: Readonly<Record<string, string>>,
+): Promise<{ ok: true; cambiados: number } | { ok: false; error: string }> {
+  if (!puede(sesion, "meta:crear")) {
+    return {
+      ok: false,
+      error: "No tienes permiso para cambiar el presupuesto meta.",
+    };
+  }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
+  const codigos = Object.keys(recargos);
+  if (codigos.length === 0) return { ok: true, cambiados: 0 };
+
+  const meta = await metaQueManda(sesion.companyId, obraId);
+  if (!meta) return { ok: false, error: "Esta obra todavia no tiene presupuesto meta." };
+
+  if (meta.aprobadaAt !== null) {
+    return {
+      ok: false,
+      error:
+        `La meta v${meta.version} esta aprobada y no se puede retocar. ` +
+        "Para cambiar el margen se carga una version nueva.",
+    };
+  }
+
+  /**
+   * Cada porcentaje, normalizado y acotado.
+   *
+   * El tope no es una manía: un recargo de cuatro cifras casi siempre es un
+   * dedo de mas al teclear, y el numero acabaria en un contrato.
+   */
+  const validados = new Map<string, string>();
+  for (const [codigo, crudo] of Object.entries(recargos)) {
+    const pct = normalizarDecimal(String(crudo ?? ""), 3);
+    if (pct === null) {
+      return { ok: false, error: `El recargo del capitulo ${codigo} no es un numero.` };
+    }
+    if (!esPositivo(pct) && !esCero(pct)) {
+      return { ok: false, error: `El recargo del capitulo ${codigo} no puede ser negativo.` };
+    }
+    if (Number(pct) > 999) {
+      return { ok: false, error: `El recargo del capitulo ${codigo} pasa del 999 %.` };
+    }
+    validados.set(codigo, pct);
+  }
+
+  // Solo capitulos, y solo de ESTA meta: el recargo de una partida suelta no
+  // existe -lo hereda de su capitulo- y escribirlo ahi seria un dato muerto
+  // que ademas cambiaria el calculo sin que nadie lo hubiera pedido.
+  const items = await prisma.presupuestoMetaItem.findMany({
+    where: {
+      presupuestoMetaId: meta.id,
+      tipo: "CAPITULO",
+      codigoRef: { in: [...validados.keys()] },
+    },
+    select: { id: true, codigoRef: true },
+  });
+
+  if (items.length === 0) {
+    return { ok: false, error: "Ninguno de esos codigos es un capitulo de la meta." };
+  }
+
+  await prisma.$transaction(
+    items.map((i) =>
+      prisma.presupuestoMetaItem.update({
+        where: { id: i.id },
+        data: { porcentajeRecargo: validados.get(i.codigoRef ?? "") ?? null },
+      }),
+    ),
+  );
+
+  return { ok: true, cambiados: items.length };
+}
 
 export async function crearMeta(
   sesion: SesionActiva,
