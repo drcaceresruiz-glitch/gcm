@@ -108,18 +108,18 @@ export async function accionImportarMeta(
     return { error: "No se pudo leer el archivo. Comprueba que sea un Excel valido." };
   }
 
-  // Un Excel de la plantilla vieja. Los gastos generales YA NO son de la
-  // meta: los reconoce el contrato y los gestiona la empresa. Se rechaza en
-  // vez de ignorarlos en silencio, que dejaria al usuario creyendo que se
-  // guardaron.
-  if (gastos.filas.length > 0) {
-    return {
-      error:
-        "Este archivo trae la hoja «Gastos Generales», que ya no forma parte del " +
-        "presupuesto meta: los gastos generales los reconoce el contrato y los " +
-        "gestiona la empresa. Descarga la plantilla nueva y vuelve a cargarlo.",
-    };
-  }
+  /*
+   * Los gastos generales VUELVEN a la meta, y a proposito.
+   *
+   * El 21 de agosto se sacaron de aqui con el argumento de que "los reconoce
+   * el contrato y los gestiona la empresa". Es cierto de cara al CLIENTE -el
+   * contrato los reconoce englobados, no sueldo a sueldo- pero no de cara a
+   * la empresa: el residente, el maestro y la camioneta cuestan, y sin ellos
+   * la meta no es lo que la obra cuesta, solo lo que cuestan sus partidas.
+   *
+   * Siguen sin salir en el contractual ni en el cronograma: viven en su
+   * propia tabla y el contractual se genera desde los ITEMS de la meta.
+   */
   if (costo.errores.length > 0) {
     const primero = costo.errores[0]!;
     return {

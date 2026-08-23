@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import ExcelJS from "exceljs";
 
-import { generarPlantillaMeta, TOTAL_COSTO_EJEMPLO } from "./plantilla-meta";
+import {
+  generarPlantillaMeta,
+  TOTAL_COSTO_EJEMPLO,
+  TOTAL_GASTOS_EJEMPLO,
+  COSTE_MENSUAL_EJEMPLO,
+} from "./plantilla-meta";
 import { analizarExcel } from "./excel-presupuesto";
 import { analizarGastosGenerales, HOJA_GASTOS } from "./excel-meta";
 
@@ -92,6 +97,53 @@ describe("la hoja de costo directo de la plantilla meta", () => {
     // mas. La fila de TOTAL del final no cuenta porque queda fuera de la
     // tabla, que es donde tiene que quedarse.
     expect(r.filasTextoOmitidas).toBe(1);
+  });
+});
+
+describe("la hoja de gastos generales de la plantilla", () => {
+  /*
+   * Volvio a la plantilla el 23 de agosto. Salio el 21 con el argumento de
+   * que "los reconoce el contrato y los gestiona la empresa": cierto de cara
+   * al CLIENTE -el contrato los reconoce englobados- pero no de cara a la
+   * empresa, que paga al residente igual. Sin ellos la meta no es lo que la
+   * obra cuesta, solo lo que cuestan sus partidas.
+   */
+  it("la lee su propio analizador, sin un error", async () => {
+    const r = await analizarGastosGenerales(await generarPlantillaMeta());
+
+    expect(r.errores).toEqual([]);
+    expect(r.total).toBe(TOTAL_GASTOS_EJEMPLO);
+    // La cifra que convierte "vamos un mes tarde" en dinero.
+    expect(r.costeMensualDelAtraso).toBe(COSTE_MENSUAL_EJEMPLO);
+  });
+
+  it("los meses de ejemplo se recortan al plazo real de la obra", async () => {
+    // Sin esto, la plantilla de una obra de dos meses propone ocho meses de
+    // residente y quien la rellena deprisa se lleva un gasto general cuatro
+    // veces mayor que su obra.
+    const r = await analizarGastosGenerales(await generarPlantillaMeta(2));
+
+    expect(r.errores).toEqual([]);
+    for (const f of r.filas) {
+      if (f.tipo === "VARIABLE" && f.meses !== null) {
+        expect(Number(f.meses)).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  it("el costo directo NO se contamina con los gastos generales", async () => {
+    // Van en hojas distintas y por analizadores distintos a proposito: si un
+    // sueldo entrara como partida, acabaria en el contrato del cliente y en
+    // el cronograma como una tarea.
+    const r = await analizarExcel(await generarPlantillaMeta(), {
+      propiasDeLaMeta: true,
+    });
+
+    expect(r.montoTotal).toBe(TOTAL_COSTO_EJEMPLO);
+    expect(r.filas.some((f) => f.descripcion.includes("Residente"))).toBe(false);
+    expect(r.propiasDeLaMeta.some((f) => f.descripcion.includes("Residente"))).toBe(
+      false,
+    );
   });
 });
 

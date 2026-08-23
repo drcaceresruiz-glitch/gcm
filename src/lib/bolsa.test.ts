@@ -398,3 +398,50 @@ describe("el precio de cada mes de atraso", () => {
     expect(r.invalidas).toBe(0);
   });
 });
+
+describe("la bolsa neta: lo que queda despues de los gastos generales", () => {
+  /*
+   * La bolsa de produccion mide el margen de las PARTIDAS. Los gastos
+   * generales -residente, maestro, camioneta, polizas- se pagan igual aunque
+   * todas las partidas cuadren, asi que la cifra que dice si la obra deja
+   * algo es la de despues de restarlos.
+   */
+  const datos = (gastosGeneralesMeta?: string) => ({
+    modo: "PARTIDA" as const,
+    contractual: [{ codigo: "1.1", descripcion: "Zapatas", importe: "10000.00" }],
+    meta: [{ codigoRef: "1.1", descripcion: "Zapatas", importe: "7000.00" }],
+    utilidadContractual: "0.00",
+    ...(gastosGeneralesMeta === undefined ? {} : { gastosGeneralesMeta }),
+  });
+
+  it("resta los gastos generales de la bolsa", () => {
+    const b = calcularBolsa(datos("1200.00"));
+
+    expect(b.bolsaTotal).toBe("3000.00");
+    expect(b.gastosGeneralesMeta).toBe("1200.00");
+    expect(b.bolsaNeta).toBe("1800.00");
+  });
+
+  it("una meta sin gastos generales deja la neta igual que la bruta", () => {
+    // Es el caso de una meta cargada sin la hoja: no se inventa un gasto.
+    const b = calcularBolsa(datos());
+
+    expect(b.gastosGeneralesMeta).toBe("0.00");
+    expect(b.bolsaNeta).toBe(b.bolsaTotal);
+  });
+
+  it("unos gastos generales mayores que la bolsa la dejan NEGATIVA, y se ve", () => {
+    // Es justo el caso que hay que poder ver: las partidas cuadran y la obra
+    // pierde dinero igual, porque la estructura se la come.
+    const b = calcularBolsa(datos("4500.00"));
+
+    expect(b.bolsaTotal).toBe("3000.00");
+    expect(b.bolsaNeta).toBe("-1500.00");
+  });
+
+  it("la bolsa de produccion NO cambia: la miran media docena de sitios", () => {
+    expect(calcularBolsa(datos("9999.00")).bolsaTotal).toBe(
+      calcularBolsa(datos()).bolsaTotal,
+    );
+  });
+});

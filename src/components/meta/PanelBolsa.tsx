@@ -2,7 +2,7 @@ import { AlertTriangle, Info, Lock } from "lucide-react";
 
 import { soles } from "@/utils/formato";
 import { fechaCorta } from "@/utils/fechas";
-import { esNegativo, esPositivo } from "@/lib/decimal";
+import { esCero, esNegativo, esPositivo } from "@/lib/decimal";
 import { origenDeEjemplo } from "@/lib/datos-de-ejemplo";
 import type { ComparacionMeta } from "@/services/meta.service";
 
@@ -111,13 +111,34 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
           valor={bolsa.costoDirectoMeta}
         />
 
-
         <div
           className="my-1 border-t"
           style={{ borderColor: "var(--borde)" }}
           aria-hidden="true"
         />
 
+        <div
+          className="flex items-baseline justify-between gap-4 py-2"
+          style={negativa ? { color: "var(--color-peligro)" } : undefined}
+        >
+          <span>
+            Bolsa de producción
+            <span className="ml-2 text-sm font-normal opacity-60">
+              lo que dejan las partidas
+            </span>
+          </span>
+          <span className="tabular-nums">{soles(bolsa.bolsaTotal)}</span>
+        </div>
+
+        {/* Los gastos generales solo se enseñan si la meta los trae. Una
+            linea a cero invita a pensar que la obra no tiene residente. */}
+        {!esCero(bolsa.gastosGeneralesMeta) && (
+          <Fila
+            etiqueta="− Gastos generales"
+            nota="residente, maestro, pólizas: cuestan aunque no sean partidas"
+            valor={bolsa.gastosGeneralesMeta}
+          />
+        )}
 
         <div
           className="my-1 border-t-2"
@@ -127,15 +148,19 @@ export function PanelBolsa({ c }: { c: ComparacionMeta }) {
 
         <div
           className="flex items-baseline justify-between gap-4 py-2 text-lg font-semibold"
-          style={negativa ? { color: "var(--color-peligro)" } : undefined}
+          style={
+            esNegativo(bolsa.bolsaNeta)
+              ? { color: "var(--color-peligro)" }
+              : undefined
+          }
         >
           <span>
-            Bolsa
+            {esCero(bolsa.gastosGeneralesMeta) ? "Bolsa" : "Bolsa neta"}
             <span className="ml-2 text-sm font-normal opacity-60">
               lo que la obra puede gestionar
             </span>
           </span>
-          <span className="tabular-nums">{soles(bolsa.bolsaTotal)}</span>
+          <span className="tabular-nums">{soles(bolsa.bolsaNeta)}</span>
         </div>
 
         {/* La utilidad va DEBAJO de la bolsa y separada. Es el punto que mas

@@ -317,6 +317,9 @@ export async function compararConContractual(
   }));
 
   const bolsa = calcularBolsa({
+    // El costo interno de la obra que no es partida. Va a la bolsa NETA, no a
+    // la de produccion: la de arriba mide el margen de las partidas.
+    gastosGeneralesMeta: meta.gastosGenerales.toString(),
     modo,
     contractual: await lineasContractuales(modo, obraId, vigente.partidas),
     meta: lineasMeta,

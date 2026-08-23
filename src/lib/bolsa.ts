@@ -210,6 +210,9 @@ export interface DatosBolsa {
   /// Utilidad del contractual. Viaja para poder ensenarla al lado de la
   /// bolsa; NUNCA se suma a ella.
   utilidadContractual: string;
+  /// Gastos generales de la meta, ya sumados. Opcional: una meta cargada sin
+  /// la hoja de gastos no los tiene, y ahi la bolsa neta es la bruta.
+  gastosGeneralesMeta?: string;
 }
 
 export interface Bolsa {
@@ -220,9 +223,23 @@ export interface Bolsa {
   /// Costo directo contractual - costo directo meta.
   bolsaProduccion: string;
 
-  /// La bolsa que gestiona la obra. Hoy es exactamente la de produccion:
-  /// los gastos generales salieron de la meta y ya no son de la obra.
+  /// La bolsa que gestiona la obra ANTES de sus gastos generales. Es la que
+  /// se compara linea a linea con el contrato, y por eso se conserva con este
+  /// nombre: media docena de sitios la leen asi.
   bolsaTotal: string;
+
+  /// Los gastos generales de la meta: personal indirecto, polizas, todo lo
+  /// que la obra cuesta sin ser una partida. Cero si la meta no los trae.
+  gastosGeneralesMeta: string;
+
+  /**
+   * Lo que de verdad queda: la bolsa menos los gastos generales.
+   *
+   * Es la cifra INTERNA, la que dice si la obra deja algo. La de arriba mide
+   * el margen de las partidas; esta descuenta ademas el residente, el maestro
+   * y la camioneta, que se pagan igual aunque todas las partidas cuadren.
+   */
+  bolsaNeta: string;
 
   /// Aparte y etiquetada. No es bolsa: es el margen ofertado.
   utilidadContractual: string;
@@ -262,10 +279,15 @@ export function calcularBolsa(datos: DatosBolsa): Bolsa {
     restar(costoDirectoContractual, costoDirectoMeta) ?? "0.00";
   const bolsaTotal = bolsaProduccion;
 
+  const gastosGeneralesMeta = datos.gastosGeneralesMeta ?? "0.00";
+  const bolsaNeta = restar(bolsaTotal, gastosGeneralesMeta) ?? bolsaTotal;
+
   return {
     porLinea: union.filas,
     costoDirectoContractual,
     costoDirectoMeta,
+    gastosGeneralesMeta,
+    bolsaNeta,
     bolsaProduccion,
     bolsaTotal,
     utilidadContractual: datos.utilidadContractual,
