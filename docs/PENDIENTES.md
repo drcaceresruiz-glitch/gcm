@@ -2092,6 +2092,23 @@ Lo que SI se hara, en este orden:
    ahora— hay que cambiarlo a `microphone=(self)` para que esto funcione
    en produccion. Sin empezar el codigo.
 
+   **Pedido el 22 de agosto de 2026: catalogo de que acciones puede
+   llegar a ejecutar el chat de IA, solo para saber y decidir despues.**
+   Investigacion, no codigo. Siete herramientas de LECTURA, siempre
+   disponibles con `agente_ia:usar` (`listar_obras`, `resumen_empresa`,
+   `semaforo_cartera`, `sobregiro_cartera`, `confiabilidad_cartera`,
+   `partidas_de_obra`, `tareas_de_obra`) y tres de ESCRITURA
+   (`crear_movimiento`, `registrar_avance`, `crear_nota`), estas ultimas
+   SOLO detras de `proponer_accion` -el agente nunca las ejecuta directo,
+   siempre propone y un humano confirma en pantalla-, y solo visibles para
+   quien tiene el permiso aparte `agente_ia:escribir` (hoy: RESIDENTE y
+   ADMIN_OBRA). Detalle completo de cada herramienta y las salvaguardas
+   del lado de escritura -resumen calculado por el servidor nunca por el
+   modelo, doble-click atomico, expiracion a 24h- en la seccion "Fase 2b"
+   de aqui arriba. **Sigue sin decidirse** si la escritura se deja activa,
+   se restringe mas, o se quita del todo -este catalogo es el insumo para
+   esa decision, no la decision en si-.
+
 ---
 
 ## 6c. Auditoria del 10 de agosto: las costuras, no las formulas
