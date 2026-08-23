@@ -5,6 +5,20 @@ export default defineConfig({
   resolve: {
     // Mismo alias que tsconfig, para que las pruebas importen igual que la app.
     alias: {
+      /*
+       * El cliente GENERADO de Prisma no existe para las pruebas, y falla
+       * diciendo por que. Ver `test/prisma-generado-prohibido.ts`: el CI corre
+       * las pruebas ANTES del build -que es quien lo genera-, asi que una
+       * prueba que llegue hasta el pasa en local y revienta el despliegue.
+       * Este alias trae ese fallo al puesto de trabajo.
+       *
+       * VA DELANTE DE `"@"`: Vite compara los alias EN ORDEN y gana el primero
+       * que casa. Detras, `"@"` reescribe la ruta a `src/generated/...` y esto
+       * no se mira nunca -comprobado con una prueba trampa que paso en verde-.
+       */
+      "@/generated/prisma/client": fileURLToPath(
+        new URL("./test/prisma-generado-prohibido.ts", import.meta.url),
+      ),
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       // Ver test/server-only-vacio.ts: sin esto, la capa de servicios no se
       // puede importar desde una prueba.

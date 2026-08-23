@@ -5,7 +5,10 @@ import { analizarExcel } from "@/lib/excel-presupuesto";
 import { esPositivo, normalizarDecimal } from "@/lib/decimal";
 import { crearMeta, type EntradaItemMeta } from "@/services/meta.service";
 import type { SesionActiva } from "@/services/sesion.service";
-import type { ModoMeta } from "@/lib/bolsa";
+import {
+  MODOS,
+  validarArchivoMeta,
+} from "@/lib/meta-excel";
 
 /**
  * Cargar el presupuesto meta desde el Excel de la plantilla.
@@ -21,44 +24,16 @@ import type { ModoMeta } from "@/lib/bolsa";
  * termina en un sitio distinto.
  */
 
-const EXTENSIONES = [".xlsx", ".xlsm", ".xls"];
-const LIMITE_BYTES = 8 * 1024 * 1024;
-
-export const MODOS: ModoMeta[] = ["PARTIDA", "CAPITULO", "FRENTE"];
+/*
+ * Se reexportan: quien carga una meta no tiene por que saber que la parte
+ * pura vive en otro archivo. La razon de que viva alli es del CI, no suya
+ * -ver la cabecera de `lib/meta-excel`-.
+ */
+export { mesesEntre, validarArchivoMeta, MODOS } from "@/lib/meta-excel";
 
 export type ResultadoCarga =
   | { ok: true; version: number }
   | { ok: false; error: string };
-
-type Validacion = { ok: true; archivo: File } | { ok: false; error: string };
-
-/** El archivo, comprobado antes de gastar un solo ciclo en abrirlo. */
-export function validarArchivoMeta(archivo: unknown): Validacion {
-  if (!(archivo instanceof File) || archivo.size === 0) {
-    return { ok: false, error: "Selecciona el archivo de Excel de la meta." };
-  }
-
-  const nombre = archivo.name.toLowerCase();
-  if (!EXTENSIONES.some((e) => nombre.endsWith(e))) {
-    return {
-      ok: false,
-      error: `El archivo tiene que ser de Excel (${EXTENSIONES.join(", ")}).`,
-    };
-  }
-
-  if (archivo.size > LIMITE_BYTES) {
-    const mb = (archivo.size / 1024 / 1024).toFixed(1);
-    return { ok: false, error: `El archivo pesa ${mb} MB y el limite son 8 MB.` };
-  }
-
-  return { ok: true, archivo };
-}
-
-/** Meses entre dos fechas, a 30 dias. Se PROPONE; el usuario puede cambiarlo. */
-export function mesesEntre(inicio: Date, fin: Date): string {
-  const dias = (fin.getTime() - inicio.getTime()) / 86_400_000;
-  return (Math.round((dias / 30) * 100) / 100).toFixed(2);
-}
 
 export interface EntradaCargaMeta {
   archivo: unknown;

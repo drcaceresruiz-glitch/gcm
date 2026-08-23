@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { mesesEntre, validarArchivoMeta } from "@/services/meta-desde-excel";
+import { mesesEntre, validarArchivoMeta } from "@/lib/meta-excel";
 
 /**
- * La lectura del Excel de la meta, compartida por DOS caminos.
+ * Lo que se decide sobre el Excel de la meta antes de abrirlo.
  *
- * Vive en un servicio y no en la accion de una pantalla porque el alta de
- * obra tambien la usa: se adjunta el Excel al crear la obra y esta nace con
- * su presupuesto. Dos lecturas del mismo archivo se desincronizan a la
- * primera columna nueva -es exactamente lo que costo caro con la hoja de
- * gastos generales-, asi que lo que se prueba aqui es la puerta comun.
+ * Lo comparten DOS caminos: la pantalla de la meta y el alta de obra, donde
+ * se adjunta el Excel y la obra nace con su presupuesto. Dos lecturas del
+ * mismo archivo se desincronizan a la primera columna nueva -es exactamente
+ * lo que costo caro con la hoja de gastos generales-, asi que se prueba la
+ * puerta comun.
+ *
+ * APUNTA A `lib/` Y NO AL SERVICIO, y no es un detalle de gusto: el CI corre
+ * las pruebas ANTES del build, que es quien genera el cliente de Prisma. Una
+ * prueba que importe el servicio arrastra `lib/prisma` y revienta en CI
+ * aunque en local pase -en local el cliente ya esta generado-, asi que el
+ * gancho de pre-push no puede cazarlo. Paso, y costo dos despliegues rojos.
  */
 
 function archivoFalso(nombre: string, bytes: number): File {
