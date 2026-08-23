@@ -18,6 +18,7 @@ export interface Riesgo {
   creadasAMano: { codigo: string; descripcion: string }[];
   corregidasAMano: { codigo: string; descripcion: string }[];
   totalPartidas: number;
+  totalCapitulos: number;
 }
 
 export function ConfirmarContractual({
@@ -75,7 +76,22 @@ export function ConfirmarContractual({
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" name="reemplazar" className="mt-1" />
           <span>
-            Reemplazar las {riesgo.totalPartidas} partidas que ya tiene la obra.
+            {/*
+              Se dice BORRAR y no «reemplazar» a secas, y se cuentan los
+              capitulos aparte. La casilla decia «las 6 partidas» contando las
+              filas del arbol mientras el boton de al lado decia «con 4
+              partida(s)» contando solo las que llevan importe: el mismo
+              conjunto con dos cifras distintas, en la misma pantalla y a dos
+              centimetros. Y «reemplazar» sonaba a fusionar, que es justo lo
+              que NO hace.
+            */}
+            Borrar el presupuesto que ya tiene la obra —{riesgo.totalPartidas}{" "}
+            partida{riesgo.totalPartidas === 1 ? "" : "s"}
+            {riesgo.totalCapitulos > 0 && (
+              <> y {riesgo.totalCapitulos} capítulo{riesgo.totalCapitulos === 1 ? "" : "s"}</>
+            )}
+            — y poner este en su lugar. Sin marcarlo no se genera nada: no se
+            añade a lo que hay.
             {riesgo.creadasAMano.length > 0 && (
               <strong className="block text-amber-800">
                 {riesgo.creadasAMano.length} se escribieron a mano y no estan en

@@ -41,14 +41,25 @@ export interface EnRiesgoPorReemplazo {
   /// Importadas pero corregidas despues: el archivo las trae, con los
   /// valores viejos.
   corregidasAMano: { codigo: string; descripcion: string }[];
+  /// Las lineas que de verdad llevan dinero. Es lo que se cuenta al hablar
+  /// de «partidas» en el resto de la pantalla.
   totalPartidas: number;
+  /// Los titulos que las agrupan. Se cuentan APARTE y no se suman: llamar
+  /// «partidas» a las seis filas del arbol cuando cuatro llevan importe hace
+  /// que la misma pantalla diga 6 en un sitio y 4 en el de al lado.
+  totalCapitulos: number;
 }
 
 export async function analizarRiesgoDeReemplazo(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<EnRiesgoPorReemplazo> {
-  const vacio = { creadasAMano: [], corregidasAMano: [], totalPartidas: 0 };
+  const vacio = {
+    creadasAMano: [],
+    corregidasAMano: [],
+    totalPartidas: 0,
+    totalCapitulos: 0,
+  };
 
   // Esta funcion solo ANALIZA (partida:leer): la pantalla entera exige
   // meta:leer, mas floja, porque ver la vista previa no es importar nada
@@ -69,6 +80,7 @@ export async function analizarRiesgoDeReemplazo(
       descripcion: true,
       origen: true,
       editadaAMano: true,
+      tipo: true,
     },
   });
 
@@ -84,7 +96,8 @@ export async function analizarRiesgoDeReemplazo(
     corregidasAMano: items
       .filter((i) => i.origen === "IMPORTADO" && i.editadaAMano)
       .map(aviso),
-    totalPartidas: items.length,
+    totalPartidas: items.filter((i) => i.tipo === "PARTIDA").length,
+    totalCapitulos: items.filter((i) => i.tipo === "CAPITULO").length,
   };
 }
 
