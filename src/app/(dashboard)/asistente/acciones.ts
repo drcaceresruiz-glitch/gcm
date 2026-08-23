@@ -7,9 +7,26 @@ import {
   iniciarTurno,
   estadoDeTurno,
   confirmarPropuestaAgente,
+  conversacionReciente,
   type EstadoTurno,
   type ResultadoConfirmacion,
+  type MensajeAgenteResumen,
 } from "@/services/agente-conversacion.service";
+
+/**
+ * Lo que pide el lanzador flotante (`LanzadorAsistente.tsx`) la primera vez
+ * que alguien lo abre -para no pagar esta consulta en CADA pantalla del
+ * area privada, solo cuando de verdad hace falta.
+ */
+export async function accionConversacionReciente(): Promise<{
+  id: string;
+  mensajes: MensajeAgenteResumen[];
+} | null> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  return conversacionReciente(sesion);
+}
 
 export interface EstadoEnvioAsistente {
   error?: string;

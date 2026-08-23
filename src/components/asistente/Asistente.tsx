@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { LoaderCircle, Send, AlertCircle, Check, X } from "lucide-react";
 import {
   accionEnviarMensajeAsistente,
@@ -12,11 +11,6 @@ import {
 } from "@/app/(dashboard)/asistente/acciones";
 import { SIN_PROVEEDOR_ACTIVO } from "@/lib/agente-conversacion";
 import type { MensajeAgenteResumen } from "@/services/agente-conversacion.service";
-
-// Sin renderizado en servidor, a proposito: Three.js toca `window`/WebGL,
-// que no existen en el servidor, y ademas asi solo esta pantalla paga el
-// peso de three.js/@react-three -ninguna otra ruta de GCM lo carga-.
-const AvatarMike = dynamic(() => import("./AvatarMike"), { ssr: false });
 
 /**
  * El chat con el asistente de IA — Fase 2a, solo lectura.
@@ -168,8 +162,13 @@ function Burbuja({
 
 export function Asistente({
   conversacionInicial,
+  alCambiarActividad,
 }: {
   conversacionInicial: { id: string; mensajes: MensajeAgenteResumen[] } | null;
+  /** Para quien monta el chat desde afuera -el lanzador flotante-, y quiere
+   * reflejar "pensando" en su propia burbuja sin tener que duplicar el
+   * sondeo aqui dentro. */
+  alCambiarActividad?: (activo: boolean) => void;
 }) {
   const [mensajes, setMensajes] = useState<MensajeAgenteResumen[]>(
     conversacionInicial?.mensajes ?? [],
@@ -290,6 +289,10 @@ export function Asistente({
     );
   }
 
+  useEffect(() => {
+    alCambiarActividad?.(pendienteId !== null);
+  }, [pendienteId, alCambiarActividad]);
+
   const hayPropuestaPendiente = mensajes.some((m) => m.propuestaPendiente);
 
   // No borra nada de la base -las filas viejas se quedan, historicas,
@@ -305,8 +308,6 @@ export function Asistente({
 
   return (
     <div className="flex flex-col gap-4">
-      <AvatarMike activo={pendienteId !== null} />
-
       {mensajes.length > 0 && (
         <button
           type="button"

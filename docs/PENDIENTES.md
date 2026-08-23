@@ -2078,142 +2078,61 @@ Lo que SI se hara, en este orden:
      tarjeta de Confirmar/Cancelar nunca se vio disparar en vivo, solo en
      las pruebas mockeadas.
 
-   **Sigue sin empezar**:
-   - **Pedido el 22 de agosto de 2026: que el agente tenga cara — un
-     avatar 3D animado en el navegador, llamado "Mike".** Confirmado con
-     el usuario que "Mike" no existe hoy en ningun lado (ni en GCM ni en
-     otro sistema): es una idea nueva, sin modelo 3D, sin diseno visual
-     todavia. Y que se quiere 3D DE VERDAD, animado en el navegador —no
-     una ilustracion fija ni un icono—, la opcion mas grande de las que se
-     plantearon.
+   ~~**Pedido el 22 de agosto de 2026: que el agente tenga cara — un
+   avatar 3D animado en el navegador, llamado "Mike".**~~ **HECHO el 22
+   de agosto de 2026, pero no como se pidio al principio.** El pedido
+   original queria 3D de verdad, animado en el navegador, embebido en la
+   pantalla del Asistente. Dos intentos con eso NO sirvieron:
+   - **Primer intento**: `CesiumMan.glb`, el astronauta de muestra de
+     Khronos (CC-BY 4.0), con Three.js/`react-three-fiber`/drei
+     (`ssr:false`, solo `/asistente` paga ese peso). Probado en vivo,
+     funcionaba tecnicamente -camara, animacion, chat sin romperse- pero
+     el usuario lo rechazo de plano: "ESO SE VE HORRIBLE... SINO LO
+     PUEDES MEJORAR Y QUE SEA REALISTA, COMO UN CONSTRUCTOR". Con razon:
+     un astronauta generico no tiene nada que ver con GCM.
+   - **Segundo intento**: `Worker` de Quaternius (CC0, via poly.pizza) -
+     casco, chaleco reflectante, botas, 24 animaciones- con el encuadre
+     de camara resuelto por `<Bounds fit clip observe>` de drei en vez de
+     numeros a mano. Mejor asset, pero **el usuario senalo algo mas
+     importante**: GCM YA TIENE su propia mascota -"el maestro de obra"
+     en `public/mascota/` (`Mascota.tsx`), cuatro poses WebP en uso desde
+     antes en media docena de pantallas- y un modelo 3D generico de
+     internet, por bueno que sea, nunca se le va a parecer. Pidio que la
+     cara del asistente fuera ESA mascota, no una nueva, y que apareciera
+     "libre" -como el widget "Dormi" de drcaceresruiz.com (otro proyecto
+     del mismo usuario)-, no encerrada dentro de la tarjeta del chat.
 
-     Esto es una pieza de ingenieria NUEVA para GCM, separada del agente
-     conversacional en si y de tamano comparable o mayor: hoy CERO
-     pantallas usan WebGL o una libreria de graficos —hasta las curvas S y
-     los graficos de gerencia son SVG a mano, a proposito, para no sumar
-     dependencias—. Antes de disenarla en serio hace falta decidir, con el
-     usuario, al menos:
-     - **De donde sale el modelo 3D de "Mike"**: no se puede generar
-       codigo sin un asset —un personaje 3D rigged y animado hay que
-       modelarlo, encargarlo, o generarlo con un servicio, no se escribe
-       a mano—.
-     - **Que libreria de render en el navegador** (candidato obvio:
-       Three.js/`react-three-fiber`, pero es una decision a tomar, no un
-       hecho) y que impacto tiene en el peso de la pagina y el rendimiento
-       en equipos de obra modestos —el mismo criterio de "cuidado con el
-       cliente que no tiene GPU" que ya descarto WebLLM en la seccion 6b
-       de aqui arriba aplica tambien a un avatar 3D pesado—.
-     - **Que anima al avatar**: si habla con voz de verdad (texto a voz,
-       otro servicio externo mas, otra clave de API mas) con sincronizado
-       de labios, o solo gestos genericos mientras el texto aparece
-       aparte.
-     - ~~Depende de que exista primero la Fase 2 (el motor de
-       conversacion, turnos, herramientas)~~: **la Fase 2a ya existe**
-       (arriba), asi que este punto ya tiene con que hablar. Sigue sin
-       empezar por las tres preguntas de arriba (asset, libreria,
-       animacion), no por esta dependencia.
+   **Version final**: se saco WebGL del todo -`AvatarMike.tsx`, el GLB,
+   las dependencias de three.js- y en su lugar:
+   - `LanzadorAsistente.tsx`: una burbuja fija (`fixed bottom-4 right-4`)
+     con la mascota existente (pose `saludando`), montada UNA vez en
+     `(dashboard)/layout.tsx` -visible en cualquier pantalla del area
+     privada, no solo en `/asistente`-, gated por el mismo
+     `puede(sesion, "agente_ia:usar")` que ya condiciona el enlace de
+     navegacion. Al hacer clic abre un panel flotante con el mismo
+     componente `<Asistente>` de siempre -sin duplicar logica de envio ni
+     sondeo-, cargando la conversacion reciente la PRIMERA vez que se
+     abre (Server Action nueva, `accionConversacionReciente`), no en cada
+     pagina: eso habria pagado esa consulta en toda el area privada la
+     abra alguien o no.
+   - `Asistente` gano una prop opcional `alCambiarActividad`, para que el
+     lanzador refleje "pensando" (pose `pensando` de la mascota) en su
+     propia burbuja mientras el turno sigue en curso, sin duplicar el
+     sondeo.
+   - La pagina dedicada `/asistente` (a pantalla completa) se queda tal
+     cual estaba -util para una sesion de preguntas larga-; el lanzador
+     se oculta solo ahi (`usePathname`) para no flotar sobre si mismo.
 
-     **Investigado el 22 de agosto de 2026** (workflow dedicado, dos
-     agentes en paralelo con busqueda web real, no de memoria) para
-     responder las tres preguntas de arriba antes de escribir codigo:
-     - **Ready Player Me, el candidato que se habia mencionado, CERRO el
-       31 de enero de 2026** — ya no es una opcion. En su lugar:
-       **Mixamo (Adobe) sigue operando en 2026** y sigue siendo gratis
-       con una cuenta Adobe gratuita —Adobe no lo actualiza hace anos y
-       su propio foro de soporte llego a decir que "ya no tiene
-       soporte", tratarlo como herramienta legada que hoy funciona, no
-       con SLA—. Licencia: personajes y animaciones gratis, sin
-       regalias, para uso comercial O no comercial ilimitado, con la
-       unica condicion de que el asset viaje EMBEBIDO en el producto
-       terminado (este caso exacto) y no se reempaquete suelto para
-       vender. Mixamo NO exporta glTF/GLB directo -solo FBX/OBJ/Collada-,
-       asi que hace falta pasar por Blender (gratis) para convertir.
-       **Alternativa de respaldo sin ese paso de conversion**:
-       Quaternius (quaternius.com), personajes ya en glTF con licencia
-       CC0 explicita, todavia mas permisiva que Mixamo.
-     - **Version exacta a instalar** (confirmado contra el registro de
-       npm, no de memoria): `three@^0.185.1`,
-       `@react-three/fiber@^9.7.0`, `@react-three/drei@^10.7.8` —
-       `three-stdlib` y `detect-gpu` entran como dependencias TRANSITIVAS
-       de drei, pero conviene declararlas directas porque el codigo las
-       importa directo (`SkeletonUtils` de three-stdlib, deteccion de
-       calidad inicial con detect-gpu). Compatibilidad con React 19.2.8 y
-       Next 16.3 confirmada via `npm view <paquete> peerDependencies`
-       sobre esas versiones exactas.
-     - **Turbopack** (bundler de dev y build de este proyecto): no se
-       encontro un problema vigente en 2026 de three.js/r3f/drei con
-       Turbopack en si —lo que aparece en busquedas es un hilo de mayo de
-       2024 contra Next 14.2, sin confirmar si sigue aplicando—.
-       Recomendacion: instalar y compilar SIN tocar `next.config.ts`
-       primero; si el build falla mencionando a esos paquetes por
-       nombre, recien ahi agregar `transpilePackages`. Si hay problemas
-       que Turbopack no resuelve, `next build --webpack` sigue existiendo
-       como valvula de escape. Aparte, vigente y confirmado: la funcion
-       `cacheComponents` de Next 16 (opt-in, este proyecto NO la tiene
-       activada hoy) rompe escenas de three.js/r3f al navegar
-       atras/adelante con el boton del navegador -si alguien la activa
-       algun dia para `/asistente`, hay que reprobar esa navegacion antes
-       de darlo por bueno-.
-     - **Arquitectura**: carga dinamica sin renderizado en servidor
-       (`ssr: false`) para que solo `/asistente` pague el costo de
-       three.js/r3f -ninguna otra pantalla de GCM debe cargarlo-, `Canvas`
-       + `useGLTF`/`useAnimations` de drei, GLB servido desde `public/`.
-       Salvaguarda si WebGL no esta disponible: mostrar solo el chat de
-       texto de siempre, sin romper la pantalla.
+   Typecheck/lint/2637 pruebas/build en verde. **Sin confirmar todavia
+   visualmente en un navegador real**: las herramientas de navegador se
+   desconectaron a mitad de esta sesion y no se pudieron reconectar.
+   Falta ese ultimo paso -ver la burbuja, abrir el panel, mandar un
+   mensaje- antes de darlo por bueno del todo.
 
-     **Primer intento, hecho y REVERTIDO el mismo 22 de agosto de 2026**:
-     se armo la tuberia completa (componente `AvatarMike.tsx`, carga
-     dinamica sin SSR, `Canvas`+`useGLTF`/`useAnimations`, limite de error
-     propio) usando el placeholder mas rapido de conseguir sin cuenta de
-     Mixamo ni Blender a mano: `CesiumMan.glb`, el astronauta de muestra
-     oficial de Khronos (CC-BY 4.0). Typecheck/lint/tests/build en verde,
-     probado en vivo en el navegador (camara, animacion de caminar, chat
-     funcionando con el avatar montado). **El usuario lo vio y lo
-     rechazo de plano**: "ESO SE VE HORRIBLE, FEO ME NIEGO A QUE ESO
-     SIRVA... SINO LO PUEDES MEJORAR Y QUE SEA REALISTA, COMO UN
-     CONSTRUCTOR, MEJOR QUITALO". Con razon —un astronauta generico con
-     textura de globo terraqueo no tiene nada que ver con un constructor
-     ni con GCM—. Se saco todo (`AvatarMike.tsx`, `public/mike/`, las
-     dependencias de three.js del `package.json`, el enganche en
-     `Asistente.tsx`), el chat de texto solo sigue igual que siempre.
-     **Leccion para el proximo intento**: no vale cualquier modelo 3D
-     rigged que se consiga rapido: tiene que verse como alguien de obra
-     (casco, chaleco, ropa de trabajo), lo que probablemente saca de la
-     mesa los assets genericos de muestra y obliga a Mixamo/Quaternius
-     con un personaje elegido a proposito, o a un encargo de diseno.
-
-     **Segundo intento, mismo dia**: el usuario empujo a no rendirse
-     ("O SEA, LO SACAS Y YA? ERES IMPOTENTE DE HACER ALGO REALMENTE
-     BUENO?") y aclaro que el avatar va DENTRO de la pantalla del
-     Asistente, no aparte. Se busco un modelo que si fuera un obrero de
-     verdad: `Worker` de Quaternius (CC0, dominio publico, via
-     poly.pizza), un personaje con casco amarillo, chaleco reflectante
-     naranja/gris, pantalon de trabajo con rodilleras y botas -exactamente
-     el tipo de personaje que el primer intento no tenia-. Trae 24 clips
-     de animacion (Idle, Walk, Run, Wave, Interact, etc.), muy por encima
-     del unico ciclo de caminar de CesiumMan: ahora "pensando" usa el
-     clip `Wave` y en reposo usa `Idle`, dos animaciones de verdad en vez
-     de una sola a distinta velocidad.
-
-     **Cambio de ingenieria, no solo de asset**: el encuadre de camara ya
-     no usa numeros de escala/posicion a mano (lo que en el primer intento
-     hizo que el personaje desapareciera sin error alguno al cambiar tres
-     numeros a la vez) -ahora usa `<Bounds fit clip observe>` de drei, que
-     calcula el recuadro real del modelo cargado y ajusta la camara sola.
-     El dia que llegue el diseno final de "Mike" y se reemplace el GLB,
-     el encuadre no deberia romperse.
-
-     Typecheck/lint/tests/build en verde, servidor de desarrollo
-     confirma que la ruta `/asistente` y el archivo `.glb` cargan sin
-     error 500. **Sin confirmar todavia visualmente en un navegador
-     real**: las herramientas de navegador se desconectaron a mitad de
-     esta sesion y no se pudieron reconectar. Falta ese ultimo paso antes
-     de darlo por bueno del todo.
-
-     Reporte completo del workflow original (licencias con enlaces, flujo
-     exacto de exportacion, plan de archivos) disponible en la
-     transcripcion de esta sesion si hace falta revisarlo de nuevo antes
-     de construir el diseno final.
+   La investigacion original de Mixamo/Quaternius/Three.js (licencias,
+   versiones exactas, notas de Turbopack) queda sin usar por ahora, pero
+   disponible en la transcripcion de esta sesion si algun dia se decide
+   igual construir un "Mike" 3D de verdad en vez de la mascota 2D.
 
    ~~**Dictado por voz en el Asistente.**~~ **Investigado el 22 de agosto
    de 2026** (mismo workflow, en paralelo con lo de Mike), sin empezar el

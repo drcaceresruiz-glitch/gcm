@@ -21,6 +21,7 @@ import { Migas } from "@/components/navegacion/Migas";
 import { FraseRotativa } from "@/components/portada/FraseRotativa";
 import { CierrePorInactividad } from "@/components/navegacion/CierrePorInactividad";
 import { PieDePagina } from "@/components/navegacion/PieDePagina";
+import { LanzadorAsistente } from "@/components/asistente/LanzadorAsistente";
 
 /**
  * Area privada.
@@ -312,6 +313,8 @@ export default async function DashboardLayout({
       </main>
 
         <PieDePagina />
+
+        {puede(sesion, "agente_ia:usar") && <LanzadorAsistente />}
       </div>
     </ProveedorEtiquetas>
   );
