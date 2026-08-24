@@ -9,6 +9,7 @@ import {
   type EstadoMeta,
 } from "@/app/(dashboard)/obras/[id]/meta/acciones";
 import { CampoTexto } from "@/components/auth/CampoTexto";
+import { MODOS_OFRECIDOS, MODO_POR_DEFECTO } from "@/lib/meta-excel";
 
 /**
  * Carga del presupuesto meta desde el Excel de la plantilla.
@@ -17,21 +18,6 @@ import { CampoTexto } from "@/components/auth/CampoTexto";
  * dentro obligaria a decidir que se hace con lo cargado, y la respuesta
  * honesta suele ser que se pierde. Por eso se explica al elegir, no despues.
  */
-
-const MODOS = [
-  {
-    valor: "PARTIDA",
-    titulo: "Partida por partida",
-    ayuda:
-      "La meta espeja los códigos del contrato. La bolsa sale por partida: se ve exactamente cuál se come el margen.",
-  },
-  {
-    valor: "CAPITULO",
-    titulo: "Por capítulo",
-    ayuda:
-      "La meta lleva una cifra por capítulo. Más rápido de cargar; la bolsa sale por capítulo, no por partida.",
-  },
-] as const;
 
 function Boton() {
   const { pending } = useFormStatus();
@@ -96,7 +82,7 @@ export function FormularioMeta({
           nueva de la meta.
         </p>
 
-        {MODOS.map((m, i) => (
+        {MODOS_OFRECIDOS.map((m) => (
           <label
             key={m.valor}
             className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
@@ -106,7 +92,7 @@ export function FormularioMeta({
               type="radio"
               name="modo"
               value={m.valor}
-              defaultChecked={i === 0}
+              defaultChecked={m.valor === MODO_POR_DEFECTO}
               className="mt-1"
             />
             <span>

@@ -28,6 +28,49 @@ export const LIMITE_BYTES = 8 * 1024 * 1024;
 
 export const MODOS: ModoMeta[] = ["PARTIDA", "CAPITULO", "FRENTE"];
 
+/**
+ * Los modos que se OFRECEN al cargar una meta, con el texto que los explica.
+ *
+ * Uno solo, y compartido, porque estaban duplicados: el alta de obra ofrecia
+ * tres opciones sin explicacion y proponia CAPITULO; la pantalla de la meta
+ * ofrecia dos, con ayuda, y proponia PARTIDA. La misma decision, con nombres
+ * distintos y contrarios segun por donde entrabas.
+ *
+ * NO ESTA FRENTE, y esa es la diferencia con `MODOS` de arriba. `MODOS` es lo
+ * que el importador ADMITE; esto es lo que se puede elegir a sabiendas. El
+ * reparto de un frente a partidas vive en `MetaItemPartida`, y a dia de hoy
+ * NINGUN camino de la aplicacion escribe esa tabla -solo se lee y se cuenta-.
+ * Una meta en FRENTE nace con el reparto vacio, `unirPorFrente` marca entonces
+ * TODAS sus lineas como costo propio, y la bolsa deja de querer decir nada.
+ * Ofrecerlo era una trampa: el algoritmo existe y esta probado, lo que falta
+ * es por donde meter el reparto. Cuando eso exista, se anade aqui.
+ */
+export const MODOS_OFRECIDOS = [
+  {
+    valor: "PARTIDA",
+    titulo: "Partida por partida",
+    ayuda:
+      "La meta espeja los códigos del contrato. La bolsa sale por partida: se ve exactamente cuál se come el margen.",
+  },
+  {
+    valor: "CAPITULO",
+    titulo: "Por capítulo",
+    ayuda:
+      "La meta lleva una cifra por capítulo. Más rápido de cargar; la bolsa sale por capítulo, no por partida.",
+  },
+] as const;
+
+/**
+ * El que viene marcado.
+ *
+ * CAPITULO, y se decide UNA vez aqui para que las dos pantallas propongan lo
+ * mismo. Es el mas barato de cargar y el que menos compromete: el modo queda
+ * congelado en la version de la meta, asi que el que se propone solo deberia
+ * ser el que menos trabajo pide, no el mas ambicioso. Quien quiera el detalle
+ * por partida lo elige, que para eso esta explicado al lado.
+ */
+export const MODO_POR_DEFECTO = "CAPITULO";
+
 export type ValidacionArchivo =
   | { ok: true; archivo: File }
   | { ok: false; error: string };

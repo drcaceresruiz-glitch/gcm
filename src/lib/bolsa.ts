@@ -161,7 +161,22 @@ function unirPorCodigo(
       deducido: m.deducido ?? "0.00",
       bolsa,
       senal: senalDe(bolsa),
-      propia: c === undefined,
+      /*
+       * PROPIA ES NO TENER CODIGO, no «no encontrar contraparte».
+       *
+       * Estaba escrito `c === undefined`, y eso marcaba como costo propio
+       * TODA linea de la meta sin pareja en el contractual -incluidas las
+       * CABECERAS DE CAPITULO, que en modo PARTIDA no la tienen porque el
+       * contractual solo aporta partidas-. Visto en una obra real el 24 de
+       * agosto de 2026: el panel «Costos propios de la meta» listaba los
+       * siete capitulos a S/ 0,00 por delante de los sueldos, y el detalle
+       * por linea decia «propia de la meta» de un capitulo, que es falso.
+       *
+       * Un costo propio es el item SIN `codigoRef` -asi lo define el modelo y
+       * asi lo suma `costoPropioMeta` cuatro lineas mas abajo-. Que las dos
+       * cosas salieran de criterios distintos era el fallo.
+       */
+      propia: m.codigoRef === null,
     });
   }
 

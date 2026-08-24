@@ -18,9 +18,10 @@
  *      cualquier margen que se enseñe estaria calculado con un criterio que
  *      nadie confirmo.
  *   2. El ALTA de la obra, EN EL MISMO ORDEN QUE EL RIEL DEL MENU:
- *      meta -> contractual -> congelarlo -> cronograma -> equipo. Es
- *      «completar un registro», el unico sitio donde encadenar aporta de
- *      verdad: son cinco pasos con un final, no un flujo de exploracion.
+ *      meta -> contractual -> congelar la meta -> congelar el contractual ->
+ *      cronograma -> equipo. Es «completar un registro», el unico sitio donde
+ *      encadenar aporta de verdad: son pasos con un final, no un flujo de
+ *      exploracion.
  *   3. Lo que espera una FIRMA de gerencia: primero la adenda -que tiene a
  *      alguien bloqueado, no se le puede pagar al contratista- y despues la
  *      deduccion de costos propios, que no bloquea nada pero deja a alguien
@@ -85,6 +86,14 @@ export interface PasoSiguiente {
 export interface EstadoAlta {
   /// El contractual: el arbol de partidas contra el que se mide la obra.
   presupuesto: boolean;
+  /**
+   * La meta esta APROBADA, o sea congelada.
+   *
+   * Distinto de `meta`, que solo dice si hay alguna cargada. Sin congelarla no
+   * se pueden pedir deducciones de costos propios -la pantalla lo dice- y la
+   * bolsa se sostiene sobre un borrador que cualquiera puede recargar.
+   */
+  metaAprobada: boolean;
   /// El real u operativo. Es de donde sale el contractual, asi que decide
   /// cual de los dos tramos toca sugerir.
   meta: boolean;
@@ -114,6 +123,8 @@ export interface PuedeHacer {
   lineaBase: boolean;
   lookahead: boolean;
   planSemanal: boolean;
+  /// Congelar el presupuesto meta.
+  meta: boolean;
   /// Firmar adendas. Es de gerencia: quien registra el adicional no es quien
   /// lo aprueba, y a quien no puede firmar no se le propone que firme.
   adendas: boolean;
@@ -212,6 +223,32 @@ export function siguientePaso(
         "Sale del real inflando cada capítulo, y es contra él contra lo que se miden el avance y la desviación.",
       accion: "Generar el contractual",
       camino: "/contractual",
+    };
+  }
+
+  /*
+   * CONGELAR LA META, y va DESPUES de generar el contractual a proposito.
+   *
+   * Generar el contractual es lo que obliga a mirar la meta con su recargo
+   * puesto: si algo esta mal, se corrige la meta ANTES de congelarla. Por eso
+   * no se pide antes.
+   *
+   * ESTE ESCALON FALTABA, y se vio recorriendo una obra entera el 24 de agosto
+   * de 2026: la meta se cargaba, el anclaje pasaba al contractual y nadie
+   * volvia a mencionarla. Quedaba en borrador para siempre, «Meta» se quedaba
+   * sin marcar en el riel, y la deduccion de costos propios era inalcanzable
+   * -la propia pantalla dice «las deducciones existen para cuando ya esta
+   * congelada» sin que nada te lleve a congelarla-.
+   */
+  if (alta.meta && !alta.metaAprobada && puede.meta) {
+    return {
+      clave: "alta-meta-aprobar",
+      gravedad: "sugerencia",
+      titulo: "El presupuesto meta sigue siendo un borrador",
+      consecuencia:
+        "Congelarlo es lo que hace que la bolsa se mida contra algo firme; y mientras siga en borrador no se pueden pedir deducciones de costos propios.",
+      accion: "Aprobar la meta",
+      camino: "/meta",
     };
   }
 

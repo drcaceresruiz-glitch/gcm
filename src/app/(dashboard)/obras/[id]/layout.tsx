@@ -345,6 +345,8 @@ export default async function ObraLayout({
           {
             presupuesto: hitos.presupuesto,
             meta: hitos.metaCargada,
+            // `hitos.meta` es la APROBADA; `metaCargada`, que exista alguna.
+            metaAprobada: hitos.meta,
             cronograma: hitos.cronograma,
             equipo: hitos.equipo,
             equipoAsignable: hitos.equipoAsignable,
@@ -355,6 +357,9 @@ export default async function ObraLayout({
             // mismo que poder ver la seccion. Los dos ultimos si son de
             // lectura: lo que se propone ahi es mirar, no escribir.
             presupuesto: puede(sesion, "partida:importar"),
+            // Congelar la meta, que es de gerencia y va en INNEGOCIABLES: a
+            // quien no puede firmarla no se le propone que la firme.
+            meta: puede(sesion, "meta:aprobar"),
             cronograma: puede(sesion, "cronograma:importar"),
             equipo: puede(sesion, "obra:asignar_equipo"),
             lineaBase: puede(sesion, "linea_base:aprobar"),

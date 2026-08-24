@@ -20,6 +20,7 @@ import {
 const ALTA_COMPLETA: EstadoAlta = {
   presupuesto: true,
   meta: true,
+  metaAprobada: true,
   cronograma: true,
   equipo: true,
   lineaBase: true,
@@ -28,6 +29,7 @@ const ALTA_COMPLETA: EstadoAlta = {
 
 const TODO: PuedeHacer = {
   presupuesto: true,
+  meta: true,
   cronograma: true,
   equipo: true,
   lineaBase: true,
@@ -39,6 +41,7 @@ const TODO: PuedeHacer = {
 
 const NADA: PuedeHacer = {
   presupuesto: false,
+  meta: false,
   cronograma: false,
   equipo: false,
   lineaBase: false,
@@ -74,10 +77,11 @@ describe("el paso siguiente de la obra", () => {
    * Planificar sobre un presupuesto que todavia se toca es planificar sobre
    * algo que va a cambiar.
    */
-  it("recorre el alta en el orden del riel: meta, contractual, congelar, cronograma, equipo", () => {
+  it("recorre el alta en el orden del riel: meta, contractual, congelarla, congelar el contractual, cronograma, equipo", () => {
     const estado: EstadoAlta = {
       presupuesto: false,
       meta: false,
+      metaAprobada: false,
       cronograma: false,
       equipo: false,
       lineaBase: false,
@@ -88,6 +92,10 @@ describe("el paso siguiente de la obra", () => {
     for (const paso of [
       "meta",
       "presupuesto",
+      // Congelar la meta va AQUI, despues de generar el contractual: es
+      // generarlo lo que obliga a mirar la meta con su recargo puesto, y si
+      // algo esta mal se corrige la meta antes de dejarla firme.
+      "metaAprobada",
       "lineaBase",
       "cronograma",
       "equipo",
@@ -100,6 +108,7 @@ describe("el paso siguiente de la obra", () => {
     expect(vistos).toEqual([
       "alta-presupuesto",
       "alta-contractual",
+      "alta-meta-aprobar",
       "alta-linea-base",
       "alta-cronograma",
       "alta-equipo",
@@ -164,6 +173,7 @@ describe("el paso siguiente de la obra", () => {
     const sinNada: EstadoAlta = {
       presupuesto: false,
       meta: false,
+      metaAprobada: false,
       cronograma: false,
       equipo: false,
       lineaBase: false,
@@ -181,6 +191,7 @@ describe("el paso siguiente de la obra", () => {
     const sinNada: EstadoAlta = {
       presupuesto: false,
       meta: false,
+      metaAprobada: false,
       cronograma: false,
       equipo: false,
       lineaBase: false,
@@ -425,5 +436,40 @@ describe("el alta del presupuesto, en dos tramos", () => {
   it("a quien no puede cargarlo no se le propone ninguno de los dos", () => {
     expect(siguientePaso(sinNada, NADA, EN_PAZ)).toBeNull();
     expect(siguientePaso(conMeta, NADA, EN_PAZ)).toBeNull();
+  });
+});
+
+describe("congelar la meta", () => {
+  /*
+   * FALTABA ENTERO, y se vio recorriendo una obra de punta a punta el 24 de
+   * agosto de 2026: la meta se cargaba, el anclaje pasaba al contractual y
+   * nadie volvia a mencionarla nunca. Se quedaba en borrador para siempre.
+   *
+   * Lo que eso rompia no era cosmetico: la deduccion de costos propios EXIGE
+   * la meta aprobada, y su propia pantalla dice «las deducciones existen para
+   * cuando ya esta congelada» sin que nada te llevara a congelarla.
+   */
+  const CARGADA_SIN_APROBAR: EstadoAlta = {
+    ...ALTA_COMPLETA,
+    metaAprobada: false,
+  };
+
+  it("se pide cuando la meta esta cargada pero sigue en borrador", () => {
+    const paso = siguientePaso(CARGADA_SIN_APROBAR, TODO, EN_PAZ);
+    expect(paso?.clave).toBe("alta-meta-aprobar");
+  });
+
+  it("no se le propone a quien no puede firmarla", () => {
+    const paso = siguientePaso(CARGADA_SIN_APROBAR, { ...TODO, meta: false }, EN_PAZ);
+    expect(paso?.clave).not.toBe("alta-meta-aprobar");
+  });
+
+  it("no se pide si no hay meta que congelar", () => {
+    const paso = siguientePaso(
+      { ...CARGADA_SIN_APROBAR, meta: false },
+      TODO,
+      EN_PAZ,
+    );
+    expect(paso?.clave).not.toBe("alta-meta-aprobar");
   });
 });

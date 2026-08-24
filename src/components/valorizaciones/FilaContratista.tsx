@@ -11,6 +11,7 @@ import {
   accionRegistrarPago,
 } from "@/app/(dashboard)/obras/[id]/valorizaciones/acciones";
 import type { FilaValorizacion } from "@/services/pagos.service";
+import { esCero, restar } from "@/lib/decimal";
 
 /**
  * Un contratista en el panel de valorizaciones.
@@ -36,9 +37,22 @@ export function FilaContratista({
   const [hecho, setHecho] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
 
-  /// Se le pago mas de lo que ha valorizado.
-  /// Si el contrato se movio despues de firmarse. Ver abajo.
-  const conAdendas = fila.montoVigente !== fila.montoContratado;
+  /**
+   * Si el contrato se movio despues de firmarse. Ver abajo.
+   *
+   * SE COMPARA RESTANDO, no con `!==`. Estaba con `!==` y por eso la pantalla
+   * ensenaba «Contratado 92.000 / Vigente 92.000» en encargos SIN ninguna
+   * adenda, contra lo que dice su propio comentario de tres lineas mas abajo.
+   *
+   * Los dos numeros son la misma plata escrita distinto: `montoVigente` sale
+   * de `sumar()`, que normaliza a dos decimales, y `montoContratado` viene
+   * crudo del `Decimal` de Prisma, que se come los ceros del final. «92000»
+   * y «92000.00» son textos distintos y el mismo dinero.
+   *
+   * Es la regla numero uno del proyecto: el dinero se compara con
+   * `esCero(restar(a, b))`, nunca por igualdad de su representacion.
+   */
+  const conAdendas = !esCero(restar(fila.montoVigente, fila.montoContratado) ?? "0");
 
   const adelantado = fila.porPagar.trim().startsWith("-");
 

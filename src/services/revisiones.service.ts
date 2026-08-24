@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { esNegativo, normalizarDecimal, sumar } from "@/lib/decimal";
+import { esNegativo, esPositivo, multiplicar, normalizarDecimal, restar, sumar } from "@/lib/decimal";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
 import {
   calcularCascada,
@@ -147,6 +147,15 @@ export type ResultadoRevision =
   | { ok: true; version: number; montoTotal: string }
   | { ok: false; error: string };
 
+/// Como se llama cada porcentaje en la pantalla, para que el error hable del
+/// campo que la persona ve y no del nombre de la columna.
+const NOMBRE_DEL_PORCENTAJE: Record<string, string> = {
+  porcentajeGastosGenerales: "Gastos generales",
+  porcentajeUtilidad: "La utilidad",
+  porcentajeIgv: "El IGV",
+  porcentajeDescuento: "El descuento",
+};
+
 export async function crearRevision(
   sesion: SesionActiva,
   obraId: string,
@@ -215,6 +224,42 @@ export async function crearRevision(
 
   for (const [campo, valor] of Object.entries(porcentajes)) {
     if (valor === null) return { ok: false, error: `El valor de ${campo} no es valido.` };
+  }
+
+  /*
+   * LOS PORCENTAJES VAN COMO FRACCION, y esto se comprueba AQUI a proposito.
+   *
+   * La comprobacion ya existia, pero solo en `revisiones/acciones.ts`, o sea
+   * en el formulario. Cualquier otra entrada al servicio se la saltaba entera:
+   * un 7 escrito donde iba 0.07 se guardaba tal cual y multiplicaba el
+   * presupuesto por veinte EN SILENCIO -la revision quedaba creada, con su
+   * numero, y el disparate solo se veia mirando el total-. Pasado de verdad el
+   * 24 de agosto de 2026 recorriendo una obra entera desde fuera del
+   * formulario.
+   *
+   * Es la misma regla que la del `companyId`: se vuelve a aplicar DONDE SE
+   * USA el dato, no se confia en que quien llama ya la aplico. Repetirla no es
+   * pereza; es lo unico que protege cuando aparece un llamador nuevo.
+   *
+   * El tope es 1 -el 100 %, el mismo que usa el formulario- porque es justo
+   * donde deja de haber ambiguedad: por debajo, un numero es una fraccion
+   * legitima; por encima, en una obra real es casi siempre un porcentaje mal
+   * escrito. Y el mensaje dice la unidad esperada, que es lo unico que saca de
+   * la confusion a quien la tiene.
+   */
+  for (const [campo, valor] of Object.entries(porcentajes)) {
+    if (esNegativo(valor!)) {
+      return { ok: false, error: `${NOMBRE_DEL_PORCENTAJE[campo] ?? campo} no puede ser negativo.` };
+    }
+    if (esPositivo(restar(valor!, "1", 4)!)) {
+      const comoPorcentaje = multiplicar(valor!, "100", 2);
+      return {
+        ok: false,
+        error:
+          `${NOMBRE_DEL_PORCENTAJE[campo] ?? campo} vale ${valor}, que seria ${comoPorcentaje} %. ` +
+          `Aqui los porcentajes van como fraccion: 0.07 es el 7 %, 0.12 el 12 %.`,
+      };
+    }
   }
 
   const tipoImpuesto = datos.tipoImpuesto ?? "IGV";

@@ -522,3 +522,49 @@ describe("una deduccion de costo propio sube la bolsa SIN tocar la meta", () => 
     expect(cuadrilla.metaPresupuestada).toBe("5000.00");
   });
 });
+
+describe("una cabecera de capitulo NO es un costo propio", () => {
+  /*
+   * VISTO EN UNA OBRA REAL el 24 de agosto de 2026. `propia` se decidia con
+   * «no encontre contraparte en el contractual», y en modo PARTIDA el
+   * contractual solo aporta PARTIDAS: las cabeceras de capitulo de la meta se
+   * quedaban sin pareja y salian marcadas como costos propios.
+   *
+   * En pantalla eso era el panel «Costos propios de la meta» listando los
+   * siete capitulos a S/ 0,00 por delante de los sueldos, y el detalle por
+   * linea afirmando «propia de la meta» de un capitulo.
+   */
+  const CON_CAPITULO: LineaMeta[] = [
+    // La cabecera: tiene codigo pero el contractual de este modo no la trae.
+    { id: "c1", codigoRef: "1", descripcion: "CAPITULO I", importe: "0.00" },
+    { id: "i1", codigoRef: "1.1", descripcion: "Concreto", importe: "45000.00" },
+    { id: "i2", codigoRef: null, descripcion: "Residente de obra", importe: "19500.00" },
+  ];
+
+  const b = calcularBolsa({
+    modo: "PARTIDA",
+    contractual: [{ codigo: "1.1", descripcion: "Concreto", importe: "50000.00" }],
+    meta: CON_CAPITULO,
+    utilidadContractual: "0.00",
+  });
+
+  it("la cabecera no se marca como propia", () => {
+    const capitulo = b.porLinea.find((l) => l.descripcion === "CAPITULO I")!;
+    expect(capitulo.propia).toBe(false);
+  });
+
+  it("el sueldo si", () => {
+    const sueldo = b.porLinea.find((l) => l.descripcion === "Residente de obra")!;
+    expect(sueldo.propia).toBe(true);
+  });
+
+  /**
+   * LA INVARIANTE que evita que vuelva: lo que se marca `propia` tiene que ser
+   * exactamente lo que suma `costoPropioMeta`. Que las dos cosas salieran de
+   * criterios distintos ERA el fallo.
+   */
+  it("lo marcado como propio suma exactamente el costo propio", () => {
+    const suma = sumar(b.porLinea.filter((l) => l.propia).map((l) => l.meta));
+    expect(suma).toBe(b.costoPropioMeta);
+  });
+});

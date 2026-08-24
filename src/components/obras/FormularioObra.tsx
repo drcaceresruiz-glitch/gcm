@@ -7,6 +7,7 @@ import { type EstadoObra } from "@/app/(dashboard)/obras/nueva/acciones";
 import { fechaDeObra } from "@/lib/obras";
 import { CampoTexto } from "@/components/auth/CampoTexto";
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
+import { MODOS_OFRECIDOS, MODO_POR_DEFECTO } from "@/lib/meta-excel";
 import {
   ChecklistRequisitos,
   todosCumplidos,
@@ -232,19 +233,28 @@ export function FormularioObra({
                   <label htmlFor="modo" className="block text-sm font-medium">
                     Con qué detalle se compara con el contractual
                   </label>
+                  {/* LA MISMA LISTA que la pantalla de la meta, y por eso
+                      sale de `lib/meta-excel` en vez de estar escrita aqui.
+                      Estaban duplicadas y no coincidian: esta ofrecia tres
+                      opciones sin explicar ninguna y llamaba «Por partida» a
+                      lo que alli era «Partida por partida»; y una de las tres
+                      era FRENTE, que no hay forma de rellenar -ver el
+                      comentario de `MODOS_OFRECIDOS`-. */}
                   <select
                     id="modo"
                     name="modo"
-                    defaultValue="CAPITULO"
+                    defaultValue={MODO_POR_DEFECTO}
                     className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
                     style={{
                       borderColor: "var(--borde)",
                       backgroundColor: "var(--fondo)",
                     }}
                   >
-                    <option value="CAPITULO">Por capítulo</option>
-                    <option value="PARTIDA">Por partida</option>
-                    <option value="FRENTE">Por frente</option>
+                    {MODOS_OFRECIDOS.map((m) => (
+                      <option key={m.valor} value={m.valor}>
+                        {m.titulo}
+                      </option>
+                    ))}
                   </select>
                   <p className="text-xs opacity-60">
                     Por capítulo es lo habitual. Solo cambia el nivel al que se
