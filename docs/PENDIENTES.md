@@ -310,11 +310,31 @@ documento es de antes y no decia cuales se habian cerrado:
   (`modulos.tsx`).
 - ~~`pendientesDeLaObra` no filtra `restriccion` por `companyId`~~ **ARREGLADO**:
   filtra por `tarea.project.companyId`.
-- **La ponderacion por DINERO sigue sin existir.** `ponderarPorDuracion` es la
-  unica funcion de ponderacion que se llama en todo el repo: avance fisico,
-  curva y capitulos pesan siempre por duracion, con o sin mapeo completo,
-  aunque el manual y los comentarios prometan otra cosa cuando el mapeo pase
-  del 60 %. Es el ultimo hallazgo de esa auditoria que queda vivo.
+- ~~La ponderacion por DINERO sigue sin existir~~ **CERRADO el 24 de agosto de
+  2026, y la nota estaba equivocada**: se construyo el 23 (`lib/pesos-tarea`) y
+  ya estaba conectada a la curva S y a la tarjeta de avance del panel. Lo que
+  faltaba era peor y mas concreto: **el informe semanal pesaba por duracion y
+  lleva dentro una curva que ya pesaba por dinero**, o sea que el PDF que se le
+  entrega al cliente podia decir dos cosas de la misma obra el mismo dia. Lo
+  mismo el ritmo semanal.
+
+  Ahora las tres preguntan a `pesoDeLaObra` (`services/cronograma.service`),
+  que decide UNA vez por obra, y el informe dice con que se peso.
+
+  **Los capitulos siguen por duracion A PROPOSITO**, y esta escrito en
+  `agruparPorCapitulo`: su planeado se LEE del archivo de MS Project, que
+  consolida por duracion, asi que pesar el real por dinero haria que la columna
+  de desviacion restara dos varas distintas.
+
+  **De paso, el hallazgo de verdad**: habia DOS `importePorTarea`, misma firma
+  y nombre en dos modulos, decidiendo lo contrario sobre el reparto. Ahora son
+  `pesoEnDineroPorTarea` (reparte, sus pesos suman el presupuesto) e
+  `importeCubiertoPorTarea` (no reparte, dice que cubre cada tarea), con una
+  prueba que fija la diferencia.
+
+  **Leccion para este documento**: una nota de auditoria que dice «no existe»
+  caduca en cuanto alguien lo construye, y nadie la vuelve a comprobar. Antes
+  de arrancar por un pendiente viejo, mirar el codigo.
 
 ### El comprometido tenia CINCO definiciones (cerrado el 23 de agosto)
 
