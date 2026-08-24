@@ -105,6 +105,15 @@ export interface DatosCsvInforme {
   real: string;
   planeado: string;
   desviacion: string;
+  /**
+   * Con que se pesaron las tres de arriba: "DURACION" o "DINERO".
+   *
+   * OPCIONAL para no romper a quien componga un documento sin el; cuando no
+   * viene se asume duracion, que es lo que todo el mundo da por hecho al ver
+   * un porcentaje de avance de obra. El PDF solo lo dice cuando es dinero,
+   * que es la excepcion.
+   */
+  criterioPeso?: "DURACION" | "DINERO";
   periodo: PeriodoCsv;
   curva: CurvaCsv;
   capitulos: readonly Capitulo[];

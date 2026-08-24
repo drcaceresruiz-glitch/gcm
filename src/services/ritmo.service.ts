@@ -6,6 +6,7 @@ import type { SesionActiva } from "@/services/sesion.service";
 import { capituloDeCadaTarea } from "@/lib/control-avance";
 import { fechasSemanales } from "@/lib/curva-s";
 import { ritmoPorTramos, type TareaDelRitmo, type TramoDeRitmo } from "@/lib/ritmo-de-obra";
+import { pesoDeLaObra } from "@/services/cronograma.service";
 
 export interface RitmoDeObra {
   tramos: TramoDeRitmo[];
@@ -148,7 +149,20 @@ export async function ritmoDeObra(
   const primero = reportes[0]!.fecha;
   const semanas = fechasSemanales(primero, new Date(), obra?.diaCorteSemanal ?? 5);
 
-  const tramos = ritmoPorTramos(tareas, reportes, semanas).slice(-TRAMOS_MAXIMOS);
+  /*
+   * EL MISMO PESO QUE LA CURVA S DE ESTA OBRA.
+   *
+   * El ritmo es la resta de dos medidas del avance, y hasta el 24 de agosto de
+   * 2026 las media siempre por duracion mientras la curva de la misma obra ya
+   * pesaba por dinero cuando el mapeo lo permitia. Las dos pantallas hablaban
+   * del mismo avance con dos varas, que es el modo de fallo que este proyecto
+   * lleva dos dias quitando de en medio.
+   */
+  const peso = await pesoDeLaObra(sesion.companyId, obraId, tareas);
+
+  const tramos = ritmoPorTramos(tareas, reportes, semanas, peso.peso).slice(
+    -TRAMOS_MAXIMOS,
+  );
 
   // Hace falta cerrar al menos un corte para que haya un tramo: con todos los
   // partes dentro de la misma semana no hay dos medidas que restar.

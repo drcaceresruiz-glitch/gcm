@@ -57,6 +57,12 @@ export interface DatosInforme {
   real: string;
   planeado: string;
   desviacion: string;
+  /// Con que se pesaron las tres de arriba. Se ENSEÑA cuando es por dinero:
+  /// una cifra de avance sin su vara no se puede contrastar, y la curva de mas
+  /// abajo se pesa con la misma.
+  criterioPeso: "DURACION" | "DINERO";
+  /// Cuantas tareas no cuentan por no tener partida mapeada. Cero con duracion.
+  tareasSinPeso: number;
   /// Lo que se movio entre el corte anterior y este.
   periodo: PeriodoInforme;
   curva: DatosCurva;
@@ -168,6 +174,28 @@ export function InformeSemanal({ datos }: { datos: DatosInforme }) {
               </dt>
             </div>
           </dl>
+
+          {/* CON QUE SE PESO. El informe se entrega al cliente y lleva su
+              propia curva S dentro: hasta el 24/08/2026 estas cifras se
+              ponderaban siempre por duracion mientras la curva de abajo ya se
+              pesaba por dinero, o sea que el mismo PDF podia decir dos cosas
+              de la misma obra. Ahora se pesan igual, y el documento lo dice:
+              una cifra de avance sin su vara no se puede contrastar. */}
+          {datos.criterioPeso === "DINERO" && (
+            <p className="mt-3 text-center text-xs opacity-70">
+              Avance <strong>ponderado por dinero</strong>: cada tarea pesa lo
+              que vale su partida, no lo que dura.
+              {datos.tareasSinPeso > 0 && (
+                <>
+                  {" "}
+                  {datos.tareasSinPeso === 1
+                    ? "1 tarea no cuenta"
+                    : `${datos.tareasSinPeso} tareas no cuentan`}{" "}
+                  por no tener partida mapeada.
+                </>
+              )}
+            </p>
+          )}
 
           {/* Lo que dice Project por su cuenta, al lado y no en lugar de lo
               anterior: son dos formas de ponderar el mismo plan y esconder la

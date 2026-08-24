@@ -4,7 +4,7 @@ import { puede } from "@/lib/rbac";
 import { esPositivo } from "@/lib/decimal";
 import {
   cobertura,
-  importePorTarea,
+  importeCubiertoPorTarea,
   proponerPartidas,
   type Cobertura,
   type PartidaMapeable,
@@ -107,7 +107,7 @@ export async function obtenerMapeo(
     }));
 
   const porCodigo = new Map(partidas.map((p) => [p.codigo, p]));
-  const importes = importePorTarea(enlaces, partidas);
+  const importes = importeCubiertoPorTarea(enlaces, partidas);
 
   const porUid = new Map<number, string[]>();
   for (const e of enlaces) {

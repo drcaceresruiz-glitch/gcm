@@ -135,3 +135,50 @@ describe("ritmoPorTramos", () => {
     expect(ritmoPorTramos([t(1, "A")], [], [SEMANAS[0]!])).toEqual([]);
   });
 });
+
+/**
+ * EL RITMO SE MIDE CON LA MISMA VARA QUE LA CURVA DE ESA OBRA.
+ *
+ * Hasta el 24 de agosto de 2026 el ritmo pesaba siempre por duracion mientras
+ * la curva S de la misma obra ya podia pesar por dinero. Dos pantallas
+ * hablando del mismo avance con dos varas es el modo de fallo que este
+ * proyecto lleva dias quitando de en medio.
+ */
+describe("el peso llega de fuera, no se decide aqui", () => {
+  /// Dos tareas que duran lo mismo y valen muy distinto.
+  const BARATA = t(1, "ACABADOS", "10");
+  const CARA = t(2, "ESTRUCTURAS", "10");
+
+  /// Solo avanza la CARA. Por duracion pesa la mitad; por dinero, casi todo.
+  const AVANCES = [a(2, "2026-08-08", "100.00")];
+
+  const porDinero = (x: TareaDelRitmo) =>
+    x.uid === 2 ? "90000.0000" : "10000.0000";
+
+  it("por defecto pesa por duracion, como siempre", () => {
+    const r = ritmoPorTramos([BARATA, CARA], AVANCES, SEMANAS);
+    // Dos tareas iguales en duracion, una al 100 %: la mitad de la obra.
+    expect(r[0]?.acumulado).toBeCloseTo(50, 5);
+  });
+
+  it("con el peso por dinero, la tarea cara manda", () => {
+    const r = ritmoPorTramos([BARATA, CARA], AVANCES, SEMANAS, porDinero);
+    // La cara es el 90 % del dinero y esta al 100 %.
+    expect(r[0]?.acumulado).toBeCloseTo(90, 5);
+  });
+
+  /**
+   * Y EL REPARTO POR CAPITULOS TAMBIEN. Si el avance se pesara por dinero pero
+   * los capitulos siguieran repartiendose por duracion, la suma de lo que
+   * aporta cada capitulo dejaria de dar el avance de la obra.
+   */
+  it("los capitulos se reparten con la misma vara", () => {
+    const r = ritmoPorTramos([BARATA, CARA], AVANCES, SEMANAS, porDinero);
+    const aporte = r[0]?.capitulos.reduce((s, c) => s + c.aporte, 0) ?? 0;
+
+    expect(aporte).toBeCloseTo(r[0]?.ganado ?? -1, 5);
+    const estructuras = r[0]?.capitulos.find((c) => c.capitulo === "ESTRUCTURAS");
+    // ESTRUCTURAS es el 90 % del dinero: se lleva casi todo el ganado.
+    expect(estructuras?.aporte).toBeCloseTo(90, 5);
+  });
+});

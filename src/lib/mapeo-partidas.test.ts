@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   cobertura,
-  importePorTarea,
+  importeCubiertoPorTarea,
   parecido,
   proponerPartidas,
   type PartidaMapeable,
@@ -92,11 +92,11 @@ describe("proponerPartidas", () => {
   });
 });
 
-describe("importePorTarea", () => {
+describe("importeCubiertoPorTarea", () => {
   it("suma las partidas que cubre una misma tarea", async () => {
     // El presupuesto es tres veces mas fino que el cronograma: una tarea cubre
     // varias partidas.
-    const importes = importePorTarea(
+    const importes = importeCubiertoPorTarea(
       [
         { uid: 10, codigoPartida: "1.01" },
         { uid: 10, codigoPartida: "1.02" },
@@ -112,7 +112,7 @@ describe("importePorTarea", () => {
   it("ignora el enlace a una partida que ya no existe", async () => {
     // Reimportar el presupuesto puede borrar una partida; el mapeo se guarda
     // por codigo justo para sobrevivir a eso, pero el codigo puede desaparecer.
-    const importes = importePorTarea(
+    const importes = importeCubiertoPorTarea(
       [{ uid: 10, codigoPartida: "9.99" }],
       [p("1.01", "A", "1000.00")],
     );

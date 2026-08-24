@@ -144,6 +144,25 @@ export function hojaDashboard(
         : "tinta";
   texto(xDesv, yPar, `${d.desviacion} pts`, 14, { negrita: true, tinta: tintaDesv });
 
+  /*
+   * CON QUE SE PESO, debajo del par.
+   *
+   * Solo cuando es por DINERO, que es la excepcion: por duracion es lo que
+   * todo el mundo da por hecho al ver un % de avance de obra. Lo mismo hace la
+   * pantalla de la curva. Va en el PDF y no solo en la web porque este
+   * documento se le entrega al cliente y es donde la cifra vive sola, sin
+   * nadie al lado para explicarla.
+   */
+  if (d.criterioPeso === "DINERO") {
+    texto(
+      izq,
+      yPar - 12,
+      "Ponderado por dinero: cada tarea pesa lo que vale su partida.",
+      6,
+      { tinta: "tinta-suave" },
+    );
+  }
+
   // ---- Capitulos ----------------------------------------------------------
 
   const xCap = izq + 210;

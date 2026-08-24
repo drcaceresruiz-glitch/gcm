@@ -147,7 +147,14 @@ export interface EnlaceConfirmado {
 }
 
 /**
- * Cuanto dinero cubre cada tarea, segun el mapeo confirmado.
+ * Cuanto dinero CUBRE cada tarea, segun el mapeo confirmado.
+ *
+ * Se llamaba `importePorTarea` y era el nombre exacto de otra funcion de
+ * `lib/pesos-tarea` que decide lo contrario sobre el reparto. Esta NO reparte
+ * -a proposito, ver abajo- y sirve para ENSEÑAR que cubre cada tarea en la
+ * pantalla de mapeo. La otra reparte porque es un PESO y sus pesos tienen que
+ * sumar el presupuesto, no el doble. Con el mismo nombre, elegir la
+ * equivocada no daba error: daba una cifra creible.
  *
  * Una tarea puede cubrir VARIAS partidas —hay 314 partidas para 106 tareas,
  * asi que el presupuesto es tres veces mas fino—, y su importe es la suma de
@@ -158,7 +165,7 @@ export interface EnlaceConfirmado {
  * proporcion, y eso no lo sabe ningun algoritmo. Lo que si hace `cobertura` es
  * contarla UNA sola vez, para que el porcentaje cubierto no pase del 100%.
  */
-export function importePorTarea(
+export function importeCubiertoPorTarea(
   enlaces: readonly EnlaceConfirmado[],
   partidas: readonly PartidaMapeable[],
 ): Map<number, string> {
@@ -195,8 +202,9 @@ export interface Cobertura {
  * Es la cifra que decide si el CPI (y sus proyecciones, EAC/VAC) son
  * fiables: un costo registrado que solo cubre el 20% del presupuesto
  * describe una quinta parte de la obra, aunque la cifra parezca completa. No
- * decide con que se pesa el avance —eso siempre es la duracion, GCM no
- * pondera por dinero hoy—.
+ * decide con que se pesa el avance: eso lo decide `criterioDePeso` en
+ * `lib/pesos-tarea`, que desde el 23 de agosto de 2026 SI pondera por dinero
+ * cuando esta cobertura pasa del 60 %.
  *
  * Cada partida cuenta UNA vez aunque la cubran varias tareas; si no, el
  * porcentaje podria pasar del 100% y dejaria de significar nada.

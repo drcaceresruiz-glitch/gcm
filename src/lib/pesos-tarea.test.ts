@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   UMBRAL_DINERO,
   criterioDePeso,
-  importePorTarea,
+  pesoEnDineroPorTarea,
   pesoDeTarea,
 } from "./pesos-tarea";
+import { importeCubiertoPorTarea } from "./mapeo-partidas";
 import { ponderar, planeadoEnFecha } from "./curva-s";
 
 describe("cuando se pondera por dinero", () => {
@@ -28,7 +29,7 @@ describe("cuanto dinero le toca a cada tarea", () => {
   ];
 
   it("una tarea por partida: el importe entero", () => {
-    const r = importePorTarea(
+    const r = pesoEnDineroPorTarea(
       [
         { uid: 10, codigoPartida: "1.1" },
         { uid: 11, codigoPartida: "1.2" },
@@ -44,7 +45,7 @@ describe("cuanto dinero le toca a cada tarea", () => {
     // Si se le diera el importe entero a cada una, esa partida pesaria el
     // triple que las demas y el avance lo gobernaria la que mas veces se
     // mapeo. Es el mismo cuidado que ya tiene `cobertura`.
-    const r = importePorTarea(
+    const r = pesoEnDineroPorTarea(
       [
         { uid: 10, codigoPartida: "1.1" },
         { uid: 20, codigoPartida: "1.1" },
@@ -57,7 +58,7 @@ describe("cuanto dinero le toca a cada tarea", () => {
   });
 
   it("una tarea que cubre varias partidas suma sus trozos", () => {
-    const r = importePorTarea(
+    const r = pesoEnDineroPorTarea(
       [
         { uid: 10, codigoPartida: "1.1" },
         { uid: 10, codigoPartida: "1.2" },
@@ -69,14 +70,14 @@ describe("cuanto dinero le toca a cada tarea", () => {
   });
 
   it("una partida sin importe no da peso, y no rompe", () => {
-    const r = importePorTarea([{ uid: 99, codigoPartida: "1.0" }], partidas);
+    const r = pesoEnDineroPorTarea([{ uid: 99, codigoPartida: "1.0" }], partidas);
     expect(r.has(99)).toBe(false);
   });
 
   it("un mapeo a una partida que ya no existe se ignora", () => {
     // El mapeo guarda el CODIGO y no el id, justamente para sobrevivir a que
     // se reimporte el presupuesto. A cambio, un codigo puede desaparecer.
-    const r = importePorTarea([{ uid: 7, codigoPartida: "9.9" }], partidas);
+    const r = pesoEnDineroPorTarea([{ uid: 7, codigoPartida: "9.9" }], partidas);
     expect(r.size).toBe(0);
   });
 });
@@ -124,7 +125,7 @@ describe("por que importa: la cifra cambia", () => {
     { uid: 11, esResumen: false, duracionDias: "10", real: "100.00" },
   ];
 
-  const importes = importePorTarea(
+  const importes = pesoEnDineroPorTarea(
     [
       { uid: 10, codigoPartida: "1.1" },
       { uid: 11, codigoPartida: "1.2" },
@@ -186,5 +187,47 @@ describe("el plan se pesa igual que el real", () => {
     // La compatibilidad importa: una obra sin mapeo no cambia ni una cifra.
     const plan = planeadoEnFecha(planificadas, new Date(Date.UTC(2026, 0, 6)));
     expect(plan).toBeCloseTo(50, 1);
+  });
+});
+
+/**
+ * LAS DOS FUNCIONES QUE SE LLAMABAN IGUAL.
+ *
+ * `lib/mapeo-partidas` tenia otra `importePorTarea` con la misma forma de
+ * entrada y de salida que esta, y decide lo CONTRARIO sobre el reparto. Las
+ * dos son correctas para lo suyo -aquella dice cuanto CUBRE una tarea, esta
+ * cuanto PESA- pero con el mismo nombre nadie podia saber cual estaba usando,
+ * y elegir la equivocada no daba error: daba una cifra creible.
+ *
+ * Esta prueba fija la diferencia para que no se vuelvan a fundir «porque hacen
+ * lo mismo».
+ */
+describe("pesar y cubrir no son lo mismo", () => {
+  const ENLACES = [
+    { uid: 1, codigoPartida: "1.1" },
+    { uid: 2, codigoPartida: "1.1" },
+  ];
+  const PARTIDAS = [{ codigo: "1.1", parcial: "10000.00" }];
+
+  it("el PESO reparte: dos tareas sobre una partida suman el presupuesto", () => {
+    const pesos = pesoEnDineroPorTarea(ENLACES, PARTIDAS);
+
+    expect(pesos.get(1)).toBe("5000.0000");
+    expect(pesos.get(2)).toBe("5000.0000");
+    // La invariante: los pesos suman lo que vale la partida, no el doble. Sin
+    // esto, esa partida pesaria el doble que las demas y el avance de la obra
+    // quedaria gobernado por la que mas veces se mapeo.
+    expect(Number(pesos.get(1)) + Number(pesos.get(2))).toBe(10000);
+  });
+
+  it("lo CUBIERTO no reparte: cada tarea cubre la partida entera", () => {
+    const cubierto = importeCubiertoPorTarea(ENLACES, [
+      { codigo: "1.1", descripcion: "Concreto", parcial: "10000.00" },
+    ]);
+
+    // Y es correcto para lo suyo: la pantalla de mapeo dice «esta tarea cubre
+    // la partida 1.1, que vale 10.000», no «cubre media partida».
+    expect(cubierto.get(1)).toBe("10000.00");
+    expect(cubierto.get(2)).toBe("10000.00");
   });
 });

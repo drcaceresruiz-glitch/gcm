@@ -27,7 +27,6 @@ import {
   fechasSemanales,
   planeadoEnFecha,
   ponderar,
-  ponderarPorDuracion,
   proyectar,
   serieCurvaS,
   serieRealPorFechas,
@@ -36,8 +35,9 @@ import {
 } from "@/lib/curva-s";
 import {
   criterioDePeso,
-  importePorTarea,
   pesoDeTarea,
+  pesoEnDineroPorTarea,
+  type PesoDeTarea,
   type CriterioPeso,
 } from "@/lib/pesos-tarea";
 import { cobertura } from "@/lib/mapeo-partidas";
@@ -1206,10 +1206,23 @@ export interface InformeAlCorte {
   periodo: PeriodoInforme;
   /// Las tareas MEDIDAS a esa fecha: el avance que se conocia ese dia.
   tareas: (TareaDelPlan & Medida)[];
-  /// % real ponderado por duracion a la fecha del informe.
+  /// % real a la fecha del informe, con el peso que le toque a la obra.
   real: string;
-  /// % planeado reconstruido dia a dia a esa misma fecha.
+  /// % planeado reconstruido dia a dia a esa misma fecha, CON EL MISMO PESO.
   planeado: string;
+  /**
+   * Con que se pesaron las dos cifras de arriba: "DURACION" o "DINERO".
+   *
+   * VIAJA HASTA EL DOCUMENTO a proposito. El informe se le entrega al cliente
+   * y lleva dentro su propia curva S, que desde el 23/08 ya se pesaba por
+   * dinero cuando el mapeo lo permite: el PDF podia decir «14,8 % real» arriba
+   * y dibujar debajo una curva que decia otra cosa de la misma obra el mismo
+   * dia. Ahora se pesan igual, y el documento dice con que.
+   */
+  criterioPeso: "DURACION" | "DINERO";
+  /// Cuantas tareas no cuentan por no tener partida mapeada. Solo con DINERO;
+  /// cero con duracion. Se enseña: su avance deja de pesar.
+  tareasSinPeso: number;
   /// Real menos planeado.
   desviacion: string;
   /// Las fechas que el selector puede ofrecer, de la mas reciente a la mas
@@ -1385,13 +1398,33 @@ export async function informeAlCorte(
     avances.map((a) => ({ ...a, porcentaje: a.porcentaje.toString() })),
   );
 
+  /**
+   * EL MISMO PESO QUE LA CURVA DE ESTE MISMO DOCUMENTO.
+   *
+   * Hasta el 24 de agosto de 2026 estas dos cifras se ponderaban siempre por
+   * duracion mientras la curva S que el informe dibuja mas abajo ya se pesaba
+   * por dinero cuando el mapeo lo permitia. El PDF que se le entrega al
+   * cliente podia decir «14,8 % de avance real» y llevar debajo una curva que
+   * decia otra cosa de la misma obra el mismo dia.
+   *
+   * Se pide una vez y se pasa a las DOS -real y planeado-: pesarlas distinto
+   * haria que su resta, que es la desviacion que encabeza el informe, no
+   * significara nada.
+   */
+  const peso = await pesoDeLaObra(sesion.companyId, obraId, tareasBase);
+
   const medibles = medido.tareas.map((t) => ({
+    uid: t.uid,
     esResumen: t.esResumen,
     duracionDias: t.duracionDias,
     real: t.porcentajeReal,
   }));
 
-  const real = ponderarPorDuracion(medibles, (t) => t.real);
+  const real = ponderar(
+    medibles.filter((t) => !t.esResumen),
+    peso.peso,
+    (t) => t.real,
+  );
   const planeado = planeadoEnFecha(
     tareasBase.map((t) => ({
       uid: t.uid,
@@ -1401,6 +1434,7 @@ export async function informeAlCorte(
       fin: t.fin,
     })),
     fechaCorte,
+    peso.peso,
   ).toFixed(2);
 
   const resumen = tareasBase.find((t) => t.nivel === 1);
@@ -1432,12 +1466,18 @@ export async function informeAlCorte(
         .map((a) => ({ ...a, porcentaje: a.porcentaje.toString() })),
     );
 
-    const realAnterior = ponderarPorDuracion(
-      medidoAntes.tareas.map((t) => ({
-        esResumen: t.esResumen,
-        duracionDias: t.duracionDias,
-        real: t.porcentajeReal,
-      })),
+    // Con el MISMO peso que el acumulado de arriba: lo ganado en el periodo es
+    // la resta de los dos, y dos pesos distintos darian un avance inventado.
+    const realAnterior = ponderar(
+      medidoAntes.tareas
+        .filter((t) => !t.esResumen)
+        .map((t) => ({
+          uid: t.uid,
+          esResumen: t.esResumen,
+          duracionDias: t.duracionDias,
+          real: t.porcentajeReal,
+        })),
+      peso.peso,
       (t) => t.real,
     );
 
@@ -1481,6 +1521,8 @@ export async function informeAlCorte(
     cortes,
     version: cronograma.version,
     importadoPor: cronograma.importadoPor,
+    criterioPeso: peso.criterio,
+    tareasSinPeso: peso.sinPeso,
     planeadoProject: resumen?.porcentajePlaneado ?? null,
     realProject: resumen?.porcentajeArchivo ?? null,
   };
@@ -1785,6 +1827,64 @@ export interface DatosCurva {
  * unos pocos cortes por obra, asi que cabe de sobra en una consulta; hacerlo
  * por partes obligaria a repetir el calculo de la ponderacion en dos sitios.
  */
+/**
+ * CON QUE PESA CADA TAREA ESTA OBRA. Una sola decision, un solo sitio.
+ *
+ * Por DINERO cuando el mapeo tarea-partida cubre lo bastante del presupuesto,
+ * y por DURACION cuando no. La regla y el umbral viven en `lib/pesos-tarea`;
+ * aqui solo se traen las filas.
+ *
+ * ESTA FUNCION EXISTE PORQUE LA DECISION SE ESTABA TOMANDO EN VARIOS SITIOS.
+ * La curva S ya pesaba por dinero desde el 23 de agosto de 2026, pero el
+ * INFORME SEMANAL -que lleva esa misma curva dentro- seguia calculando su
+ * porcentaje de avance por duracion. O sea que un mismo PDF, el que se le
+ * entrega al cliente, podia decir «14,8 % de avance real» arriba y dibujar
+ * debajo una curva que decia otra cosa de la misma obra el mismo dia.
+ *
+ * El peso es una propiedad de la OBRA, no de la pantalla. Quien lo pregunte
+ * aqui no puede contestarse distinto que el de al lado.
+ *
+ * `tareas` solo se usa para contar cuantas se quedan sin peso al pesar por
+ * dinero -las que no tienen partida mapeada valen cero- y poder decirlo.
+ */
+export async function pesoDeLaObra(
+  companyId: string,
+  obraId: string,
+  tareas: readonly { uid: number; esResumen: boolean }[],
+): Promise<PesoDeTarea> {
+  const [enlaces, partidasObra] = await Promise.all([
+    prisma.mapeoTareaPartida.findMany({
+      // La empresa se aplica DONDE se lee, no donde se leyo antes.
+      where: { projectId: obraId, project: { companyId } },
+      select: { uid: true, codigoPartida: true },
+    }),
+    prisma.wbsItem.findMany({
+      where: { projectId: obraId, project: { companyId }, tipo: "PARTIDA" },
+      select: { codigoPartida: true, parcial: true },
+    }),
+  ]);
+
+  const partidasMapeables = partidasObra.map((p) => ({
+    codigo: p.codigoPartida,
+    // `cobertura` la pide por firma pero no la mira: solo suma importes.
+    descripcion: "",
+    parcial: p.parcial?.toString() ?? null,
+  }));
+
+  // Sin ni un enlace no hay nada que cubrir: se ahorra el calculo y se dice
+  // duracion, que es lo que `criterioDePeso` contestaria igual.
+  const criterio =
+    enlaces.length === 0
+      ? ("DURACION" as const)
+      : criterioDePeso(cobertura(enlaces, partidasMapeables).porcentaje);
+
+  return pesoDeTarea(
+    criterio,
+    pesoEnDineroPorTarea(enlaces, partidasMapeables),
+    tareas,
+  );
+}
+
 export async function datosCurvaS(
   sesion: SesionActiva,
   obraId: string,
@@ -1897,35 +1997,9 @@ export async function datosCurvaS(
    * real- porque lo unico que se lee en una curva S es la distancia entre
    * ellas, y pesarlas distinto la vuelve ilegible.
    */
-  const [enlaces, partidasObra] = await Promise.all([
-    prisma.mapeoTareaPartida.findMany({
-      where: { projectId: obraId, project: { companyId: sesion.companyId } },
-      select: { uid: true, codigoPartida: true },
-    }),
-    prisma.wbsItem.findMany({
-      where: {
-        projectId: obraId,
-        project: { companyId: sesion.companyId },
-        tipo: "PARTIDA",
-      },
-      select: { codigoPartida: true, parcial: true },
-    }),
-  ]);
-
-  const partidasMapeables = partidasObra.map((p) => ({
-    codigo: p.codigoPartida,
-    // `cobertura` la pide por firma pero no la mira: solo suma importes.
-    descripcion: "",
-    parcial: p.parcial?.toString() ?? null,
-  }));
-
-  const criterioCurva =
-    enlaces.length === 0
-      ? ("DURACION" as const)
-      : criterioDePeso(cobertura(enlaces, partidasMapeables).porcentaje);
-  const pesoCurva = pesoDeTarea(
-    criterioCurva,
-    importePorTarea(enlaces, partidasMapeables),
+  const pesoCurva = await pesoDeLaObra(
+    sesion.companyId,
+    obraId,
     planificadas,
   );
 
@@ -2222,7 +2296,7 @@ export async function avanceFisicoPorObra(
         ? "DURACION"
         : criterioDePeso(cobertura(enlacesDeLaObra, partidasDeLaObra).porcentaje);
 
-    const importes = importePorTarea(enlacesDeLaObra, partidasDeLaObra);
+    const importes = pesoEnDineroPorTarea(enlacesDeLaObra, partidasDeLaObra);
     const peso = pesoDeTarea(criterio, importes, suyas);
 
     const medibles = suyas.map((t) => ({

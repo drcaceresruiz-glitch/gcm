@@ -55,6 +55,18 @@ export interface InformeCompuesto {
   real: string;
   planeado: string;
   desviacion: string;
+  /**
+   * Con que se pesaron `real` y `planeado`: "DURACION" o "DINERO".
+   *
+   * Viaja hasta el documento porque la CURVA que va aqui al lado se pesa con
+   * el mismo criterio, y hasta el 24 de agosto de 2026 no era asi: las cifras
+   * de arriba iban siempre por duracion y la curva ya podia ir por dinero. El
+   * mismo PDF, dos varas.
+   */
+  criterioPeso: "DURACION" | "DINERO";
+  /// Cuantas tareas no cuentan por no tener partida mapeada. Cero con
+  /// duracion; con dinero se enseña, porque su avance deja de pesar.
+  tareasSinPeso: number;
   periodo: PeriodoInforme;
   curva: DatosCurva;
   capitulos: Capitulo[];
@@ -146,6 +158,8 @@ export async function componerInforme(
       real: informe.real,
       planeado: informe.planeado,
       desviacion: informe.desviacion,
+      criterioPeso: informe.criterioPeso,
+      tareasSinPeso: informe.tareasSinPeso,
       periodo: informe.periodo,
       curva,
       capitulos: agruparPorCapitulo(informe.tareas),

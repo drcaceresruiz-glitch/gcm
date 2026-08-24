@@ -7,10 +7,18 @@ import { dividir, sumar } from "./decimal";
  * que duren lo mismo pesaban igual en el avance. Es una aproximacion razonable
  * cuando no se sabe cuanto vale cada tarea, y una mentira en cuanto se sabe.
  *
- * El sistema lleva prometiendo lo otro desde el principio —`lib/evm.ts` lo dice
- * literalmente: «el %avance puede venir ponderado por DURACION (lo que trae el
- * archivo) o por DINERO (cuando el mapeo tarea-partida pasa del 60%)»— y no
- * estaba construido.
+ * El sistema llevaba prometiendo lo otro desde el principio —`lib/evm.ts` lo
+ * dice literalmente: «el %avance puede venir ponderado por DURACION (lo que
+ * trae el archivo) o por DINERO (cuando el mapeo tarea-partida pasa del 60%)»—
+ * y no estaba construido. Se construyo el 23 de agosto de 2026, y el 24 se
+ * conecto a las tres cifras que faltaban: el informe semanal, su periodo y el
+ * ritmo. Quien decide el peso de una obra es `pesoDeLaObra`, en
+ * `services/cronograma.service`, y lo decide UNA vez.
+ *
+ * LO QUE SIGUE POR DURACION, con motivo: la tabla de capitulos
+ * (`lib/control-avance`). Su planeado se LEE del archivo de MS Project, que
+ * consolida por duracion; pesar el real por dinero restaria dos varas
+ * distintas, que es justo lo que la regla de oro de abajo prohibe.
  *
  * **La regla de oro: el PLAN y el REAL se pesan IGUAL.** Un plan pesado por
  * duracion contra un real pesado por dinero no se pueden restar: la desviacion
@@ -49,7 +57,16 @@ export interface PartidaConImporte {
 }
 
 /**
- * Cuanto dinero le toca a cada tarea, por su uid.
+ * Cuanto PESA cada tarea en dinero, por su uid.
+ *
+ * NO SE LLAMA `importePorTarea`, y el nombre es la mitad del arreglo. Habia
+ * otra funcion con ese nombre exacto en `lib/mapeo-partidas`, con la misma
+ * forma de entrada y de salida, que decide lo CONTRARIO sobre el reparto: alla
+ * una partida enlazada a dos tareas cuenta entera en las dos, aqui se parte.
+ * Las dos decisiones son correctas para lo suyo -aquella dice que CUBRE una
+ * tarea, esta cuanto PESA- pero compartiendo nombre nadie podia saber cual
+ * estaba usando, y la diferencia es que los pesos sumen el presupuesto o el
+ * doble.
  *
  * **El importe de una partida se REPARTE entre las tareas que la cubren.** Si
  * tres tareas ejecutan la misma partida y se le diera el importe entero a cada
@@ -62,7 +79,7 @@ export interface PartidaConImporte {
  * duracion mezclaria los dos criterios justo en la funcion que existe para
  * separarlos. En el caso normal —una partida, una tarea— el reparto es exacto.
  */
-export function importePorTarea(
+export function pesoEnDineroPorTarea(
   enlaces: readonly EnlaceTareaPartida[],
   partidas: readonly PartidaConImporte[],
 ): Map<number, string> {

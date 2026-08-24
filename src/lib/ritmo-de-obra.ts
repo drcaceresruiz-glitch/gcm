@@ -20,7 +20,7 @@
  */
 
 import { ultimoAvancePorTarea, type AvanceReportado } from "@/lib/cronograma";
-import { ponderarPorDuracion, type TareaParaCurva } from "@/lib/curva-s";
+import { ponderar, type TareaParaCurva } from "@/lib/curva-s";
 import { sumar } from "@/lib/decimal";
 
 export interface TareaDelRitmo extends TareaParaCurva {
@@ -55,11 +55,19 @@ export interface TramoDeRitmo {
   capitulos: CapituloEnTramo[];
 }
 
-/// Avance ponderado de un grupo de tareas en una fecha dada.
+/**
+ * Avance ponderado de un grupo de tareas en una fecha dada.
+ *
+ * `pesoDe` llega de fuera y por defecto es la duracion. Quien llama decide, y
+ * pasa EL MISMO peso que usan la curva y el informe de esa obra: el ritmo es
+ * la resta de dos medidas, y medirlas con pesos distintos daria un avance
+ * semanal inventado.
+ */
 function avanceEn(
   tareas: readonly TareaDelRitmo[],
   avances: readonly AvanceReportado[],
   fecha: Date,
+  pesoDe: (t: TareaDelRitmo) => string,
 ): number {
   // Lo VIGENTE en esa fecha, no lo de hoy: el tramo cuenta lo que se sabia
   // entonces. Sin reporte manda el porcentaje que traia el archivo.
@@ -68,8 +76,9 @@ function avanceEn(
   );
   return (
     Number(
-      ponderarPorDuracion(
-        tareas,
+      ponderar(
+        tareas.filter((t) => !t.esResumen),
+        pesoDe,
         (t) => vigentes.get(t.uid)?.porcentaje ?? t.porcentajeArchivo,
       ),
     ) || 0
@@ -88,6 +97,12 @@ export function ritmoPorTramos(
   tareas: readonly TareaDelRitmo[],
   avances: readonly AvanceReportado[],
   fechas: readonly Date[],
+  /**
+   * Con que pesa cada tarea. Por defecto la DURACION, y quien llama pasa el de
+   * la obra -que puede ser el dinero- para que esta pantalla no diga un avance
+   * distinto del de la curva S de la misma obra el mismo dia.
+   */
+  pesoDe: (t: TareaDelRitmo) => string = (t) => t.duracionDias,
 ): TramoDeRitmo[] {
   if (fechas.length < 2) return [];
 
@@ -104,15 +119,15 @@ export function ritmoPorTramos(
   /*
    * Cuanto pesa cada capitulo dentro de la obra.
    *
-   * Con la duracion, que es la misma vara que usa la curva S. Usar otra aqui
-   * daria dos cifras de avance para la misma obra en dos pantallas, que es el
-   * modo de fallo que este proyecto ya conoce.
+   * Con LA MISMA vara con la que se mide el avance, sea la duracion o el
+   * dinero. Usar otra aqui daria dos cifras de avance para la misma obra en
+   * dos pantallas, que es el modo de fallo que este proyecto ya conoce.
    */
-  const duracionTotal = Number(sumar(medibles.map((t) => t.duracionDias), 4)) || 0;
+  const pesoTotal = Number(sumar(medibles.map(pesoDe), 4)) || 0;
   const peso = new Map<string, number>();
   for (const [capitulo, suyas] of porCapitulo) {
-    const suma = Number(sumar(suyas.map((t) => t.duracionDias), 4)) || 0;
-    peso.set(capitulo, duracionTotal > 0 ? suma / duracionTotal : 0);
+    const suma = Number(sumar(suyas.map(pesoDe), 4)) || 0;
+    peso.set(capitulo, pesoTotal > 0 ? suma / pesoTotal : 0);
   }
 
   const ordenadas = [...fechas].sort((a, b) => a.getTime() - b.getTime());
@@ -122,8 +137,8 @@ export function ritmoPorTramos(
 
     const capitulos: CapituloEnTramo[] = [...porCapitulo.entries()].map(
       ([capitulo, suyas]) => {
-        const antes = avanceEn(suyas, avances, desde);
-        const despues = avanceEn(suyas, avances, hasta);
+        const antes = avanceEn(suyas, avances, desde, pesoDe);
+        const despues = avanceEn(suyas, avances, hasta, pesoDe);
         const ganado = redondear(despues - antes);
         return {
           capitulo,
@@ -141,7 +156,7 @@ export function ritmoPorTramos(
       // coincide EXACTAMENTE con su propio total y no queda un hueco de
       // redondeo que nadie sabe explicar.
       ganado: redondear(capitulos.reduce((s, c) => s + c.aporte, 0)),
-      acumulado: avanceEn(medibles, avances, hasta),
+      acumulado: avanceEn(medibles, avances, hasta, pesoDe),
       capitulos: capitulos.sort((a, b) => b.aporte - a.aporte),
     };
   });

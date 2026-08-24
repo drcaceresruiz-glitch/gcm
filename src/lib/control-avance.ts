@@ -125,7 +125,28 @@ function recorrerCapitulos(
   return salida;
 }
 
-/** Agrupa las tareas por capitulo y pondera cada uno por duracion. */
+/**
+ * Agrupa las tareas por capitulo y pondera cada uno POR DURACION.
+ *
+ * SIEMPRE POR DURACION, tambien en las obras que pesan por dinero, y esto no
+ * es un olvido: es la consecuencia de donde sale cada cifra.
+ *
+ * El PLANEADO de un capitulo se LEE del archivo de MS Project -ver el
+ * comentario de dentro-, y Project lo consolida con su propio metodo, que es
+ * por duracion. Si el REAL se pesara por dinero, la resta de las dos -que es
+ * la columna de desviacion que se mira- estaria restando dos varas distintas,
+ * y esa es exactamente la regla de oro que `lib/pesos-tarea` existe para
+ * proteger: el plan y el real se pesan IGUAL.
+ *
+ * Para pesar esta tabla por dinero habria que calcular tambien el planeado del
+ * capitulo por nuestra cuenta, y eso ya se probo: daba 67,82 % donde el informe
+ * que el cliente tiene en la mano dice 64 %. Se eligio cuadrar con el documento
+ * del cliente, y esa eleccion sigue en pie.
+ *
+ * Donde SI manda el peso de la obra es en las cifras que GCM calcula entera:
+ * la curva S, el informe semanal y el ritmo. Ver `pesoDeLaObra` en
+ * `services/cronograma.service`.
+ */
 export function agruparPorCapitulo(
   tareas: readonly TareaControlada[],
 ): Capitulo[] {
