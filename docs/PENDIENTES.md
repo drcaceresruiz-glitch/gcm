@@ -91,7 +91,7 @@ clic real en coordenadas, el panel se abre entero. Mismo caso que la nota
 reacciona», hay que reproducirlo con un clic de verdad antes de tocar codigo
 que puede estar sano.**
 
-### SIN CERRAR: los botones de escritura en una obra CERRADA
+### Los botones de escritura en una obra CERRADA — HECHO el 24 de agosto
 
 Visto el 24 de agosto en la obra OB-000004, ya cerrada: `/proveedores` sigue
 ofreciendo «Valorizar», «Cerrar» y «Anular», y `/valorizaciones` ofrece
@@ -100,12 +100,49 @@ probado-, pero es justo lo que el propio codigo de esa tarjeta condena tres
 lineas mas arriba, hablando del boton Anular: «un boton que siempre falla
 invita a probar».
 
-El menu de la obra YA sabe hacerlo bien (`layout.tsx` no propone ningun paso
-siguiente si la obra esta cerrada). Falta bajar esa misma regla a las
-pantallas de escritura. No se hizo en el mismo commit porque es una regla
-transversal -hay que decidir pantalla por pantalla que se esconde y que se
-queda, y «Reabrir» tiene que quedarse-, y mezclarla con cinco arreglos
-puntuales habria hecho el cambio imposible de revisar.
+La causa de fondo: **el criterio existia solo en el servidor**.
+`obraAdmiteCambios` dice en su propio comentario que se declara en logica pura
+«para que el mismo criterio valga en la pantalla y en el servidor», y en la
+pantalla no lo usaba nadie —once servicios y CERO componentes—.
+
+**Lo que se hizo.** `src/components/obras/EscrituraDeLaObra.tsx`: el layout de
+la obra resuelve el estado una vez y las pantallas de dentro lo leen. Sin una
+consulta de mas —los dos campos que faltaban (`archivadaEn` y la migracion de
+la empresa) viajan ya en `obtenerObra`, que es la misma consulta y esta en
+`cache()`—. Tres piezas:
+
+- `useMotivoSinEscritura(opciones)` para los componentes de cliente.
+- `<SiSePuedeEscribir>` para envolver un boton desde una pagina de servidor.
+- `<AvisoSinEscritura />`, el cartel UNA vez por pantalla. Los controles
+  escondidos no llevan cartel cada uno: en una lista de quince encargos serian
+  quince veces la misma frase.
+
+**Las `opciones` importan y hay que acertarlas.** Cada componente pasa las
+MISMAS que su escritura en el servidor. `BotonAprobarMovimiento` lleva
+`{ permiteEnParalizada: true }` porque `aprobarMovimiento` tambien lo lleva
+—aprobar cierra algo en curso, no abre trabajo nuevo—: esconderlo con el
+default restrictivo habria quitado una funcion que existe. Ante la duda, mirar
+el servicio que hay al otro lado del boton.
+
+**Cubierto (las pantallas del dinero, que es de donde salio el hallazgo):**
+proveedores (nuevo encargo, valorizar, cerrar, anular), valorizaciones
+(registrar pago, cadencia), ordenes (registrar, aprobar, anular, eliminar),
+movimientos (registrar, aprobar, eliminar borrador) y meta (aprobar, borrar,
+deducciones).
+
+**Sin cubrir todavia, y es mecanico:** cronograma, plan semanal, lookahead,
+parte del dia, notas, kanban, galeria, personal, equipo, evidencia,
+contractual, presupuesto y revisiones. El mecanismo ya esta; cada una es una
+linea mas el import. Se dejo fuera a proposito: son otros catorce sitios donde
+hay que mirar uno por uno que opciones usa su servicio, y meterlos a ciegas en
+el mismo diff era justo la forma de colar un boton escondido que si deberia
+estar.
+
+**Pendiente de mirar en pantalla.** La bateria G6 pasa entera (typecheck,
+lint, 3018 pruebas, build) pero la sesion del servidor de desarrollo caduco
+antes de poder verlo con los ojos en la obra OB-000004. Es lo primero que hay
+que hacer al retomar: entrar, abrir esa obra cerrada y comprobar que los
+botones no estan y que el cartel si.
 
 ## El dinero de la obra, de punta a punta (23 de agosto de 2026)
 

@@ -20,6 +20,10 @@ import { puede } from "@/lib/rbac";
 import { Paginacion } from "@/components/ui/Paginacion";
 import { PanelVigente } from "@/components/movimientos/PanelVigente";
 import { HistorialMovimientos } from "@/components/movimientos/HistorialMovimientos";
+import {
+  AvisoSinEscritura,
+  SiSePuedeEscribir,
+} from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Movimientos presupuestales" };
 
@@ -87,17 +91,23 @@ export default async function MovimientosPage({
           Movimientos presupuestales
         </h2>
 
+        {/* Una obra cerrada no admite movimientos nuevos: lo rechaza
+            `crearMovimiento`. El motivo se explica una vez, aqui debajo. */}
         {presupuesto && puedeCrear && (
-          <Link
-            href={`/obras/${id}/movimientos/nuevo`}
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-            style={{ backgroundColor: "var(--color-marca-600)" }}
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            Registrar movimiento
-          </Link>
+          <SiSePuedeEscribir>
+            <Link
+              href={`/obras/${id}/movimientos/nuevo`}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: "var(--color-marca-600)" }}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              Registrar movimiento
+            </Link>
+          </SiSePuedeEscribir>
         )}
       </div>
+
+      <AvisoSinEscritura />
 
       {creado && (
         <Aviso icono={CheckCircle2} tono="exito">

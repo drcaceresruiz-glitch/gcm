@@ -12,6 +12,7 @@ import {
 } from "@/app/(dashboard)/obras/[id]/valorizaciones/acciones";
 import type { FilaValorizacion } from "@/services/pagos.service";
 import { esCero, restar } from "@/lib/decimal";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Un contratista en el panel de valorizaciones.
@@ -55,6 +56,15 @@ export function FilaContratista({
   const conAdendas = !esCero(restar(fila.montoVigente, fila.montoContratado) ?? "0");
 
   const adelantado = fila.porPagar.trim().startsWith("-");
+
+  /*
+   * En una obra cerrada no se registra un pago ni se cambia la cadencia. Es
+   * la misma regla que ya aplica `registrarPago` en el servidor, y sin
+   * opciones porque el servicio tampoco las pasa.
+   *
+   * Sin cartel en cada fila: lo pone una sola vez la pantalla, arriba.
+   */
+  const sePuedeEscribir = useMotivoSinEscritura() === null;
 
   function pagar(datos: FormData) {
     setError(null);
@@ -163,7 +173,7 @@ export function FilaContratista({
       {error && <Nota tono="peligro">{error}</Nota>}
       {hecho && <Nota tono="exito">{hecho}</Nota>}
 
-      {puedeGestionar && (
+      {puedeGestionar && sePuedeEscribir && (
         <div className="flex flex-wrap items-end gap-4">
           <button
             type="button"
@@ -203,7 +213,7 @@ export function FilaContratista({
         </div>
       )}
 
-      {abierto && puedeGestionar && (
+      {abierto && puedeGestionar && sePuedeEscribir && (
         <form
           action={pagar}
           className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2"

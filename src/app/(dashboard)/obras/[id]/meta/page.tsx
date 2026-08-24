@@ -26,6 +26,7 @@ import { TablaMetaEditable } from "@/components/meta/TablaMetaEditable";
 import { lineasDelBorrador } from "@/services/meta-edicion.service";
 import { FormularioMeta } from "@/components/meta/FormularioMeta";
 import { AccionesMeta } from "@/components/meta/AccionesMeta";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Presupuesto meta" };
 
@@ -206,6 +207,8 @@ export default async function MetaPage({
           esperado y no dinero disponible.
         </p>
       </div>
+
+      <AvisoSinEscritura />
 
       {/*
         LA OBRA SE CREO, EL PRESUPUESTO NO.

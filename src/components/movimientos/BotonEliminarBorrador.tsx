@@ -7,6 +7,7 @@ import {
   accionEliminarBorrador,
   type EstadoMovimiento,
 } from "@/app/(dashboard)/obras/[id]/movimientos/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Descartar un borrador.
@@ -32,6 +33,13 @@ export function BotonEliminarBorrador({
     {},
   );
   const [confirmando, setConfirmando] = useState(false);
+
+  /*
+   * En una obra que no admite cambios no se ofrece borrar el borrador.
+   * Mismas opciones que `eliminarBorrador` en el servidor: sin excepciones.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   return (
     <div className="space-y-2">

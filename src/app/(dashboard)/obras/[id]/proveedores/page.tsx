@@ -10,6 +10,10 @@ import { puede } from "@/lib/rbac";
 import { soles } from "@/utils/formato";
 import { Mascota } from "@/components/ui/Mascota";
 import { TarjetaEncargo } from "@/components/proveedores/TarjetaEncargo";
+import {
+  AvisoSinEscritura,
+  SiSePuedeEscribir,
+} from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Proveedores" };
 
@@ -53,17 +57,24 @@ export default async function ProveedoresPage({
             Reparte la obra en encargos: quién hace qué, por cuánto y cómo va.
           </p>
         </div>
+        {/* En una obra cerrada no se abre un encargo nuevo: el servicio lo
+            rechaza, y ofrecer el boton solo invita a intentarlo. El motivo se
+            explica una vez, en el aviso de aqui debajo. */}
         {puedeGestionar && (
-          <Link
-            href={`/obras/${id}/proveedores/nuevo`}
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-            style={{ backgroundColor: "var(--color-marca-600)" }}
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            Nuevo encargo
-          </Link>
+          <SiSePuedeEscribir>
+            <Link
+              href={`/obras/${id}/proveedores/nuevo`}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: "var(--color-marca-600)" }}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              Nuevo encargo
+            </Link>
+          </SiSePuedeEscribir>
         )}
       </div>
+
+      <AvisoSinEscritura />
 
       {/* Cobertura: cuanto del presupuesto tiene ya un proveedor detras. La
           lectura de arriba antes de mirar encargo por encargo. */}

@@ -7,6 +7,7 @@ import {
   accionAnularOrden,
   type EstadoOrden,
 } from "@/app/(dashboard)/obras/[id]/ordenes/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Anula una orden. No la borra.
@@ -39,6 +40,16 @@ export function BotonAnularOrden({
     {},
   );
   const [abierto, setAbierto] = useState(false);
+
+  /*
+   * En una obra cerrada, archivada o de una empresa congelada no se
+   * ofrece: `anularOrden` lo rechaza en el servidor, y un boton que
+   * siempre falla invita a probar. Va DESPUES de los hooks y antes de
+   * cualquier rama: es lo primero que se decide, pero no puede
+   * saltarse una llamada a un hook por el camino.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   if (!abierto) {
     return (

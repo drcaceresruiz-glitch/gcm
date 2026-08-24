@@ -16,6 +16,7 @@ import type { EstadoEncargo } from "@/generated/prisma/enums";
 import { soles } from "@/utils/formato";
 import { fechaCorta, hoy } from "@/utils/fechas";
 import { Chip, type TonoChip } from "@/components/ui/Chip";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 import {
   accionValorizar,
   accionCambiarEstado,
@@ -301,6 +302,17 @@ function Acciones({
   const [pendiente, iniciar] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  /*
+   * En una obra cerrada -o archivada, o de una empresa congelada- no se
+   * ofrece ninguna de las tres. Es la misma regla que ya aplica el servidor
+   * en `valorizarEncargo` y `cambiarEstadoEncargo`, y sin opciones porque
+   * ellos tampoco las pasan: en una obra PARALIZADA tampoco se valoriza.
+   *
+   * Sin cartel aqui: en una lista de quince encargos serian quince veces la
+   * misma frase. Lo pone una sola vez la pantalla, arriba.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+
   function cambiarEstado(estado: EstadoEncargo) {
     setError(null);
     iniciar(async () => {
@@ -308,6 +320,8 @@ function Acciones({
       if (!r.ok) setError(r.error);
     });
   }
+
+  if (sinEscritura) return null;
 
   return (
     <div

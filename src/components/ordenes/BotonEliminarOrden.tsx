@@ -7,6 +7,7 @@ import {
   accionEliminarOrden,
   type EstadoOrden,
 } from "@/app/(dashboard)/obras/[id]/ordenes/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Borra una orden. Solo se ofrece en borradores y en anuladas.
@@ -35,6 +36,16 @@ export function BotonEliminarOrden({
     {},
   );
   const [abierto, setAbierto] = useState(false);
+
+  /*
+   * En una obra cerrada, archivada o de una empresa congelada no se
+   * ofrece: `eliminarOrden` lo rechaza en el servidor, y un boton que
+   * siempre falla invita a probar. Va DESPUES de los hooks y antes de
+   * cualquier rama: es lo primero que se decide, pero no puede
+   * saltarse una llamada a un hook por el camino.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   if (!abierto) {
     return (

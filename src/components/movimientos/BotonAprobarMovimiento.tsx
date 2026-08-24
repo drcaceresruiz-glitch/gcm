@@ -7,6 +7,7 @@ import {
   accionAprobarMovimiento,
   type EstadoMovimiento,
 } from "@/app/(dashboard)/obras/[id]/movimientos/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Aprobar un movimiento presupuestal.
@@ -44,6 +45,16 @@ export function BotonAprobarMovimiento({
     {},
   );
   const [confirmando, setConfirmando] = useState(false);
+
+  /*
+   * En una obra que no admite cambios no se ofrece aprobar.
+   * Mismas opciones que `aprobarMovimiento` en el servidor: una obra PARALIZADA
+   * SI lo admite -cierra algo en curso, no abre trabajo nuevo-, asi que
+   * esconderlo aqui seria quitar una funcion que existe.
+   */
+  const sinEscritura =
+    useMotivoSinEscritura({ permiteEnParalizada: true }) !== null;
+  if (sinEscritura) return null;
 
   if (!confirmando) {
     return (

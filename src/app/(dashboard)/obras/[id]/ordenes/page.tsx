@@ -21,6 +21,10 @@ import { Paginacion } from "@/components/ui/Paginacion";
 import { PanelComprometido } from "@/components/ordenes/PanelComprometido";
 import { FiltrosOrdenes } from "@/components/ordenes/FiltrosOrdenes";
 import { HistorialOrdenes } from "@/components/ordenes/HistorialOrdenes";
+import {
+  AvisoSinEscritura,
+  SiSePuedeEscribir,
+} from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Órdenes de compra" };
 
@@ -123,17 +127,23 @@ export default async function OrdenesPage({
           Órdenes de compra
         </h2>
 
+        {/* Una obra cerrada no admite ordenes nuevas: lo rechaza
+            `crearOrden`. El motivo se explica una vez, aqui debajo. */}
         {puede(sesion, "orden:crear") && (
-          <Link
-            href={`/obras/${id}/ordenes/nueva`}
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-            style={{ backgroundColor: "var(--color-marca-600)" }}
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            Registrar orden
-          </Link>
+          <SiSePuedeEscribir>
+            <Link
+              href={`/obras/${id}/ordenes/nueva`}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: "var(--color-marca-600)" }}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              Registrar orden
+            </Link>
+          </SiSePuedeEscribir>
         )}
       </div>
+
+      <AvisoSinEscritura />
 
       {avisos.map((aviso) => (
         <p

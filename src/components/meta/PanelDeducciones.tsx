@@ -12,6 +12,7 @@ import {
 import type { DeduccionFila } from "@/services/deducciones.service";
 import type { ResumenDeducciones } from "@/lib/deducciones";
 import { soles } from "@/utils/formato";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Deducir un costo propio de la meta congelada, con sus dos firmas.
@@ -106,6 +107,13 @@ export function PanelDeducciones({
   const [resolucion, accionResolver] = useActionState(accionResolverDeduccion, {});
   /// Qué deducción se está rechazando: el motivo solo se pide al decir que no.
   const [rechazando, setRechazando] = useState<string | null>(null);
+
+  /*
+   * En una obra que no admite cambios no se pide ni se firma una deduccion.
+   * Mismas opciones que `solicitarDeduccion` en el servidor: sin excepciones.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   // Sin líneas propias no hay nada que deducir, y decirlo es más útil que
   // pintar un panel vacío con un botón que no lleva a ningún sitio.

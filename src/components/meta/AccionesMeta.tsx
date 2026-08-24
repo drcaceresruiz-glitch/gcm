@@ -9,6 +9,7 @@ import {
   accionEliminarBorradorMeta,
   type EstadoMeta,
 } from "@/app/(dashboard)/obras/[id]/meta/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Congelar y descartar un borrador de meta.
@@ -75,6 +76,14 @@ export function AccionesMeta({
     accionEliminarBorradorMeta,
     {},
   );
+
+  /*
+   * En una obra que no admite cambios no se ofrece aprobar ni borrar la
+   * meta: las dos escrituras estan detras del mismo criterio.
+   * Mismas opciones que `aprobarMeta` en el servidor: sin excepciones.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   const error = aprobar.error ?? borrar.error;
 

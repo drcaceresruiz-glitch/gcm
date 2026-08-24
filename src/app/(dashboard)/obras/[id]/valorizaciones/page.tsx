@@ -8,6 +8,7 @@ import { puede } from "@/lib/rbac";
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
 import { Paginacion } from "@/components/ui/Paginacion";
 import { FilaContratista } from "@/components/valorizaciones/FilaContratista";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Valorizaciones y pagos" };
 
@@ -54,6 +55,8 @@ export default async function ValorizacionesPage({
         titulo="Valorizaciones y pagos"
         nota={`Por defecto cada contratista valoriza con el corte de la obra, los ${DIAS[panel.diaCorteObra]}. Quien tenga otra cadencia pactada, la suya.`}
       >
+        <AvisoSinEscritura />
+
         {/* Los tres frentes. Se cuentan sobre TODOS los encargos vigentes, no
             sobre la pagina: un contador que cambia al pasar de pagina no
             sirve para decidir nada. */}

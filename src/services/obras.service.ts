@@ -557,6 +557,11 @@ export interface ObraDetalle {
   /// este campo tambien los trae en null.
   motivoParalizacion: string | null;
   fechaEstimadaReanudacion: Date | null;
+  /// Con fecha, esto no es una obra sino una copia restaurada para auditoria.
+  archivadaEn: Date | null;
+  /// La constructora entera esta congelada para exportarla. No es un estado de
+  /// la obra, pero manda sobre el: ver `motivoNoAdmiteCambios`.
+  empresaEnMigracion: boolean;
 }
 
 /**
@@ -606,6 +611,21 @@ export const obtenerObra = cache(async function obtenerObra(
       diaCorteSemanal: true,
       motivoParalizacion: true,
       fechaEstimadaReanudacion: true,
+      /*
+       * LOS DOS DATOS QUE FALTABAN PARA QUE LA PANTALLA PUEDA APLICAR EL
+       * MISMO CRITERIO QUE EL SERVIDOR.
+       *
+       * `motivoNoAdmiteCambios` decide con tres cosas -el estado, si es una
+       * copia archivada, y si la empresa entera esta congelada- y aqui solo
+       * viajaba la primera. Sin las otras dos, la unica forma de que una
+       * pantalla supiera si puede escribir era consultar otra vez.
+       *
+       * No cuesta nada: es la MISMA consulta, dos columnas mas, y ya esta en
+       * `cache()`. Es lo que permite que el layout de la obra lo resuelva una
+       * vez y todas las pantallas de dentro lo lean sin volver a preguntar.
+       */
+      archivadaEn: true,
+      company: { select: { enMigracionAt: true } },
       baselines: {
         where: { aprobadaAt: { not: null } },
         orderBy: { version: "desc" },
@@ -617,8 +637,14 @@ export const obtenerObra = cache(async function obtenerObra(
 
   if (!obra) return null;
 
-  const { baselines, ...resto } = obra;
-  return { ...resto, lineaBaseVersion: baselines[0]?.version ?? null };
+  const { baselines, company, ...resto } = obra;
+  return {
+    ...resto,
+    // Se aplana a un booleano aqui: fuera del servicio nadie tiene por que
+    // saber que la migracion se guarda como una fecha en la empresa.
+    empresaEnMigracion: company.enMigracionAt !== null,
+    lineaBaseVersion: baselines[0]?.version ?? null,
+  };
 });
 
 /**

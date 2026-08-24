@@ -16,6 +16,7 @@ import { MenuObra, type FaseMenu } from "@/components/obras/MenuObra";
 import { PublicarEtiqueta } from "@/components/navegacion/PublicarEtiqueta";
 import { EstadoObra } from "@/components/obras/EstadoObra";
 import { requisitosParaEjecutar, type EstadoObra as EstadoObraTipo } from "@/lib/obras";
+import { ProveedorEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Marco comun de una obra.
@@ -519,7 +520,19 @@ export default async function ObraLayout({
           propio componente se esconde si ya estas en la pantalla del paso. */}
       {paso && <PasoSiguiente obraId={id} paso={paso} />}
 
-      {children}
+      {/* Si en esta obra se puede escribir, resuelto UNA vez para las mas de
+          veinte pantallas de dentro. No cuesta una consulta: los tres campos
+          que decide `motivoNoAdmiteCambios` viajan ya en `obtenerObra`.
+          Ver la cabecera de `EscrituraDeLaObra`. */}
+      <ProveedorEscritura
+        obra={{
+          estado: obra.estado,
+          archivadaEn: obra.archivadaEn,
+          empresaEnMigracion: obra.empresaEnMigracion,
+        }}
+      >
+        {children}
+      </ProveedorEscritura>
       </div>
     </div>
   );
