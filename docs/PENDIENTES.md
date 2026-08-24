@@ -3494,6 +3494,34 @@ reglas solo se han visto en pruebas.
 
 ## 7. Defectos conocidos, sin arreglar
 
+- **La pantalla de cronograma reventó una vez y NO se pudo reproducir**
+  (24 de agosto de 2026, obra OB-000016 «REMODELACION», codigo de fallo
+  `81572617`). La obra se borro despues, asi que ese dato ya no existe y el
+  caso queda abierto. **Lo que SI se descarto, para no repetirlo:**
+
+  - Se ejecuto el encadenamiento COMPLETO de esa pantalla contra una base real
+    -`obtenerCronograma`, `datosCurvaS`, `datosEvm`, `ritmoDeObra`, historial,
+    linea base, calendario, tareas a mano, hitos, anclas, personas y
+    prediccion- sobre las seis obras locales. Ninguna falla. Una de ellas pesa
+    por DINERO, que era la rama nueva de ese dia: pasa entera.
+  - Se probo el cronograma DEGENERADO -EDT recien generada, sin fechas,
+    duracion cero- contra las nueve funciones puras que dibujan la pantalla.
+    Ninguna revienta.
+  - El commit sospechoso (`3f219ce`, la ponderacion) resulto ser una extraccion
+    literal en `datosCurvaS`; el cambio del ritmo esta guardado en los bordes.
+
+  **Si vuelve a pasar, lo unico que hace falta es el mensaje del log del
+  servidor**: el codigo que ve el usuario es un hash de Next -mensaje mas pila-
+  y no se puede revertir. Sin el se adivina, y adivinar aqui costo media
+  mañana.
+
+  **Y la tecnica que si sirvio, apuntada porque no era obvia**: la base de
+  desarrollo SI es alcanzable desde el puesto de trabajo, y los servicios se
+  pueden ejecutar de verdad desde una prueba de vitest que doble solo
+  `@/lib/prisma` con un cliente real -importando el generado por ruta RELATIVA,
+  porque el alias `@/generated/prisma/client` esta prohibido a proposito-. Es
+  `scripts/humo.ts` en pequeño y sin levantar el servidor.
+
 - **Ortografía: el sitio entero se escribió sin tildes** (convención heredada
   por miedo a la codificación, que ya no aplica: UTF-8 de punta a punta y
   prod lo sirve bien). El usuario lo señaló el 10 de agosto. **Tandas 1 y 2
