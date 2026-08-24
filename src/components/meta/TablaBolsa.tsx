@@ -7,6 +7,11 @@ import type { LineaBolsa, SenalBolsa } from "@/lib/bolsa";
  * La columna que decide la lectura es la SENAL, no el importe: una linea
  * `sin_meta` tiene una bolsa grande y positiva y aun asi es un problema, no
  * un logro. Pintarlas igual que las favorables era el error facil.
+ *
+ * La columna META es lo VIGENTE: lo presupuestado menos lo que gerencia ya
+ * firmo que no se gastara. Cuando hay deduccion se enseñan las dos cifras, no
+ * solo el resultado; la meta sigue congelada y esa resta es una decision con
+ * firma, no una correccion del plan.
  */
 
 const SENALES: Record<SenalBolsa, { texto: string; color: string }> = {
@@ -68,6 +73,20 @@ export function TablaBolsa({ lineas }: { lineas: readonly LineaBolsa[] }) {
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
                     {soles(l.meta)}
+                    {/* Lo presupuestado se conserva al lado del vigente, igual
+                        que el monto firmado al lado del vigente en un
+                        contrato: si desapareciera, nadie podria saber despues
+                        si el alquiler siempre valio eso o si se recorto a
+                        mitad de obra para cuadrar la bolsa. Solo cuando
+                        difieren: repetir la misma cifra dos veces es ruido. */}
+                    {Number(l.deducido) > 0 && (
+                      <span
+                        className="block text-xs"
+                        style={{ color: "var(--color-exito)" }}
+                      >
+                        {soles(l.metaPresupuestada)} − {soles(l.deducido)}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-medium">
                     {soles(l.bolsa)}

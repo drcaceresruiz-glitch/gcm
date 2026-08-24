@@ -221,6 +221,18 @@ export const TABLAS: readonly TablaRespaldo[] = [
     decimales: { fraccion: 3 },
   },
   {
+    /// Despues de los items: cuelga de uno de ellos. Al borrar -esta lista al
+    /// reves- se va antes que el item del que deduce.
+    tabla: "deducciones_costo_propio",
+    modelo: "deduccionCostoPropio",
+    refs: [
+      { campo: "projectId", a: "projects" },
+      { campo: "presupuestoMetaId", a: "presupuestos_meta" },
+      { campo: "metaItemId", a: "presupuesto_meta_items" },
+    ],
+    decimales: { importe: 2 },
+  },
+  {
     tabla: "proveedor_partidas",
     modelo: "proveedorPartida",
     refs: [{ campo: "wbsItemId", a: "wbs_items" }],

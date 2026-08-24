@@ -800,9 +800,53 @@ const META = (
       />
     </S>
 
+    <S titulo="Si hay que gastar menos, se pide y lo firma gerencia">
+      <p>
+        La meta está congelada, y eso es lo que permite ver la desviación: si
+        se pudiera bajar cuando la bolsa se pone fea, el plan se reescribiría
+        para encajar con la realidad y siempre parecería que se va justo. Pero
+        a veces <strong>de verdad se va a gastar menos</strong>: el andamio se
+        devuelve dos meses antes, la cuadrilla de apoyo se desmonta.
+      </p>
+      <p>
+        Para eso está la <strong>deducción de un costo propio</strong>. La pide
+        el residente o el administrador de obra desde la pantalla de la meta, y
+        la <strong>firma gerencia</strong>. Aprobada, ese dinero vuelve a la
+        bolsa — y la meta <strong>sigue sin tocarse</strong>: la pantalla
+        enseña las dos cifras, lo presupuestado y lo que queda, para que dentro
+        de seis meses se sepa que hubo una decisión y quién la firmó. Es la
+        misma relación que hay entre el presupuesto contractual congelado y sus
+        movimientos aprobados.
+      </p>
+      <p>
+        <strong>Solo de un costo propio</strong>, nunca de una partida. Un
+        costo propio es una decisión de la empresa — cuántos meses se alquila
+        algo — y por eso se puede decidir gastar menos. El costo de una partida
+        lo dicta la obra: bajarlo no sería decidir nada, sería reescribir el
+        plan para que cuadre.
+      </p>
+      <p>
+        Y el <strong>motivo es obligatorio</strong>: una deducción no es dinero
+        encontrado, es un compromiso de no gastarlo. Alguien tiene que poder
+        comprobar después que se cumplió.
+      </p>
+    </S>
+
     <S titulo="Lo que sale mal">
       <SaleMal
         casos={[
+          {
+            hace: "Usar la deducción para cuadrar la bolsa",
+            pasa: (
+              <p>
+                Deducir «para que salga» sin que nadie vaya a dejar de gastar
+                nada convierte la bolsa en un número que se ajusta a voluntad,
+                y entonces deja de servir para decidir. Por eso hay dos firmas
+                y por eso el motivo es obligatorio: lo que se firma es el
+                compromiso, no la cifra.
+              </p>
+            ),
+          },
           {
             hace: "Dejar la meta congelada mientras entran adicionales",
             pasa: (

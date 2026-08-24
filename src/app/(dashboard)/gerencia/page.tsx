@@ -126,12 +126,13 @@ export default async function GerenciaPage() {
           <SeccionTarjeta
             primera
             titulo="Esperando tu firma"
-            nota="Adicionales y deductivos que el residente ya dio por buenos y que solo gerencia puede aprobar. Hasta que se firmen, el contrato del contratista vale lo de antes: no se le puede pagar de más y ese dinero no cuenta como comprometido en la obra."
+            nota="Lo que la obra ya dio por bueno y solo gerencia puede aprobar: adicionales del contratista y peticiones de gastar menos en un costo propio. Mientras no se firmen, el contrato del contratista vale lo de antes y la bolsa de la obra sigue como está."
           >
-            {firmas.cuantas === 0 ? (
+            {firmas.cuantas === 0 && firmas.cuantasDeducciones === 0 ? (
               <p className="text-sm opacity-70">
-                No hay ninguna adenda esperando. Cuando un residente registre
-                un adicional, aparecerá aquí el mismo día.
+                No hay nada esperando tu firma. Cuando un residente registre un
+                adicional o pida deducir un costo propio, aparecerá aquí el
+                mismo día.
               </p>
             ) : (
               <>
@@ -215,6 +216,74 @@ export default async function GerenciaPage() {
                   aprobada se corrige con otra de signo contrario.
                 </p>
               </>
+            )}
+
+            {/* LAS DEDUCCIONES VAN EN LA MISMA CAJA y en su propia lista.
+                Para quien firma son la misma tarea -algo que alguien pidió y
+                espera-, así que repartirlas en dos paneles obligaría a mirar
+                en dos sitios para saber si queda algo pendiente. Pero tiran
+                del dinero al revés: la adenda se lo lleva, la deducción lo
+                devuelve. Sumarlas en un solo importe daría una cifra que no
+                significa nada. */}
+            {firmas.cuantasDeducciones > 0 && (
+              <div
+                className="space-y-3 border-t pt-4"
+                style={{ borderColor: "var(--borde)" }}
+              >
+                <div>
+                  <p className="text-sm font-medium">
+                    Y {firmas.cuantasDeducciones}{" "}
+                    {firmas.cuantasDeducciones === 1
+                      ? "deducción de costos propios"
+                      : "deducciones de costos propios"}{" "}
+                    por {soles(firmas.importeDeducciones)}
+                  </p>
+                  <p className="mt-0.5 text-xs opacity-60">
+                    La obra pide gastar menos en un sueldo, un alquiler o una
+                    póliza. Aprobarlo devuelve ese dinero a la bolsa — y es un
+                    compromiso de no gastarlo, no dinero encontrado.
+                  </p>
+                </div>
+
+                <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>
+                  {firmas.deducciones.map((d) => (
+                    <li
+                      key={d.id}
+                      className="flex flex-wrap items-start justify-between gap-3 py-3"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/obras/${d.obraId}/meta`}
+                          className="text-sm font-medium underline-offset-2 hover:underline"
+                        >
+                          {d.linea}
+                        </Link>
+                        <p className="text-xs opacity-70">{d.motivo}</p>
+                        <p className="mt-0.5 text-xs opacity-60">
+                          {d.obraNombre} · Deducción {d.numero} · la pidió{" "}
+                          {d.solicitadaPor}
+                          {d.diasEsperando > 0 &&
+                            ` · ${d.diasEsperando} ${d.diasEsperando === 1 ? "día" : "días"} esperando`}
+                        </p>
+                      </div>
+                      {/* En verde y con el menos delante: al contrario que la
+                          adenda, esto BAJA lo que la obra va a gastar. */}
+                      <p
+                        className="text-sm font-medium"
+                        style={{ color: "var(--color-exito)" }}
+                      >
+                        −{soles(d.importe)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+
+                <p className="text-xs opacity-60">
+                  Cada línea enlaza al presupuesto meta de su obra, que es
+                  donde se firma o se rechaza. La meta no se toca: la
+                  deducción se apunta encima, con su firma y su motivo.
+                </p>
+              </div>
             )}
           </SeccionTarjeta>
         </Tarjeta>

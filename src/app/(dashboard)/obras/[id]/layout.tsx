@@ -109,6 +109,17 @@ export default async function ObraLayout({
           pregunta: "cuánto queremos gastar",
           href: `${raiz}/meta`,
           hecho: hitos.meta,
+          /// Las deducciones de costos propios se piden y se firman aqui.
+          /// `critico` solo para quien puede firmarlas, igual que en
+          /// Proveedores: en rojo para quien la pidio seria una alarma que no
+          /// puede apagar haciendo nada.
+          pendientes:
+            avisos.deducciones > 0
+              ? {
+                  cuantos: avisos.deducciones,
+                  critico: puede(sesion, "deduccion:aprobar"),
+                }
+              : null,
         },
         puede(sesion, "partida:leer") && {
           clave: "presupuesto",
@@ -352,11 +363,15 @@ export default async function ObraLayout({
             // Firmar, no leer: el paso que se propone aqui es aprobar la
             // adenda, y quien solo la ve no puede darlo.
             adendas: puede(sesion, "adenda:aprobar"),
+            // Permiso propio: una empresa puede repartir las dos firmas en
+            // dos personas distintas.
+            deducciones: puede(sesion, "deduccion:aprobar"),
           },
           {
             restriccionesVencidas: avisos.lookahead,
             semanasSinCerrar: avisos.planSemanal,
             adendasPorFirmar: avisos.adendas,
+            deduccionesPorFirmar: avisos.deducciones,
           },
         );
 

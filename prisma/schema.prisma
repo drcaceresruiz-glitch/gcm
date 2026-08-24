@@ -1016,6 +1016,7 @@ model Project {
   avisos               Aviso[]
   ajustesAvisos        AjustesAvisosObra?
   estadoBolsa          EstadoBolsaObra?
+  deduccionesPropias   DeduccionCostoPropio[]
   presupuestosMeta     PresupuestoMeta[]
   valorizaciones       ValorizacionEncargo[]
   adendasEncargo       AdendaEncargo[]
@@ -4080,6 +4081,7 @@ model PresupuestoMeta {
 
   project              Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
   items                PresupuestoMetaItem[]
+  deducciones          DeduccionCostoPropio[]
 
   @@unique([projectId, version])
   @@index([projectId])
@@ -4138,10 +4140,99 @@ model PresupuestoMetaItem {
   porcentajeRecargo Decimal?          @db.Decimal(6, 3)
   meta              PresupuestoMeta   @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
   reparto           MetaItemPartida[]
+  deducciones       DeduccionCostoPropio[]
 
   @@index([presupuestoMetaId, orden])
   @@index([presupuestoMetaId, codigoRef])
   @@map("presupuesto_meta_items")
+}
+
+/// Estado de una solicitud de deduccion. Igual que `EstadoAdenda`: el mismo
+/// circuito de dos firmas, y a proposito se escribe igual para que se lea
+/// igual.
+enum EstadoDeduccion {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+}
+
+/// Bajar un costo propio de la meta CONGELADA, con la firma de gerencia.
+///
+/// PEDIDO ASI: «que el residente y/o el administrador de la obra pueda
+/// solicitar deducir monto de los gastos generales, se le presenta al gerente
+/// general y si este lo aprueba perfecto, se hacen todos los ajustes». Los
+/// «gastos generales» de esa frase son hoy los costos propios: los items de la
+/// meta sin `codigoRef` -sueldos, alquileres, polizas-.
+///
+/// ## Por que es una tabla aparte y no una edicion de la meta
+///
+/// La meta se CONGELA al aprobarla, y esa congelacion es el motivo por el que
+/// la desviacion se puede ver: si el plan se reescribiera para encajar con la
+/// realidad, siempre pareceria que se va justo. Tocar el item bajaria la meta
+/// y la bolsa subiria sola, sin rastro de que alguien lo decidio.
+///
+/// Es exactamente la relacion que ya existe entre `Baseline` y
+/// `MovimientoPresupuestal`: base congelada mas ajustes aprobados igual a
+/// vigente. Aqui, meta congelada mas deducciones aprobadas igual a lo que de
+/// verdad se va a gastar.
+///
+/// ## Solo de lineas SIN codigoRef
+///
+/// Un costo propio es una DECISION de la empresa -cuantos meses se alquila el
+/// andamio- y por eso se puede decidir gastar menos. El costo de una partida
+/// lo dicta la obra: deducirlo no seria decidir nada, seria reescribir el plan
+/// para que cuadre, que es justo lo que la meta congelada impide.
+///
+/// ## Atada a la VERSION de la meta
+///
+/// Cuelga de `presupuestoMetaId`. Una meta nueva ya nace reflejando lo que se
+/// decidio, asi que arrastrarle las deducciones de la anterior las contaria
+/// dos veces. Mismo criterio que `movimientosAlFijar`.
+model DeduccionCostoPropio {
+  id                String @id @default(cuid())
+  projectId         String
+  presupuestoMetaId String
+  /// La linea propia de la que se deduce. Deducir de una linea y no del total
+  /// es lo que permite comprobar que no se deduce mas de lo que la linea vale,
+  /// y lo que hace que el rastro diga QUE se dejo de gastar.
+  metaItemId        String
+
+  /// Correlativo dentro de la OBRA: «la 3.a deduccion de esta obra». No por
+  /// meta: quien la cita en un acta no piensa en versiones de la meta.
+  numero Int
+
+  /// SIEMPRE POSITIVO: cuanto se va a dejar de gastar. Un importe con signo
+  /// invitaria a usar la misma tabla para SUBIR un costo propio, que es otra
+  /// cosa -eso es una meta nueva, no una deduccion- y con otra conversacion.
+  importe Decimal @db.Decimal(14, 2)
+
+  /// Que NO se va a gastar, y por que se puede. Obligatorio: una deduccion sin
+  /// esto es dinero que aparece de la nada, y alguien tiene que poder
+  /// comprobar despues que de verdad no se gasto.
+  motivo String @db.Text
+
+  estado EstadoDeduccion @default(PENDIENTE)
+
+  /// Quien la pide, que es quien le da el primer visto bueno.
+  solicitadaPor String   @db.VarChar(150)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  /// La segunda firma. Aprobar es irreversible: se corrige con otra meta, no
+  /// desaprobando -si se pudiera desaprobar, la bolsa bajaria sin rastro de
+  /// que alguna vez subio-.
+  resueltaAt    DateTime?
+  resueltaPor   String?   @db.VarChar(150)
+  motivoRechazo String?   @db.Text
+
+  project Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  meta    PresupuestoMeta     @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
+  item    PresupuestoMetaItem @relation(fields: [metaItemId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, numero])
+  @@index([presupuestoMetaId, estado])
+  @@index([metaItemId, estado])
+  @@map("deducciones_costo_propio")
 }
 
 /// Reparto de una linea de meta entre las partidas del contractual. SOLO en

@@ -20,8 +20,10 @@
  *   2. El ALTA de la obra: presupuesto -> cronograma -> equipo -> linea base.
  *      Es «completar un registro», el unico sitio donde encadenar aporta de
  *      verdad: son cuatro pasos con un final, no un flujo de exploracion.
- *   3. Lo que espera una FIRMA de gerencia y tiene a otro parado mientras
- *      tanto: hoy, las adendas pendientes.
+ *   3. Lo que espera una FIRMA de gerencia: primero la adenda -que tiene a
+ *      alguien bloqueado, no se le puede pagar al contratista- y despues la
+ *      deduccion de costos propios, que no bloquea nada pero deja a alguien
+ *      esperando una respuesta.
  *   4. Lo que quedo a medias y ya vencio. Aqui NO se encadena nada: se
  *      recuerda donde se quedo uno.
  *
@@ -114,6 +116,9 @@ export interface PuedeHacer {
   /// Firmar adendas. Es de gerencia: quien registra el adicional no es quien
   /// lo aprueba, y a quien no puede firmar no se le propone que firme.
   adendas: boolean;
+  /// Firmar deducciones de costos propios. Es un permiso distinto del de las
+  /// adendas: una empresa puede repartir las dos firmas en dos personas.
+  deducciones: boolean;
 }
 
 /**
@@ -130,6 +135,8 @@ export interface AvisosVivos {
   semanasSinCerrar: number;
   /// Adendas registradas por obra y todavia sin la firma de gerencia.
   adendasPorFirmar: number;
+  /// Deducciones de costos propios pedidas por obra y sin firmar.
+  deduccionesPorFirmar: number;
 }
 
 function plural(n: number, singular: string, plural: string): string {
@@ -246,6 +253,28 @@ export function siguientePaso(
         "Hasta que se firme, el contrato del contratista vale lo de antes: no se le puede pagar de más y ese dinero no cuenta como comprometido en la obra.",
       accion: "Ver los contratistas",
       camino: "/proveedores",
+    };
+  }
+
+  /*
+   * La deduccion va DESPUES de la adenda, y no al mismo nivel.
+   *
+   * La adenda tiene a alguien BLOQUEADO: sin ella no se le puede pagar al
+   * contratista. La deduccion no bloquea nada -la obra sigue trabajando-, lo
+   * que hay es alguien esperando una respuesta. Por eso es sugerencia y se
+   * puede aplazar con «Ahora no»: sigue estando en la bandeja de gerencia y en
+   * la insignia de Meta, que es donde no se pierde.
+   */
+  if (avisos.deduccionesPorFirmar > 0 && puede.deducciones) {
+    const n = avisos.deduccionesPorFirmar;
+    return {
+      clave: "deducciones-por-firmar",
+      gravedad: "sugerencia",
+      titulo: `${n} ${plural(n, "deducción espera tu firma", "deducciones esperan tu firma")}`,
+      consecuencia:
+        "La obra pide gastar menos en un costo propio para recuperar bolsa; hasta que lo firmes, ese dinero sigue comprometido.",
+      accion: "Ver el presupuesto meta",
+      camino: "/meta",
     };
   }
 

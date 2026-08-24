@@ -34,6 +34,7 @@ const TODO: PuedeHacer = {
   lookahead: true,
   planSemanal: true,
   adendas: true,
+  deducciones: true,
 };
 
 const NADA: PuedeHacer = {
@@ -44,12 +45,14 @@ const NADA: PuedeHacer = {
   lookahead: false,
   planSemanal: false,
   adendas: false,
+  deducciones: false,
 };
 
 const EN_PAZ: AvisosVivos = {
   restriccionesVencidas: 0,
   semanasSinCerrar: 0,
   adendasPorFirmar: 0,
+  deduccionesPorFirmar: 0,
 };
 
 describe("el paso siguiente de la obra", () => {
@@ -148,6 +151,7 @@ describe("el paso siguiente de la obra", () => {
       restriccionesVencidas: 5,
       semanasSinCerrar: 2,
       adendasPorFirmar: 1,
+      deduccionesPorFirmar: 0,
     });
 
     expect(paso?.clave).toBe("adendas-por-firmar");
@@ -168,6 +172,7 @@ describe("el paso siguiente de la obra", () => {
       restriccionesVencidas: 1,
       semanasSinCerrar: 0,
       adendasPorFirmar: 3,
+      deduccionesPorFirmar: 0,
     });
 
     // Pasa de largo al siguiente escalon en vez de callarse: lo vencido sigue
@@ -179,10 +184,51 @@ describe("el paso siguiente de la obra", () => {
     const paso = siguientePaso(
       { ...ALTA_COMPLETA, presupuesto: false, meta: false },
       TODO,
-      { restriccionesVencidas: 0, semanasSinCerrar: 0, adendasPorFirmar: 2 },
+      { ...EN_PAZ, adendasPorFirmar: 2 },
     );
 
     expect(paso?.clave).toBe("alta-presupuesto");
+  });
+
+  /**
+   * LA DEDUCCION VA DETRAS DE LA ADENDA, y no al mismo nivel. La adenda tiene
+   * a alguien BLOQUEADO -sin ella no se le puede pagar al contratista-; la
+   * deduccion no bloquea nada, lo que hay es alguien esperando una respuesta.
+   */
+  it("la adenda manda sobre la deduccion", () => {
+    const paso = siguientePaso(ALTA_COMPLETA, TODO, {
+      ...EN_PAZ,
+      adendasPorFirmar: 1,
+      deduccionesPorFirmar: 3,
+    });
+
+    expect(paso?.clave).toBe("adendas-por-firmar");
+  });
+
+  it("sin adendas, la deduccion sale y se puede aplazar", () => {
+    const paso = siguientePaso(ALTA_COMPLETA, TODO, {
+      ...EN_PAZ,
+      deduccionesPorFirmar: 1,
+    });
+
+    expect(paso?.clave).toBe("deducciones-por-firmar");
+    expect(paso?.titulo).toBe("1 deducción espera tu firma");
+    // Sugerencia y no bloqueante: se puede decir «Ahora no». Sigue en la
+    // bandeja de gerencia y en la insignia de Meta, que es donde no se pierde.
+    expect(paso?.gravedad).toBe("sugerencia");
+  });
+
+  it("las dos firmas son permisos distintos", () => {
+    // Una empresa puede repartirlas en dos personas: a quien solo firma
+    // deducciones no se le propone la adenda, y al reves.
+    const soloDeducciones: PuedeHacer = { ...TODO, adendas: false };
+    const paso = siguientePaso(ALTA_COMPLETA, soloDeducciones, {
+      ...EN_PAZ,
+      adendasPorFirmar: 2,
+      deduccionesPorFirmar: 1,
+    });
+
+    expect(paso?.clave).toBe("deducciones-por-firmar");
   });
 
   it("con el alta hecha, recuerda lo que vencio", () => {
@@ -190,6 +236,7 @@ describe("el paso siguiente de la obra", () => {
       restriccionesVencidas: 3,
       semanasSinCerrar: 1,
       adendasPorFirmar: 0,
+      deduccionesPorFirmar: 0,
     });
 
     expect(paso?.clave).toBe("restricciones-vencidas");
@@ -201,6 +248,7 @@ describe("el paso siguiente de la obra", () => {
       restriccionesVencidas: 1,
       semanasSinCerrar: 0,
       adendasPorFirmar: 0,
+      deduccionesPorFirmar: 0,
     });
     expect(una?.titulo).toBe("1 restricción con la fecha ya pasada");
 
@@ -208,6 +256,7 @@ describe("el paso siguiente de la obra", () => {
       restriccionesVencidas: 0,
       semanasSinCerrar: 1,
       adendasPorFirmar: 0,
+      deduccionesPorFirmar: 0,
     });
     expect(semana?.titulo).toBe("1 semana sin cerrar con el corte ya pasado");
   });
@@ -224,6 +273,7 @@ describe("el paso siguiente de la obra", () => {
       [{ ...ALTA_COMPLETA, equipo: false }, EN_PAZ],
       [{ ...ALTA_COMPLETA, lineaBase: false }, EN_PAZ],
       [ALTA_COMPLETA, { ...EN_PAZ, adendasPorFirmar: 1 }],
+      [ALTA_COMPLETA, { ...EN_PAZ, deduccionesPorFirmar: 1 }],
       [ALTA_COMPLETA, { ...EN_PAZ, restriccionesVencidas: 1 }],
       [ALTA_COMPLETA, { ...EN_PAZ, semanasSinCerrar: 1 }],
     ];

@@ -832,13 +832,27 @@ export interface AvisosSeccion {
    * enterarse de que sigue ahi salvo volviendo a entrar al encargo a mirar.
    */
   adendas: number;
+  /**
+   * Deducciones de costos propios PENDIENTES: la obra pidio gastar menos en un
+   * sueldo o un alquiler y espera la firma de gerencia.
+   *
+   * El otro aviso que espera a OTRA PERSONA, como las adendas. Se cuenta
+   * aparte porque vive en otra pantalla -la meta- y llevan a sitios distintos.
+   */
+  deducciones: number;
 }
 
 export const avisosDeSeccion = cache(async function avisosDeSeccion(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<AvisosSeccion> {
-  const vacio = { lookahead: 0, planSemanal: 0, notas: 0, adendas: 0 };
+  const vacio = {
+    lookahead: 0,
+    planSemanal: 0,
+    notas: 0,
+    adendas: 0,
+    deducciones: 0,
+  };
   if (!puede(sesion, "obra:leer")) return vacio;
   if (!alcanzaObra(sesion, obraId)) return vacio;
 
@@ -848,7 +862,8 @@ export const avisosDeSeccion = cache(async function avisosDeSeccion(
     project: { companyId: sesion.companyId },
   };
 
-  const [vencidas, sinCerrar, notasVencidas, adendas] = await Promise.all([
+  const [vencidas, sinCerrar, notasVencidas, adendas, deducciones] =
+    await Promise.all([
     puede(sesion, "lookahead:leer")
       ? prisma.restriccion.count({
           where: {
@@ -880,6 +895,13 @@ export const avisosDeSeccion = cache(async function avisosDeSeccion(
           where: { ...deLaObra, estado: "PENDIENTE" },
         })
       : 0,
+    // `meta:leer` y no `deduccion:solicitar`: la insignia informa de que hay
+    // algo esperando, y eso lo tiene que ver tambien quien no puede pedirlo.
+    puede(sesion, "meta:leer")
+      ? prisma.deduccionCostoPropio.count({
+          where: { ...deLaObra, estado: "PENDIENTE" },
+        })
+      : 0,
   ]);
 
   return {
@@ -887,6 +909,7 @@ export const avisosDeSeccion = cache(async function avisosDeSeccion(
     planSemanal: sinCerrar,
     notas: notasVencidas,
     adendas,
+    deducciones,
   };
 });
 

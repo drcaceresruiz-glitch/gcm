@@ -413,3 +413,112 @@ describe("la bolsa descuenta lo que no es partida", () => {
     expect(b.margenEsperado).toBe("2300.00");
   });
 });
+
+describe("una deduccion de costo propio sube la bolsa SIN tocar la meta", () => {
+  /*
+   * PEDIDO ASI: «que el residente y/o el administrador de la obra pueda
+   * solicitar deducir monto de los gastos generales, se le presenta al gerente
+   * general y si este lo aprueba perfecto, se hacen todos los ajustes».
+   *
+   * Lo que estas pruebas vigilan no es la resta, es que lo presupuestado NO
+   * desaparezca. La meta se congela para poder ver la desviacion: si bajar un
+   * costo propio reescribiera la meta, la bolsa subiria sola y nadie podria
+   * saber despues si el andamio siempre valio 3.000 o si se recorto a mitad
+   * de obra para cuadrar.
+   */
+  const CON_DEDUCCION: LineaMeta[] = [
+    { id: "i1", codigoRef: "1.1", descripcion: "Concreto", importe: "45000.00" },
+    { id: "i2", codigoRef: "1.2", descripcion: "Acero", importe: "31000.00" },
+    {
+      id: "i3",
+      codigoRef: null,
+      descripcion: "Andamio alquilado",
+      importe: "3000.00",
+      deducido: "1200.00",
+    },
+  ];
+
+  it("el costo propio baja y la bolsa total sube en lo mismo", () => {
+    const sin = calcularBolsa(BASE);
+    const con = calcularBolsa({ ...BASE, meta: CON_DEDUCCION });
+
+    expect(sin.costoPropioMeta).toBe("3000.00");
+    expect(con.costoPropioMeta).toBe("1800.00");
+    // La bolsa sube EXACTAMENTE lo deducido, ni un centimo mas.
+    expect(sumar([sin.bolsaTotal, "1200.00"])).toBe(con.bolsaTotal);
+  });
+
+  it("lo presupuestado sigue ahi, al lado de lo vigente", () => {
+    const b = calcularBolsa({ ...BASE, meta: CON_DEDUCCION });
+
+    expect(b.costoPropioPresupuestado).toBe("3000.00");
+    expect(b.deducidoDeCostosPropios).toBe("1200.00");
+
+    const andamio = b.porLinea.find((l) => l.descripcion === "Andamio alquilado")!;
+    expect(andamio.metaPresupuestada).toBe("3000.00");
+    expect(andamio.deducido).toBe("1200.00");
+    expect(andamio.meta).toBe("1800.00");
+  });
+
+  it("sin deducciones las dos cifras valen lo mismo y no hay nada que explicar", () => {
+    const b = calcularBolsa(BASE);
+
+    expect(b.costoPropioPresupuestado).toBe(b.costoPropioMeta);
+    expect(b.deducidoDeCostosPropios).toBe("0.00");
+    expect(b.porLinea.every((l) => l.deducido === "0.00")).toBe(true);
+  });
+
+  /*
+   * LA PRODUCCION NO SE MUEVE. La deduccion es de un costo propio, y la bolsa
+   * de produccion mide el margen de las PARTIDAS. Si esto empezara a moverla,
+   * un ahorro en el alquiler del andamio se leeria como que el concreto salio
+   * mas barato.
+   */
+  it("la bolsa de produccion no se entera", () => {
+    const sin = calcularBolsa(BASE);
+    const con = calcularBolsa({ ...BASE, meta: CON_DEDUCCION });
+
+    expect(con.bolsaProduccion).toBe(sin.bolsaProduccion);
+    expect(con.costoDirectoMeta).toBe(sin.costoDirectoMeta);
+  });
+
+  it("el id de la linea viaja, que es lo que permite pedir la deduccion sobre ella", () => {
+    const b = calcularBolsa({ ...BASE, meta: CON_DEDUCCION });
+    const andamio = b.porLinea.find((l) => l.descripcion === "Andamio alquilado")!;
+    expect(andamio.id).toBe("i3");
+  });
+
+  it("tambien en modo FRENTE, que es el otro camino de la union", () => {
+    // Los dos modos unen distinto, y en cuanto uno se olvidara de restar, la
+    // bolsa de ese modo diria otra cosa con los mismos datos.
+    const frentes: LineaMeta[] = [
+      {
+        id: "f1",
+        codigoRef: null,
+        descripcion: "Estructura",
+        importe: "60000.00",
+        reparto: [{ parcial: "80000.00", fraccion: "100" }],
+      },
+      {
+        id: "f2",
+        codigoRef: null,
+        descripcion: "Cuadrilla de apoyo",
+        importe: "5000.00",
+        deducido: "2000.00",
+      },
+    ];
+
+    const b = calcularBolsa({
+      modo: "FRENTE",
+      contractual: [
+        { codigo: "1.1", descripcion: "Estructura", importe: "80000.00" },
+      ],
+      meta: frentes,
+      utilidadContractual: "0.00",
+    });
+
+    const cuadrilla = b.porLinea.find((l) => l.descripcion === "Cuadrilla de apoyo")!;
+    expect(cuadrilla.meta).toBe("3000.00");
+    expect(cuadrilla.metaPresupuestada).toBe("5000.00");
+  });
+});

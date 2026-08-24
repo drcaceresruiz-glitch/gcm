@@ -46,6 +46,8 @@ const datos = {
   restricciones: [] as unknown[],
   /// Adendas PENDIENTES, para la bandeja de firma.
   adendas: [] as unknown[],
+  /// Deducciones de costos propios PENDIENTES, la otra mitad de la bandeja.
+  deducciones: [] as unknown[],
   /// Encargos completos (fechasValorizacion/valorizaciones/pagos), para
   /// `valorizacionesDeCartera` -distinto del agregado `encargosVigentes`.
   encargosCompletos: [] as unknown[],
@@ -165,6 +167,12 @@ vi.mock("@/lib/prisma", () => ({
         return datos.adendas;
       },
     },
+    deduccionCostoPropio: {
+      findMany: async (args: unknown) => {
+        llamadas.push({ modelo: "deduccionCostoPropio", args });
+        return datos.deducciones;
+      },
+    },
   },
 }));
 
@@ -230,6 +238,7 @@ beforeEach(() => {
   datos.imputacionesSueltas = [];
   datos.sueltasComprometido = [];
   datos.adendas = [];
+  datos.deducciones = [];
   datos.wbsItems = [];
   datos.restricciones = [];
   datos.encargosCompletos = [];
@@ -1124,5 +1133,129 @@ describe("adendasPorFirmar", () => {
     const orden = (llamadas.find((l) => l.modelo === "adendaEncargo")
       ?.args as { orderBy: { createdAt: string } }).orderBy;
     expect(orden.createdAt).toBe("asc");
+  });
+});
+
+/**
+ * LAS DEDUCCIONES SON LA OTRA MITAD DE LA BANDEJA.
+ *
+ * Van en la MISMA caja que las adendas porque para quien firma son la misma
+ * tarea -algo que alguien pidio y espera-, y repartirlas en dos paneles
+ * obligaria a mirar en dos sitios para saber si queda algo pendiente. Pero se
+ * listan aparte y con su propio importe porque tiran del dinero en direcciones
+ * opuestas: la adenda se lo lleva, la deduccion lo devuelve.
+ */
+describe("adendasPorFirmar: las deducciones de costos propios", () => {
+  function haceDias(n: number): Date {
+    const a = new Date();
+    return new Date(Date.UTC(a.getFullYear(), a.getMonth(), a.getDate() - n));
+  }
+
+  function deduccion(over: Record<string, unknown> = {}) {
+    return {
+      id: "ded-1",
+      numero: 1,
+      importe: "8000.00",
+      motivo: "El andamio se devuelve en octubre.",
+      solicitadaPor: "Ana Perez",
+      createdAt: haceDias(2),
+      projectId: "obra-1",
+      project: { nombreObra: "Torre A" },
+      item: { descripcion: "Alquiler de andamios" },
+      ...over,
+    };
+  }
+
+  it("quien solo firma adendas no ve las deducciones, ni se consultan", async () => {
+    datos.deducciones = [deduccion()];
+
+    const r = await adendasPorFirmar(sesion(null, ["adenda:aprobar"]));
+
+    expect(r?.deducciones).toEqual([]);
+    expect(r?.cuantasDeducciones).toBe(0);
+    expect(
+      llamadas.filter((l) => l.modelo === "deduccionCostoPropio"),
+    ).toHaveLength(0);
+  });
+
+  it("quien solo firma deducciones ve la bandeja, no un null", async () => {
+    // Es un permiso distinto del de las adendas: una empresa puede repartir
+    // las dos firmas en dos personas. Devolver null aqui esconderia la
+    // pantalla entera a quien si tiene algo que firmar.
+    datos.deducciones = [deduccion()];
+
+    const r = await adendasPorFirmar(sesion(null, ["deduccion:aprobar"]));
+
+    expect(r).not.toBeNull();
+    expect(r?.cuantasDeducciones).toBe(1);
+    expect(r?.deducciones[0]?.linea).toBe("Alquiler de andamios");
+    expect(r?.deducciones[0]?.obraNombre).toBe("Torre A");
+    // Y ninguna adenda: no puede firmarlas.
+    expect(r?.adendas).toEqual([]);
+    expect(llamadas.filter((l) => l.modelo === "adendaEncargo")).toHaveLength(0);
+  });
+
+  it("los dos importes van por separado: uno se lleva el dinero y el otro lo devuelve", async () => {
+    const ambos = sesion(null, ["adenda:aprobar", "deduccion:aprobar"]);
+    datos.adendas = [
+      {
+        id: "ad-1",
+        numero: 1,
+        fecha: haceDias(1),
+        importe: "5000.00",
+        concepto: "Refuerzo",
+        registradaPor: "Ana",
+        createdAt: haceDias(1),
+        encargoId: "enc-1",
+        projectId: "obra-1",
+        project: { nombreObra: "Torre A" },
+        encargo: { proveedor: { razonSocial: "Sur" } },
+      },
+    ];
+    datos.deducciones = [deduccion({ importe: "8000.00" })];
+
+    const r = await adendasPorFirmar(ambos);
+
+    expect(r?.importe).toBe("5000.00");
+    expect(r?.importeDeducciones).toBe("8000.00");
+    // Sumarlos daria 13.000, que no significa nada: uno sube el gasto y el
+    // otro lo baja.
+    expect(r?.cuantas).toBe(1);
+    expect(r?.cuantasDeducciones).toBe(1);
+  });
+
+  it("la mas antigua es la mas antigua DE LAS DOS listas", async () => {
+    const ambos = sesion(null, ["adenda:aprobar", "deduccion:aprobar"]);
+    datos.adendas = [
+      {
+        id: "ad-1",
+        numero: 1,
+        fecha: haceDias(2),
+        importe: "5000.00",
+        concepto: "Refuerzo",
+        registradaPor: "Ana",
+        createdAt: haceDias(2),
+        encargoId: "enc-1",
+        projectId: "obra-1",
+        project: { nombreObra: "Torre A" },
+        encargo: { proveedor: { razonSocial: "Sur" } },
+      },
+    ];
+    datos.deducciones = [deduccion({ createdAt: haceDias(9) })];
+
+    const r = await adendasPorFirmar(ambos);
+    expect(r?.diasDeLaMasVieja).toBe(9);
+  });
+
+  it("pide solo PENDIENTES y solo de la empresa de la sesion", async () => {
+    await adendasPorFirmar(sesion(null, ["deduccion:aprobar"]));
+
+    const c = llamadas.find((l) => l.modelo === "deduccionCostoPropio");
+    const donde = (
+      c?.args as { where: { estado: string; project: { companyId: string } } }
+    ).where;
+
+    expect(donde.estado).toBe("PENDIENTE");
+    expect(donde.project.companyId).toBe("emp-1");
   });
 });

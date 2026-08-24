@@ -90,6 +90,7 @@ const proveedores = await import("@/services/proveedores.service");
 const usuarios = await import("@/services/usuarios.service");
 const causaRaiz = await import("@/services/causa-raiz.service");
 const meta = await import("@/services/meta.service");
+const deducciones = await import("@/services/deducciones.service");
 const tablero = await import("@/services/tablero-semanal.service");
 const galeria = await import("@/services/galeria.service");
 
@@ -723,6 +724,43 @@ describe("presupuesto meta", () => {
       meta.compararConContractual(
         sesion(MIA, ["meta:leer", "movimiento:leer"]),
         obraAjena,
+      ),
+    );
+  });
+
+  /**
+   * Las deducciones de costos propios ensenan la misma materia que la meta -el
+   * margen- y ademas la MUEVEN. Aqui se comprueba lo de siempre: que todo lo
+   * que consultan va acotado a la empresa de la sesion, tambien cuando llegan
+   * a una linea por su id.
+   */
+  it("listar las deducciones de una obra ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      deducciones.deduccionesDeLaMeta(sesion(MIA, leer), obraAjena),
+    );
+  });
+
+  it("pedir una deduccion sobre una linea ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      deducciones.solicitarDeduccion(
+        sesion(MIA, ["deduccion:solicitar"]),
+        obraAjena,
+        {
+          metaItemId: "ITEM-DE-EMPRESA-B",
+          importe: "1000.00",
+          motivo: "x",
+        },
+      ),
+    );
+  });
+
+  it("firmar una deduccion ajena va acotado", async () => {
+    await exigeFiltroDeEmpresa(() =>
+      deducciones.resolverDeduccion(
+        sesion(MIA, ["deduccion:aprobar"]),
+        obraAjena,
+        "DEDUCCION-DE-EMPRESA-B",
+        { aprobar: true },
       ),
     );
   });

@@ -8,6 +8,7 @@ import { obtenerObra } from "@/services/obras.service";
 import {
   compararConContractual,
   listarMetas,
+  type ComparacionMeta,
 } from "@/services/meta.service";
 import { puede } from "@/lib/rbac";
 import { hoy } from "@/utils/fechas";
@@ -17,6 +18,10 @@ import { PanelBolsa } from "@/components/meta/PanelBolsa";
 import { BolsaComprometida } from "@/components/meta/BolsaComprometida";
 import { bolsaComprometidaDeObra } from "@/services/adendas.service";
 import { TablaBolsa } from "@/components/meta/TablaBolsa";
+import {
+  PanelDeducciones,
+  type LineaPropia,
+} from "@/components/meta/PanelDeducciones";
 import { TablaMetaEditable } from "@/components/meta/TablaMetaEditable";
 import { lineasDelBorrador } from "@/services/meta-edicion.service";
 import { FormularioMeta } from "@/components/meta/FormularioMeta";
@@ -60,6 +65,28 @@ function mesesEntre(inicio: Date, fin: Date): string {
  * y solo despues el detalle linea a linea. Quien entra a mirar el numero no
  * tiene que bajar hasta la tabla.
  */
+/**
+ * Las lineas propias de la meta -sueldos, alquileres, polizas- con lo que ya
+ * se dedujo de cada una.
+ *
+ * Salen de `bolsa.porLinea` y no de una consulta propia: son las MISMAS filas
+ * que se restan en la bolsa, asi que el panel de deducciones y el detalle de
+ * abajo no pueden discrepar. `propia` es lo que las distingue: no espejan
+ * ningun codigo del contrato.
+ */
+function lineasPropias(c: ComparacionMeta): LineaPropia[] {
+  return c.bolsa.porLinea
+    .filter((l) => l.propia && l.id !== undefined)
+    .map((l) => ({
+      id: l.id!,
+      descripcion: l.descripcion,
+      presupuestado: l.metaPresupuestada,
+      deducido: l.deducido,
+      // `meta` ya es lo vigente: lo presupuestado menos lo deducido.
+      queda: l.meta,
+    }));
+}
+
 export default async function MetaPage({
   params,
   searchParams,
@@ -218,6 +245,18 @@ export default async function MetaPage({
           {comprometida && (
             <BolsaComprometida cuentas={comprometida} obraId={id} />
           )}
+          {/* Los costos propios y sus deducciones van ANTES del detalle por
+              linea: es donde se actua -pedir que se gaste menos- y el detalle
+              de abajo es donde se mira. */}
+          <PanelDeducciones
+            obraId={id}
+            lineas={lineasPropias(comparacion.comparacion)}
+            filas={comparacion.comparacion.deducciones.filas}
+            resumen={comparacion.comparacion.deducciones.resumen}
+            metaAprobada={comparacion.comparacion.meta.aprobada}
+            puedeSolicitar={puede(sesion, "deduccion:solicitar")}
+            puedeAprobar={puede(sesion, "deduccion:aprobar")}
+          />
           <TablaBolsa lineas={comparacion.comparacion.bolsa.porLinea} />
         </>
       ) : (

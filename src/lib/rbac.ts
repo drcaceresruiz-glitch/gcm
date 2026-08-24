@@ -83,6 +83,26 @@ export const PERMISOS = [
   "meta:leer",
   "meta:crear",
   "meta:aprobar",
+  /**
+   * Pedir que se baje un costo propio de la meta congelada.
+   *
+   * Es de OBRA: quien sabe que el andamio se devuelve dos meses antes es
+   * quien esta alli. Va aparte de `meta:crear` porque no es armar la meta
+   * sino pedir un ajuste sobre una que ya esta congelada, y quien puede lo
+   * segundo no tiene por que poder lo primero -el administrador de obra ve
+   * la meta y no la construye-.
+   */
+  "deduccion:solicitar",
+  /**
+   * La segunda firma. Mismo reparto que `adenda:aprobar` y por el mismo
+   * motivo: el que pide no puede ser el que aprueba, porque lo que se aprueba
+   * es dinero que vuelve a la bolsa de la obra.
+   *
+   * Tampoco esta en `INNEGOCIABLES`, igual que aquella: quien firma esto
+   * cambia de una constructora a otra, y dejarlo negociable permite asignarlo
+   * desde Empresa > Permisos sin tocar codigo.
+   */
+  "deduccion:aprobar",
 
   "movimiento:leer",
   "movimiento:crear",
@@ -339,6 +359,10 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// que puede mover la aguja trabajando a ciegas sobre ella.
     "meta:leer",
     "meta:crear",
+    /// PIDE deducir un costo propio, y no lo aprueba. Es quien sabe en obra
+    /// que el andamio se devuelve antes o que la cuadrilla de apoyo se
+    /// desmonta; la firma que devuelve ese dinero a la bolsa es de gerencia.
+    "deduccion:solicitar",
     "movimiento:crear",
     /// Ve a quien se le compra y cuanto se ha comprometido contra SU
     /// presupuesto, pero no pide ni aprueba: eso es administracion.
@@ -401,6 +425,10 @@ const MATRIZ: Record<Role, readonly Permiso[]> = {
     /// residente. Si una empresa lo organiza al reves, `meta:crear` se concede
     /// desde la matriz de permisos sin tocar codigo.
     "meta:leer",
+    /// Tambien pide deducciones: el usuario lo pidio para los dos -«el
+    /// residente y/o el administrador de la obra»-, y muchas se ven antes
+    /// desde el lado administrativo que desde el campo.
+    "deduccion:solicitar",
     /// Reparte la obra entre proveedores: crea encargos, les asigna el frente
     /// y su monto, y tambien valoriza. Es el trabajo economico-administrativo
     /// previo a emitir las ordenes.

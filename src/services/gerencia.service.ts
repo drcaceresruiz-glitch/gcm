@@ -118,13 +118,47 @@ export interface AdendaPorFirmar {
 
 export interface BandejaDeFirma {
   adendas: AdendaPorFirmar[];
-  /// Cuantas hay en total, aunque la lista venga recortada.
+  /**
+   * Las deducciones de costos propios que esperan firma.
+   *
+   * Van en la MISMA bandeja que las adendas y no en un panel aparte: para
+   * quien firma son la misma tarea -algo que alguien pidio y espera-, y
+   * repartirlas en dos cajas obliga a mirar en dos sitios para saber si queda
+   * algo pendiente. Se listan aparte DENTRO de la bandeja porque tiran del
+   * dinero en direcciones opuestas: una adenda se lo lleva y una deduccion lo
+   * devuelve, asi que sumarlas en un solo importe daria una cifra que no
+   * significa nada.
+   */
+  deducciones: DeduccionPorFirmar[];
+  /// Cuantas ADENDAS hay en total, aunque la lista venga recortada.
   cuantas: number;
-  /// Lo que sumarian a los contratos si se firmaran todas, con signo.
+  /// Cuantas DEDUCCIONES hay en total.
+  cuantasDeducciones: number;
+  /// Lo que sumarian a los contratos si se firmaran todas las adendas, con
+  /// signo.
   importe: string;
-  /// Dias que lleva esperando la mas antigua. 0 si no hay ninguna.
+  /// Lo que volveria a las bolsas si se firmaran todas las deducciones.
+  importeDeducciones: string;
+  /// Dias que lleva esperando la mas antigua de TODAS. 0 si no hay ninguna.
   diasDeLaMasVieja: number;
   tope: number;
+}
+
+export interface DeduccionPorFirmar {
+  id: string;
+  obraId: string;
+  obraNombre: string;
+  /// Correlativo dentro de la obra.
+  numero: number;
+  /// La linea de la meta de la que se quiere dejar de gastar.
+  linea: string;
+  /// Que no se va a gastar, y por que se puede. Es lo que hay que leer para
+  /// decidir: sin eso, aprobar seria firmar una cifra a ciegas.
+  motivo: string;
+  /// Siempre positivo: cuanto volveria a la bolsa.
+  importe: string;
+  solicitadaPor: string;
+  diasEsperando: number;
 }
 
 /**
@@ -148,48 +182,82 @@ export interface BandejaDeFirma {
  * dinero hay pedido- y aqui se mira una cola de trabajo. Lo que primero se
  * pudre es lo que lleva mas tiempo esperando, no lo que mas vale.
  *
- * UNA consulta, con el nombre de la obra y del proveedor dentro.
+ * DOS COSAS ESPERAN FIRMA, y las dos van aqui: las adendas del contratista y
+ * las deducciones de costos propios. Para quien firma son la misma tarea, y
+ * repartirlas en dos paneles obligaria a mirar en dos sitios para saber si
+ * queda algo pendiente. Se listan por separado dentro de la bandeja porque
+ * tiran del dinero en direcciones opuestas -la adenda se lo lleva, la
+ * deduccion lo devuelve- y sumarlas en un solo importe daria una cifra que no
+ * significa nada.
+ *
+ * QUIEN FIRMA CADA UNA ES UN PERMISO DISTINTO, y por eso cada lista se pide
+ * por separado: en una empresa puede firmar adendas el jefe de proyectos y
+ * deducciones solo el gerente. A quien no puede firmar ninguna de las dos no
+ * se le enseña la bandeja.
+ *
+ * DOS consultas, con el nombre de la obra dentro.
  */
 export async function adendasPorFirmar(
   sesion: SesionActiva,
 ): Promise<BandejaDeFirma | null> {
-  // Solo a quien puede firmarlas: una bandeja de firma para quien no firma es
-  // una lista de cosas que no puede hacer.
-  if (!puede(sesion, "adenda:aprobar")) return null;
+  const firmaAdendas = puede(sesion, "adenda:aprobar");
+  const firmaDeducciones = puede(sesion, "deduccion:aprobar");
 
-  const filas = await prisma.adendaEncargo.findMany({
-    where: {
-      estado: "PENDIENTE",
-      // La empresa sale de la SESION y se aplica DONDE se lee.
-      project: { companyId: sesion.companyId, ...filtroDeObras(sesion) },
-    },
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      numero: true,
-      fecha: true,
-      importe: true,
-      concepto: true,
-      registradaPor: true,
-      createdAt: true,
-      encargoId: true,
-      projectId: true,
-      project: { select: { nombreObra: true } },
-      encargo: { select: { proveedor: { select: { razonSocial: true } } } },
-    },
-  });
+  // Una bandeja de firma para quien no firma nada es una lista de cosas que no
+  // puede hacer.
+  if (!firmaAdendas && !firmaDeducciones) return null;
 
-  if (filas.length === 0) {
-    return {
-      adendas: [],
-      cuantas: 0,
-      importe: "0.00",
-      diasDeLaMasVieja: 0,
-      tope: MAX_ADENDAS_EN_BANDEJA,
-    };
-  }
+  // El alcance de obras se resuelve una vez: es el mismo para las dos.
+  const deLaEmpresa = {
+    companyId: sesion.companyId,
+    ...filtroDeObras(sesion),
+  };
+
+  const [filas, pedidas] = await Promise.all([
+    firmaAdendas
+      ? prisma.adendaEncargo.findMany({
+          where: {
+            estado: "PENDIENTE",
+            // La empresa sale de la SESION y se aplica DONDE se lee.
+            project: deLaEmpresa,
+          },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            numero: true,
+            fecha: true,
+            importe: true,
+            concepto: true,
+            registradaPor: true,
+            createdAt: true,
+            encargoId: true,
+            projectId: true,
+            project: { select: { nombreObra: true } },
+            encargo: { select: { proveedor: { select: { razonSocial: true } } } },
+          },
+        })
+      : [],
+    firmaDeducciones
+      ? prisma.deduccionCostoPropio.findMany({
+          where: { estado: "PENDIENTE", project: deLaEmpresa },
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            numero: true,
+            importe: true,
+            motivo: true,
+            solicitadaPor: true,
+            createdAt: true,
+            projectId: true,
+            project: { select: { nombreObra: true } },
+            item: { select: { descripcion: true } },
+          },
+        })
+      : [],
+  ]);
 
   const dia = hoy();
+
   const adendas = filas.slice(0, MAX_ADENDAS_EN_BANDEJA).map((a) => ({
     id: a.id,
     obraId: a.projectId,
@@ -205,14 +273,35 @@ export async function adendasPorFirmar(
     diasEsperando: diasEntre(a.createdAt, dia),
   }));
 
+  const deducciones = pedidas.slice(0, MAX_ADENDAS_EN_BANDEJA).map((d) => ({
+    id: d.id,
+    obraId: d.projectId,
+    obraNombre: d.project.nombreObra,
+    numero: d.numero,
+    linea: d.item.descripcion,
+    motivo: d.motivo,
+    importe: d.importe.toString(),
+    solicitadaPor: d.solicitadaPor,
+    diasEsperando: diasEntre(d.createdAt, dia),
+  }));
+
+  // La mas antigua DE LAS DOS listas: la cifra del titular dice cuanto lleva
+  // esperando lo que mas lleva, no lo que mas lleva de un tipo.
+  const esperas = [
+    ...filas.map((a) => a.createdAt),
+    ...pedidas.map((d) => d.createdAt),
+  ].map((f) => diasEntre(f, dia));
+
   return {
     adendas,
+    deducciones,
     cuantas: filas.length,
-    // El importe es el de TODAS, no solo las listadas: si se recorta la lista,
-    // la cifra del titular no puede recortarse con ella.
+    cuantasDeducciones: pedidas.length,
+    // Los importes son los de TODAS, no solo las listadas: si se recorta la
+    // lista, la cifra del titular no puede recortarse con ella.
     importe: sumar(filas.map((a) => a.importe.toString())),
-    // `filas` viene ordenada de mas antigua a mas nueva.
-    diasDeLaMasVieja: diasEntre(filas[0]!.createdAt, dia),
+    importeDeducciones: sumar(pedidas.map((d) => d.importe.toString())),
+    diasDeLaMasVieja: esperas.length === 0 ? 0 : Math.max(...esperas),
     tope: MAX_ADENDAS_EN_BANDEJA,
   };
 }

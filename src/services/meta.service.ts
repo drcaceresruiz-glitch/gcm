@@ -18,6 +18,10 @@ import {
   SinLineaBaseError,
 } from "@/services/movimientos.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
+import {
+  deduccionesDeMeta,
+  type DeduccionesDeLaMeta,
+} from "@/services/deducciones.service";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -117,6 +121,14 @@ export interface ComparacionMeta {
   bolsa: Bolsa;
   /// Cuanto exagera la bolsa por movimientos aprobados despues de fijarla.
   desfase: Desfase;
+  /**
+   * Las deducciones de costos propios de esta meta, con su estado.
+   *
+   * Viajan CON la comparacion y no en una consulta aparte de la pantalla: la
+   * bolsa ya las descuenta, y pedirlas dos veces abriria la puerta a que la
+   * lista que se enseña y la que se resto no sean la misma.
+   */
+  deducciones: DeduccionesDeLaMeta;
 }
 
 /**
@@ -325,10 +337,22 @@ export async function comparacionDeObra(
     vigente.partidas.map((p) => [p.wbsItemId, p.vigente]),
   );
 
+  /*
+   * Las deducciones de costos propios que gerencia YA FIRMO.
+   *
+   * No se restan del item -la meta esta congelada y tiene que seguir
+   * estandolo-: viajan aparte y `calcularBolsa` las descuenta al calcular lo
+   * vigente, dejando lo presupuestado visible al lado. Si se restaran aqui, la
+   * bolsa subiria sin que nadie pudiera ver por que. Ver `lib/deducciones.ts`.
+   */
+  const deducciones = await deduccionesDeMeta(companyId, meta.id);
+
   const lineasMeta: LineaMeta[] = items.map((i) => ({
+    id: i.id,
     codigoRef: i.codigoRef,
     descripcion: i.descripcion,
     importe: i.parcial?.toString() ?? "0.00",
+    deducido: deducciones.porItem.get(i.id),
     reparto: i.reparto.map((r) => ({
       parcial: vigentePorId.get(r.wbsItemId) ?? "0.00",
       fraccion: r.fraccion.toString(),
@@ -383,6 +407,7 @@ export async function comparacionDeObra(
       desfase: desfaseDeMeta(
         posteriores.map((m) => ({ importeNeto: m.importeNeto.toString() })),
       ),
+      deducciones,
     },
   };
 }

@@ -50,11 +50,27 @@ export interface LineaContractual {
 
 /** Una linea del lado META. */
 export interface LineaMeta {
+  /// El id del item, cuando quien construye la linea lo tiene. Lo necesita la
+  /// pantalla para poder pedir una deduccion sobre esta linea concreta.
+  id?: string;
   /// Codigo contractual que espeja. null = linea propia de la meta.
   codigoRef: string | null;
   descripcion: string;
-  /// Lo que la meta presupuesta para esta linea.
+  /// Lo que la meta presupuesta para esta linea. NO se toca nunca: la meta
+  /// esta congelada, y es esa congelacion la que permite ver la desviacion.
   importe: string;
+  /**
+   * Lo que se decidio DEJAR DE GASTAR de esta linea, ya firmado por gerencia.
+   *
+   * Solo en las lineas propias -sueldos, alquileres-: son las que la empresa
+   * decide y puede decidir gastar menos. Ver `lib/deducciones.ts`.
+   *
+   * Va aparte de `importe` y no restado dentro a proposito. Restarlo en el
+   * origen dejaria la meta reescrita y sin rastro: la pantalla tiene que poder
+   * enseñar «presupuestaste 40.000, dedujiste 8.000, quedan 32.000», que es lo
+   * que hace auditable la decision.
+   */
+  deducido?: string;
   /// Solo en modo FRENTE: que partidas cubre y en que fraccion.
   reparto?: readonly PartidaDeFrente[];
 }
@@ -62,12 +78,21 @@ export interface LineaMeta {
 export type SenalBolsa = "favorable" | "ajustada" | "excedida" | "sin_meta";
 
 export interface LineaBolsa {
+  /// El id del item de la meta, cuando viene. Es lo que permite pedir una
+  /// deduccion sobre esta linea desde la tabla.
+  id?: string;
   /// null en las lineas propias de la meta y en los frentes, que no espejan
   /// un codigo del contrato.
   codigo: string | null;
   descripcion: string;
   contractual: string;
+  /// Lo que esta linea cuesta HOY: lo presupuestado menos lo deducido.
   meta: string;
+  /// Lo presupuestado, sin descontar. Solo difiere de `meta` cuando hay
+  /// deducciones firmadas, y entonces la pantalla enseña las dos.
+  metaPresupuestada: string;
+  /// Lo deducido y aprobado. "0.00" cuando no hay ninguna.
+  deducido: string;
   /// contractual - meta. Positivo = sobra; negativo = te has pasado.
   bolsa: string;
   senal: SenalBolsa;
@@ -75,6 +100,19 @@ export interface LineaBolsa {
   /// (andamio alquilado, cuadrilla de apoyo). Consume bolsa por definicion,
   /// porque el contrato no lo paga aparte.
   propia: boolean;
+}
+
+/**
+ * Lo que una linea de la meta cuesta HOY.
+ *
+ * Lo presupuestado menos lo deducido y firmado. Vive aqui, en una funcion, y
+ * no repetido en las dos uniones: son dos caminos distintos -por codigo y por
+ * frente- y en cuanto uno de los dos se olvidara de restar, la bolsa de ese
+ * modo diria otra cosa que la del otro con los mismos datos.
+ */
+function metaVigenteDe(m: LineaMeta): string {
+  if (!m.deducido) return m.importe;
+  return restar(m.importe, m.deducido) ?? m.importe;
 }
 
 /** Positivo sobra, negativo te has pasado, cero justo. */
@@ -110,13 +148,17 @@ function unirPorCodigo(
     if (c) cubiertos.add(c.codigo);
 
     const contra = c?.importe ?? "0.00";
-    const bolsa = restar(contra, m.importe) ?? "0.00";
+    const vigente = metaVigenteDe(m);
+    const bolsa = restar(contra, vigente) ?? "0.00";
 
     filas.push({
+      id: m.id,
       codigo: m.codigoRef,
       descripcion: m.descripcion,
       contractual: contra,
-      meta: m.importe,
+      meta: vigente,
+      metaPresupuestada: m.importe,
+      deducido: m.deducido ?? "0.00",
       bolsa,
       senal: senalDe(bolsa),
       propia: c === undefined,
@@ -134,6 +176,8 @@ function unirPorCodigo(
       // es la senal, que la pantalla pinta como aviso y no como ahorro.
       contractual: c.importe,
       meta: "0.00",
+      metaPresupuestada: "0.00",
+      deducido: "0.00",
       bolsa: c.importe,
       senal: "sin_meta",
       propia: false,
@@ -165,13 +209,17 @@ function unirPorFrente(
   const filas: LineaBolsa[] = meta.map((m) => {
     const reparto = m.reparto ?? [];
     const contra = reparto.length === 0 ? "0.00" : importeDeFrente(reparto);
-    const bolsa = restar(contra, m.importe) ?? "0.00";
+    const vigente = metaVigenteDe(m);
+    const bolsa = restar(contra, vigente) ?? "0.00";
 
     return {
+      id: m.id,
       codigo: null,
       descripcion: m.descripcion,
       contractual: contra,
-      meta: m.importe,
+      meta: vigente,
+      metaPresupuestada: m.importe,
+      deducido: m.deducido ?? "0.00",
       bolsa,
       senal: senalDe(bolsa),
       propia: reparto.length === 0,
@@ -193,6 +241,8 @@ function unirPorFrente(
         : "Partidas sin frente asignado",
       contractual: sinMeta,
       meta: "0.00",
+      metaPresupuestada: "0.00",
+      deducido: "0.00",
       bolsa: sinMeta,
       senal: "sin_meta",
       propia: false,
@@ -234,13 +284,26 @@ export interface Bolsa {
    */
   bolsaTotal: string;
 
-  /// Las lineas de la meta SIN codigo: personal indirecto, alquileres,
-  /// polizas, fianzas. Todo lo que la obra cuesta sin ser una partida.
-  ///
-  /// NO se recibe de fuera: se deriva de la misma lista que el costo directo.
-  /// Hasta el 23 de agosto de 2026 llegaba como parametro desde una tabla
-  /// aparte, y llegaba en cero sin que nada avisara.
+  /**
+   * Las lineas de la meta SIN codigo: personal indirecto, alquileres, polizas,
+   * fianzas. Todo lo que la obra cuesta sin ser una partida.
+   *
+   * VIGENTE: ya descontadas las deducciones que gerencia firmo. La meta sigue
+   * congelada -lo presupuestado esta abajo, en `costoPropioPresupuestado`-.
+   *
+   * NO se recibe de fuera: se deriva de la misma lista que el costo directo.
+   * Hasta el 23 de agosto de 2026 llegaba como parametro desde una tabla
+   * aparte, y llegaba en cero sin que nada avisara.
+   */
   costoPropioMeta: string;
+
+  /// Lo que la meta presupuesto para esos mismos costos, sin descontar nada.
+  /// Igual que `costoPropioMeta` mientras no haya ninguna deduccion firmada.
+  costoPropioPresupuestado: string;
+  /// Cuanto se ha decidido dejar de gastar, ya firmado. Es lo que explica la
+  /// diferencia entre las dos cifras de arriba, y lo que hace que la bolsa
+  /// haya subido sin que la meta se haya tocado.
+  deducidoDeCostosPropios: string;
 
   /// Aparte y etiquetada. No es bolsa: es el margen ofertado.
   utilidadContractual: string;
@@ -279,11 +342,28 @@ export function calcularBolsa(datos: DatosBolsa): Bolsa {
   // que no la tiene se descuenta despues. Antes el segundo sumando llegaba de
   // una tabla aparte y podia venir en cero sin que nada chirriara.
   const costoDirectoMeta = sumar(
-    datos.meta.filter((m) => m.codigoRef !== null).map((m) => m.importe),
+    datos.meta.filter((m) => m.codigoRef !== null).map(metaVigenteDe),
   );
+  /*
+   * Lo VIGENTE, o sea descontando lo que gerencia ya firmo que no se gastara.
+   *
+   * La meta sigue congelada -`importe` no se toca nunca- y la deduccion vive
+   * aparte, con su firma y su motivo. Aqui se restan porque la bolsa mide lo
+   * que la obra puede gestionar HOY, y un alquiler que ya se decidio devolver
+   * dos meses antes no lo consume. Ver `lib/deducciones.ts`.
+   *
+   * Lo presupuestado se sigue viendo linea a linea (`metaPresupuestada`), asi
+   * que la decision queda auditable en vez de desaparecer dentro del total.
+   */
   const costoPropioMeta = sumar(
+    datos.meta.filter((m) => m.codigoRef === null).map(metaVigenteDe),
+  );
+  /// Lo que la meta presupuesto para los costos propios, sin descontar nada.
+  const costoPropioPresupuestado = sumar(
     datos.meta.filter((m) => m.codigoRef === null).map((m) => m.importe),
   );
+  const deducidoDeCostosPropios =
+    restar(costoPropioPresupuestado, costoPropioMeta) ?? "0.00";
 
   // Produccion mide SOLO el margen de las partidas. Lo que se paga sin ser
   // partida -residente, maestro, alquileres, polizas- se descuenta despues:
@@ -297,6 +377,8 @@ export function calcularBolsa(datos: DatosBolsa): Bolsa {
     costoDirectoContractual,
     costoDirectoMeta,
     costoPropioMeta,
+    costoPropioPresupuestado,
+    deducidoDeCostosPropios,
     bolsaProduccion,
     bolsaTotal,
     utilidadContractual: datos.utilidadContractual,
