@@ -91,3 +91,11 @@ codigo dice que deberia funcionar.
 - El detalle completo de la primera pasada (permisos por rol via HTTP) y
   el hallazgo de ALMACENERO minimo-deliberado esta en `PENDIENTES.md`,
   punto 13.
+
+**El sintoma exacto de no reiniciar el servidor tras `prisma generate`:** la
+pantalla revienta con `Cannot read properties of undefined (reading 'count')`
+—o cualquier metodo sobre un modelo nuevo—, porque el proceso lleva en memoria
+un cliente de Prisma que no conoce ese modelo. Parece un fallo de codigo y no
+lo es. Comprobarlo comparando la fecha del proceso (`Get-CimInstance
+Win32_Process`) con la de `src/generated/prisma/`. Paso el 24 de agosto de
+2026 y me llevo un rato de susto antes de mirar las dos fechas.
