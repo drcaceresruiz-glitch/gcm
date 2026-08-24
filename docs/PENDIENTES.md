@@ -355,10 +355,9 @@ en el menu de Proveedores para todos.
 
 ---
 
-## Lo que el usuario pidio (al 24 de agosto de 2026)
+## Lo que el usuario pidio (al 24 de agosto de 2026) — LOS TRES HECHOS
 
-En orden de lo que duele antes. Los dos primeros estan hechos; del tercero hay
-que hablar antes de tocar nada.
+En orden de lo que duele antes. Los tres se cerraron el 24 de agosto.
 
 ### 1. Avisos configurables de la bolsa — HECHO el 24 de agosto de 2026
 
@@ -397,14 +396,27 @@ Segundo inquilino de la bandeja «Esperando tu firma» de Gerencia, en su propia
 lista: la adenda se lleva dinero y la deduccion lo devuelve, asi que sumarlas
 en un solo importe no significaria nada.
 
-### 3. La pantalla del gerente general
+### 3. La pantalla del gerente general — HECHO el 24 de agosto de 2026
 
-«Creo que ya es hora que el gerente general tenga su propia pantalla.»
+«Creo que ya es hora que el gerente general tenga su propia pantalla.» Ya
+existia -`/gerencia`- asi que la pregunta era si le faltaba algo o si el
+problema era que nadie sabia que estaba ahi. **Las dos cosas**, y las dos se
+podian comprobar leyendo el codigo sin preguntar nada:
 
-**Ya existe**: `/gerencia`, con nueve paneles contando el de firmas de hoy. Lo
-que queda por decidir con el usuario es si le falta algo concreto o si el
-problema es que no sabia que estaba ahi -en cuyo caso lo que falta no es una
-pantalla sino que se llegue a ella-.
+- **No se encontraba.** La entrada vivia dentro de «Mi constructora», un grupo
+  que su propio comentario describe como «consulta ocasional» y que nace
+  plegado. Ahora va arriba, junto a Obras.
+- **No avisaba.** Sin insignia, con adendas y deducciones esperando su firma el
+  panel no decia nada. Ahora la lleva, contando solo lo que esa persona puede
+  firmar.
+- **Le faltaba la bolsa.** Nueve paneles y ninguno hablaba de la cifra que dice
+  si una obra va a dejar dinero.
+
+**El patron que deja, y que conviene reusar**: el panel de bolsas NO calcula
+nada, lee lo que el reloj de avisos ya midio en `EstadoBolsaObra`. Cuando haga
+falta otra cifra cara en una pantalla de cartera, ese es el camino -el reloj la
+calcula una vez cada seis horas, la pantalla la lee por indice, y la fila dice
+CUANDO se midio-.
 
 ---
 
