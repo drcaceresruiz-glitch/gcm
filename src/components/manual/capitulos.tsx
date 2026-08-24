@@ -1610,13 +1610,15 @@ const AVISOS = (
         enciende en su suscripción.
       </p>
       <p>
-        El reloj avisa de tres cosas: las <strong>restricciones</strong> que
+        El reloj avisa de cinco cosas: las <strong>restricciones</strong> que
         llevan días abiertas o cuya fecha comprometida ya pasó (un
         recordatorio, y un resumen del día a partir de la hora que diga la
         obra); los <strong>hitos</strong> que se acercan o se pasan, con la
-        fecha del cronograma vigente; y las{" "}
-        <strong>valorizaciones</strong> que tocaban y no constan, que van
-        solo a la campanita de los residentes de esa obra.
+        fecha del cronograma vigente; las{" "}
+        <strong>valorizaciones</strong> que tocaban y no constan; las{" "}
+        <strong>notas</strong> con recordatorio vencido; y la{" "}
+        <strong>bolsa</strong> de la obra cuando queda poca o se acaba. Las
+        tres últimas van solo a la campanita.
       </p>
       <p>
         Cuando una restricción tiene <strong>responsable</strong>, esa
@@ -1641,6 +1643,43 @@ const AVISOS = (
         hasta que alguien los enciende por obra, y siguen sonando aunque no
         hayas abierto GCM en toda la semana. Uno te orienta cuando entras; el
         otro te avisa cuando no estás.
+      </p>
+    </S>
+
+    <S titulo="La bolsa es la única excepción: avisa sin que la enciendas">
+      <p>
+        Todo lo demás de este capítulo está apagado hasta que alguien lo
+        configura. El aviso de la <strong>bolsa</strong> no: viene encendido
+        de fábrica en todas las obras. La razón es lo que dice — que a la
+        obra se le está acabando el dinero — y callarlo hasta que alguien
+        entre a una pantalla que no sabe que existe sería justo{" "}
+        <strong>asumirlo a sabiendas</strong>.
+      </p>
+      <p>
+        <strong>Suena dos veces como mucho</strong>, no todos los días:
+        una al bajar del porcentaje que hayas puesto (por defecto, cuando
+        queda menos de una cuarta parte de la bolsa prevista) y otra al
+        llegar a cero o pasarte. Si la bolsa se recupera —un deductivo, un
+        frente que se cierra por debajo— <strong>se rearma</strong> y puede
+        volver a sonar si se estropea otra vez. Un aviso que se repitiera
+        cada día porque la obra lleva un mes justa se ignoraría a la semana,
+        y entonces tampoco se leería el día que pasa algo nuevo.
+      </p>
+      <p>
+        Mira la <strong>bolsa comprometida</strong>, no la prevista: la
+        prevista es el margen que planificaste y no se mueve nunca; la
+        comprometida le resta las desviaciones de los contratos ya firmados,
+        y es la que baja con cada adenda que gerencia aprueba. Llega a los
+        residentes y administradores de la obra <strong>y también</strong> a
+        la gerencia, porque las dos salidas —renegociar con el contratista o
+        deducir de los costos propios— necesitan a los dos enterados.
+      </p>
+      <p>
+        Se configura en <strong>Personal</strong>, junto al resto de los
+        avisos: se puede apagar solo él, y se elige a partir de qué
+        porcentaje avisa. Con <strong>0</strong> deja de avisar de «queda
+        poca» pero sigue avisando cuando la bolsa llega a cero. Y el
+        interruptor general de la obra lo apaga como a todo lo demás.
       </p>
     </S>
 

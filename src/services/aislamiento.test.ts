@@ -715,8 +715,15 @@ describe("presupuesto meta", () => {
   });
 
   it("comparar contra el contractual en una obra ajena va acotado", async () => {
+    // Con los DOS permisos: la bolsa es la diferencia entre la meta y el
+    // contractual, asi que sin `movimiento:leer` la funcion se niega antes de
+    // consultar nada y esta prueba no demostraria nada -que es justo el falso
+    // verde contra el que avisa `exigeFiltroDeEmpresa`-.
     await exigeFiltroDeEmpresa(() =>
-      meta.compararConContractual(sesion(MIA, leer), obraAjena),
+      meta.compararConContractual(
+        sesion(MIA, ["meta:leer", "movimiento:leer"]),
+        obraAjena,
+      ),
     );
   });
 

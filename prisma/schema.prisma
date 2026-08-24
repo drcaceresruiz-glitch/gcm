@@ -1015,6 +1015,7 @@ model Project {
   suscripcionesAviso   SuscripcionAviso[]
   avisos               Aviso[]
   ajustesAvisos        AjustesAvisosObra?
+  estadoBolsa          EstadoBolsaObra?
   presupuestosMeta     PresupuestoMeta[]
   valorizaciones       ValorizacionEncargo[]
   adendasEncargo       AdendaEncargo[]
@@ -3732,6 +3733,21 @@ enum EventoAviso {
   /// vivia solo en el widget del tablero: si nadie abria el panel ese dia,
   /// era como si no existiera.
   NOTA_VENCIDA
+
+  /// A la bolsa comprometida de la obra le queda menos del umbral configurado.
+  ///
+  /// SUENA EN EL CRUCE, una sola vez al entrar en ese escalon, y se rearma si
+  /// la bolsa se recupera. Ver `lib/aviso-bolsa.ts`: un aviso que se repite
+  /// cada dia porque la obra lleva un mes justa se ignora a la semana.
+  BOLSA_EN_RIESGO
+
+  /// La bolsa comprometida llego a cero o se paso.
+  ///
+  /// El escalon de arriba: si la obra pasa de holgada a roja de golpe -una
+  /// adenda grande- suena este y no el otro. Si ya habia sonado el de riesgo,
+  /// este suena igual, porque quedarse sin bolsa no es lo mismo que tener
+  /// poca.
+  BOLSA_EN_ROJO
 }
 
 /// El aviso dentro de GCM.
@@ -3836,12 +3852,65 @@ model AjustesAvisosObra {
   /// Tope de SMS al dia PARA ESTA OBRA.
   maxSmsDia Int @default(20)
 
+  /// Avisar cuando la bolsa comprometida se acerque al limite o se ponga en
+  /// rojo. Va aparte del `activo` de arriba porque son dos cosas distintas:
+  /// aquel apaga los avisos de restricciones -los que insisten- y este apaga
+  /// uno que suena como mucho dos veces por obra.
+  avisoBolsa Boolean @default(true)
+
+  /// Que porcentaje de la bolsa PREVISTA tiene que quedar para que todavia no
+  /// avise. 0 apaga el escalon de «queda poca» sin apagar el de «no queda».
+  /// Ver `UMBRAL_BOLSA_POR_DEFECTO` en `lib/aviso-bolsa.ts`.
+  umbralBolsaPorcentaje Int @default(25)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("ajustes_avisos_obra")
+}
+
+/// Lo que el reloj RECUERDA de la bolsa de cada obra. No es configuracion.
+///
+/// Va en su propia tabla y no como dos columnas mas de `AjustesAvisosObra`, y
+/// la razon no es de estilo: la existencia de aquella fila SIGNIFICA algo -si
+/// no hay fila, la obra nunca configuro los avisos y el reloj no le manda
+/// recordatorios ni resumenes-. Si el reloj la creara para poder apuntar el
+/// estado de la bolsa, encenderia de rebote los avisos de restricciones de una
+/// obra que nunca los pidio. Aqui puede escribir sin encender nada.
+///
+/// Sirve para dos cosas:
+///
+///   1. Avisar solo en el CRUCE. Sin memoria, o se avisa cada pasada -y se
+///      ignora a la semana- o se avisa una sola vez para siempre -y una obra
+///      que se arregla y se vuelve a romper solo avisa de la primera vez-.
+///   2. No recalcular la bolsa en cada pasada. Es la cuenta mas cara del
+///      reloj: cruza el presupuesto vigente entero con la meta entera. La
+///      bolsa no se mueve por minutos, se mueve cuando alguien firma algo.
+model EstadoBolsaObra {
+  projectId String @id
+
+  /// "holgada" | "cerca" | "roja". Texto y no un enum: es estado interno del
+  /// reloj, no un dato del dominio que nadie mas lee ni filtra.
+  estado String @db.VarChar(12)
+
+  /// Lo que quedaba la ultima vez que se miro. Solo para poder explicar en la
+  /// pantalla de avisos por que sono lo que sono.
+  comprometida Decimal @db.Decimal(14, 2)
+  prevista     Decimal @db.Decimal(14, 2)
+
+  /// Cuando se miro por ultima vez. Es lo que evita rehacer la cuenta cara en
+  /// cada pasada del reloj.
+  revisadaAt DateTime
+
+  /// Cuando sono por ultima vez, y con que estado. Null = nunca sono.
+  avisadoAt     DateTime?
+  estadoAvisado String?   @db.VarChar(12)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("estado_bolsa_obra")
 }
 
 /// Cuando corrio por ultima vez cada tarea programada.

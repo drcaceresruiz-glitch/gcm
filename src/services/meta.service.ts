@@ -14,7 +14,7 @@ import {
   type ModoMeta,
 } from "@/lib/bolsa";
 import {
-  obtenerPresupuestoVigente,
+  presupuestoVigenteDeObra,
   SinLineaBaseError,
 } from "@/services/movimientos.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
@@ -231,28 +231,6 @@ export async function compararConContractual(
     };
   }
 
-  const obra = await prisma.project.findFirst({
-    where: { id: obraId, companyId: sesion.companyId },
-    select: {
-        id: true,
-        fechaInicio: true,
-        fechaFinProgramada: true,
-        metaIncluyeGastosGenerales: true,
-      },
-  });
-  if (!obra) {
-    return { ok: false, motivo: "sin-obra", error: "Obra no encontrada." };
-  }
-
-  const meta = await metaQueManda(sesion.companyId, obraId);
-  if (!meta) {
-    return {
-      ok: false,
-      motivo: "sin-meta",
-      error: "Esta obra todavia no tiene presupuesto meta.",
-    };
-  }
-
   // Se comprueba ANTES de llamar, y no cazando la excepcion: el permiso que
   // falta es un dato conocido, no un accidente que haya que interceptar por
   // el texto de su mensaje.
@@ -267,9 +245,51 @@ export async function compararConContractual(
     };
   }
 
+  return comparacionDeObra(sesion.companyId, obraId);
+}
+
+/**
+ * La misma comparacion, SIN SESION.
+ *
+ * Existe para el reloj de avisos, que corre sin nadie detras y necesita saber
+ * si la bolsa de la obra se puso en rojo. Escribir alli una segunda version de
+ * esta cuenta seria repetir el error que este proyecto acaba de pasar un dia
+ * entero deshaciendo con el comprometido: cinco lecturas del mismo numero, y
+ * la que se quedo atras enseñando dinero disponible que ya estaba gastado.
+ *
+ * NO comprueba permisos, por eso es interna. La empresa se recibe y se aplica
+ * en cada consulta -nunca sale de la peticion-, y quien la llama desde una
+ * pantalla es `compararConContractual`, que si los comprueba.
+ */
+export async function comparacionDeObra(
+  companyId: string,
+  obraId: string,
+): Promise<ResultadoComparacion> {
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId },
+    select: {
+        id: true,
+        fechaInicio: true,
+        fechaFinProgramada: true,
+        metaIncluyeGastosGenerales: true,
+      },
+  });
+  if (!obra) {
+    return { ok: false, motivo: "sin-obra", error: "Obra no encontrada." };
+  }
+
+  const meta = await metaQueManda(companyId, obraId);
+  if (!meta) {
+    return {
+      ok: false,
+      motivo: "sin-meta",
+      error: "Esta obra todavia no tiene presupuesto meta.",
+    };
+  }
+
   let vigente;
   try {
-    vigente = await obtenerPresupuestoVigente(sesion, obraId);
+    vigente = await presupuestoVigenteDeObra(companyId, obraId);
   } catch (e) {
     if (e instanceof SinLineaBaseError) {
       return {

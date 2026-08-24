@@ -118,7 +118,27 @@ export async function obtenerPresupuestoVigente(
     throw new Error("No tienes permiso para ver el presupuesto vigente.");
   }
 
-  const base = await lineaBaseAprobada(sesion.companyId, obraId);
+  return presupuestoVigenteDeObra(sesion.companyId, obraId);
+}
+
+/**
+ * Lo mismo, SIN SESION.
+ *
+ * Existe para el reloj de avisos, que corre sin nadie detras y necesita esta
+ * cifra para saber si la bolsa de una obra se puso en rojo. La alternativa
+ * era escribir alli una segunda version de la cuenta, y este proyecto acaba
+ * de pasar un dia entero quitando la quinta copia del comprometido.
+ *
+ * NO comprueba permisos, por eso es interna: la empresa se recibe y se aplica
+ * -no se lee de ningun sitio manipulable- y quien la llama desde una pantalla
+ * es `obtenerPresupuestoVigente`, que si los comprueba. No se exporta fuera
+ * de los servicios.
+ */
+export async function presupuestoVigenteDeObra(
+  companyId: string,
+  obraId: string,
+): Promise<PresupuestoVigente> {
+  const base = await lineaBaseAprobada(companyId, obraId);
   if (!base) throw new SinLineaBaseError();
 
   const [items, partidasVivas, ajustesPorPartida] = await Promise.all([

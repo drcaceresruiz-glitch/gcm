@@ -5,6 +5,7 @@ import { BellRing, Plus, Trash2, TriangleAlert, UserPlus } from "lucide-react";
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
 import { Chip } from "@/components/ui/Chip";
 import { FLUJOS_RESTRICCION } from "@/lib/lookahead";
+import { UMBRAL_BOLSA_MAX, UMBRAL_BOLSA_MIN } from "@/lib/aviso-bolsa";
 import {
   accionGuardarAjustes,
   accionGuardarSuscripcion,
@@ -244,7 +245,8 @@ function Ajustes({
         <span>
           <strong>Avisar de las restricciones de esta obra</strong>
           <span className="block text-xs opacity-70">
-            Apagado, la configuración se conserva pero no sale ningún aviso.
+            Apagado, la configuración se conserva pero no sale ningún aviso, ni
+            siquiera el de la bolsa.
           </span>
         </span>
       </label>
@@ -280,6 +282,48 @@ function Ajustes({
           disabled={!puedeConfigurar}
           onChange={(n) => setV({ ...v, maxSmsDia: n })}
         />
+      </div>
+
+      {/* LA BOLSA VA APARTE Y CON SU PROPIO INTERRUPTOR.
+          No es un aviso de restricciones: no insiste, suena como mucho dos
+          veces en toda la obra -al quedar poca y al acabarse- y habla de
+          dinero, no de flujos. Mezclarlo con los tres numeros de arriba lo
+          haria leer como un ajuste mas del mismo mecanismo. */}
+      <div
+        className="mt-3 rounded-lg border p-3"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <label className="flex items-start gap-2.5 text-sm">
+          <input
+            type="checkbox"
+            checked={v.avisoBolsa}
+            disabled={!puedeConfigurar}
+            onChange={(e) => setV({ ...v, avisoBolsa: e.target.checked })}
+            className="mt-0.5 size-4"
+            style={{ accentColor: "var(--color-marca-600)" }}
+          />
+          <span>
+            <strong>Avisar cuando se acabe la bolsa de esta obra</strong>
+            <span className="block text-xs opacity-70">
+              Suena una vez al quedar poca y otra al acabarse, no todos los
+              días. Si la bolsa se recupera y se vuelve a estropear, vuelve a
+              sonar. Solo campanita: no gasta correo ni SMS.
+            </span>
+          </span>
+        </label>
+
+        <div className="mt-3 max-w-[16rem]">
+          <Numero
+            etiqueta="Avisar cuando quede menos del"
+            sufijo="%"
+            valor={v.umbralBolsaPorcentaje}
+            min={UMBRAL_BOLSA_MIN}
+            max={UMBRAL_BOLSA_MAX}
+            nota="Porcentaje de la bolsa prevista. Con 0 solo avisa cuando la bolsa llega a cero, no antes."
+            disabled={!puedeConfigurar || !v.avisoBolsa}
+            onChange={(n) => setV({ ...v, umbralBolsaPorcentaje: n })}
+          />
+        </div>
       </div>
 
       {puedeConfigurar && (

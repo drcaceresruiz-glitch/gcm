@@ -58,7 +58,9 @@ vi.mock("@/services/movimientos.service", async () => {
     );
   return {
     ...real,
-    obtenerPresupuestoVigente: async () => {
+    // Se dobla la version SIN SESION, que es la que llama `meta.service`
+    // desde que el reloj de avisos necesita la misma cuenta sin nadie detras.
+    presupuestoVigenteDeObra: async () => {
       if (!estado.hayLineaBase) throw new real.SinLineaBaseError();
       return { lineas: [], version: 1 };
     },

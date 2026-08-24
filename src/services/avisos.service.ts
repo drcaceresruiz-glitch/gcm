@@ -5,6 +5,11 @@ import { puede } from "@/lib/rbac";
 import { ETIQUETA_ROL, ROLES } from "@/lib/rbac";
 import { FLUJOS_RESTRICCION } from "@/lib/lookahead";
 import {
+  UMBRAL_BOLSA_MAX,
+  UMBRAL_BOLSA_MIN,
+  UMBRAL_BOLSA_POR_DEFECTO,
+} from "@/lib/aviso-bolsa";
+import {
   canalesEfectivos,
   validarContacto,
   validarSuscripcion,
@@ -53,6 +58,11 @@ const AJUSTES_POR_DEFECTO = {
   diasRecordatorio: 3,
   horaResumen: 7,
   maxSmsDia: 20,
+  // Encendido por defecto, y lo mismo hace el reloj cuando no hay fila: este
+  // aviso suena como mucho dos veces por obra y lo que dice es que se esta
+  // acabando el dinero. Ver `services/avisos-bolsa.ts`.
+  avisoBolsa: true,
+  umbralBolsaPorcentaje: UMBRAL_BOLSA_POR_DEFECTO,
 };
 
 // ---------------------------------------------------------------------------
@@ -143,6 +153,8 @@ export async function obtenerImplicados(
         diasRecordatorio: true,
         horaResumen: true,
         maxSmsDia: true,
+        avisoBolsa: true,
+        umbralBolsaPorcentaje: true,
       },
     }),
     prisma.projectMembership.findMany({
@@ -333,6 +345,11 @@ export interface DatosAjustes {
   diasRecordatorio: number;
   horaResumen: number;
   maxSmsDia: number;
+  /// Avisar cuando la bolsa comprometida se acerque al limite o se acabe.
+  avisoBolsa: boolean;
+  /// Que porcentaje de la bolsa prevista tiene que quedar para que todavia no
+  /// avise. 0 apaga el escalon de «queda poca» sin apagar el de «no queda».
+  umbralBolsaPorcentaje: number;
 }
 
 /** Los ajustes de avisos de la obra. Se crean al guardarlos por primera vez. */
@@ -351,11 +368,20 @@ export async function guardarAjustes(
   const hora = Math.min(23, Math.max(0, Math.trunc(datos.horaResumen)));
   const maxSms = Math.min(100, Math.max(0, Math.trunc(datos.maxSmsDia)));
 
+  // El tope de arriba no es 100: una bolsa que avisa cuando aun queda el
+  // 95 % avisa el primer dia de la obra y no vuelve a decir nada util.
+  const umbralBolsa = Math.min(
+    UMBRAL_BOLSA_MAX,
+    Math.max(UMBRAL_BOLSA_MIN, Math.trunc(datos.umbralBolsaPorcentaje)),
+  );
+
   const valores = {
     activo: datos.activo,
     diasRecordatorio: dias,
     horaResumen: hora,
     maxSmsDia: maxSms,
+    avisoBolsa: datos.avisoBolsa,
+    umbralBolsaPorcentaje: umbralBolsa,
   };
 
   await prisma.$transaction(async (tx) => {

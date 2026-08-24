@@ -466,8 +466,25 @@ export async function bolsaComprometidaDeObra(
 ): Promise<BolsaComprometida | null> {
   if (!puede(sesion, "encargo:leer") || !puede(sesion, "meta:leer")) return null;
 
+  return bolsaComprometidaDe(sesion.companyId, obraId, prevista);
+}
+
+/**
+ * La misma bolsa comprometida, SIN SESION.
+ *
+ * Para el reloj de avisos, que corre sin nadie detras. No comprueba permisos
+ * -por eso es interna- pero si aplica la empresa en cada consulta. Ver la
+ * nota de `comparacionDeObra` en `meta.service.ts`: son la pareja, y existen
+ * para que el aviso de la bolsa lea EXACTAMENTE la misma cifra que la
+ * pantalla, no una parecida calculada aparte.
+ */
+export async function bolsaComprometidaDe(
+  companyId: string,
+  obraId: string,
+  prevista: string,
+): Promise<BolsaComprometida | null> {
   const meta = await prisma.presupuestoMeta.findFirst({
-    where: { projectId: obraId, project: { companyId: sesion.companyId } },
+    where: { projectId: obraId, project: { companyId } },
     orderBy: { version: "desc" },
     select: { id: true },
   });
@@ -481,7 +498,15 @@ export async function bolsaComprometidaDeObra(
     prisma.encargoProveedor.findMany({
       // Los ANULADOS no cuentan: no hay contrato. Los CERRADOS si, porque su
       // dinero se gasto igual.
-      where: { projectId: obraId, estado: { not: "ANULADO" } },
+      //
+      // La empresa se repite aqui aunque la meta de arriba ya la comprobo: el
+      // filtro va donde SE LEE, no donde se leyo antes. Es la misma regla que
+      // se salto `sobregiroProyectadoDeCartera` hasta ayer.
+      where: {
+        projectId: obraId,
+        estado: { not: "ANULADO" },
+        project: { companyId },
+      },
       orderBy: { numero: "asc" },
       select: {
         id: true,
@@ -498,7 +523,7 @@ export async function bolsaComprometidaDeObra(
       },
     }),
     prisma.adendaEncargo.findMany({
-      where: { projectId: obraId, project: { companyId: sesion.companyId } },
+      where: { projectId: obraId, project: { companyId } },
       select: { encargoId: true, importe: true, estado: true },
     }),
   ]);

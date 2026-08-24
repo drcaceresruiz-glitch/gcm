@@ -80,6 +80,12 @@ export const EXCLUIDAS: Readonly<Record<string, string>> = {
   envios_aviso:
     "Solo son claves de deduplicacion para no repetir un aviso. Restaurarlas " +
     "no aporta nada y reservaria claves de una obra que ya paso.",
+  estado_bolsa_obra:
+    "Es lo que el reloj RECUERDA de la bolsa: en que estado la vio y cuando " +
+    "aviso. No es un dato de la obra, es memoria de un mecanismo, y ademas " +
+    "se deriva entera del presupuesto y los contratos, que si viajan. " +
+    "Restaurarla podria callar el primer aviso de la obra restaurada -si " +
+    "llega diciendo que ya sono el rojo- que es justo el que hay que dar.",
   audit_logs:
     "SI viaja en el zip —es historia de la obra— pero NO se restaura. El " +
     "libro de auditoria de una empresa es de la empresa: si un archivo " +

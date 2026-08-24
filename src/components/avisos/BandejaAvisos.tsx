@@ -11,6 +11,7 @@ import {
   Diamond,
   Inbox,
   Mail,
+  Wallet,
 } from "lucide-react";
 import { fechaCorta } from "@/utils/fechas";
 import { accionMarcarLeidos } from "@/app/(dashboard)/avisos/acciones";
@@ -44,6 +45,10 @@ const ICONO: Record<EventoAviso, typeof BellRing> = {
   // El mismo icono que el widget de "proximos recordatorios" del tablero:
   // es la misma idea, una fecha que se queria recordar.
   NOTA_VENCIDA: CalendarClock,
+  // La cartera: es el mismo icono con el que el panel de empresa rotula el
+  // presupuesto, y aqui se habla justo de eso, de lo que queda para gastar.
+  BOLSA_EN_RIESGO: Wallet,
+  BOLSA_EN_ROJO: Wallet,
 };
 
 const COLOR: Record<EventoAviso, string> = {
@@ -60,6 +65,10 @@ const COLOR: Record<EventoAviso, string> = {
   RESPUESTA_CONTRATISTA: "var(--color-marca-500)",
   // Rojo, como HITO_VENCIDO: paso la fecha y sigue sin atenderse.
   NOTA_VENCIDA: "var(--color-peligro)",
+  // Ambar mientras queda margen para renegociar, rojo cuando ya no queda: es
+  // la misma pareja de HITO_CERCA y HITO_VENCIDO, y por el mismo motivo.
+  BOLSA_EN_RIESGO: "var(--color-alerta)",
+  BOLSA_EN_ROJO: "var(--color-peligro)",
 };
 
 export function BandejaAvisos({ avisos }: { avisos: AvisoBandeja[] }) {

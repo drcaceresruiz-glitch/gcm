@@ -36,6 +36,7 @@ import {
 } from "@/services/avisos-envio";
 import { avisarValorizacionesPendientes } from "@/services/avisos-valorizacion";
 import { avisarNotasVencidas } from "@/services/avisos-notas";
+import { avisarBolsaComprometida } from "@/services/avisos-bolsa";
 import type { EventoAviso, TipoRestriccion } from "@/generated/prisma/enums";
 
 /**
@@ -252,17 +253,43 @@ async function pasadaDeObra(
     },
   });
 
-  // Sin fila, la obra nunca configuro nada. El recordatorio y el resumen NO se
-  // dan por defecto: son los dos que insisten, y empezar a insistirle a quien
-  // no lo pidio es la forma mas rapida de que apague los avisos enteros.
-  if (!ajustes || !ajustes.activo) return nada;
+  // El interruptor general de la obra apaga TODO lo que suena solo, la bolsa
+  // incluida: si alguien apago los avisos, se apagaron.
+  if (ajustes && !ajustes.activo) return nada;
+
+  /**
+   * LA BOLSA SE MIRA AUNQUE LA OBRA NUNCA HAYA CONFIGURADO NADA.
+   *
+   * Es la unica excepcion a la regla de abajo, y la justifica lo que dice el
+   * aviso. El recordatorio y el resumen INSISTEN, asi que no se dan por
+   * defecto: empezar a insistirle a quien no lo pidio es la forma mas rapida
+   * de que apague los avisos enteros. Este suena como mucho dos veces en toda
+   * la vida de la obra -al quedar poca bolsa y al acabarse- y lo que dice es
+   * que la obra se esta quedando sin dinero. Callarlo hasta que alguien entre
+   * a configurar una pantalla que no sabe que existe seria exactamente lo que
+   * el usuario pidio evitar: «en vez de asumirlo a sabiendas».
+   *
+   * Se guarda su propio recuerdo en `EstadoBolsaObra` -tabla aparte- para no
+   * tener que crear aqui la fila de ajustes, que encenderia de rebote todo lo
+   * demas. Y solo rehace la cuenta cara cada seis horas.
+   */
+  const avisosBolsa = await avisarBolsaComprometida(
+    { id: obra.id, companyId: obra.companyId },
+    ahora,
+  );
+
+  // Sin fila, la obra nunca configuro nada, y el resto de los avisos no se dan
+  // por defecto por lo que se acaba de explicar.
+  if (!ajustes) return { ...nada, avisosApp: avisosBolsa };
 
   const umbral = ajustes.diasRecordatorio;
 
   // La primera pasada sobre una obra con cuarenta restricciones viejas
   // mandaria cuarenta recordatorios de golpe, y quien acaba de configurar los
   // avisos concluiria —con razon— que esto es spam.
-  if (esEstreno(ajustes.createdAt, ahora, umbral)) return nada;
+  if (esEstreno(ajustes.createdAt, ahora, umbral)) {
+    return { ...nada, avisosApp: avisosBolsa };
+  }
 
   /**
    * Las notas con recordatorio vencido y sin atender.
@@ -307,10 +334,11 @@ async function pasadaDeObra(
           },
         });
 
-  // `avisosNotas` no es parte de `nada`: aunque no haya ni hitos ni
-  // restricciones abiertas, ya pudo haber sonado un recordatorio de nota.
+  // `avisosNotas` y `avisosBolsa` no son parte de `nada`: aunque no haya ni
+  // hitos ni restricciones abiertas, ya pudo haber sonado un recordatorio de
+  // nota o el aviso de la bolsa.
   if (hitos.length === 0 && abiertas.length === 0) {
-    return { avisosApp: avisosNotas, correos: 0, sms: 0 };
+    return { avisosApp: avisosNotas + avisosBolsa, correos: 0, sms: 0 };
   }
 
   const personas = await personasPorClave(obra.id);
@@ -324,7 +352,7 @@ async function pasadaDeObra(
     correosDisponibles,
   });
 
-  let avisosApp = porHitos.avisosApp + avisosNotas;
+  let avisosApp = porHitos.avisosApp + avisosNotas + avisosBolsa;
   let correos = porHitos.correos;
   let sms = porHitos.sms;
 
