@@ -821,13 +821,24 @@ export interface AvisosSeccion {
   /// (ver `esVencida` en `@/lib/notas`): se cuenta con la misma condicion,
   /// no leyendo una columna que no existe.
   notas: number;
+  /**
+   * Adendas PENDIENTES: registradas por el residente y esperando la firma de
+   * gerencia.
+   *
+   * Es el unico aviso de aqui que espera a OTRA PERSONA, y por eso hacia
+   * falta. Mientras no se firme, el contrato vigente del contratista no sube,
+   * no se le puede pagar por encima de lo firmado y el comprometido de la
+   * obra no cuenta ese dinero; y quien la registro no tiene forma de
+   * enterarse de que sigue ahi salvo volviendo a entrar al encargo a mirar.
+   */
+  adendas: number;
 }
 
 export const avisosDeSeccion = cache(async function avisosDeSeccion(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<AvisosSeccion> {
-  const vacio = { lookahead: 0, planSemanal: 0, notas: 0 };
+  const vacio = { lookahead: 0, planSemanal: 0, notas: 0, adendas: 0 };
   if (!puede(sesion, "obra:leer")) return vacio;
   if (!alcanzaObra(sesion, obraId)) return vacio;
 
@@ -837,7 +848,7 @@ export const avisosDeSeccion = cache(async function avisosDeSeccion(
     project: { companyId: sesion.companyId },
   };
 
-  const [vencidas, sinCerrar, notasVencidas] = await Promise.all([
+  const [vencidas, sinCerrar, notasVencidas, adendas] = await Promise.all([
     puede(sesion, "lookahead:leer")
       ? prisma.restriccion.count({
           where: {
@@ -862,9 +873,21 @@ export const avisosDeSeccion = cache(async function avisosDeSeccion(
           },
         })
       : 0,
+    // Un `count` con indice, como los otros tres: cabe en el layout, que
+    // corre en CADA navegacion dentro de la obra.
+    puede(sesion, "encargo:leer")
+      ? prisma.adendaEncargo.count({
+          where: { ...deLaObra, estado: "PENDIENTE" },
+        })
+      : 0,
   ]);
 
-  return { lookahead: vencidas, planSemanal: sinCerrar, notas: notasVencidas };
+  return {
+    lookahead: vencidas,
+    planSemanal: sinCerrar,
+    notas: notasVencidas,
+    adendas,
+  };
 });
 
 // ---------------------------------------------------------------------------

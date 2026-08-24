@@ -33,6 +33,7 @@ const TODO: PuedeHacer = {
   lineaBase: true,
   lookahead: true,
   planSemanal: true,
+  adendas: true,
 };
 
 const NADA: PuedeHacer = {
@@ -42,9 +43,14 @@ const NADA: PuedeHacer = {
   lineaBase: false,
   lookahead: false,
   planSemanal: false,
+  adendas: false,
 };
 
-const EN_PAZ: AvisosVivos = { restriccionesVencidas: 0, semanasSinCerrar: 0 };
+const EN_PAZ: AvisosVivos = {
+  restriccionesVencidas: 0,
+  semanasSinCerrar: 0,
+  adendasPorFirmar: 0,
+};
 
 describe("el paso siguiente de la obra", () => {
   it("con la obra al dia y sin nada vencido, no sugiere nada", () => {
@@ -131,10 +137,59 @@ describe("el paso siguiente de la obra", () => {
     expect(siguientePaso(sinAsignables, TODO, EN_PAZ)).toBeNull();
   });
 
+  /**
+   * LA ADENDA PENDIENTE TIENE A DOS PERSONAS PARADAS A LA VEZ, y ninguna se
+   * entera. El residente no puede pagarle al contratista por encima de lo
+   * firmado -el pago se rechaza-, y gerencia mira un comprometido que no
+   * cuenta ese dinero. Todo por una firma que no esta en ninguna bandeja.
+   */
+  it("una adenda sin firmar manda sobre lo que solo esta vencido", () => {
+    const paso = siguientePaso(ALTA_COMPLETA, TODO, {
+      restriccionesVencidas: 5,
+      semanasSinCerrar: 2,
+      adendasPorFirmar: 1,
+    });
+
+    expect(paso?.clave).toBe("adendas-por-firmar");
+    expect(paso?.titulo).toBe("1 adicional espera tu firma");
+    // Bloqueante y no sugerencia: no se puede aplazar con «Ahora no». Lo que
+    // se aplaza deja de verse, y esto tiene a otro esperando.
+    expect(paso?.gravedad).toBe("bloqueante");
+  });
+
+  /**
+   * A quien no puede firmar no se le propone que firme: seria un aviso que no
+   * se puede quitar haciendo la tarea. El residente que la registro la ve en
+   * la insignia del menu de Proveedores, que informa sin pedir nada.
+   */
+  it("a quien no puede firmar no se le propone", () => {
+    const soloResidente: PuedeHacer = { ...TODO, adendas: false };
+    const paso = siguientePaso(ALTA_COMPLETA, soloResidente, {
+      restriccionesVencidas: 1,
+      semanasSinCerrar: 0,
+      adendasPorFirmar: 3,
+    });
+
+    // Pasa de largo al siguiente escalon en vez de callarse: lo vencido sigue
+    // estando ahi.
+    expect(paso?.clave).toBe("restricciones-vencidas");
+  });
+
+  it("el alta manda sobre la firma: sin presupuesto, primero el presupuesto", () => {
+    const paso = siguientePaso(
+      { ...ALTA_COMPLETA, presupuesto: false, meta: false },
+      TODO,
+      { restriccionesVencidas: 0, semanasSinCerrar: 0, adendasPorFirmar: 2 },
+    );
+
+    expect(paso?.clave).toBe("alta-presupuesto");
+  });
+
   it("con el alta hecha, recuerda lo que vencio", () => {
     const paso = siguientePaso(ALTA_COMPLETA, TODO, {
       restriccionesVencidas: 3,
       semanasSinCerrar: 1,
+      adendasPorFirmar: 0,
     });
 
     expect(paso?.clave).toBe("restricciones-vencidas");
@@ -145,12 +200,14 @@ describe("el paso siguiente de la obra", () => {
     const una = siguientePaso(ALTA_COMPLETA, TODO, {
       restriccionesVencidas: 1,
       semanasSinCerrar: 0,
+      adendasPorFirmar: 0,
     });
     expect(una?.titulo).toBe("1 restricción con la fecha ya pasada");
 
     const semana = siguientePaso(ALTA_COMPLETA, TODO, {
       restriccionesVencidas: 0,
       semanasSinCerrar: 1,
+      adendasPorFirmar: 0,
     });
     expect(semana?.titulo).toBe("1 semana sin cerrar con el corte ya pasado");
   });
@@ -162,12 +219,13 @@ describe("el paso siguiente de la obra", () => {
    */
   it("ningun paso tiene el camino vacio", () => {
     const casos: PasoPosible[] = [
-            [{ ...ALTA_COMPLETA, presupuesto: false }, EN_PAZ],
+      [{ ...ALTA_COMPLETA, presupuesto: false }, EN_PAZ],
       [{ ...ALTA_COMPLETA, cronograma: false }, EN_PAZ],
       [{ ...ALTA_COMPLETA, equipo: false }, EN_PAZ],
       [{ ...ALTA_COMPLETA, lineaBase: false }, EN_PAZ],
-      [ALTA_COMPLETA, { restriccionesVencidas: 1, semanasSinCerrar: 0 }],
-      [ALTA_COMPLETA, { restriccionesVencidas: 0, semanasSinCerrar: 1 }],
+      [ALTA_COMPLETA, { ...EN_PAZ, adendasPorFirmar: 1 }],
+      [ALTA_COMPLETA, { ...EN_PAZ, restriccionesVencidas: 1 }],
+      [ALTA_COMPLETA, { ...EN_PAZ, semanasSinCerrar: 1 }],
     ];
 
     for (const [alta, avisos] of casos) {

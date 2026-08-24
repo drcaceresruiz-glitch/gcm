@@ -44,6 +44,8 @@ const datos = {
   imputacionesSueltas: [] as { importe: string; ordenCompra: { projectId: string } }[],
   wbsItems: [] as unknown[],
   restricciones: [] as unknown[],
+  /// Adendas PENDIENTES, para la bandeja de firma.
+  adendas: [] as unknown[],
   /// Encargos completos (fechasValorizacion/valorizaciones/pagos), para
   /// `valorizacionesDeCartera` -distinto del agregado `encargosVigentes`.
   encargosCompletos: [] as unknown[],
@@ -157,6 +159,12 @@ vi.mock("@/lib/prisma", () => ({
         return datos.restricciones;
       },
     },
+    adendaEncargo: {
+      findMany: async (args: unknown) => {
+        llamadas.push({ modelo: "adendaEncargo", args });
+        return datos.adendas;
+      },
+    },
   },
 }));
 
@@ -169,6 +177,8 @@ const {
   evmDeCartera,
   confiabilidadDeCartera,
   valorizacionesDeCartera,
+  adendasPorFirmar,
+  MAX_ADENDAS_EN_BANDEJA,
   MAX_OBRAS_POR_CARGA,
   UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS,
 } = await import("@/services/gerencia.service");
@@ -219,6 +229,7 @@ beforeEach(() => {
   datos.encargosVigentes = [];
   datos.imputacionesSueltas = [];
   datos.sueltasComprometido = [];
+  datos.adendas = [];
   datos.wbsItems = [];
   datos.restricciones = [];
   datos.encargosCompletos = [];
@@ -985,5 +996,133 @@ describe("valorizacionesDeCartera", () => {
     expect(
       llamadas.filter((l) => l.modelo === "encargoProveedor:findMany"),
     ).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// La bandeja de firma
+// ---------------------------------------------------------------------------
+
+/**
+ * LO QUE ESPERA LA FIRMA DE GERENCIA.
+ *
+ * El circuito de la adenda se diseño con dos firmas -el residente registra,
+ * gerencia aprueba- y a la segunda le faltaba la bandeja: las adendas se
+ * firman dentro del encargo, o sea a tres clics desde una obra concreta y a
+ * ninguno si no sabes en cual mirar. Mientras tanto hay dos personas paradas:
+ * al residente se le rechaza el pago por encima de lo firmado, y el
+ * comprometido que mira el propio gerente no cuenta ese dinero.
+ */
+describe("adendasPorFirmar", () => {
+  /**
+   * Igual que `hoy()`: dia LOCAL llevado a medianoche UTC. El `diasDesdeHoy`
+   * de mas arriba parte del dia UTC, y a partir de las 19:00 en Lima esos dos
+   * dias ya no son el mismo -la prueba pasaba de dia y fallaba de noche-.
+   */
+  function haceDias(n: number): Date {
+    const a = new Date();
+    return new Date(Date.UTC(a.getFullYear(), a.getMonth(), a.getDate() - n));
+  }
+
+  function adenda(over: Record<string, unknown> = {}) {
+    return {
+      id: "ad-1",
+      numero: 1,
+      fecha: haceDias(3),
+      importe: "8000.00",
+      concepto: "Ampliacion de alcance en cimentacion",
+      registradaPor: "Ana Perez",
+      createdAt: haceDias(3),
+      encargoId: "enc-1",
+      projectId: "obra-1",
+      project: { nombreObra: "Torre A" },
+      encargo: { proveedor: { razonSocial: "Constructora Sur" } },
+      ...over,
+    };
+  }
+
+  it("no la ve quien no puede firmar: una bandeja de firma para quien no firma es una lista de cosas que no puede hacer", async () => {
+    datos.adendas = [adenda()];
+    expect(await adendasPorFirmar(sesion(null, ["encargo:leer"]))).toBeNull();
+    // Y ni siquiera se pregunta.
+    expect(llamadas.filter((l) => l.modelo === "adendaEncargo")).toHaveLength(0);
+  });
+
+  it("sin ninguna pendiente lo dice, no devuelve null", async () => {
+    const r = await adendasPorFirmar(sesion(null, ["adenda:aprobar"]));
+
+    expect(r).not.toBeNull();
+    expect(r?.cuantas).toBe(0);
+    expect(r?.importe).toBe("0.00");
+    expect(r?.diasDeLaMasVieja).toBe(0);
+  });
+
+  it("trae la obra, el contratista y cuanto lleva esperando", async () => {
+    datos.adendas = [adenda({ createdAt: haceDias(11) })];
+
+    const r = await adendasPorFirmar(sesion(null, ["adenda:aprobar"]));
+    const a = r?.adendas[0];
+
+    expect(a?.obraNombre).toBe("Torre A");
+    expect(a?.proveedor).toBe("Constructora Sur");
+    expect(a?.registradaPor).toBe("Ana Perez");
+    expect(a?.diasEsperando).toBe(11);
+    expect(r?.diasDeLaMasVieja).toBe(11);
+    // El enlace se arma en la pantalla con estos dos: obra y encargo.
+    expect(a?.obraId).toBe("obra-1");
+    expect(a?.encargoId).toBe("enc-1");
+  });
+
+  it("suma los importes CON SIGNO: un deductivo baja el total", async () => {
+    datos.adendas = [
+      adenda({ id: "a", importe: "8000.00" }),
+      adenda({ id: "b", importe: "-12000.00" }),
+    ];
+
+    const r = await adendasPorFirmar(sesion(null, ["adenda:aprobar"]));
+    expect(r?.importe).toBe("-4000.00");
+    expect(r?.cuantas).toBe(2);
+  });
+
+  /**
+   * Solo las PENDIENTES, y solo de esta empresa. Ninguna suma lo notaria si
+   * alguien quita cualquiera de los dos filtros: saldria una bandeja con
+   * adendas ya firmadas, o -mucho peor- con las de otra constructora.
+   */
+  it("pide solo PENDIENTES y solo de la empresa de la sesion", async () => {
+    await adendasPorFirmar(sesion(null, ["adenda:aprobar"]));
+
+    const c = llamadas.find((l) => l.modelo === "adendaEncargo");
+    const donde = (
+      c?.args as {
+        where: { estado: string; project: { companyId: string } };
+      }
+    ).where;
+
+    expect(donde.estado).toBe("PENDIENTE");
+    expect(donde.project.companyId).toBe("emp-1");
+  });
+
+  /**
+   * Por ANTIGUEDAD y no por importe, al reves que `adicionalesEnBorrador`.
+   * Alli se mira exposicion -cuanto dinero hay pedido-; aqui es una cola de
+   * trabajo, y lo que primero se pudre es lo que mas lleva esperando.
+   */
+  it("se ordena por antiguedad, y el corte no recorta el importe", async () => {
+    datos.adendas = Array.from({ length: MAX_ADENDAS_EN_BANDEJA + 5 }, (_, i) =>
+      adenda({ id: `a-${i}`, importe: "100.00" }),
+    );
+
+    const r = await adendasPorFirmar(sesion(null, ["adenda:aprobar"]));
+
+    expect(r?.adendas).toHaveLength(MAX_ADENDAS_EN_BANDEJA);
+    expect(r?.cuantas).toBe(MAX_ADENDAS_EN_BANDEJA + 5);
+    // El titular cuenta TODAS, no solo las listadas: recortar la lista no
+    // puede recortar la cifra.
+    expect(r?.importe).toBe("2500.00");
+
+    const orden = (llamadas.find((l) => l.modelo === "adendaEncargo")
+      ?.args as { orderBy: { createdAt: string } }).orderBy;
+    expect(orden.createdAt).toBe("asc");
   });
 });

@@ -10,6 +10,7 @@ import {
   Gauge,
   ClipboardCheck,
   Receipt,
+  PenLine,
 } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
@@ -21,6 +22,7 @@ import {
   evmDeCartera,
   confiabilidadDeCartera,
   valorizacionesDeCartera,
+  adendasPorFirmar,
   UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS,
 } from "@/services/gerencia.service";
 import { textoSinCosto } from "@/lib/evm";
@@ -49,7 +51,9 @@ export const metadata: Metadata = { title: "Gerencia" };
  * convertiria el nombre en ruido. Esta se distingue por su ambito: es de
  * EMPRESA, no de obra.
  *
- * Contesta lo que no se ve mirando las obras de una en una: que partidas
+ * Contesta lo que no se ve mirando las obras de una en una: QUE ESPERA SU
+ * FIRMA -lo unico de aqui donde quien mira es el cuello de botella-, que
+ * partidas
  * criticas van tarde en la cartera, que obras se estan comprometiendo mas
  * rapido de lo que avanzan, como va el valor ganado y la confiabilidad del
  * plan semanal de toda la cartera, cuanto hay pedido (adicionales y
@@ -70,6 +74,7 @@ export default async function GerenciaPage() {
   // hacer en una pantalla que la resume. Lo deciden los servicios; solo si
   // las ocho dicen que no, esta pantalla no existe para esta sesion.
   const [
+    firmas,
     semaforo,
     sobregiro,
     evm,
@@ -79,6 +84,7 @@ export default async function GerenciaPage() {
     valorizaciones,
     restricciones,
   ] = await Promise.all([
+    adendasPorFirmar(sesion),
     semaforoDeCartera(sesion),
     sobregiroProyectadoDeCartera(sesion),
     evmDeCartera(sesion),
@@ -89,6 +95,7 @@ export default async function GerenciaPage() {
     restriccionesDeCartera(sesion),
   ]);
   if (
+    !firmas &&
     !semaforo &&
     !sobregiro &&
     !evm &&
@@ -109,6 +116,109 @@ export default async function GerenciaPage() {
           Lo que solo se ve mirando todas las obras a la vez.
         </p>
       </div>
+
+      {/* EL PRIMERO de la pantalla, y es el unico bloque donde quien mira es
+          el cuello de botella: los demas informan, este pide una decision que
+          solo puede tomar gerencia. Mientras no se firme hay alguien en obra
+          que no puede pagarle a su contratista. */}
+      {firmas && (
+        <Tarjeta>
+          <SeccionTarjeta
+            primera
+            titulo="Esperando tu firma"
+            nota="Adicionales y deductivos que el residente ya dio por buenos y que solo gerencia puede aprobar. Hasta que se firmen, el contrato del contratista vale lo de antes: no se le puede pagar de más y ese dinero no cuenta como comprometido en la obra."
+          >
+            {firmas.cuantas === 0 ? (
+              <p className="text-sm opacity-70">
+                No hay ninguna adenda esperando. Cuando un residente registre
+                un adicional, aparecerá aquí el mismo día.
+              </p>
+            ) : (
+              <>
+                <div
+                  className="rounded-lg border p-4"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  <p className="flex items-center gap-2 text-xs opacity-60">
+                    <PenLine className="size-4" aria-hidden="true" />
+                    Lo que cambiarían los contratos si firmas todo
+                  </p>
+                  <p className="mt-1 text-3xl font-semibold">
+                    {soles(firmas.importe)}
+                  </p>
+                  <p className="mt-1 text-xs opacity-60">
+                    {firmas.cuantas === 1
+                      ? "1 adenda pendiente"
+                      : `${firmas.cuantas} adendas pendientes`}
+                    {firmas.diasDeLaMasVieja > 0 && (
+                      <>
+                        {" · "}
+                        {firmas.diasDeLaMasVieja === 1
+                          ? "la más antigua lleva 1 día esperando"
+                          : `la más antigua lleva ${firmas.diasDeLaMasVieja} días esperando`}
+                      </>
+                    )}
+                  </p>
+                </div>
+
+                {/* Por ANTIGUEDAD, no por importe: esto es una cola de
+                    trabajo, y lo que primero se pudre es lo que mas lleva
+                    esperando. Los adicionales en borrador de mas abajo si van
+                    por importe, porque alli se mira exposicion. */}
+                <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>
+                  {firmas.adendas.map((a) => (
+                    <li
+                      key={a.id}
+                      className="flex flex-wrap items-start justify-between gap-3 py-3"
+                    >
+                      <div className="min-w-0">
+                        <Link
+                          href={`/obras/${a.obraId}/proveedores/${a.encargoId}`}
+                          className="text-sm font-medium underline-offset-2 hover:underline"
+                        >
+                          {a.proveedor}
+                        </Link>
+                        <p className="text-xs opacity-70">{a.concepto}</p>
+                        <p className="mt-0.5 text-xs opacity-60">
+                          {a.obraNombre} · Adenda {a.numero} ·{" "}
+                          {fechaCorta(a.fecha)} · la registró {a.registradaPor}
+                          {a.diasEsperando > 0 &&
+                            ` · ${a.diasEsperando} ${a.diasEsperando === 1 ? "día" : "días"} esperando`}
+                        </p>
+                      </div>
+                      <p
+                        className="text-sm font-medium"
+                        // Un deductivo baja el contrato: se lee distinto de un
+                        // adicional y el color lo dice antes que el signo.
+                        style={{
+                          color: a.importe.trimStart().startsWith("-")
+                            ? "var(--color-exito)"
+                            : "var(--color-alerta)",
+                        }}
+                      >
+                        {soles(a.importe)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+
+                {firmas.cuantas > firmas.adendas.length && (
+                  <p className="text-xs opacity-60">
+                    Se listan las {firmas.adendas.length} más antiguas de{" "}
+                    {firmas.cuantas}. El importe de arriba las cuenta todas.
+                  </p>
+                )}
+
+                <p className="text-xs opacity-60">
+                  Cada línea enlaza al contrato del contratista, que es donde
+                  se firma o se rechaza. Aprobar es irreversible: una adenda
+                  aprobada se corrige con otra de signo contrario.
+                </p>
+              </>
+            )}
+          </SeccionTarjeta>
+        </Tarjeta>
+      )}
 
       {semaforo && (
         <Tarjeta>

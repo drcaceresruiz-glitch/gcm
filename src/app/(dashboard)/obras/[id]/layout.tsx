@@ -281,11 +281,22 @@ export default async function ObraLayout({
       clave: "compras",
       titulo: "Compras",
       secciones: [
+        /// Las adendas viven dentro del encargo, o sea a dos clics de aqui:
+        /// sin insignia, una que espera firma no se ve desde ninguna pantalla.
+        /// `critico` SOLO para quien puede firmarla: en rojo para el residente
+        /// que la registro seria una alarma que no puede apagar haciendo nada.
         puede(sesion, "encargo:leer") && {
           clave: "proveedores",
           titulo: "Proveedores",
           pregunta: "quién hace cada frente",
           href: `${raiz}/proveedores`,
+          pendientes:
+            avisos.adendas > 0
+              ? {
+                  cuantos: avisos.adendas,
+                  critico: puede(sesion, "adenda:aprobar"),
+                }
+              : null,
         },
         /// Va DESPUES de Proveedores y ANTES de Órdenes: el orden del trabajo
         /// real es contratar el frente, valorizar lo avanzado y pagarlo.
@@ -338,10 +349,14 @@ export default async function ObraLayout({
             lineaBase: puede(sesion, "linea_base:aprobar"),
             lookahead: puede(sesion, "lookahead:leer"),
             planSemanal: puede(sesion, "plan_semanal:leer"),
+            // Firmar, no leer: el paso que se propone aqui es aprobar la
+            // adenda, y quien solo la ve no puede darlo.
+            adendas: puede(sesion, "adenda:aprobar"),
           },
           {
             restriccionesVencidas: avisos.lookahead,
             semanasSinCerrar: avisos.planSemanal,
+            adendasPorFirmar: avisos.adendas,
           },
         );
 

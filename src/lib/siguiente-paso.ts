@@ -20,7 +20,9 @@
  *   2. El ALTA de la obra: presupuesto -> cronograma -> equipo -> linea base.
  *      Es «completar un registro», el unico sitio donde encadenar aporta de
  *      verdad: son cuatro pasos con un final, no un flujo de exploracion.
- *   3. Lo que quedo a medias y ya vencio. Aqui NO se encadena nada: se
+ *   3. Lo que espera una FIRMA de gerencia y tiene a otro parado mientras
+ *      tanto: hoy, las adendas pendientes.
+ *   4. Lo que quedo a medias y ya vencio. Aqui NO se encadena nada: se
  *      recuerda donde se quedo uno.
  *
  * LO QUE ESTE MODULO NO HACE, y es deliberado:
@@ -109,6 +111,9 @@ export interface PuedeHacer {
   lineaBase: boolean;
   lookahead: boolean;
   planSemanal: boolean;
+  /// Firmar adendas. Es de gerencia: quien registra el adicional no es quien
+  /// lo aprueba, y a quien no puede firmar no se le propone que firme.
+  adendas: boolean;
 }
 
 /**
@@ -123,6 +128,8 @@ export interface PuedeHacer {
 export interface AvisosVivos {
   restriccionesVencidas: number;
   semanasSinCerrar: number;
+  /// Adendas registradas por obra y todavia sin la firma de gerencia.
+  adendasPorFirmar: number;
 }
 
 function plural(n: number, singular: string, plural: string): string {
@@ -206,6 +213,39 @@ export function siguientePaso(
         "Aprobarlo lo congela como línea base del PRESUPUESTO: la referencia contra la que se miden los adicionales y el valor ganado. Mientras siga en borrador se puede seguir tocando, y lo que se mide cambia con él.",
       accion: "Ver revisiones",
       camino: "/revisiones",
+    };
+  }
+
+  /*
+   * 2. LO QUE ESPERA UNA FIRMA, y por eso tiene la obra parada por dentro.
+   *
+   * Va con las bloqueantes y no con las sugerencias, y no se puede aplazar:
+   * mientras la adenda siga pendiente, el contrato del contratista vale lo
+   * de antes. No se le puede pagar por encima de lo firmado -desde el
+   * 23/08 el pago se rechaza nombrando justo esta salida-, y el
+   * comprometido de la obra no cuenta ese dinero. O sea que el residente
+   * esta bloqueado y el numero que mira gerencia esta corto, las dos cosas
+   * a la vez, por una firma que nadie recuerda que falta.
+   *
+   * Se propone SOLO a quien puede firmar. Al residente que la registro no
+   * se le dice «firma esto», porque no puede: para el, la adenda pendiente
+   * es la insignia del menu de Proveedores, que informa sin pedir nada.
+   *
+   * Y va DESPUES del alta: si la obra todavia no tiene presupuesto, lo que
+   * toca antes es eso. En la practica no se cruzan -no hay contratistas con
+   * adicionales en una obra sin presupuesto-, pero el orden tiene que
+   * decidirlo alguien y no el azar.
+   */
+  if (avisos.adendasPorFirmar > 0 && puede.adendas) {
+    const n = avisos.adendasPorFirmar;
+    return {
+      clave: "adendas-por-firmar",
+      gravedad: "bloqueante",
+      titulo: `${n} ${plural(n, "adicional espera tu firma", "adicionales esperan tu firma")}`,
+      consecuencia:
+        "Hasta que se firme, el contrato del contratista vale lo de antes: no se le puede pagar de más y ese dinero no cuenta como comprometido en la obra.",
+      accion: "Ver los contratistas",
+      camino: "/proveedores",
     };
   }
 

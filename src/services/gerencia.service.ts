@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
+import { filtroDeObras } from "@/lib/alcance-obras";
 import { sumar, restar, esPositivo } from "@/lib/decimal";
 import { alertasDeAtraso } from "@/lib/control-avance";
 import { medirAvance, type AvanceReportado } from "@/lib/cronograma";
@@ -92,6 +93,130 @@ export interface AdicionalesPendientes {
  * Una para los movimientos y otra para sus lineas agrupadas. Nada crece con
  * el numero de obras.
  */
+/// Cuantas adendas pendientes se listan como mucho. Es una bandeja de firma:
+/// veinte decisiones ya son mas de las que nadie resuelve de una sentada, y el
+/// total sigue diciendose aunque la lista se corte.
+export const MAX_ADENDAS_EN_BANDEJA = 20;
+
+export interface AdendaPorFirmar {
+  id: string;
+  obraId: string;
+  obraNombre: string;
+  encargoId: string;
+  /// Correlativo dentro del encargo: «la 2.a adenda de este contratista».
+  numero: number;
+  proveedor: string;
+  concepto: string;
+  /// Con signo: positivo es un adicional, negativo un deductivo.
+  importe: string;
+  fecha: Date;
+  registradaPor: string;
+  /// Dias desde que se registro. Es lo que convierte «hay una pendiente» en
+  /// «hay una pendiente desde hace once dias».
+  diasEsperando: number;
+}
+
+export interface BandejaDeFirma {
+  adendas: AdendaPorFirmar[];
+  /// Cuantas hay en total, aunque la lista venga recortada.
+  cuantas: number;
+  /// Lo que sumarian a los contratos si se firmaran todas, con signo.
+  importe: string;
+  /// Dias que lleva esperando la mas antigua. 0 si no hay ninguna.
+  diasDeLaMasVieja: number;
+  tope: number;
+}
+
+/**
+ * LO QUE ESPERA LA FIRMA DE GERENCIA, en un sitio.
+ *
+ * Las adendas se registran dentro del encargo y se firman dentro del encargo:
+ * obra -> Proveedores -> el contratista -> el panel de adendas. Tres clics
+ * desde una obra concreta, y CERO desde ninguna parte si no sabes en cual
+ * mirar. El circuito se diseño con dos firmas -el residente registra, gerencia
+ * aprueba- y a la segunda firma le faltaba la bandeja: quien tiene que firmar
+ * no tenia como enterarse de que habia algo que firmar.
+ *
+ * MIENTRAS TANTO HAY DOS PERSONAS PARADAS. Al residente no se le deja pagar
+ * al contratista por encima de lo firmado -el pago se rechaza nombrando esta
+ * adenda-, y el comprometido de la obra no cuenta ese dinero, asi que la
+ * cifra que mira el propio gerente para decidir esta corta. Las dos cosas se
+ * arreglan con la misma firma.
+ *
+ * SE ORDENA POR ANTIGUEDAD, no por importe. Es lo contrario que
+ * `adicionalesEnBorrador`, y a proposito: alli se mira exposicion -cuanto
+ * dinero hay pedido- y aqui se mira una cola de trabajo. Lo que primero se
+ * pudre es lo que lleva mas tiempo esperando, no lo que mas vale.
+ *
+ * UNA consulta, con el nombre de la obra y del proveedor dentro.
+ */
+export async function adendasPorFirmar(
+  sesion: SesionActiva,
+): Promise<BandejaDeFirma | null> {
+  // Solo a quien puede firmarlas: una bandeja de firma para quien no firma es
+  // una lista de cosas que no puede hacer.
+  if (!puede(sesion, "adenda:aprobar")) return null;
+
+  const filas = await prisma.adendaEncargo.findMany({
+    where: {
+      estado: "PENDIENTE",
+      // La empresa sale de la SESION y se aplica DONDE se lee.
+      project: { companyId: sesion.companyId, ...filtroDeObras(sesion) },
+    },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      numero: true,
+      fecha: true,
+      importe: true,
+      concepto: true,
+      registradaPor: true,
+      createdAt: true,
+      encargoId: true,
+      projectId: true,
+      project: { select: { nombreObra: true } },
+      encargo: { select: { proveedor: { select: { razonSocial: true } } } },
+    },
+  });
+
+  if (filas.length === 0) {
+    return {
+      adendas: [],
+      cuantas: 0,
+      importe: "0.00",
+      diasDeLaMasVieja: 0,
+      tope: MAX_ADENDAS_EN_BANDEJA,
+    };
+  }
+
+  const dia = hoy();
+  const adendas = filas.slice(0, MAX_ADENDAS_EN_BANDEJA).map((a) => ({
+    id: a.id,
+    obraId: a.projectId,
+    obraNombre: a.project.nombreObra,
+    encargoId: a.encargoId,
+    numero: a.numero,
+    proveedor: a.encargo.proveedor.razonSocial,
+    concepto: a.concepto,
+    // A texto en la frontera: es dinero.
+    importe: a.importe.toString(),
+    fecha: a.fecha,
+    registradaPor: a.registradaPor,
+    diasEsperando: diasEntre(a.createdAt, dia),
+  }));
+
+  return {
+    adendas,
+    cuantas: filas.length,
+    // El importe es el de TODAS, no solo las listadas: si se recorta la lista,
+    // la cifra del titular no puede recortarse con ella.
+    importe: sumar(filas.map((a) => a.importe.toString())),
+    // `filas` viene ordenada de mas antigua a mas nueva.
+    diasDeLaMasVieja: diasEntre(filas[0]!.createdAt, dia),
+    tope: MAX_ADENDAS_EN_BANDEJA,
+  };
+}
+
 export async function adicionalesEnBorrador(
   sesion: SesionActiva,
 ): Promise<AdicionalesPendientes | null> {
