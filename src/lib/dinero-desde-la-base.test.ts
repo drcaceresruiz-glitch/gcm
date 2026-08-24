@@ -46,11 +46,10 @@ const COMPARADORES = ["esPositivo", "esNegativo", "esCero"];
  * pasar por aqui y decidirlo, en vez de aparecer sin que nadie lo mire.
  */
 const AGREGADOS_DE_DINERO: Readonly<Record<string, string>> = {
-  "services/tablero.service.ts": "comprometido de la obra y sobregiro por partida",
+  "services/comprometido.service.ts":
+    "LA definicion de comprometido: encargos vigentes y ordenes sueltas",
   "services/gerencia.service.ts": "movimientos por obra en el tablero del gerente",
   "services/presupuesto-obra.ts": "los ajustes aprobados sobre la linea base",
-  "services/ordenes.service.ts": "las ordenes sueltas del comprometido",
-  "services/obras.service.ts": "comprometido y sobregiro, de toda la cartera",
   "services/movimientos.service.ts": "los ajustes ya aprobados sobre cada partida",
 };
 

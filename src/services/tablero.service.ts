@@ -3,7 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { alcanzaObra } from "@/lib/alcance-obras";
-import { esPositivo, restar } from "@/lib/decimal";
+import { restar } from "@/lib/decimal";
 import {
   agruparPorCapitulo,
   alertasDeAtraso,
@@ -12,6 +12,7 @@ import {
 import { diasLaborablesEntre } from "@/lib/calendario";
 import { metricasEvm, valorDeAvance, type MetricasEvm } from "@/lib/evm";
 import { obtenerObra } from "@/services/obras.service";
+import { comprometidoDelAmbito } from "@/services/comprometido.service";
 import { bacDeObra, totalDeObra } from "@/services/presupuesto-obra";
 import { datosCurvaS, obtenerCronograma } from "@/services/cronograma.service";
 import { obtenerCalendario } from "@/services/calendario.service";
@@ -643,10 +644,21 @@ function armarCurva(
 /**
  * Presupuesto y comprometido de UNA obra.
  *
- * Las mismas definiciones que el resumen de empresa: el presupuesto es la
- * suma de los parciales de las partidas (sin IGV) y el comprometido es el
- * importe IMPUTABLE de las ordenes APROBADAS —neto con IGV, total con
- * retencion—. Un borrador todavia no compromete a nadie.
+ * EL COMPROMETIDO NO SE CALCULA AQUI. Sale de `comprometido.service.ts`, que
+ * es donde vive la unica definicion: encargos VIGENTES por su monto vigente
+ * -lo firmado mas sus adendas aprobadas- mas las ordenes SUELTAS aprobadas
+ * por su importe imputable.
+ *
+ * Hasta el 23 de agosto de 2026 esta funcion tenia su PROPIA lectura, que
+ * contaba solo ordenes de compra, y encima el comentario de aqui arriba decia
+ * «las mismas definiciones que el resumen de empresa» siendo ya falso desde
+ * el 18/08. El resultado en pantalla, con datos reales: «Comprometido S/ 0,00
+ * de S/ 740,00 - saldo disponible S/ 740,00» en una obra cuyo unico
+ * contratista tenia 735 firmados y 740 ya cobrados. El tablero ofrecia como
+ * disponible dinero que ya estaba gastado.
+ *
+ * El presupuesto sigue siendo la suma de los parciales de las partidas, sin
+ * IGV, con la regla de hojas.
  */
 async function presupuestoDeObra(
   sesion: SesionActiva,
@@ -660,63 +672,22 @@ async function presupuestoDeObra(
   });
   if (!obraDeLaEmpresa) return PRESUPUESTO_VACIO;
 
-  const [partidas, comprometido, porPartida] = await Promise.all([
+  const [partidas, comprometido] = await Promise.all([
     // `totalDeObra` y no un `SUM(parcial)` plano: un grupo a suma alzada con
     // hijas costeadas tambien es tipo PARTIDA, y sumarlos a los dos contaba el
     // mismo dinero dos veces. Este total ademas alimenta la tarjeta de VALOR
     // GANADO de mas abajo, o sea el BAC.
     totalDeObra(obraId),
 
-    prisma.ordenImputacion.aggregate({
-      where: {
-        ordenCompra: {
-          projectId: obraId,
-          companyId: sesion.companyId,
-          estado: "APROBADA",
-        },
-      },
-      _sum: { importe: true },
-    }),
-
-    prisma.ordenImputacion.groupBy({
-      by: ["wbsItemId"],
-      where: {
-        ordenCompra: {
-          projectId: obraId,
-          companyId: sesion.companyId,
-          estado: "APROBADA",
-        },
-      },
-      _sum: { importe: true },
-    }),
+    // La definicion compartida. El conteo de partidas pasadas de su parcial
+    // viene con ella: se mide con el reparto de los encargos ya hecho, no
+    // solo con las ordenes, que es como se contaban antes -y por eso una obra
+    // llevada entera por contratistas nunca marcaba ninguna-.
+    comprometidoDelAmbito(sesion, { id: obraId }),
   ]);
 
   const total = partidas.costoDirecto;
-  const gastado = comprometido._sum.importe?.toString() ?? "0.00";
-
-  // Partida a partida y no dos sumas: un total holgado puede esconder varias
-  // partidas pasadas de largo, que es justo lo que hay que corregir.
-  let sobregiradas = 0;
-  if (porPartida.length > 0) {
-    const parciales = await prisma.wbsItem.findMany({
-      where: { id: { in: porPartida.map((p) => p.wbsItemId) } },
-      select: { id: true, parcial: true },
-    });
-    const parcialPorId = new Map(
-      parciales.map((p) => [p.id, p.parcial?.toString() ?? "0"]),
-    );
-
-    for (const fila of porPartida) {
-      // Con `restar` y no con `sumar([a, "-"+b])`: el parcial puede ser
-      // negativo —un descuento comercial— y esa forma produce "--26821.60",
-      // que `sumar` descarta en silencio marcando un sobregiro que no existe.
-      const exceso = restar(
-        fila._sum.importe?.toString() ?? "0",
-        parcialPorId.get(fila.wbsItemId) ?? "0",
-      );
-      if (exceso !== null && esPositivo(exceso)) sobregiradas++;
-    }
-  }
+  const gastado = comprometido.total;
 
   const numeroTotal = Number(total);
 
@@ -726,7 +697,7 @@ async function presupuestoDeObra(
     saldo: restar(total, gastado) ?? "0.00",
     porcentaje: numeroTotal > 0 ? (Number(gastado) / numeroTotal) * 100 : 0,
     partidas: partidas.partidas,
-    sobregiradas,
+    sobregiradas: comprometido.sobregiradas.length,
   };
 }
 

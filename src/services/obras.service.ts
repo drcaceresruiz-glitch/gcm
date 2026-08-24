@@ -7,12 +7,11 @@ import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { alcanzaObra, filtroDeObras, VE_TODAS_LAS_OBRAS } from "@/lib/alcance-obras";
 import { esPositivo, restar, sumar } from "@/lib/decimal";
+import { importeDeValorizacion, montoVigente } from "@/lib/adendas";
 import {
-  comprometidoPorPartida,
-  desgloseComprometido,
-  importeValorizado,
-  type EncargoDelComprometido,
-} from "@/lib/encargos";
+  comprometidoDelAmbito,
+  comprometidoPorObra,
+} from "@/services/comprometido.service";
 import { subtotalesPorRama, sumarHojas } from "@/lib/jerarquia-partidas";
 import { totalDeEmpresa, totalesPorObra } from "@/services/presupuesto-obra";
 import {
@@ -88,15 +87,31 @@ export interface ResumenEmpresa {
   obras: number;
   obrasEnEjecucion: number;
   /**
+   * Cuantas obras hay DETRAS del dinero de abajo: en ejecucion o paralizadas
+   * (`ESTADOS_OBRA_CON_EXPOSICION`).
+   *
+   * Va aparte de `obrasEnEjecucion` porque no son lo mismo y el panel lo
+   * notaba: las cifras cubren tambien las paralizadas -paralizar no borra lo
+   * comprometido- pero el conteo no, asi que con cero en ejecucion y una
+   * paralizada la caja se titulaba «La obra en ejecución» sobre cifras de una
+   * obra parada. Y con CERO obras vivas se pintaba esa misma caja llena de
+   * ceros, que es lo que hizo preguntar «¿por que esas tarjetas no muestran
+   * nada?»: no estaban rotas, es que no habia nada que enseñar y nadie lo
+   * decia.
+   */
+  obrasConExposicion: number;
+  /**
    * Suma de las partidas SOLO de las obras en ejecucion, no de la cartera
    * entera. Mezclar planificacion, ejecucion y cerradas daba un numero
    * contra el que nadie decide nada: la exposicion de hoy es lo que esta
    * vivo. La cartera completa es cifra de presentacion, no de operacion.
    */
   presupuestoTotal: string;
-  /// Comprometido con proveedores de las obras en ejecucion: encargos
-  /// vigentes (monto contratado) mas ordenes sueltas aprobadas (importe
-  /// imputable). Las ordenes contra un encargo no suman: ya las puso el.
+  /// Comprometido con proveedores de las obras con exposicion, con LA
+  /// definicion compartida de `comprometido.service.ts`: encargos vigentes
+  /// por su monto VIGENTE -adendas aprobadas incluidas- mas ordenes sueltas
+  /// aprobadas por su importe imputable. Las ordenes contra un encargo no
+  /// suman: ya las puso el.
   comprometido: string;
   /// Presupuesto menos comprometido, ambos ya acotados a ejecucion. Puede
   /// salir negativo, y entonces hay que verlo: se ha pedido mas de lo que
@@ -152,12 +167,26 @@ export async function obtenerResumenEmpresa(
   // esta cacheada por peticion: el panel tambien pide las alertas para el
   // popup, asi que ese trabajo se hace una sola vez y aqui solo se leen sus
   // totales. Lo demas son agregados propios que van en el mismo lote.
-  const [obras, obrasEnEjecucion, presupuesto, encargos, sueltas, alertas] =
-    await Promise.all([
+  const [
+    obras,
+    obrasEnEjecucion,
+    obrasConExposicion,
+    presupuesto,
+    comprometido,
+    alertas,
+  ] = await Promise.all([
       prisma.project.count({ where: obrasDelAlcance }),
 
       prisma.project.count({
         where: { ...obrasDelAlcance, estado: "EN_EJECUCION" },
+      }),
+
+      // Las que de verdad ponen el dinero de abajo. Ver `obrasConExposicion`.
+      prisma.project.count({
+        where: {
+          ...obrasDelAlcance,
+          estado: { in: [...ESTADOS_OBRA_CON_EXPOSICION] },
+        },
       }),
 
       // Con la regla de hojas y no con un `SUM` plano: filtrar por `tipo` no
@@ -168,53 +197,26 @@ export async function obtenerResumenEmpresa(
       // nadie. PARALIZADA entra: paralizar no borra lo comprometido.
       totalDeEmpresa(sesion, ESTADOS_OBRA_CON_EXPOSICION),
 
-      // El comprometido son DOS agregados desde que el encargo manda: el
-      // monto contratado de los encargos vigentes y las ordenes sueltas
-      // aprobadas. La orden emitida contra un encargo no entra —su dinero ya
-      // lo puso el monto del encargo—: la excluye el `encargoId: null`.
-      prisma.encargoProveedor.aggregate({
-        where: {
-          estado: "VIGENTE",
-          // El encargo no lleva companyId propio: su empresa es la de su
-          // obra, y el alcance tambien se aplica ahi.
-          project: {
-            ...deLaEmpresa,
-            estado: { in: [...ESTADOS_OBRA_CON_EXPOSICION] },
-            ...filtroDeObras(sesion),
-          },
-        },
-        _sum: { montoContratado: true },
-      }),
-
-      prisma.ordenImputacion.aggregate({
-        where: {
-          ordenCompra: {
-            ...deLaEmpresa,
-            estado: "APROBADA",
-            encargoId: null,
-            // El alcance se aplica a la OBRA de la orden, que es donde `id`
-            // significa lo que aqui hace falta.
-            project: {
-              estado: { in: [...ESTADOS_OBRA_CON_EXPOSICION] },
-              ...filtroDeObras(sesion),
-            },
-          },
-        },
-        _sum: { importe: true },
+      // El comprometido con LA definicion compartida, la misma que ve el
+      // tablero de cada obra: encargos VIGENTES por su monto vigente -con las
+      // adendas aprobadas dentro- mas las ordenes sueltas aprobadas. Hasta el
+      // 23/08 esto sumaba `montoContratado`, asi que un adicional ya firmado
+      // por gerencia no aparecia en la exposicion de la empresa.
+      comprometidoDelAmbito(sesion, {
+        estado: { in: [...ESTADOS_OBRA_CON_EXPOSICION] },
+        ...filtroDeObras(sesion),
       }),
 
       datosAlertasEmpresa(sesion),
     ]);
 
   const presupuestoTotal = presupuesto;
-  const comprometidoTotal = sumar([
-    encargos._sum.montoContratado?.toString() ?? "0",
-    sueltas._sum.importe?.toString() ?? "0",
-  ]);
+  const comprometidoTotal = comprometido.total;
 
   return {
     obras,
     obrasEnEjecucion,
+    obrasConExposicion,
     presupuestoTotal,
     comprometido: comprometidoTotal,
     // Con aritmetica decimal y no con resta de numeros: aqui son importes, y
@@ -255,43 +257,12 @@ const datosAlertasEmpresa = cache(async function datosAlertasEmpresa(
 ): Promise<DatosAlertas> {
   const deLaEmpresa = { companyId: sesion.companyId };
 
-  const [sueltas, encargosVigentes, vencidas] = await Promise.all([
-    // Las ordenes SUELTAS aprobadas. Las emitidas contra un encargo no
-    // entran: su dinero ya lo pone el monto contratado del encargo, que se
-    // trae aparte. El alcance cuelga de `project` y no del `id` de la orden:
-    // aqui el sujeto de la consulta es la imputacion, no la obra.
-    prisma.ordenImputacion.groupBy({
-      by: ["wbsItemId"],
-      where: {
-        ordenCompra: {
-          ...deLaEmpresa,
-          estado: "APROBADA",
-          encargoId: null,
-          project: filtroDeObras(sesion),
-        },
-      },
-      _sum: { importe: true },
-    }),
-    // Los encargos vigentes, con sus partidas y parciales para repartir su
-    // monto. El encargo no lleva companyId propio: su empresa es la de su
-    // obra, y el alcance se aplica ahi.
-    prisma.encargoProveedor.findMany({
-      where: {
-        estado: "VIGENTE",
-        project: { ...deLaEmpresa, ...filtroDeObras(sesion) },
-      },
-      select: {
-        projectId: true,
-        montoContratado: true,
-        partidas: {
-          select: {
-            wbsItemId: true,
-            fraccion: true,
-            partida: { select: { parcial: true } },
-          },
-        },
-      },
-    }),
+  const [comprometido, vencidas] = await Promise.all([
+    // El comprometido de toda la cartera del alcance, con la definicion
+    // compartida. Trae ya repartido por partida QUIEN se paso de su parcial:
+    // antes esa cuenta se rehacia aqui, y una copia mas de la misma regla es
+    // una copia mas que se puede quedar atras.
+    comprometidoPorObra(sesion, filtroDeObras(sesion)),
     prisma.project.findMany({
       where: {
         ...deLaEmpresa,
@@ -308,103 +279,35 @@ const datosAlertasEmpresa = cache(async function datosAlertasEmpresa(
   const alertas: AlertaEmpresa[] = [];
   let partidasSobregiradas = 0;
 
-  if (sueltas.length > 0 || encargosVigentes.length > 0) {
-    // De que obra es cada partida y su parcial: las sueltas lo preguntan a
-    // la base; las de encargo ya lo traen consigo.
-    const partidas =
-      sueltas.length > 0
-        ? await prisma.wbsItem.findMany({
-            where: { id: { in: sueltas.map((p) => p.wbsItemId) } },
-            select: { id: true, parcial: true, projectId: true },
-          })
-        : [];
+  // Cuantas partidas se pasan de su parcial, y de que obra es cada una: el
+  // total va al resumen, el desglose por obra al popup. Quien decide que es un
+  // sobregiro es `resumirComprometido`, no este bucle: hasta el 23/08 la regla
+  // -incluida la trampa del parcial negativo- estaba copiada en tres sitios.
+  const sobregiroPorObra = new Map<string, number>();
+  for (const [obraId, resumen] of comprometido) {
+    if (resumen.sobregiradas.length === 0) continue;
+    partidasSobregiradas += resumen.sobregiradas.length;
+    sobregiroPorObra.set(obraId, resumen.sobregiradas.length);
+  }
 
-    const infoPartida = new Map<string, { parcial: string; projectId: string }>();
-    for (const p of partidas) {
-      infoPartida.set(p.id, {
-        parcial: p.parcial?.toString() ?? "0",
-        projectId: p.projectId,
+  if (sobregiroPorObra.size > 0) {
+    const conSobregiro = await prisma.project.findMany({
+      where: { id: { in: [...sobregiroPorObra.keys()] } },
+      select: { id: true, nombreObra: true },
+    });
+    const nombrePorId = new Map(conSobregiro.map((o) => [o.id, o.nombreObra]));
+
+    for (const [obraId, n] of sobregiroPorObra) {
+      alertas.push({
+        obraId,
+        obraNombre: nombrePorId.get(obraId) ?? "Obra",
+        clave: "sobregiro",
+        camino: `/obras/${obraId}`,
+        texto:
+          n === 1
+            ? "1 partida comprometida por encima de su presupuesto"
+            : `${n} partidas comprometidas por encima de su presupuesto`,
       });
-    }
-    for (const e of encargosVigentes) {
-      for (const p of e.partidas) {
-        infoPartida.set(p.wbsItemId, {
-          parcial: p.partida.parcial?.toString() ?? "0",
-          projectId: e.projectId,
-        });
-      }
-    }
-
-    /**
-     * El comprometido por partida con LA definicion —encargos vigentes
-     * repartidos mas ordenes sueltas—, fundido en `@/lib/encargos` igual que
-     * en la pantalla de la obra: dos copias de esta cuenta acabarian
-     * marcando sobregiros distintos en el panel y en la obra.
-     *
-     * Las claves son ids de partida, unicos en toda la base, asi que un solo
-     * mapa vale para la empresa entera.
-     */
-    const mapa = comprometidoPorPartida(
-      encargosVigentes.map((e) => ({
-        montoContratado: e.montoContratado.toString(),
-        partidas: e.partidas.map((p) => ({
-          clave: p.wbsItemId,
-          parcial: p.partida.parcial?.toString() ?? "0",
-          fraccion: p.fraccion.toString(),
-        })),
-      })),
-      sueltas.map((s) => ({
-        clave: s.wbsItemId,
-        importe: s._sum.importe?.toString() ?? "0",
-      })),
-    );
-
-    // Cuantas partidas se pasan, y de que obra es cada una: el total va al
-    // resumen, el desglose por obra al popup.
-    const sobregiroPorObra = new Map<string, number>();
-    for (const [wbsItemId, comprometido] of mapa) {
-      const partida = infoPartida.get(wbsItemId);
-      if (!partida) continue;
-
-      /**
-       * Con `restar`, y aqui importa de verdad.
-       *
-       * `sumar([importe, \`-${parcial}\`])` se rompe cuando el parcial ya es
-       * negativo —el descuento comercial de CRIOCORD es -26.821,60—: produce
-       * "--26821.60", `sumar` lo descarta en silencio y el exceso queda igual
-       * al importe comprometido, que es positivo. Resultado: la partida se
-       * marcaba SOBREGIRADA sin estarlo, y saltaba una alerta falsa.
-       */
-      const exceso = restar(comprometido, partida.parcial);
-
-      if (exceso !== null && esPositivo(exceso)) {
-        partidasSobregiradas++;
-        sobregiroPorObra.set(
-          partida.projectId,
-          (sobregiroPorObra.get(partida.projectId) ?? 0) + 1,
-        );
-      }
-    }
-
-    if (sobregiroPorObra.size > 0) {
-      const obras = await prisma.project.findMany({
-        where: { id: { in: [...sobregiroPorObra.keys()] } },
-        select: { id: true, nombreObra: true },
-      });
-      const nombrePorId = new Map(obras.map((o) => [o.id, o.nombreObra]));
-
-      for (const [obraId, n] of sobregiroPorObra) {
-        alertas.push({
-          obraId,
-          obraNombre: nombrePorId.get(obraId) ?? "Obra",
-          clave: "sobregiro",
-          camino: `/obras/${obraId}`,
-          texto:
-            n === 1
-              ? "1 partida comprometida por encima de su presupuesto"
-              : `${n} partidas comprometidas por encima de su presupuesto`,
-        });
-      }
     }
   }
 
@@ -604,148 +507,22 @@ export async function listarObras(
   // Se agrega en la base y no en JavaScript: sumar miles de partidas en
   // memoria seria innecesariamente costoso y perderia precision decimal.
   //
-  // Los dos agregados —presupuesto por obra y comprometido por partida— son
+  // Los dos agregados —presupuesto por obra y comprometido por obra— son
   // independientes entre si, asi que van en el mismo lote: encadenarlos solo
   // sumaba una ida y vuelta a la base de mas por cada carga del panel.
   const idsObras = obras.map((o) => o.id);
-  const [totales, sueltas, encargosVigentes] = await Promise.all([
+  const [totales, comprometido] = await Promise.all([
     // Igual que arriba: la regla de hojas, no una suma plana por tipo.
     totalesPorObra(idsObras),
 
-    /**
-     * Comprometido por obra, con la MISMA definicion que `obtenerComprometido`:
-     * encargos VIGENTES (monto contratado) mas ordenes SUELTAS aprobadas por
-     * su importe imputable —de eso ya se encarga la imputacion, que guarda la
-     * cifra que cuenta—. Las ordenes contra un encargo las excluye el
-     * `encargoId: null`: su dinero ya lo puso el monto del encargo.
-     *
-     * Va en sus propias consultas y no colgando de la de partidas porque son
-     * agregados distintos; juntarlos multiplicaria filas y falsearia todos.
-     */
-    prisma.ordenImputacion.groupBy({
-      by: ["wbsItemId"],
-      where: {
-        ordenCompra: {
-          projectId: { in: idsObras },
-          estado: "APROBADA",
-          encargoId: null,
-          companyId: sesion.companyId,
-        },
-      },
-      _sum: { importe: true },
-    }),
-
-    prisma.encargoProveedor.findMany({
-      where: {
-        projectId: { in: idsObras },
-        estado: "VIGENTE",
-        project: { companyId: sesion.companyId },
-      },
-      select: {
-        projectId: true,
-        montoContratado: true,
-        partidas: {
-          select: {
-            wbsItemId: true,
-            fraccion: true,
-            partida: { select: { parcial: true } },
-          },
-        },
-      },
-    }),
+    // El comprometido de estas obras con LA definicion compartida. Hasta el
+    // 23/08 este bloque tenia su propia copia de las consultas, del reparto y
+    // de la deteccion de sobregiro; eran ochenta lineas que repetian, una a
+    // una, decisiones ya tomadas en otro sitio.
+    comprometidoPorObra(sesion, { id: { in: idsObras } }),
   ]);
 
   const porObra = totales;
-
-  // Para saber a que obra pertenece cada partida SUELTA, y su parcial, con el
-  // que se detecta el sobregiro. Las partidas de encargo ya traen ambas cosas.
-  const partidas =
-    sueltas.length > 0
-      ? await prisma.wbsItem.findMany({
-          where: { id: { in: sueltas.map((c) => c.wbsItemId) } },
-          select: { id: true, projectId: true, parcial: true },
-        })
-      : [];
-
-  const partidaPorId = new Map(partidas.map((p) => [p.id, p]));
-
-  // Las dos fuentes agrupadas por obra, para fundirlas con la aritmetica de
-  // `@/lib/encargos`, que es la misma de la pantalla de ordenes.
-  const encargosDeObra = new Map<string, EncargoDelComprometido[]>();
-  for (const e of encargosVigentes) {
-    const lista = encargosDeObra.get(e.projectId) ?? [];
-    lista.push({
-      montoContratado: e.montoContratado.toString(),
-      partidas: e.partidas.map((p) => ({
-        clave: p.wbsItemId,
-        parcial: p.partida.parcial?.toString() ?? "0",
-        fraccion: p.fraccion.toString(),
-      })),
-    });
-    encargosDeObra.set(e.projectId, lista);
-  }
-
-  const sueltasDeObra = new Map<string, { clave: string; importe: string }[]>();
-  for (const fila of sueltas) {
-    const partida = partidaPorId.get(fila.wbsItemId);
-    if (!partida) continue;
-    const lista = sueltasDeObra.get(partida.projectId) ?? [];
-    lista.push({
-      clave: fila.wbsItemId,
-      importe: fila._sum.importe?.toString() ?? "0",
-    });
-    sueltasDeObra.set(partida.projectId, lista);
-  }
-
-  // El parcial de cada partida tocada, se llegue a ella por donde se llegue.
-  const parcialDePartida = new Map<string, string>();
-  for (const p of partidas) {
-    parcialDePartida.set(p.id, p.parcial?.toString() ?? "0");
-  }
-  for (const e of encargosVigentes) {
-    for (const p of e.partidas) {
-      parcialDePartida.set(p.wbsItemId, p.partida.parcial?.toString() ?? "0");
-    }
-  }
-
-  const comprometidoPorObra = new Map<string, string>();
-  const sobregiradasPorObra = new Map<string, number>();
-
-  for (const obraId of idsObras) {
-    const encargosAqui = encargosDeObra.get(obraId) ?? [];
-    const sueltasAqui = sueltasDeObra.get(obraId) ?? [];
-    if (encargosAqui.length === 0 && sueltasAqui.length === 0) continue;
-
-    // El TOTAL sale de los montos y las sueltas; el reparto por partida es
-    // para el sobregiro. Un encargo sin partidas repartidas cuenta en el
-    // total aunque no pinte ninguna fila.
-    comprometidoPorObra.set(
-      obraId,
-      desgloseComprometido(
-        encargosAqui.map((e) => e.montoContratado),
-        sueltasAqui.map((s) => s.importe),
-      ).total,
-    );
-
-    // Se compara contra el parcial de la partida. El vigente (base +
-    // movimientos) seria mas fino, pero exige la linea base aprobada y el
-    // panel tiene que servir tambien para obras que aun no la tienen.
-    //
-    // La resta va con `restar` y no con `Number`: aqui son importes y el
-    // dinero nunca pasa por coma flotante. Y con `restar` y no con
-    // `sumar([importe, `-${parcial}`])`, que con un parcial negativo produce
-    // "--26821.60" —lo hay en CRIOCORD—, `sumar` lo descarta en silencio y la
-    // partida sale marcada como sobregirada sin estarlo.
-    let sobregiradas = 0;
-    for (const [wbsItemId, importe] of comprometidoPorPartida(
-      encargosAqui,
-      sueltasAqui,
-    )) {
-      const exceso = restar(importe, parcialDePartida.get(wbsItemId) ?? "0");
-      if (exceso !== null && esPositivo(exceso)) sobregiradas++;
-    }
-    if (sobregiradas > 0) sobregiradasPorObra.set(obraId, sobregiradas);
-  }
 
   const filas = obras.map((obra) => {
     const agregado = porObra.get(obra.id);
@@ -753,8 +530,8 @@ export async function listarObras(
       ...obra,
       presupuestoTotal: agregado?.costoDirecto ?? "0",
       totalPartidas: agregado?.partidas ?? 0,
-      comprometido: comprometidoPorObra.get(obra.id) ?? "0.00",
-      partidasSobregiradas: sobregiradasPorObra.get(obra.id) ?? 0,
+      comprometido: comprometido.get(obra.id)?.total ?? "0.00",
+      partidasSobregiradas: comprometido.get(obra.id)?.sobregiradas.length ?? 0,
     };
   });
 
@@ -1604,10 +1381,22 @@ export async function cambiarEstadoObra(
   if (nuevoEstado === "CERRADA") {
     const [encargosVigentes, movimientosBorrador] = await Promise.all([
       prisma.encargoProveedor.findMany({
-        where: { projectId: obraId, estado: "VIGENTE" },
+        where: {
+          projectId: obraId,
+          estado: "VIGENTE",
+          project: { companyId: sesion.companyId },
+        },
         select: {
           montoContratado: true,
-          valorizaciones: { orderBy: { fecha: "desc" }, take: 1, select: { porcentaje: true } },
+          // Contra el VIGENTE, no contra lo firmado: un adicional aprobado es
+          // deuda con el contratista, y sin contarlo la obra se podia cerrar
+          // dejando dinero por pagar que el requisito no veia.
+          adendas: { where: { estado: "APROBADA" }, select: { importe: true } },
+          valorizaciones: {
+            orderBy: { fecha: "desc" },
+            take: 1,
+            select: { porcentaje: true, importe: true },
+          },
           pagos: { select: { monto: true } },
         },
       }),
@@ -1617,8 +1406,22 @@ export async function cambiarEstadoObra(
     ]);
 
     const valorizacionesPendientes = encargosVigentes.filter((e) => {
-      const porcentaje = e.valorizaciones[0]?.porcentaje.toString() ?? "0";
-      const valorizado = importeValorizado(e.montoContratado.toString(), porcentaje);
+      const ultima = e.valorizaciones[0];
+      const vigente = montoVigente(
+        e.montoContratado.toString(),
+        e.adendas.map((a) => ({ importe: a.importe.toString() })),
+      );
+      // El importe CONGELADO del corte cuando lo hay: recalcularlo contra el
+      // contrato de hoy revalua el pasado cada vez que entra una adenda.
+      const valorizado = ultima
+        ? importeDeValorizacion(
+            {
+              porcentaje: ultima.porcentaje.toString(),
+              importe: ultima.importe?.toString() ?? null,
+            },
+            vigente,
+          )
+        : "0.00";
       const pagado = sumar(e.pagos.map((p) => p.monto.toString()));
       return esPositivo(restar(valorizado, pagado) ?? "0.00");
     }).length;

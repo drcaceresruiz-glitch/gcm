@@ -31,7 +31,16 @@ const datos = {
   cronogramas: {} as Record<string, unknown>,
   avances: [] as unknown[],
   ordenesCompra: [] as unknown[],
-  encargosVigentes: [] as { projectId: string; _sum: { montoContratado: string } }[],
+  /// Los encargos VIGENTES tal como los lee `comprometido.service.ts`: con
+  /// sus adendas aprobadas y sus partidas, no ya agregados.
+  encargosVigentes: [] as {
+    projectId: string;
+    montoContratado: string;
+    adendas: { importe: string }[];
+    partidas: unknown[];
+  }[],
+  /// Las ordenes sueltas aprobadas, agrupadas por partida.
+  sueltasComprometido: [] as { wbsItemId: string; _sum: { importe: string } }[],
   imputacionesSueltas: [] as { importe: string; ordenCompra: { projectId: string } }[],
   wbsItems: [] as unknown[],
   restricciones: [] as unknown[],
@@ -88,12 +97,14 @@ vi.mock("@/lib/prisma", () => ({
       },
     },
     encargoProveedor: {
-      groupBy: async (args: unknown) => {
-        llamadas.push({ modelo: "encargoProveedor:groupBy", args });
-        return datos.encargosVigentes;
-      },
       findMany: async (args: unknown) => {
         llamadas.push({ modelo: "encargoProveedor:findMany", args });
+        // Dos lecturas distintas comparten el modelo: la del comprometido
+        // pide `partidas` para repartir; la de valorizaciones, cadencia y
+        // pagos. Se distinguen por el select en vez de por el orden, que es
+        // lo que hacia fallar la prueba al cambiar el uno de sitio.
+        const select = (args as { select?: Record<string, unknown> }).select;
+        if (select?.partidas) return datos.encargosVigentes;
         return datos.encargosCompletos;
       },
     },
@@ -128,6 +139,10 @@ vi.mock("@/lib/prisma", () => ({
       findMany: async (args: unknown) => {
         llamadas.push({ modelo: "ordenImputacion", args });
         return datos.imputacionesSueltas;
+      },
+      groupBy: async (args: unknown) => {
+        llamadas.push({ modelo: "ordenImputacion:groupBy", args });
+        return datos.sueltasComprometido;
       },
     },
     wbsItem: {
@@ -203,6 +218,7 @@ beforeEach(() => {
   datos.ordenesCompra = [];
   datos.encargosVigentes = [];
   datos.imputacionesSueltas = [];
+  datos.sueltasComprometido = [];
   datos.wbsItems = [];
   datos.restricciones = [];
   datos.encargosCompletos = [];
@@ -699,9 +715,9 @@ describe("sobregiroProyectadoDeCartera", () => {
     ]);
 
     datos.encargosVigentes = [
-      { projectId: "obra-1", _sum: { montoContratado: "800.00" } },
-      { projectId: "obra-2", _sum: { montoContratado: "500.00" } },
-      { projectId: "obra-3", _sum: { montoContratado: "100.00" } },
+      { projectId: "obra-1", montoContratado: "800.00", adendas: [], partidas: [] },
+      { projectId: "obra-2", montoContratado: "500.00", adendas: [], partidas: [] },
+      { projectId: "obra-3", montoContratado: "100.00", adendas: [], partidas: [] },
     ];
 
     datos.wbsItems = [
@@ -753,7 +769,9 @@ describe("sobregiroProyectadoDeCartera", () => {
   it("pedidas juntas (misma sesion), las dos siguen dando el resultado correcto", async () => {
     datos.obras = [obra("obra-1")];
     conCronograma("obra-1", [tarea(1, { porcentajePlaneado: "50.00", porcentajeArchivo: "50.00" })]);
-    datos.encargosVigentes = [{ projectId: "obra-1", _sum: { montoContratado: "100.00" } }];
+    datos.encargosVigentes = [
+      { projectId: "obra-1", montoContratado: "100.00", adendas: [], partidas: [] },
+    ];
     datos.wbsItems = [
       { projectId: "obra-1", codigoPartida: "01", tipo: "PARTIDA", parcial: "1000.00" },
     ];
@@ -918,6 +936,7 @@ describe("valorizacionesDeCartera", () => {
       {
         projectId: "obra-1",
         montoContratado: "1000.00",
+        adendas: [],
         cadenciaDias: null,
         fechaInicio: null,
         createdAt: diasDesdeHoy(-60),
@@ -929,6 +948,7 @@ describe("valorizacionesDeCartera", () => {
       {
         projectId: "obra-1",
         montoContratado: "1000.00",
+        adendas: [],
         cadenciaDias: null,
         fechaInicio: null,
         createdAt: diasDesdeHoy(-30),
@@ -940,6 +960,7 @@ describe("valorizacionesDeCartera", () => {
       {
         projectId: "obra-1",
         montoContratado: "500.00",
+        adendas: [],
         cadenciaDias: null,
         fechaInicio: null,
         createdAt: diasDesdeHoy(-30),

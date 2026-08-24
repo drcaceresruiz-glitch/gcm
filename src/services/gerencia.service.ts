@@ -12,6 +12,7 @@ import { semaforoIndice, type Semaforo } from "@/lib/tablero";
 import { diasEntre, hoy } from "@/utils/fechas";
 import type { TipoRestriccion } from "@/generated/prisma/enums";
 import { totalesPorObra } from "@/services/presupuesto-obra";
+import { comprometidoPorObra } from "@/services/comprometido.service";
 import {
   metricasEvm,
   valorDeAvance,
@@ -23,7 +24,7 @@ import {
   type UltimoPpc,
 } from "@/services/plan-semanal.service";
 import { estadoDeCadencia } from "@/lib/cadencia-valorizacion";
-import { importeValorizado } from "@/lib/encargos";
+import { importeDeValorizacion, montoVigente } from "@/lib/adendas";
 import type { SesionActiva } from "@/services/sesion.service";
 
 /**
@@ -530,41 +531,16 @@ export async function sobregiroProyectadoDeCartera(
 
   const obraIds = lote.map((o) => o.obraId);
 
-  const [encargosVigentes, imputacionesSueltas, presupuestos] = await Promise.all([
-    // MISMA formula de comprometido que `obtenerResumenEmpresa` en
-    // obras.service.ts: encargos VIGENTE, agregados por obra. EncargoProveedor
-    // tiene `projectId` propio, asi que un `groupBy` directo alcanza.
-    prisma.encargoProveedor.groupBy({
-      by: ["projectId"],
-      where: { estado: "VIGENTE", projectId: { in: obraIds } },
-      _sum: { montoContratado: true },
-    }),
-    // Las ordenes SUELTAS aprobadas. `OrdenImputacion` NO tiene `projectId`
-    // propio (solo `ordenId`/`wbsItemId`), asi que no hay `groupBy` posible
-    // aqui: se trae la fila con el projectId de su orden y se agrega en JS,
-    // mismo patron que `adicionalesEnBorrador` con los movimientos.
-    prisma.ordenImputacion.findMany({
-      where: {
-        ordenCompra: { estado: "APROBADA", encargoId: null, projectId: { in: obraIds } },
-      },
-      select: { importe: true, ordenCompra: { select: { projectId: true } } },
-    }),
+  const [comprometidoDeCadaObra, presupuestos] = await Promise.all([
+    // LA definicion compartida (`comprometido.service.ts`), la misma que el
+    // tablero de la obra y el panel de empresa. Antes esto tenia su propia
+    // pareja de consultas -y ninguna de las dos filtraba por empresa, se fiaba
+    // de que `obraIds` ya venia acotado-: ahora el filtro se aplica tambien
+    // donde se lee, como manda la regla.
+    comprometidoPorObra(sesion, { id: { in: obraIds } }),
     // Ya existe, ya es batched: una consulta a `wbsItem`, sin tocar cronograma.
     totalesPorObra(obraIds),
   ]);
-
-  const comprometidoPorObra = new Map<string, string[]>();
-  for (const e of encargosVigentes) {
-    const importes = comprometidoPorObra.get(e.projectId) ?? [];
-    importes.push(e._sum.montoContratado?.toString() ?? "0");
-    comprometidoPorObra.set(e.projectId, importes);
-  }
-  for (const i of imputacionesSueltas) {
-    const obraId = i.ordenCompra.projectId;
-    const importes = comprometidoPorObra.get(obraId) ?? [];
-    importes.push(i.importe.toString());
-    comprometidoPorObra.set(obraId, importes);
-  }
 
   const obras: ObraConSobregiroProyectado[] = lote.map((o) => {
     let avanceFisicoPct: number | null = null;
@@ -581,7 +557,7 @@ export async function sobregiroProyectadoDeCartera(
     }
 
     const presupuesto = Number(presupuestos.get(o.obraId)?.costoDirecto ?? "0");
-    const comprometido = Number(sumar(comprometidoPorObra.get(o.obraId) ?? []));
+    const comprometido = Number(comprometidoDeCadaObra.get(o.obraId)?.total ?? "0");
     const comprometidoPct = presupuesto > 0 ? (comprometido / presupuesto) * 100 : null;
 
     const desviacionPuntos =
@@ -1032,6 +1008,10 @@ export async function valorizacionesDeCartera(
     select: {
       projectId: true,
       montoContratado: true,
+      // Contra el VIGENTE: un adicional aprobado es dinero que el contratista
+      // puede valorizar y cobrar, y sin contarlo el «por pagar» de gerencia
+      // salia corto justo en los encargos que mas se han movido.
+      adendas: { where: { estado: "APROBADA" }, select: { importe: true } },
       cadenciaDias: true,
       fechaInicio: true,
       createdAt: true,
@@ -1039,7 +1019,7 @@ export async function valorizacionesDeCartera(
       valorizaciones: {
         orderBy: { fecha: "desc" },
         take: 1,
-        select: { fecha: true, porcentaje: true },
+        select: { fecha: true, porcentaje: true, importe: true },
       },
       pagos: { select: { monto: true } },
     },
@@ -1055,7 +1035,20 @@ export async function valorizacionesDeCartera(
     const diaCorteObra = diaCortePorObra.get(e.projectId) ?? 5;
     const ultima = e.valorizaciones[0] ?? null;
     const porcentaje = ultima?.porcentaje.toString() ?? "0";
-    const valorizado = importeValorizado(e.montoContratado.toString(), porcentaje);
+    // Con el importe CONGELADO del corte cuando lo hay: recalcularlo contra el
+    // contrato de hoy revaluaria el pasado en cuanto entra una adenda.
+    const valorizado = ultima
+      ? importeDeValorizacion(
+          {
+            porcentaje,
+            importe: ultima.importe?.toString() ?? null,
+          },
+          montoVigente(
+            e.montoContratado.toString(),
+            e.adendas.map((a) => ({ importe: a.importe.toString() })),
+          ),
+        )
+      : "0.00";
     const pagado = sumar(e.pagos.map((p) => p.monto.toString()));
     const porPagar = restar(valorizado, pagado) ?? "0.00";
 

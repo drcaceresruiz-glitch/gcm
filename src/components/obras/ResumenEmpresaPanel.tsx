@@ -23,9 +23,18 @@ import { AlertasEmpresa } from "@/components/obras/AlertasEmpresa";
  * tarjetas en fila pareja hacian leer las tres de dinero como si fueran del
  * mismo "5" de la primera: la jerarquia visual decia "mismo ambito" aunque
  * el texto dijera lo contrario. "Obras" queda sola, de cartera; el dinero
- * va aparte, dentro de una caja con su propio titulo —"La obra en
- * ejecución"—, que ya no necesita nombrar la obra: al mostrarse solo cuando
- * hay exactamente una, decirlo asi es exacto y no una aproximacion.
+ * va aparte, dentro de una caja con su propio titulo, que al mostrarse solo
+ * cuando hay exactamente una obra viva puede nombrarla en singular.
+ *
+ * CON CERO OBRAS VIVAS no se pinta la caja llena de ceros, se dice por que
+ * esta vacia. Un usuario pregunto «¿por que esas tarjetas no muestran nada?»
+ * teniendo su unica obra en planificacion: las cifras no estaban rotas, es
+ * que no cubren lo que aun no ha arrancado, y la pantalla no lo decia en
+ * ningun sitio. Tres ceros sin explicacion se leen como un fallo.
+ *
+ * Y el titulo sigue al ESTADO real: las cifras cubren tambien las obras
+ * PARALIZADAS -paralizar no borra lo que se debe-, asi que llamarlas siempre
+ * «La obra en ejecución» era falso justo cuando mas importa mirarlas.
  *
  * El presupuesto va SIN IGV, que es la cifra de control. El comprometido va
  * por el importe IMPUTABLE de cada orden —neto con IGV, total con retencion—,
@@ -54,7 +63,13 @@ export function ResumenEmpresaPanel({
    * propia tarjeta de la lista de abajo -eso no cambia-, asi que aqui se
    * quitan en vez de explicarlas con texto.
    */
-  const unaSolaEnEjecucion = resumen.obrasEnEjecucion <= 1;
+  const vivas = resumen.obrasConExposicion;
+  const unaSola = vivas === 1;
+
+  // El titulo dice el estado que de verdad tiene la obra que hay detras. Con
+  // una sola viva, o esta en ejecucion o esta paralizada.
+  const tituloDeLaCaja =
+    resumen.obrasEnEjecucion === 1 ? "La obra en ejecución" : "La obra paralizada";
 
   return (
     // `relative z-20`: crea un contexto de apilamiento para TODO el panel de
@@ -79,13 +94,26 @@ export function ResumenEmpresaPanel({
         />
       </dl>
 
-      {unaSolaEnEjecucion && (
+      {vivas === 0 && resumen.obras > 0 && (
+        <div
+          className="rounded-xl border px-3 py-2.5"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <p className="text-xs opacity-60">
+            Presupuesto, comprometido y saldo aparecen aquí cuando una obra
+            arranca. Ahora mismo ninguna está en ejecución, así que no hay
+            exposición que resumir.
+          </p>
+        </div>
+      )}
+
+      {unaSola && (
         <div
           className="rounded-xl border p-3"
           style={{ borderColor: "var(--borde)" }}
         >
           <p className="mb-2 px-1 text-xs font-medium opacity-60">
-            La obra en ejecución
+            {tituloDeLaCaja}
           </p>
           <dl className="grid gap-3 sm:grid-cols-3">
             <Cifra

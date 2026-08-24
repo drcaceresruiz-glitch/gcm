@@ -11,11 +11,8 @@ import {
   sumarLineas,
   type TipoImpuesto,
 } from "@/lib/ordenes";
-import {
-  comprometidoPorPartida,
-  desgloseComprometido,
-  type DesgloseComprometido,
-} from "@/lib/encargos";
+import { type DesgloseComprometido } from "@/lib/encargos";
+import { comprometidoDelAmbito } from "@/services/comprometido.service";
 import {
   contarPaginas,
   normalizarPagina,
@@ -842,24 +839,21 @@ export interface ComprometidoPorPartida {
 
 /**
  * Lo comprometido con proveedores, por partida. LA DEFINICION cambio el
- * 18/08 con la decision de que el encargo es el contrato marco y manda:
+ * 18/08 con la decision de que el encargo es el contrato marco y manda, y
+ * desde el 23/08 vive en UN solo sitio, `comprometido.service.ts`:
  *
- *     encargos VIGENTES (su monto contratado, repartido entre sus partidas)
+ *     encargos VIGENTES (su monto vigente, repartido entre sus partidas)
  *   + ordenes sueltas APROBADAS (las que no cuelgan de ningun encargo)
  *
  * Una orden emitida CONTRA un encargo no suma: su compromiso ya lo puso el
- * monto contratado, y contarla ademas seria contar el mismo dinero dos
- * veces. El filtro `encargoId: null` de la consulta es esa regla, no una
- * optimizacion. Igual que siempre, un BORRADOR no compromete a nadie y una
- * ANULADA dejo de hacerlo; y de las sueltas cuenta el importe IMPUTABLE, que
- * es el neto con IGV y el total con retencion o sin impuesto.
+ * monto del encargo, y contarla ademas seria contar el mismo dinero dos
+ * veces. Igual que siempre, un BORRADOR no compromete a nadie y una ANULADA
+ * dejo de hacerlo; y de las sueltas cuenta el importe IMPUTABLE, que es el
+ * neto con IGV y el total con retencion o sin impuesto.
  *
  * El monto de los encargos es EL PRECIO DEL CONTRATISTA, no tu presupuesto:
  * puede quedar por encima o por debajo del parcial, y por eso el sobregiro
  * por fin puede verse al contratar, no recien al emitir ordenes.
- *
- * La aritmetica del reparto y de la fusion vive en `@/lib/encargos` —pura y
- * probada—; aqui solo se traen las filas.
  */
 export async function obtenerComprometido(
   sesion: SesionActiva,
@@ -892,7 +886,12 @@ export async function desgloseComprometidoDeObra(
 }
 
 /**
- * Las dos consultas del comprometido, UNA vez para las dos lecturas.
+ * Las dos lecturas del comprometido de la obra, de una sola pasada.
+ *
+ * Las filas y la aritmetica las pone `comprometido.service.ts`, que desde el
+ * 23 de agosto de 2026 es el unico sitio que decide que cuenta. Antes esta
+ * funcion tenia su copia de las consultas y era una de las cinco que habia
+ * repartidas por el codigo, cada una un poco distinta de las demas.
  *
  * `porPartida` sale del reparto y `desglose.total` de los montos: un encargo
  * vigente sin partidas repartidas cuenta en el total aunque no pinte fila, y
@@ -902,66 +901,18 @@ async function comprometidoDeObra(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<{ porPartida: ComprometidoPorPartida[]; desglose: DesgloseDeObra }> {
-  const [encargos, sueltas] = await Promise.all([
-    prisma.encargoProveedor.findMany({
-      where: {
-        projectId: obraId,
-        estado: "VIGENTE",
-        project: { companyId: sesion.companyId },
-      },
-      select: {
-        montoContratado: true,
-        partidas: {
-          select: {
-            wbsItemId: true,
-            fraccion: true,
-            partida: { select: { parcial: true } },
-          },
-        },
-      },
-    }),
-    prisma.ordenImputacion.groupBy({
-      by: ["wbsItemId"],
-      where: {
-        ordenCompra: {
-          projectId: obraId,
-          estado: "APROBADA",
-          encargoId: null,
-          company: { id: sesion.companyId },
-        },
-      },
-      _sum: { importe: true },
-    }),
-  ]);
-
-  // Los Decimal a texto en la frontera, como en todo el sistema. `_sum` es
-  // null sin filas, y ademas normaliza: Prisma devuelve "10000", no "10000.00".
-  const paraReparto = encargos.map((e) => ({
-    montoContratado: e.montoContratado.toString(),
-    partidas: e.partidas.map((p) => ({
-      clave: p.wbsItemId,
-      parcial: p.partida.parcial?.toString() ?? "0",
-      fraccion: p.fraccion.toString(),
-    })),
-  }));
-  const importesSueltos = sueltas.map((s) => ({
-    clave: s.wbsItemId,
-    importe: s._sum.importe?.toString() ?? "0",
-  }));
-
-  const mapa = comprometidoPorPartida(paraReparto, importesSueltos);
+  const resumen = await comprometidoDelAmbito(sesion, { id: obraId });
 
   return {
-    porPartida: [...mapa].map(([wbsItemId, comprometido]) => ({
+    porPartida: [...resumen.porPartida].map(([wbsItemId, comprometido]) => ({
       wbsItemId,
       comprometido,
     })),
     desglose: {
-      ...desgloseComprometido(
-        paraReparto.map((e) => e.montoContratado),
-        importesSueltos.map((s) => s.importe),
-      ),
-      encargosVigentes: encargos.length,
+      total: resumen.total,
+      deEncargos: resumen.deEncargos,
+      deOrdenesSueltas: resumen.deOrdenesSueltas,
+      encargosVigentes: resumen.encargosVigentes,
     },
   };
 }

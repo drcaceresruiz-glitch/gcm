@@ -414,7 +414,11 @@ describe("obtenerComprometido: encargos vigentes + ordenes sueltas", () => {
     // y un tercio) mas una orden suelta de 500 en la primera.
     estado.encargosVigentes = [
       {
+        projectId: "obra-1",
         montoContratado: "9000.00",
+        // Sin adendas: el vigente es lo firmado. Que el campo viaje siempre
+        // es lo que evita volver a leer el comprometido contra lo firmado.
+        adendas: [],
         partidas: [
           { wbsItemId: "p-1", fraccion: "100", partida: { parcial: "10000.00" } },
           { wbsItemId: "p-2", fraccion: "50", partida: { parcial: "10000.00" } },
@@ -460,7 +464,9 @@ describe("obtenerComprometido: encargos vigentes + ordenes sueltas", () => {
   });
 
   it("sin permiso de ordenes devuelve vacio y no consulta", async () => {
-    estado.encargosVigentes = [{ montoContratado: "9000.00", partidas: [] }];
+    estado.encargosVigentes = [
+      { projectId: "obra-1", montoContratado: "9000.00", adendas: [], partidas: [] },
+    ];
     expect(await obtenerComprometido(sesion([]), "obra-1")).toEqual([]);
     expect(estado.consultas).toEqual([]);
   });

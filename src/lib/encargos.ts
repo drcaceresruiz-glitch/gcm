@@ -297,7 +297,16 @@ export function repartirContratado(
 }
 
 export interface EncargoDelComprometido {
-  montoContratado: string;
+  /**
+   * Lo firmado MAS sus adendas APROBADAS.
+   *
+   * Se llama `montoVigente` y no `montoContratado` a proposito: hasta el 23
+   * de agosto de 2026 aqui llegaba lo firmado, asi que un adicional aprobado
+   * -dinero que ya se le debe al contratista- no aparecia en el comprometido
+   * de ninguna pantalla. El nombre del campo es lo que obliga a quien lea
+   * filas de la base a acordarse de sumar las adendas antes de llegar aqui.
+   */
+  montoVigente: string;
   partidas: readonly PartidaDeReparto[];
 }
 
@@ -331,7 +340,7 @@ export function comprometidoPorPartida(
 
   for (const encargo of encargos) {
     for (const parte of repartirContratado(
-      encargo.montoContratado,
+      encargo.montoVigente,
       encargo.partidas,
     )) {
       anotar(parte.clave, parte.importe);
@@ -360,6 +369,71 @@ export interface DesgloseComprometido {
  * comprometido y el total lo tiene que contar. La diferencia entre el total
  * y la suma de filas es visible en pantalla, no un descuadre silencioso.
  */
+export interface ResumenComprometido extends DesgloseComprometido {
+  /// Cuanto carga cada partida, con el reparto ya hecho.
+  porPartida: Map<string, string>;
+  /// Las partidas que se pasaron de su parcial. Los IDS y no un conteo: quien
+  /// llama necesita agruparlas por obra, y volver a calcularlas para eso seria
+  /// tener otra vez dos copias de la misma regla.
+  sobregiradas: string[];
+  /// Cuantos encargos vigentes ponen la parte `deEncargos`.
+  encargosVigentes: number;
+}
+
+/**
+ * TODO el comprometido de un ambito, de una sola pasada: el total, el
+ * desglose por origen, el reparto por partida y cuales se pasaron.
+ *
+ * NACE DE UN NUMERO EQUIVOCADO EN PANTALLA, el 23 de agosto de 2026. El
+ * tablero de la obra decia «Comprometido S/ 0,00 de S/ 740,00 - saldo
+ * disponible S/ 740,00» en una obra con un contratista de 735 firmados y 740
+ * ya pagados. La causa no fue un fallo de calculo: habia DOS definiciones de
+ * comprometido conviviendo. Cuando el encargo paso a ser el contrato marco
+ * (18/08) se actualizo la del panel de empresa y no la del tablero, que se
+ * quedo contando solo ordenes de compra -y esa obra no tenia ninguna-. El
+ * comentario del tablero llego a decir «las mismas definiciones que el
+ * resumen de empresa» siendo ya falso.
+ *
+ * Que un saldo diga que hay dinero libre que en realidad ya se gasto es el
+ * peor tipo de cifra equivocada: no parece rota, parece buena noticia.
+ *
+ * Por eso esta funcion y `services/comprometido.service.ts` son el UNICO
+ * sitio donde se decide que cuenta. Aqui la aritmetica, alli las filas.
+ *
+ * El sobregiro se mide con `restar` y no con `sumar([importe, "-"+parcial])`:
+ * un parcial negativo -un descuento comercial, los hay- produce "--26821.60",
+ * `sumar` lo descarta en silencio y la partida sale marcada como sobregirada
+ * sin estarlo. Ya paso.
+ */
+export function resumirComprometido(
+  encargos: readonly EncargoDelComprometido[],
+  sueltas: readonly { clave: string; importe: string }[],
+  parcialDePartida: ReadonlyMap<string, string>,
+): ResumenComprometido {
+  const porPartida = comprometidoPorPartida(encargos, sueltas);
+
+  const sobregiradas: string[] = [];
+  for (const [clave, importe] of porPartida) {
+    const parcial = parcialDePartida.get(clave);
+    // Sin parcial conocido no se afirma nada: una partida que no se pudo leer
+    // no es una partida sobregirada.
+    if (parcial === undefined) continue;
+
+    const exceso = restar(importe, parcial);
+    if (exceso !== null && esPositivo(exceso)) sobregiradas.push(clave);
+  }
+
+  return {
+    ...desgloseComprometido(
+      encargos.map((e) => e.montoVigente),
+      sueltas.map((s) => s.importe),
+    ),
+    porPartida,
+    sobregiradas,
+    encargosVigentes: encargos.length,
+  };
+}
+
 export function desgloseComprometido(
   montosDeEncargos: readonly string[],
   importesSueltos: readonly string[],

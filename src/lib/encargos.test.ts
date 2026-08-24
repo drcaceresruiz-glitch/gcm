@@ -210,7 +210,7 @@ describe("comprometidoPorPartida", () => {
     const r = comprometidoPorPartida(
       [
         {
-          montoContratado: "9000.00",
+          montoVigente: "9000.00",
           partidas: [
             { clave: "a", parcial: "10000.00", fraccion: "100" },
             { clave: "b", parcial: "10000.00", fraccion: "50" },
@@ -233,11 +233,11 @@ describe("comprometidoPorPartida", () => {
     const r = comprometidoPorPartida(
       [
         {
-          montoContratado: "4000.00",
+          montoVigente: "4000.00",
           partidas: [{ clave: "a", parcial: "10000.00", fraccion: "50" }],
         },
         {
-          montoContratado: "5500.00",
+          montoVigente: "5500.00",
           partidas: [{ clave: "a", parcial: "10000.00", fraccion: "50" }],
         },
       ],
@@ -264,7 +264,7 @@ describe("desgloseComprometido", () => {
    */
   it("un encargo sin partidas cuenta en el total aunque no tenga filas", () => {
     const filas = comprometidoPorPartida(
-      [{ montoContratado: "7000.00", partidas: [] }],
+      [{ montoVigente: "7000.00", partidas: [] }],
       [],
     );
     const totales = desgloseComprometido(["7000.00"], []);
