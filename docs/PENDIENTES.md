@@ -3,7 +3,7 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 23 de agosto de 2026 (segunda tanda).
+Ultima revision: 23 de agosto de 2026 (tercera tanda).
 
 ## El dinero de la obra, de punta a punta (23 de agosto de 2026)
 
@@ -315,6 +315,87 @@ documento es de antes y no decia cuales se habian cerrado:
   curva y capitulos pesan siempre por duracion, con o sin mapeo completo,
   aunque el manual y los comentarios prometan otra cosa cuando el mapeo pase
   del 60 %. Es el ultimo hallazgo de esa auditoria que queda vivo.
+
+### El comprometido tenia CINCO definiciones (cerrado el 23 de agosto)
+
+El usuario pidio «revisa si esta todo bien, reportado bien» y salio la peor
+clase de cifra equivocada: el tablero de su obra decia **«Comprometido S/ 0,00
+de S/ 740,00 - saldo disponible S/ 740,00»** teniendo un contratista con 735
+firmados y 740 ya pagados. Ofrecia como disponible dinero ya gastado, y eso no
+parece roto: parece una buena noticia.
+
+No fue un fallo de cuentas. Habia CINCO lecturas del comprometido -una en
+`tablero.service`, tres en `obras.service`, una en `gerencia.service`- y
+cuando el 18/08 el encargo paso a ser el contrato marco solo se actualizaron
+algunas. La del tablero se quedo contando ordenes de compra, y esa obra no
+tenia ninguna.
+
+Ahora hay UNA: `services/comprometido.service.ts` trae las filas y
+`lib/encargos.resumirComprometido` hace la aritmetica, deteccion de sobregiro
+incluida. Cuenta el monto VIGENTE -con las adendas aprobadas dentro- y el
+campo de la interfaz se llama `montoVigente` a proposito, para que quien lea
+filas de la base tenga que acordarse de sumar las adendas. De paso: el
+requisito para cerrar una obra y el «por pagar» de gerencia tambien valoraban
+contra lo firmado, y las consultas del sobregiro proyectado no filtraban por
+empresa.
+
+Tres ficheros salieron de la lista de `dinero-desde-la-base.test.ts`: ya no le
+piden sumas de dinero a la base porque ya no leen el comprometido por su
+cuenta. Esa lista es un buen indicador de si la duplicacion vuelve.
+
+### Y las adendas ya no esperan en silencio (23 de agosto)
+
+El circuito de la adenda tenia dos firmas y a la segunda le faltaba la
+bandeja: se firman dentro del encargo, a tres clics desde una obra concreta.
+Mientras tanto el residente no puede pagarle al contratista -el tope de pago
+lo rechaza- y el comprometido del gerente esta corto. Ahora salen en Gerencia
+(«Esperando tu firma», el primer bloque, ordenado por antiguedad), en el paso
+siguiente de la obra como BLOQUEANTE para quien puede firmar, y como insignia
+en el menu de Proveedores para todos.
+
+---
+
+## Lo que el usuario pidio y NO esta construido (al 23 de agosto de 2026)
+
+Los tres estan pedidos con sus palabras y siguen sin empezar. Estan en orden
+de lo que duele antes.
+
+### 1. Avisos configurables de la bolsa
+
+«Deberia haber avisos cuando la bolsa se vea comprometida, se acerca o se pone
+en negativo, que permita configurar estos avisos. En vez de asumirlo a
+sabiendas.»
+
+**Lo que ya existe y hay que reusar, no rehacer**: el modelo `Aviso`, la
+campanita, el envio por correo, el cron `avisos-reloj` -que ya se vigila desde
+`/api/health`- y `AjustesAvisosObra`, que es donde encajan los umbrales por
+obra. Lo que falta es el detector -comparar la bolsa comprometida contra dos
+umbrales, «se acerca» y «en rojo»- y su clave de aviso.
+
+**Cuidado con el ruido**: un aviso de bolsa que salta cada dia porque la obra
+lleva un mes en rojo se ignora a la semana. Tiene que avisar en el CRUCE del
+umbral, no mientras dure la condicion.
+
+### 2. Solicitud de deducir costos propios, con firma del gerente
+
+«Que el residente y/o el administrador de la obra pueda solicitar deducir
+monto de los gastos generales, se le presenta al gerente general y si este lo
+aprueba, se hacen todos los ajustes.»
+
+Es el MISMO patron de dos firmas que la adenda, y conviene copiarlo entero:
+quien solicita da el primer visto bueno, gerencia resuelve, el estado va en el
+WHERE de la actualizacion para sobrevivir a dos firmas simultaneas, y aprobar
+es irreversible -se corrige con otra solicitud de signo contrario-. La bandeja
+de firma de Gerencia ya existe desde hoy: esto seria su segundo inquilino.
+
+### 3. La pantalla del gerente general
+
+«Creo que ya es hora que el gerente general tenga su propia pantalla.»
+
+**Ya existe**: `/gerencia`, con nueve paneles contando el de firmas de hoy. Lo
+que queda por decidir con el usuario es si le falta algo concreto o si el
+problema es que no sabia que estaba ahi -en cuyo caso lo que falta no es una
+pantalla sino que se llegue a ella-.
 
 ---
 
