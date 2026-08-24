@@ -424,10 +424,17 @@ export function motivoNoAdmiteCambios(
  *
  * Nombra la salida: sin ella, quien se topa con esto no sabe si ha hecho algo
  * mal o si el sistema esta roto.
+ *
+ * ESTOS CUATRO TEXTOS LLEVAN TILDES y el resto del codigo no. No es un
+ * descuido: son de los pocos literales de este archivo que una persona LEE en
+ * pantalla, y desde el 24 de agosto de 2026 se leen mucho mas -antes solo
+ * aparecian al fallar una accion; ahora la pantalla los ensena antes de dejar
+ * intentarlo-. Sin tildes desentonan al lado de «quien hace que» y del resto
+ * de la interfaz, que si las lleva.
  */
 export const OBRA_CERRADA =
-  "La obra esta cerrada y no admite cambios. El resultado de una obra " +
-  "cerrada es historia: modificarlo falsearia lo que de verdad paso.";
+  "La obra está cerrada y no admite cambios. El resultado de una obra " +
+  "cerrada es historia: modificarlo falsearía lo que de verdad pasó.";
 
 /**
  * Igual que `OBRA_CERRADA` pero para PARALIZADA: aqui si se puede seguir
@@ -435,7 +442,7 @@ export const OBRA_CERRADA =
  * candado total.
  */
 export const OBRA_PARALIZADA =
-  "La obra esta paralizada: no se puede abrir trabajo nuevo mientras dure. " +
+  "La obra está paralizada: no se puede abrir trabajo nuevo mientras dure. " +
   "Se puede seguir cerrando lo que ya estaba en curso (aprobar movimientos " +
   "pendientes, subir evidencia, cerrar la semana abierta, resolver " +
   "restricciones).";
@@ -448,10 +455,10 @@ export const OBRA_PARALIZADA =
  * que hay alguien que puede devolverlo a la normalidad.
  */
 export const EMPRESA_EN_MIGRACION =
-  "La constructora esta en migracion: se esta sacando una copia completa de " +
+  "La constructora está en migración: se está sacando una copia completa de " +
   "sus datos y nadie puede escribir mientras dure, para que el archivo no " +
   "salga con unas cifras de un momento y otras de otro. Lo levanta el " +
-  "administrador cuando la exportacion termine.";
+  "administrador cuando la exportación termine.";
 
 /**
  * Lo mismo, para una copia restaurada de un respaldo.
@@ -462,7 +469,7 @@ export const EMPRESA_EN_MIGRACION =
  */
 export const OBRA_ARCHIVADA =
   "Esto es una copia restaurada de un respaldo, abierta solo para revisarla. " +
-  "No admite cambios: lo que se escribiera aqui no le pasaria a ninguna obra.";
+  "No admite cambios: lo que se escribiera aquí no le pasaría a ninguna obra.";
 
 /**
  * El verbo del boton que hace la transicion, no el nombre del estado destino.
