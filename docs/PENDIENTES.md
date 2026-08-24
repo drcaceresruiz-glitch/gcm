@@ -579,7 +579,7 @@ CUANDO se midio-.
 
 ---
 
-## Plantillas del informe de obra (23 de agosto de 2026) — DISENO LISTO, CODIGO SIN EMPEZAR
+## Plantillas del informe de obra (23 de agosto de 2026) — HECHAS
 
 **Casi se pierde entero.** El trabajo se hizo la noche del 22 en una sesion que
 murio a mitad de la reparacion, y no estaba anotado en ninguna parte: hubo que
@@ -650,10 +650,39 @@ tarea:
   OBRA, y las secciones se apagan una a una. Ver la seccion «El dinero de la
   obra, de punta a punta» de mas arriba.
 
-**Detalles menores que el revisor dejo anotados y no se arreglaron**: en la hoja
-de control, el estado vacio de Last Planner ocupa ~40 % del papel (honesto, pero
-mucho papel para cero informacion) y no hay cruce fisico-economico POR CAPITULO,
-solo global.
+**El cruce POR CAPITULO — HECHO el 24 de agosto de 2026.** Era uno de los dos
+detalles que el revisor dejo anotados. La hoja cruzaba fisico contra economico
+solo en global -«11 % de avance contra 26,3 % comprometido»-, y una cifra
+global avisa de que hay un problema sin decir a donde ir a mirarlo.
+
+El bloque «DONDE SE ABRE LA BRECHA» lista los capitulos ordenados por brecha
+descendente, con el fisico, el gastado y la distancia en puntos: rojo cuando se
+gasta por delante, verde cuando el presupuesto acompana. Cuatro decisiones que
+conviene no deshacer:
+
+- **Sale de `cruceDeObra`, no se recalcula.** Es el mismo servicio que alimenta
+  la pantalla de fisico-economico y el panel «Que falta». Dos lecturas del
+  mismo cruce acabarian marcando capitulos distintos en la pantalla y en el
+  papel, que es el patron que lleva tres sesiones dando problemas.
+- **Un capitulo SIN MEDIR no se pinta.** Sin tarea mapeada no se sabe como va,
+  y colarlo con un cero lo dibujaria igual que uno sano. Misma regla que el
+  estado vacio de Last Planner: un dato que no existe no se rellena.
+- **Sin permiso de ordenes, el bloque entero desaparece.** El cruce viene con
+  el gastado en cero, y pintarlo se leeria como «no se ha comprometido nada»:
+  no seria un cruce conservador, seria uno que miente en la direccion
+  tranquilizadora.
+- **Cinco capitulos como tope.** Mas no cabe legible en media hoja apaisada; el
+  resto se mira en pantalla, que no tiene tope de papel.
+
+Verificado en un PDF de verdad, no solo con pruebas. Y hay una prueba que fija
+que ningun elemento se dibuja por debajo del margen en el peor caso: anadir
+filas a una hoja de altura fija es exactamente como se sale algo por abajo, y
+un elemento con `y` negativa no da error, simplemente no se ve.
+
+**Lo que sigue anotado y sin arreglar**: el estado vacio de Last Planner ocupa
+~40 % del papel (honesto, pero mucho papel para cero informacion). El bloque
+nuevo equilibra un poco la hoja, porque cae en la mitad que estaba mas vacia,
+pero el desequilibrio sigue ahi en una obra sin semanas cerradas.
 
 ---
 

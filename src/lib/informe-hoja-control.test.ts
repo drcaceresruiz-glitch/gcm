@@ -189,3 +189,98 @@ describe("hojaControl - la hoja como papel", () => {
     }
   });
 });
+
+describe("donde se abre la brecha", () => {
+  /*
+   * EL BLOQUE QUE EL REVISOR ECHO EN FALTA. La hoja cruzaba fisico contra
+   * economico solo en global -«11 % de avance contra 26,3 % comprometido»-, y
+   * una cifra global avisa de que hay un problema sin decir a donde ir.
+   */
+  const CAPITULOS: DatosControl["cruce"] = [
+    // El peor: gasta 40 puntos por delante de lo que construye.
+    { codigo: "3", nombre: "OBRAS DE CONCRETO", fisico: 20, economico: 60 },
+    { codigo: "1", nombre: "OBRAS PROVISIONALES", fisico: 90, economico: 95 },
+    // Al reves: el presupuesto acompaña.
+    { codigo: "2", nombre: "MOVIMIENTO DE TIERRAS", fisico: 70, economico: 40 },
+    // Sin medir: no se sabe como va.
+    { codigo: "9", nombre: "VARIOS", fisico: null, economico: null },
+  ];
+
+  it("nombra el capitulo donde mas se ha gastado por delante", () => {
+    expect(dice({ cruce: CAPITULOS }, "OBRAS DE CONCRETO")).toBe(true);
+  });
+
+  it("pone el peor primero", () => {
+    const t = textos(hoja({ cruce: CAPITULOS })[0]!.elementos);
+    const concreto = t.findIndex((x) => x.includes("OBRAS DE CONCRETO"));
+    const provisionales = t.findIndex((x) => x.includes("OBRAS PROVISIONALES"));
+    expect(concreto).toBeGreaterThan(-1);
+    expect(concreto).toBeLessThan(provisionales);
+  });
+
+  it("dice la brecha en puntos, con signo", () => {
+    expect(dice({ cruce: CAPITULOS }, "+40 pts")).toBe(true);
+  });
+
+  /**
+   * UN CAPITULO SIN MEDIR NO SE PINTA, y esto no es un detalle: sin tarea
+   * mapeada no se sabe como va, y colarlo con un cero lo dibujaria igual que
+   * uno sano. Es la misma regla que el estado vacio de Last Planner —un dato
+   * que no existe no se rellena—.
+   */
+  it("deja fuera los capitulos de los que no se sabe como van", () => {
+    expect(dice({ cruce: CAPITULOS }, "VARIOS")).toBe(false);
+  });
+
+  it("sin cruce, la hoja sale como antes y no inventa el bloque", () => {
+    expect(dice({}, "DÓNDE SE ABRE LA BRECHA")).toBe(false);
+  });
+
+  it("con todos los capitulos sin medir tampoco pinta el bloque", () => {
+    const sinMedir = CAPITULOS.filter((c) => c.fisico === null);
+    expect(dice({ cruce: sinMedir }, "DÓNDE SE ABRE LA BRECHA")).toBe(false);
+  });
+
+  /// Media hoja apaisada no da para mas: el resto se mira en pantalla.
+  it("corta a cinco capitulos aunque haya mas", () => {
+    const muchos = Array.from({ length: 12 }, (_, i) => ({
+      codigo: `${i + 1}`,
+      nombre: `CAPITULO NUMERO ${i + 1}`,
+      fisico: 10,
+      economico: 90 - i,
+    }));
+    const t = textos(hoja({ cruce: muchos })[0]!.elementos);
+    const pintados = muchos.filter((c) =>
+      t.some((x) => x.includes(c.nombre)),
+    );
+    expect(pintados).toHaveLength(5);
+  });
+});
+
+describe("la hoja cabe en el papel", () => {
+  /*
+   * ANADIR FILAS A UNA HOJA DE ALTURA FIJA ES COMO SE SALE ALGO POR ABAJO, y
+   * un elemento con `y` negativa no da error: se dibuja fuera y no se ve. El
+   * bloque de la brecha suma cinco filas a la mitad economica, que ya era la
+   * mas cargada, asi que se fija aqui el peor caso posible.
+   */
+  const PEOR: Partial<DatosControl> = {
+    // Sin linea base se pinta una nota mas.
+    economia: economia({ conLineaBase: false, saldo: "-120000.00" }),
+    cruce: Array.from({ length: 12 }, (_, i) => ({
+      codigo: `${i + 1}`,
+      nombre: `CAPITULO CON UN NOMBRE LARGO NUMERO ${i + 1}`,
+      fisico: 5,
+      economico: 95,
+    })),
+    lastPlanner: null,
+  };
+
+  it("ningun elemento se dibuja por debajo del margen", () => {
+    const pagina = hoja(PEOR)[0]!;
+    const ys = pagina.elementos.flatMap((e) =>
+      e.tipo === "linea" ? [e.y1, e.y2] : "y" in e ? [e.y] : [],
+    );
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+  });
+});

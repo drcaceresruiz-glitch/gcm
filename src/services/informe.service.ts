@@ -20,9 +20,13 @@ import {
 } from "@/lib/control-avance";
 import { puede } from "@/lib/rbac";
 import { restar } from "@/lib/decimal";
-import type { EconomiaDelInforme } from "@/lib/informe-documento";
+import type {
+  CapituloDeLaBrecha,
+  EconomiaDelInforme,
+} from "@/lib/informe-documento";
 import { bacDeObra } from "./presupuesto-obra";
 import { desgloseComprometidoDeObra } from "./ordenes.service";
+import { cruceDeObra } from "./fisico-economico.service";
 import type { SesionActiva } from "./sesion.service";
 import { fotosDeTareas, type FotoResumen } from "./evidencia.service";
 
@@ -84,6 +88,20 @@ export interface InformeCompuesto {
    * un cero que se leeria como «no hay nada comprometido».
    */
   economia: EconomiaDelInforme | null;
+  /**
+   * DONDE se abre la brecha entre lo construido y lo comprometido.
+   *
+   * La hoja de control enseñaba el cruce fisico-economico SOLO en global -«11 %
+   * de avance contra 26,3 % comprometido»- y el revisor lo dejo anotado: la
+   * cifra global dice que hay un problema y no dice donde. Capitulo a capitulo
+   * si lo dice, y es el dato que convierte el aviso en algo que se puede ir a
+   * mirar.
+   *
+   * `null` sin permiso de ordenes, igual que `economia`: sin poder leer el
+   * gasto el cruce saldria con el gastado en cero, y eso no seria un cruce
+   * conservador sino uno que miente en la direccion tranquilizadora.
+   */
+  cruce: readonly CapituloDeLaBrecha[] | null;
   generadoPor: string;
   /// Las fechas que el selector puede ofrecer. Solo la pantalla las usa.
   cortes: CorteDisponible[];
@@ -115,7 +133,7 @@ export async function componerInforme(
   const obra = await obtenerObra(sesion, obraId);
   if (!obra) return { estado: "sin-obra" };
 
-  const [informe, curva, empresa, bac, comprometido] = await Promise.all([
+  const [informe, curva, empresa, bac, comprometido, cruce] = await Promise.all([
     informeAlCorte(sesion, obraId, corteISO),
     datosCurvaS(sesion, obraId),
     obtenerEmpresa(sesion),
@@ -125,6 +143,13 @@ export async function componerInforme(
     bacDeObra(obraId),
     // Devuelve null sin permiso de ordenes, y ese null viaja hasta el informe.
     desgloseComprometidoDeObra(sesion, obraId),
+    /*
+     * El cruce POR CAPITULO. Es el mismo `cruceDeObra` que ya alimenta la
+     * pantalla de fisico-economico y el panel «Que falta»: no se calcula aqui
+     * otra vez, se pide. Dos lecturas del mismo cruce acabarian marcando
+     * capitulos distintos en la pantalla y en el papel.
+     */
+    cruceDeObra(sesion, obraId),
   ]);
 
   if (!informe) return { estado: "sin-cronograma" };
@@ -169,6 +194,13 @@ export async function componerInforme(
       alertas: alertasDeAtraso(informe.tareas, informe.fechaCorte),
       activas,
       fotosPorUid,
+      /*
+       * Solo los capitulos, y solo si de verdad hay cifra de gasto.
+       * `sinPermisoDeCosto` existe para esto: sin `orden:leer` el cruce viene
+       * con el gastado en cero, que pintado en el papel se lee como «no se ha
+       * comprometido nada». Se prefiere no dibujar el bloque.
+       */
+      cruce: !cruce || cruce.sinPermisoDeCosto ? null : cruce.capitulos,
       economia:
         comprometido === null
           ? null

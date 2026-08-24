@@ -131,7 +131,36 @@ export interface DatosCsvInforme {
   /// El dinero al corte. La hoja de calculo lo ignora; la hoja de control
   /// economica del PDF lo dibuja. `null` sin permiso de ordenes.
   economia?: EconomiaDelInforme | null;
+  /**
+   * DONDE se abre la brecha entre lo construido y lo comprometido.
+   *
+   * El revisor del diseño lo dejo anotado: la hoja de control cruzaba fisico
+   * contra economico SOLO en global -«11 % de avance contra 26,3 %
+   * comprometido»-, y una cifra global dice que hay un problema sin decir
+   * donde ir a mirarlo. Capitulo a capitulo si lo dice.
+   *
+   * Opcional y anulable por lo mismo que `economia`: sin permiso de ordenes no
+   * hay cifra de gasto, y un cruce con el gasto en cero no seria un cruce
+   * conservador, seria uno que miente en la direccion tranquilizadora.
+   */
+  cruce?: readonly CapituloDeLaBrecha[] | null;
   generadoPor: string;
+}
+
+/**
+ * Un capitulo del cruce fisico-economico, con lo justo para dibujarlo.
+ *
+ * Es un recorte de `CapituloDelCruce` a proposito: el documento no necesita
+ * los subtotales ni la base medible, solo los dos porcentajes, y aceptar el
+ * tipo entero ataria `lib/` a la forma que hoy tiene el servicio.
+ */
+export interface CapituloDeLaBrecha {
+  codigo: string;
+  nombre: string;
+  /// 0..100 ponderado por importe. Null si no hay ninguna partida medible.
+  fisico: number | null;
+  /// 0..100: gastado sobre lo medible. Null por la misma razon.
+  economico: number | null;
 }
 
 /// dd/mm/aaaa, que es como se leen las fechas en obra. En UTC, por lo que

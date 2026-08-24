@@ -1,6 +1,10 @@
 import { dividir, esCero, esPositivo, multiplicar } from "./decimal";
 import { fechaCsv } from "./informe-documento";
-import type { DatosCsvInforme, EconomiaDelInforme } from "./informe-documento";
+import type {
+  CapituloDeLaBrecha,
+  DatosCsvInforme,
+  EconomiaDelInforme,
+} from "./informe-documento";
 import type { ElementoPdf, OpcionesPdf, PaginaPdf, TintaPdf } from "./informe-pdf";
 import { ETIQUETA_CNC } from "./plan-semanal";
 import { aWinAnsi, partirEnLineas, type Medir } from "./pdf-texto";
@@ -33,8 +37,20 @@ export interface DatosControl {
   /// El avance fisico al corte, en texto, como lo trae el informe.
   real: string;
   economia: EconomiaDelInforme | null;
+  /**
+   * DONDE se abre la brecha, capitulo a capitulo.
+   *
+   * El revisor del diseño lo dejo anotado: la hoja enseñaba el cruce SOLO en
+   * global, y una cifra global dice que hay un problema sin decir donde.
+   * Vacio -o sin permiso de ordenes- y este bloque no se pinta.
+   */
+  cruce?: readonly CapituloDeLaBrecha[];
   lastPlanner: DatosCsvInforme["lastPlanner"];
 }
+
+/// Cuantos capitulos de la brecha caben legibles en la mitad economica. Los
+/// peores primero: el resto se mira en pantalla, que no tiene tope de papel.
+const CAPITULOS_DE_LA_BRECHA = 5;
 
 /// Un porcentaje en texto, acotado a 0..100 y tolerante con la basura: una
 /// cifra ilegible se dibuja como cero, nunca como NaN.
@@ -247,6 +263,66 @@ export function hojaControl(
         tinta: "tinta-suave",
       });
       yE -= 11;
+    }
+
+    /*
+     * DONDE SE ABRE LA BRECHA.
+     *
+     * El bloque que el revisor del diseño echo en falta: arriba se dice que se
+     * ha comprometido N puntos mas de lo construido, y hasta aqui la hoja no
+     * decia en QUE capitulo. Una cifra global avisa; esta lista dice a donde
+     * ir a mirar.
+     *
+     * Se ordenan por brecha descendente y se cortan a `CAPITULOS_DE_LA_BRECHA`:
+     * mas no cabe legible en media hoja apaisada. Los capitulos SIN medir
+     * -sin ninguna partida con tarea mapeada- no entran: de ellos no se sabe
+     * como van, y colarlos con un cero los pintaria como si fueran los sanos.
+     */
+    const conBrecha = (d.cruce ?? [])
+      .filter((c) => c.fisico !== null && c.economico !== null)
+      .map((c) => ({ ...c, brecha: c.economico! - c.fisico! }))
+      .sort((a, b) => b.brecha - a.brecha)
+      .slice(0, CAPITULOS_DE_LA_BRECHA);
+
+    if (conBrecha.length > 0) {
+      yE -= 14;
+      texto(izq, yE, "DÓNDE SE ABRE LA BRECHA", 9, { negrita: true });
+      yE -= 6;
+      el.push({ tipo: "linea", x1: izq, y1: yE, x2: medio - 24, y2: yE, tinta: "linea" });
+      yE -= 14;
+
+      texto(izq, yE, "Capítulo", 7, { tinta: "tinta-suave" });
+      const cabeceras = "Físico   Gastado   Brecha";
+      texto(medio - 24 - medir(cabeceras, 7), yE, cabeceras, 7, {
+        tinta: "tinta-suave",
+      });
+      yE -= 12;
+
+      for (const c of conBrecha) {
+        const nombre = [c.codigo, c.nombre].filter(Boolean).join(" ");
+        const cifras = `${c.fisico!.toFixed(0)}%   ${c.economico!.toFixed(0)}%`;
+        const anchoCifras = medir(cifras, 8);
+        const signo = c.brecha > 0 ? "+" : "";
+        const brechaTexto = `${signo}${c.brecha.toFixed(0)} pts`;
+        const anchoBrecha = medir(brechaTexto, 8);
+
+        // El nombre se recorta a lo que quede libre: la fila tiene que caber
+        // en una linea o la tabla deja de leerse de un vistazo.
+        const libre = medio - 24 - izq - anchoCifras - anchoBrecha - 16;
+        const lineas = partirEnLineas(nombre, Math.max(40, libre), 8, medir);
+        texto(izq, yE, lineas[0] ?? nombre, 8);
+
+        texto(medio - 24 - anchoBrecha - 12 - anchoCifras, yE, cifras, 8, {
+          tinta: "tinta-suave",
+        });
+        // El signo manda el color: gastar por delante del avance es lo que
+        // avisa, ir por detras es que el presupuesto acompaña.
+        texto(medio - 24 - anchoBrecha, yE, brechaTexto, 8, {
+          negrita: true,
+          tinta: c.brecha > 0 ? "peligro" : "exito",
+        });
+        yE -= 13;
+      }
     }
   }
 

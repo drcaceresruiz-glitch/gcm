@@ -138,6 +138,9 @@ export async function generarInformePdf(
       fechaCorte: d.fechaCorte,
       real: d.real,
       economia: d.economia ?? null,
+      // Sin cruce -o sin permiso de ordenes- el bloque no se pinta y la hoja
+      // queda como estaba. Ver `CapituloDeLaBrecha`.
+      cruce: d.cruce ?? undefined,
       lastPlanner: d.lastPlanner,
     },
     A4_APAISADO,
