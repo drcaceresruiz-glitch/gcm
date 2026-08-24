@@ -5,6 +5,108 @@ son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
 Ultima revision: 24 de agosto de 2026.
 
+## La obra de tres meses, recorrida entera (24 de agosto de 2026)
+
+El usuario pidio crear una obra de cero -tres meses, siete capitulos, cinco
+partidas cada uno, bolsa operativa de 35.000, utilidad 12 %, gastos generales
+7 %-, correrla entera, cargarle contratistas, probar todas las secuencias
+posibles y cerrarla. Se hizo en dos tramos: el navegador contra la base de
+desarrollo hasta donde llego, y una prueba de vitest ejecutando los servicios
+de verdad para lo que el navegador no alcanzaba.
+
+**Lo que quedo probado de punta a punta y funcionando**: la meta desde Excel,
+el contractual generado con su recargo, las revisiones, la linea base, el
+cronograma con su EDT, los encargos, las valorizaciones, los pagos con su
+tope, el adelanto, un adicional aprobado, la deduccion de costos propios
+entera, el reloj de avisos de la bolsa, el arranque con requisitos y el
+cierre de la obra. 32 pasos.
+
+Tres cosas se verificaron por primera vez desde que se construyeron:
+
+- **El tope de pago** rechaza nombrando la cifra exacta que sobra.
+- **La deduccion de costos propios** no toca la meta: presupuestado 45.800,
+  vigente 44.000, deducido 1.800, las tres cifras a la vez.
+- **El aviso de la bolsa suena EN EL CRUCE, no mientras dure.** Con la bolsa
+  holgada, cero avisos; al caer a 9.800 de 51.800 previstos, dos avisos; y
+  llamado otra vez con la bolsa igual de mal, cero. Era la decision de diseno
+  del dia anterior y no se habia podido comprobar hasta ahora.
+
+### Los cinco fallos que salieron, y su arreglo
+
+Todos arreglados el mismo dia. Los cinco son la misma clase de fallo, y por
+eso conviene leerlos juntos: **dos sitios que deciden lo mismo por criterios
+distintos**. Es el patron que lleva tres sesiones apareciendo.
+
+1. **Los capitulos se hacian pasar por costos propios.** `propia` se decidia
+   en `lib/bolsa.ts` con «no encontre contraparte en el contractual», y en
+   modo PARTIDA el contractual solo aporta partidas: las cabeceras de capitulo
+   se quedaban sin pareja. El panel «Costos propios de la meta» listaba los
+   siete capitulos a S/ 0,00 por delante de los sueldos. Ahora `propia` es no
+   tener codigo, que es lo que ya sumaba `costoPropioMeta`; una prueba fija
+   que las dos cosas coincidan siempre.
+
+2. **Nada pedia nunca congelar la meta.** Se cargaba, el anclaje saltaba al
+   contractual y no volvia a mencionarla: quedaba en borrador para siempre y
+   la deduccion de costos propios era inalcanzable -la exige aprobada, y su
+   pantalla lo dice sin que nada te llevara alli-. El paso nuevo va DESPUES de
+   generar el contractual, que es cuando se mira la meta con el recargo
+   puesto: si algo esta mal, se corrige antes de dejarla firme.
+
+3. **`crearRevision` no validaba los porcentajes.** Un 7 donde iba 0.07
+   multiplicaba el presupuesto por veinte en silencio. La comprobacion existia
+   solo en el formulario; cualquier otra entrada se la saltaba. Ahora esta
+   tambien en el servicio, por el mismo motivo que el `companyId` se repite
+   donde se usa.
+
+4. **Las dos pantallas del modo de comparacion no coincidian.** El alta de
+   obra proponia «Por capitulo» y la de la meta «Partida por partida», con
+   nombres distintos para lo mismo. Una sola lista ahora, en
+   `lib/meta-excel`.
+
+5. **Valorizaciones repetia la misma cifra dos veces.** Comparaba dinero con
+   `!==` sobre el texto: `montoVigente` sale de `sumar()`, que normaliza a dos
+   decimales, y `montoContratado` viene crudo del `Decimal` de Prisma, que se
+   come los ceros del final. «92000» y «92000.00» son textos distintos y la
+   misma plata, asi que salia «Vigente» en encargos sin ninguna adenda. Se
+   barrio el resto del codigo buscando mas casos: no hay: los demas comparan
+   dos valores producidos ambos por `sumar()`.
+
+### Y de propina, uno que no se buscaba
+
+El modo **FRENTE no tiene por donde rellenarse**. El reparto de un frente a
+partidas vive en `MetaItemPartida`, y NINGUN camino de la aplicacion escribe
+esa tabla -solo se lee y se cuenta-. Una meta en FRENTE nace con el reparto
+vacio, `unirPorFrente` marca entonces todas sus lineas como costo propio, y
+la bolsa deja de querer decir nada. El formulario de alta lo ofrecia como una
+de tres opciones. Se ha quitado de lo que se puede elegir; el algoritmo se
+queda, probado, esperando a que exista por donde meter el reparto.
+
+### Lo que se reporto como fallo y NO lo era
+
+**El boton «Valorizar» de la tarjeta del contratista funciona.** Se anoto como
+que no hacia nada, y era falso: el clic se habia dado por referencia de
+elemento desde la automatizacion del navegador y no llegaba a React. Con un
+clic real en coordenadas, el panel se abre entero. Mismo caso que la nota
+`clic-dentro-de-menu-desplegable`: **si el sintoma es «la interfaz no
+reacciona», hay que reproducirlo con un clic de verdad antes de tocar codigo
+que puede estar sano.**
+
+### SIN CERRAR: los botones de escritura en una obra CERRADA
+
+Visto el 24 de agosto en la obra OB-000004, ya cerrada: `/proveedores` sigue
+ofreciendo «Valorizar», «Cerrar» y «Anular», y `/valorizaciones` ofrece
+«Registrar pago» y «Guardar cadencia». Los servicios los rechazan -esta
+probado-, pero es justo lo que el propio codigo de esa tarjeta condena tres
+lineas mas arriba, hablando del boton Anular: «un boton que siempre falla
+invita a probar».
+
+El menu de la obra YA sabe hacerlo bien (`layout.tsx` no propone ningun paso
+siguiente si la obra esta cerrada). Falta bajar esa misma regla a las
+pantallas de escritura. No se hizo en el mismo commit porque es una regla
+transversal -hay que decidir pantalla por pantalla que se esconde y que se
+queda, y «Reabrir» tiene que quedarse-, y mezclarla con cinco arreglos
+puntuales habria hecho el cambio imposible de revisar.
+
 ## El dinero de la obra, de punta a punta (23 de agosto de 2026)
 
 Veinte commits en una sesion, casi todos nacidos de que el usuario recorrio
