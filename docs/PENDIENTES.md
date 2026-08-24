@@ -3,7 +3,7 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 23 de agosto de 2026 (tercera tanda).
+Ultima revision: 24 de agosto de 2026.
 
 ## El dinero de la obra, de punta a punta (23 de agosto de 2026)
 
@@ -355,26 +355,30 @@ en el menu de Proveedores para todos.
 
 ---
 
-## Lo que el usuario pidio y NO esta construido (al 23 de agosto de 2026)
+## Lo que el usuario pidio (al 24 de agosto de 2026)
 
-Los tres estan pedidos con sus palabras y siguen sin empezar. Estan en orden
-de lo que duele antes.
+En orden de lo que duele antes. El primero ya esta hecho; los otros dos siguen
+sin empezar.
 
-### 1. Avisos configurables de la bolsa
+### 1. Avisos configurables de la bolsa — HECHO el 24 de agosto de 2026
 
-«Deberia haber avisos cuando la bolsa se vea comprometida, se acerca o se pone
-en negativo, que permita configurar estos avisos. En vez de asumirlo a
-sabiendas.»
+Suena en el CRUCE del umbral y se rearma si la bolsa se recupera; viene
+encendido por defecto -unica excepcion del reloj, porque lo que dice es que la
+obra se queda sin dinero-; el umbral se configura por obra en Personal (25 %
+por defecto); va a la obra y TAMBIEN a gerencia, porque las dos salidas
+posibles necesitan a los dos enterados.
 
-**Lo que ya existe y hay que reusar, no rehacer**: el modelo `Aviso`, la
-campanita, el envio por correo, el cron `avisos-reloj` -que ya se vigila desde
-`/api/health`- y `AjustesAvisosObra`, que es donde encajan los umbrales por
-obra. Lo que falta es el detector -comparar la bolsa comprometida contra dos
-umbrales, «se acerca» y «en rojo»- y su clave de aviso.
+**Lo que costo mas que el aviso**, y conviene que quede escrito: la bolsa solo
+se sabia calcular con una sesion detras, y el reloj no tiene ninguna. En vez de
+escribir alli una segunda version se partieron en dos `presupuestoVigenteDeObra`,
+`comparacionDeObra` y `bolsaComprometidaDe`: el nucleo sin sesion y la puerta
+que comprueba permisos. Si algun dia hace falta otra cifra de dinero desde el
+reloj, ese es el patron.
 
-**Cuidado con el ruido**: un aviso de bolsa que salta cada dia porque la obra
-lleva un mes en rojo se ignora a la semana. Tiene que avisar en el CRUCE del
-umbral, no mientras dure la condicion.
+`EstadoBolsaObra` es tabla propia a proposito: la EXISTENCIA de la fila de
+`AjustesAvisosObra` significa que la obra configuro los avisos, asi que si el
+reloj la creara para apuntar el estado de la bolsa encenderia de rebote los
+recordatorios de una obra que nunca los pidio.
 
 ### 2. Solicitud de deducir costos propios, con firma del gerente
 
