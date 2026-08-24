@@ -94,7 +94,13 @@ describe("una copia restaurada de un respaldo tampoco admite cambios", () => {
 });
 
 describe("requisitos para poner una obra en marcha", () => {
-  const completa = { partidas: 313, tieneCronograma: true, tieneLineaBase: true };
+  const completa = {
+    partidas: 313,
+    tieneMeta: true,
+    presupuestoCongelado: true,
+    tieneCronograma: true,
+    tieneLineaBase: true,
+  };
 
   it("una obra completa no tiene nada pendiente", () => {
     const faltan = requisitosParaEjecutar(completa);
@@ -109,6 +115,56 @@ describe("requisitos para poner una obra en marcha", () => {
     expect(puedeArrancar(faltan)).toBe(false);
     expect(faltan[0]?.clave).toBe("presupuesto");
     expect(faltan[0]?.bloqueante).toBe(true);
+  });
+
+  /**
+   * LA SECUENCIA, pedida asi por el usuario mirando la pantalla: «¿cómo me va
+   * a pedir cargar el cronograma sin antes decidir la revisión del
+   * presupuesto, sin ser aprobado y congelado? Quiero que todo tenga una
+   * secuencia lógica, ordenada».
+   *
+   * Hasta el 24 de agosto de 2026 se podia poner una obra en ejecucion sin
+   * meta y con el presupuesto todavia en borrador, y nada lo decia: los
+   * requisitos solo miraban partidas, cronograma y la linea base DEL
+   * CRONOGRAMA. El orden de la lista ES la secuencia del riel.
+   */
+  it("los requisitos salen en el orden del trabajo", () => {
+    const vacia = {
+      partidas: 0,
+      tieneMeta: false,
+      presupuestoCongelado: false,
+      tieneCronograma: false,
+      tieneLineaBase: false,
+    };
+
+    expect(requisitosParaEjecutar(vacia).map((r) => r.clave)).toEqual([
+      "presupuesto",
+      "meta",
+      "linea_base_presupuesto",
+      "cronograma",
+    ]);
+  });
+
+  it("sin meta se avisa: sin ella no hay bolsa que vigilar", () => {
+    const faltan = requisitosParaEjecutar({ ...completa, tieneMeta: false });
+
+    expect(faltan.map((r) => r.clave)).toEqual(["meta"]);
+    // Se avisa, no se bloquea: en obra real a veces se arranca antes que el
+    // papeleo, y un muro solo consigue que se trabaje fuera del sistema.
+    expect(puedeArrancar(faltan)).toBe(true);
+    expect(faltan[0]?.consecuencia).toContain("bolsa");
+  });
+
+  it("con el presupuesto sin congelar se avisa antes de arrancar", () => {
+    const faltan = requisitosParaEjecutar({
+      ...completa,
+      presupuestoCongelado: false,
+    });
+
+    expect(faltan.map((r) => r.clave)).toEqual(["linea_base_presupuesto"]);
+    expect(puedeArrancar(faltan)).toBe(true);
+    // Nombra CUAL de las dos lineas base: en GCM hay dos y se llaman igual.
+    expect(faltan[0]?.falta).toContain("contractual");
   });
 
   it("sin cronograma se avisa, pero se deja arrancar", () => {
@@ -141,6 +197,8 @@ describe("requisitos para poner una obra en marcha", () => {
   it("acumula lo bloqueante y lo que solo avisa", () => {
     const faltan = requisitosParaEjecutar({
       partidas: 0,
+      tieneMeta: true,
+      presupuestoCongelado: true,
       tieneCronograma: false,
       tieneLineaBase: false,
     });
@@ -152,6 +210,8 @@ describe("requisitos para poner una obra en marcha", () => {
     // Un aviso que solo nombra lo que falta no ayuda a decidir.
     for (const r of requisitosParaEjecutar({
       partidas: 0,
+      tieneMeta: false,
+      presupuestoCongelado: false,
       tieneCronograma: false,
       tieneLineaBase: false,
     })) {

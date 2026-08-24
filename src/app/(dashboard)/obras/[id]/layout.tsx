@@ -435,6 +435,8 @@ export default async function ObraLayout({
                 obra.estado === "PLANIFICACION"
                   ? requisitosParaEjecutar({
                       partidas: hitos.presupuesto ? 1 : 0,
+                      tieneMeta: hitos.metaCargada,
+                      presupuestoCongelado: hitos.lineaBase,
                       tieneCronograma: hitos.cronograma,
                       tieneLineaBase: hitos.lineaBaseCronograma,
                     })

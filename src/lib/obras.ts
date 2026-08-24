@@ -131,6 +131,11 @@ export const ESTADOS_OBRA_CON_EXPOSICION: readonly EstadoObra[] = [
 export interface RequisitoObra {
   clave:
     | "presupuesto"
+    | "meta"
+    /// La del PRESUPUESTO contractual. La del cronograma va aparte, abajo:
+    /// en GCM hay DOS lineas base y llamarlas igual ya costo un aviso
+    /// ilegible.
+    | "linea_base_presupuesto"
     | "cronograma"
     | "linea_base_cronograma"
     | "valorizaciones"
@@ -146,6 +151,16 @@ export interface RequisitoObra {
 
 export interface EstadoObraParaArrancar {
   partidas: number;
+  /// Hay presupuesto META, aunque siga en borrador. Sin el no hay bolsa.
+  tieneMeta: boolean;
+  /**
+   * El presupuesto CONTRACTUAL esta congelado (`Baseline.aprobadaAt`).
+   *
+   * Se llama asi y no `tieneLineaBase` porque ese nombre ya esta cogido por la
+   * del CRONOGRAMA, que es otra cosa. En GCM hay DOS lineas base y confundirlas
+   * ya costo un aviso ilegible: ver el comentario de mas abajo.
+   */
+  presupuestoCongelado: boolean;
   tieneCronograma: boolean;
   tieneLineaBase: boolean;
 }
@@ -163,6 +178,41 @@ export function requisitosParaEjecutar(
         "Sin partidas no hay contra que imputar las ordenes de compra ni con " +
         "que calcular el valor ganado: el presupuesto de control seria cero.",
       bloqueante: true,
+    });
+  }
+
+  /*
+   * LA SECUENCIA, Y LA PIDIO EL USUARIO ASI: «¿cómo me va a pedir cargar el
+   * cronograma sin antes decidir la revisión del presupuesto, sin ser aprobado
+   * y congelado? Quiero que todo tenga una secuencia lógica, ordenada».
+   *
+   * El orden de estos requisitos ES esa secuencia, la misma del riel de la
+   * obra: partidas -> meta -> congelar -> cronograma -> su linea base. Solo
+   * las partidas bloquean; los demas se avisan y se firman, porque en obra
+   * real a veces se arranca antes que el papeleo y un muro solo consigue que
+   * se trabaje fuera del sistema.
+   */
+  if (!estado.tieneMeta) {
+    faltan.push({
+      clave: "meta",
+      falta: "No hay presupuesto meta.",
+      consecuencia:
+        "El meta es lo que a la empresa le cuesta la obra, y la bolsa es su " +
+        "diferencia con el contractual: sin el no hay margen que vigilar, ni " +
+        "aviso cuando se acabe, ni deduccion de costos propios que pedir.",
+      bloqueante: false,
+    });
+  }
+
+  if (!estado.presupuestoCongelado) {
+    faltan.push({
+      clave: "linea_base_presupuesto",
+      falta: "El presupuesto contractual sigue en borrador.",
+      consecuencia:
+        "Congelarlo es lo que fija la referencia contra la que se miden los " +
+        "adicionales y el valor ganado. Arrancar sin eso deja las ordenes " +
+        "imputandose contra un presupuesto que todavia puede cambiar.",
+      bloqueante: false,
     });
   }
 

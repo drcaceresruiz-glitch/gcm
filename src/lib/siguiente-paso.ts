@@ -17,9 +17,10 @@
  *      generales). No es un paso del alta: es una decision sin la cual
  *      cualquier margen que se enseñe estaria calculado con un criterio que
  *      nadie confirmo.
- *   2. El ALTA de la obra: presupuesto -> cronograma -> equipo -> linea base.
- *      Es «completar un registro», el unico sitio donde encadenar aporta de
- *      verdad: son cuatro pasos con un final, no un flujo de exploracion.
+ *   2. El ALTA de la obra, EN EL MISMO ORDEN QUE EL RIEL DEL MENU:
+ *      meta -> contractual -> congelarlo -> cronograma -> equipo. Es
+ *      «completar un registro», el unico sitio donde encadenar aporta de
+ *      verdad: son cinco pasos con un final, no un flujo de exploracion.
  *   3. Lo que espera una FIRMA de gerencia: primero la adenda -que tiene a
  *      alguien bloqueado, no se le puede pagar al contratista- y despues la
  *      deduccion de costos propios, que no bloquea nada pero deja a alguien
@@ -148,27 +149,61 @@ export function siguientePaso(
   puede: PuedeHacer,
   avisos: AvisosVivos,
 ): PasoSiguiente | null {
-  // 1. El alta, en el orden en que se hace.
-  // El presupuesto entra en DOS tramos: primero el REAL, con la plantilla, y
-  // de el se genera el contractual inflando cada capitulo. Enseñar solo el
-  // primero deja a medias a quien llega nuevo: carga la meta, ve desaparecer
-  // el aviso y no se entera de que el contractual sigue sin existir.
-  if (!alta.presupuesto && puede.presupuesto) {
-    if (!alta.meta) {
-      return {
-        clave: "alta-presupuesto",
-        gravedad: "sugerencia",
-        titulo: "Esta obra todavía no tiene presupuesto",
-        consecuencia:
-          "Son dos pasos: primero entra el presupuesto meta con la plantilla, y de él se genera el contractual.",
-        accion: "Cargar el presupuesto meta",
-        camino: "/meta",
-        despues: { accion: "Generar el contractual", camino: "/contractual" },
-      };
-    }
+  /*
+   * 1. EL ALTA, EN EL ORDEN DEL MENU DE LA OBRA. Que es lo mismo que decir:
+   *    en el orden del trabajo real.
+   *
+   *        meta -> contractual -> congelarlo -> cronograma -> equipo
+   *
+   * HASTA EL 24 DE AGOSTO DE 2026 ESTE ORDEN ERA OTRO, y lo dijo el usuario
+   * mirando la pantalla: «¿cómo me va a pedir que cargue el cronograma si aún
+   * no se ha congelado el presupuesto, si aún no se ha terminado de definir?».
+   * Tenia razon, y ademas GCM se contradecia a si mismo: el riel de la obra
+   * ordena Meta, Presupuesto, Revisiones y DESPUES Cronograma -su propio
+   * comentario explica que el cronograma va al final «detras de todo el hilo
+   * del dinero: su EDT sale del presupuesto»- mientras este anclaje pedia el
+   * cronograma antes de congelar nada. El manual da por hecho que el riel es
+   * el indice de la obra, asi que el que estaba mal era este.
+   *
+   * Y no es solo estetica: la EDT del cronograma SE GENERA desde las partidas.
+   * Planificar sobre un presupuesto que todavia se esta tocando es planificar
+   * sobre algo que va a cambiar, y el mapeo tarea-partida se rompe con el.
+   */
 
-    // El real ya esta: el tramo que falta es el otro, y pedir el primero otra
-    // vez seria mandar a una pantalla donde no queda nada por hacer.
+  /*
+   * LA META VA PRIMERA, Y SE PIDE AUNQUE EL CONTRACTUAL YA EXISTA.
+   *
+   * Este era el agujero de verdad, el que no se veia. La condicion era
+   * `!alta.presupuesto`, o sea que la meta SOLO se pedia mientras no hubiera
+   * partidas. Quien cargaba el contractual directamente -por Excel, que es
+   * como entra una obra nueva- se quedaba con `presupuesto` hecho y `meta`
+   * sin hacer, y el anclaje no se lo volvia a mencionar NUNCA: pasaba de
+   * largo al cronograma.
+   *
+   * Sin meta no hay bolsa. Y sin bolsa no hay margen, ni aviso cuando se
+   * acaba, ni deduccion de costos propios que pedir: se queda fuera la mitad
+   * del control economico de la obra, en silencio.
+   */
+  if (!alta.meta && puede.presupuesto) {
+    return {
+      clave: "alta-presupuesto",
+      gravedad: "sugerencia",
+      titulo: "Esta obra todavía no tiene presupuesto meta",
+      consecuencia:
+        "La meta es lo que a la empresa le cuesta la obra, y sin ella no hay bolsa: ni margen, ni aviso cuando se acabe.",
+      accion: "Cargar el presupuesto meta",
+      camino: "/meta",
+      // El segundo tramo solo se ofrece si de verdad falta. Con el contractual
+      // ya cargado, mandar a generarlo seria mandar a una pantalla donde no
+      // queda nada por hacer.
+      ...(alta.presupuesto
+        ? {}
+        : { despues: { accion: "Generar el contractual", camino: "/contractual" } }),
+    };
+  }
+
+  if (!alta.presupuesto && puede.presupuesto) {
+    // La meta ya esta: el tramo que falta es el otro.
     return {
       clave: "alta-contractual",
       gravedad: "sugerencia",
@@ -177,6 +212,25 @@ export function siguientePaso(
         "Sale del real inflando cada capítulo, y es contra él contra lo que se miden el avance y la desviación.",
       accion: "Generar el contractual",
       camino: "/contractual",
+    };
+  }
+
+  /*
+   * ESTA es la linea base del PRESUPUESTO, no la del cronograma.
+   *
+   * Las dos existen y las dos se llaman igual. Este aviso y el de requisitos
+   * (`requisitosParaEjecutar`) salen en la misma pantalla, asi que ninguno de
+   * los dos puede decir «linea base» a secas: hay que nombrar cual.
+   */
+  if (!alta.lineaBase && puede.lineaBase) {
+    return {
+      clave: "alta-linea-base",
+      gravedad: "sugerencia",
+      titulo: "El presupuesto contractual sigue siendo un borrador",
+      consecuencia:
+        "Congelarlo es lo que fija la referencia contra la que se miden los adicionales y el valor ganado; y el cronograma se planifica sobre esas partidas, así que hacerlo antes es planificar sobre algo que aún puede cambiar.",
+      accion: "Ver revisiones",
+      camino: "/revisiones",
     };
   }
 
@@ -201,25 +255,6 @@ export function siguientePaso(
         "Quien no sea ADMIN entra a un panel vacío y no la ve, y no parece un permiso mal puesto sino una avería.",
       accion: "Asignar el equipo",
       camino: "/equipo",
-    };
-  }
-
-  /*
-   * ESTA es la linea base del PRESUPUESTO, no la del cronograma.
-   *
-   * Las dos existen y las dos se llaman igual. Este aviso y el de requisitos
-   * (`requisitosParaEjecutar`) salen en la misma pantalla, asi que ninguno de
-   * los dos puede decir «linea base» a secas: hay que nombrar cual.
-   */
-  if (!alta.lineaBase && puede.lineaBase) {
-    return {
-      clave: "alta-linea-base",
-      gravedad: "sugerencia",
-      titulo: "El presupuesto contractual sigue siendo un borrador",
-      consecuencia:
-        "Aprobarlo lo congela como línea base del PRESUPUESTO: la referencia contra la que se miden los adicionales y el valor ganado. Mientras siga en borrador se puede seguir tocando, y lo que se mide cambia con él.",
-      accion: "Ver revisiones",
-      camino: "/revisiones",
     };
   }
 

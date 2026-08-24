@@ -61,11 +61,20 @@ describe("el paso siguiente de la obra", () => {
   });
 
   /**
-   * El orden del alta no es cosmetico: el cronograma sin presupuesto no tiene
-   * dinero que ponderar, y congelar la linea base antes de tener las dos
-   * cosas congela un plan incompleto.
+   * EL ORDEN DEL ALTA, Y LO DIJO EL USUARIO MIRANDO LA PANTALLA: «¿cómo me va
+   * a pedir que cargue el cronograma si aún no se ha congelado el presupuesto,
+   * si aún no se ha terminado de definir?».
+   *
+   * Tenia razon, y GCM ademas se contradecia a si mismo: el riel de la obra
+   * ordena Meta, Presupuesto, Revisiones y DESPUES Cronograma, y el manual da
+   * por hecho que ese riel es el indice. Este anclaje pedia el cronograma
+   * antes de congelar nada.
+   *
+   * Y no es estetica: la EDT del cronograma se GENERA desde las partidas.
+   * Planificar sobre un presupuesto que todavia se toca es planificar sobre
+   * algo que va a cambiar.
    */
-  it("recorre el alta en el orden del trabajo real", () => {
+  it("recorre el alta en el orden del riel: meta, contractual, congelar, cronograma, equipo", () => {
     const estado: EstadoAlta = {
       presupuesto: false,
       meta: false,
@@ -76,7 +85,13 @@ describe("el paso siguiente de la obra", () => {
     };
     const vistos: string[] = [];
 
-    for (const paso of ["presupuesto", "cronograma", "equipo", "lineaBase"] as const) {
+    for (const paso of [
+      "meta",
+      "presupuesto",
+      "lineaBase",
+      "cronograma",
+      "equipo",
+    ] as const) {
       const siguiente = siguientePaso(estado, TODO, EN_PAZ);
       vistos.push(siguiente!.clave);
       estado[paso] = true;
@@ -84,12 +99,65 @@ describe("el paso siguiente de la obra", () => {
 
     expect(vistos).toEqual([
       "alta-presupuesto",
+      "alta-contractual",
+      "alta-linea-base",
       "alta-cronograma",
       "alta-equipo",
-      "alta-linea-base",
     ]);
     // Y al terminar el alta ya no queda nada que sugerir.
     expect(siguientePaso(estado, TODO, EN_PAZ)).toBeNull();
+  });
+
+  it("el cronograma NO se pide antes de congelar el presupuesto", () => {
+    // El caso exacto de la captura: partidas cargadas, revision en BORRADOR,
+    // y el anclaje pidiendo el cronograma.
+    const sinCongelar: EstadoAlta = {
+      ...ALTA_COMPLETA,
+      lineaBase: false,
+      cronograma: false,
+    };
+
+    expect(siguientePaso(sinCongelar, TODO, EN_PAZ)?.clave).toBe(
+      "alta-linea-base",
+    );
+  });
+
+  /**
+   * EL AGUJERO QUE NO SE VEIA. La condicion era `!alta.presupuesto`, o sea que
+   * la meta SOLO se pedia mientras no hubiera partidas. Quien cargaba el
+   * contractual directamente -por Excel, que es como entra una obra nueva- se
+   * quedaba con el presupuesto hecho y la meta sin hacer, y el anclaje no se
+   * lo volvia a mencionar NUNCA.
+   *
+   * Sin meta no hay bolsa: ni margen, ni aviso cuando se acaba, ni deduccion
+   * de costos propios que pedir. Media obra sin control economico, en
+   * silencio.
+   */
+  it("pide la meta aunque el contractual ya exista", () => {
+    const conContractualSinMeta: EstadoAlta = {
+      ...ALTA_COMPLETA,
+      meta: false,
+    };
+
+    const paso = siguientePaso(conContractualSinMeta, TODO, EN_PAZ);
+    expect(paso?.clave).toBe("alta-presupuesto");
+    expect(paso?.consecuencia).toContain("bolsa");
+  });
+
+  it("y entonces no ofrece generar un contractual que ya existe", () => {
+    const conContractual: EstadoAlta = { ...ALTA_COMPLETA, meta: false };
+    expect(siguientePaso(conContractual, TODO, EN_PAZ)?.despues).toBeUndefined();
+
+    // Sin ninguno de los dos, el segundo tramo si se ofrece: quien llega nuevo
+    // carga la meta y se queda sin saber que aun falta generar el contractual.
+    const sinNinguno: EstadoAlta = {
+      ...ALTA_COMPLETA,
+      meta: false,
+      presupuesto: false,
+    };
+    expect(siguientePaso(sinNinguno, TODO, EN_PAZ)?.despues?.camino).toBe(
+      "/contractual",
+    );
   });
 
   it("no propone un paso a quien no puede darlo", () => {

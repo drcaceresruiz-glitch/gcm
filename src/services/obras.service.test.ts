@@ -30,10 +30,13 @@ vi.mock("@/lib/prisma", () => ({
     // Solo se consulta al arrancar desde PLANIFICACION. Con partidas, el
     // presupuesto obligatorio no bloquea.
     wbsItem: { count: () => Promise.resolve(1) },
-    // El arranque comprueba ademas cronograma y su linea base: sin ellos la
-    // obra puede arrancar igual, pero hay que confirmarlo. Aqui se dan por
-    // puestos para que estas pruebas sigan hablando solo de PARALIZADA.
+    // El arranque comprueba ademas la meta, el presupuesto congelado, el
+    // cronograma y la linea base de este: sin ellos la obra puede arrancar
+    // igual, pero hay que confirmarlo. Aqui se dan por puestos para que estas
+    // pruebas sigan hablando solo de PARALIZADA.
     cronograma: { findFirst: () => Promise.resolve({ id: "c1" }) },
+    presupuestoMeta: { findFirst: () => Promise.resolve({ id: "m1" }) },
+    baseline: { findFirst: () => Promise.resolve({ id: "b1" }) },
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
         project: {

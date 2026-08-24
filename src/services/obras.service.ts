@@ -1371,24 +1371,41 @@ export async function cambiarEstadoObra(
      * Ojo con la linea base: la que pide este requisito es la del CRONOGRAMA
      * -habla de plazo- y no la del presupuesto, que es otra cosa.
      */
-    const [partidas, cronograma, cronogramaBase] = await Promise.all([
-      prisma.wbsItem.count({ where: { projectId: obraId, tipo: "PARTIDA" } }),
-      prisma.cronograma.findFirst({
-        where: { projectId: obraId, project: { companyId: sesion.companyId } },
-        select: { id: true },
-      }),
-      prisma.cronograma.findFirst({
-        where: {
-          projectId: obraId,
-          project: { companyId: sesion.companyId },
-          lineaBaseAt: { not: null },
-        },
-        select: { id: true },
-      }),
-    ]);
+    const [partidas, meta, presupuestoBase, cronograma, cronogramaBase] =
+      await Promise.all([
+        prisma.wbsItem.count({ where: { projectId: obraId, tipo: "PARTIDA" } }),
+        // Sin exigir que este aprobada: para arrancar, tenerla ya es el paso.
+        prisma.presupuestoMeta.findFirst({
+          where: { projectId: obraId, project: { companyId: sesion.companyId } },
+          select: { id: true },
+        }),
+        // La linea base del PRESUPUESTO. La del cronograma va aparte, abajo.
+        prisma.baseline.findFirst({
+          where: {
+            projectId: obraId,
+            project: { companyId: sesion.companyId },
+            aprobadaAt: { not: null },
+          },
+          select: { id: true },
+        }),
+        prisma.cronograma.findFirst({
+          where: { projectId: obraId, project: { companyId: sesion.companyId } },
+          select: { id: true },
+        }),
+        prisma.cronograma.findFirst({
+          where: {
+            projectId: obraId,
+            project: { companyId: sesion.companyId },
+            lineaBaseAt: { not: null },
+          },
+          select: { id: true },
+        }),
+      ]);
 
     const faltan = requisitosParaEjecutar({
       partidas,
+      tieneMeta: meta !== null,
+      presupuestoCongelado: presupuestoBase !== null,
       tieneCronograma: cronograma !== null,
       tieneLineaBase: cronogramaBase !== null,
     });

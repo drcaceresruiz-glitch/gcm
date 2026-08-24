@@ -19,7 +19,12 @@ import { cambiarEstadoObra } from "@/services/obras.service";
 interface Estado {
   estadoObra: string;
   partidas: number;
+  /// Hay presupuesto meta, aunque siga en borrador.
+  hayMeta: boolean;
+  /// La linea base del PRESUPUESTO contractual.
+  hayPresupuestoCongelado: boolean;
   hayCronograma: boolean;
+  /// La linea base del CRONOGRAMA. Son dos cosas distintas.
   hayLineaBase: boolean;
   guardado: Record<string, unknown> | null;
 }
@@ -27,6 +32,8 @@ interface Estado {
 const estado: Estado = {
   estadoObra: "PLANIFICACION",
   partidas: 1,
+  hayMeta: true,
+  hayPresupuestoCongelado: true,
   hayCronograma: true,
   hayLineaBase: true,
   guardado: null,
@@ -45,6 +52,13 @@ vi.mock("@/lib/prisma", () => ({
       },
     },
     wbsItem: { count: async () => estado.partidas },
+    presupuestoMeta: {
+      findFirst: async () => (estado.hayMeta ? { id: "m1" } : null),
+    },
+    baseline: {
+      findFirst: async () =>
+        estado.hayPresupuestoCongelado ? { id: "b1" } : null,
+    },
     cronograma: {
       findFirst: async ({ where }: { where: { lineaBaseAt?: unknown } }) => {
         if (where.lineaBaseAt) return estado.hayLineaBase ? { id: "c1" } : null;
