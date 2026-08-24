@@ -102,15 +102,32 @@ describe("hojaControl - la mitad economica", () => {
 });
 
 describe("hojaControl - la mitad de Last Planner", () => {
-  it("sin semanas cerradas dibuja el hueco y lo explica", () => {
+  it("sin semanas cerradas dice el hueco con todas las letras", () => {
     // Es la correccion que costo rehacer la hoja entera: rellenar un PPC de
     // muestra cuando la obra no tiene ninguna semana cerrada.
     const t = textos(hoja()[0]!.elementos);
     expect(t).toContain("Todavía no hay nada que medir");
-    expect(t.some((x) => x.includes("no tiene ninguna semana del plan cerrada"))).toBe(
-      true,
-    );
-    expect(t).toContain("PPC semana a semana");
+    expect(
+      t.some((x) => x.includes("no tiene ninguna semana del plan cerrada")),
+    ).toBe(true);
+    // Y dice que se llenara sola: sin eso, el hueco se lee como una carencia
+    // del sistema en vez de como algo que le toca a la obra.
+    expect(t.some((x) => x.includes("al cerrar la primera semana"))).toBe(true);
+  });
+
+  /*
+   * EL ESQUELETO VACIO YA NO SE DIBUJA, y es a proposito.
+   *
+   * Los dos rotulos con su «SIN DATOS» enseñaban la estructura que la hoja
+   * tendra. Se aprobaron en su dia y se quitaron el 24 de agosto de 2026
+   * porque eran la mayor parte del ~40 % de papel en blanco que el propio
+   * revisor apunto despues. La honestidad estaba en el texto, no en el
+   * esqueleto.
+   */
+  it("no dibuja el esqueleto de lo que no hay: el sitio se lo lleva el dinero", () => {
+    const t = textos(hoja()[0]!.elementos);
+    expect(t).not.toContain("SIN DATOS");
+    expect(t).not.toContain("Pareto de causas de incumplimiento");
   });
 
   it("y NO inventa ni una sola cifra de PPC", () => {
@@ -123,7 +140,6 @@ describe("hojaControl - la mitad de Last Planner", () => {
         (e.tinta === "exito" || e.tinta === "alerta" || e.tinta === "peligro"),
     );
     expect(barras).toHaveLength(0);
-    expect(textos(el)).toContain("SIN DATOS");
   });
 
   it("con semanas cerradas dibuja una barra por semana", () => {
@@ -241,19 +257,36 @@ describe("donde se abre la brecha", () => {
     expect(dice({ cruce: sinMedir }, "DÓNDE SE ABRE LA BRECHA")).toBe(false);
   });
 
-  /// Media hoja apaisada no da para mas: el resto se mira en pantalla.
-  it("corta a cinco capitulos aunque haya mas", () => {
-    const muchos = Array.from({ length: 12 }, (_, i) => ({
-      codigo: `${i + 1}`,
-      nombre: `CAPITULO NUMERO ${i + 1}`,
-      fisico: 10,
-      economico: 90 - i,
-    }));
-    const t = textos(hoja({ cruce: muchos })[0]!.elementos);
-    const pintados = muchos.filter((c) =>
-      t.some((x) => x.includes(c.nombre)),
-    );
-    expect(pintados).toHaveLength(5);
+  const MUCHOS = Array.from({ length: 20 }, (_, i) => ({
+    codigo: `${i + 1}`,
+    nombre: `CAPITULO NUMERO ${i + 1}`,
+    fisico: 10,
+    economico: 90 - i,
+  }));
+
+  const cuantosSePintan = (parcial: Partial<DatosControl>) => {
+    const t = textos(hoja({ cruce: MUCHOS, ...parcial })[0]!.elementos);
+    return MUCHOS.filter((c) => t.some((x) => x.includes(c.nombre))).length;
+  };
+
+  /// Con el plan al lado, media hoja apaisada no da para mas de cinco.
+  it("corta a cinco cuando comparte la hoja con Last Planner", () => {
+    expect(
+      cuantosSePintan({
+        lastPlanner: {
+          semana: null,
+          compromisos: [],
+          tendencia: [{ fecha: new Date(Date.UTC(2026, 7, 1)), ppc: 80 }],
+          pareto: [],
+        },
+      }),
+    ).toBe(5);
+  });
+
+  /// Sin plan que dibujar, el dinero se lleva la hoja entera y caben mas: es
+  /// justo el hueco que antes se quedaba en blanco.
+  it("llega a doce cuando tiene la hoja para el solo", () => {
+    expect(cuantosSePintan({})).toBe(12);
   });
 });
 

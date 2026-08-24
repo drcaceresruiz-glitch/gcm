@@ -48,9 +48,16 @@ export interface DatosControl {
   lastPlanner: DatosCsvInforme["lastPlanner"];
 }
 
-/// Cuantos capitulos de la brecha caben legibles en la mitad economica. Los
-/// peores primero: el resto se mira en pantalla, que no tiene tope de papel.
+/**
+ * Cuantos capitulos de la brecha caben legibles. Los peores primero: el resto
+ * se mira en pantalla, que no tiene tope de papel.
+ *
+ * Dos cifras porque el ancho de la columna depende de si hay Last Planner que
+ * dibujar. Cuando no lo hay, el dinero se lleva la hoja entera y caben mas: es
+ * justo el hueco que antes se quedaba en blanco.
+ */
 const CAPITULOS_DE_LA_BRECHA = 5;
+const CAPITULOS_DE_LA_BRECHA_ANCHO = 12;
 
 /// Un porcentaje en texto, acotado a 0..100 y tolerante con la basura: una
 /// cifra ilegible se dibuja como cero, nunca como NaN.
@@ -135,8 +142,20 @@ export function hojaControl(
   y -= 10;
   el.push({ tipo: "linea", x1: izq, y1: y, x2: der, y2: y, tinta: "linea" });
 
-  /// Dos columnas: el dinero a la izquierda, el plan a la derecha.
-  const medio = izq + (der - izq) * 0.54;
+  /**
+   * Dos columnas -el dinero a la izquierda, el plan a la derecha- SOLO cuando
+   * hay plan que dibujar.
+   *
+   * Sin ninguna semana cerrada, la mitad derecha se quedaba con una nota y dos
+   * rotulos vacios, y el revisor del diseño lo dejo anotado: «honesto, pero
+   * mucho papel para cero informacion». Era ~40 % de la hoja en blanco.
+   *
+   * Asi que el dinero se lleva el ancho entero y el aviso de Last Planner baja
+   * a una franja al pie. `der + 24` no es un truco: la columna del dinero
+   * dibuja hasta `medio - 24`, asi que esto la hace terminar justo en el
+   * margen derecho sin tener que tocar ni una de las lineas de abajo.
+   */
+  const medio = hayLastPlanner ? izq + (der - izq) * 0.54 : der + 24;
   const anchoIzq = medio - izq - 24;
 
   // ---- Mitad economica ----------------------------------------------------
@@ -282,7 +301,12 @@ export function hojaControl(
       .filter((c) => c.fisico !== null && c.economico !== null)
       .map((c) => ({ ...c, brecha: c.economico! - c.fisico! }))
       .sort((a, b) => b.brecha - a.brecha)
-      .slice(0, CAPITULOS_DE_LA_BRECHA);
+      .slice(
+        0,
+        hayLastPlanner
+          ? CAPITULOS_DE_LA_BRECHA
+          : CAPITULOS_DE_LA_BRECHA_ANCHO,
+      );
 
     if (conBrecha.length > 0) {
       yE -= 14;
@@ -326,52 +350,54 @@ export function hojaControl(
     }
   }
 
-  // ---- Mitad Last Planner -------------------------------------------------
-
-  let yL = y - 20;
-  texto(medio, yL, "LAST PLANNER", 9, { negrita: true });
-  yL -= 6;
-  el.push({ tipo: "linea", x1: medio, y1: yL, x2: der, y2: yL, tinta: "linea" });
-  yL -= 16;
+  // ---- Last Planner -------------------------------------------------------
 
   const tendencia = d.lastPlanner?.tendencia ?? [];
   const pareto = d.lastPlanner?.pareto ?? [];
 
   if (tendencia.length === 0) {
     /**
-     * El estado vacio, dibujado y no disimulado.
+     * El estado vacio, dicho y no disimulado, pero en UNA FRANJA al pie.
      *
-     * Es la correccion que costo rehacer la hoja entera: mientras no haya una
-     * semana cerrada no hay PPC, ni causas, ni Pareto. Se dice con esas
-     * palabras y se deja el sitio marcado, en vez de rellenarlo con un
-     * grafico de muestra que el lector tomaria por suyo.
+     * Sigue en pie la correccion que costo rehacer la hoja entera: mientras no
+     * haya una semana cerrada no hay PPC, ni causas, ni Pareto, y eso se dice
+     * con esas palabras en vez de dibujar un grafico de muestra que el lector
+     * tomaria por suyo.
+     *
+     * LO QUE SI CAMBIA -y conviene saber que fue a proposito- son los dos
+     * rotulos vacios con su «SIN DATOS» y su linea, que enseñaban la
+     * estructura que la hoja TENDRA. Se aprobaron en su dia y se quitan ahora
+     * porque eran la mayor parte de ese 40 % de papel en blanco que el propio
+     * revisor apunto despues. La honestidad estaba en el texto, no en el
+     * esqueleto: el texto se queda entero, y el sitio se lo lleva el dinero,
+     * que si tiene algo que contar.
      */
-    texto(medio, yL, "Todavía no hay nada que medir", 9, { negrita: true, tinta: "marca" });
-    yL -= 13;
+    let yL = yE - 26;
+    texto(izq, yL, "LAST PLANNER", 9, { negrita: true });
+    yL -= 6;
+    el.push({ tipo: "linea", x1: izq, y1: yL, x2: der, y2: yL, tinta: "linea" });
+    yL -= 14;
+    texto(izq, yL, "Todavía no hay nada que medir", 8, {
+      negrita: true,
+      tinta: "marca",
+    });
+    yL -= 11;
     for (const linea of partirEnLineas(
-      `Al corte del ${fechaCsv(d.fechaCorte)} la obra no tiene ninguna semana del plan cerrada. Por eso no hay PPC, ni causas de incumplimiento: esos datos no existen todavía, y ninguno se ha estimado para rellenar el hueco.`,
-      der - medio,
+      `Al corte del ${fechaCsv(d.fechaCorte)} la obra no tiene ninguna semana del plan cerrada: no hay PPC ni causas de incumplimiento. Esos datos no existen todavía y ninguno se ha estimado para rellenar el hueco. Esta hoja los recogerá sola al cerrar la primera semana del plan.`,
+      der - izq,
       8,
       medir,
     )) {
-      texto(medio, yL, linea, 8, { tinta: "tinta-suave" });
+      texto(izq, yL, linea, 8, { tinta: "tinta-suave" });
       yL -= 11;
     }
-    yL -= 8;
-    for (const rotuloVacio of [
-      "PPC semana a semana",
-      "Pareto de causas de incumplimiento",
-    ]) {
-      texto(medio, yL, rotuloVacio, 8, { negrita: true });
-      texto(der - medir("SIN DATOS", 7), yL, "SIN DATOS", 7, { tinta: "tinta-suave" });
-      yL -= 8;
-      el.push({ tipo: "linea", x1: medio, y1: yL, x2: der, y2: yL, tinta: "linea" });
-      yL -= 22;
-    }
-    texto(medio, yL, "Se llenará solo al cerrar la primera semana del plan.", 7, {
-      tinta: "tinta-suave",
-    });
   } else {
+    let yL = y - 20;
+    texto(medio, yL, "LAST PLANNER", 9, { negrita: true });
+    yL -= 6;
+    el.push({ tipo: "linea", x1: medio, y1: yL, x2: der, y2: yL, tinta: "linea" });
+    yL -= 16;
+
     texto(medio, yL, "PPC SEMANA A SEMANA", 8, { negrita: true, tinta: "tinta-suave" });
     yL -= 14;
 
