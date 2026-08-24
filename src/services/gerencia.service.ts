@@ -8,7 +8,7 @@ import { sumar, restar, esPositivo } from "@/lib/decimal";
 import { alertasDeAtraso } from "@/lib/control-avance";
 import { medirAvance, type AvanceReportado } from "@/lib/cronograma";
 import { ponderarPorDuracion } from "@/lib/curva-s";
-import { obraAdmiteCambios } from "@/lib/obras";
+import { obraAdmiteCambios, ESTADOS_OBRA_CON_EXPOSICION } from "@/lib/obras";
 import { semaforoIndice, type Semaforo } from "@/lib/tablero";
 import { diasEntre, hoy } from "@/utils/fechas";
 import type { TipoRestriccion } from "@/generated/prisma/enums";
@@ -303,6 +303,155 @@ export async function adendasPorFirmar(
     importeDeducciones: sumar(pedidas.map((d) => d.importe.toString())),
     diasDeLaMasVieja: esperas.length === 0 ? 0 : Math.max(...esperas),
     tope: MAX_ADENDAS_EN_BANDEJA,
+  };
+}
+
+/**
+ * CUANTO ESPERA TU FIRMA, en un numero.
+ *
+ * Para la insignia del menu, que es lo que hace que la pantalla de Gerencia se
+ * encuentre. Dos `count` con indice y nada mas: esto corre en el panel, que se
+ * pinta en cada navegacion fuera de una obra.
+ *
+ * Cuenta lo que ESTA PERSONA puede firmar, no lo que hay pendiente: una
+ * insignia con un 3 que no se puede bajar haciendo nada enseña a ignorar las
+ * insignias. Es el mismo criterio que ya rige las de la obra.
+ */
+export async function cuantoEsperaTuFirma(
+  sesion: SesionActiva,
+): Promise<number> {
+  const firmaAdendas = puede(sesion, "adenda:aprobar");
+  const firmaDeducciones = puede(sesion, "deduccion:aprobar");
+  if (!firmaAdendas && !firmaDeducciones) return 0;
+
+  const deLaEmpresa = {
+    companyId: sesion.companyId,
+    ...filtroDeObras(sesion),
+  };
+
+  const [adendas, deducciones] = await Promise.all([
+    firmaAdendas
+      ? prisma.adendaEncargo.count({
+          where: { estado: "PENDIENTE", project: deLaEmpresa },
+        })
+      : 0,
+    firmaDeducciones
+      ? prisma.deduccionCostoPropio.count({
+          where: { estado: "PENDIENTE", project: deLaEmpresa },
+        })
+      : 0,
+  ]);
+
+  return adendas + deducciones;
+}
+
+export interface BolsaDeObra {
+  obraId: string;
+  obraNombre: string;
+  /// "cerca" o "roja". Las holgadas no se listan: un panel que enumera lo que
+  /// esta bien es un panel que no se lee.
+  estado: string;
+  /// Lo que queda de bolsa. Negativo = se paso.
+  comprometida: string;
+  /// La bolsa que se habia previsto. Es contra lo que se lee la de al lado.
+  prevista: string;
+  /// Cuando la miro el reloj por ultima vez. Se enseña: una cifra de dinero
+  /// que puede tener horas y no lo dice es la clase de numero que costo dos
+  /// dias arreglar en el tablero.
+  revisadaAt: Date;
+}
+
+export interface BolsasDeCartera {
+  obras: BolsaDeObra[];
+  enRojo: number;
+  enRiesgo: number;
+  /// De cuantas obras vivas hay dato. Si el reloj no ha pasado por una, aqui
+  /// no sale, y una lista vacia no puede leerse como «todas van bien».
+  conDatos: number;
+  obrasVivas: number;
+  /// La revision mas antigua de las que se enseñan. Con el reloj parado, esto
+  /// envejece y la pantalla lo dice en vez de fingir que esta al dia.
+  revisadaMasVieja: Date | null;
+}
+
+/**
+ * LAS BOLSAS DE LA CARTERA: que obras se estan quedando sin margen.
+ *
+ * Es lo que le faltaba a esta pantalla, y era lo mas raro que le faltara: la
+ * bolsa es la cifra que dice si una obra va a dejar dinero, y gerencia solo
+ * podia verla entrando obra por obra a la pantalla de la meta.
+ *
+ * NO SE CALCULA AQUI. Se lee de `EstadoBolsaObra`, que es donde el reloj de
+ * avisos deja lo que midio. Esa cuenta cruza el presupuesto vigente entero con
+ * la meta entera, y hacerla para diez obras al pintar una pantalla es
+ * exactamente lo que en este hosting ya tumbo produccion dos veces. El reloj
+ * ya la hizo; aqui cuesta una consulta por indice.
+ *
+ * EL PRECIO SE DICE. La cifra puede tener horas -el reloj revisa cada seis- y
+ * la pantalla enseña cuando se miro. Un numero de dinero que puede estar
+ * viejo y no lo dice es la misma clase de cifra que el «saldo disponible» que
+ * costo dos dias arreglar.
+ *
+ * SOLO LAS QUE VAN MAL. Enumerar las holgadas convertiria esto en una lista
+ * larga que nadie lee, y el conteo de arriba ya dice cuantas se miraron.
+ */
+export async function bolsasDeCartera(
+  sesion: SesionActiva,
+): Promise<BolsasDeCartera | null> {
+  if (sesion.obrasAsignadas !== null) return null;
+  // `meta:leer`: la bolsa es el MARGEN, el dato mas sensible que guarda la
+  // aplicacion. No se enseña a quien no puede ver la meta.
+  if (!puede(sesion, "meta:leer")) return null;
+
+  const vivas = {
+    companyId: sesion.companyId,
+    estado: { in: [...ESTADOS_OBRA_CON_EXPOSICION] },
+  };
+
+  const [filas, obrasVivas] = await Promise.all([
+    prisma.estadoBolsaObra.findMany({
+      where: { project: vivas },
+      select: {
+        projectId: true,
+        estado: true,
+        comprometida: true,
+        prevista: true,
+        revisadaAt: true,
+        project: { select: { nombreObra: true } },
+      },
+    }),
+    prisma.project.count({ where: vivas }),
+  ]);
+
+  const malas = filas.filter((f) => f.estado !== "holgada");
+
+  const obras: BolsaDeObra[] = malas.map((f) => ({
+    obraId: f.projectId,
+    obraNombre: f.project.nombreObra,
+    estado: f.estado,
+    // A texto en la frontera: es dinero.
+    comprometida: f.comprometida.toString(),
+    prevista: f.prevista.toString(),
+    revisadaAt: f.revisadaAt,
+  }));
+
+  // Las rojas primero y, dentro de cada grupo, la que menos bolsa le queda.
+  // `Number` solo para ORDENAR: no se compara ni se suma nada con el.
+  obras.sort((a, b) => {
+    if (a.estado !== b.estado) return a.estado === "roja" ? -1 : 1;
+    return Number(a.comprometida) - Number(b.comprometida);
+  });
+
+  const revisiones = filas.map((f) => f.revisadaAt.getTime());
+
+  return {
+    obras,
+    enRojo: malas.filter((f) => f.estado === "roja").length,
+    enRiesgo: malas.filter((f) => f.estado === "cerca").length,
+    conDatos: filas.length,
+    obrasVivas,
+    revisadaMasVieja:
+      revisiones.length === 0 ? null : new Date(Math.min(...revisiones)),
   };
 }
 

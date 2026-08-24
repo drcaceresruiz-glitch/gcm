@@ -48,6 +48,10 @@ const datos = {
   adendas: [] as unknown[],
   /// Deducciones de costos propios PENDIENTES, la otra mitad de la bandeja.
   deducciones: [] as unknown[],
+  /// Lo que el reloj dejo apuntado de la bolsa de cada obra.
+  bolsas: [] as unknown[],
+  /// Cuantas obras vivas hay. Lo devuelve `project.count`.
+  obrasVivas: 0,
   /// Encargos completos (fechasValorizacion/valorizaciones/pagos), para
   /// `valorizacionesDeCartera` -distinto del agregado `encargosVigentes`.
   encargosCompletos: [] as unknown[],
@@ -79,6 +83,10 @@ vi.mock("@/lib/prisma", () => ({
       findMany: async (args: unknown) => {
         llamadas.push({ modelo: "project", args });
         return datos.obras;
+      },
+      count: async (args: unknown) => {
+        llamadas.push({ modelo: "project:count", args });
+        return datos.obrasVivas;
       },
     },
     cronograma: {
@@ -166,11 +174,25 @@ vi.mock("@/lib/prisma", () => ({
         llamadas.push({ modelo: "adendaEncargo", args });
         return datos.adendas;
       },
+      count: async (args: unknown) => {
+        llamadas.push({ modelo: "adendaEncargo:count", args });
+        return (datos.adendas as unknown[]).length;
+      },
     },
     deduccionCostoPropio: {
       findMany: async (args: unknown) => {
         llamadas.push({ modelo: "deduccionCostoPropio", args });
         return datos.deducciones;
+      },
+      count: async (args: unknown) => {
+        llamadas.push({ modelo: "deduccionCostoPropio:count", args });
+        return (datos.deducciones as unknown[]).length;
+      },
+    },
+    estadoBolsaObra: {
+      findMany: async (args: unknown) => {
+        llamadas.push({ modelo: "estadoBolsaObra", args });
+        return datos.bolsas;
       },
     },
   },
@@ -186,6 +208,8 @@ const {
   confiabilidadDeCartera,
   valorizacionesDeCartera,
   adendasPorFirmar,
+  bolsasDeCartera,
+  cuantoEsperaTuFirma,
   MAX_ADENDAS_EN_BANDEJA,
   MAX_OBRAS_POR_CARGA,
   UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS,
@@ -239,6 +263,8 @@ beforeEach(() => {
   datos.sueltasComprometido = [];
   datos.adendas = [];
   datos.deducciones = [];
+  datos.bolsas = [];
+  datos.obrasVivas = 0;
   datos.wbsItems = [];
   datos.restricciones = [];
   datos.encargosCompletos = [];
@@ -1257,5 +1283,146 @@ describe("adendasPorFirmar: las deducciones de costos propios", () => {
 
     expect(donde.estado).toBe("PENDIENTE");
     expect(donde.project.companyId).toBe("emp-1");
+  });
+});
+
+/**
+ * LAS BOLSAS DE LA CARTERA.
+ *
+ * Era lo mas raro que le faltara a la pantalla de gerencia: la bolsa es la
+ * cifra que dice si una obra va a dejar dinero, y solo se podia ver entrando
+ * obra por obra a la meta.
+ *
+ * No se calcula aqui: se LEE de lo que el reloj de avisos ya midio. Esa cuenta
+ * cruza el presupuesto vigente entero con la meta entera, y hacerla para diez
+ * obras al pintar una pantalla es lo que en este hosting ya tumbo produccion
+ * dos veces.
+ */
+describe("bolsasDeCartera", () => {
+  function bolsa(over: Record<string, unknown> = {}) {
+    return {
+      projectId: "obra-1",
+      estado: "roja",
+      comprometida: "-4200.00",
+      prevista: "84000.00",
+      revisadaAt: new Date("2026-08-24T06:00:00Z"),
+      project: { nombreObra: "Torre A" },
+      ...over,
+    };
+  }
+
+  it("no la ve quien lleva una obra, ni quien no puede ver la meta", async () => {
+    expect(await bolsasDeCartera(sesion(["o1"], ["meta:leer"]))).toBeNull();
+    // La bolsa es el MARGEN, el dato mas sensible que guarda la aplicacion.
+    expect(await bolsasDeCartera(sesion(null, ["orden:leer"]))).toBeNull();
+  });
+
+  it("solo lista las que van mal: las holgadas no necesitan una fila", async () => {
+    datos.bolsas = [
+      bolsa({ projectId: "a", estado: "holgada", comprometida: "50000.00" }),
+      bolsa({ projectId: "b", estado: "cerca", comprometida: "8000.00" }),
+    ];
+    datos.obrasVivas = 2;
+
+    const r = await bolsasDeCartera(sesion(null, ["meta:leer"]));
+
+    expect(r?.obras).toHaveLength(1);
+    expect(r?.obras[0]?.obraId).toBe("b");
+    // Pero el conteo dice cuantas se miraron: si no, una lista corta se leeria
+    // como que solo hay dos obras.
+    expect(r?.conDatos).toBe(2);
+  });
+
+  it("las rojas primero y, dentro, la que menos le queda", async () => {
+    datos.bolsas = [
+      bolsa({ projectId: "cerca", estado: "cerca", comprometida: "8000.00" }),
+      bolsa({ projectId: "roja-leve", comprometida: "-100.00" }),
+      bolsa({ projectId: "roja-grave", comprometida: "-90000.00" }),
+    ];
+
+    const r = await bolsasDeCartera(sesion(null, ["meta:leer"]));
+
+    expect(r?.obras.map((o) => o.obraId)).toEqual([
+      "roja-grave",
+      "roja-leve",
+      "cerca",
+    ]);
+    expect(r?.enRojo).toBe(2);
+    expect(r?.enRiesgo).toBe(1);
+  });
+
+  /**
+   * NI UNA OBRA MEDIDA NO ES «TODAS VAN BIEN»: es que no se sabe. Devolver lo
+   * mismo en los dos casos dejaria a la pantalla dando una buena noticia que
+   * nadie ha comprobado, que es exactamente el fallo del «saldo disponible»
+   * que costo dos dias.
+   */
+  it("distingue «ninguna va mal» de «ninguna se ha medido»", async () => {
+    datos.bolsas = [];
+    datos.obrasVivas = 3;
+
+    const r = await bolsasDeCartera(sesion(null, ["meta:leer"]));
+
+    expect(r?.obras).toEqual([]);
+    expect(r?.conDatos).toBe(0);
+    expect(r?.obrasVivas).toBe(3);
+    expect(r?.revisadaMasVieja).toBeNull();
+  });
+
+  it("dice cuando se miro la mas antigua, para poder ver si el reloj va al dia", async () => {
+    datos.bolsas = [
+      bolsa({ projectId: "a", revisadaAt: new Date("2026-08-24T06:00:00Z") }),
+      bolsa({ projectId: "b", revisadaAt: new Date("2026-08-20T06:00:00Z") }),
+    ];
+
+    const r = await bolsasDeCartera(sesion(null, ["meta:leer"]));
+    expect(r?.revisadaMasVieja?.toISOString()).toBe("2026-08-20T06:00:00.000Z");
+  });
+
+  it("solo obras vivas y solo de la empresa de la sesion", async () => {
+    await bolsasDeCartera(sesion(null, ["meta:leer"]));
+
+    const c = llamadas.find((l) => l.modelo === "estadoBolsaObra");
+    const donde = (
+      c?.args as {
+        where: { project: { companyId: string; estado: { in: string[] } } };
+      }
+    ).where.project;
+
+    expect(donde.companyId).toBe("emp-1");
+    // PARALIZADA entra: paralizar no devuelve la bolsa que ya se gasto.
+    expect(donde.estado.in).toContain("EN_EJECUCION");
+    expect(donde.estado.in).toContain("PARALIZADA");
+  });
+});
+
+/**
+ * LA INSIGNIA que hace que la pantalla de gerencia se encuentre.
+ *
+ * Estaba dentro de un plegable descrito por su propio codigo como «consulta
+ * ocasional», y sin ningun aviso: con tres adendas esperando su firma, el
+ * panel no le decia nada al gerente.
+ */
+describe("cuantoEsperaTuFirma", () => {
+  it("cuenta solo lo que ESTA persona puede firmar", async () => {
+    datos.adendas = [{}, {}];
+    datos.deducciones = [{}];
+
+    // Un numero que no se puede bajar haciendo nada enseña a ignorar las
+    // insignias: quien no firma deducciones no las ve contadas.
+    expect(await cuantoEsperaTuFirma(sesion(null, ["adenda:aprobar"]))).toBe(2);
+    expect(await cuantoEsperaTuFirma(sesion(null, ["deduccion:aprobar"]))).toBe(1);
+    expect(
+      await cuantoEsperaTuFirma(
+        sesion(null, ["adenda:aprobar", "deduccion:aprobar"]),
+      ),
+    ).toBe(3);
+  });
+
+  it("quien no firma nada no gasta ni una consulta", async () => {
+    datos.adendas = [{}, {}];
+
+    expect(await cuantoEsperaTuFirma(sesion(null, ["meta:leer"]))).toBe(0);
+    expect(llamadas.filter((l) => l.modelo.endsWith(":count"))).toHaveLength(0);
   });
 });

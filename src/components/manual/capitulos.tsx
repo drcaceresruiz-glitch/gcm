@@ -1509,10 +1509,10 @@ const GERENCIA = (
   <>
     <Clave>
       Gerencia contesta lo que <strong>no se ve mirando las obras de una
-      en una</strong>: cuánto hay pedido en adicionales que todavía no
-      cuenta en ningún presupuesto, y qué partidas críticas van tarde en
-      toda la cartera. Es de empresa, no de obra — por eso no se llama
-      «tablero».
+      en una</strong>: qué espera tu firma, qué obras se están quedando sin
+      bolsa, cuánto hay pedido en adicionales que todavía no cuenta en ningún
+      presupuesto, y qué partidas críticas van tarde en toda la cartera. Es de
+      empresa, no de obra — por eso no se llama «tablero».
     </Clave>
 
     <S titulo="Quién entra: es el alcance, no un permiso">
@@ -1522,6 +1522,61 @@ const GERENCIA = (
         es, por definición, quien responde de ella. A quien lleva una obra,
         un resumen de las demás no le dice nada que pueda usar — y ni
         siquiera le aparece la entrada en el menú.
+      </p>
+      <p>
+        La entrada está <strong>arriba, junto a Obras</strong>, y no dentro de
+        «Mi constructora». Estuvo ahí hasta el 24 de agosto de 2026 y era un
+        error de sitio: ese grupo nace plegado porque son consultas
+        ocasionales, y esta no lo es. Escondida detrás de un plegable, la
+        pregunta que se acaba haciendo no es qué le falta a la pantalla sino
+        si la pantalla existe.
+      </p>
+    </S>
+
+    <S titulo="Esperando tu firma">
+      <p>
+        Lo único de esta pantalla donde <strong>quien mira es el cuello de
+        botella</strong>: los demás bloques informan, este pide una decisión
+        que solo puede tomar gerencia. Por eso va el primero, y por eso el
+        menú lleva una <strong>insignia</strong> con cuántas cosas esperan —
+        contando solo las que esa persona puede firmar.
+      </p>
+      <p>
+        Hay dos clases y van en la misma caja, porque para quien firma son la
+        misma tarea: los <strong>adicionales</strong> del contratista y las{" "}
+        <strong>deducciones de costos propios</strong> que pide la obra. Se
+        listan por separado porque tiran del dinero al revés — uno se lo lleva
+        y la otra lo devuelve —, así que sumarlas en un solo importe daría una
+        cifra que no significa nada.
+      </p>
+      <p>
+        Se ordenan por <strong>antigüedad</strong>, no por importe. Al revés
+        que los adicionales en borrador de más abajo: allí se mira exposición,
+        aquí es una cola de trabajo, y lo que primero se pudre es lo que lleva
+        más tiempo esperando.
+      </p>
+    </S>
+
+    <S titulo="Obras que se están quedando sin bolsa">
+      <p>
+        La <strong>bolsa comprometida</strong>: lo que se planificó de margen
+        menos las desviaciones de los contratos ya firmados. Es la que baja con
+        cada adenda que se aprueba, y hasta el 24 de agosto de 2026 solo se
+        podía ver entrando obra por obra a la pantalla de la meta.
+      </p>
+      <p>
+        <strong>No se calcula aquí.</strong> Se lee de lo que el reloj de
+        avisos ya midió: esa cuenta cruza el presupuesto vigente entero con la
+        meta entera, y hacerla para diez obras al pintar una pantalla es lo que
+        en este servidor ya tumbó producción dos veces. Por eso cada fila dice{" "}
+        <strong>cuándo se revisó</strong>: la cifra puede tener unas horas, y
+        un número de dinero que puede estar viejo y no lo dice es exactamente
+        la clase de cifra que no se debe enseñar.
+      </p>
+      <p>
+        Solo salen las que van mal. Y si <strong>ninguna se ha medido</strong>{" "}
+        todavía, la pantalla lo dice con esas palabras en vez de quedarse en
+        blanco: «ninguna va mal» y «no lo sé» no son lo mismo.
       </p>
     </S>
 
@@ -1568,6 +1623,18 @@ const GERENCIA = (
     <S titulo="Lo que sale mal">
       <SaleMal
         casos={[
+          {
+            hace: "Leer una lista de bolsas vacía como que todo va bien",
+            pasa: (
+              <p>
+                Si el reloj de avisos no ha pasado todavía por ninguna obra —o
+                si ninguna tiene meta y contractual con los que comparar—, no
+                hay nada que listar. La pantalla lo dice, y dice de cuántas
+                obras vivas hay dato. Una lista vacía sin esa frase se leería
+                como una buena noticia que nadie ha comprobado.
+              </p>
+            ),
+          },
           {
             hace: "Leer el semáforo como si cubriera toda la cartera",
             pasa: (

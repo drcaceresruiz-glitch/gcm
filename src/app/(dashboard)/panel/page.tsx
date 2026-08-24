@@ -10,7 +10,10 @@ import {
 } from "@/services/obras.service";
 import { listarActividad } from "@/services/actividad.service";
 import { avanceFisicoPorObra } from "@/services/cronograma.service";
-import { semaforoDeCartera } from "@/services/gerencia.service";
+import {
+  cuantoEsperaTuFirma,
+  semaforoDeCartera,
+} from "@/services/gerencia.service";
 import { puede } from "@/lib/rbac";
 import {
   ETIQUETA_ESTADO_OBRA,
@@ -66,6 +69,7 @@ export default async function PanelPage({
     solicitudes,
     semanas,
     semaforo,
+    porFirmar,
   ] = await Promise.all([
     listarObras(sesion, {
       pagina: consulta.p,
@@ -91,6 +95,9 @@ export default async function PanelPage({
     // no ve toda la cartera, sin consulta extra -la puerta la pone el propio
     // servicio-.
     semaforoDeCartera(sesion),
+    // Solo para la insignia de Gerencia: dos `count` con indice, no la
+    // bandeja entera. Aqui hace falta el numero, no las filas.
+    cuantoEsperaTuFirma(sesion),
   ]);
 
   // El avance fisico se pide DESPUES y solo para las obras de esta pagina:
@@ -151,7 +158,34 @@ export default async function PanelPage({
           soloExacto: true,
           hecho: marca(preliminares.obras),
         },
-      ],
+        /**
+         * GERENCIA VIVE AQUI, con las obras, y no dentro del plegable.
+         *
+         * Estaba en «Mi constructora», que su propio comentario describe como
+         * «siete entradas de CONSULTA OCASIONAL» y que nace plegado. Para el
+         * gerente general esta no es una consulta ocasional: es su pantalla
+         * diaria, la unica que le contesta como va la cartera. Escondida
+         * detras de un plegable, la pregunta que se acaba haciendo no es «que
+         * le falta a esa pantalla» sino «existe esa pantalla».
+         *
+         * Y CON INSIGNIA. Con tres adendas y dos deducciones esperando su
+         * firma, el panel no le decia nada: tenia que acordarse de entrar. La
+         * insignia cuenta solo lo que ESTA PERSONA puede firmar, porque un
+         * numero que no se puede bajar haciendo nada enseña a ignorar las
+         * insignias.
+         *
+         * Solo para quien ve TODA la cartera: es la misma puerta que usan los
+         * servicios (`obrasAsignadas === null`), no un permiso nuevo.
+         */
+        sesion.obrasAsignadas === null && {
+          clave: "gerencia",
+          titulo: "Gerencia",
+          pregunta: "cómo va la cartera",
+          href: "/gerencia",
+          pendientes:
+            porFirmar > 0 ? { cuantos: porFirmar, critico: true } : null,
+        },
+      ].filter(Boolean) as FaseMenu["secciones"],
     },
     {
       clave: "empresa",
@@ -161,16 +195,6 @@ export default async function PanelPage({
       // las obras, que es a lo que se entra a diario.
       plegable: true,
       secciones: [
-        /// Solo para quien ve TODA la cartera: es la misma puerta que usa el
-        /// servicio (`obrasAsignadas === null`), y no un permiso nuevo. A
-        /// quien lleva una obra, un resumen de las demas no le dice nada que
-        /// pueda usar. Va la PRIMERA porque es la lectura de arriba.
-        sesion.obrasAsignadas === null && {
-          clave: "gerencia",
-          titulo: "Gerencia",
-          pregunta: "cómo va la cartera",
-          href: "/gerencia",
-        },
         puede(sesion, "proveedor:leer") && {
           clave: "contratistas",
           titulo: "Contratistas",

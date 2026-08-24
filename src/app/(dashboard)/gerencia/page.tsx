@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   Receipt,
   PenLine,
+  PiggyBank,
 } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
@@ -23,6 +24,7 @@ import {
   confiabilidadDeCartera,
   valorizacionesDeCartera,
   adendasPorFirmar,
+  bolsasDeCartera,
   UMBRAL_SOBREGIRO_PROYECTADO_PUNTOS,
 } from "@/services/gerencia.service";
 import { textoSinCosto } from "@/lib/evm";
@@ -52,8 +54,8 @@ export const metadata: Metadata = { title: "Gerencia" };
  * EMPRESA, no de obra.
  *
  * Contesta lo que no se ve mirando las obras de una en una: QUE ESPERA SU
- * FIRMA -lo unico de aqui donde quien mira es el cuello de botella-, que
- * partidas
+ * FIRMA -lo unico de aqui donde quien mira es el cuello de botella-, que obras
+ * se estan quedando sin BOLSA, que partidas
  * criticas van tarde en la cartera, que obras se estan comprometiendo mas
  * rapido de lo que avanzan, como va el valor ganado y la confiabilidad del
  * plan semanal de toda la cartera, cuanto hay pedido (adicionales y
@@ -75,6 +77,7 @@ export default async function GerenciaPage() {
   // las ocho dicen que no, esta pantalla no existe para esta sesion.
   const [
     firmas,
+    bolsas,
     semaforo,
     sobregiro,
     evm,
@@ -85,6 +88,7 @@ export default async function GerenciaPage() {
     restricciones,
   ] = await Promise.all([
     adendasPorFirmar(sesion),
+    bolsasDeCartera(sesion),
     semaforoDeCartera(sesion),
     sobregiroProyectadoDeCartera(sesion),
     evmDeCartera(sesion),
@@ -96,6 +100,7 @@ export default async function GerenciaPage() {
   ]);
   if (
     !firmas &&
+    !bolsas &&
     !semaforo &&
     !sobregiro &&
     !evm &&
@@ -284,6 +289,145 @@ export default async function GerenciaPage() {
                   deducción se apunta encima, con su firma y su motivo.
                 </p>
               </div>
+            )}
+          </SeccionTarjeta>
+        </Tarjeta>
+      )}
+
+      {/* LA BOLSA VA JUSTO DETRAS DE LAS FIRMAS.
+          Es la cifra que dice si una obra va a dejar dinero, y hasta hoy
+          gerencia solo podia verla entrando obra por obra a la pantalla de la
+          meta. No se calcula aqui: se lee de lo que el reloj de avisos ya
+          midio -esa cuenta cruza el presupuesto vigente entero con la meta
+          entera, y hacerla para diez obras al pintar una pantalla es lo que en
+          este hosting ya tumbo produccion dos veces-. */}
+      {bolsas && (
+        <Tarjeta>
+          <SeccionTarjeta
+            primera
+            titulo="Obras que se están quedando sin bolsa"
+            nota="La bolsa comprometida: lo que se planificó de margen menos las desviaciones de los contratos ya firmados. Es la que baja con cada adenda que se aprueba. Solo se listan las que van mal; las holgadas no necesitan una fila."
+          >
+            {bolsas.conDatos === 0 ? (
+              /* Ni una obra medida NO es «todas van bien»: es que no se sabe.
+                 Decir lo segundo con el aspecto de lo primero es justo la
+                 clase de silencio que este panel viene a romper. */
+              <p className="text-sm opacity-70">
+                Todavía no hay ninguna bolsa medida. Se calcula sola en la obra
+                que tenga presupuesto meta y contractual, y aparece aquí en
+                cuanto el reloj de avisos pase por ella.
+              </p>
+            ) : bolsas.obras.length === 0 ? (
+              <p className="text-sm opacity-70">
+                Ninguna de las {bolsas.conDatos}{" "}
+                {bolsas.conDatos === 1 ? "obra medida" : "obras medidas"} está
+                cerca de quedarse sin bolsa.
+                {bolsas.conDatos < bolsas.obrasVivas && (
+                  <>
+                    {" "}
+                    De las {bolsas.obrasVivas} vivas, el resto todavía no tiene
+                    meta y contractual con los que medirla.
+                  </>
+                )}
+              </p>
+            ) : (
+              <>
+                <div
+                  className="rounded-lg border p-4"
+                  style={{
+                    borderColor:
+                      bolsas.enRojo > 0 ? "var(--color-peligro)" : "var(--borde)",
+                  }}
+                >
+                  <p className="flex items-center gap-2 text-xs opacity-60">
+                    <PiggyBank className="size-4" aria-hidden="true" />
+                    Obras sin margen o a punto
+                  </p>
+                  <p className="mt-1 text-3xl font-semibold">
+                    {bolsas.obras.length}
+                  </p>
+                  <p className="mt-1 text-xs opacity-60">
+                    {bolsas.enRojo === 1
+                      ? "1 sin bolsa"
+                      : `${bolsas.enRojo} sin bolsa`}
+                    {" · "}
+                    {bolsas.enRiesgo === 1
+                      ? "1 con poca"
+                      : `${bolsas.enRiesgo} con poca`}
+                    {" · "}de {bolsas.conDatos}{" "}
+                    {bolsas.conDatos === 1 ? "medida" : "medidas"}
+                  </p>
+                </div>
+
+                {/* Las rojas primero y, dentro, la que menos le queda. */}
+                <ul className="divide-y" style={{ borderColor: "var(--borde)" }}>
+                  {bolsas.obras.map((o) => (
+                    <li
+                      key={o.obraId}
+                      className="flex flex-wrap items-center justify-between gap-3 py-3"
+                    >
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          aria-hidden="true"
+                          className="size-2.5 shrink-0 rounded-full"
+                          style={{
+                            backgroundColor:
+                              o.estado === "roja"
+                                ? "var(--color-peligro)"
+                                : "var(--color-alerta)",
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <Link
+                            href={`/obras/${o.obraId}/meta`}
+                            className="truncate text-sm font-medium underline-offset-2 hover:underline"
+                          >
+                            {o.obraNombre}
+                          </Link>
+                          <p className="text-xs opacity-60">
+                            {o.estado === "roja"
+                              ? "Sin bolsa"
+                              : "Queda poca bolsa"}{" "}
+                            · de {soles(o.prevista)} previstos ·{" "}
+                            {/* CUANDO se miro. Una cifra de dinero que puede
+                                tener horas y no lo dice es la misma clase de
+                                numero que el «saldo disponible» de ayer. */}
+                            revisado el {fechaCorta(o.revisadaAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <p
+                        className="text-sm font-semibold tabular-nums"
+                        style={{
+                          color:
+                            o.estado === "roja"
+                              ? "var(--color-peligro)"
+                              : "var(--color-alerta)",
+                        }}
+                      >
+                        {soles(o.comprometida)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+
+                {bolsas.conDatos < bolsas.obrasVivas && (
+                  /* Un recorte que no se dice se lee como cobertura completa.
+                     Mismo aviso honesto que el resto de la pantalla. */
+                  <p className="text-xs opacity-60">
+                    Se miden {bolsas.conDatos} de {bolsas.obrasVivas} obras
+                    vivas: el resto todavía no tiene meta y contractual con los
+                    que comparar.
+                  </p>
+                )}
+
+                <p className="text-xs opacity-60">
+                  Cada obra enlaza a su presupuesto meta, que es donde se ve
+                  qué frente se comió la bolsa. Las dos salidas son renegociar
+                  con ese contratista o pedir que se deduzca de los costos
+                  propios.
+                </p>
+              </>
             )}
           </SeccionTarjeta>
         </Tarjeta>
