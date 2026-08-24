@@ -357,8 +357,8 @@ en el menu de Proveedores para todos.
 
 ## Lo que el usuario pidio (al 24 de agosto de 2026)
 
-En orden de lo que duele antes. El primero ya esta hecho; los otros dos siguen
-sin empezar.
+En orden de lo que duele antes. Los dos primeros estan hechos; del tercero hay
+que hablar antes de tocar nada.
 
 ### 1. Avisos configurables de la bolsa — HECHO el 24 de agosto de 2026
 
@@ -380,17 +380,22 @@ reloj, ese es el patron.
 reloj la creara para apuntar el estado de la bolsa encenderia de rebote los
 recordatorios de una obra que nunca los pidio.
 
-### 2. Solicitud de deducir costos propios, con firma del gerente
+### 2. Solicitud de deducir costos propios — HECHO el 24 de agosto de 2026
 
-«Que el residente y/o el administrador de la obra pueda solicitar deducir
-monto de los gastos generales, se le presenta al gerente general y si este lo
-aprueba, se hacen todos los ajustes.»
+La meta NO se toca: la deduccion se apunta encima, con su firma y su motivo,
+igual que un movimiento presupuestal sobre la linea base. Lo presupuestado se
+sigue viendo al lado de lo que queda.
 
-Es el MISMO patron de dos firmas que la adenda, y conviene copiarlo entero:
-quien solicita da el primer visto bueno, gerencia resuelve, el estado va en el
-WHERE de la actualizacion para sobrevivir a dos firmas simultaneas, y aprobar
-es irreversible -se corrige con otra solicitud de signo contrario-. La bandeja
-de firma de Gerencia ya existe desde hoy: esto seria su segundo inquilino.
+**Lo que hay que recordar si alguien viene a tocarlo**: solo se deduce de
+lineas SIN codigoRef -un costo propio es una decision de la empresa; el costo
+de una partida lo dicta la obra, y bajarlo seria reescribir el plan para que
+cuadre-. Y el tope se comprueba DOS veces, al pedir y al firmar: entre las dos
+cosas puede aprobarse otra deduccion sobre la misma linea, y las dos pasarian
+la validacion del alta por separado.
+
+Segundo inquilino de la bandeja «Esperando tu firma» de Gerencia, en su propia
+lista: la adenda se lleva dinero y la deduccion lo devuelve, asi que sumarlas
+en un solo importe no significaria nada.
 
 ### 3. La pantalla del gerente general
 
