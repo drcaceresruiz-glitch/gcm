@@ -106,6 +106,17 @@ export function FormularioRevision({
     ],
   );
 
+  /*
+   * En una obra que no admite cambios no se ofrece: `crearRevision` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
+
   const etiquetas = {
     gastosGenerales: gastosGenerales.trim() || "0",
     utilidad: utilidad.trim() || "0",
@@ -304,16 +315,6 @@ export function FormularioRevision({
 function BotonCrear() {
   const { pending } = useFormStatus();
 
-  /*
-   * En una obra que no admite cambios no se ofrece: `crearRevision` lo
-   * rechaza, y un boton que siempre falla invita a probar. El motivo se
-   * explica una vez por pantalla, no en cada control.
-   * Mismas opciones que el servidor: sin excepciones.
-   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
-   * un hook cambia el orden entre renders y React lo prohibe.
-   */
-  const sinEscritura = useMotivoSinEscritura() !== null;
-  if (sinEscritura) return null;
 
   return (
     <button

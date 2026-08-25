@@ -9,7 +9,10 @@ import { fechaLarga, hoy } from "@/utils/fechas";
 import { ParteDelDia } from "@/components/avance/ParteDelDia";
 import { fotosDeTareas, type FotoResumen } from "@/services/evidencia.service";
 import { accionSubirEvidencia } from "@/app/(dashboard)/obras/[id]/evidencia/acciones";
-import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
+import {
+  AvisoSinEscritura,
+  SiSePuedeEscribir,
+} from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Parte del día" };
 
@@ -125,6 +128,12 @@ export default async function AvancePage({
 
       <AvisoSinEscritura />
 
+      {/* Toda esta pantalla es UN formulario: la barra de cierre de semana y
+          los filtros de ventana solo existen para acotar lo que se va a
+          reportar. Con el parte escondido se quedaban huerfanos, filtrando
+          una lista que no esta —y encima diciendo «llevas 2 dias sin
+          reportar», que en una obra cerrada es un reproche sin salida—. */}
+      <SiSePuedeEscribir>
       <div
         className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm"
         style={{ borderColor: "var(--borde)", backgroundColor: "var(--superficie)" }}
@@ -191,6 +200,7 @@ export default async function AvancePage({
           </Link>
         </div>
       </div>
+      </SiSePuedeEscribir>
 
       {parte.tareas === 0 ? (
         <p className="text-sm opacity-60">

@@ -15,7 +15,10 @@ import {
   accionMarcarVisible,
   accionSubirFotoGaleria,
 } from "./acciones";
-import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
+import {
+  AvisoSinEscritura,
+  SiSePuedeEscribir,
+} from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Galería" };
 
@@ -59,8 +62,15 @@ export default async function GaleriaPage({
 
       <AvisoSinEscritura />
 
+      {/* SUBIR es lo unico que el servidor rechaza en una obra cerrada
+          -`subirFotoGaleria` es la unica de las nueve funciones de galeria con
+          guarda-. Editar, eliminar y marcar visible las acepta, asi que sus
+          botones se quedan: esconder lo que si funciona seria quitar una
+          funcion, no evitar un fallo. */}
       {puedeGestionar && (
-        <SubirFotosGaleria obraId={id} accion={accionSubirFotoGaleria} />
+        <SiSePuedeEscribir>
+          <SubirFotosGaleria obraId={id} accion={accionSubirFotoGaleria} />
+        </SiSePuedeEscribir>
       )}
 
       {puedePublicar && (
@@ -81,8 +91,12 @@ export default async function GaleriaPage({
             <Mascota pose="trabajando" alto={150} />
           </div>
           <p className="mt-3 text-sm opacity-70">
-            Todavía no hay fotos. La primera cuenta más que un informe: sube
-            la de hoy.
+            Todavía no hay fotos.{" "}
+            {/* La invitacion solo si de verdad se puede subir: decirle «sube
+                la de hoy» a quien no puede es peor que no decir nada. */}
+            <SiSePuedeEscribir>
+              La primera cuenta más que un informe: sube la de hoy.
+            </SiSePuedeEscribir>
           </p>
         </div>
       ) : (

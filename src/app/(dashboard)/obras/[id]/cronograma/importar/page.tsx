@@ -9,6 +9,7 @@ import { puedeConvertirProject } from "@/services/mpp.service";
 import { puede } from "@/lib/rbac";
 import { Volver } from "@/components/ui/Volver";
 import { ImportadorCronograma } from "@/components/cronograma/ImportadorCronograma";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Cargar cronograma" };
 
@@ -57,6 +58,8 @@ export default async function ImportarCronogramaPage({
           tocar nada de lo que se haya reportado desde obra.
         </p>
       </div>
+
+      <AvisoSinEscritura />
 
       {/* EL CAMINO CORTO, delante de todo lo demas. Quien tiene presupuesto
           cargado no deberia teclear su estructura por segunda vez. */}

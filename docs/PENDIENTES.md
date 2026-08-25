@@ -158,18 +158,69 @@ apunto como hueco del servidor. **Es falso**: delega en `aplicarImportacion`, y
 esa si la llama. El servidor esta bien; lo que faltaba era esconder el boton, y
 ya esta hecho.
 
-**Una pregunta abierta, no un fallo**: `pase.service` crea y edita pases de
-obra sin pasar por la guarda. Puede estar bien —revocar el pase de alguien
-DESPUES de cerrar la obra es exactamente lo que hay que poder hacer— o puede
-ser un olvido en la parte de crear. No se toco: cambiar lo que el servidor
-acepta pide decidir antes cual de las dos cosas es, y eso lo decide quien
-conozca como se usan los pases en obra.
+### El recorrido en pantalla, y lo que aparecio en el
 
-**Pendiente de mirar en pantalla.** La bateria G6 pasa entera (typecheck, lint,
-3028 pruebas, build). Se vio con los ojos en proveedores, valorizaciones y
-ordenes; las demas no, porque `npm run build` invalida la sesion del servidor
-de desarrollo y no se pudo volver a entrar. Al retomar: entrar, abrir una obra
-cerrada y recorrer cronograma, plan semanal, lookahead, notas y galeria.
+Se hizo el 24 de agosto en la obra OB-000004, ya cerrada, pantalla por
+pantalla. Salieron cinco cosas que la bateria verde NO caza, y todas estan
+arregladas:
+
+1. **Los botones de las PAGINAS no estaban cubiertos**, solo los de los
+   componentes de cliente. «Cargar un corte nuevo», «Cargar el cronograma
+   desde MS Project» y «Asignar el primer encargo» seguian ofreciendose. Y las
+   cuatro sub-rutas de creacion (`/cronograma/importar`, `/ordenes/nueva`,
+   `/movimientos/nuevo`, `/proveedores/nuevo`) quedaban en blanco al esconderse
+   su formulario, sin decir por que.
+2. **Diez guardas habian caido en el subcomponente equivocado.** El script que
+   las coloco buscaba «el ultimo hook», y su patron no reconocia los hooks con
+   genericos (`useActionState<Estado, FormData>(`): en esos archivos se iba al
+   siguiente hook que encontraba, que estaba dentro de un `Guardar()` o un
+   `BotonCrear()` de mas abajo. Efecto visible: en el cronograma desaparecia el
+   boton «Guardar» pero se quedaba el desplegable del dia de corte.
+3. **La pantalla de notas se quedaba muda**: su estado vacio dependia de
+   `puedeCrear`, que es un PERMISO. En una obra cerrada el permiso sigue
+   puesto, asi que ni notas, ni formulario, ni «Todavia no hay notas». Se
+   movio el hueco a `ListaNotas`, que es quien sabe las dos cosas a la vez.
+4. **En galeria se escondio de mas.** De las nueve funciones del servicio solo
+   `subirFotoGaleria` tiene guarda: editar, eliminar y marcar visible las
+   acepta el servidor. Estaban escondidas, o sea que se habia quitado una
+   funcion que existe. Revertido: solo se esconde subir.
+5. **El parte del dia se quedaba con la barra huerfana** —«llevas 2 dias sin
+   reportar» y los filtros de ventana— filtrando una lista que ya no estaba.
+   En una obra cerrada eso ademas es un reproche sin salida.
+
+**La leccion, que vale mas que las cinco**: cinco de cinco eran cosas que
+typecheck, lint, 3028 pruebas y build daban por buenas. Un cambio que consiste
+en NO ENSENAR algo no se puede dar por hecho sin mirarlo.
+
+**Y un detector que no vale**: buscar `motivoSiObraCerrada` dentro del cuerpo
+de cada funcion exportada da falsos negativos, porque media docena de servicios
+la llaman a traves de un ayudante compartido (`contextoEditable`,
+`borradorEditable`, `puertaDeEscritura`). Hay que seguir una llamada de
+profundidad. Con el detector ingenuo parecia que el cronograma manual y la
+edicion de la meta no guardaban, y si guardan.
+
+### Dos preguntas abiertas, que no son fallos
+
+- **`pase.service`** crea y edita pases de obra sin pasar por la guarda. Puede
+  estar bien —revocar el pase de alguien DESPUES de cerrar la obra es
+  exactamente lo que hay que poder hacer— o puede ser un olvido en la parte de
+  crear.
+- **`galeria.service` es incoherente consigo mismo**: subir una foto a una obra
+  cerrada se rechaza, pero editarla, borrarla o publicarla al cliente no. Una
+  de las dos mitades esta mal y no se sabe cual.
+
+Ninguna se toco: cambiar lo que el servidor ACEPTA pide decidir antes cual es
+el comportamiento bueno, y eso lo decide quien conozca como se usan en obra.
+
+**Visto en pantalla, obra cerrada OB-000004**: proveedores, valorizaciones,
+ordenes, cronograma, plan semanal, lookahead, notas, galeria, parte del dia,
+kanban y equipo. Queda sin ver la matriz del Lookahead con tareas dentro de la
+ventana y el caso PARALIZADA —esa obra no existe hoy—, que es justo donde los
+dos interruptores se separan.
+
+**Nota practica**: `npm run build` invalida la sesion del servidor de
+desarrollo. Conviene hacer el recorrido ANTES de construir, o contar con volver
+a entrar.
 
 ## El dinero de la obra, de punta a punta (23 de agosto de 2026)
 

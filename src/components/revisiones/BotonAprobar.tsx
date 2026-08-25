@@ -41,6 +41,17 @@ export function BotonAprobar({
   );
   const [confirmando, setConfirmando] = useState(false);
 
+  /*
+   * En una obra que no admite cambios no se ofrece: `aprobarRevision` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
+
   if (!confirmando) {
     return (
       <div className="space-y-2">
@@ -127,16 +138,6 @@ export function BotonAprobar({
 function BotonConfirmar({ version }: { version: number }) {
   const { pending } = useFormStatus();
 
-  /*
-   * En una obra que no admite cambios no se ofrece: `aprobarRevision` lo
-   * rechaza, y un boton que siempre falla invita a probar. El motivo se
-   * explica una vez por pantalla, no en cada control.
-   * Mismas opciones que el servidor: sin excepciones.
-   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
-   * un hook cambia el orden entre renders y React lo prohibe.
-   */
-  const sinEscritura = useMotivoSinEscritura() !== null;
-  if (sinEscritura) return null;
 
   return (
     <button

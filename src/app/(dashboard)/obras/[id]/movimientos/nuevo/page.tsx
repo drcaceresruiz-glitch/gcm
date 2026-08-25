@@ -15,6 +15,7 @@ import {
   type OpcionCapitulo,
   type OpcionPartida,
 } from "@/components/movimientos/FormularioMovimiento";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Nuevo movimiento presupuestal" };
 
@@ -70,6 +71,8 @@ export default async function NuevoMovimientoPage({
           Sobre la línea base v{presupuesto.version}
         </p>
       </div>
+
+      <AvisoSinEscritura />
 
       <FormularioMovimiento
         obraId={id}

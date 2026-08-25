@@ -18,6 +18,7 @@ import type { NotaResumen, ResultadoNota } from "@/services/notas.service";
 import type { CategoriaNota } from "@/generated/prisma/enums";
 import { CampoTexto } from "@/components/auth/CampoTexto";
 import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
+import { Mascota } from "@/components/ui/Mascota";
 
 /**
  * La bitacora libre de la obra.
@@ -121,6 +122,28 @@ export function ListaNotas({
 
   const ahora = new Date();
   const ordenadas = ordenar(notas);
+
+  /*
+   * EL HUECO SE PINTA AQUI, no en la pagina.
+   *
+   * Estaba alli y dependia de `puedeCrear`, que es un PERMISO. En una obra
+   * cerrada el permiso sigue puesto y lo que no se puede es escribir, asi que
+   * la pantalla se quedaba en blanco: ni notas, ni formulario, ni el aviso de
+   * que no hay ninguna. Aqui si se sabe las dos cosas a la vez.
+   */
+  if (ordenadas.length === 0 && !puedeCrear) {
+    return (
+      <div
+        className="rounded-xl border border-dashed p-10 text-center"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <div className="flex justify-center">
+          <Mascota pose="trabajando" alto={150} />
+        </div>
+        <p className="mt-3 text-sm opacity-70">Todavía no hay notas.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

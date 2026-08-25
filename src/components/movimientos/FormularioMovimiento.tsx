@@ -157,6 +157,17 @@ export function FormularioMovimiento({
   ]);
   const clave = useRef(2);
 
+  /*
+   * En una obra que no admite cambios no se ofrece: `crearMovimiento` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
+
   /// Solo se llama desde manejadores, nunca al pintar: el contador vive en
   /// una ref y leerla durante el render no garantizaria un valor estable.
   const nuevaExistente = (direccion: Direccion): LineaExistente =>
@@ -925,16 +936,6 @@ function BotonSecundario({
 function BotonCrear() {
   const { pending } = useFormStatus();
 
-  /*
-   * En una obra que no admite cambios no se ofrece: `crearMovimiento` lo
-   * rechaza, y un boton que siempre falla invita a probar. El motivo se
-   * explica una vez por pantalla, no en cada control.
-   * Mismas opciones que el servidor: sin excepciones.
-   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
-   * un hook cambia el orden entre renders y React lo prohibe.
-   */
-  const sinEscritura = useMotivoSinEscritura() !== null;
-  if (sinEscritura) return null;
 
   return (
     <button

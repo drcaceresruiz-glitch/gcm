@@ -4,7 +4,6 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { listarNotas } from "@/services/notas.service";
 import { puede } from "@/lib/rbac";
 import { AcentoTitulo } from "@/components/ui/Regla";
-import { Mascota } from "@/components/ui/Mascota";
 import { ListaNotas } from "@/components/notas/ListaNotas";
 import {
   accionAlternarAtendidaNota,
@@ -53,19 +52,12 @@ export default async function NotasPage({
 
       <AvisoSinEscritura />
 
-      {notas.length === 0 && !puedeCrear && (
-        <div
-          className="rounded-xl border border-dashed p-10 text-center"
-          style={{ borderColor: "var(--borde)" }}
-        >
-          <div className="flex justify-center">
-            <Mascota pose="trabajando" alto={150} />
-          </div>
-          <p className="mt-3 text-sm opacity-70">Todavía no hay notas.</p>
-        </div>
-      )}
-
-      {(notas.length > 0 || puedeCrear) && (
+      {/* SIEMPRE, aunque no haya notas y aunque no se pueda escribir: el
+          hueco lo pinta la propia lista. Estaba aqui y dependia de
+          `puedeCrear`, que es un PERMISO; en una obra cerrada el permiso
+          sigue estando y lo que no se puede es escribir, asi que la pantalla
+          se quedaba en blanco sin decir siquiera que no hay notas. */}
+      {(
         <ListaNotas
           obraId={id}
           notas={notas}

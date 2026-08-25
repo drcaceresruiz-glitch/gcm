@@ -11,6 +11,7 @@ import { puede } from "@/lib/rbac";
 import { Volver } from "@/components/ui/Volver";
 import { Tarjeta } from "@/components/ui/Tarjeta";
 import { FormularioEncargo } from "@/components/proveedores/FormularioEncargo";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Nuevo encargo" };
 
@@ -51,6 +52,8 @@ export default async function NuevoEncargoPage({
           partidas.
         </p>
       </div>
+
+      <AvisoSinEscritura />
 
       <Tarjeta>
         <FormularioEncargo

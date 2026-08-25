@@ -44,6 +44,17 @@ export function BotonLineaBase({
   );
   const [confirmando, setConfirmando] = useState(false);
 
+  /*
+   * En una obra que no admite cambios no se ofrece: `marcarLineaBase` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
+
   if (esActual) {
     return (
       <span
@@ -126,16 +137,6 @@ export function BotonLineaBase({
 function BotonConfirmar({ version }: { version: number }) {
   const { pending } = useFormStatus();
 
-  /*
-   * En una obra que no admite cambios no se ofrece: `marcarLineaBase` lo
-   * rechaza, y un boton que siempre falla invita a probar. El motivo se
-   * explica una vez por pantalla, no en cada control.
-   * Mismas opciones que el servidor: sin excepciones.
-   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
-   * un hook cambia el orden entre renders y React lo prohibe.
-   */
-  const sinEscritura = useMotivoSinEscritura() !== null;
-  if (sinEscritura) return null;
 
   return (
     <button

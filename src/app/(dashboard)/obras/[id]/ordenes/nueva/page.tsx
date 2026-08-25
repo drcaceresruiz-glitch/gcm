@@ -19,6 +19,7 @@ import {
   FormularioOrden,
   type OpcionImputacion,
 } from "@/components/ordenes/FormularioOrden";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Nueva orden de compra" };
 
@@ -111,6 +112,8 @@ export default async function NuevaOrdenPage({
           Nueva orden
         </h2>
       </div>
+
+      <AvisoSinEscritura />
 
       {proveedores.length === 0 ? (
         <div

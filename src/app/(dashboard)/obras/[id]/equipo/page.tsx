@@ -5,6 +5,7 @@ import { obtenerObra } from "@/services/obras.service";
 import { listarEquipo } from "@/services/equipo.service";
 import { puede } from "@/lib/rbac";
 import { PanelEquipo } from "@/components/equipo/PanelEquipo";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Equipo de la obra" };
 
@@ -33,5 +34,10 @@ export default async function EquipoObraPage({
 
   const personas = await listarEquipo(sesion, id);
 
-  return <PanelEquipo obraId={id} personas={personas} />;
+  return (
+    <div className="space-y-4">
+      <AvisoSinEscritura />
+      <PanelEquipo obraId={id} personas={personas} />
+    </div>
+  );
 }

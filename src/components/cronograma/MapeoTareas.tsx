@@ -38,6 +38,17 @@ export function MapeoTareas({
   const [error, setError] = useState<{ uid: number; texto: string } | null>(null);
   const [pendiente, iniciar] = useTransition();
 
+  /*
+   * En una obra que no admite cambios no se ofrece: `confirmarEnlace` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
+
   function ejecutar(datos: FormData, quitar: boolean) {
     iniciar(async () => {
       const r = await (quitar ? accionDesenlazar : accionEnlazar)({ ok: true }, datos);
@@ -261,16 +272,6 @@ function BuscadorManual({
 }) {
   const [texto, setTexto] = useState("");
 
-  /*
-   * En una obra que no admite cambios no se ofrece: `confirmarEnlace` lo
-   * rechaza, y un boton que siempre falla invita a probar. El motivo se
-   * explica una vez por pantalla, no en cada control.
-   * Mismas opciones que el servidor: sin excepciones.
-   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
-   * un hook cambia el orden entre renders y React lo prohibe.
-   */
-  const sinEscritura = useMotivoSinEscritura() !== null;
-  if (sinEscritura) return null;
 
   if (!puedeEditar) {
     return <p className="mt-2 text-xs opacity-60">Sin propuestas para esta tarea.</p>;

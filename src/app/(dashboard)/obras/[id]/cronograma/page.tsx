@@ -54,7 +54,10 @@ import {
 } from "@/services/hitos.service";
 import { hitosPropuestos } from "@/services/hitos-predictivos.service";
 import { listarTareasManuales } from "@/services/cronograma-manual.service";
-import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
+import {
+  AvisoSinEscritura,
+  SiSePuedeEscribir,
+} from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Cronograma" };
 
@@ -189,7 +192,10 @@ export default async function CronogramaPage({
             </Link>
           )}
 
+          {/* Cargar un cronograma es escribir: en una obra cerrada no se
+              ofrece. Lo rechaza `importarCronograma`. */}
           {puedeImportar && (
+            <SiSePuedeEscribir>
             <Link
               href={`/obras/${id}/cronograma/importar`}
               className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
@@ -198,6 +204,7 @@ export default async function CronogramaPage({
               <CalendarClock className="size-4" aria-hidden="true" />
               {cronograma ? "Cargar un corte nuevo" : "Cargar cronograma"}
             </Link>
+            </SiSePuedeEscribir>
           )}
         </div>
       </div>
@@ -242,12 +249,14 @@ export default async function CronogramaPage({
             el avance planeado que trae el propio archivo.
           </p>
           {puedeImportar && (
-            <Link
-              href={`/obras/${id}/cronograma/importar`}
-              className="mt-4 inline-flex items-center gap-2 text-sm font-medium underline"
-            >
-              Cargar el cronograma desde MS Project
-            </Link>
+            <SiSePuedeEscribir>
+              <Link
+                href={`/obras/${id}/cronograma/importar`}
+                className="mt-4 inline-flex items-center gap-2 text-sm font-medium underline"
+              >
+                Cargar el cronograma desde MS Project
+              </Link>
+            </SiSePuedeEscribir>
           )}
 
           {/* El camino corto, y el que mejor cuadra: el presupuesto YA es la

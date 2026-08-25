@@ -42,6 +42,17 @@ export function TablaMetaEditable({
   const [editando, setEditando] = useState<string | null>(null);
   const [anadiendo, setAnadiendo] = useState(false);
 
+  /*
+   * En una obra que no admite cambios no se ofrece: `editarLineaMeta` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
+
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -335,16 +346,6 @@ function BotonEliminar({
   );
   const [seguro, setSeguro] = useState(false);
 
-  /*
-   * En una obra que no admite cambios no se ofrece: `editarLineaMeta` lo
-   * rechaza, y un boton que siempre falla invita a probar. El motivo se
-   * explica una vez por pantalla, no en cada control.
-   * Mismas opciones que el servidor: sin excepciones.
-   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
-   * un hook cambia el orden entre renders y React lo prohibe.
-   */
-  const sinEscritura = useMotivoSinEscritura() !== null;
-  if (sinEscritura) return null;
 
   if (!seguro) {
     return (

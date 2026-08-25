@@ -132,14 +132,16 @@ export default async function ProveedoresPage({
             Aún no hay proveedores asignados a frentes de esta obra.
           </p>
           {puedeGestionar ? (
-            <Link
-              href={`/obras/${id}/proveedores/nuevo`}
-              className="mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--color-marca-600)" }}
-            >
-              <Handshake className="size-4" aria-hidden="true" />
-              Asignar el primer encargo
-            </Link>
+            <SiSePuedeEscribir>
+              <Link
+                href={`/obras/${id}/proveedores/nuevo`}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
+                style={{ backgroundColor: "var(--color-marca-600)" }}
+              >
+                <Handshake className="size-4" aria-hidden="true" />
+                Asignar el primer encargo
+              </Link>
+            </SiSePuedeEscribir>
           ) : null}
         </div>
       ) : (
