@@ -36,7 +36,18 @@ export default async function UsuariosPage() {
         </p>
       </div>
 
-      <GestorUsuarios usuarios={usuarios} />
+      {/* Que puede HACER, no solo si puede mirar. Cada permiso es el mismo
+          que exige su servicio: `crearUsuario`, `editarUsuario`,
+          `cambiarEstadoUsuario` y `resetearClave`. */}
+      <GestorUsuarios
+        usuarios={usuarios}
+        puede={{
+          crear: puede(sesion, "usuario:crear"),
+          editar: puede(sesion, "usuario:editar"),
+          desactivar: puede(sesion, "usuario:desactivar"),
+          resetearClave: puede(sesion, "usuario:resetear_clave"),
+        }}
+      />
     </div>
   );
 }

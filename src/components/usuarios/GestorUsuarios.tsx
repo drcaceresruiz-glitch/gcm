@@ -45,12 +45,40 @@ import type { Role } from "@/generated/prisma/enums";
  * destacado con boton de copiar: no hay correo configurado todavia, asi que el
  * admin la comunica a mano. Cuando exista el envio, ademas saldra por correo.
  */
-export function GestorUsuarios({ usuarios }: { usuarios: UsuarioLista[] }) {
+/**
+ * QUE PUEDE HACER QUIEN MIRA, y no solo si puede mirar.
+ *
+ * La pantalla entraba con `usuario:leer` y luego pintaba TODOS los botones:
+ * «Nuevo usuario», «Editar», «Resetear clave», «Desactivar» y «Eliminar»,
+ * sobre cada persona de la empresa y sin comprobar nada mas. Un residente
+ * -que tiene `usuario:leer` y ninguno de los otros cuatro- veia el boton de
+ * resetearle la clave al administrador.
+ *
+ * El servidor los rechazaba, asi que no habia escalada; pero es justo lo que
+ * el resto del codigo condena: un boton que siempre falla invita a probar, y
+ * este ademas asusta. Visto el 25 de agosto de 2026 recorriendo la aplicacion
+ * con una sesion de residente de verdad.
+ */
+export interface PuedeConUsuarios {
+  crear: boolean;
+  editar: boolean;
+  desactivar: boolean;
+  resetearClave: boolean;
+}
+
+export function GestorUsuarios({
+  usuarios,
+  puede,
+}: {
+  usuarios: UsuarioLista[];
+  puede: PuedeConUsuarios;
+}) {
   const [creando, setCreando] = useState(false);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
+        {puede.crear && (
         <button
           type="button"
           onClick={() => setCreando((v) => !v)}
@@ -60,13 +88,14 @@ export function GestorUsuarios({ usuarios }: { usuarios: UsuarioLista[] }) {
           {creando ? <X className="size-4" /> : <Plus className="size-4" />}
           {creando ? "Cerrar" : "Nuevo usuario"}
         </button>
+        )}
       </div>
 
-      {creando && <PanelAlta alCerrar={() => setCreando(false)} />}
+      {creando && puede.crear && <PanelAlta alCerrar={() => setCreando(false)} />}
 
       <ul className="space-y-3">
         {usuarios.map((u) => (
-          <FilaUsuario key={u.id} usuario={u} />
+          <FilaUsuario key={u.id} usuario={u} puede={puede} />
         ))}
       </ul>
     </div>
@@ -213,7 +242,13 @@ function PanelAlta({ alCerrar }: { alCerrar: () => void }) {
 
 // --- Fila de usuario --------------------------------------------------------
 
-function FilaUsuario({ usuario }: { usuario: UsuarioLista }) {
+function FilaUsuario({
+  usuario,
+  puede,
+}: {
+  usuario: UsuarioLista;
+  puede: PuedeConUsuarios;
+}) {
   const [editando, setEditando] = useState(false);
   const inactivo = usuario.estado !== "ACTIVO";
 
@@ -241,28 +276,36 @@ function FilaUsuario({ usuario }: { usuario: UsuarioLista }) {
               </p>
             </div>
 
+            {/* Cada control con SU permiso, no con el de entrar a la
+                pantalla. Ver la cabecera de `PuedeConUsuarios`. */}
             {!editando && (
               <div className="flex shrink-0 flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditando(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs"
-                  style={{ borderColor: "var(--borde)" }}
-                >
-                  <Pencil className="size-3.5" /> Editar
-                </button>
+                {puede.editar && (
+                  <button
+                    type="button"
+                    onClick={() => setEditando(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs"
+                    style={{ borderColor: "var(--borde)" }}
+                  >
+                    <Pencil className="size-3.5" /> Editar
+                  </button>
+                )}
                 {/* El reseteo es para OTROS: genera clave temporal y cierra
                     sesiones. Para la propia clave esta "Cambiar clave". */}
-                {!usuario.esYo && <FormReset usuario={usuario} />}
+                {puede.resetearClave && !usuario.esYo && <FormReset usuario={usuario} />}
                 {/* Rescate: solo si la tiene encendida y no es uno mismo. La
-                  propia se apaga desde "Mi perfil". */}
-                {!usuario.esYo && usuario.dosFactoresActivo && (
+                  propia se apaga desde "Mi perfil". Va con `editar`, que es lo
+                  que exige `desactivarDosFactoresUsuario`. */}
+                {puede.editar && !usuario.esYo && usuario.dosFactoresActivo && (
                   <FormDosFactores usuario={usuario} />
                 )}
                 {/* Nadie se desactiva a si mismo: no se ofrece el boton. */}
-                {!usuario.esYo && <FormEstado usuario={usuario} inactivo={inactivo} />}
-                {/* Eliminar: nunca al administrador principal ni a uno mismo. */}
-                {!usuario.esYo && !usuario.esPrincipal && (
+                {puede.desactivar && !usuario.esYo && (
+                  <FormEstado usuario={usuario} inactivo={inactivo} />
+                )}
+                {/* Eliminar: nunca al administrador principal ni a uno mismo.
+                    Va con `desactivar`, que es lo que exige el servicio. */}
+                {puede.desactivar && !usuario.esYo && !usuario.esPrincipal && (
                   <FormEliminar usuario={usuario} />
                 )}
               </div>
