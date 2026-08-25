@@ -26,6 +26,16 @@ son DECISIONES, no trabajo empezado:
    reaparece, `grep 'GCM-FALLO <codigo>'` en el `stderr.log` de la app da la
    ruta, el mensaje y la pila.
 
+**NUEVO, pedido el 25 de agosto de 2026 por la tarde: cobrar la licencia de
+GCM.** Se mapeo lo que hay y se escribio el plan en
+[`plan-cobro-licencia.md`](plan-cobro-licencia.md). **No se ha tocado codigo a
+proposito**: hay cinco decisiones de negocio antes —si una licencia vencida
+suspende sola, que planes y a que precio, la moneda, quien emite la factura
+electronica y si se guarda la tarjeta— y ninguna es tecnica. El hallazgo del
+mapeo: **hoy una constructora no ve NADA de su propia licencia**, es
+informacion solo del operador, asi que no se le puede pedir que pague algo que
+no puede mirar. Ese es el paso 3 del plan, el de mas valor y ningun riesgo.
+
 **La cola acordada con el usuario, en este orden**: el asistente (hecho, aqui
 abajo), el fallo `81572617`, y luego exportar presupuesto y ordenes a Excel, la
 ventana del Lookahead por obra, y el modulo de PPC contra el de Causas.
