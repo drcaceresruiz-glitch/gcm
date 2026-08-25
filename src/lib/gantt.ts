@@ -109,15 +109,38 @@ const MES_CORTO = [
 ];
 
 /**
+ * Cuantas marcas como mucho, pase lo que pase con las fechas.
+ *
+ * No es un gusto de diseño, es un tope de trabajo. El eje se recorre de marca
+ * en marca, asi que sin tope el coste crece con el PLAZO y no con el tamaño
+ * del cronograma: una tarea con el año mal tecleado —un 9999 por un 2026—
+ * pedia noventa y siete mil marcas mensuales. Medido el 25/08/2026 sobre una
+ * obra de sonda de 1900 a 9999: el Gantt tardaba 10 s y el PDF del informe
+ * semanal **39 s**, con dos tareas dentro. En produccion eso no es lentitud,
+ * es la pantalla caida.
+ *
+ * Con el tope, el paso se ensancha —cada dos meses, cada año, cada decada— en
+ * vez de multiplicarse las marcas. Un plazo normal ni lo nota: el paso se
+ * queda en 1 y las marcas salen exactamente donde salian.
+ */
+const TOPE_MARCAS = 120;
+
+/**
  * Las marcas del eje temporal, con el paso adecuado al plazo.
  *
  * Un plazo corto se marca por semanas —cada lunes— y uno largo por meses: mil
  * rayitas en un Gantt de dos años no dicen mas que doce, solo emborronan. El
  * umbral es noventa dias, mas o menos un trimestre.
+ *
+ * Y el paso se ensancha si aun asi no caben: ver `TOPE_MARCAS`.
  */
 export function marcasCalendario(rango: RangoGantt): MarcaCalendario[] {
   const marcas: MarcaCalendario[] = [];
   const porMeses = rango.totalDias > 90;
+  // 30,44 dias por mes: el promedio del año, para estimar cuantas marcas
+  // saldrian antes de empezar a recorrerlas.
+  const pasoMeses = Math.max(1, Math.ceil(rango.totalDias / 30.44 / TOPE_MARCAS));
+  const pasoSemanas = Math.max(1, Math.ceil(rango.totalDias / 7 / TOPE_MARCAS));
 
   const inicio = new Date(
     Date.UTC(
@@ -142,7 +165,7 @@ export function marcasCalendario(rango: RangoGantt): MarcaCalendario[] {
         etiqueta: `${MES_CORTO[cursor.getUTCMonth()]} ${String(cursor.getUTCFullYear()).slice(2)}`,
         inicioDeMes: true,
       });
-      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+      cursor.setUTCMonth(cursor.getUTCMonth() + pasoMeses);
     }
   } else {
     // Un tick cada lunes. Se busca el primer lunes en el rango o antes.
@@ -160,7 +183,7 @@ export function marcasCalendario(rango: RangoGantt): MarcaCalendario[] {
           inicioDeMes: cursor.getUTCDate() <= 7,
         });
       }
-      cursor.setUTCDate(cursor.getUTCDate() + 7);
+      cursor.setUTCDate(cursor.getUTCDate() + 7 * pasoSemanas);
     }
   }
 

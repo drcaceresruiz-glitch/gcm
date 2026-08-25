@@ -20,13 +20,79 @@ son DECISIONES, no trabajo empezado:
    INSTITUTO`. Se dejo asi a proposito: es la cuenta con la que se puede volver
    a recorrer la aplicacion con alcance limitado sin montar nada. Si estorba, se
    desactiva desde `Empresa -> Usuarios`.
-3. **El fallo `81572617` del cronograma** sigue abierto, pero **ya no es
-   indiagnosticable**: si reaparece, `grep 'GCM-FALLO <codigo>'` en el
-   `stderr.log` de la app da la ruta, el mensaje y la pila.
+3. **El fallo `81572617` del cronograma** sigue abierto y ya se busco a fondo
+   —ver la seccion propia aqui abajo—: no esta en el dibujado de la pantalla
+   con datos raros, ni en los servicios, ni en las funciones puras. Si
+   reaparece, `grep 'GCM-FALLO <codigo>'` en el `stderr.log` de la app da la
+   ruta, el mensaje y la pila.
 
 **La cola acordada con el usuario, en este orden**: el asistente (hecho, aqui
 abajo), el fallo `81572617`, y luego exportar presupuesto y ordenes a Excel, la
 ventana del Lookahead por obra, y el modulo de PPC contra el de Causas.
+
+---
+
+## El fallo `81572617`, buscado a fondo — 25 de agosto de 2026 (tarde)
+
+**Sigue sin reproducirse, y ahora se sabe donde NO esta.** Pero la busqueda
+encontro otro fallo que si era real, y de los que tumban una pantalla en
+produccion.
+
+### Lo que faltaba por probar, y ya se probo
+
+El 24 de agosto se ejecuto el encadenamiento COMPLETO de servicios de esa
+pantalla y las nueve funciones puras que la dibujan. Lo que nunca se hizo fue
+**dibujar la pantalla**: un `toISOString()` sobre una fecha invalida o un deref
+dentro del JSX no lo ve ninguna de las dos cosas. Y `humo.ts` tampoco llega:
+abre cada ruta UNA vez con los datos que ya hay, y los datos que ya hay son
+razonables.
+
+Asi que se hizo lo que faltaba, con `scripts/sonda-cronograma.ts` (nuevo):
+
+- **Las pantallas de cronograma de TODAS las obras de la base de desarrollo**
+  —pantalla, Gantt, informe, plantilla, mapeo, importar—: todas 200.
+- **Y dieciseis obras degeneradas creadas a proposito**, cada una con su
+  pantalla, su Gantt, su informe, su PDF y su CSV: cronograma sin ni una tarea,
+  tarea de duracion cero, tarea con el fin ANTES del inicio, obra de un solo
+  dia, EDT recien generada sin programar, solo hitos, solo resumenes, fechas de
+  1900 a 9999, corte anterior a todo el plan, corte en el año 9999, porcentajes
+  al limite, linea base sobre un cronograma vacio, `minutosPorDia = 0`, obra
+  que termina antes de empezar, corte semanal en domingo, y obra sin ningun
+  cronograma. **Ninguna revento.**
+
+La sonda se queda en el repositorio: es el instrumento que faltaba, y el que
+encontrara el proximo.
+
+### Lo que SI aparecio: el plazo mandaba sobre el coste
+
+Con una tarea de **1900 a 9999** —un año mal tecleado, un 9999 por un 2026, o
+un archivo de MS Project con una fecha suelta— medido contra el servidor real:
+
+| | antes | despues |
+|---|---|---|
+| Gantt | **10,4 s** | 1,6 s |
+| PDF del informe semanal | **39,3 s** | 1,9 s |
+
+Con DOS tareas dentro. El eje se recorre de marca en marca, asi que el coste lo
+fijaba el PLAZO y no el tamaño del cronograma: salian noventa y siete mil
+bandas mensuales y cuatrocientas mil rayitas. En produccion eso no es lentitud,
+es la pantalla caida —y es exactamente la forma que tendria el fallo que se
+busca, aunque no se pueda afirmar que sea el mismo—.
+
+Acotado en `marcasCalendario` (`lib/gantt.ts`, `TOPE_MARCAS`) y en
+`calcularBandas`/`calcularTicks` (`components/cronograma/Gantt.tsx`,
+`TOPE_BANDAS`/`TOPE_TICKS`): **el paso se ensancha —cada dos meses, cada año,
+cada decada— en vez de multiplicarse las marcas**. Un plazo normal ni lo nota,
+y hay una prueba que lo fija por los dos lados (que el tope aprieta con un
+plazo absurdo, y que NO aprieta con uno de diez años).
+
+### Lo que queda de `81572617`
+
+Abierto, y sin nada mas que probar desde aqui: la obra se borro y el dato ya no
+existe. Si reaparece, `grep 'GCM-FALLO 81572617'` en el `stderr.log` de la app
+da la ruta, el mensaje y la pila —eso no ha cambiado—. Lo que si cambio es que
+ahora se puede decir que no esta en el dibujado de la pantalla con datos raros,
+ni en el encadenamiento de servicios, ni en las funciones puras.
 
 ---
 
@@ -4129,7 +4195,11 @@ reglas solo se han visto en pruebas.
 - **La pantalla de cronograma reventó una vez y NO se pudo reproducir**
   (24 de agosto de 2026, obra OB-000016 «REMODELACION», codigo de fallo
   `81572617`). La obra se borro despues, asi que ese dato ya no existe y el
-  caso queda abierto. **Lo que SI se descarto, para no repetirlo:**
+  caso queda abierto. **El 25 de agosto se busco otra vez y mas a fondo —con
+  `scripts/sonda-cronograma.ts`, dibujando la pantalla con dieciseis
+  cronogramas degenerados—: tampoco salio, pero salio otro fallo real. Ver la
+  seccion del 25 de agosto arriba.** **Lo que SI se descarto, para no
+  repetirlo:**
 
   - Se ejecuto el encadenamiento COMPLETO de esa pantalla contra una base real
     -`obtenerCronograma`, `datosCurvaS`, `datosEvm`, `ritmoDeObra`, historial,

@@ -139,6 +139,31 @@ describe("marcasCalendario", () => {
     expect(m.length).toBeLessThanOrEqual(13);
     expect(m.every((x) => x.inicioDeMes)).toBe(true);
   });
+
+  /**
+   * Una tarea con el año mal tecleado —un 9999 por un 2026— pedia noventa y
+   * siete mil marcas, y con ellas el Gantt tardaba 10 s y el PDF del informe
+   * 39 s con dos tareas dentro. El eje se ensancha; no se multiplica.
+   */
+  it("no crece sin freno aunque el plazo sea absurdo", () => {
+    const rango = rangoGantt([
+      tarea({ uid: 1, fila: 1, inicio: d("1900-01-01"), fin: d("9999-12-31") }),
+    ])!;
+    const m = marcasCalendario(rango);
+    expect(m.length).toBeLessThanOrEqual(121);
+    // Y sigue cubriendo el eje de punta a punta, no solo el principio.
+    expect(m[m.length - 1]!.x).toBeGreaterThan(rango.totalDias * 0.98);
+  });
+
+  it("un plazo de diez anos conserva el paso mensual", () => {
+    const rango = rangoGantt([
+      tarea({ uid: 1, fila: 1, inicio: d("2020-01-01"), fin: d("2029-12-31") }),
+    ])!;
+    const m = marcasCalendario(rango);
+    // 120 meses justos: el tope no llega a apretar.
+    expect(m.length).toBeGreaterThanOrEqual(115);
+    expect(m.length).toBeLessThanOrEqual(121);
+  });
 });
 
 /**

@@ -69,6 +69,21 @@ todavía decía en voz alta que el asistente «todavía no existe».
 **Y la contraseña del FTP de producción ya está rotada**, que era lo último que
 seguía abierto en la sección de seguridad.
 
+### Y buscando el fallo `81572617` apareció otro que sí era real
+
+El fallo del cronograma del día 24 sigue sin reproducirse, pero la búsqueda
+cerró el hueco de método que quedaba: aquel día se ejecutaron los servicios y
+las funciones puras, y **nunca se dibujó la pantalla**. Ahora hay
+`scripts/sonda-cronograma.ts`, que crea obras degeneradas —cronograma vacío,
+tarea que acaba antes de empezar, fechas de 1900 a 9999, corte fuera del
+plan…—, pide sus pantallas con una sesión real y las borra. Ninguna revienta.
+
+Lo que sí apareció: **el plazo mandaba sobre el coste**. Con una tarea de 1900
+a 9999 —un año mal tecleado— el Gantt tardaba 10,4 s y el PDF del informe
+semanal 39,3 s, con dos tareas dentro; el eje pedía noventa y siete mil bandas
+y cuatrocientas mil rayitas. Ahora el paso se ensancha en vez de multiplicarse
+las marcas: 1,6 s y 1,9 s. Un plazo normal no lo nota.
+
 ---
 
 ## Anexo — 24 de agosto de 2026

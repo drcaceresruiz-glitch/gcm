@@ -62,6 +62,20 @@ function diasUTC(desde: Date, hasta: Date): number {
   return Math.round((b - a) / DIA_MS);
 }
 
+/**
+ * Cuantas bandas y cuantos ticks como mucho, pase lo que pase con las fechas.
+ *
+ * El mismo tope y por la misma razon que `TOPE_MARCAS` en `lib/gantt`: los dos
+ * ejes se recorren de banda en banda y de tick en tick, asi que sin tope el
+ * coste lo fija el PLAZO y no el tamaño del cronograma. Con una tarea de 1900
+ * a 9999 —un año mal tecleado— salian noventa y siete mil bandas y cuatrocientos
+ * mil ticks, y el Gantt tardaba 10 s en dibujarse con dos tareas dentro
+ * (medido el 25/08/2026). El paso se ensancha en vez de multiplicarse las
+ * rayitas; un plazo normal no lo nota.
+ */
+const TOPE_BANDAS = 120;
+const TOPE_TICKS = 400;
+
 /** Bandas del nivel superior: semanas en plazo corto, meses en el largo. */
 function calcularBandas(rango: RangoGantt, porMeses: boolean): Banda[] {
   const inicio = new Date(
@@ -69,11 +83,16 @@ function calcularBandas(rango: RangoGantt, porMeses: boolean): Banda[] {
   );
   const bandas: Banda[] = [];
 
+  const pasoMeses = Math.max(1, Math.ceil(rango.totalDias / 30.44 / TOPE_BANDAS));
+  const pasoSemanas = Math.max(1, Math.ceil(rango.totalDias / 7 / TOPE_BANDAS));
+
   if (porMeses) {
     const cursor = new Date(Date.UTC(inicio.getUTCFullYear(), inicio.getUTCMonth(), 1));
     let i = 0;
     while (diasUTC(rango.inicio, cursor) <= rango.totalDias) {
-      const fin = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+      const fin = new Date(
+        Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + pasoMeses, 1),
+      );
       const x = Math.max(0, diasUTC(rango.inicio, cursor));
       const xFin = Math.min(rango.totalDias + 1, diasUTC(rango.inicio, fin));
       bandas.push({
@@ -82,7 +101,7 @@ function calcularBandas(rango: RangoGantt, porMeses: boolean): Banda[] {
         etiqueta: `${MES_CORTO[cursor.getUTCMonth()]} ${String(cursor.getUTCFullYear()).slice(2)}`,
         par: i % 2 === 0,
       });
-      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+      cursor.setUTCMonth(cursor.getUTCMonth() + pasoMeses);
       i++;
     }
   } else {
@@ -92,16 +111,16 @@ function calcularBandas(rango: RangoGantt, porMeses: boolean): Banda[] {
     let i = 0;
     while (diasUTC(rango.inicio, cursor) <= rango.totalDias) {
       const fin = new Date(cursor);
-      fin.setUTCDate(fin.getUTCDate() + 6);
+      fin.setUTCDate(fin.getUTCDate() + 7 * pasoSemanas - 1);
       const x = Math.max(0, diasUTC(rango.inicio, cursor));
-      const xFin = Math.min(rango.totalDias + 1, diasUTC(rango.inicio, cursor) + 7);
+      const xFin = Math.min(rango.totalDias + 1, diasUTC(rango.inicio, cursor) + 7 * pasoSemanas);
       bandas.push({
         x,
         ancho: xFin - x,
         etiqueta: `${String(cursor.getUTCDate()).padStart(2, "0")}/${String(cursor.getUTCMonth() + 1).padStart(2, "0")} – ${String(fin.getUTCDate()).padStart(2, "0")}/${String(fin.getUTCMonth() + 1).padStart(2, "0")}`,
         par: i % 2 === 0,
       });
-      cursor.setUTCDate(cursor.getUTCDate() + 7);
+      cursor.setUTCDate(cursor.getUTCDate() + 7 * pasoSemanas);
       i++;
     }
   }
@@ -118,12 +137,13 @@ function calcularTicks(rango: RangoGantt, porMeses: boolean): Tick[] {
       Date.UTC(rango.inicio.getUTCFullYear(), rango.inicio.getUTCMonth(), rango.inicio.getUTCDate()),
     );
     cursor.setUTCDate(cursor.getUTCDate() - ((cursor.getUTCDay() + 6) % 7));
+    const paso = Math.max(1, Math.ceil(rango.totalDias / 7 / TOPE_TICKS));
     while (diasUTC(rango.inicio, cursor) <= rango.totalDias) {
       const x = diasUTC(rango.inicio, cursor);
       if (x >= 0) {
         ticks.push({ x, etiqueta: String(cursor.getUTCDate()).padStart(2, "0"), finDeSemana: false });
       }
-      cursor.setUTCDate(cursor.getUTCDate() + 7);
+      cursor.setUTCDate(cursor.getUTCDate() + 7 * paso);
     }
   } else {
     for (let dia = 0; dia <= rango.totalDias; dia++) {
