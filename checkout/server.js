@@ -1,0 +1,352 @@
+/**
+ * server.js — Servidor del checkout de GCM.
+ *
+ * QUÉ HACE. Sirve la página del checkout y habla con Izipay. Son tres rutas:
+ *
+ *   GET  /api/catalogo         qué se vende y a qué precio (lo dice el servidor)
+ *   POST /api/create-payment   pide a Izipay el formToken del pago
+ *   POST /api/validate-payment comprueba la firma de la respuesta del pago
+ *
+ * POR QUÉ LA TERCERA, SI NO SE PIDIÓ. Sin ella el checkout no puede saber si un
+ * pago fue de verdad: el navegador diría «pagado» porque el navegador lo dice, y
+ * eso lo puede escribir cualquiera desde la consola. La firma HMAC es lo único
+ * que distingue un cobro real de uno inventado, y comprobarla es el mínimo para
+ * que esta página pueda enseñarse como un checkout terminado.
+ *
+ * LO QUE ESTE SERVIDOR NO HACE TODAVÍA, y hay que añadir antes de cobrar de
+ * verdad (está razonado en docs/plan-cobro-licencia.md):
+ *   · El webhook de Izipay (IPN). La validación de aquí es la del navegador, y
+ *     el navegador se cierra: si alguien paga y cierra la pestaña, nadie se
+ *     entera. El webhook es el que avisa siempre.
+ *   · Guardar el pedido antes de mandar a la pasarela, con su clave de
+ *     idempotencia. Hoy no hay base de datos detrás de este checkout.
+ *   · La emisión del comprobante electrónico.
+ *
+ * Se arranca con:  npm start   (o npm run dev)
+ */
+
+require('dotenv').config();
+
+const express = require('express');
+const crypto = require('node:crypto');
+const path = require('node:path');
+const { buscarProducto, catalogoPublico, formatearPrecio } = require('./src/catalogo');
+const { revisarHoja, registrarHoja } = require('./src/reclamaciones');
+
+const app = express();
+const PUERTO = process.env.PORT || 3001;
+
+app.use(express.json({ limit: '32kb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ---------------------------------------------------------------------------
+//  Credenciales
+// ---------------------------------------------------------------------------
+// Se leen una vez y se comprueban al arrancar. Un checkout desplegado sin
+// credenciales no debe fallar en la cara del comprador a mitad del pago: es
+// mejor que no arranque, o que lo diga en su primer aviso.
+
+const IZIPAY = {
+  endpoint: process.env.IZIPAY_ENDPOINT || 'https://api.micuentaweb.pe',
+  usuario: process.env.IZIPAY_USERNAME || '',      // número de tienda
+  clave: process.env.IZIPAY_PASSWORD || '',        // clave de test o de producción
+  clavePublica: process.env.IZIPAY_PUBLIC_KEY || '',
+  hmac: process.env.IZIPAY_HMAC_SHA256 || '',
+};
+
+const FALTAN = Object.entries({
+  IZIPAY_USERNAME: IZIPAY.usuario,
+  IZIPAY_PASSWORD: IZIPAY.clave,
+  IZIPAY_PUBLIC_KEY: IZIPAY.clavePublica,
+  IZIPAY_HMAC_SHA256: IZIPAY.hmac,
+})
+  .filter(([, v]) => !v)
+  .map(([k]) => k);
+
+/** Cabecera Basic que exige la API de Izipay. */
+function autorizacionBasic() {
+  return 'Basic ' + Buffer.from(`${IZIPAY.usuario}:${IZIPAY.clave}`).toString('base64');
+}
+
+// ---------------------------------------------------------------------------
+//  Validación de lo que manda el formulario
+// ---------------------------------------------------------------------------
+// Se valida en el servidor aunque el navegador ya valide: lo del navegador es
+// comodidad para quien rellena, no una defensa. Cualquiera puede saltárselo.
+
+const RE_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function limpiar(valor, maximo) {
+  return String(valor ?? '').trim().slice(0, maximo);
+}
+
+/**
+ * Revisa los datos del comprador. Devuelve { datos } o { errores }.
+ *
+ * Solo el correo es obligatorio —es a donde va el comprobante y, en el caso del
+ * instalable, el enlace de descarga—. El resto se acepta vacío antes que
+ * inventado: un DNI obligatorio que la gente rellena con ceros es peor dato que
+ * un campo en blanco.
+ */
+function revisarComprador(cuerpo) {
+  const errores = {};
+
+  const correo = limpiar(cuerpo.correo, 120).toLowerCase();
+  if (!correo) errores.correo = 'Indique su correo electrónico.';
+  else if (!RE_CORREO.test(correo)) errores.correo = 'Ese correo no parece válido.';
+
+  const nombres = limpiar(cuerpo.nombres, 120);
+  const documento = limpiar(cuerpo.documento, 20);
+  const telefono = limpiar(cuerpo.telefono, 25);
+
+  // DNI son 8 dígitos y RUC son 11. Si escribieron algo, tiene que ser una de
+  // las dos cosas; si no escribieron nada, se deja pasar.
+  if (documento && !/^\d{8}$|^\d{11}$/.test(documento)) {
+    errores.documento = 'El DNI tiene 8 dígitos y el RUC, 11.';
+  }
+  if (telefono && !/^[\d\s+()-]{6,25}$/.test(telefono)) {
+    errores.telefono = 'Ese teléfono no parece válido.';
+  }
+
+  if (Object.keys(errores).length) return { errores };
+  return { datos: { correo, nombres, documento, telefono } };
+}
+
+/**
+ * Parte «Nombres Apellidos» en dos, porque Izipay pide los campos separados.
+ *
+ * Con una sola palabra, va entera al nombre y el apellido queda vacío: repetir
+ * la misma palabra en los dos campos ensuciaría el dato en la pasarela.
+ */
+function partirNombre(completo) {
+  const trozos = completo.split(/\s+/).filter(Boolean);
+  if (trozos.length === 0) return { nombre: '', apellido: '' };
+  if (trozos.length === 1) return { nombre: trozos[0], apellido: '' };
+  return { nombre: trozos.slice(0, -1).join(' '), apellido: trozos.at(-1) };
+}
+
+/** Referencia del pedido. Lleva la fecha para poder buscarlo por el día. */
+function referenciaPedido() {
+  const f = new Date();
+  const ymd = [
+    f.getFullYear(),
+    String(f.getMonth() + 1).padStart(2, '0'),
+    String(f.getDate()).padStart(2, '0'),
+  ].join('');
+  return `GCM-${ymd}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+}
+
+// ---------------------------------------------------------------------------
+//  Rutas
+// ---------------------------------------------------------------------------
+
+/** Configuración que el navegador necesita para cargar el formulario de Izipay. */
+app.get('/api/config', (_req, res) => {
+  res.json({
+    clavePublica: IZIPAY.clavePublica,
+    endpoint: IZIPAY.endpoint,
+    configurado: FALTAN.length === 0,
+  });
+});
+
+/** El catálogo. Los precios salen de aquí, nunca del navegador. */
+app.get('/api/catalogo', (_req, res) => {
+  res.json({ productos: catalogoPublico() });
+});
+
+/**
+ * POST /api/create-payment
+ *
+ * Recibe el producto elegido y los datos del comprador; devuelve el formToken
+ * con el que el navegador dibuja el formulario de tarjeta. El importe NO viaja
+ * en la petición: se busca en el catálogo por el identificador del producto.
+ */
+app.post('/api/create-payment', async (req, res) => {
+  if (FALTAN.length) {
+    return res.status(503).json({
+      error: 'La pasarela todavía no está configurada en este servidor.',
+      faltan: FALTAN,
+    });
+  }
+
+  const producto = buscarProducto(String(req.body?.producto ?? ''));
+  if (!producto) {
+    return res.status(400).json({ error: 'El producto elegido no existe.' });
+  }
+
+  const revision = revisarComprador(req.body ?? {});
+  if (revision.errores) {
+    return res.status(400).json({ error: 'Revise los datos del formulario.', campos: revision.errores });
+  }
+  const { correo, nombres, documento, telefono } = revision.datos;
+  const { nombre, apellido } = partirNombre(nombres);
+
+  const pedido = referenciaPedido();
+
+  const carga = {
+    amount: producto.precioCentimos,   // el importe lo pone el servidor
+    currency: producto.moneda,
+    orderId: pedido,
+    customer: {
+      email: correo,
+      reference: documento || correo,
+      billingDetails: {
+        firstName: nombre || undefined,
+        lastName: apellido || undefined,
+        phoneNumber: telefono || undefined,
+        identityCode: documento || undefined,
+        country: 'PE',
+        language: 'es',
+      },
+      shoppingCart: {
+        cartItemInfo: [
+          {
+            productLabel: producto.nombre,
+            productAmount: String(producto.precioCentimos),
+            productQty: 1,
+            productRef: producto.id,
+          },
+        ],
+      },
+    },
+  };
+
+  try {
+    const r = await fetch(`${IZIPAY.endpoint}/api-payment/V4/Charge/CreatePayment`, {
+      method: 'POST',
+      headers: {
+        Authorization: autorizacionBasic(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(carga),
+    });
+
+    const cuerpo = await r.json();
+
+    // Izipay responde 200 incluso cuando rechaza: lo que manda es `status`.
+    if (!r.ok || cuerpo.status !== 'SUCCESS' || !cuerpo.answer?.formToken) {
+      // El detalle se registra en el servidor y NO se le devuelve al navegador:
+      // los mensajes de la pasarela describen la configuración de la tienda.
+      console.error('[izipay] CreatePayment rechazado:', JSON.stringify(cuerpo));
+      return res.status(502).json({ error: 'No se pudo iniciar el pago. Inténtelo de nuevo en unos minutos.' });
+    }
+
+    return res.json({
+      formToken: cuerpo.answer.formToken,
+      clavePublica: IZIPAY.clavePublica,
+      pedido,
+      producto: {
+        id: producto.id,
+        nombre: producto.nombre,
+        precioTexto: formatearPrecio(producto.precioCentimos),
+      },
+    });
+  } catch (e) {
+    console.error('[izipay] CreatePayment no respondió:', e);
+    return res.status(502).json({ error: 'La pasarela no respondió. Inténtelo de nuevo en unos minutos.' });
+  }
+});
+
+/**
+ * POST /api/validate-payment
+ *
+ * Comprueba que la respuesta del pago viene de Izipay y no la escribió alguien.
+ * Se firma `kr-answer` TAL CUAL llegó —sin volver a serializarlo— porque el
+ * HMAC se calculó sobre esos bytes exactos: reordenar una clave del JSON al
+ * pasarlo por JSON.parse/stringify cambia la firma y todo pago válido pasaría
+ * a rechazado.
+ */
+app.post('/api/validate-payment', (req, res) => {
+  if (FALTAN.length) {
+    return res.status(503).json({ error: 'La pasarela todavía no está configurada en este servidor.' });
+  }
+
+  const respuesta = req.body?.['kr-answer'];
+  const firma = req.body?.['kr-hash'];
+  const claveUsada = req.body?.['kr-hash-key'];
+  if (typeof respuesta !== 'string' || typeof firma !== 'string') {
+    return res.status(400).json({ error: 'Respuesta de pago incompleta.' });
+  }
+
+  // Izipay firma con la clave HMAC o con la contraseña de la API, y dice cuál en
+  // `kr-hash-key`. Aquí solo se acepta la HMAC: si no se mirara, bastaría con
+  // decir «lo firmé con la otra» para que la comprobación se hiciera contra una
+  // clave distinta de la que estamos usando.
+  if (claveUsada && claveUsada !== 'sha256_hmac') {
+    console.warn('[izipay] validate-payment con clave inesperada:', claveUsada);
+    return res.status(400).json({ error: 'La firma del pago no es válida.' });
+  }
+
+  const calculada = crypto.createHmac('sha256', IZIPAY.hmac).update(respuesta).digest('hex');
+
+  // timingSafeEqual exige longitudes iguales, así que se comprueba antes.
+  const a = Buffer.from(calculada);
+  const b = Buffer.from(firma);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    console.warn('[izipay] firma inválida en validate-payment');
+    return res.status(400).json({ error: 'La firma del pago no es válida.' });
+  }
+
+  let datos;
+  try {
+    datos = JSON.parse(respuesta);
+  } catch {
+    return res.status(400).json({ error: 'La respuesta del pago no se pudo leer.' });
+  }
+
+  const estado = datos.orderStatus;   // PAID | UNPAID | RUNNING …
+  return res.json({
+    pagado: estado === 'PAID',
+    estado,
+    pedido: datos.orderDetails?.orderId ?? null,
+  });
+});
+
+/**
+ * POST /api/reclamacion
+ *
+ * El Libro de Reclamaciones. No depende de la pasarela: alguien puede tener algo
+ * que reclamar precisamente porque el pago falló, así que esta ruta funciona
+ * aunque Izipay no esté configurado. Por eso no lleva la comprobación de
+ * credenciales que sí llevan las otras dos.
+ */
+app.post('/api/reclamacion', (req, res) => {
+  const revision = revisarHoja(req.body ?? {});
+  if (revision.errores) {
+    return res.status(400).json({ error: 'Revise los datos señalados.', campos: revision.errores });
+  }
+
+  try {
+    const constancia = registrarHoja(revision.datos, {
+      ip: req.ip,
+      agente: String(req.get('user-agent') || '').slice(0, 200),
+    });
+    // Se registra en el servidor para que la copia se pueda mandar a mano
+    // mientras no haya correo configurado. Sin esto, una reclamación podría
+    // quedarse esperando sin que nadie se entere de que llegó.
+    console.log(`[libro] hoja ${constancia.correlativo} de ${revision.datos.correo}`);
+    return res.json(constancia);
+  } catch (e) {
+    console.error('[libro] no se pudo registrar la hoja:', e);
+    return res.status(500).json({
+      error: 'No pudimos registrar su hoja. Escríbanos a drcaceresruiz@gmail.com y la registramos nosotros.',
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+//  Arranque
+// ---------------------------------------------------------------------------
+
+app.listen(PUERTO, () => {
+  console.log(`Checkout de GCM escuchando en http://localhost:${PUERTO}/checkout.html`);
+  if (FALTAN.length) {
+    console.warn('');
+    console.warn('  ⚠  Faltan credenciales en .env: ' + FALTAN.join(', '));
+    console.warn('     La página carga, pero /api/create-payment devolverá 503.');
+    console.warn('     Copie .env.example a .env y pegue las credenciales de prueba.');
+    console.warn('');
+  }
+});
+
+module.exports = app;

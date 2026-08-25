@@ -111,3 +111,7 @@ next-env.d.ts
 /.claude/
 /.windsurf/
 skills-lock.json
+
+# El Libro de Reclamaciones lleva datos personales de consumidores (nombre,
+# documento, domicilio, correo). No se versiona jamás: se respalda aparte.
+checkout/datos/
