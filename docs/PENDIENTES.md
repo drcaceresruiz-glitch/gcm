@@ -4449,13 +4449,26 @@ reglas solo se han visto en pruebas.
 
 ## 8. Documentacion
 
-- **`docs/MANUAL.md` esta desfasado y ahora ademas compite con otro manual.**
-  Desde el 18 de agosto el manual de verdad vive DENTRO de la app (`/manual`,
-  23 capitulos) y tiene una prueba que lo ata al menu. El `MANUAL.md` de
-  `docs/` describe un panel y unas pestanas que ya no existen. **Hay que
-  decidir si se retira o se convierte en otra cosa**; dos manuales que se
-  contradicen es exactamente la grieta que el proyecto se ha pasado el mes
-  cerrando en otros sitios.
+- ~~**`docs/MANUAL.md` esta desfasado y ahora ademas compite con otro
+  manual.**~~ **RETIRADO el 25 de agosto de 2026**, despues de mover a
+  `/manual` lo que solo estaba alli.
+
+  Se comprobo cada respuesta contra el sistema de hoy, y no era solo que
+  estuviera «desfasado»: **afirmaba cosas falsas**. Contestaba que «el avance
+  fisico no esta en soles porque se pondera por duracion» dos dias despues de
+  que la ponderacion por dinero existiera y estuviera conectada a la curva, al
+  informe y al ritmo. Y hablaba de un panel de once indicadores cuando son
+  quince.
+
+  Lo que se salvo, porque el manual de la aplicacion no lo tenia: las
+  **preguntas frecuentes** (`/manual/preguntas`) y el **glosario**
+  (`/manual/glosario`), este ultimo con cinco terminos mas. Se descartaron tres
+  preguntas que eran notas de cambios y no dudas de uso -dos describian fallos
+  ya corregidos y la tercera es de quien despliega, no de quien construye-.
+
+  El archivo se queda como SEÑAL, con un puntero: hay enlaces viejos que
+  apuntan ahi y un 404 no explica nada. De paso, el manual de la aplicacion
+  gano su primera `Tabla` -no habia ninguna en 24 capitulos- y son 25.
 - **Faltan capturas y videos.** Se pidio que el manual fuera «el super
   tutorial para dummies»; hoy es solo texto.
 

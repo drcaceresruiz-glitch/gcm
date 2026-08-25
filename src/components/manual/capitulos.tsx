@@ -102,6 +102,57 @@ function SaleMal({ casos }: { casos: { hace: string; pasa: ReactNode }[] }) {
   );
 }
 
+/**
+ * Una tabla de dos o cuatro columnas, para lo que de verdad es una tabla: un
+ * glosario, o una comparacion con cifras. NO para explicar: la prosa explica
+ * mejor, y una tabla con parrafos dentro se lee peor que los parrafos solos.
+ *
+ * Se desplaza dentro de su propio contenedor: en un movil, una tabla de cuatro
+ * columnas que empuje la pagina entera hace inservible el capitulo.
+ */
+function Tabla({
+  cabeceras,
+  filas,
+}: {
+  cabeceras: string[];
+  filas: string[][];
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr>
+            {cabeceras.map((c) => (
+              <th
+                key={c}
+                className="border-b px-2 py-1.5 text-left font-semibold"
+                style={{ borderColor: "var(--borde)" }}
+              >
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((fila, i) => (
+            <tr key={i}>
+              {fila.map((celda, j) => (
+                <td
+                  key={j}
+                  className="border-b px-2 py-1.5 align-top"
+                  style={{ borderColor: "var(--borde)" }}
+                >
+                  {j === 0 ? <strong>{celda}</strong> : celda}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Capitulo: empezar
 // ---------------------------------------------------------------------------
@@ -2820,6 +2871,279 @@ const PROPUESTA = (
 );
 
 // ---------------------------------------------------------------------------
+// Capitulo: preguntas frecuentes
+// ---------------------------------------------------------------------------
+
+/**
+ * Las preguntas que se repiten, con su respuesta.
+ *
+ * Vinieron de `docs/MANUAL.md`, un manual en Markdown que competia con este y
+ * que ningun usuario de obra abre nunca —era un archivo del repositorio—. Al
+ * traerlas se comprobo cada una contra el sistema de HOY, y una habia dejado
+ * de ser cierta: la de por que el avance no esta en soles, escrita cuando la
+ * ponderacion por dinero no existia. Es exactamente lo que pasa con dos
+ * manuales: el que nadie mira se queda viejo y sigue afirmando.
+ */
+const PREGUNTAS = (
+  <>
+    <Clave>
+      Casi todas estas preguntas nacen del mismo sitio: GCM prefiere{" "}
+      <strong>callar a inventar</strong>. Cuando una cifra no se puede
+      sostener con lo que hay, no sale un numero bonito: sale la razon por la
+      que falta. Si algo «no aparece», la respuesta casi siempre es que
+      todavia no hay con que responderlo.
+    </Clave>
+
+    <S titulo="¿Por qué mi avance físico no está en soles?">
+      <p>
+        Puede estarlo, y depende de una sola cosa: de que GCM sepa{" "}
+        <strong>cuánto vale cada tarea</strong>. Mientras no lo sepa, pesa por
+        duración, que es lo único que trae el archivo de MS&nbsp;Project. Con
+        números reales:
+      </p>
+      <Tabla
+        cabeceras={["Tarea", "Duración", "Costo", "Avance"]}
+        filas={[
+          ["Curado de concreto en zapatas", "60 d", "S/ 10.000", "20 %"],
+          ["Suministro y montaje de estructura", "5 d", "S/ 200.000", "100 %"],
+        ]}
+      />
+      <p>
+        Ponderado por duración da <strong>26 %</strong>. Ponderado por dinero,{" "}
+        <strong>96 %</strong>. El curado dura mucho y no cuesta casi nada.
+      </p>
+      <p>
+        <strong>Cómo se pasa a dinero:</strong> enlaza tareas con partidas en{" "}
+        <em>Cronograma → Enlazar con el presupuesto</em>. En cuanto el mapeo
+        cubre el <strong>60 %</strong> del presupuesto, la obra entera pasa a
+        pesarse por dinero. No hace falta mapear todo: empieza por los
+        capítulos que concentran el importe.
+      </p>
+      <p>
+        La decisión se toma <strong>una vez por obra</strong> y la comparten la
+        curva S, el informe semanal y el ritmo, para que las tres no puedan
+        contestar distinto. La tabla de capítulos es la excepción y es
+        deliberada: su planeado se lee del propio archivo de Project, que
+        consolida por duración, y pesar el real por dinero restaría dos varas
+        distintas.
+      </p>
+    </S>
+
+    <S titulo="¿Qué diferencia hay entre capítulo, partida y tarea?">
+      <p>
+        <strong>Capítulo</strong>: solo agrupa. No lleva metrado ni costo
+        propio. <strong>Partida</strong>: la hoja del presupuesto, con unidad,
+        metrado y precio — es la unidad de <strong>dinero</strong>.{" "}
+        <strong>Tarea</strong>: viene de Project, con fechas y duración — es la
+        unidad de <strong>tiempo</strong>.
+      </p>
+      <p>
+        Son dos árboles distintos, y se cruzan con un mapeo que confirma una
+        persona.
+      </p>
+    </S>
+
+    <S titulo="¿Una tarea puede tener varias partidas?">
+      <p>
+        Sí, y al revés también. «Instalaciones piso 1» puede tocar tubería,
+        cableado y accesorios; «Concreto en zapatas» puede repartirse en tres
+        tareas por zonas.
+      </p>
+      <p>
+        Por eso, cuando una tarea toca partidas con unidades distintas (m² y
+        kg), el sistema <strong>no inventa</strong> una cantidad: te la pide.
+      </p>
+    </S>
+
+    <S titulo="¿El sistema no puede mapear solo las partidas?">
+      <p>
+        Ya lo hace: te propone las que más se parecen. Lo que no hace es{" "}
+        <strong>confirmar</strong> solo, y hay una razón medida sobre archivos
+        reales: de 56 coincidencias de código, <strong>36 apuntaban a otra
+        cosa</strong>. Un mapeo equivocado no da síntoma — la curva sale bonita
+        y miente.
+      </p>
+    </S>
+
+    <S titulo="¿Qué es la ruta crítica?">
+      <p>
+        La cadena de tareas donde <strong>un día perdido es un día perdido de
+        obra entera</strong>. Las demás tienen holgura.
+      </p>
+      <p>
+        Viene marcada por Project; GCM no la deduce. Lo que sí hace es quitar
+        los capítulos y los hitos, que Project también marca pero sobre los que
+        no se puede actuar: meter cuadrilla en un capítulo no significa nada.
+      </p>
+    </S>
+
+    <S titulo="La tarea sigue sin pasar a LISTA">
+      <p>Dos causas posibles, y la matriz las distingue:</p>
+      <SaleMal
+        casos={[
+          {
+            hace: "Dice «Sin analizar»",
+            pasa: (
+              <>
+                Nadie ha dicho todavía qué restricciones le aplican.
+                Selecciónala y pulsa <em>Analizar</em>. Si no le aplica
+                ninguna, «No les aplica ninguna» la deja lista al momento.
+              </>
+            ),
+          },
+          {
+            hace: "Le queda alguna casilla sin marcar",
+            pasa: (
+              <>
+                Fíjate en las columnas: un <strong>guion</strong> es un flujo
+                que no aplica; una casilla <strong>vacía</strong> es uno
+                pendiente. Solo se pone LISTA cuando no queda ninguna vacía.
+              </>
+            ),
+          },
+        ]}
+      />
+    </S>
+
+    <S titulo="Quité un flujo y sigue ahí">
+      <p>
+        A propósito. Una restricción <strong>ya levantada, con fotos de
+        evidencia o con una nota escrita</strong> no se borra: sería tirar
+        trabajo hecho, y las fotos quedarían sin sitio donde verse nunca más.
+        El panel te dice cuántas se conservaron y por qué. Solo se retiran las
+        que están en blanco.
+      </p>
+    </S>
+
+    <S titulo="¿Por qué me pide confirmar al comprometer?">
+      <p>Por una de tres, y el aviso dice cuál:</p>
+      <ul className="list-disc space-y-1 pl-5">
+        <li>
+          <strong>Nadie la ha analizado</strong>: no se sabe si se puede hacer.
+        </li>
+        <li>
+          <strong>Le quedan restricciones sin liberar</strong>: se sabe que
+          falta algo.
+        </li>
+        <li>
+          <strong>Ya está comprometida en otra semana.</strong>
+        </li>
+      </ul>
+      <p>
+        No se prohíbe —la obra a veces arranca igual— pero queda constancia de
+        que se decidió a sabiendas.
+      </p>
+    </S>
+
+    <S titulo="El valor ganado no me muestra el EAC ni el VAC">
+      <p>
+        Es a propósito, y llegó después de un susto: la pantalla llegó a
+        anunciar en verde un ahorro de <strong>S/ 633.873</strong> en una obra
+        real. Falso.
+      </p>
+      <p>
+        El «costo estimado al final» se calcula con lo que llevas gastado. Pero
+        en GCM el gasto son las <strong>órdenes de compra aprobadas</strong>, y
+        las órdenes se aprueban <em>después</em> del trabajo: cuando llevabas
+        S/ 62.000 ganados solo había una orden de S/ 11.000. Divide una cosa
+        por la otra y sale que la obra costará la quinta parte de lo
+        presupuestado. Nadie construye tan barato.
+      </p>
+      <p>
+        Así que CPI, EAC y VAC <strong>no se muestran hasta que haya con qué
+        sostenerlos</strong>: al menos un <strong>15 %</strong> de obra
+        ejecutada y que el costo registrado cubra la <strong>mitad</strong> de
+        lo ganado. Mientras tanto la pantalla dice por qué falta cada uno, en
+        vez de dejar un guion.
+      </p>
+      <p>
+        Lo que <strong>sí</strong> puedes leer desde el primer día:{" "}
+        <strong>SPI y SV</strong> —vas adelantado o atrasado, y no dependen del
+        gasto—, <strong>CV</strong> —ganado menos gastado, un hecho de hoy y no
+        una predicción— y la curva de las tres líneas.
+      </p>
+      <p>
+        <strong>Para que aparezcan antes:</strong> registra las órdenes de
+        compra al día. Cuanto menos se retrase el papeleo respecto de la obra,
+        antes sirve la proyección.
+      </p>
+    </S>
+
+    <S titulo="La curva S dice que «no se llega». ¿Nunca?">
+      <p>
+        Solo cuando el ritmo es <strong>cero</strong>. Ahí es literal: sin
+        avanzar nada, no se llega nunca.
+      </p>
+      <p>
+        En cualquier otro caso la curva estima <strong>cuánto te vas a
+        pasar</strong>: a mitad de ritmo, tardas el doble de lo que queda. Y el
+        porcentaje de ritmo no redondea: un 99,6 % se muestra como 99,6 % y no
+        como «100 %». Decirle «vas al día» a quien no va es la peor ayuda
+        posible.
+      </p>
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
+// Capitulo: glosario
+// ---------------------------------------------------------------------------
+
+const GLOSARIO = (
+  <>
+    <Clave>
+      Casi todo el vocabulario de GCM viene del <strong>Last Planner</strong> y
+      del <strong>valor ganado</strong>, dos métodos con décadas de obra
+      detrás. No son siglas de la aplicación: son las que se usan en las
+      reuniones, y por eso se respetan tal cual en vez de traducirlas a algo
+      más cómodo.
+    </Clave>
+
+    <S titulo="Planificación">
+      <Tabla
+        cabeceras={["Término", "Qué significa"]}
+        filas={[
+          ["Last Planner", "Método de planificación donde quien ejecuta es quien compromete"],
+          ["Lookahead", "La ventana de mediano plazo, donde se liberan restricciones"],
+          ["PTS", "Plan de Trabajo Semanal: los compromisos de la semana"],
+          ["PPC", "Porcentaje de Plan Cumplido: cumplidas ÷ prometidas"],
+          ["CNC", "Causa de No Cumplimiento: por qué falló un compromiso"],
+          ["Pareto", "El gráfico que ordena las causas de mayor a menor"],
+          ["Confiabilidad", "Qué porcentaje de las tareas de la ventana está LISTA"],
+        ]}
+      />
+    </S>
+
+    <S titulo="Medida de la obra">
+      <Tabla
+        cabeceras={["Término", "Qué significa"]}
+        filas={[
+          ["EVM / Valor ganado", "Compara lo planificado, lo ejecutado y lo gastado"],
+          ["SPI / CPI", "Índices de rendimiento de plazo y de costo"],
+          ["EAC", "Lo que costará la obra al final si sigues rindiendo igual"],
+          ["VAC", "Lo que sobrará (o faltará) del presupuesto al terminar"],
+          ["Ritmo", "A qué porcentaje del avance previsto vas realmente"],
+          ["Días laborables", "De los días que quedan, los que se trabaja según el calendario de la obra"],
+        ]}
+      />
+    </S>
+
+    <S titulo="Presupuesto y cronograma">
+      <Tabla
+        cabeceras={["Término", "Qué significa"]}
+        filas={[
+          ["EDT", "El árbol del presupuesto: capítulos y partidas"],
+          ["UID", "El número que identifica una tarea entre versiones del cronograma"],
+          ["Línea base", "El plan congelado contra el que se mide la desviación"],
+          ["Bolsa", "Lo que se cobra menos lo que cuesta construir: el margen de la obra"],
+          ["Comprometido", "Dinero ya pedido, aunque todavía no se haya pagado"],
+        ]}
+      />
+    </S>
+  </>
+);
+
+// ---------------------------------------------------------------------------
 // El indice: los capitulos en el orden del trabajo real
 // ---------------------------------------------------------------------------
 
@@ -3051,6 +3375,27 @@ export const CAPITULOS: CapituloManual[] = [
       "Qué significa cerrar una obra, el respaldo firmado, el borrado en " +
       "dos pasos y la restauración como copia de auditoría.",
     contenido: CIERRE,
+  },
+  {
+    slug: "preguntas",
+    titulo: "Preguntas frecuentes",
+    pregunta: "por qué el sistema hace esto",
+    paraQuien: "Todos.",
+    resumen:
+      "Las dudas que se repiten, con su respuesta: por qué el avance no " +
+      "está en soles, por qué una tarea no pasa a LISTA, por qué el valor " +
+      "ganado se calla el EAC y por qué la curva dice que no se llega.",
+    contenido: PREGUNTAS,
+  },
+  {
+    slug: "glosario",
+    titulo: "Glosario",
+    pregunta: "qué quiere decir esa sigla",
+    paraQuien: "Todos, y sobre todo quien llega nuevo al Last Planner.",
+    resumen:
+      "PPC, CNC, EDT, SPI, EAC, bolsa, comprometido. El vocabulario de las " +
+      "reuniones, con una línea cada uno.",
+    contenido: GLOSARIO,
   },
 ];
 
