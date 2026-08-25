@@ -87,3 +87,36 @@ sesion.
   seguridad**. Corre en el Edge runtime, sin acceso a base de datos, y
   solo comprueba que la cookie de sesion EXISTA -no que sea valida, ni de
   que empresa es-. La frontera real esta en cada servicio.
+
+### El aislamiento son DOS capas, y la segunda es la que se olvida
+
+`companyId` para en la puerta de la EMPRESA. Dentro de una misma
+constructora hay una segunda capa: `alcanzaObra(sesion, obraId)`, de
+`@/lib/alcance-obras`. Solo ADMIN y GERENTE ven toda la cartera; el
+residente, el administrador de obra, el almacenero y el consultor ven
+**solo las obras que se les asignan**. El consultor es el que mas importa:
+es el perfil del cliente, y sin esa capa veia el presupuesto de las obras
+de los demas clientes de la constructora.
+
+**Donde se olvida SIEMPRE: en las acciones de servidor.** Una pagina de
+`/obras/[id]` esta protegida porque el layout llama a `obtenerObra`, que
+comprueba el alcance y hace `notFound()`. Una accion de servidor NO pasa
+por ese layout: recibe el `obraId` del cliente y va directa al servicio.
+Si el servicio solo filtra por `companyId`, un residente puede tocar
+cualquier obra de su empresa mandando el id.
+
+`motivoSiObraCerrada` lleva `alcanzaObra` dentro, asi que las escrituras
+que la llaman quedan cubiertas de paso. Las que no la llaman -porque no
+tiene sentido comprobar si la obra esta cerrada- necesitan la linea a
+mano:
+
+```ts
+if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
+```
+
+El 24 de agosto de 2026 faltaba en ocho escrituras alcanzables desde una
+accion -reemplazar el cronograma, editar la obra, gestionar los pases de
+acceso, borrar fotos-. Y no era ignorancia: `crearPase` SI la tenia, con
+un comentario explicando por que. Sus cuatro hermanas del mismo archivo,
+no. **Al anadir una escritura nueva, la pregunta no es «filtro por
+empresa» sino «filtro por empresa Y por alcance».**
