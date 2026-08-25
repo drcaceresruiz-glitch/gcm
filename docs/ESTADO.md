@@ -47,6 +47,28 @@ que me inventé, un ayudante que restaba dos veces, y una prueba que pasaba con
 el fallo dentro—. Antes de decir «esto falla», comprobar que el instrumento
 sabría distinguir el caso contrario. Está en `PENDIENTES.md` y en las memorias.
 
+### Más tarde ese mismo día — el asistente y su pantalla
+
+Se abrió el día para arreglar el modelo de IA en producción y **la premisa ya
+no era cierta**: la saturación de `gemini-3.7-flash` había pasado —responde 200
+en 4,9 s— y producción estaba viva y con el código del día (`/api/health`,
+commit `aea7891`). El modelo es dato por empresa, no código, así que ningún
+despliegue lo toca y desde fuera no se puede leer: hay que entrar a mirarlo.
+
+**Y al mirar apareció el fallo real, que era peor**: la pantalla donde se
+arregla un asistente caído no decía que estaba caído. El error de cada
+conversación fallida se guardaba —`marcarErrorProveedorInterno`, y a propósito
+sin retirar el `verificadoAt`— pero `EstadoPrueba` preguntaba por `verificadoAt`
+primero y salía, así que seguía anunciando «Probado hace X y funcionó» con el
+503 guardado debajo. Ahora hay un estado más, `fallo_tras_funcionar`, y la
+decisión vive en `situacionDeProveedorIa` (`lib/proveedor-ia.ts`) con pruebas
+propias —en este repositorio no hay ni una prueba de componente, así que lo que
+se queda dentro de un `.tsx` no lo comprueba nadie—. De paso, esa pantalla
+todavía decía en voz alta que el asistente «todavía no existe».
+
+**Y la contraseña del FTP de producción ya está rotada**, que era lo último que
+seguía abierto en la sección de seguridad.
+
 ---
 
 ## Anexo — 24 de agosto de 2026

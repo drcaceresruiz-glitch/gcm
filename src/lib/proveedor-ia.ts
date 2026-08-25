@@ -149,3 +149,69 @@ export const SERVICIOS_IA_CONOCIDOS = [
     urlClaves: null,
   },
 ] as const;
+
+/**
+ * Que hay que decir del estado de un proveedor, y por que no basta con
+ * mirar `verificadoAt`.
+ *
+ * Hay DOS senales distintas y llegan por caminos distintos:
+ *
+ * - «Probar» escribe `verificadoAt` si sale y `ultimoError` si no —y cada
+ *   una limpia a la otra, asi que nunca conviven—;
+ * - una CONVERSACION real que falla escribe `ultimoError` y a proposito NO
+ *   toca `verificadoAt` (ver `marcarErrorProveedorInterno` en
+ *   `agente-ia.service.ts`): que un turno se caiga es una senal mas debil
+ *   que una prueba fallida, y no se le retira sola la confianza a un
+ *   proveedor que alguien SI confirmo.
+ *
+ * De ahi el estado que faltaba: **verificado Y con un fallo posterior**. La
+ * pantalla lo daba por «funciona» y se comia el error, que es justo el que
+ * hay que ver —el 25 de agosto de 2026 el modelo configurado se saturo, el
+ * asistente se cayo, y la pantalla de configuracion seguia diciendo
+ * «probado y funciono»: el fallo estaba guardado y nadie podia verlo—.
+ *
+ * El orden se compara por fecha y no se da por supuesto: si el fallo es
+ * ANTERIOR a la ultima prueba buena, ya no describe al proveedor de hoy.
+ */
+export type SituacionProveedorIa =
+  | { clase: "sin_probar" }
+  | { clase: "funciona"; verificadoAt: Date }
+  | { clase: "fallo"; error: string; ocurridoAt: Date | null }
+  | {
+      clase: "fallo_tras_funcionar";
+      error: string;
+      /// null solo si la fila no guardo la fecha del fallo. Entonces se
+      /// dice el fallo sin el «hace cuanto», que es mejor que inventarlo.
+      ocurridoAt: Date | null;
+      verificadoAt: Date;
+    };
+
+export function situacionDeProveedorIa(proveedor: {
+  verificadoAt: Date | null;
+  ultimoError: string | null;
+  ultimoErrorAt: Date | null;
+}): SituacionProveedorIa {
+  const { verificadoAt, ultimoError, ultimoErrorAt } = proveedor;
+
+  if (!ultimoError) {
+    return verificadoAt ? { clase: "funciona", verificadoAt } : { clase: "sin_probar" };
+  }
+
+  if (!verificadoAt) {
+    return { clase: "fallo", error: ultimoError, ocurridoAt: ultimoErrorAt };
+  }
+
+  // Sin fecha del fallo no se puede ordenar. Se trata como posterior a
+  // proposito: ensenar un error que quiza ya no aplica molesta; callar uno
+  // que si aplica deja el asistente caido sin que nadie lo sepa.
+  if (!ultimoErrorAt || ultimoErrorAt > verificadoAt) {
+    return {
+      clase: "fallo_tras_funcionar",
+      error: ultimoError,
+      ocurridoAt: ultimoErrorAt,
+      verificadoAt,
+    };
+  }
+
+  return { clase: "funciona", verificadoAt };
+}

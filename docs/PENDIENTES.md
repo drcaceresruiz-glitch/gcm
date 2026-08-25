@@ -3,19 +3,19 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 25 de agosto de 2026.
+Ultima revision: 25 de agosto de 2026 (tarde).
 
 ## AL ABRIR LA PROXIMA SESION (despues del 25 de agosto de 2026)
 
 **No queda ninguna tarea a medias.** El recorrido como residente —lo unico
-pendiente esa manana— se hizo entero y esta cerrado mas abajo. Lo que sigue son
-DECISIONES, no trabajo empezado:
+pendiente por la manana— se hizo entero y esta cerrado mas abajo. Lo que sigue
+son DECISIONES, no trabajo empezado:
 
-1. **El modelo de IA en PRODUCCION.** En desarrollo se cambio de
-   `gemini-3.7-flash` —saturado, devolvia 503 «high demand» y colgaba el
-   asistente— a `gemini-3.6-flash`, que es el que Google recomienda y responde
-   en 1,5 s. **En produccion no se ha tocado**: si alli esta el mismo modelo, el
-   asistente esta caido igual. Se arregla en `Empresa -> Configuracion -> IA`.
+1. **El modelo de IA en PRODUCCION: hay que MIRARLO, no arreglarlo a ciegas.**
+   Ver «El asistente y su pantalla» aqui abajo: la saturacion de
+   `gemini-3.7-flash` paso —medido esta tarde: responde 200 en 4,9 s—, asi que
+   produccion probablemente no esta caida. Falta ver que modelo tiene
+   configurado, y eso solo se ve entrando: `Empresa -> Configuracion -> IA`.
 2. **`Rita Residente`** quedo con contraseña y asignada a `LABORATORIO
    INSTITUTO`. Se dejo asi a proposito: es la cuenta con la que se puede volver
    a recorrer la aplicacion con alcance limitado sin montar nada. Si estorba, se
@@ -23,6 +23,61 @@ DECISIONES, no trabajo empezado:
 3. **El fallo `81572617` del cronograma** sigue abierto, pero **ya no es
    indiagnosticable**: si reaparece, `grep 'GCM-FALLO <codigo>'` en el
    `stderr.log` de la app da la ruta, el mensaje y la pila.
+
+**La cola acordada con el usuario, en este orden**: el asistente (hecho, aqui
+abajo), el fallo `81572617`, y luego exportar presupuesto y ordenes a Excel, la
+ventana del Lookahead por obra, y el modulo de PPC contra el de Causas.
+
+---
+
+## El asistente y su pantalla — 25 de agosto de 2026 (tarde)
+
+Se empezo por comprobar lo que el documento daba por caido, y resulto que el
+diagnostico de la manana ya no describia el mundo:
+
+- **Produccion esta viva y con el codigo del dia**: `/api/health` responde
+  `estado: ok`, `coherencia: ok`, `despliegue: al dia`, sobre el commit
+  `aea7891` —el mismo HEAD de `main`—.
+- **La saturacion paso.** Sondeando al proveedor con la clave real de
+  desarrollo, `gemini-3.7-flash` devuelve **200 en 4,9 s** y `gemini-3.6-flash`
+  **200 en 7,4 s**. El 503 «high demand» de la manana era transitorio, no un
+  modelo retirado. Google sigue listando los dos.
+- **Por tanto el punto 1 cambia de forma**: no es «produccion esta caida y hay
+  que cambiar el modelo», es «hay que ver que modelo tiene». El modelo es DATO
+  por empresa (`AgenteIaProveedor.modelo`), no codigo: ningun despliegue lo
+  toca, y desde fuera no se puede leer.
+
+### Y mirando eso aparecio el fallo de verdad
+
+**La pantalla donde se arregla un asistente caido no decia que estaba caido.**
+
+`marcarErrorProveedorInterno` guarda el error de cada conversacion que falla
+—«para que quien administra `/empresa/configuracion/ia` se entere la proxima
+vez que entre», dice su propio comentario— y a proposito NO toca
+`verificadoAt`. Pero `EstadoPrueba` preguntaba por `verificadoAt` PRIMERO y
+salia: un proveedor probado que despues se cae en conversacion seguia
+anunciando **«Probado hace X y funcionó»**, y el 503 guardado no lo veia nadie.
+Es exactamente lo que paso por la manana, y es la razon por la que descartar
+por capas costo lo que costo.
+
+- La decision de que se dice se saco a `situacionDeProveedorIa`
+  (`lib/proveedor-ia.ts`), logica pura y con pruebas —la pantalla solo pinta—,
+  porque en este repositorio no hay ni una prueba de componente: 191 archivos
+  de prueba y **cero** `.test.tsx`. Lo que vive en un `.tsx` no lo comprueba
+  nadie.
+- El estado que faltaba es **`fallo_tras_funcionar`**: «Probado hace X y
+  funcionó, pero falló después en una conversación (hace Y): <error>». Y el
+  orden se compara por fecha, que un fallo ANTERIOR a la ultima prueba buena ya
+  no describe al proveedor de hoy.
+- De paso, **la pantalla mentia sobre si misma**: su texto visible decia
+  «Todavía no hay ningún agente conversacional que la use». El asistente existe
+  desde hace dias y es justo lo que usa esa clave. Corregido el texto y los dos
+  comentarios de cabecera.
+
+Verificado con typecheck, lint y las 3065 pruebas en verde. **Sin recorrer la
+pantalla en un navegador**: hace falta una sesion de administrador y un
+proveedor con un fallo posterior a su ultima prueba buena para verlo con los
+ojos.
 
 **Rastro en la base de desarrollo**, para que nadie se extrañe: un reporte de
 avance del 25/08 en `LABORATORIO INSTITUTO`, partida 4.5, con el mismo 60 % que
@@ -4239,9 +4294,14 @@ Anotado antes del 10 de agosto, sin tocar:
 
 Nuevo, y sigue abierto:
 
-- **Rotar la contrasena del FTP de produccion.** Hasta el 12 de agosto viajo
-  en cada despliegue contra un extremo sin verificar. La verificacion ya esta
-  puesta; la credencial no se ha cambiado.
+- ~~**Rotar la contrasena del FTP de produccion.**~~ **HECHO el 25 de agosto
+  de 2026**, reportado por el usuario. Hasta el 12 de agosto la credencial
+  vieja viajo en cada despliegue contra un extremo sin verificar; la
+  verificacion se puso entonces y ahora la credencial tambien esta cambiada.
+  La credencial no vive en el repositorio: es un secreto de GitHub Actions
+  que `.github/workflows/desplegar.yml` lee por `secrets.FTP_PASSWORD`. Si
+  un despliegue empieza a fallar con un rechazo de autenticacion, el secreto
+  de GitHub es el primer sitio donde mirar, no el codigo.
 - **`x-forwarded-for` sigue siendo un supuesto.** Que el proxy la escriba en
   vez de dejar pasar la del cliente no lo puede garantizar la aplicacion.
 

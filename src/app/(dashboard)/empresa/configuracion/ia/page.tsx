@@ -18,10 +18,11 @@ export const metadata: Metadata = { title: "Proveedores de IA" };
  * puede crecer, y mezclarla en la pantalla principal la haria sentir mas
  * larga de lo que ya esta.
  *
- * SOLO LA INFRAESTRUCTURA DE CREDENCIALES. El agente conversacional que las
- * usaria —chat, herramientas, turnos— todavia no existe: ver
- * `docs/PENDIENTES.md`, seccion 6b, para la arquitectura pre-conversada y
- * lo que sigue pendiente.
+ * Y es donde se ARREGLA un asistente caido: el agente conversacional
+ * (`/asistente`) llama al proveedor que esta activo aqui, con el modelo
+ * que diga esta pantalla. Si el proveedor deja de responder —un modelo
+ * saturado o retirado— se cambia el modelo, o se activa otro proveedor ya
+ * probado, sin tocar codigo ni desplegar nada.
  */
 export default async function ProveedoresIaPage() {
   const sesion = await obtenerSesion();
@@ -40,10 +41,10 @@ export default async function ProveedoresIaPage() {
           Proveedores de IA
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-pretty opacity-70">
-          La clave con la que GCM llamará a un proveedor de inteligencia
-          artificial en tu nombre. Todavía no hay ningún agente conversacional
-          que la use: esto solo deja la conexión lista y probada de verdad
-          para cuando lo haya.
+          La clave con la que GCM llama a un proveedor de inteligencia
+          artificial en tu nombre. Es la que usa el asistente: si deja de
+          responder, aquí se cambia el modelo o se activa otro proveedor ya
+          probado.
         </p>
       </div>
 

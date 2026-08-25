@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   validarProveedorIa,
+  situacionDeProveedorIa,
   SERVICIOS_IA_CONOCIDOS,
   TIPOS_PROVEEDOR_IA_CONOCIDOS,
   type DatosProveedorIa,
@@ -94,5 +95,71 @@ describe("el catalogo de servicios conocidos", () => {
     );
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.datos.urlBase).toBe(gemini.urlBase);
+  });
+});
+
+describe("lo que se dice del estado de un proveedor", () => {
+  const PROBADO = new Date("2026-08-25T16:08:00Z");
+  const DESPUES = new Date("2026-08-25T18:30:00Z");
+  const ANTES = new Date("2026-08-25T09:00:00Z");
+
+  it("sin probar es sin probar", () => {
+    expect(
+      situacionDeProveedorIa({ verificadoAt: null, ultimoError: null, ultimoErrorAt: null }),
+    ).toEqual({ clase: "sin_probar" });
+  });
+
+  it("probado y sin errores funciona", () => {
+    expect(
+      situacionDeProveedorIa({ verificadoAt: PROBADO, ultimoError: null, ultimoErrorAt: null }),
+    ).toEqual({ clase: "funciona", verificadoAt: PROBADO });
+  });
+
+  it("un fallo sin prueba buena detras es un fallo a secas", () => {
+    expect(
+      situacionDeProveedorIa({ verificadoAt: null, ultimoError: "(401) clave", ultimoErrorAt: DESPUES }),
+    ).toEqual({ clase: "fallo", error: "(401) clave", ocurridoAt: DESPUES });
+  });
+
+  /**
+   * El que se comia la pantalla, y el que costo una tarde el 25 de agosto de
+   * 2026: alguien lo probo y funcionaba, el modelo se saturo, la conversacion
+   * guardo el 503 —sin tocar `verificadoAt`, a proposito— y la pantalla
+   * seguia diciendo «probado y funciono». El asistente estaba caido y su
+   * pantalla de configuracion no lo delataba.
+   */
+  it("un fallo POSTERIOR a la prueba buena no se lo come el «funciona»", () => {
+    expect(
+      situacionDeProveedorIa({
+        verificadoAt: PROBADO,
+        ultimoError: "(503) The model is experiencing high demand",
+        ultimoErrorAt: DESPUES,
+      }),
+    ).toEqual({
+      clase: "fallo_tras_funcionar",
+      error: "(503) The model is experiencing high demand",
+      ocurridoAt: DESPUES,
+      verificadoAt: PROBADO,
+    });
+  });
+
+  it("un fallo ANTERIOR a la ultima prueba buena ya no describe al proveedor", () => {
+    expect(
+      situacionDeProveedorIa({
+        verificadoAt: PROBADO,
+        ultimoError: "(503) saturado",
+        ultimoErrorAt: ANTES,
+      }),
+    ).toEqual({ clase: "funciona", verificadoAt: PROBADO });
+  });
+
+  it("un fallo sin fecha se cuenta como posterior, no se calla", () => {
+    const r = situacionDeProveedorIa({
+      verificadoAt: PROBADO,
+      ultimoError: "(503) saturado",
+      ultimoErrorAt: null,
+    });
+    expect(r.clase).toBe("fallo_tras_funcionar");
+    if (r.clase === "fallo_tras_funcionar") expect(r.ocurridoAt).toBeNull();
   });
 });

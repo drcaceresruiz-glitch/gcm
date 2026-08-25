@@ -16,7 +16,7 @@ import {
 
 import { Tarjeta, SeccionTarjeta } from "@/components/ui/Tarjeta";
 import { haceCuanto } from "@/utils/fechas";
-import { SERVICIOS_IA_CONOCIDOS } from "@/lib/proveedor-ia";
+import { SERVICIOS_IA_CONOCIDOS, situacionDeProveedorIa } from "@/lib/proveedor-ia";
 import {
   accionGuardarProveedorIa,
   accionProbarProveedorIa,
@@ -30,10 +30,10 @@ import type { ProveedorIaResumen } from "@/services/agente-ia.service";
 /**
  * Los proveedores de IA que esta empresa guardo, con su propia clave.
  *
- * SOLO LA INFRAESTRUCTURA DE CREDENCIALES: guardar, probar y elegir cual
- * esta activo. El agente conversacional que las usa todavia no existe —eso
- * es otra entrega—, asi que esta pantalla no promete un chat, solo deja
- * lista y probada de verdad la clave que el agente usara el dia que llegue.
+ * Guardar, probar y elegir cual esta activo. El agente conversacional que
+ * las usa YA EXISTE —`/asistente`—, asi que esta pantalla no es solo
+ * preparacion: es donde se arregla un asistente caido, y por eso tiene que
+ * decir la verdad sobre el estado de cada proveedor. Ver `EstadoPrueba`.
  *
  * LA CLAVE NUNCA VUELVE A LA PANTALLA, mismo criterio que el buzon de
  * correo propio: el campo nace vacio incluso al editar, y vacio significa
@@ -92,24 +92,48 @@ function Mensaje({ estado }: { estado: EstadoProveedorIa }) {
   );
 }
 
+/**
+ * Lo que se dice de un proveedor. Antes preguntaba por `verificadoAt`
+ * PRIMERO y salia, con lo que un proveedor probado que despues se cayo en
+ * una conversacion real seguia anunciando «probado y funcionó» y el error
+ * guardado no lo veia nadie. Quien decide ahora es `situacionDeProveedorIa`
+ * —logica pura, con sus pruebas—; aqui solo se pinta.
+ */
 function EstadoPrueba({ proveedor }: { proveedor: ProveedorIaResumen }) {
-  if (proveedor.verificadoAt) {
-    return (
-      <span style={{ color: "var(--color-exito)" }}>
-        Probado {haceCuanto(proveedor.verificadoAt)} y funcionó.
-      </span>
-    );
+  const situacion = situacionDeProveedorIa(proveedor);
+
+  switch (situacion.clase) {
+    case "funciona":
+      return (
+        <span style={{ color: "var(--color-exito)" }}>
+          Probado {haceCuanto(situacion.verificadoAt)} y funcionó.
+        </span>
+      );
+
+    case "fallo":
+      return (
+        <span style={{ color: "var(--color-peligro)" }}>
+          Con error
+          {situacion.ocurridoAt && ` (${haceCuanto(situacion.ocurridoAt)})`}:{" "}
+          {situacion.error}
+        </span>
+      );
+
+    // El que faltaba, y el unico que hay que leer entero: alguien lo probó y
+    // funcionaba, y aun asi el asistente se cayó con él después.
+    case "fallo_tras_funcionar":
+      return (
+        <span style={{ color: "var(--color-peligro)" }}>
+          Probado {haceCuanto(situacion.verificadoAt)} y funcionó, pero falló
+          después en una conversación
+          {situacion.ocurridoAt && ` (${haceCuanto(situacion.ocurridoAt)})`}:{" "}
+          {situacion.error}
+        </span>
+      );
+
+    case "sin_probar":
+      return <span className="opacity-70">Guardado pero sin probar todavía.</span>;
   }
-  if (proveedor.ultimoError) {
-    return (
-      <span style={{ color: "var(--color-peligro)" }}>
-        Con error
-        {proveedor.ultimoErrorAt && ` (${haceCuanto(proveedor.ultimoErrorAt)})`}:{" "}
-        {proveedor.ultimoError}
-      </span>
-    );
-  }
-  return <span className="opacity-70">Guardado pero sin probar todavía.</span>;
 }
 
 function Fila({
