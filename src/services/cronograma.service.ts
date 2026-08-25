@@ -49,6 +49,7 @@ import {
 } from "@/lib/cronograma-huella";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra, FUERA_DE_ALCANCE } from "@/lib/alcance-obras";
 
 /**
  * Escritura y lectura del cronograma.
@@ -300,6 +301,10 @@ export async function importarCronograma(
     return { ok: false, error: "No tienes permiso para importar el cronograma." };
   }
 
+  // El alcance por obra: `companyId` para en la puerta de la empresa, esto
+  // para en la de la obra. Ver el comentario largo en `editarPase`.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
+
   if (analisis.tareas.length === 0) {
     return { ok: false, error: "El archivo no trae ninguna tarea que importar." };
   }
@@ -532,6 +537,10 @@ export async function reemplazarCronograma(
   if (!puede(sesion, "cronograma:importar")) {
     return { ok: false, error: "No tienes permiso para importar el cronograma." };
   }
+
+  // El alcance por obra: `companyId` para en la puerta de la empresa, esto
+  // para en la de la obra. Ver el comentario largo en `editarPase`.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
 
   if (analisis.tareas.length === 0) {
     return { ok: false, error: "El archivo no trae ninguna tarea que importar." };

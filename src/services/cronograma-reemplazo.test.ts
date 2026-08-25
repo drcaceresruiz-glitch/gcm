@@ -184,6 +184,14 @@ const sesion: SesionActiva = {
   apellidos: "Lovelace",
   role: "RESIDENTE",
   permisos: ["cronograma:importar"],
+  /*
+   * `null` es «alcanza TODAS las obras de su empresa», que es lo que estas
+   * pruebas dan por hecho. Faltaba, y desde que `reemplazarCronograma`
+   * comprueba el alcance -24 de agosto de 2026- una sesion sin este campo ya
+   * no es una sesion valida: la lista vacia y el null son cosas opuestas y
+   * `alcanzaObra` no puede adivinar cual falta.
+   */
+  obrasAsignadas: null,
 } as unknown as SesionActiva;
 
 /** Las dos caras de la misma tarea, construidas a la vez para que coincidan. */
@@ -536,5 +544,37 @@ describe("las puertas que no se pueden cruzar", () => {
 
     expect(r).toMatchObject({ ok: false, error: "Obra no encontrada." });
     expect(estado.borradasImportado).toBe(0);
+  });
+
+  /**
+   * EL ALCANCE POR OBRA, que es la capa de DENTRO del aislamiento.
+   *
+   * La prueba de arriba cubre la puerta de la empresa. Esta cubre la de la
+   * obra: un residente al que le asignaron la obra A no puede reemplazar el
+   * cronograma de la B, aunque las dos sean de su constructora. Estaba
+   * abierto hasta el 24 de agosto de 2026 —`crearPase` si lo comprobaba y sus
+   * hermanas no, y aqui pasaba lo mismo— y esto es lo que impide que vuelva.
+   *
+   * `reemplazarCronograma` se llama desde una accion de servidor, que NO pasa
+   * por el layout de la obra: aqui no hay nadie mas que lo pare.
+   */
+  it("una obra de la MISMA empresa que no le asignaron, tampoco", async () => {
+    const suyaEsOtra = {
+      ...sesion,
+      obrasAsignadas: ["otra-obra"],
+    } as unknown as SesionActiva;
+
+    const a = par({ uid: 1 });
+    corteCargadoCon([a.guardada]);
+
+    const r = await reemplazarCronograma(
+      suyaEsOtra,
+      "obra",
+      analisisDe([par({ uid: 1, fin: "2026-08-12" }).archivo]),
+      "corte.xml",
+    );
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("No tienes acceso a esta obra");
   });
 });

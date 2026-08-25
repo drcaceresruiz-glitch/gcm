@@ -222,6 +222,28 @@ export async function importarProveedores(
     avisos: [],
   };
 
+  /*
+   * LOS QUE YA EXISTEN, EN UNA SOLA CONSULTA.
+   *
+   * Estaba como un `findFirst` por fila: un Excel de doscientos proveedores
+   * eran doscientos viajes a la base, en serie, dentro de una accion de
+   * servidor. Con una lista de verdad eso se nota.
+   *
+   * El mapa se va ACTUALIZANDO dentro del bucle con lo que se va creando, y
+   * eso no es un detalle: si el Excel trae el mismo RUC en dos filas, la
+   * segunda tiene que ver al que acaba de crear la primera. Sin eso, el
+   * cambio seria mas rapido y ademas crearia duplicados —justo lo que el
+   * `findFirst` por fila evitaba sin querer—.
+   */
+  const rucs = leidas.filas
+    .map((f) => (f.leida.ok ? f.leida.datos.ruc : null))
+    .filter((r): r is string => r !== null);
+
+  const yaEstaban = await prisma.proveedor.findMany({
+    where: { companyId: sesion.companyId, ruc: { in: rucs } },
+  });
+  const porRuc = new Map(yaEstaban.map((p) => [p.ruc, p]));
+
   for (const { fila: n, leida } of leidas.filas) {
     if (!leida.ok) {
       if (leida.motivo !== "fila vacía") {
@@ -231,14 +253,21 @@ export async function importarProveedores(
     }
     if (leida.aviso) resumen.avisos.push({ fila: n, motivo: leida.aviso });
 
-    const existente = await prisma.proveedor.findFirst({
-      where: { companyId: sesion.companyId, ruc: leida.datos.ruc },
-    });
+    const existente = porRuc.get(leida.datos.ruc);
 
     if (!existente) {
       const r = await crearProveedor(sesion, leida.datos, "IMPORTADO");
-      if (r.ok) resumen.creados++;
-      else resumen.rechazos.push({ fila: n, motivo: r.error });
+      if (r.ok) {
+        resumen.creados++;
+        // Al mapa, para que una segunda fila con el mismo RUC lo encuentre y
+        // lo complete en vez de intentar crearlo otra vez.
+        const creado = await prisma.proveedor.findFirst({
+          where: { companyId: sesion.companyId, ruc: leida.datos.ruc },
+        });
+        if (creado) porRuc.set(creado.ruc, creado);
+      } else {
+        resumen.rechazos.push({ fila: n, motivo: r.error });
+      }
       continue;
     }
 

@@ -254,6 +254,20 @@ export async function editarPase(
     return { ok: false, error: "No tienes permiso para editar los pases." };
   }
 
+  /*
+   * EL ALCANCE POR OBRA, y no basta con el `companyId`.
+   *
+   * El filtro por empresa impide llegar a la cartera de otra constructora; el
+   * alcance es la capa de dentro: un residente no tiene por que tocar las
+   * obras de su empresa que no gestiona. Esto se llama desde una accion de
+   * servidor, que NO pasa por el layout de la obra, asi que aqui es donde hay
+   * que comprobarlo.
+   *
+   * `crearPase` ya lo hacia con este mismo comentario y sus hermanas no: era
+   * un olvido, no una decision. Visto auditando el 24 de agosto de 2026.
+   */
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
+
   const previo = await prisma.paseObra.findFirst({
     where: { id: paseId, projectId: obraId, project: { companyId: sesion.companyId } },
     select: {
@@ -353,6 +367,10 @@ export async function eliminarPase(
     return { ok: false, error: "No tienes permiso para eliminar los pases." };
   }
 
+  // El alcance por obra: `companyId` para en la puerta de la empresa, esto
+  // para en la de la obra. Ver el comentario largo en `editarPase`.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
+
   const pase = await prisma.paseObra.findFirst({
     where: { id: paseId, projectId: obraId, project: { companyId: sesion.companyId } },
     select: {
@@ -440,6 +458,10 @@ export async function cambiarEstadoPase(
   if (!puede(sesion, "lookahead:gestionar")) {
     return { ok: false, error: "No tienes permiso para gestionar los pases." };
   }
+
+  // El alcance por obra: `companyId` para en la puerta de la empresa, esto
+  // para en la de la obra. Ver el comentario largo en `editarPase`.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
 
   const previo = await prisma.paseObra.findFirst({
     where: { id: paseId, projectId: obraId, project: { companyId: sesion.companyId } },
@@ -641,6 +663,10 @@ export async function generarCodigoParaEntregar(
   if (!puede(sesion, "lookahead:gestionar")) {
     return { ok: false, error: "No tienes permiso para generar códigos." };
   }
+
+  // El alcance por obra: `companyId` para en la puerta de la empresa, esto
+  // para en la de la obra. Ver el comentario largo en `editarPase`.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
 
   const pase = await prisma.paseObra.findFirst({
     where: {

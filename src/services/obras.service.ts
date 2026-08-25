@@ -5,7 +5,7 @@ import { verificarSalud } from "@/services/salud.service";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
-import { alcanzaObra, filtroDeObras, VE_TODAS_LAS_OBRAS } from "@/lib/alcance-obras";
+import { FUERA_DE_ALCANCE, VE_TODAS_LAS_OBRAS, alcanzaObra, filtroDeObras } from "@/lib/alcance-obras";
 import { esPositivo, restar, sumar } from "@/lib/decimal";
 import { importeDeValorizacion, montoVigente } from "@/lib/adendas";
 import {
@@ -1104,6 +1104,10 @@ export async function actualizarObra(
   if (!puede(sesion, "obra:editar")) {
     return { ok: false, error: "No tienes permiso para editar obras." };
   }
+
+  // El alcance por obra: `companyId` para en la puerta de la empresa, esto
+  // para en la de la obra. Ver el comentario largo en `editarPase`.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },

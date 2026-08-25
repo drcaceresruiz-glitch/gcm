@@ -9,6 +9,7 @@ import { generateToken } from "@/lib/tokens";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { AgrupacionGaleria } from "@/lib/galeria";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra, FUERA_DE_ALCANCE } from "@/lib/alcance-obras";
 
 /**
  * La galeria de la obra: fotos PARA ENSENAR, curadas, con enlace de cliente.
@@ -223,6 +224,18 @@ export async function editarFotoGaleria(
   if (!foto) return { ok: false, error: "Esa foto no existe." };
 
   /*
+   * EL ALCANCE, sobre la obra de la FOTO y no sobre un id que venga de fuera.
+   *
+   * El `companyId` de arriba para en la puerta de la empresa; esto para en la
+   * de la obra. `subirFotoGaleria` ya lo comprobaba —via `motivoSiObraCerrada`,
+   * que lleva el alcance dentro— y sus hermanas no: un residente podia borrar
+   * o retitular fotos de obras de su empresa que no gestiona.
+   */
+  if (!alcanzaObra(sesion, foto.projectId)) {
+    return { ok: false, error: FUERA_DE_ALCANCE };
+  }
+
+  /*
    * ALTERAR EL REGISTRO de una obra cerrada es lo que la propia guarda dice
    * que no se puede: «el resultado de una obra cerrada es historia,
    * modificarlo falsearia lo que de verdad paso». Una foto borrada o
@@ -273,6 +286,18 @@ export async function eliminarFotoGaleria(
   });
   if (!foto) return { ok: false, error: "Esa foto no existe." };
 
+  /*
+   * EL ALCANCE, sobre la obra de la FOTO y no sobre un id que venga de fuera.
+   *
+   * El `companyId` de arriba para en la puerta de la empresa; esto para en la
+   * de la obra. `subirFotoGaleria` ya lo comprobaba —via `motivoSiObraCerrada`,
+   * que lleva el alcance dentro— y sus hermanas no: un residente podia borrar
+   * o retitular fotos de obras de su empresa que no gestiona.
+   */
+  if (!alcanzaObra(sesion, foto.projectId)) {
+    return { ok: false, error: FUERA_DE_ALCANCE };
+  }
+
   await prisma.fotoGaleria.delete({ where: { id: foto.id } });
 
   if (foto.ruta) {
@@ -315,6 +340,18 @@ export async function marcarVisibleCliente(
     select: { id: true, projectId: true },
   });
   if (!foto) return { ok: false, error: "Esa foto no existe." };
+
+  /*
+   * EL ALCANCE, sobre la obra de la FOTO y no sobre un id que venga de fuera.
+   *
+   * El `companyId` de arriba para en la puerta de la empresa; esto para en la
+   * de la obra. `subirFotoGaleria` ya lo comprobaba —via `motivoSiObraCerrada`,
+   * que lleva el alcance dentro— y sus hermanas no: un residente podia borrar
+   * o retitular fotos de obras de su empresa que no gestiona.
+   */
+  if (!alcanzaObra(sesion, foto.projectId)) {
+    return { ok: false, error: FUERA_DE_ALCANCE };
+  }
 
   /*
    * ALTERAR EL REGISTRO de una obra cerrada es lo que la propia guarda dice

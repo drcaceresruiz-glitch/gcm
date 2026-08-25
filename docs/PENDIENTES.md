@@ -5,6 +5,98 @@ son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
 Ultima revision: 24 de agosto de 2026.
 
+## La auditoria de las cuatro reglas (24 de agosto de 2026)
+
+Se pidio «resolver todos los fallos y que quede excelente», y se hizo por
+CLASES de fallo y no a ojo: las cuatro reglas que sostienen el proyecto, una
+por una, con detectores que siguen la delegacion.
+
+### Lo que estaba BIEN, y conviene que quede escrito
+
+Que una auditoria no encuentre nada tambien es un resultado, y ahorra
+repetirla:
+
+- **Aislamiento por empresa**: ninguna consulta llega a la cartera de otra
+  constructora. Las que no validan son nucleos SIN sesion —`bacDeObra`,
+  `partidasEnEjecucion`, el reloj de avisos— y todos sus llamadores validan
+  antes. Comprobado llamador por llamador.
+- **Denegacion por defecto**: ninguna escritura con sesion se salta el
+  permiso. Las once que lo parecian son el propio perfil, los propios avisos,
+  o delegan en un componedor que si lo comprueba.
+- **Componentes sin Prisma**: lo impone ESLint y esta verde.
+
+### El agujero que SI habia: el alcance por obra
+
+`companyId` para en la puerta de la empresa; `alcanzaObra` para en la de la
+obra —un residente no tiene por que tocar las obras de su empresa que no
+gestiona—. **Ocho escrituras alcanzables desde una accion de servidor no lo
+comprobaban.** Las acciones no pasan por el layout de la obra, asi que alli no
+habia nadie mas que las parara.
+
+Que era un olvido y no una decision lo prueba el propio codigo: `crearPase`
+SI lo comprobaba, con un comentario que explica exactamente por que hace
+falta, y sus cuatro hermanas no.
+
+Lo que estaba abierto, para un RESIDENTE o un ADMIN_OBRA de la misma empresa:
+
+| Escritura | Que permitia |
+|---|---|
+| `reemplazarCronograma`, `importarCronograma` | reemplazar el cronograma de otra obra |
+| `actualizarObra` | cambiarle nombre y fechas |
+| `editarPase`, `eliminarPase`, `cambiarEstadoPase` | gestionar sus pases de acceso |
+| `generarCodigoParaEntregar` | **emitir un codigo de acceso** a esa obra |
+| `eliminarFotoGaleria`, `editarFotoGaleria` | borrar o retitular sus fotos |
+
+Todas cerradas, con una prueba que fija el caso —una obra de la MISMA empresa
+que no le asignaron— en `cronograma-reemplazo.test.ts`.
+
+**Y de paso salio esto:** una sesion de prueba sin `obrasAsignadas` dejo de
+ser valida y doce pruebas se pusieron rojas. Es lo correcto: la lista vacia
+—«ninguna obra»— y el `null` —«todas»— son cosas OPUESTAS, y `alcanzaObra` no
+puede adivinar cual falta.
+
+### El otro agujero: no se podia revocar un pase
+
+La sesion de un pase SIGUE VALIENDO en una obra PARALIZADA —solo se invalida
+si la obra esta CERRADA o la empresa suspendida—, y sin embargo revocarla y
+borrarla se rechazaban por «obra paralizada». El titular seguia entrando y
+nadie podia echarlo.
+
+Quitar acceso solo RESTA: no falsea el expediente. Ahora revocar y borrar
+tienen su propia puerta y solo los bloquea que aquello no sea una obra viva
+—una copia restaurada, o la empresa congelada—. Devolver el acceso sigue
+siendo una escritura como las demas.
+
+### El dinero: cinco copias de la misma cuenta, cuatro mal
+
+La proporcion de dinero estaba escrita cinco veces: una probada y con
+aritmetica de importes —en la hoja del informe— y cuatro con
+`Number(a) / Number(b) * 100`. Ahora hay una sola, `porcentajeDe` en
+`lib/decimal`, y devuelve `null` cuando no se puede calcular en vez de un cero
+que se lee como «no hay nada comprometido».
+
+Dos defectos mas del mismo tipo:
+
+- **La propuesta que se le manda al cliente** decidia con `Number(a) !== Number(b)`
+  si imprimir la linea de descuento y el precio de venta. «92000» y «92000.00»
+  salian como distintos.
+- **El presupuesto del frente** que se ensena al armar un encargo se acumulaba
+  en un float, arrastrando centimos justo en la cifra que la persona compara
+  con lo que va a pactar.
+
+### Rendimiento: un N+1 real
+
+`importarProveedores` hacia un `findFirst` por fila: un Excel de doscientos
+proveedores eran doscientos viajes en serie. Ahora es una consulta con todos
+los RUC. **El mapa se actualiza dentro del bucle a proposito**: si el Excel
+trae el mismo RUC dos veces, la segunda fila tiene que ver al que creo la
+primera. Hay una prueba de ese caso, porque es justo lo que el cambio podia
+romper sin que se notara.
+
+Se miraron los otros 21 sitios con consulta dentro de un bucle: son
+actualizaciones fila a fila con valores distintos —no se pueden agrupar— o
+algoritmos acotados, como el borrado del arbol de partidas por niveles.
+
 ## La obra de tres meses, recorrida entera (24 de agosto de 2026)
 
 El usuario pidio crear una obra de cero -tres meses, siete capitulos, cinco
