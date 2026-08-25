@@ -55,15 +55,51 @@ la unica.
   si tiene. Y hay una asimetria deliberada: puede cerrar la obra pero no
   reabrirla —`obra:reabrir` es innegociable—.
 
-### Lo que quedo sin poder verse
+### Los dos que faltaban — CERRADOS el mismo dia
 
-- **El agente contra una obra ajena**: el proveedor de IA tarda mas de los 45 s
-  y corta, asi que la conversacion no llega a responder. No es del codigo —otra
-  conversacion si respondio—. Por debajo si esta medido: la herramienta que
-  llamaria devuelve `null`.
-- **`/api/galeria/[id]`, `/api/evidencia/[id]` y `/api/notas/[id]`**: ninguna
-  obra ajena tiene fotos ni adjuntos en esta base, asi que no hay archivo real
-  que pedir. Medido el 24 comparando la consulta con y sin el filtro.
+**El agente contra una obra ajena.** Se pudo probar en cuanto se arreglo el
+modelo (ver abajo). Rita pidio las tareas de una obra que no gestiona y el
+asistente contesto: «La obra no tiene tareas registradas (0 tareas)». La
+herramienta corrio, choco con la guarda y devolvio `null`; no filtro ni una de
+las nueve tareas que esa obra si tiene. Y no dice «no tienes acceso», dice «no
+tiene tareas»: la misma decision de no distinguir «no la alcanzas» de «no
+existe» que el resto de la aplicacion.
+
+**`/api/galeria/[id]`.** Se creo una foto DE VERDAD —fila y archivo en disco—
+en una obra ajena, y se pidio por su id:
+
+- desde el navegador, con la sesion de Rita: **404**;
+- por el servicio, con el ADMIN: **160 bytes, la sirve**;
+- por el servicio, con Rita: **bloqueada**.
+
+Misma foto, mismo codigo, distinto alcance. Las otras dos rutas
+—`/api/evidencia/[id]` y `/api/notas/[id]`— comparten `where` y guarda, y se
+midieron el 24 comparando la consulta con y sin el filtro.
+
+### Y de paso: el asistente estaba caido, y no por GCM
+
+Las conversaciones morian con «tardo demasiado». Descartando por capas: red a
+Google 0,34 s, clave correcta —lista modelos con 200—, modelo configurado
+existente. Y entonces:
+
+| modelo | respuesta |
+|---|---|
+| `gemini-3.7-flash` (el configurado) | 503 «experiencing high demand», y a ratos cuelgue de 40 s |
+| `gemini-2.5-flash` | 404 «no longer available to new users. Please update to models/gemini-3.6-flash» |
+| `gemini-3.6-flash` | **200 en 1,5 s**, tambien con herramientas |
+
+Se cambio el modelo a `gemini-3.6-flash` por el propio servicio —para que quede
+su traza— y la prueba del proveedor pasa en 2,2 s.
+
+**GCM se porto bien en todo esto**: el reintento ya contemplaba ese 503 —su
+comentario dice «cazado en vivo: Gemini devolviendo 503 high demand»— y el
+mensaje que ve la persona dice la verdad.
+
+**Y una trampa del arnes de pruebas, apuntada porque me engano a mi mismo**:
+`vitest.config.mts` NO carga el `.env`, inyecta valores de mentira. Sin meter
+`CORREO_CLAVE_CIFRADO` a mano en `process.env`, `descifrar` falla y toda clave
+guardada parece ilegible. Estuve a punto de dar por corrupta una clave que
+estaba perfecta.
 
 ### Rastro que queda en la base de desarrollo
 
