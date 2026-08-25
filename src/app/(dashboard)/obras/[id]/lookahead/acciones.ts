@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import {
   sincronizarLookahead,
+  configurarVentanaLookahead,
   alternarRestriccion,
   fijarFlujos,
   marcarSinRestricciones,
@@ -40,6 +41,25 @@ export async function accionSincronizar(
 
   await sincronizarLookahead(sesion, obraId, semanas);
   revalidatePath(`/obras/${obraId}/lookahead`);
+}
+
+/**
+ * Deja fijada la ventana de la obra.
+ *
+ * Devuelve el error en vez de tragarselo porque puede fallar por algo que la
+ * persona necesita saber -no tiene permiso, o la obra esta cerrada-, y el
+ * desplegable habria cambiado a la vista sin que se guardara nada.
+ */
+export async function accionFijarVentana(
+  obraId: string,
+  semanas: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const r = await configurarVentanaLookahead(sesion, obraId, semanas);
+  if (r.ok) revalidatePath(`/obras/${obraId}/lookahead`);
+  return r;
 }
 
 export async function accionAlternarRestriccion(

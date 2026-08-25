@@ -69,6 +69,35 @@ base. `?doc=inventado` da 400 y una obra sin meta da 404 con su motivo.
 
 ---
 
+## La ventana del Lookahead deja de vivir en la URL — 25 de agosto de 2026
+
+Se elegía en el desplegable, viajaba en `?semanas=` y se perdía al salir de la
+pantalla: cada persona que entraba volvía a ver tres semanas y tenía que volver
+a ampliarla. Ahora `Project.semanasLookahead` la guarda por obra.
+
+- **NULL a propósito, no `@default(3)`**: «esta obra no ha elegido» y «esta
+  obra eligió tres» no son lo mismo, y con un default no se podría cambiar
+  nunca el valor recomendado sin pisar la elección de quien de verdad quiso
+  tres.
+- **`?semanas=` sigue mandando encima.** Sirve para asomarse a otra ventana
+  —un enlace compartido, mirar más lejos un momento— sin cambiársela a todo el
+  mundo. Y es lo que le queda a quien solo LEE: fijarla pide
+  `lookahead:gestionar`, se audita y respeta la guarda de obra cerrada, igual
+  que `configurarDiaCorte`, que es el mismo caso.
+- **También la ve el pase de obra.** `menuDePase` lee la ventana de SU obra: en
+  campo, con el móvil, hay que ver el mismo horizonte que la oficina o faltan
+  tareas que en el Lookahead sí están.
+- La decisión —qué manda entre las dos— vive en `semanasElegidas`
+  (`lib/lookahead`), pura y con pruebas, incluido que un `?semanas=` VACÍO no
+  es una elección y que una cifra imposible guardada en la base se acota igual.
+
+**Verificado contra la base de desarrollo** ejecutando el servicio con la
+columna puesta a null, 6, 12 y 200: la pantalla ve 3, 6, 12 y 12. Y se comprobó
+que la medición distingue —con el código viejo las mismas comprobaciones se
+ponen rojas—.
+
+---
+
 ## El fallo `81572617`, buscado a fondo — 25 de agosto de 2026 (tarde)
 
 **Sigue sin reproducirse, y ahora se sabe donde NO esta.** Pero la busqueda
@@ -4418,7 +4447,7 @@ Nuevo, y sigue abierto:
 
 | | Que es | Migracion |
 |---|---|---|
-| — | Ventana del Lookahead **por obra** (hoy solo en la URL) | Si, una columna |
+| ~~—~~ | ~~Ventana del Lookahead **por obra**~~ **HECHA el 25 de agosto de 2026**: `Project.semanasLookahead`, NULL = no elegida. `?semanas=` sigue mandando encima, para asomarse sin cambiársela a nadie | Hecha |
 | — | Empresa de demostracion para el tutorial | No: identificarla por variable de entorno |
 | — | Sombrear el area entre plan y real en la curva S | No |
 | ~~—~~ | ~~Exportar tablas a Excel (presupuesto y órdenes)~~ **HECHO el 25 de agosto de 2026.** Los tres presupuestos en `/obras/[id]/presupuesto/excel?doc=…` y las órdenes en `/obras/[id]/ordenes/excel`, esta última con los mismos filtros que la pantalla | No |

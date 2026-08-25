@@ -6,6 +6,7 @@ import {
   confiabilidad,
   planificarFlujos,
   normalizarSemanas,
+  semanasElegidas,
   SEMANAS_SUGERIDAS,
   FLUJOS_RESTRICCION,
   TIPOS_RESTRICCION,
@@ -291,5 +292,41 @@ describe("planificarFlujos", () => {
     expect(p.conservadas).toEqual([
       { id: "r2", tipo: "SEGURIDAD", motivo: "resuelta" },
     ]);
+  });
+});
+
+/**
+ * La ventana dejo de vivir solo en la URL el 25 de agosto de 2026: se elige
+ * una vez y se queda en la obra. Lo que la URL pida sigue mandando, para poder
+ * asomarse a otra ventana sin cambiarsela a todo el mundo.
+ */
+describe("que ventana se mira", () => {
+  it("manda lo que pide la URL, aunque la obra tenga otra elegida", () => {
+    expect(semanasElegidas("6", 4)).toBe(6);
+    expect(semanasElegidas(8, 4)).toBe(8);
+  });
+
+  it("sin nada en la URL, manda la de la obra", () => {
+    expect(semanasElegidas(undefined, 6)).toBe(6);
+    expect(semanasElegidas(null, 6)).toBe(6);
+    // El `?semanas=` vacio de una URL no es una eleccion.
+    expect(semanasElegidas("", 6)).toBe(6);
+    expect(semanasElegidas("   ", 6)).toBe(6);
+  });
+
+  it("sin URL y sin obra que la haya elegido, el defecto", () => {
+    expect(semanasElegidas(undefined, null)).toBe(SEMANAS_POR_DEFECTO);
+    expect(semanasElegidas("", undefined)).toBe(SEMANAS_POR_DEFECTO);
+  });
+
+  /**
+   * La guardada tambien se acota: una fila con un valor imposible -escrita a
+   * mano contra la base, o de una version futura con otro maximo- no puede
+   * dejar la pantalla pidiendo doscientas semanas de cronograma.
+   */
+  it("acota tambien la que viene guardada", () => {
+    expect(semanasElegidas(undefined, 200)).toBe(SEMANAS_MAXIMO);
+    expect(semanasElegidas(undefined, 0)).toBe(SEMANAS_MINIMO);
+    expect(semanasElegidas(undefined, -3)).toBe(SEMANAS_MINIMO);
   });
 });

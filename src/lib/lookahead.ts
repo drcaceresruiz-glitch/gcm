@@ -64,8 +64,7 @@ export function normalizarSemanas(valor: string | number | undefined | null): nu
   // valen 0, no NaN, asi que se colarian por el guardian de abajo y acabarian
   // recortados al minimo. Una URL con `?semanas=` daria una ventana de una
   // semana en vez del defecto.
-  if (valor === null || valor === undefined) return SEMANAS_POR_DEFECTO;
-  if (typeof valor === "string" && valor.trim() === "") return SEMANAS_POR_DEFECTO;
+  if (!hayValor(valor)) return SEMANAS_POR_DEFECTO;
 
   const n = Number(valor);
   if (!Number.isFinite(n)) return SEMANAS_POR_DEFECTO;
@@ -245,4 +244,30 @@ function motivoParaConservar(r: RestriccionActual): MotivoConservada | null {
   if (r.detalle !== null && r.detalle.trim() !== "") return "con-datos";
   if (r.requiereDoc || r.documentoId !== null) return "con-datos";
   return null;
+}
+
+/// Si de verdad viene algo. Un `?semanas=` vacio en la URL no es una eleccion.
+function hayValor(valor: string | number | undefined | null): boolean {
+  if (valor === null || valor === undefined) return false;
+  return !(typeof valor === "string" && valor.trim() === "");
+}
+
+/**
+ * Que ventana se mira: la que se pide de paso, o la que la obra tiene elegida.
+ *
+ * `pedidas` viene de `?semanas=` en la URL y MANDA cuando viene: sirve para
+ * asomarse a otra ventana —un enlace que alguien comparte, o mirar mas lejos
+ * un momento— sin cambiarsela a toda la obra.
+ *
+ * `guardadas` es `Project.semanasLookahead`, null mientras nadie la haya
+ * fijado. Existe porque hasta el 25 de agosto de 2026 la ventana vivia SOLO en
+ * la URL: se elegia en el desplegable y se perdia al salir de la pantalla, asi
+ * que cada persona que entraba volvia a ver tres semanas y tenia que volver a
+ * ampliarla.
+ */
+export function semanasElegidas(
+  pedidas: string | number | undefined | null,
+  guardadas: number | null | undefined,
+): number {
+  return hayValor(pedidas) ? normalizarSemanas(pedidas) : normalizarSemanas(guardadas);
 }

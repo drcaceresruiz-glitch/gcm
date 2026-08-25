@@ -34,6 +34,7 @@ import {
   accionSincronizar,
   accionAlternarRestriccion,
   accionLevantarTodas,
+  accionFijarVentana,
 } from "@/app/(dashboard)/obras/[id]/lookahead/acciones";
 import { accionSubirEvidencia } from "@/app/(dashboard)/obras/[id]/evidencia/acciones";
 import type { LookaheadDatos } from "@/services/lookahead.service";
@@ -104,6 +105,9 @@ export function MatrizLookahead({
   //
   // Arranca con lo que diga el codigo QR, si se llego por uno.
   const [evidenciaEn, setEvidenciaEn] = useState<string | null>(abrirEvidencia);
+  /// Por que no se pudo dejar fijada la ventana. Null = no ha hecho falta
+  /// decir nada.
+  const [avisoVentana, setAvisoVentana] = useState<string | null>(null);
 
   /*
    * DOS interruptores, con los mismos nombres que usa el aviso de obra
@@ -152,13 +156,38 @@ export function MatrizLookahead({
   // Lookahead pero no el PTS. Cada boton sigue mirando su propio permiso.
   const puedeSeleccionar = puedeGestionar || puedeComprometer;
 
-  // La ventana viaja en la URL: se comparte por enlace y vuelve atras con el
-  // boton del navegador. Al cambiarla se pierde la seleccion a proposito, que
-  // ya no tiene por que referirse a tareas que sigan a la vista.
+  /**
+   * Cambiar la ventana. Al hacerlo se pierde la seleccion a proposito, que ya
+   * no tiene por que referirse a tareas que sigan a la vista.
+   *
+   * Quien GESTIONA el Lookahead la deja fijada en la obra y se navega a la
+   * ruta limpia: asi la eligen una vez y la ve todo el mundo, tambien quien
+   * entre manana. Hasta el 25 de agosto de 2026 la ventana vivia solo en la
+   * URL y se perdia al salir de la pantalla.
+   *
+   * Quien solo LEE navega con `?semanas=`, como siempre: puede asomarse a otra
+   * ventana sin cambiarsela a nadie. Y si guardar falla —la obra esta
+   * cerrada—, se cae a lo mismo en vez de dejar el desplegable mintiendo.
+   */
   function cambiarSemanas(valor: string) {
     setElegidas(new Set());
     setPanel(null);
-    router.push(`${ruta}?semanas=${valor}`);
+
+    if (!puedeGestionar) {
+      router.push(`${ruta}?semanas=${valor}`);
+      return;
+    }
+
+    iniciar(async () => {
+      const r = await accionFijarVentana(obraId, Number(valor));
+      if (r.ok) {
+        setAvisoVentana(null);
+        router.push(ruta);
+      } else {
+        setAvisoVentana(r.error);
+        router.push(`${ruta}?semanas=${valor}`);
+      }
+    });
   }
 
   function alternarEleccion(uid: number) {
@@ -293,6 +322,7 @@ export function MatrizLookahead({
   // El selector se pinta tambien cuando la ventana sale vacia: si no, quien
   // eligiera una ventana corta sin tareas se quedaria sin forma de volver.
   const selectorSemanas = (
+    <div className="space-y-1">
     <label className="flex items-center gap-1.5 text-sm">
       <span className="opacity-70">Ventana</span>
       <select
@@ -312,7 +342,16 @@ export function MatrizLookahead({
           </option>
         ))}
       </select>
+      {puedeGestionar && (
+        <span className="text-xs opacity-60">se queda fijada en la obra</span>
+      )}
     </label>
+    {avisoVentana && (
+      <p className="text-xs" style={{ color: "var(--color-peligro)" }}>
+        {avisoVentana}
+      </p>
+    )}
+    </div>
   );
 
   if (filas.length === 0) {

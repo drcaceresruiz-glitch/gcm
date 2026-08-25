@@ -955,6 +955,19 @@ model Project {
   /// Last Planner). ISO: 1=lunes … 7=domingo. Viernes por defecto.
   diaCorteSemanal Int @default(5)
 
+  /**
+   * Cuantas semanas mira el Lookahead de ESTA obra.
+   *
+   * NULL = no se ha elegido, y entonces manda `SEMANAS_POR_DEFECTO`
+   * (`lib/lookahead`). No lleva `@default(3)` a proposito: «no ha elegido» y
+   * «eligio tres» no son lo mismo, y con un default no se podria cambiar
+   * nunca el valor recomendado sin pisar la eleccion de quien quiso tres.
+   *
+   * `?semanas=` en la URL sigue mandando sobre esto: sirve para mirar otra
+   * ventana de paso, sin cambiarle la de la obra a todo el mundo.
+   */
+  semanasLookahead Int?
+
   /// El ultimo `uid` que se ha entregado a una tarea tecleada a mano. Va en
   /// NEGATIVO y solo baja: 0, -1, -2…
   ///

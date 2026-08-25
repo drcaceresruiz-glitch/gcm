@@ -20,11 +20,13 @@ import {
 import { ultimoAvancePorTarea } from "@/lib/cronograma";
 import {
   ventanaLookahead,
+  semanasElegidas,
+  SEMANAS_MINIMO,
+  SEMANAS_MAXIMO,
   faseDeTarea,
   estadoDeTarea,
   confiabilidad,
   planificarFlujos,
-  normalizarSemanas,
   TIPOS_RESTRICCION,
   type Confiabilidad,
   type FaseAnalisis,
@@ -360,6 +362,26 @@ async function tareasDeLaVentana(
  * su estado de confiabilidad. Lectura pura (no crea nada): las tareas aun no
  * sincronizadas salen con celdas vacias y `sincronizada: false`.
  */
+/**
+ * Las semanas que toca mirar en esta obra: lo que pida la URL, y si no lo que
+ * la obra tenga elegido. Ver `semanasElegidas` en `lib/lookahead`.
+ *
+ * Una consulta minuscula y siempre por `companyId`, como toda lectura de obra.
+ * Si la obra no existe o no es de esta empresa, se cae al defecto: quien llama
+ * ya devuelve vacio por su cuenta, y aqui no hay nada que contar.
+ */
+async function semanasDeLaObra(
+  companyId: string,
+  obraId: string,
+  semanasPedidas: string | number | undefined,
+): Promise<number> {
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId },
+    select: { semanasLookahead: true },
+  });
+  return semanasElegidas(semanasPedidas, obra?.semanasLookahead);
+}
+
 export async function obtenerLookahead(
   sesion: SesionActiva,
   obraId: string,
@@ -372,7 +394,7 @@ export async function obtenerLookahead(
   // la regla 4 en `gcm-limites-de-capas`.
   if (!alcanzaObra(sesion, obraId)) return null;
 
-  const semanas = normalizarSemanas(semanasPedidas);
+  const semanas = await semanasDeLaObra(sesion.companyId, obraId, semanasPedidas);
   const { desde, hasta, tareas } = await tareasDeLaVentana(sesion, obraId, semanas);
   // Una sola vez para toda la matriz: si cada celda leyera la fecha por su
   // cuenta, dos celdas de la misma pantalla podrian caer a distinto lado de la
@@ -694,7 +716,14 @@ export async function menuDePase(
   pase: PaseActivo,
   semanasPedidas?: string | number,
 ): Promise<MenuPaseDatos> {
-  const semanas = normalizarSemanas(semanasPedidas);
+  // La ventana de LA OBRA del pase, no el defecto: quien esta en campo con el
+  // movil tiene que ver el mismo horizonte que la oficina, o le faltaran
+  // tareas que en el Lookahead si estan.
+  const obraDelPase = await prisma.project.findFirst({
+    where: { id: pase.obraId, companyId: pase.companyId },
+    select: { semanasLookahead: true },
+  });
+  const semanas = semanasElegidas(semanasPedidas, obraDelPase?.semanasLookahead);
   const { desde, hasta } = ventanaLookahead(hoy(), semanas);
 
   // El cronograma vigente de SU obra. No se reusa `cronogramaVigente`, que
@@ -855,7 +884,7 @@ export async function confiabilidadDeVentana(
   // la regla 4 en `gcm-limites-de-capas`.
   if (!alcanzaObra(sesion, obraId)) return null;
 
-  const semanas = normalizarSemanas(semanasPedidas);
+  const semanas = await semanasDeLaObra(sesion.companyId, obraId, semanasPedidas);
   const { desde, hasta } = ventanaLookahead(hoy(), semanas);
   const tareas = tareasDeLaSemana([...tareasCronograma], desde, hasta, terminadas);
 
@@ -922,6 +951,70 @@ export async function confiabilidadDeVentana(
  *
  * Idempotente: no duplica las que ya existen.
  */
+export type ResultadoVentana = { ok: true } | { ok: false; error: string };
+
+/**
+ * Fija cuantas semanas mira el Lookahead de esta obra.
+ *
+ * Es una preferencia de la obra, no un dato contable —el mismo caso que el dia
+ * de corte semanal (`configurarDiaCorte`)—, y se lleva con el mismo permiso
+ * que el resto del Lookahead. Se audita para dejar rastro de cuando y quien
+ * cambio el horizonte con el que se planifica: ampliarlo o acortarlo cambia
+ * que trabajo entra en el analisis de restricciones, y eso se discute.
+ *
+ * Se comprueba que la obra admita cambios por lo mismo que `configurarDiaCorte`:
+ * una obra cerrada no se reconfigura. Para asomarse a otra ventana sin
+ * cambiarla queda `?semanas=` en la URL, que sigue mandando y no escribe nada.
+ */
+export async function configurarVentanaLookahead(
+  sesion: SesionActiva,
+  obraId: string,
+  semanas: number,
+): Promise<ResultadoVentana> {
+  if (!puede(sesion, "lookahead:gestionar")) {
+    return { ok: false, error: "No tienes permiso para gestionar el Lookahead." };
+  }
+
+  if (!Number.isInteger(semanas) || semanas < SEMANAS_MINIMO || semanas > SEMANAS_MAXIMO) {
+    return {
+      ok: false,
+      error: `La ventana tiene que estar entre ${SEMANAS_MINIMO} y ${SEMANAS_MAXIMO} semanas.`,
+    };
+  }
+
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
+
+  const obra = await prisma.project.findFirst({
+    where: { id: obraId, companyId: sesion.companyId },
+    select: { id: true, semanasLookahead: true },
+  });
+  if (!obra) return { ok: false, error: "Obra no encontrada." };
+
+  if (obra.semanasLookahead === semanas) return { ok: true };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.project.update({
+      where: { id: obraId },
+      data: { semanasLookahead: semanas },
+    });
+    await tx.auditLog.create({
+      data: {
+        companyId: sesion.companyId,
+        userId: sesion.userId,
+        projectId: obraId,
+        entidad: "Project",
+        entidadId: obraId,
+        accion: "UPDATE",
+        antes: { semanasLookahead: obra.semanasLookahead },
+        despues: { semanasLookahead: semanas },
+      },
+    });
+  });
+
+  return { ok: true };
+}
+
 export async function sincronizarLookahead(
   sesion: SesionActiva,
   obraId: string,
@@ -946,7 +1039,7 @@ export async function sincronizarLookahead(
   const { tareas } = await tareasDeLaVentana(
     sesion,
     obraId,
-    normalizarSemanas(semanasPedidas),
+    await semanasDeLaObra(sesion.companyId, obraId, semanasPedidas),
   );
   if (tareas.length === 0) return { ok: true, creadas: 0 };
 
