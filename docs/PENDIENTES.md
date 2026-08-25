@@ -5,6 +5,73 @@ son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
 Ultima revision: 24 de agosto de 2026.
 
+## La revision de lo que faltaba (24 de agosto de 2026, noche)
+
+Se pidio comprobar TODO lo que quedaba sin mirar. Se hizo por areas, cada una
+con su clase de riesgo propia. **Aparecieron seis fugas del mismo tipo**, y
+ninguna la cazaba la bateria.
+
+### Lo que se reviso y estaba bien
+
+Escrito para no repetirlo:
+
+- **Autenticacion**: scrypt con sal y comparacion en tiempo constante, un
+  `verifyPassword` señuelo para no filtrar que correos existen, bloqueo por
+  cuenta Y por IP —con el `X-Forwarded-For` ya resuelto—, y cierre de TODAS
+  las sesiones al cambiar clave, recuperarla, cambiar correo o desactivar.
+- **Doble factor**: el desafio no crea sesion, caduca, limita intentos, se
+  gasta al acertar, compara en tiempo constante y vuelve a mirar el estado de
+  la cuenta entre un paso y otro.
+- **Administracion de constructoras**: borrar una exige operador, que no sea
+  la propia, que este congelada, que haya exportacion reciente de menos de N
+  horas y teclear la razon social.
+- **Pase de obra**: solo escribe evidencia, y el destino tiene que ser de SU
+  obra con el `projectId` sacado de la fila del pase, no de la peticion.
+- **Correo y SMS**: credenciales con AES-256-GCM y clave derivada con scrypt;
+  los destinatarios salen de la propia obra, nunca de la peticion.
+- **Escrituras del agente de IA**: pasan por los servicios reales, con la
+  sesion, y exigen confirmacion humana.
+
+### Las seis fugas, todas de la misma clase
+
+**Lecturas alcanzables SIN pasar por el layout de la obra**, que es lo unico
+que comprobaba el alcance:
+
+| Por donde | Que servia |
+|---|---|
+| Agente de IA, `tareas_de_obra` | el cronograma entero de una obra ajena |
+| `/obras/[id]/propuesta/excel` | cliente, cascada de precios y **margen** |
+| `/api/galeria/[id]` | cualquier foto de la constructora |
+| `/api/evidencia/[id]` | cualquier foto de campo |
+| `/api/notas/[id]` | cualquier adjunto de una nota |
+| `listarEquipo` y `listarPartidas` | el equipo y el arbol de partidas |
+
+Todas comprobadas contra la base con una sesion de residente de verdad, no
+razonando sobre el codigo.
+
+### Y despues, la clase entera
+
+En vez de seguir tapando de una en una, se midio: llamar a **las 69 lecturas
+de obra** con una sesion de alcance limitado y ver cuales devuelven datos.
+Salieron 39. No eran 39 agujeros —34 solo se alcanzan por una pagina, y esa la
+tapa el layout— pero es exactamente el fallo que la regla 4 predice, y hoy se
+cumplio seis veces en un dia.
+
+Las 60 llevan ya la guarda, y cada una devuelve **lo mismo** que ya devolvia al
+negar el permiso: las dos cosas dicen «esto no es para ti», y asi no se puede
+distinguir por la respuesta si la obra existe.
+
+**Como reproducir el barrido** si hace falta repetirlo: una prueba de vitest
+que doble solo `@/lib/prisma` con un cliente real —ver
+`e2e-golden-path-verificado`—, que arme una sesion con `permisos: permisosDe("ADMIN")`
+y `obrasAsignadas: [otraObra]`, y llame a cada lectura con el id de una obra
+que SI tenga datos. Lo unico que puede frenarla entonces es el alcance.
+
+**Una trampa de medicion que casi cuela**: las tres rutas de archivos
+devuelven el mismo error cuando la fila no aparece y cuando el fichero no esta
+en disco. Con una foto de prueba sin archivo, un «bloqueada» no probaba nada.
+Hubo que comparar las DOS consultas sobre la misma fila.
+
 ## La auditoria de las cuatro reglas (24 de agosto de 2026)
 
 Se pidio «resolver todos los fallos y que quede excelente», y se hizo por
