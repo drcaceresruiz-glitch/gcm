@@ -3,72 +3,74 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 24 de agosto de 2026.
+Ultima revision: 25 de agosto de 2026.
 
-## LO PRIMERO DE MAÑANA (25 de agosto de 2026)
+## El recorrido como RESIDENTE — HECHO el 25 de agosto de 2026
 
-**Recorrer GCM con los ojos de un residente.** Es el unico hueco de
-verificacion que quedo abierto el 24 de agosto, y el dia demostro once veces
-que mirar encuentra lo que la bateria no.
+Era el ultimo hueco de verificacion. Se hizo entero, con `Rita Residente`
+asignada a una sola obra viva y entrando en incognito.
 
-**Por que hace falta.** Ese dia se cerraron seis fugas de alcance por obra y se
-puso la guarda en las sesenta lecturas. Todo eso esta verificado **contra la
-base y con pruebas**, pero SIEMPRE con una sesion de administrador, que alcanza
-todas las obras: el recorrido por el navegador nunca ejecuto el codigo nuevo.
+### Lo que aparecio
 
-### Los tres pasos de preparacion
+**Tres fallos, ninguno cazado por la bateria:**
 
-**NO hay que crear ningun usuario: ya existe.** `Rita Residente`, rol
-Residente, `residente.prueba@local.test`, activa. Esta en
-`Empresa -> Usuarios`, la ultima de la lista.
+1. **La pantalla de usuarios ofrecia todos los botones de gestion.** Entraba con
+   `usuario:leer` y despues pintaba «Nuevo usuario», «Editar», «Resetear
+   clave», «Desactivar» y «Eliminar» sobre cada persona de la empresa. Un
+   residente veia el boton de resetearle la clave al administrador principal.
+   El servidor los rechazaba —no habia escalada—, pero es lo que el propio
+   codigo condena. Cada control lleva ya SU permiso.
+2. **Tu pregunta al asistente desaparecia** de la conversacion: se leia del
+   textarea despues de que la accion respondiera, y React 19 ya lo habia
+   limpiado.
+3. **El error del asistente salia en ingles** y crudo del runtime.
 
-1. **Sacarle clave.** En su fila, «Resetear clave». La clave temporal sale EN
-   PANTALLA y solo se ve una vez. Al entrar pedira cambiarla
-   (`mustChangePassword`): poner una que se recuerde. El envio por correo
-   fallara —`local.test` no es un dominio real— y da igual.
-2. **Asignarle UNA sola obra.** Es el punto entero de la prueba: con todas
-   asignadas no se ejerce nada. Sirve `LABORATORIO INSTITUTO DE
-   CRIOPRESERVACION` (OB-000001), que esta en ejecucion y tiene datos. Se hace
-   en la obra -> `Equipo` -> «Asignar a la obra» en la fila de Rita.
-3. **Entrar en una ventana de incognito**, para no tirar la sesion de
-   administrador de la ventana normal.
+**Y se barrieron las demas pantallas** buscando el patron del primero —entrar
+con un permiso de lectura y pintar controles de escritura—: la de usuarios era
+la unica.
 
-**Y NO EMPUJAR HASTA TERMINAR.** `npm run build` invalida la sesion del
-servidor de desarrollo y echa fuera a quien este dentro. Y lo que de verdad
-importa: **`git push` construye**, porque el gancho de `pre-push` corre la
-bateria G6 entera —typecheck, lint, test y build—. O sea que cada `push`
-expulsa a quien este recorriendo la aplicacion.
+### Lo que se comprobo que funciona
 
-Paso el 25 de agosto a media mañana, dos veces seguidas. Durante el recorrido:
-`typecheck`, `lint` y `test` a mano, si; `build` y `push`, al final. Se juntan
-los commits y se empuja todo de una vez cuando el recorrido termina.
+- **El alcance aguanta en pantalla**: entrar por la barra de direcciones a una
+  obra ajena da «Aqui no hay nada», sin distinguir «no la alcanzas» de «no
+  existe». Y con su sesion real contra la base, las seis lecturas que estuvieron
+  abiertas devuelven vacio.
+- **Puede trabajar de verdad en la suya**: se reporto un parte del dia y
+  guardo —«Parte guardado: 1 tarea(s)»—, y la partida paso de 7 dias sin
+  reportar a 0. Las quince pantallas de su obra devuelven datos.
+- **El Lookahead con tareas dentro de la ventana**, que era el hueco que quedaba
+  del dia 24: se creo una tarea a mano —cosa que un residente puede hacer— y la
+  matriz aparecio con «Traer al Lookahead», «Analizar» y «Comprometer al PTS».
+  Los dos ultimos son los que se gatearon el 24 con el interruptor estricto:
+  **en una obra viva estan, y el panel de «Analizar» abre entero**. La
+  correccion de aquel dia era correcta por los dos lados.
 
-Doble factor NO estorba: `dosFactoresActivo` viene en `false`.
+### Dos falsas alarmas, apuntadas para no repetirlas
 
-### Que hay que comprobar, y por donde
+- **El panel ANIMA sus cifras.** La tarjeta «Obras» marcaba 1 cuando eran 2, y
+  el presupuesto 314.098 cuando eran 745.553: eran fotogramas del contador
+  subiendo. Una captura del panel puede leerse mal; hay que dejarlo asentar.
+- **`obra:cambiar_estado` no existe.** Se creyo que «Paralizar» y «Cerrar obra»
+  se ofrecian sin permiso; el permiso real es `obra:editar`, que un residente
+  si tiene. Y hay una asimetria deliberada: puede cerrar la obra pero no
+  reabrirla —`obra:reabrir` es innegociable—.
 
-Lo que **NO** debe poder, cada uno por su camino —los seis son los que
-estuvieron abiertos—:
+### Lo que quedo sin poder verse
 
-- El panel y el buscador de obras: solo la suya.
-- **El agente de IA**: pedirle «dame las tareas del cronograma de <otra obra>»
-  y que no las de. Era la fuga de `tareas_de_obra`.
-- **Cambiar el id en la barra de direcciones** hacia otra obra: tablero,
-  cronograma, presupuesto, valorizaciones.
-- **`/obras/<otra>/propuesta/excel`**: servia cliente, cascada de precios y
-  MARGEN.
-- **`/api/galeria/<id>`, `/api/evidencia/<id>`, `/api/notas/<id>`** con un id de
-  otra obra: servian el archivo.
-- El equipo y el arbol de partidas de otra obra.
+- **El agente contra una obra ajena**: el proveedor de IA tarda mas de los 45 s
+  y corta, asi que la conversacion no llega a responder. No es del codigo —otra
+  conversacion si respondio—. Por debajo si esta medido: la herramienta que
+  llamaria devuelve `null`.
+- **`/api/galeria/[id]`, `/api/evidencia/[id]` y `/api/notas/[id]`**: ninguna
+  obra ajena tiene fotos ni adjuntos en esta base, asi que no hay archivo real
+  que pedir. Medido el 24 comparando la consulta con y sin el filtro.
 
-Y lo que **SI** tiene que poder, que es la otra mitad y la que se rompe al
-apretar de mas: trabajar con normalidad en SU obra —reportar avance, valorizar,
-subir fotos, notas, plan semanal—.
+### Rastro que queda en la base de desarrollo
 
-**Ojo con dar por bueno un «vacio»**: varias de estas devuelven lo mismo cuando
-no alcanzas la obra que cuando no hay datos. Si sale vacio, mirar que la obra
-de prueba SI tenga ese dato antes de cantar victoria. Es la trampa que casi
-cuela el 24.
+Un reporte de avance en `LABORATORIO INSTITUTO`, partida 4.5, con el MISMO 60 %
+que ya tenia —un parte veraz—. No se puede borrar: la serie de avance es
+append-only a proposito. La tarea a mano que se creo para poblar el Lookahead
+si se borro.
 
 ---
 
