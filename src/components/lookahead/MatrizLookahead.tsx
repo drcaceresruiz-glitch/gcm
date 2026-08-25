@@ -106,17 +106,23 @@ export function MatrizLookahead({
   const [evidenciaEn, setEvidenciaEn] = useState<string | null>(abrirEvidencia);
 
   /*
-   * DOS interruptores, porque esta pantalla mezcla las dos reglas del
-   * servidor. `sincronizarLookahead` -traer tareas nuevas- usa el criterio
-   * estricto: es abrir trabajo. Levantar restricciones, comprometerlas y
-   * subir evidencia pasan `{ permiteEnParalizada: true }`, porque son cerrar
-   * lo que ya estaba abierto, que es justo lo que hay que poder hacer
-   * mientras la obra esta parada.
+   * DOS interruptores, con los mismos nombres que usa el aviso de obra
+   * PARALIZADA: ABRIR trabajo nuevo contra CERRAR lo que ya estaba en curso.
+   * No es una metafora, es literalmente como parten las guardas del servidor.
    *
-   * Un solo interruptor estricto habria apagado media pantalla en una obra
-   * PARALIZADA, y es la mitad que mas falta hace ahi.
+   * ABREN (criterio estricto): traer tareas al Lookahead
+   * -`sincronizarLookahead`-, analizarlas -`fijarFlujos`,
+   * `marcarSinRestricciones`- y llevarlas al Plan Semanal
+   * -`comprometerAlPts`-.
+   *
+   * CIERRAN (`{ permiteEnParalizada: true }`): levantar restricciones,
+   * asignarles responsable y fecha, y subir evidencia. Siguen disponibles con
+   * la obra parada, que es justo cuando mas falta hacen.
+   *
+   * Un solo interruptor estricto habria apagado esa segunda mitad; uno solo
+   * laxo dejaria botones que el servidor rechaza.
    */
-  const sinTraer = useMotivoSinEscritura() !== null;
+  const sinAbrirTrabajo = useMotivoSinEscritura() !== null;
   const sinCerrar =
     useMotivoSinEscritura({ permiteEnParalizada: true }) !== null;
   const router = useRouter();
@@ -371,7 +377,7 @@ export function MatrizLookahead({
             que prometio levantar, y son dos problemas distintos. */}
         <LiberacionATiempo datos={liberacion} />
 
-        {puedeGestionar && !sinTraer && pendientesDeSincronizar > 0 && (
+        {puedeGestionar && !sinAbrirTrabajo && pendientesDeSincronizar > 0 && (
           <button
             type="button"
             onClick={sincronizar}
@@ -398,7 +404,7 @@ export function MatrizLookahead({
         <div className="flex flex-wrap items-center gap-3">
           {elegidas.size > 0 ? (
             <>
-              {puedeGestionar && !sinTraer && (
+              {puedeGestionar && !sinAbrirTrabajo && (
                 <button
                   type="button"
                   onClick={() => setPanel("analizar")}
@@ -439,7 +445,11 @@ export function MatrizLookahead({
                 </button>
               )}
 
-              {puedeComprometer && (
+              {/* Sin esto, el boton se quedaba en una obra paralizada y abria
+                  un panel que ya no se dibuja: un boton que no hace nada.
+                  Visto en pantalla el 24 de agosto de 2026, y lo habia
+                  provocado el propio arreglo de esconder el panel. */}
+              {puedeComprometer && !sinAbrirTrabajo && (
                 <button
                   type="button"
                   onClick={() => setPanel("comprometer")}

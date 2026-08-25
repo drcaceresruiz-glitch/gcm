@@ -15,7 +15,11 @@ import { constaRespaldoReciente } from "@/services/obra-borrado.service";
 import { MenuObra, type FaseMenu } from "@/components/obras/MenuObra";
 import { PublicarEtiqueta } from "@/components/navegacion/PublicarEtiqueta";
 import { EstadoObra } from "@/components/obras/EstadoObra";
-import { requisitosParaEjecutar, type EstadoObra as EstadoObraTipo } from "@/lib/obras";
+import {
+  obraAdmiteCambios,
+  requisitosParaEjecutar,
+  type EstadoObra as EstadoObraTipo,
+} from "@/lib/obras";
 import { ProveedorEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
@@ -339,6 +343,24 @@ export default async function ObraLayout({
    * cualquier paso que se propusiera seria un boton que no lleva a ninguna
    * parte. Una obra cerrada es historia, y a la historia no le falta nada.
    */
+  /**
+   * Si en esta obra se puede ESCRIBIR, con el criterio estricto.
+   *
+   * Apaga los pasos que son una escritura. Sin esto, una obra PARALIZADA
+   * seguia proponiendo «Aprobar la meta» o «Cargar el cronograma» —visto en
+   * pantalla el 24 de agosto de 2026—, y el servidor los rechaza: es el mismo
+   * boton-que-no-lleva-a-ninguna-parte que se acaba de quitar de las
+   * pantallas, pero en el sitio mas visible de la obra.
+   *
+   * Los dos pasos de LECTURA se quedan: mirar el Lookahead o el plan semanal
+   * de una obra parada es exactamente lo que hay que poder hacer.
+   */
+  const escribible = obraAdmiteCambios({
+    estado: obra.estado,
+    archivadaEn: obra.archivadaEn,
+    empresaEnMigracion: obra.empresaEnMigracion,
+  });
+
   const paso =
     obra.estado === "CERRADA"
       ? null
@@ -355,23 +377,23 @@ export default async function ObraLayout({
           },
           {
             // Para PROPONER un paso hace falta poder darlo, que no es lo
-            // mismo que poder ver la seccion. Los dos ultimos si son de
-            // lectura: lo que se propone ahi es mirar, no escribir.
-            presupuesto: puede(sesion, "partida:importar"),
+            // mismo que poder ver la seccion. Los dos de lectura van sin
+            // `escribible`: lo que se propone ahi es mirar, no escribir.
+            presupuesto: escribible && puede(sesion, "partida:importar"),
             // Congelar la meta, que es de gerencia y va en INNEGOCIABLES: a
             // quien no puede firmarla no se le propone que la firme.
-            meta: puede(sesion, "meta:aprobar"),
-            cronograma: puede(sesion, "cronograma:importar"),
-            equipo: puede(sesion, "obra:asignar_equipo"),
-            lineaBase: puede(sesion, "linea_base:aprobar"),
+            meta: escribible && puede(sesion, "meta:aprobar"),
+            cronograma: escribible && puede(sesion, "cronograma:importar"),
+            equipo: escribible && puede(sesion, "obra:asignar_equipo"),
+            lineaBase: escribible && puede(sesion, "linea_base:aprobar"),
             lookahead: puede(sesion, "lookahead:leer"),
             planSemanal: puede(sesion, "plan_semanal:leer"),
             // Firmar, no leer: el paso que se propone aqui es aprobar la
             // adenda, y quien solo la ve no puede darlo.
-            adendas: puede(sesion, "adenda:aprobar"),
+            adendas: escribible && puede(sesion, "adenda:aprobar"),
             // Permiso propio: una empresa puede repartir las dos firmas en
             // dos personas distintas.
-            deducciones: puede(sesion, "deduccion:aprobar"),
+            deducciones: escribible && puede(sesion, "deduccion:aprobar"),
           },
           {
             restriccionesVencidas: avisos.lookahead,

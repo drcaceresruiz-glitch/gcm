@@ -212,11 +212,41 @@ edicion de la meta no guardaban, y si guardan.
 Ninguna se toco: cambiar lo que el servidor ACEPTA pide decidir antes cual es
 el comportamiento bueno, y eso lo decide quien conozca como se usan en obra.
 
-**Visto en pantalla, obra cerrada OB-000004**: proveedores, valorizaciones,
-ordenes, cronograma, plan semanal, lookahead, notas, galeria, parte del dia,
-kanban y equipo. Queda sin ver la matriz del Lookahead con tareas dentro de la
-ventana y el caso PARALIZADA —esa obra no existe hoy—, que es justo donde los
-dos interruptores se separan.
+**Visto en pantalla, obra OB-000004**: primero CERRADA —proveedores,
+valorizaciones, ordenes, cronograma, plan semanal, lookahead, notas, galeria,
+parte del dia, kanban y equipo— y despues PARALIZADA, que es donde los dos
+interruptores se separan. Para esto se le metieron tareas manuales dentro de
+la ventana del Lookahead y restricciones abiertas ANTES de pararla; **la obra
+se queda paralizada a proposito**, que es el unico sitio donde hoy se puede
+comprobar este reparto.
+
+**El reparto, confirmado con los ojos en una obra PARALIZADA:**
+
+| Boton | Criterio | Con la obra parada |
+|---|---|---|
+| Traer al Lookahead | abre trabajo | no se ofrece |
+| Analizar | abre trabajo | no se ofrece |
+| Comprometer al PTS | abre trabajo | no se ofrece |
+| Levantar restricciones | cierra lo abierto | **se ofrece** |
+| Asignar responsable y fecha | cierra lo abierto | **se ofrece** |
+| Equipo · Asignar a la obra | abre trabajo | no se ofrece |
+| Equipo · Quitar de la obra | cierra lo abierto | **se ofrece** |
+
+Y el aviso cambia de texto solo: el de PARALIZADA enumera «aprobar movimientos
+pendientes, subir evidencia, cerrar la semana abierta, resolver
+restricciones», que es exactamente lo que queda en pantalla.
+
+**Dos fallos mas que solo aparecieron aqui**, los dos provocados por el propio
+arreglo y ninguno cazable por la bateria:
+
+- **«Comprometer al PTS» abria un panel que ya no se dibuja.** El boton estaba
+  gateado solo por permiso; el panel que abre si se escondio. Un boton que no
+  hace nada, del mismo tipo que los que se venian a quitar.
+- **El anclaje de la obra seguia proponiendo «Aprobar la meta»** en una obra
+  parada, y el servidor lo rechaza. Solo se apagaba con la obra CERRADA. Ahora
+  los pasos que son ESCRITURA se apagan con el mismo criterio que todo lo
+  demas; los dos que son de LECTURA —mirar el Lookahead, mirar el plan
+  semanal— se quedan, que es lo que hay que poder hacer en una obra parada.
 
 **Nota practica**: `npm run build` invalida la sesion del servidor de
 desarrollo. Conviene hacer el recorrido ANTES de construir, o contar con volver
