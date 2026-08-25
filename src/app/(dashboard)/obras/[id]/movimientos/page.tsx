@@ -20,6 +20,7 @@ import { puede } from "@/lib/rbac";
 import { Paginacion } from "@/components/ui/Paginacion";
 import { PanelVigente } from "@/components/movimientos/PanelVigente";
 import { HistorialMovimientos } from "@/components/movimientos/HistorialMovimientos";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 import {
   AvisoSinEscritura,
   SiSePuedeEscribir,
@@ -95,14 +96,14 @@ export default async function MovimientosPage({
             `crearMovimiento`. El motivo se explica una vez, aqui debajo. */}
         {presupuesto && puedeCrear && (
           <SiSePuedeEscribir>
-            <Link
+            <EnlaceBoton
               href={`/obras/${id}/movimientos/nuevo`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--color-marca-600)" }}
+              icono={Plus}
+              posicionIcono="izquierda"
+              className="shrink-0"
             >
-              <Plus className="size-4" aria-hidden="true" />
               Registrar movimiento
-            </Link>
+            </EnlaceBoton>
           </SiSePuedeEscribir>
         )}
       </div>

@@ -27,6 +27,7 @@ import { lineasDelBorrador } from "@/services/meta-edicion.service";
 import { FormularioMeta } from "@/components/meta/FormularioMeta";
 import { AccionesMeta } from "@/components/meta/AccionesMeta";
 import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 
 export const metadata: Metadata = { title: "Presupuesto meta" };
 
@@ -284,14 +285,9 @@ export default async function MetaPage({
             encontraba nada que hacer, volvia, y le seguian pidiendo lo mismo.
           */}
           {comparacion.motivo === "sin-contractual" && (
-            <Link
-              href={`/obras/${id}/contractual`}
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--color-marca-600)" }}
-            >
+            <EnlaceBoton href={`/obras/${id}/contractual`} icono={ArrowRight}>
               Generar el presupuesto contractual
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
+            </EnlaceBoton>
           )}
         </section>
       )}

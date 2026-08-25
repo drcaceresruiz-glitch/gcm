@@ -21,7 +21,7 @@ import {
   ArrowRight,
   Maximize2,
 } from "lucide-react";
-import type { DefinicionModulo, ModuloTablero } from "@/lib/tablero";
+import type { ModuloDelCatalogo, ModuloTablero } from "@/lib/tablero";
 import { resumirPendientes } from "@/lib/pendientes";
 import {
   COLOR_SEMAFORO,
@@ -54,57 +54,128 @@ import { EnlaceModulo } from "@/components/tablero/Tablero";
  */
 
 /**
- * Si un modulo tiene con que pintarse.
+ * De que datos depende cada modulo, y como se pinta. **En un solo sitio.**
  *
- * Sin esto se dibujaba la CAJA VACIA: un recuadro con borde y nada dentro,
- * que no se lee como "aqui no hay datos" sino como "esto se ha roto". Pasaba
- * con quien no tiene permiso de ordenes, y volvio a pasar al apagar los
- * modulos de Last Planner.
+ * Antes eran dos listas paralelas: `moduloConDatos` decidia si habia con que
+ * pintar, y `ModuloContenido` volvia a comprobarlo modulo por modulo dentro
+ * del JSX (`clave === "ordenes" && datos.ordenes && ...`). Estaban pegadas y
+ * comentadas a proposito, pero nada impedia que discreparan, y el dia que una
+ * dijera que hay datos y la otra no los pintara volvia LA CAJA VACIA: un
+ * recuadro con borde y nada dentro, que no se lee como «aqui no hay datos»
+ * sino como «esto se ha roto». Ya paso dos veces —con quien no tiene permiso
+ * de ordenes, y al apagar los modulos de Last Planner—.
  *
- * Vive aqui, pegado a las guardas de `ModuloContenido`, para que las dos no
- * puedan discrepar: si una dice que hay datos y la otra no los pinta, se
- * vuelve al recuadro vacio.
+ * Ahora cada modulo declara UNA funcion `extraer`. Si devuelve null, el modulo
+ * no se ofrece Y no se pinta, porque las dos preguntas llaman a esa misma
+ * funcion: no pueden discrepar aunque alguien las separe de sitio.
+ *
+ * Y el registro va indexado por `ModuloTablero`, que es la union de las claves
+ * del catalogo: anadir un modulo a `lib/tablero` sin declararlo aqui ya no
+ * compila. Antes caia en el `default: return true` del `switch` y aparecia
+ * como una caja vacia.
  */
-export function moduloConDatos(
-  clave: DefinicionModulo["clave"],
-  datos: DatosTablero,
-): boolean {
-  switch (clave) {
-    case "avance":
-    case "curva":
-    case "atrasos":
-    case "criticas":
-    case "capitulos":
-      return datos.cronograma !== null;
-    case "ordenes":
-      return datos.ordenes !== null;
-    case "recordatorios":
-      // Igual que "ordenes": null es "sin permiso o modulo apagado", no
-      // "sin recordatorios". Una lista vacia SI se pinta, en verde.
-      return datos.recordatorios !== null;
-    case "ppc":
-    case "causas":
-      return datos.planSemanal !== null;
-    case "confiabilidad":
-      return datos.lookahead !== null;
-    case "liberacion":
-      // Sin ningun flujo con casos no se pinta: un modulo con siete ceros
-      // diria que todo se libera al instante, que es lo contrario de "aun no
-      // hay con que responder".
-      return (
-        datos.liberacion !== null && datos.liberacion.flujos.length > 0
-      );
-    case "valorGanado":
-      return datos.valorGanado !== null;
-    case "pendientes":
-      // Con la obra al dia se pinta igual, en verde: es la unica forma de
-      // que "no hay nada" signifique algo. Si desapareciera cuando todo esta
-      // bien, nadie sabria si esta al dia o si el modulo se rompio.
-      return true;
-    default:
-      // Plazo y presupuesto salen de la propia obra: siempre hay algo.
-      return true;
-  }
+interface ModuloPintable {
+  hayDatos: (datos: DatosTablero) => boolean;
+  pintar: (datos: DatosTablero, obraId: string) => React.ReactNode;
+}
+
+/**
+ * Ata un extractor a su dibujo.
+ *
+ * `extraer` narra de que depende el modulo y NARROWS el tipo: lo que recibe
+ * `pintar` ya no es nullable, asi que no hace falta volver a comprobarlo.
+ */
+function declarar<T>(
+  extraer: (datos: DatosTablero) => T | null,
+  pintar: (dato: NonNullable<T>, obraId: string) => React.ReactNode,
+): ModuloPintable {
+  return {
+    hayDatos: (datos) => extraer(datos) !== null,
+    pintar: (datos, obraId) => {
+      const dato = extraer(datos);
+      return dato === null ? null : pintar(dato as NonNullable<T>, obraId);
+    },
+  };
+}
+
+const PINTABLES: Record<ModuloTablero, ModuloPintable> = {
+  // Con la obra al dia se pinta igual, en verde: es la unica forma de que «no
+  // hay nada» signifique algo. Si desapareciera cuando todo esta bien, nadie
+  // sabria si esta al dia o si el modulo se rompio. La lista vacia NO es null.
+  pendientes: declarar(
+    (d) => d.pendientes,
+    (lista, obraId) => <Pendientes lista={lista} obraId={obraId} />,
+  ),
+  // null es «sin permiso o modulo apagado», no «sin recordatorios». Una lista
+  // vacia SI se pinta, en verde.
+  recordatorios: declarar(
+    (d) => d.recordatorios,
+    (lista, obraId) => <Recordatorios lista={lista} obraId={obraId} />,
+  ),
+  avance: declarar(
+    (d) => d.cronograma,
+    (crono, obraId) => <Avance crono={crono} obraId={obraId} />,
+  ),
+  curva: declarar(
+    (d) => d.cronograma,
+    (crono, obraId) => <Curva crono={crono} obraId={obraId} />,
+  ),
+  // Plazo y presupuesto salen de la propia obra: siempre hay algo que enseñar.
+  plazo: declarar(
+    (d) => d,
+    (datos, obraId) => <Plazo datos={datos} obraId={obraId} />,
+  ),
+  presupuesto: declarar(
+    (d) => d,
+    (datos, obraId) => <Presupuesto datos={datos} obraId={obraId} />,
+  ),
+  valorGanado: declarar(
+    (d) => d.valorGanado,
+    (vg, obraId) => <ValorGanado vg={vg} obraId={obraId} />,
+  ),
+  ppc: declarar(
+    (d) => d.planSemanal,
+    (plan, obraId) => <Ppc plan={plan} obraId={obraId} />,
+  ),
+  confiabilidad: declarar(
+    (d) => d.lookahead,
+    (lk, obraId) => <Confiabilidad lk={lk} obraId={obraId} />,
+  ),
+  // Sin ningun flujo con casos no se pinta: un modulo con siete ceros diria
+  // que todo se libera al instante, que es lo contrario de «aun no hay con que
+  // responder».
+  liberacion: declarar(
+    (d) => (d.liberacion && d.liberacion.flujos.length > 0 ? d.liberacion : null),
+    (dem, obraId) => <Demora dem={dem} obraId={obraId} />,
+  ),
+  causas: declarar(
+    (d) => d.planSemanal,
+    (plan, obraId) => <Causas plan={plan} obraId={obraId} />,
+  ),
+  atrasos: declarar(
+    (d) => d.cronograma,
+    (crono, obraId) => <Atrasos crono={crono} obraId={obraId} />,
+  ),
+  criticas: declarar(
+    (d) => d.cronograma,
+    (crono, obraId) => <Criticas crono={crono} obraId={obraId} />,
+  ),
+  capitulos: declarar(
+    (d) => d.cronograma,
+    (crono, obraId) => <Capitulos crono={crono} obraId={obraId} />,
+  ),
+  ordenes: declarar(
+    (d) => d.ordenes,
+    (ordenes, obraId) => <Ordenes ordenes={ordenes} obraId={obraId} />,
+  ),
+};
+
+/**
+ * Si un modulo tiene con que pintarse. Lo pregunta la rejilla ANTES de
+ * ofrecerlo; lo contesta el mismo extractor que luego lo dibuja.
+ */
+export function moduloConDatos(clave: ModuloTablero, datos: DatosTablero): boolean {
+  return PINTABLES[clave].hayDatos(datos);
 }
 
 /**
@@ -119,59 +190,18 @@ export function ModuloContenido({
   datos,
   ampliado = false,
 }: {
-  modulo: DefinicionModulo;
+  /// Una entrada DEL CATALOGO, no una `DefinicionModulo` cualquiera: asi la
+  /// clave esta estrechada y `PINTABLES` no puede quedarse sin entrada.
+  modulo: ModuloDelCatalogo;
   datos: DatosTablero;
   ampliado?: boolean;
 }) {
-  const obraId = datos.obra.id;
   const acento = acentoDeModulo(modulo.clave, datos);
 
   return (
     <Caja ancho={modulo.ancho} acento={acento} ampliada={ampliado}>
       {!ampliado && <CabeceraModulo modulo={modulo} acento={acento} />}
-      {modulo.clave === "avance" && datos.cronograma && (
-        <Avance crono={datos.cronograma} obraId={obraId} />
-      )}
-      {modulo.clave === "curva" && datos.cronograma && (
-        <Curva crono={datos.cronograma} obraId={obraId} />
-      )}
-      {modulo.clave === "plazo" && <Plazo datos={datos} obraId={obraId} />}
-      {modulo.clave === "presupuesto" && (
-        <Presupuesto datos={datos} obraId={obraId} />
-      )}
-      {modulo.clave === "valorGanado" && datos.valorGanado && (
-        <ValorGanado vg={datos.valorGanado} obraId={obraId} />
-      )}
-      {modulo.clave === "ppc" && datos.planSemanal && (
-        <Ppc plan={datos.planSemanal} obraId={obraId} />
-      )}
-      {modulo.clave === "confiabilidad" && datos.lookahead && (
-        <Confiabilidad lk={datos.lookahead} obraId={obraId} />
-      )}
-      {modulo.clave === "liberacion" && datos.liberacion && (
-        <Demora dem={datos.liberacion} obraId={obraId} />
-      )}
-      {modulo.clave === "causas" && datos.planSemanal && (
-        <Causas plan={datos.planSemanal} obraId={obraId} />
-      )}
-      {modulo.clave === "atrasos" && datos.cronograma && (
-        <Atrasos crono={datos.cronograma} obraId={obraId} />
-      )}
-      {modulo.clave === "criticas" && datos.cronograma && (
-        <Criticas crono={datos.cronograma} obraId={obraId} />
-      )}
-      {modulo.clave === "capitulos" && datos.cronograma && (
-        <Capitulos crono={datos.cronograma} obraId={obraId} />
-      )}
-      {modulo.clave === "pendientes" && (
-        <Pendientes lista={datos.pendientes} obraId={obraId} />
-      )}
-      {modulo.clave === "ordenes" && datos.ordenes && (
-        <Ordenes ordenes={datos.ordenes} obraId={obraId} />
-      )}
-      {modulo.clave === "recordatorios" && datos.recordatorios && (
-        <Recordatorios lista={datos.recordatorios} obraId={obraId} />
-      )}
+      {PINTABLES[modulo.clave].pintar(datos, datos.obra.id)}
     </Caja>
   );
 }
@@ -250,12 +280,10 @@ function CabeceraModulo({
   modulo,
   acento,
 }: {
-  modulo: DefinicionModulo;
+  modulo: ModuloDelCatalogo;
   acento: string;
 }) {
-  // La firma dice `string` (el contrato de `DefinicionModulo`), pero todo
-  // modulo sale del catalogo, cuyo `satisfies` garantiza su entrada aqui.
-  const Icono = ICONOS[modulo.clave as ModuloTablero];
+  const Icono = ICONOS[modulo.clave];
 
   return (
     <header className="mb-1 flex items-start justify-between gap-2">
@@ -297,10 +325,7 @@ function semaforoVentana(porcentaje: number): Semaforo {
  * juicio que hacer (la curva, las ordenes), marca neutral: pintar de rojo lo
  * que no esta mal enseña a ignorar el rojo.
  */
-function acentoDeModulo(
-  clave: DefinicionModulo["clave"],
-  datos: DatosTablero,
-): string {
+function acentoDeModulo(clave: ModuloTablero, datos: DatosTablero): string {
   const MARCA = "var(--color-marca-500)";
 
   switch (clave) {

@@ -102,6 +102,27 @@ semana cerrada sin ningún compromiso no da PPC, y el módulo lo contaba como si
 no hubiera semanas cerradas, mientras el de al lado contaba los incumplimientos
 de esas mismas semanas. Reproducido montando el estado exacto contra la base.
 
+### Y la deuda pequeña, cerrada entera
+
+**Los módulos del tablero declaran de qué datos dependen, en un solo sitio.**
+Había dos listas paralelas —una decidía si el módulo tenía con qué pintarse y
+la otra lo volvía a comprobar dentro del JSX— y nada impedía que discreparan;
+el día que lo hicieran volvía la caja vacía. Ahora es una función por módulo, y
+además el registro va indexado por la unión de claves del catálogo: un módulo
+nuevo sin declarar **ya no compila**, donde antes salía como caja vacía y
+reventaba al buscar su icono. Verificado pidiendo el tablero de las nueve obras
+con el código viejo y el nuevo: pinta lo mismo, byte a byte.
+
+**`EnlaceBoton` con su regla decidida y aplicada.** La regla vive en la
+cabecera del componente, no en un documento: sí a los enlaces de acción; no a
+pestañas, tarjetas-enlace, enlaces dentro de un párrafo, descargas y botones de
+formulario. Trece enlaces que estaban a mano pasan por él.
+
+**Y dos que se cierran decidiendo, no programando**: las tandas 3 y 4 de
+ortografía quedan cerradas —lo que se ve en pantalla ya está bien—, y la cookie
+vieja `gcm-tablero` se deja caducar sola, porque borrarla cuesta más código del
+que vale el problema.
+
 ---
 
 ## Anexo — 24 de agosto de 2026

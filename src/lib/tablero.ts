@@ -159,6 +159,18 @@ export const MODULOS = [
 
 export type ModuloTablero = (typeof MODULOS)[number]["clave"];
 
+/**
+ * Una entrada DEL CATALOGO, con su clave ya estrechada a `ModuloTablero`.
+ *
+ * `DefinicionModulo` declara `clave: string` porque es la FORMA que cada
+ * entrada tiene que cumplir, y ahi todavia no existe la lista. Quien recibe un
+ * modulo para pintarlo necesita lo contrario: saber que la clave es una de las
+ * del catalogo y no una cualquiera. Sin este tipo hacia falta un `as` en el
+ * componente, y un `as` es justo por donde vuelve la caja vacia: una clave
+ * desconocida se colaria y no encontraria con que pintarse.
+ */
+export type ModuloDelCatalogo = (typeof MODULOS)[number];
+
 /// Todos encendidos. Un tablero que empieza vacio no se configura: se ignora.
 export const MODULOS_POR_DEFECTO: readonly ModuloTablero[] = MODULOS.map(
   (m) => m.clave,

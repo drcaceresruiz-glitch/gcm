@@ -7,6 +7,7 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { preliminaresDeEmpresa } from "@/services/preliminares.service";
 import { pasosDePuestaEnMarcha } from "@/lib/puesta-en-marcha";
 import { Volver } from "@/components/ui/Volver";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 
 export const metadata: Metadata = { title: "Puesta en marcha" };
 
@@ -119,14 +120,9 @@ export default async function PuestaEnMarchaPage() {
                     {paso.plantilla.titulo}
                   </a>
                 )}
-                <Link
-                  href={paso.camino}
-                  className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-                  style={{ backgroundColor: "var(--color-marca-600)" }}
-                >
+                <EnlaceBoton href={paso.camino} icono={ArrowRight}>
                   {paso.accion}
-                  <ArrowRight className="size-4" aria-hidden="true" />
-                </Link>
+                </EnlaceBoton>
               </div>
             </div>
           </li>

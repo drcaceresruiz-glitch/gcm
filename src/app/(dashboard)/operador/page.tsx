@@ -10,6 +10,7 @@ import { Chip } from "@/components/ui/Chip";
 import { Mascota } from "@/components/ui/Mascota";
 import { Volver } from "@/components/ui/Volver";
 import { BotonSuspender } from "@/components/operador/BotonSuspender";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 
 export const metadata: Metadata = { title: "Constructoras" };
 
@@ -69,14 +70,9 @@ export default async function OperadorPage() {
             obras y presupuestos son suyos y no se ven desde aquí.
           </p>
         </div>
-        <Link
-          href="/operador/nueva"
-          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white"
-          style={{ backgroundColor: "var(--color-marca-600)" }}
-        >
-          <Plus className="size-4" aria-hidden="true" />
+        <EnlaceBoton href="/operador/nueva" icono={Plus} posicionIcono="izquierda">
           Nueva constructora
-        </Link>
+        </EnlaceBoton>
       </div>
 
       {constructoras.length === 0 ? (

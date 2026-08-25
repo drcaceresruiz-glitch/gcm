@@ -3,6 +3,7 @@ import { ArrowRight, Compass, Plus } from "lucide-react";
 import { Mascota } from "@/components/ui/Mascota";
 import { PaletasHero } from "@/components/obras/PaletasHero";
 import type { AlertaEmpresa, ResumenEmpresa } from "@/services/obras.service";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 
 /**
  * La cabecera del panel: saludo, fecha y EL SIGUIENTE PASO.
@@ -241,14 +242,14 @@ export function Bienvenida({
         {/* Con la empresa vacia el boton no se duplica: ya lo pone, en
             grande, el estado vacio de la lista. */}
         {puedeCrear && !vacia && (
-          <Link
+          <EnlaceBoton
             href="/obras/nueva"
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-            style={{ backgroundColor: "var(--color-marca-600)" }}
+            icono={Plus}
+            posicionIcono="izquierda"
+            className="shrink-0"
           >
-            <Plus className="size-4" aria-hidden="true" />
             Nueva obra
-          </Link>
+          </EnlaceBoton>
         )}
       </div>
 

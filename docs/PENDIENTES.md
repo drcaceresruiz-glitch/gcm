@@ -4309,15 +4309,41 @@ reglas solo se han visto en pruebas.
   `src/lib` + tests) y **4** (docs) quedaron DETENIDAS el mismo día por
   decisión del usuario ("es suficiente lo de ortografía"): lo que el usuario
   ve en pantalla ya está correcto; los mensajes de error y los docs pueden
-  esperar. Si algún día se retoman: los textos de lib están fijados por
+  esperar.
+
+  **CERRADAS POR DECISIÓN el 25 de agosto de 2026**, al repasar la deuda
+  pequeña: se preguntó si se retomaban y la respuesta fue cerrarlas. El motivo
+  sigue siendo el mismo del 10 de agosto —lo que ve el usuario en pantalla ya
+  está bien—, y encima la tanda 4 son miles de líneas de traspaso escritas sin
+  tildes a propósito durante un mes. **Deja de contar como deuda.**
+
+  Si algún día se retoman de todas formas: los textos de lib están fijados por
   tests (cambiarlos JUNTOS), incluye el "Sin capitulo" de
   `control-avance.ts:361` duplicado en dos páginas, y la regla es solo texto
   visible —no tocar claves, rutas, enums de Prisma ni cookies—.
 
-- **`moduloConDatos` duplica las guardas de `ModuloContenido`**
-  (`components/tablero/modulos.tsx`). Estan pegadas y comentadas a proposito,
-  pero si algun dia se separan vuelve la caja vacia. Lo correcto es que cada
-  modulo declare de que datos depende, en un solo sitio.
+- ~~**`moduloConDatos` duplica las guardas de `ModuloContenido`**~~ **HECHO el
+  25 de agosto de 2026**, tal como decia esta nota: cada modulo declara ahora
+  de que datos depende, en un solo sitio.
+
+  `PINTABLES` (`components/tablero/modulos.tsx`) ata cada clave a UNA funcion
+  `extraer`. Si devuelve null, el modulo no se ofrece Y no se pinta, porque las
+  dos preguntas llaman a esa misma funcion: ya no pueden discrepar aunque
+  alguien las separe de sitio. `extraer` ademas ESTRECHA el tipo, asi que lo
+  que recibe el dibujo ya no es nullable y no hay que volver a comprobarlo.
+
+  **Y de propina, el agujero que nadie habia anotado**: el `switch` viejo
+  acababa en `default: return true`, asi que un modulo nuevo en el catalogo sin
+  su rama aqui se ofrecia y salia como caja vacia —y encima reventaba al buscar
+  su icono—. El registro va indexado por `ModuloTablero`, la union de las
+  claves del catalogo: **ahora eso no compila**. Comprobado anadiendo un modulo
+  de mentira al catalogo: tres errores de tipos, dos en `PINTABLES` y uno en
+  `ICONOS`. Se retiraron los tres `as ModuloTablero` que quedaban, que eran por
+  donde volvia a colarse una clave desconocida.
+
+  **Verificado que no cambia nada de lo que se ve**: se pidio el tablero de las
+  nueve obras de desarrollo con el codigo viejo y con el nuevo, y la lista de
+  modulos pintados sale identica byte a byte.
 - ~~**El modulo de PPC y el de Causas se contradicen a la vista.**~~ **HECHO
   el 25 de agosto de 2026**, y no era donde ponia. La mitad se habia arreglado
   el 10 de agosto (commit `b7edebd`, punto 2) y esta nota se quedo sin tachar:
@@ -4342,12 +4368,37 @@ reglas solo se han visto en pruebas.
   Presupuesto → Cronograma → Linea base → Lookahead → Plan semanal como riel
   fijo a la izquierda, con hecho / estas aqui por paso. Pedido por el usuario
   como "diagrama de ubicacion siempre visible".
-- **`EnlaceBoton` solo esta en el tablero y en «Editar datos de la obra».**
-  Falta decidir los casos raros: pestanas de navegacion, tarjetas enteras que
-  son enlace, y enlaces dentro de un parrafo. Convertirlo TODO en boton hace
-  que nada destaque.
-- **La cookie vieja `gcm-tablero`** sigue en los navegadores, ignorada desde
-  que se paso a `gcm-tablero-off`. Inofensiva; caduca sola dentro de un ano.
+- ~~**`EnlaceBoton` solo esta en el tablero y en «Editar datos de la obra».**~~
+  **HECHO el 25 de agosto de 2026.** Los casos raros quedaron decididos, y la
+  regla vive **en la cabecera del propio componente**, que es donde alguien va
+  a ir a preguntarselo —no aqui, que es un documento que no se abre al escribir
+  una pantalla—:
+
+  - **SI**: enlaces de ACCION, los que llevan a otra pantalla a hacer algo. Es
+    el paso principal de esa pantalla y solo deberia haber uno destacado.
+  - **NO**: pestanas de navegacion (una pestana dice DONDE ESTAS, no que vas a
+    hacer), tarjetas enteras que son enlace (el area pulsable ya es la
+    tarjeta), enlaces dentro de un parrafo (parten la lectura), **descargas**
+    (un `.pdf` o un `.xlsx` no te lleva a otra pantalla, y ademas van con `<a>`
+    y no con `next/link`) y botones de formulario (eso es un `<button>`; que se
+    parezcan no los hace lo mismo).
+
+  Y aplicada: los trece enlaces de accion que quedaban a mano —«Nueva obra»,
+  «Registrar orden», «Registrar movimiento», «Cargar cronograma», «Nuevo
+  encargo», «Asignar el primer encargo», «Cargar el presupuesto meta»,
+  «Generar el presupuesto contractual», «Nueva constructora», «Volver al
+  panel» y los pasos de la puesta en marcha— pasan por el componente. Cada uno
+  repetia su propio `className` con el color de marca plano, asi que ademas de
+  no destacar, ninguno tenia el degradado ni el realce al pasar por encima que
+  el componente ya daba.
+- ~~**La cookie vieja `gcm-tablero`**~~ **DECIDIDO el 25 de agosto de 2026:
+  se deja caducar.** Sigue en los navegadores, ignorada desde que se paso a
+  `gcm-tablero-off`, y no produce ningun sintoma: se muere sola dentro de un
+  ano. Borrarla activamente pedia mandar un `Set-Cookie` con `Max-Age=0` cada
+  vez que alguien configura el tablero, o sea codigo de limpieza que habria que
+  acordarse de quitar despues —mas codigo del que vale el problema—. **Sale de
+  la lista de defectos**; si alguien la ve en el navegador, esto explica por
+  que esta ahi.
 
 - ~~**`src/lib/calendario.ts` cuenta los dias en hora LOCAL.**~~ **HECHO el
   22 de agosto de 2026.** `diaIso` usaba `getDay()` y `diasLaborablesEntre`

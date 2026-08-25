@@ -14,9 +14,28 @@ import Link from "next/link";
  * la pantalla y desentonaban: el contraste era mejor pero la pieza no
  * pertenecia al conjunto.
  *
- * Se usa para enlaces de ACCION —los que llevan a otra pantalla a hacer algo—.
- * No para enlaces dentro de un parrafo ni para los que envuelven una tarjeta
- * entera: convertir todo en boton hace que nada destaque.
+ * DONDE SE USA Y DONDE NO. La regla entera, decidida el 25 de agosto de 2026,
+ * porque «convertirlo todo en boton hace que nada destaque» y hasta ese dia
+ * cada pantalla lo resolvia a mano con su propio `className`:
+ *
+ * - **SI**: enlaces de ACCION, los que llevan a otra pantalla A HACER ALGO
+ *   —«Nueva obra», «Registrar orden», «Cargar cronograma», «Generar el
+ *   presupuesto contractual»—. Es el paso principal de la pantalla donde
+ *   estan, y solo deberia haber uno destacado a la vez.
+ * - **NO, pestañas de navegacion.** Una pestaña dice DONDE ESTAS, no que vas
+ *   a hacer; cinco botones solidos en fila no destacan ninguno y ademas
+ *   mienten sobre lo que hacen.
+ * - **NO, tarjetas enteras que son enlace.** El area pulsable ya es la
+ *   tarjeta: meterle dentro un boton da dos objetivos de clic para el mismo
+ *   destino.
+ * - **NO, enlaces dentro de un parrafo.** Un boton en medio de una frase
+ *   parte la lectura; ahi va un enlace de texto, subrayado o en color de
+ *   marca.
+ * - **NO, descargas.** Un `.pdf` o un `.xlsx` no te lleva a otra pantalla, y
+ *   ademas se sirven con `<a>` y no con `next/link`. Comparten aspecto por su
+ *   cuenta (ver `DescargarPresupuestos`).
+ * - **NO, botones de formulario.** Eso es un `<button type="submit">`; que se
+ *   parezcan no los hace lo mismo, y un enlace no envia nada.
  */
 export function EnlaceBoton({
   href,

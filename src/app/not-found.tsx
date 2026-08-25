@@ -1,6 +1,6 @@
-import Link from "next/link";
 
 import { Mascota } from "@/components/ui/Mascota";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 
 /**
  * Lo que se ve cuando algo no existe.
@@ -30,13 +30,7 @@ export default function NoEncontrado() {
           un enlace de dentro de GCM, puede que se haya eliminado.
         </p>
 
-        <Link
-          href="/panel"
-          className="rounded-lg px-4 py-2 text-sm font-medium text-white"
-          style={{ backgroundColor: "var(--color-marca-600)" }}
-        >
-          Volver al panel
-        </Link>
+        <EnlaceBoton href="/panel">Volver al panel</EnlaceBoton>
       </div>
     </div>
   );

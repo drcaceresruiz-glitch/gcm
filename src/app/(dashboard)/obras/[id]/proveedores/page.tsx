@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Plus, Handshake } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
@@ -10,6 +9,7 @@ import { puede } from "@/lib/rbac";
 import { soles } from "@/utils/formato";
 import { Mascota } from "@/components/ui/Mascota";
 import { TarjetaEncargo } from "@/components/proveedores/TarjetaEncargo";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 import {
   AvisoSinEscritura,
   SiSePuedeEscribir,
@@ -62,14 +62,14 @@ export default async function ProveedoresPage({
             explica una vez, en el aviso de aqui debajo. */}
         {puedeGestionar && (
           <SiSePuedeEscribir>
-            <Link
+            <EnlaceBoton
               href={`/obras/${id}/proveedores/nuevo`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--color-marca-600)" }}
+              icono={Plus}
+              posicionIcono="izquierda"
+              className="shrink-0"
             >
-              <Plus className="size-4" aria-hidden="true" />
               Nuevo encargo
-            </Link>
+            </EnlaceBoton>
           </SiSePuedeEscribir>
         )}
       </div>
@@ -133,14 +133,14 @@ export default async function ProveedoresPage({
           </p>
           {puedeGestionar ? (
             <SiSePuedeEscribir>
-              <Link
+              <EnlaceBoton
                 href={`/obras/${id}/proveedores/nuevo`}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-                style={{ backgroundColor: "var(--color-marca-600)" }}
+                icono={Handshake}
+                posicionIcono="izquierda"
+                className="mt-4"
               >
-                <Handshake className="size-4" aria-hidden="true" />
                 Asignar el primer encargo
-              </Link>
+              </EnlaceBoton>
             </SiSePuedeEscribir>
           ) : null}
         </div>

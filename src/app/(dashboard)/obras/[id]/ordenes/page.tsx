@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CheckCircle2, Plus, Sheet } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
@@ -21,6 +20,7 @@ import { Paginacion } from "@/components/ui/Paginacion";
 import { PanelComprometido } from "@/components/ordenes/PanelComprometido";
 import { FiltrosOrdenes } from "@/components/ordenes/FiltrosOrdenes";
 import { HistorialOrdenes } from "@/components/ordenes/HistorialOrdenes";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 import {
   AvisoSinEscritura,
   SiSePuedeEscribir,
@@ -141,14 +141,14 @@ export default async function OrdenesPage({
             `crearOrden`. El motivo se explica una vez, aqui debajo. */}
         {puede(sesion, "orden:crear") && (
           <SiSePuedeEscribir>
-            <Link
+            <EnlaceBoton
               href={`/obras/${id}/ordenes/nueva`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--color-marca-600)" }}
+              icono={Plus}
+              posicionIcono="izquierda"
+              className="shrink-0"
             >
-              <Plus className="size-4" aria-hidden="true" />
               Registrar orden
-            </Link>
+            </EnlaceBoton>
           </SiSePuedeEscribir>
         )}
       </div>

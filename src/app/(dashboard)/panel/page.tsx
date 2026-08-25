@@ -41,6 +41,7 @@ import { preliminaresDeEmpresa } from "@/services/preliminares.service";
 import { siguientePasoDeEmpresa } from "@/lib/puesta-en-marcha";
 import { semanaDeLaEmpresa } from "@/services/plan-semanal.service";
 import { contarSolicitudesPendientes } from "@/services/perfil.service";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 
 export const metadata: Metadata = { title: "Panel" };
 
@@ -386,14 +387,14 @@ export default async function PanelPage({
             </p>
           </div>
           {puedeCrear && (
-            <Link
+            <EnlaceBoton
               href="/obras/nueva"
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--color-marca-600)" }}
+              icono={Plus}
+              posicionIcono="izquierda"
+              className="shrink-0"
             >
-              <Plus className="size-4" aria-hidden="true" />
               Nueva obra
-            </Link>
+            </EnlaceBoton>
           )}
         </div>
       ) : obras.filas.length === 0 ? (

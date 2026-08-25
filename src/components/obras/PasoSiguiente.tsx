@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowRight, TriangleAlert } from "lucide-react";
 import type { PasoSiguiente as Paso } from "@/lib/siguiente-paso";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 
 /**
  * El anclaje de continuidad: que toca ahora en esta obra, con su boton.
@@ -161,14 +162,9 @@ export function PasoSiguiente({
           </Link>
         )}
 
-        <Link
-          href={destino}
-          className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-          style={{ backgroundColor: "var(--color-marca-600)" }}
-        >
+        <EnlaceBoton href={destino} icono={ArrowRight} tamano="sm">
           {paso.accion}
-          <ArrowRight className="size-4" aria-hidden="true" />
-        </Link>
+        </EnlaceBoton>
       </span>
     </div>
   );

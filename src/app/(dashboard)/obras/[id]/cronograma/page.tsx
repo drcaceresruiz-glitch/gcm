@@ -54,6 +54,7 @@ import {
 } from "@/services/hitos.service";
 import { hitosPropuestos } from "@/services/hitos-predictivos.service";
 import { listarTareasManuales } from "@/services/cronograma-manual.service";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 import {
   AvisoSinEscritura,
   SiSePuedeEscribir,
@@ -196,14 +197,13 @@ export default async function CronogramaPage({
               ofrece. Lo rechaza `importarCronograma`. */}
           {puedeImportar && (
             <SiSePuedeEscribir>
-            <Link
+            <EnlaceBoton
               href={`/obras/${id}/cronograma/importar`}
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style={{ backgroundColor: "var(--color-marca-600)" }}
+              icono={CalendarClock}
+              posicionIcono="izquierda"
             >
-              <CalendarClock className="size-4" aria-hidden="true" />
               {cronograma ? "Cargar un corte nuevo" : "Cargar cronograma"}
-            </Link>
+            </EnlaceBoton>
             </SiSePuedeEscribir>
           )}
         </div>

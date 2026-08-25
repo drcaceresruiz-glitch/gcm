@@ -15,6 +15,7 @@ import { PanelAyuda, type PuntoAyuda } from "@/components/ui/PanelAyuda";
 import { FisicoVsEconomico } from "@/components/partidas/FisicoVsEconomico";
 import { cruceDeObra } from "@/services/fisico-economico.service";
 import { DescargarPresupuestos } from "@/components/presupuesto/DescargarPresupuestos";
+import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 
 export const metadata: Metadata = { title: "Presupuesto de la obra" };
 
@@ -131,14 +132,13 @@ export default async function ObraPage({
       */}
       {puedeImportar && obra.lineaBaseVersion === null && filas.length > 0 && (
         <div className="flex justify-end">
-          <Link
+          <EnlaceBoton
             href={`/obras/${id}/meta`}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-            style={{ backgroundColor: "var(--color-marca-600)" }}
+            icono={FileSpreadsheet}
+            posicionIcono="izquierda"
           >
-            <FileSpreadsheet className="size-4" aria-hidden="true" />
             Cargar el presupuesto meta
-          </Link>
+          </EnlaceBoton>
         </div>
       )}
 
