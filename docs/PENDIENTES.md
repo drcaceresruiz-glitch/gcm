@@ -692,8 +692,10 @@ como los casos aprendidos de CRIOCORD—. Se cambio solo lo visible.
   **La receta**: generar el PDF con una prueba de vitest que llame a
   `pintarDocumento`, escribirlo en `public/` y abrirlo en
   `http://localhost:3000/<nombre>.pdf`. Asi se vieron la hoja de control con y
-  sin Last Planner. **Lo que sigue sin verse es la comparativa**, que lleva una
-  columna mas y es donde menos margen hay.
+  sin Last Planner. **La comparativa YA SE VIO** —y traia un fallo, justo donde
+  se temia—: «UND.» y «METRADO» se pisaban y la cabecera se leia «UNDMETRADO».
+  No solo en la comparativa: en los TRES documentos. Arreglado derivando la
+  posicion del ancho MEDIDO de los rotulos en vez de ponerla a mano.
 - ~~**Los cuatro datos `data-manual`**~~ **HECHO.** Y el hallazgo fue que
   TRES YA ESTABAN en el modelo -`Company.ruc`, `Project.ubicacion`,
   `Cronograma.nombreProyecto`-: lo que faltaba no era guardarlos sino USARLOS,
@@ -3951,10 +3953,17 @@ reglas solo se han visto en pruebas.
   - El commit sospechoso (`3f219ce`, la ponderacion) resulto ser una extraccion
     literal en `datosCurvaS`; el cambio del ritmo esta guardado en los bordes.
 
-  **Si vuelve a pasar, lo unico que hace falta es el mensaje del log del
-  servidor**: el codigo que ve el usuario es un hash de Next -mensaje mas pila-
-  y no se puede revertir. Sin el se adivina, y adivinar aqui costo media
-  mañana.
+  **YA NO HACE FALTA PEDIR NADA: desde el 24 de agosto de 2026 el servidor lo
+  escribe solo.** `src/instrumentation.ts` engancha `onRequestError`, que es el
+  unico sitio donde el digest y el mensaje coinciden -la frontera de error es
+  un componente de CLIENTE y en produccion solo recibe el hash-. Cuando alguien
+  reporte un codigo:
+
+      grep 'GCM-FALLO 81572617' <la salida del servidor>
+
+  y sale la ruta, el mensaje y la pila. Comprobado de punta a punta: se hizo
+  reventar una pagina a proposito y el codigo de la pantalla y el del log eran
+  el mismo.
 
   **Y la tecnica que si sirvio, apuntada porque no era obvia**: la base de
   desarrollo SI es alcanzable desde el puesto de trabajo, y los servicios se

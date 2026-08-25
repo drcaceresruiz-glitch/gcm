@@ -100,19 +100,42 @@ export function paginasDelPresupuesto(
   const izq = o.margen;
   const der = o.ancho - o.margen;
 
+  /**
+   * DONDE EMPIEZA LA COLUMNA DE LA UNIDAD SE MIDE, no se pone a ojo.
+   *
+   * «METRADO» va alineado a la DERECHA, asi que su `x` es su borde derecho y
+   * el rotulo se dibuja hacia atras. «UND.» va alineado a la izquierda. Con
+   * las dos posiciones escritas a mano los rotulos se pisaban y la cabecera
+   * se leia «UNDMETRADO» —en los TRES documentos, no solo en la comparativa—.
+   * Se vio el 24 de agosto de 2026, en cuanto se pudo mirar un PDF de verdad;
+   * las pruebas no lo cazaban porque comprueban que nada se salga del papel,
+   * no que dos textos no se solapen.
+   *
+   * Restando los dos anchos medidos mas un hueco, no se pueden pisar aunque
+   * alguien cambie los rotulos o el cuerpo de letra.
+   */
+  const metrado = comparativa ? der - 190 : der - 175;
+  const unidad = metrado - medir("METRADO", 7) - medir("UND.", 7) - 6;
+
   const cols: Columnas = comparativa
     ? {
         codigo: izq,
-        unidad: der - 250,
-        metrado: der - 210,
+        unidad,
+        /*
+         * `der - 190` y no `der - 210`, que era donde estaba: en la
+         * comparativa el sitio sale gratis porque la columna `precio` no se
+         * dibuja -no hay «P. UNITARIO»- y entre el metrado y el contractual
+         * quedaban noventa puntos sin usar.
+         */
+        metrado,
         precio: der - 160,
         parcial: der - 80,
         otro: der - 0,
       }
     : {
         codigo: izq,
-        unidad: der - 220,
-        metrado: der - 175,
+        unidad,
+        metrado,
         precio: der - 105,
         parcial: der,
       };

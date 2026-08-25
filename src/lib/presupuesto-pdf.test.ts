@@ -7,6 +7,7 @@ import {
   type LineaPresupuesto,
 } from "./presupuesto-pdf";
 import type { ElementoPdf } from "./informe-pdf";
+import type { Medir } from "./pdf-texto";
 
 const medir = (texto: string, tamano: number) => texto.length * (tamano / 2);
 
@@ -254,4 +255,65 @@ describe("el membrete y la firma", () => {
     expect(t).not.toContain("RUC");
     expect(t).toContain("LARQUITECTURA");
   });
+});
+
+describe("los rotulos de la cabecera no se pisan", () => {
+  /*
+   * LO QUE ESTABA MAL Y NINGUNA PRUEBA CAZABA. «UND.» va alineado a la
+   * izquierda y «METRADO» a la derecha. Con las dos posiciones puestas a mano
+   * se solapaban y la cabecera se leia «UNDMETRADO», en los TRES documentos.
+   * Visto el 24 de agosto de 2026 mirando un PDF de verdad por primera vez.
+   *
+   * LA PRIMERA VERSION DE ESTA PRUEBA NO SERVIA, y conviene saber por que: se
+   * limitaba a comprobar que las cajas no se tocaran, y con el `medir` de
+   * mentira de aqui arriba —tres coma cinco puntos por letra— los rotulos
+   * caben aunque el codigo este mal. Una prueba que pasa con el fallo dentro
+   * es peor que no tenerla.
+   *
+   * Asi que se comprueba OTRA COSA: que la posicion se DERIVE del ancho
+   * medido. Se dibuja dos veces con dos medidores distintos; si la columna
+   * estuviera puesta a mano, «UND.» caeria en el mismo sitio con los dos.
+   */
+  const conMedidor = (m: Medir, comparativa: boolean) =>
+    paginasDelPresupuesto(datos(), A4_VERTICAL, m, comparativa)[0]!.elementos;
+
+  const xDe = (elementos: readonly ElementoPdf[], contenido: string) => {
+    const e = elementos.find(
+      (x) => x.tipo === "texto" && x.texto === contenido,
+    ) as { x: number } | undefined;
+    return e?.x ?? null;
+  };
+
+  const ancho = (m: Medir, elementos: readonly ElementoPdf[], contenido: string) => {
+    const e = elementos.find(
+      (x) => x.tipo === "texto" && x.texto === contenido,
+    ) as { x: number; texto: string; tam: number } | undefined;
+    return e ? { desde: e.x, hasta: e.x + m(e.texto, e.tam) } : null;
+  };
+
+  /// El doble de ancho por letra: una letra mas gorda tiene que empujar.
+  const gordo: Medir = (texto, tam) => texto.length * tam;
+
+  for (const comparativa of [false, true]) {
+    const donde = comparativa ? "en la comparativa" : "en el presupuesto";
+
+    it(`${donde}, la columna se mueve si el rotulo mide mas`, () => {
+      const flaco = xDe(conMedidor(medir, comparativa), "UND.");
+      const anchoDeVerdad = xDe(conMedidor(gordo, comparativa), "UND.");
+
+      expect(flaco).not.toBeNull();
+      expect(anchoDeVerdad).not.toBeNull();
+      // Con letras mas gordas, «UND.» tiene que retroceder para dejar sitio.
+      expect(anchoDeVerdad!).toBeLessThan(flaco!);
+    });
+
+    it(`${donde}, y con cualquiera de los dos medidores no se tocan`, () => {
+      for (const m of [medir, gordo]) {
+        const el = conMedidor(m, comparativa);
+        const und = ancho(m, el, "UND.")!;
+        const met = ancho(m, el, "METRADO")!;
+        expect(und.hasta, `${donde} con ese medidor`).toBeLessThan(met.desde);
+      }
+    });
+  }
 });

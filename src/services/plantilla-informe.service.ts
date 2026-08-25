@@ -12,6 +12,7 @@ import {
   type SeccionInformeClave,
 } from "@/lib/plantilla-informe";
 import type { SesionActiva } from "@/services/sesion.service";
+import { filtroDeObras } from "@/lib/alcance-obras";
 
 /**
  * Que hojas lleva el informe de esta obra: se lee aqui, se decide en
@@ -37,10 +38,26 @@ export async function eleccionDeInforme(
       where: { id: sesion.companyId },
       select: { plantillaInforme: true, seccionesInformeOff: true },
     }),
-    // Con el filtro de empresa, como toda lectura de obra: el identificador
-    // llega de la URL.
+    /*
+     * Con el filtro de empresa Y el de alcance, como toda lectura de obra: el
+     * identificador llega de la URL.
+     *
+     * Aqui el alcance no protege gran cosa —lo que se lee es que PLANTILLA de
+     * informe eligio la obra, no un dato suyo— y por eso se quedo fuera del
+     * barrido del 24 de agosto de 2026. Se cierra igual, por coherencia: una
+     * lectura de obra que filtra distinto que las otras sesenta es una
+     * excepcion que hay que recordar, y las excepciones que hay que recordar
+     * son las que se olvidan. Cuesta media linea.
+     *
+     * Sin la obra, `deLaObra` queda en null y se hereda lo de la empresa, que
+     * es exactamente lo que ya pasaba con una obra sin plantilla propia.
+     */
     prisma.project.findFirst({
-      where: { id: obraId, companyId: sesion.companyId },
+      where: {
+        id: obraId,
+        companyId: sesion.companyId,
+        ...filtroDeObras(sesion),
+      },
       select: { plantillaInforme: true, seccionesInformeOff: true },
     }),
   ]);
