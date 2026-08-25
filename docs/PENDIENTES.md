@@ -33,6 +33,12 @@ Residente, `residente.prueba@local.test`, activa. Esta en
 3. **Entrar en una ventana de incognito**, para no tirar la sesion de
    administrador de la ventana normal.
 
+**Y NO CONSTRUIR HASTA TERMINAR.** `npm run build` invalida la sesion del
+servidor de desarrollo y echa fuera a quien este dentro. Estaba anotado y aun
+asi paso el 25 de agosto a media mañana: se corrio la bateria completa —que
+incluye `build`— en mitad del recorrido y hubo que volver a entrar. Durante el
+recorrido, `typecheck`, `lint` y `test` si; `build`, al final.
+
 Doble factor NO estorba: `dosFactoresActivo` viene en `false`.
 
 ### Que hay que comprobar, y por donde
