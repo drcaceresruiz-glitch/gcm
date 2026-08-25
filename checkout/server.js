@@ -55,6 +55,22 @@ const URL_PUBLICA = (process.env.URL_PUBLICA || '').replace(/\/+$/, '');
 app.use(express.json({ limit: '32kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+/**
+ * La RAÍZ enseña la tienda.
+ *
+ * Sin esto, entrar a https://pagos.drcaceresruiz.com devolvía el «Cannot GET /»
+ * de Express: la página existía, pero solo en /checkout.html. Eso no es un
+ * detalle estético — es lo que ve Izipay cuando comprueba la URL declarada de la
+ * tienda, y lo que le hace responder «dominio desconocido o inaccesible».
+ * También es lo que vería cualquiera que teclee la dirección sin la página.
+ *
+ * Se sirve el archivo, no un redirect: un comprobador automático que sigue la
+ * dirección tiene que encontrar la tienda ahí mismo, con un 200, sin saltos.
+ */
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
+});
+
 // ---------------------------------------------------------------------------
 //  Credenciales
 // ---------------------------------------------------------------------------
