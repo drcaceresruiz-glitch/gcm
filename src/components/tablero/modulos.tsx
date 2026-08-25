@@ -928,15 +928,31 @@ function Ppc({
   const href = `/obras/${obraId}/plan-semanal#ppc-tendencia`;
 
   if (!plan.ultima) {
+    /**
+     * TRES estados, y el tercero es el que faltaba.
+     *
+     * Sin PPC no significa «sin semanas cerradas»: una semana cerrada SIN
+     * ningun compromiso no tiene PPC que calcular (`ppcDePlan` devuelve null),
+     * y entonces `ultima` es null con `cerradas` mayor que cero. Se decia «2
+     * semanas abiertas sin cerrar todavia» habiendo semanas cerradas, y al
+     * lado el modulo de Causas contaba incumplimientos de esas mismas semanas:
+     * los dos ciertos y juntos incomprensibles.
+     */
+    const sinCompromisos = plan.cerradas > 0;
+
     return (
       <>
         <p className="mt-2 text-sm opacity-60">
-          {plan.abiertas > 0
-            ? `${plan.abiertas === 1 ? "Una semana abierta" : `${plan.abiertas} semanas abiertas`} sin cerrar todavía.`
-            : "Aún no hay ninguna semana cerrada."}
+          {sinCompromisos
+            ? `${plan.cerradas === 1 ? "La semana cerrada no llegó" : `Las ${plan.cerradas} semanas cerradas no llegaron`} a comprometer nada.`
+            : plan.abiertas > 0
+              ? `${plan.abiertas === 1 ? "Una semana abierta" : `${plan.abiertas} semanas abiertas`} sin cerrar todavía.`
+              : "Aún no hay ninguna semana cerrada."}
         </p>
         <p className="mt-1 text-xs opacity-50">
-          El PPC aparece al cerrar la primera semana.
+          {sinCompromisos
+            ? "Sin compromisos no hay PPC: es el porcentaje de lo prometido que se cumplió."
+            : "El PPC aparece al cerrar la primera semana."}
         </p>
         <EnlaceModulo href={href}>Ver plan semanal</EnlaceModulo>
       </>
@@ -1187,6 +1203,15 @@ function Causas({
             ? "Sin causa, cerrar la semana no enseña nada."
             : `Hacen falta ${MINIMO_PARA_PARETO} y al menos dos causas distintas: con menos, el primer puesto lo decide el azar.`}
         </p>
+        {/* La misma aclaracion que lleva el modulo cuando SI hay causa, y por
+            el mismo motivo: junto al PPC —que solo cuenta semanas cerradas—
+            este recuento parece contradecirlo. Faltaba justo en esta rama, que
+            es donde se vio la contradiccion. */}
+        {plan.fallosConCausa > 0 && plan.abiertas > 0 && (
+          <p className="mt-0.5 text-xs opacity-50">
+            Cuenta todas las semanas, incluidas las {plan.abiertas} abiertas.
+          </p>
+        )}
         <EnlaceModulo href={href}>Ver causas</EnlaceModulo>
       </>
     );

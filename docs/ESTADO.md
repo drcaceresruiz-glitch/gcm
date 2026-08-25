@@ -84,6 +84,24 @@ semanal 39,3 s, con dos tareas dentro; el eje pedía noventa y siete mil bandas
 y cuatrocientas mil rayitas. Ahora el paso se ensancha en vez de multiplicarse
 las marcas: 1,6 s y 1,9 s. Un plazo normal no lo nota.
 
+### Y la cola larga, entera
+
+**El presupuesto y las órdenes en Excel** —pedido del 10 de agosto, lo último
+que quedaba de aquella lista—. Los tres presupuestos salen de
+`presupuesto-documento.service`, el mismo del que sale el PDF, para que no
+puedan discrepar; las órdenes salen con dos hojas, y la segunda —una fila por
+imputación— es la que de verdad hacía falta para cruzarlas con el presupuesto.
+
+**La ventana del Lookahead ya no vive solo en la URL.** `Project.semanasLookahead`,
+NULL mientras nadie elija. `?semanas=` sigue mandando encima, para asomarse sin
+cambiársela a nadie.
+
+**Y el módulo de PPC dejaba de contradecirse con el de Causas** — pero el
+hallazgo fue otro: debajo de la redacción había una afirmación falsa. Una
+semana cerrada sin ningún compromiso no da PPC, y el módulo lo contaba como si
+no hubiera semanas cerradas, mientras el de al lado contaba los incumplimientos
+de esas mismas semanas. Reproducido montando el estado exacto contra la base.
+
 ---
 
 ## Anexo — 24 de agosto de 2026

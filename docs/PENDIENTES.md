@@ -4318,11 +4318,25 @@ reglas solo se han visto en pruebas.
   (`components/tablero/modulos.tsx`). Estan pegadas y comentadas a proposito,
   pero si algun dia se separan vuelve la caja vacia. Lo correcto es que cada
   modulo declare de que datos depende, en un solo sitio.
-- **El modulo de PPC y el de Causas se contradicen a la vista.** Uno dice
-  «2 semanas abiertas sin cerrar todavia» y el de al lado «5 incumplimientos
-  con causa». No es un error de calculo —el Pareto cuenta TODAS las semanas a
-  proposito, incluidas las abiertas— pero leidos juntos no se entienden. Se
-  arregla con una palabra en el subtitulo del modulo de causas.
+- ~~**El modulo de PPC y el de Causas se contradicen a la vista.**~~ **HECHO
+  el 25 de agosto de 2026**, y no era donde ponia. La mitad se habia arreglado
+  el 10 de agosto (commit `b7edebd`, punto 2) y esta nota se quedo sin tachar:
+  el modulo de causas ya decia «Cuenta todas las semanas, incluidas las N
+  abiertas»… **pero solo en la rama que SI tiene una causa destacada.** En la
+  otra —«todavia no hay suficiente para señalar una causa: 5 incumplimientos
+  con causa»— faltaba, y esa es justo la que se reporto.
+
+  Y debajo habia algo peor, que no era de redaccion: **el modulo de PPC
+  afirmaba una falsedad.** Una semana CERRADA sin ningun compromiso no tiene
+  PPC que calcular (`ppcDePlan` devuelve null), asi que `ultima` sale null con
+  `cerradas` mayor que cero, y el modulo caia en «2 semanas abiertas sin
+  cerrar todavia» habiendo una cerrada. De ahi la pareja incomprensible: una
+  tarjeta negaba las semanas cerradas de las que la de al lado contaba los
+  incumplimientos. Ahora son tres estados y el tercero dice la verdad —«la
+  semana cerrada no llego a comprometer nada»—.
+
+  **Reproducido y verificado montando el estado exacto contra la base**: con el
+  codigo viejo sale la contradiccion reportada, con el nuevo no.
 - ~~Sin migas de pan en las subpaginas profundas~~ Resuelto el 10 de agosto
   con la **ruta de la obra** (`RutaObra` + `hitosDeObra`): el ciclo
   Presupuesto → Cronograma → Linea base → Lookahead → Plan semanal como riel
