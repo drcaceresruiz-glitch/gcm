@@ -1059,3 +1059,49 @@ describe("alcance por obra: partidas", () => {
     expect(where?.project?.id?.in).toEqual([OBRA_ASIGNADA]);
   });
 });
+
+describe("alcance por obra: el AGENTE DE IA no es un atajo", () => {
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  /**
+   * LA HERRAMIENTA `tareas_de_obra` DEL AGENTE, que era la fuga.
+   *
+   * El agente recibe un `obraId` que el modelo escoge de lo que le pida la
+   * persona, y NO pasa por el layout de la obra: es la unica pantalla donde
+   * un residente puede nombrar una obra que no gestiona y que alguien la
+   * consulte por el. El 24 de agosto de 2026 devolvia las doce tareas del
+   * cronograma de una obra ajena, comprobado contra la base con una sesion de
+   * residente de verdad.
+   *
+   * Las otras tres herramientas de lectura ya filtraban —`listarObras` y
+   * `obtenerResumenEmpresa` por `filtroDeObras`, y `obtenerPresupuestoVigente`
+   * devolvia null—. Esta era la que faltaba, y por eso la prueba vive aqui y
+   * no en las del cronograma: lo que fija no es el cronograma, es que el
+   * agente no abra una puerta que el resto de la aplicacion tiene cerrada.
+   */
+  it("no devuelve el cronograma de una obra de mi empresa que no llevo", async () => {
+    const s = sesion(MIA, ["cronograma:leer"], [OBRA_ASIGNADA]);
+    const r = await cronograma.obtenerCronograma(s, OBRA_MIA_AJENA);
+
+    expect(r).toBeNull();
+  });
+
+  it("y ni siquiera consulta para negarlo", async () => {
+    await exigeNiTocarLaBase(() =>
+      cronograma.obtenerCronograma(
+        sesion(MIA, ["cronograma:leer"], [OBRA_ASIGNADA]),
+        OBRA_MIA_AJENA,
+      ),
+    );
+  });
+
+  it("la que SI lleva la sigue viendo", async () => {
+    const s = sesion(MIA, ["cronograma:leer"], [OBRA_ASIGNADA]);
+    await cronograma.obtenerCronograma(s, OBRA_ASIGNADA);
+
+    // Llego a consultar: el alcance no la corto.
+    expect(llamadas.length).toBeGreaterThan(0);
+  });
+});

@@ -765,6 +765,25 @@ export async function obtenerCronograma(
 ): Promise<CronogramaVigente | null> {
   if (!puede(sesion, "cronograma:leer")) return null;
 
+  /*
+   * EL ALCANCE POR OBRA, y aqui hacia falta de verdad.
+   *
+   * Esta lectura es la que alimenta la herramienta `tareas_de_obra` del
+   * AGENTE DE IA, y el agente no pasa por el layout de la obra: recibe un
+   * `obraId` que el modelo escoge de lo que le pida la persona. Comprobado el
+   * 24 de agosto de 2026 con una sesion de residente de verdad: devolvia las
+   * doce tareas del cronograma de una obra que no gestionaba.
+   *
+   * Las otras tres herramientas de lectura del agente si filtraban
+   * -`listarObras` y `obtenerResumenEmpresa` por `filtroDeObras`, y
+   * `obtenerPresupuestoVigente` devolvia null-. Esta era la que faltaba.
+   *
+   * Se devuelve `null`, como cuando no hay cronograma: es la misma respuesta
+   * que da `obtenerObra` a una obra fuera de alcance, y distinguir «no la
+   * alcanzas» de «no existe» ya seria contar algo.
+   */
+  if (!alcanzaObra(sesion, obraId)) return null;
+
   const cronograma = await prisma.cronograma.findFirst({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
     orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
