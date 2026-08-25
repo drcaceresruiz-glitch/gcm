@@ -6,17 +6,54 @@ qué está construido así.
 **Lo que FALTA vive en [`PENDIENTES.md`](PENDIENTES.md)**, aparte, para poder
 tacharlo sin reescribir esto.
 
-Última actualización: 22 de agosto de 2026.
+Última actualización: 24 de agosto de 2026.
 
 > **Este documento se escribió por capas y las más nuevas van arriba.** Las
 > secciones numeradas del final son del 8 de agosto; los anexos recogen lo
 > ocurrido después. **Ante una contradicción, manda siempre el anexo más
-> reciente**, que es el del 22 de agosto.
+> reciente**, que es el del 24 de agosto.
 >
 > Entre el 12 y el 21 de agosto entraron 297 commits y el sistema cambió de
 > forma en cosas de fondo —el contractual ahora se genera desde el presupuesto
 > real, y los gastos generales dejaron de ser de la obra—. Si algo de más
 > abajo te suena raro, comprueba primero si el anexo lo desmiente.
+
+---
+
+## Anexo — 24 de agosto de 2026
+
+El día que se recorrió la aplicación entera con los ojos, no solo con la
+batería. **Once fallos reales**, y el hilo conductor de casi todos es el mismo:
+*el código estaba bien probado y aun así estaba mal, y solo se vio mirando.*
+
+**Lo que se arregló, por familias:**
+
+- **Seis fugas de alcance por obra.** Lecturas alcanzables sin pasar por el
+  layout —el agente de IA, la propuesta comercial con su margen, las tres rutas
+  que sirven archivos por id, el equipo y el árbol de partidas—. Después se
+  midió la clase entera y se puso la guarda en las **60 lecturas**, con la misma
+  respuesta que ya daban al negar el permiso.
+- **Dos agujeros en los pases de obra.** No se podía revocar el pase de una
+  obra parada mientras el titular seguía entrando; y se podía dar un pase nuevo
+  en una obra cerrada.
+- **Tres defectos de dinero.** La proporción estaba escrita cinco veces, cuatro
+  en coma flotante: ahora es `porcentajeDe` en `lib/decimal`. Más una comparación
+  de importes con `!==` en la propuesta impresa y una suma acumulada en float.
+- **La regla de «obra cerrada» bajada a las 22 pantallas**, distinguiendo abrir
+  trabajo de cerrar lo ya abierto.
+- **Un N+1** en la importación de proveedores, y los rótulos `UND.`/`METRADO`
+  que se pisaban en los tres presupuestos en PDF.
+- **`src/instrumentation.ts`**: un fallo de pantalla ya no es indiagnosticable.
+  El hash que ve la persona y el mensaje del servidor se escriben juntos en
+  `stderr.log`.
+
+**La lección, y es la que conviene heredar:** cinco veces seguidas, un cambio
+que consistía en NO enseñar algo pasó typecheck, lint, 3.000 pruebas y build
+estando mal. Las pruebas comprueban lo que se dibuja; no lo que ya no se
+dibuja, ni que lo de alrededor se sostenga sin ello.
+
+El detalle de cada cosa —incluida la receta para repetir el barrido de alcance
+y las trampas de medición que casi cuelan— está en `PENDIENTES.md`.
 
 ---
 

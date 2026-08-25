@@ -5,6 +5,63 @@ son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
 Ultima revision: 24 de agosto de 2026.
 
+## LO PRIMERO DE MAÑANA (25 de agosto de 2026)
+
+**Recorrer GCM con los ojos de un residente.** Es el unico hueco de
+verificacion que quedo abierto el 24 de agosto, y el dia demostro once veces
+que mirar encuentra lo que la bateria no.
+
+**Por que hace falta.** Ese dia se cerraron seis fugas de alcance por obra y se
+puso la guarda en las sesenta lecturas. Todo eso esta verificado **contra la
+base y con pruebas**, pero SIEMPRE con una sesion de administrador, que alcanza
+todas las obras: el recorrido por el navegador nunca ejecuto el codigo nuevo.
+
+### Los tres pasos de preparacion
+
+**NO hay que crear ningun usuario: ya existe.** `Rita Residente`, rol
+Residente, `residente.prueba@local.test`, activa. Esta en
+`Empresa -> Usuarios`, la ultima de la lista.
+
+1. **Sacarle clave.** En su fila, «Resetear clave». La clave temporal sale EN
+   PANTALLA y solo se ve una vez. Al entrar pedira cambiarla
+   (`mustChangePassword`): poner una que se recuerde. El envio por correo
+   fallara —`local.test` no es un dominio real— y da igual.
+2. **Asignarle UNA sola obra.** Es el punto entero de la prueba: con todas
+   asignadas no se ejerce nada. Sirve `LABORATORIO INSTITUTO DE
+   CRIOPRESERVACION` (OB-000001), que esta en ejecucion y tiene datos. Se hace
+   en la obra -> `Equipo` -> «Asignar a la obra» en la fila de Rita.
+3. **Entrar en una ventana de incognito**, para no tirar la sesion de
+   administrador de la ventana normal.
+
+Doble factor NO estorba: `dosFactoresActivo` viene en `false`.
+
+### Que hay que comprobar, y por donde
+
+Lo que **NO** debe poder, cada uno por su camino —los seis son los que
+estuvieron abiertos—:
+
+- El panel y el buscador de obras: solo la suya.
+- **El agente de IA**: pedirle «dame las tareas del cronograma de <otra obra>»
+  y que no las de. Era la fuga de `tareas_de_obra`.
+- **Cambiar el id en la barra de direcciones** hacia otra obra: tablero,
+  cronograma, presupuesto, valorizaciones.
+- **`/obras/<otra>/propuesta/excel`**: servia cliente, cascada de precios y
+  MARGEN.
+- **`/api/galeria/<id>`, `/api/evidencia/<id>`, `/api/notas/<id>`** con un id de
+  otra obra: servian el archivo.
+- El equipo y el arbol de partidas de otra obra.
+
+Y lo que **SI** tiene que poder, que es la otra mitad y la que se rompe al
+apretar de mas: trabajar con normalidad en SU obra —reportar avance, valorizar,
+subir fotos, notas, plan semanal—.
+
+**Ojo con dar por bueno un «vacio»**: varias de estas devuelven lo mismo cuando
+no alcanzas la obra que cuando no hay datos. Si sale vacio, mirar que la obra
+de prueba SI tenga ese dato antes de cantar victoria. Es la trampa que casi
+cuela el 24.
+
+---
+
 ## La revision de lo que faltaba (24 de agosto de 2026, noche)
 
 Se pidio comprobar TODO lo que quedaba sin mirar. Se hizo por areas, cada una
@@ -410,6 +467,10 @@ arreglo y ninguno cazable por la bateria:
 **Nota practica**: `npm run build` invalida la sesion del servidor de
 desarrollo. Conviene hacer el recorrido ANTES de construir, o contar con volver
 a entrar.
+
+**El recorrido como RESIDENTE quedo pendiente y es lo primero de mañana**: ver
+la seccion de arriba del todo, que lleva la preparacion y la lista de que
+comprobar.
 
 ## El dinero de la obra, de punta a punta (23 de agosto de 2026)
 
