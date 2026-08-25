@@ -21,3 +21,4 @@
 - [El instrumento tambien miente](el-instrumento-tambien-miente.md) — antes de reportar, comprobar que la medicion distingue; volver al codigo viejo y ver que la prueba se pone roja
 - [Vitest no carga el .env](vitest-no-carga-el-env.md) — para tocar la base o descifrar desde una prueba hay que leer el .env a mano, tambien CORREO_CLAVE_CIFRADO
 - [El push cierra las sesiones abiertas](push-cierra-las-sesiones-abiertas.md) — el gancho de pre-push construye; no empujar mientras alguien recorre la aplicacion
+- [Heredoc se rompe con plantillas JS](heredoc-se-rompe-con-plantillas-js.md) — un `<<'EOF'` con `${...}` dentro de backticks falla; escribir el script con Write
