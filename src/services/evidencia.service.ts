@@ -8,6 +8,7 @@ import { env } from "@/lib/env";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { motivoNoAdmiteCambios } from "@/lib/obras";
 import type { SesionActiva } from "@/services/sesion.service";
+import { filtroDeObras } from "@/lib/alcance-obras";
 
 /**
  * Evidencia fotografica (Last Planner): la foto adosada al dato donde se
@@ -512,8 +513,28 @@ export async function archivoEvidencia(
     return { error: "no" };
   }
 
+  /*
+   * EL ALCANCE, metido en el propio `where` y no comprobado despues.
+   *
+   * Estas rutas sirven un ARCHIVO por su id, sin pasar por el layout de la
+   * obra: `/api/{ruta}/[id]`. Filtraban por empresa y no por alcance, asi que
+   * un residente con el id a mano se bajaba el archivo de una obra que no
+   * gestiona. Comprobado el 24 de agosto de 2026 con una sesion de residente
+   * de verdad.
+   *
+   * Va DENTRO del `where` porque asi la respuesta a «no la alcanzas» y a «no
+   * existe» es la misma consulta y el mismo `null`: no hay forma de usar
+   * estas rutas para averiguar que ids existen.
+   */
   const foto = await prisma.fotoEvidencia.findFirst({
-    where: { id: fotoId, project: { companyId: sesion.companyId } },
+    where: {
+      id: fotoId,
+      // `filtroDeObras` esparcido DENTRO del filtro del proyecto: es su forma
+      // natural -devuelve `{}` para quien alcanza todas las obras, y
+      // `{ id: { in: [...] } }` para quien no-, la misma que usa el resumen
+      // de empresa.
+      project: { companyId: sesion.companyId, ...filtroDeObras(sesion) },
+    },
     select: { ruta: true, mimeType: true, purgadaAt: true },
   });
 

@@ -93,6 +93,9 @@ const meta = await import("@/services/meta.service");
 const deducciones = await import("@/services/deducciones.service");
 const tablero = await import("@/services/tablero-semanal.service");
 const galeria = await import("@/services/galeria.service");
+const evidencia = await import("@/services/evidencia.service");
+const notas = await import("@/services/notas.service");
+const propuesta = await import("@/services/propuesta.service");
 
 /**
  * El alcance por defecto es `null` —sin restriccion— porque lo que audita
@@ -1103,5 +1106,78 @@ describe("alcance por obra: el AGENTE DE IA no es un atajo", () => {
 
     // Llego a consultar: el alcance no la corto.
     expect(llamadas.length).toBeGreaterThan(0);
+  });
+});
+
+describe("alcance por obra: los ARCHIVOS por id y la propuesta", () => {
+  beforeEach(() => {
+    llamadas.length = 0;
+  });
+
+  /**
+   * TRES RUTAS QUE SIRVEN UN ARCHIVO POR SU ID, sin pasar por el layout de la
+   * obra: `/api/galeria/[id]`, `/api/evidencia/[id]` y `/api/notas/[id]`.
+   * Filtraban por empresa y no por alcance. Medido contra la base el 24 de
+   * agosto de 2026 comparando la consulta con y sin el filtro: la de antes
+   * ENCONTRABA la foto de una obra ajena; la de ahora no.
+   *
+   * El alcance va DENTRO del `where` y no comprobado despues, a proposito:
+   * asi «no la alcanzas» y «no existe» son la misma consulta y el mismo
+   * `{ error: "no" }`, y estas rutas no sirven para averiguar que ids existen.
+   *
+   * Lo que se comprueba aqui es LA CONSULTA, no el archivo: `leerArchivo`
+   * devuelve el mismo error cuando la fila no aparece y cuando el fichero no
+   * esta en disco, asi que mirar el resultado no distingue las dos cosas.
+   */
+  const acotaLaObra = (where: unknown) => {
+    const w = where as { project?: { id?: { in: string[] } } };
+    expect(w.project?.id?.in, "la consulta no acota por obra").toEqual([OBRA_ASIGNADA]);
+  };
+
+  it("la foto de galeria se pide acotada a mis obras", async () => {
+    await galeria.archivoGaleria(
+      sesion(MIA, ["galeria:leer"], [OBRA_ASIGNADA]),
+      "foto-de-otra-obra",
+    );
+    acotaLaObra(llamadas.find((l) => l.modelo === "fotoGaleria")?.args?.where);
+  });
+
+  it("la foto de evidencia, igual", async () => {
+    await evidencia.archivoEvidencia(
+      sesion(MIA, ["lookahead:leer"], [OBRA_ASIGNADA]),
+      "evidencia-de-otra-obra",
+    );
+    acotaLaObra(llamadas.find((l) => l.modelo === "fotoEvidencia")?.args?.where);
+  });
+
+  it("el adjunto de una nota, igual", async () => {
+    await notas.archivoAdjuntoNota(
+      sesion(MIA, ["nota:leer"], [OBRA_ASIGNADA]),
+      "adjunto-de-otra-obra",
+    );
+    acotaLaObra(llamadas.find((l) => l.modelo === "adjuntoNota")?.args?.where);
+  });
+
+  /**
+   * Y LA PROPUESTA COMERCIAL, que no es un archivo pero se sirve igual: por
+   * la ruta `/obras/[id]/propuesta/excel`, cambiando el id en la barra de
+   * direcciones. Lo que devolvia no era un dato menor —el cliente, la cascada
+   * de precios y el MARGEN de una obra que no gestionas—.
+   */
+  it("la propuesta de una obra que no llevo no se compone", async () => {
+    const r = await propuesta.obtenerPropuesta(
+      sesion(MIA, ["linea_base:leer"], [OBRA_ASIGNADA]),
+      OBRA_MIA_AJENA,
+    );
+    expect(r).toBeNull();
+  });
+
+  it("y ni siquiera consulta para negarlo", async () => {
+    await exigeNiTocarLaBase(() =>
+      propuesta.obtenerPropuesta(
+        sesion(MIA, ["linea_base:leer"], [OBRA_ASIGNADA]),
+        OBRA_MIA_AJENA,
+      ),
+    );
   });
 });

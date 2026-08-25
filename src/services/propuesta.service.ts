@@ -11,6 +11,7 @@ import {
 import { logoDeEmpresa, type LogoEmpresa } from "@/services/logo.service";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { LineaPropuesta } from "@/lib/propuesta-detalle";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * La propuesta economica: el presupuesto contractual tal como se entrega al
@@ -114,6 +115,21 @@ export async function obtenerPropuesta(
   revisionId?: string,
 ): Promise<Propuesta | null> {
   if (!puede(sesion, "linea_base:leer")) return null;
+
+  /*
+   * EL ALCANCE, antes de consultar.
+   *
+   * Esto lo sirve la ruta `/obras/[id]/propuesta/excel`, que NO pasa por el
+   * layout de la obra: basta cambiar el id en la barra de direcciones. Y lo
+   * que devuelve no es un dato menor —el cliente, la cascada de precios y el
+   * MARGEN de la obra—. Comprobado el 24 de agosto de 2026 con una sesion de
+   * residente de verdad: devolvia la propuesta entera de una obra que no
+   * gestionaba.
+   *
+   * El filtro por empresa de abajo para en la puerta de la constructora;
+   * este para en la de la obra.
+   */
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   // El filtro por empresa va aqui: a partir de este punto la obra ya es
   // suya, y las consultas que siguen cuelgan de ella.
