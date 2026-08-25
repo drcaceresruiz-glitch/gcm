@@ -366,6 +366,9 @@ function sesion(permisos: string[] = ["agente_ia:usar"]): SesionActiva {
     apellidos: "Lovelace",
     role: "ADMIN",
     permisos,
+    // `null` es «alcanza todas las obras de su empresa». Sin este campo la
+    // sesion no es valida: la lista vacia y el null son cosas opuestas.
+    obrasAsignadas: null,
     esOperador: false,
   } as unknown as SesionActiva;
 }

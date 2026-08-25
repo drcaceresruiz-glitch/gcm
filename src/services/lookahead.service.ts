@@ -55,6 +55,7 @@ import type { TipoRestriccion } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { PaseActivo } from "@/services/pase.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Lookahead (Last Planner): la ventana de mediano plazo y el analisis de las 7
@@ -365,6 +366,11 @@ export async function obtenerLookahead(
   semanasPedidas?: string | number,
 ): Promise<LookaheadDatos | null> {
   if (!puede(sesion, "lookahead:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const semanas = normalizarSemanas(semanasPedidas);
   const { desde, hasta, tareas } = await tareasDeLaVentana(sesion, obraId, semanas);
@@ -843,6 +849,11 @@ export async function confiabilidadDeVentana(
   semanasPedidas?: string | number,
 ): Promise<ConfiabilidadVentana | null> {
   if (!puede(sesion, "lookahead:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const semanas = normalizarSemanas(semanasPedidas);
   const { desde, hasta } = ventanaLookahead(hoy(), semanas);
@@ -1525,6 +1536,11 @@ export async function demoraDeLiberacion(
 ): Promise<DemoraLiberacion | null> {
   if (!puede(sesion, "lookahead:leer")) return null;
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
+
   const filas = await prisma.restriccion.findMany({
     where: {
       resuelta: true,
@@ -1570,6 +1586,11 @@ export async function tasaDeLiberacionDeObra(
   ahora: Date = hoy(),
 ): Promise<TasaLiberacion | null> {
   if (!puede(sesion, "lookahead:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const filas = await prisma.restriccion.findMany({
     where: { tarea: { projectId: obraId, project: { companyId: sesion.companyId } } },

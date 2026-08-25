@@ -6,6 +6,7 @@ import { veTodasLasObras, ETIQUETA_ALCANCE_TOTAL } from "@/lib/alcance-obras";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { Role } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Quien trabaja en cada obra.
@@ -62,7 +63,10 @@ export async function listarEquipo(
   sesion: SesionActiva,
   obraId: string,
 ): Promise<MiembroObra[]> {
-  if (!puedeRepartir(sesion)) return [];
+
+  // El alcance por obra, con la misma respuesta que «no tienes permiso». Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },

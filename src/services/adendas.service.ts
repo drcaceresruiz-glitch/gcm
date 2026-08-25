@@ -14,6 +14,7 @@ import { montoVigente, resumenAdendas, type ResumenAdendas } from "@/lib/adendas
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { EstadoAdenda } from "@/generated/prisma/enums";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Adicionales y deductivos del contratista, con su circuito de dos firmas.
@@ -76,6 +77,11 @@ export async function adendasDelEncargo(
 ): Promise<AdendasDelEncargo> {
   if (!puede(sesion, "encargo:leer")) return SIN_ADENDAS;
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return SIN_ADENDAS;
+
   const encargo = await prisma.encargoProveedor.findFirst({
     // El filtro por empresa sale de la SESION, no de la peticion: es lo que
     // impide leer el contrato de otra constructora cambiando el id.
@@ -135,6 +141,11 @@ export async function adendasPorEncargo(
 ): Promise<Map<string, { aprobadas: string[]; resumen: ResumenAdendas }>> {
   const vacio = new Map<string, { aprobadas: string[]; resumen: ResumenAdendas }>();
   if (!puede(sesion, "encargo:leer")) return vacio;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return vacio;
 
   const filas = await prisma.adendaEncargo.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },

@@ -458,6 +458,11 @@ async function planSemanalDeObra(
 ): Promise<DatosPlanSemanalTablero | null> {
   if (!puede(sesion, "plan_semanal:leer")) return null;
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
+
   const { semanas, tendencia, pareto } = await listarPlanesSemanales(
     sesion,
     obraId,

@@ -179,6 +179,9 @@ const sesion = {
   apellidos: "Ruiz",
   email: "ana@obra.pe",
   permisos: ["cronograma:editar", "cronograma:eliminar"],
+  // `null` es «alcanza todas las obras de su empresa». Sin este campo la
+  // sesion no es valida: la lista vacia y el null son cosas opuestas.
+  obrasAsignadas: null,
 } as unknown as SesionActiva;
 
 const tarea = {

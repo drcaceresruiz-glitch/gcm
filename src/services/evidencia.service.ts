@@ -8,7 +8,7 @@ import { env } from "@/lib/env";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { motivoNoAdmiteCambios } from "@/lib/obras";
 import type { SesionActiva } from "@/services/sesion.service";
-import { filtroDeObras } from "@/lib/alcance-obras";
+import { alcanzaObra, filtroDeObras } from "@/lib/alcance-obras";
 
 /**
  * Evidencia fotografica (Last Planner): la foto adosada al dato donde se
@@ -359,6 +359,10 @@ export async function fotosPorDestino(
   obraId: string,
   destinos: { restricciones?: string[]; compromisos?: string[] },
 ): Promise<Map<string, FotoResumen[]>> {
+  // El alcance en el `where`, como en `archivoEvidencia`: estas fotos son de
+  // una obra concreta y quien no la alcanza no las ve.
+  if (!alcanzaObra(sesion, obraId)) return new Map();
+
   const fotos = await prisma.fotoEvidencia.findMany({
     where: {
       projectId: obraId,
@@ -392,6 +396,7 @@ export async function fotosDeTareas(
   dia?: string,
 ): Promise<Map<number, FotoResumen[]>> {
   if (uids.length === 0) return new Map();
+  if (!alcanzaObra(sesion, obraId)) return new Map();
 
   const fotos = await prisma.fotoEvidencia.findMany({
     where: {

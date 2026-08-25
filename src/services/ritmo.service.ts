@@ -41,6 +41,11 @@ export async function ritmoDeObra(
   obraId: string,
 ): Promise<RitmoDeObra | null> {
   if (!puede(sesion, "cronograma:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
   if (!alcanzaObra(sesion, obraId)) return null;
 
   const [corte, avances, obra] = await Promise.all([

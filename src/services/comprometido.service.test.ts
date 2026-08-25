@@ -72,6 +72,9 @@ const SESION = {
   companyId: "empresa-1",
   role: "ADMIN",
   permisos: [],
+  // `null` es «alcanza todas las obras de su empresa». Sin este campo la
+  // sesion no es valida: la lista vacia y el null son cosas opuestas.
+  obrasAsignadas: null,
 } as unknown as SesionActiva;
 
 function encargo(parcial: Partial<FilaEncargo> = {}): FilaEncargo {

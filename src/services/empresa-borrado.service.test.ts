@@ -146,6 +146,9 @@ function sesion(esOperador: boolean, companyId = "emp-propia"): SesionActiva {
     companyId,
     role: "ADMIN",
     permisos: [],
+    // `null` es «alcanza todas las obras de su empresa». Sin este campo la
+    // sesion no es valida: la lista vacia y el null son cosas opuestas.
+    obrasAsignadas: null,
     esOperador,
   } as unknown as SesionActiva;
 }

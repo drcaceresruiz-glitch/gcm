@@ -13,6 +13,7 @@ import {
 } from "@/lib/presupuesto";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Revisiones del presupuesto.
@@ -107,6 +108,11 @@ export async function obtenerCostoDirectoActual(
   if (!puede(sesion, "partida:leer")) {
     return { costoDirecto: "0.00", descuentos: "0.00", totalPartidas: 0 };
   }
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return { costoDirecto: "0.00", descuentos: "0.00", totalPartidas: 0 };
 
   const items = await prisma.wbsItem.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
@@ -387,6 +393,11 @@ export async function obtenerResumen(
   if (!puede(sesion, "linea_base:leer")) {
     return { revisiones: [], comparacion: null };
   }
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return { revisiones: [], comparacion: null };
 
   const filas = await prisma.baseline.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },

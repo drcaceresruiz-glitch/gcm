@@ -5,6 +5,7 @@ import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { ponerEdtAlDia } from "@/services/edt-sincronizar";
 import type { Resultado } from "@/services/edt.service";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Los hitos de la obra: las fechas clave que marca el planificador.
@@ -336,6 +337,11 @@ export async function personasParaResponsable(
 ): Promise<PersonaPosible[]> {
   if (!puede(sesion, "cronograma:leer")) return [];
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
+
   const [miembros, contactos] = await Promise.all([
     prisma.projectMembership.findMany({
       where: {
@@ -469,6 +475,11 @@ export async function partidasParaAnclar(
 ): Promise<AnclaPosible[]> {
   if (!puede(sesion, "cronograma:leer")) return [];
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
+
   const filas = await prisma.wbsItem.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
     orderBy: { codigoPartida: "asc" },
@@ -488,6 +499,11 @@ export async function listarHitos(
   obraId: string,
 ): Promise<HitoListado[]> {
   if (!puede(sesion, "cronograma:leer")) return [];
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
 
   const vigente = await prisma.cronograma.findFirst({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },

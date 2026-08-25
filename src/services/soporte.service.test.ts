@@ -160,6 +160,9 @@ function sesion(
     apellidos: "Lovelace",
     role: "ADMIN",
     permisos: opciones.permisos ?? ["soporte:usar"],
+    // `null` es «alcanza todas las obras de su empresa». Sin este campo la
+    // sesion no es valida: la lista vacia y el null son cosas opuestas.
+    obrasAsignadas: null,
     esOperador: opciones.esOperador ?? false,
   } as unknown as SesionActiva;
 }

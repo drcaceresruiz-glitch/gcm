@@ -249,6 +249,11 @@ export async function listarPagos(
   encargoId: string,
 ): Promise<PagoRegistrado[]> {
   if (!puede(sesion, "encargo:leer")) return [];
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
   if (!alcanzaObra(sesion, obraId)) return [];
 
   const filas = await prisma.pagoEncargo.findMany({
@@ -388,6 +393,11 @@ export async function panelDeValorizaciones(
   opciones: { pagina?: string; q?: string } = {},
 ): Promise<PanelValorizaciones | null> {
   if (!puede(sesion, "encargo:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
   if (!alcanzaObra(sesion, obraId)) return null;
 
   const obra = await prisma.project.findFirst({

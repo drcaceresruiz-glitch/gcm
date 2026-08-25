@@ -18,6 +18,7 @@ import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { totalDeObra } from "@/services/presupuesto-obra";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { EstadoEncargo, TipoImpuesto } from "@/generated/prisma/enums";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Encargos a proveedores: repartir la obra en frentes, cada uno con su
@@ -119,6 +120,11 @@ export async function listarEncargos(
   };
 
   if (!puede(sesion, "encargo:leer")) return vacio;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return vacio;
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
@@ -316,6 +322,11 @@ export async function obtenerEncargo(
 ): Promise<EncargoDetalle | null> {
   if (!puede(sesion, "encargo:leer")) return null;
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
+
   const e = await prisma.encargoProveedor.findFirst({
     where: {
       id: encargoId,
@@ -400,6 +411,11 @@ export async function partidasAsignables(
   obraId: string,
 ): Promise<PartidaAsignable[]> {
   if (!puede(sesion, "encargo:leer")) return [];
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
 
   // En paralelo: las partidas y cuando estan programadas. La segunda consulta
   // es lo que evita pedir a mano unas fechas que el cronograma ya sabe.
@@ -540,6 +556,11 @@ export async function capitulosConPartidas(
   obraId: string,
 ): Promise<CapituloAsignable[]> {
   if (!puede(sesion, "encargo:leer")) return [];
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
 
   const items = await prisma.wbsItem.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
@@ -1167,6 +1188,11 @@ export async function encargosParaOrden(
   obraId: string,
 ): Promise<EncargoParaOrden[]> {
   if (!puede(sesion, "orden:crear")) return [];
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
 
   return prisma.encargoProveedor.findMany({
     where: {

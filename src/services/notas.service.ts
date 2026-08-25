@@ -10,6 +10,7 @@ import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { CategoriaNota } from "@/generated/prisma/enums";
 import { filtroDeObras } from "@/lib/alcance-obras";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * La bitacora libre de la obra: notas con, como mucho, una fecha en la que
@@ -59,6 +60,11 @@ export async function listarNotas(
   obraId: string,
 ): Promise<NotaResumen[] | null> {
   if (!puede(sesion, "nota:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
@@ -121,6 +127,11 @@ export async function recordatoriosDeObra(
   limite = 5,
 ): Promise<RecordatorioNota[] | null> {
   if (!puede(sesion, "nota:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const ahora = new Date();
 

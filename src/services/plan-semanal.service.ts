@@ -40,6 +40,7 @@ import type {
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { fotosPorDestino, type FotoResumen } from "@/services/evidencia.service";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Plan Semanal (Last Planner): la escritura y lectura de los compromisos de la
@@ -91,6 +92,11 @@ export async function listarPlanesSemanales(
 ): Promise<PlanesSemanales> {
   const vacio: PlanesSemanales = { semanas: [], tendencia: [], pareto: [] };
   if (!puede(sesion, "plan_semanal:leer")) return vacio;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return vacio;
 
   const planes = await prisma.planSemanal.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
@@ -179,6 +185,11 @@ export async function lastPlannerAlCorte(
   fechaCorte: Date,
 ): Promise<LastPlannerAlCorte | null> {
   if (!puede(sesion, "plan_semanal:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const planes = await prisma.planSemanal.findMany({
     where: {
@@ -354,6 +365,11 @@ export async function obtenerPlanSemanal(
   planId: string,
 ): Promise<PlanSemanalDetalle | null> {
   if (!puede(sesion, "plan_semanal:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const plan = await prisma.planSemanal.findFirst({
     where: { id: planId, projectId: obraId, project: { companyId: sesion.companyId } },
@@ -1520,6 +1536,11 @@ export async function semanasParaComprometer(
 ): Promise<SemanaDestino[]> {
   if (!puede(sesion, "plan_semanal:leer")) return [];
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
+
   const [abiertas, cerradas] = await Promise.all([
     prisma.planSemanal.findMany({
       where: {
@@ -1555,6 +1576,11 @@ export async function planesAbiertos(
   obraId: string,
 ): Promise<SemanaAbierta[]> {
   if (!puede(sesion, "plan_semanal:leer")) return [];
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
 
   return prisma.planSemanal.findMany({
     where: {

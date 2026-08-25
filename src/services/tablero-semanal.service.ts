@@ -6,6 +6,7 @@ import { construirTablero, type CompromisoEnTablero, type Tablero } from "@/lib/
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { EstadoPlanSemanal } from "@/generated/prisma/enums";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * El tablero de planificacion semanal.
@@ -36,6 +37,11 @@ export async function obtenerTablero(
   planId: string,
 ): Promise<TableroDatos | null> {
   if (!puede(sesion, "plan_semanal:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const plan = await prisma.planSemanal.findFirst({
     where: { id: planId, projectId: obraId, project: { companyId: sesion.companyId } },

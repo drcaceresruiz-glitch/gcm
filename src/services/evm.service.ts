@@ -8,6 +8,7 @@ import { metricasEvm, valorDeAvance, type MetricasEvm } from "@/lib/evm";
 import { cobertura } from "@/lib/mapeo-partidas";
 import { datosCurvaS } from "@/services/cronograma.service";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Valor ganado (EVM) de una obra.
@@ -72,6 +73,11 @@ export async function datosEvm(
   obraId: string,
 ): Promise<DatosEvm | null> {
   if (!puede(sesion, "cronograma:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const verCosto = puede(sesion, "orden:leer");
   const deLaObra = { projectId: obraId, project: { companyId: sesion.companyId } };

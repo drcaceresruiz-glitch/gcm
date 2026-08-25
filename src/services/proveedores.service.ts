@@ -635,6 +635,11 @@ export async function semaforoDeContratos(
   const salida = new Map<string, EstadoContrato>();
   if (proveedorIds.length === 0) return salida;
   if (!puede(sesion, "proveedor:leer")) return salida;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return salida;
   // El pool de contratistas SI se comparte entre obras; su contrato en ESTA
   // obra, no. Ver `@/lib/alcance-obras`.
   if (!alcanzaObra(sesion, obraId)) return salida;

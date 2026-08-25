@@ -28,6 +28,7 @@ import type {
   TipoOrden,
 } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Ordenes de compra y de servicio.
@@ -963,6 +964,11 @@ export async function listarProveedoresConOrdenes(
 ): Promise<{ id: string; razonSocial: string }[]> {
   if (!puede(sesion, "orden:leer")) return [];
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
+
   const filas = await prisma.ordenCompra.findMany({
     where: { projectId: obraId, companyId: sesion.companyId },
     distinct: ["proveedorId"],
@@ -987,6 +993,11 @@ export async function contarOrdenesDeObra(
   obraId: string,
 ): Promise<number> {
   if (!puede(sesion, "orden:leer")) return 0;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return 0;
 
   return prisma.ordenCompra.count({
     where: { projectId: obraId, companyId: sesion.companyId },
@@ -1038,6 +1049,11 @@ export async function listarOrdenes(
   if (!puede(sesion, "orden:leer")) {
     return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
   }
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
 
   const texto = opciones.q?.trim();
   const desde = fechaFiltro(opciones.desde);
@@ -1154,6 +1170,11 @@ export async function obtenerPartidasHabituales(
 ): Promise<Record<string, string[]>> {
   if (!puede(sesion, "orden:crear")) return {};
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return {};
+
   const filas = await prisma.proveedorPartida.findMany({
     where: {
       proveedor: { companyId: sesion.companyId },
@@ -1245,6 +1266,11 @@ export async function obtenerOrdenParaImpresion(
   ordenId: string,
 ): Promise<OrdenImpresa | null> {
   if (!puede(sesion, "orden:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const orden = await prisma.ordenCompra.findFirst({
     // El companyId no es redundante con el id: sin el, un id adivinado de

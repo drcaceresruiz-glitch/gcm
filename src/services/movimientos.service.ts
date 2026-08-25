@@ -21,6 +21,7 @@ import {
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
 import type { ModalidadPartida, TipoMovimiento } from "@/generated/prisma/enums";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Movimientos presupuestales: los ajustes que van ENCIMA de la linea base.
@@ -936,6 +937,11 @@ export async function listarMovimientos(
   if (!puede(sesion, "movimiento:leer")) {
     return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
   }
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
 
   const where = {
     projectId: obraId,

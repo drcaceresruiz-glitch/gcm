@@ -11,6 +11,7 @@ import {
   type ResultadoContractual,
 } from "@/lib/contractual-desde-meta";
 import { multiplicar } from "@/lib/decimal";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Generar el presupuesto contractual a partir del real.
@@ -85,6 +86,11 @@ export async function previsualizarContractual(
   if (!puede(sesion, "meta:leer")) {
     return { ok: false, error: "No tienes permiso para ver el presupuesto meta." };
   }
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, error: "No tienes permiso para ver el presupuesto meta." };
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },

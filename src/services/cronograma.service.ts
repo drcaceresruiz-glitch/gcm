@@ -876,6 +876,11 @@ export async function historialCronogramas(
 ): Promise<CorteImportado[]> {
   if (!puede(sesion, "cronograma:leer")) return [];
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
+
   const cortes = await prisma.cronograma.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
     orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
@@ -996,6 +1001,11 @@ export async function lineaBaseCronograma(
   obraId: string,
 ): Promise<LineaBaseCronograma | null> {
   if (!puede(sesion, "cronograma:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const base = await prisma.cronograma.findFirst({
     where: {
@@ -1294,6 +1304,11 @@ export async function informeAlCorte(
 ): Promise<InformeAlCorte | null> {
   if (!puede(sesion, "cronograma:leer")) return null;
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
+
   const cronograma = await prisma.cronograma.findFirst({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
     orderBy: [{ fechaCorte: "desc" }, { version: "desc" }],
@@ -1589,6 +1604,11 @@ export async function obtenerParteDelDia(
   opciones: { diasVista?: number | null } = {},
 ): Promise<ParteDelDia | null> {
   if (!puede(sesion, "cronograma:leer")) return null;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const vigente = await obtenerCronograma(sesion, obraId);
   if (!vigente) return null;
@@ -1928,6 +1948,11 @@ export async function datosCurvaS(
   };
 
   if (!puede(sesion, "cronograma:leer")) return vacio;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return vacio;
 
   const [cortes, avances, obra] = await Promise.all([
     prisma.cronograma.findMany({

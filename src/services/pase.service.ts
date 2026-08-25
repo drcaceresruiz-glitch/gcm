@@ -109,6 +109,11 @@ export async function listarPases(
 ): Promise<PaseLista[]> {
   if (!puede(sesion, "lookahead:gestionar")) return [];
 
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
+
   const ahora = new Date();
   const pases = await prisma.paseObra.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },

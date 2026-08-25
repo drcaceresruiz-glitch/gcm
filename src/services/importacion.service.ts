@@ -11,6 +11,7 @@ import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { partidasEnEjecucionQueDesaparecen } from "@/services/partidas-en-ejecucion";
 import type { FilaImportada } from "@/lib/excel-presupuesto";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Escritura del presupuesto importado.
@@ -61,6 +62,9 @@ export async function analizarRiesgoDeReemplazo(
     totalCapitulos: 0,
   };
 
+  // El alcance por obra. Ver la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return vacio;
+
   // Esta funcion solo ANALIZA (partida:leer): la pantalla entera exige
   // meta:leer, mas floja, porque ver la vista previa no es importar nada
   // todavia. El boton que si importa esta oculto sin `partida:importar`
@@ -68,6 +72,11 @@ export async function analizarRiesgoDeReemplazo(
   // aqui debajo: los servicios son la frontera real, y una ruta nueva
   // podria llamar a esto sin pasar por la pantalla.
   if (!puede(sesion, "partida:leer")) return vacio;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return vacio;
 
   const items = await prisma.wbsItem.findMany({
     where: {

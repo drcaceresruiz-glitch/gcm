@@ -8,6 +8,7 @@ import {
 } from "@/lib/causa-raiz";
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * El analisis de causa raiz: por que se repite una causa y que se hara.
@@ -49,6 +50,11 @@ export async function listarAnalisis(
   obraId: string,
 ): Promise<AnalisisResumen[]> {
   if (!puede(sesion, "plan_semanal:leer")) return [];
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
 
   const filas = await prisma.analisisCausa.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },
@@ -93,6 +99,11 @@ export async function causasParaAnalizar(
 ): Promise<CausasParaAnalizar> {
   const vacio: CausasParaAnalizar = { pendientes: [], enCurso: [] };
   if (!puede(sesion, "plan_semanal:leer")) return vacio;
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return vacio;
 
   const [planes, abiertos] = await Promise.all([
     prisma.planSemanal.findMany({

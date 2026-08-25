@@ -5,6 +5,7 @@ import { puede } from "@/lib/rbac";
 import { validarCalendario, type DiaLaboral } from "@/lib/calendario";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * El regimen laboral de la obra.
@@ -28,6 +29,11 @@ export async function obtenerCalendario(
   obraId: string,
 ): Promise<DiaLaboral[]> {
   if (!puede(sesion, "obra:leer")) return [];
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
 
   const dias = await prisma.workCalendar.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },

@@ -8,6 +8,7 @@ import { hoy as hoyCalendario } from "@/utils/fechas";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { recalcularResumenes } from "@/services/edt.service";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Tareas de cronograma escritas a mano.
@@ -777,6 +778,11 @@ export async function listarTareasManuales(
   obraId: string,
 ): Promise<TareaManualListada[]> {
   if (!puede(sesion, "cronograma:leer")) return [];
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
 
   const vigente = await prisma.cronograma.findFirst({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },

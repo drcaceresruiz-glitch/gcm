@@ -37,6 +37,9 @@ const sesion = {
   companyId: "c1",
   role: "ADMIN",
   permisos: ["partida:leer"],
+  // `null` es «alcanza todas las obras de su empresa». Sin este campo la
+  // sesion no es valida: la lista vacia y el null son cosas opuestas.
+  obrasAsignadas: null,
   nombres: "A",
   apellidos: "B",
 } as never;

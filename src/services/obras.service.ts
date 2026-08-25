@@ -1602,6 +1602,10 @@ export async function listarPartidas(
 ): Promise<ArbolPartidas> {
   if (!puede(sesion, "partida:leer")) throw new SinPermisoError();
 
+  // El alcance por obra, con la misma respuesta que «no tienes permiso». Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) throw new SinPermisoError();
+
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
     select: { id: true },

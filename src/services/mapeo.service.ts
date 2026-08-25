@@ -12,6 +12,7 @@ import {
 } from "@/lib/mapeo-partidas";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Que partidas del presupuesto cubre cada tarea del cronograma.
@@ -54,6 +55,11 @@ export async function obtenerMapeo(
   if (!puede(sesion, "cronograma:leer") || !puede(sesion, "partida:leer")) {
     return null;
   }
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return null;
 
   const cronograma = await prisma.cronograma.findFirst({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },

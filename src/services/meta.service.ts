@@ -23,6 +23,7 @@ import {
   type DeduccionesDeLaMeta,
 } from "@/services/deducciones.service";
 import type { SesionActiva } from "@/services/sesion.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Presupuesto meta de la obra: lo que la empresa se compromete a gastar.
@@ -65,6 +66,11 @@ export async function listarMetas(
   obraId: string,
 ): Promise<MetaResumen[]> {
   if (!puede(sesion, "meta:leer")) return [];
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return [];
 
   const filas = await prisma.presupuestoMeta.findMany({
     where: { projectId: obraId, project: { companyId: sesion.companyId } },

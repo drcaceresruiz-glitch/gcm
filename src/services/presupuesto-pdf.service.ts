@@ -25,6 +25,7 @@ import {
   medidorCon,
   pintarDocumento,
 } from "@/services/pdf-pintor.service";
+import { alcanzaObra } from "@/lib/alcance-obras";
 
 /**
  * Los presupuestos en PDF: contractual, meta y la comparativa.
@@ -83,6 +84,11 @@ export async function generarPresupuestoPdf(
   if (!puede(sesion, "partida:leer")) {
     return { ok: false, estado: 403, error: "Sin permiso." };
   }
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return { ok: false, estado: 403, error: "Sin permiso." };
 
   // Ata la obra a la empresa de quien mira, como toda lectura de obra.
   const obra = await obtenerObra(sesion, obraId);
