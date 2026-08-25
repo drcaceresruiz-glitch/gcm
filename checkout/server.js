@@ -65,9 +65,21 @@ app.use(express.static(path.join(__dirname, 'public')));
 const IZIPAY = {
   endpoint: process.env.IZIPAY_ENDPOINT || 'https://api.micuentaweb.pe',
   usuario: process.env.IZIPAY_USERNAME || '',      // número de tienda
-  clave: process.env.IZIPAY_PASSWORD || '',        // clave de test o de producción
+  clave: process.env.IZIPAY_PASSWORD || '',        // la del modo en que opera
   clavePublica: process.env.IZIPAY_PUBLIC_KEY || '',
   hmac: process.env.IZIPAY_HMAC_SHA256 || '',
+  // La MISMA URL de notificación sirve a test y a producción, pero cada modo
+  // firma con SU contraseña. Sin esta segunda, el día que se active producción
+  // las notificaciones reales se rechazarían por firma —con el checkout
+  // aparentemente bien— y el fallo parecería cualquier otra cosa.
+  claveAlterna: process.env.IZIPAY_PASSWORD_ALTERNA || '',
+  hmacAlterna: process.env.IZIPAY_HMAC_SHA256_ALTERNA || '',
+};
+
+/** Las claves con las que se puede verificar una notificación entrante. */
+const CLAVES_VERIFICACION = {
+  password: [IZIPAY.clave, IZIPAY.claveAlterna],
+  hmac: [IZIPAY.hmac, IZIPAY.hmacAlterna],
 };
 
 const FALTAN = Object.entries({
@@ -372,7 +384,7 @@ app.post('/api/reclamacion', (req, res) => {
  * de ahí el middleware propio de la ruta.
  */
 app.post('/api/ipn', express.urlencoded({ extended: false, limit: '64kb' }), (req, res) => {
-  const firma = verificarFirma(req.body ?? {}, { password: IZIPAY.clave, hmac: IZIPAY.hmac });
+  const firma = verificarFirma(req.body ?? {}, CLAVES_VERIFICACION);
   if (!firma.ok) {
     console.warn('[ipn] notificación rechazada:', firma.motivo);
     return res.status(400).send('firma invalida');
@@ -416,7 +428,7 @@ const manejarRetorno = (req, res) => {
   let resumen = null;
 
   if (cuerpo['kr-answer'] && cuerpo['kr-hash']) {
-    const firma = verificarFirma(cuerpo, { password: IZIPAY.clave, hmac: IZIPAY.hmac });
+    const firma = verificarFirma(cuerpo, CLAVES_VERIFICACION);
     if (firma.ok) {
       try {
         resumen = resumirPago(cuerpo['kr-answer']);

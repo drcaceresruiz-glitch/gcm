@@ -44,8 +44,15 @@ const LIBRO_PAGOS = path.join(DIRECTORIO, 'pagos.jsonl');
  * JSON.stringify reordena las claves y cambia el resultado: la firma dejaría de
  * cuadrar en pagos perfectamente válidos.
  *
+ * TEST Y PRODUCCIÓN TIENEN CONTRASEÑAS DISTINTAS, y la misma URL de
+ * notificación sirve a las dos. Por eso `password` puede ser una lista: se
+ * prueban todas las configuradas. Aquí sí es correcto probar varias, al revés
+ * que con la HMAC: las dos contraseñas son de la misma tienda y las dos son
+ * nuestras, así que aceptar cualquiera no abre ninguna puerta. Lo que no se
+ * puede es mezclar contraseña con clave HMAC, que son roles distintos.
+ *
  * @param {object} cuerpo   campos kr-* recibidos
- * @param {object} claves   { password, hmac }
+ * @param {object} claves   { password: string|string[], hmac: string|string[] }
  * @returns {{ok: boolean, motivo?: string}}
  */
 function verificarFirma(cuerpo, claves) {
@@ -61,22 +68,24 @@ function verificarFirma(cuerpo, claves) {
     return { ok: false, motivo: 'algoritmo inesperado: ' + algoritmo };
   }
 
-  // Aquí es donde se elige la clave. No se prueban las dos «por si acaso»: eso
-  // convertiría en válida una firma hecha con la clave equivocada.
-  let secreto;
-  if (tipoClave === 'password') secreto = claves.password;
-  else if (tipoClave === 'sha256_hmac') secreto = claves.hmac;
+  // El TIPO de clave no se adivina: lo dice kr-hash-key y se respeta. Firmar
+  // con la HMAC y declarar `password` tiene que seguir fallando.
+  let candidatas;
+  if (tipoClave === 'password') candidatas = claves.password;
+  else if (tipoClave === 'sha256_hmac') candidatas = claves.hmac;
   else return { ok: false, motivo: 'kr-hash-key desconocida: ' + tipoClave };
 
-  if (!secreto) return { ok: false, motivo: 'no hay clave configurada para ' + tipoClave };
+  candidatas = (Array.isArray(candidatas) ? candidatas : [candidatas]).filter(Boolean);
+  if (!candidatas.length) return { ok: false, motivo: 'no hay clave configurada para ' + tipoClave };
 
-  const calculada = crypto.createHmac('sha256', secreto).update(respuesta).digest('hex');
-  const a = Buffer.from(calculada);
-  const b = Buffer.from(firma);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return { ok: false, motivo: 'la firma no coincide' };
+  const recibida = Buffer.from(firma);
+  for (const secreto of candidatas) {
+    const calculada = Buffer.from(crypto.createHmac('sha256', secreto).update(respuesta).digest('hex'));
+    if (calculada.length === recibida.length && crypto.timingSafeEqual(calculada, recibida)) {
+      return { ok: true };
+    }
   }
-  return { ok: true };
+  return { ok: false, motivo: 'la firma no coincide con ninguna clave configurada' };
 }
 
 /**

@@ -87,6 +87,12 @@ que cambiaría la firma— y solo entonces se da el pago por bueno.
 Verificar el IPN con la clave HMAC no falla «a veces»: falla siempre, y el
 síntoma es un webhook que rechaza todos los pagos buenos.
 
+**Y test y producción tienen claves distintas**, aunque compartan la misma URL de
+notificación. Por eso `.env` admite `IZIPAY_PASSWORD_ALTERNA` y
+`IZIPAY_HMAC_SHA256_ALTERNA`: las del modo que no se esté usando, solo para
+verificar lo que entra. Sin ellas, el día que se active producción las
+notificaciones reales se rechazarían por firma con todo aparentemente bien.
+
 **El que manda es el IPN.** La vuelta por el navegador puede no llegar nunca —el
 comprador cierra la pestaña— y entonces el cobro existiría sin que nadie se
 enterase. `/retorno` solo sirve para enseñarle el resultado a la persona;
