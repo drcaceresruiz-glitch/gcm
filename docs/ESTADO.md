@@ -6,17 +6,46 @@ qué está construido así.
 **Lo que FALTA vive en [`PENDIENTES.md`](PENDIENTES.md)**, aparte, para poder
 tacharlo sin reescribir esto.
 
-Última actualización: 24 de agosto de 2026.
+Última actualización: 25 de agosto de 2026.
 
 > **Este documento se escribió por capas y las más nuevas van arriba.** Las
 > secciones numeradas del final son del 8 de agosto; los anexos recogen lo
 > ocurrido después. **Ante una contradicción, manda siempre el anexo más
-> reciente**, que es el del 24 de agosto.
+> reciente**, que es el del 25 de agosto.
 >
 > Entre el 12 y el 21 de agosto entraron 297 commits y el sistema cambió de
 > forma en cosas de fondo —el contractual ahora se genera desde el presupuesto
 > real, y los gastos generales dejaron de ser de la obra—. Si algo de más
 > abajo te suena raro, comprueba primero si el anexo lo desmiente.
+
+---
+
+## Anexo — 25 de agosto de 2026
+
+El día del **recorrido con los ojos de un residente**, que era el último hueco
+de verificación abierto. Cuatro fallos reales, y el hilo vuelve a ser el mismo
+del día anterior: *la batería estaba verde y aun así estaban ahí.*
+
+- **La pantalla de usuarios ofrecía todos los botones de gestión** a quien solo
+  tenía `usuario:leer`. Un residente veía «Resetear clave» sobre el
+  administrador principal. Cada control lleva ya su permiso.
+- **La pregunta al asistente desaparecía** de la conversación: se leía del
+  campo después de que la acción respondiera, y React 19 ya lo había limpiado.
+- **El error del asistente salía en inglés**, crudo del runtime.
+- **El asistente estaba caído**, y no por GCM: el modelo `gemini-3.7-flash`
+  estaba saturado. Se cambió a `gemini-3.6-flash`.
+
+**Lo que se comprobó que funciona**, y era la mitad que se rompe al apretar de
+más: un residente puede trabajar en su obra —se reportó un parte del día de
+verdad—, y no alcanza nada de las demás, verificado por pantalla, por servicio,
+por el agente de IA y pidiendo un archivo por su id con el fichero puesto en
+disco.
+
+**Lo que hay que llevarse del día**: cuatro veces estuve a punto de reportar un
+fallo que no existía, y siempre por medir mal —un contador animado, un permiso
+que me inventé, un ayudante que restaba dos veces, y una prueba que pasaba con
+el fallo dentro—. Antes de decir «esto falla», comprobar que el instrumento
+sabría distinguir el caso contrario. Está en `PENDIENTES.md` y en las memorias.
 
 ---
 

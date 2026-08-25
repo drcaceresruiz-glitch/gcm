@@ -18,3 +18,6 @@
 - [Esconder algo no lo caza la bateria](esconder-algo-no-lo-caza-la-bateria.md) — un cambio que consiste en NO ensenar algo pasa las 3028 pruebas estando mal; recorrer las pantallas
 - [Clic por referencia no llega a React](clic-por-referencia-no-llega-a-react.md) — antes de reportar «el boton no hace nada», repetirlo con un clic real en coordenadas
 - [Priorizar bugs reportados sobre tareas en curso](priorizar-bugs-reportados-sobre-tareas-en-curso.md) — un bug real con evidencia pausa cualquier otra tarea, aunque el usuario la haya pedido hace poco
+- [El instrumento tambien miente](el-instrumento-tambien-miente.md) — antes de reportar, comprobar que la medicion distingue; volver al codigo viejo y ver que la prueba se pone roja
+- [Vitest no carga el .env](vitest-no-carga-el-env.md) — para tocar la base o descifrar desde una prueba hay que leer el .env a mano, tambien CORREO_CLAVE_CIFRADO
+- [El push cierra las sesiones abiertas](push-cierra-las-sesiones-abiertas.md) — el gancho de pre-push construye; no empujar mientras alguien recorre la aplicacion

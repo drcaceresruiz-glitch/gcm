@@ -5,6 +5,31 @@ son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
 Ultima revision: 25 de agosto de 2026.
 
+## AL ABRIR LA PROXIMA SESION (despues del 25 de agosto de 2026)
+
+**No queda ninguna tarea a medias.** El recorrido como residente —lo unico
+pendiente esa manana— se hizo entero y esta cerrado mas abajo. Lo que sigue son
+DECISIONES, no trabajo empezado:
+
+1. **El modelo de IA en PRODUCCION.** En desarrollo se cambio de
+   `gemini-3.7-flash` —saturado, devolvia 503 «high demand» y colgaba el
+   asistente— a `gemini-3.6-flash`, que es el que Google recomienda y responde
+   en 1,5 s. **En produccion no se ha tocado**: si alli esta el mismo modelo, el
+   asistente esta caido igual. Se arregla en `Empresa -> Configuracion -> IA`.
+2. **`Rita Residente`** quedo con contraseña y asignada a `LABORATORIO
+   INSTITUTO`. Se dejo asi a proposito: es la cuenta con la que se puede volver
+   a recorrer la aplicacion con alcance limitado sin montar nada. Si estorba, se
+   desactiva desde `Empresa -> Usuarios`.
+3. **El fallo `81572617` del cronograma** sigue abierto, pero **ya no es
+   indiagnosticable**: si reaparece, `grep 'GCM-FALLO <codigo>'` en el
+   `stderr.log` de la app da la ruta, el mensaje y la pila.
+
+**Rastro en la base de desarrollo**, para que nadie se extrañe: un reporte de
+avance del 25/08 en `LABORATORIO INSTITUTO`, partida 4.5, con el mismo 60 % que
+ya tenia. Es un parte veraz y la serie es append-only a proposito.
+
+---
+
 ## El recorrido como RESIDENTE — HECHO el 25 de agosto de 2026
 
 Era el ultimo hueco de verificacion. Se hizo entero, con `Rita Residente`
