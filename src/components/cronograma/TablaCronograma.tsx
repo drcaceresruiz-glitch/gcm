@@ -6,6 +6,7 @@ import type { CronogramaVigente } from "@/services/cronograma.service";
 import { accionRegistrarAvance } from "@/app/(dashboard)/obras/[id]/cronograma/acciones";
 import { fechaCorta, fechaCronograma } from "@/utils/fechas";
 import { decimal } from "@/utils/formato";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 type Fila = CronogramaVigente["tareas"][number];
 
@@ -24,7 +25,7 @@ type Fila = CronogramaVigente["tareas"][number];
 export function TablaCronograma({
   obraId,
   tareas,
-  puedeRegistrar,
+  puedeRegistrar: puedeRegistrarRecibido,
   fechaReporteDefecto,
 }: {
   obraId: string;
@@ -56,6 +57,18 @@ export function TablaCronograma({
       }
     });
   }
+
+  /*
+   * En una obra que no admite cambios el cronograma se LEE entero -es
+   * historia, y para eso esta- pero no se reporta avance: lo rechaza
+   * `registrarAvance`. Solo se cae la columna de reportar.
+   *
+   * El hook se llama SUELTO y no dentro del `&&`: en `a && useHook()` la
+   * llamada se salta cuando `a` es falso, y eso cambia el orden de los hooks
+   * entre renders.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  const puedeRegistrar = puedeRegistrarRecibido && !sinEscritura;
 
   const columnas = puedeRegistrar ? 8 : 7;
 

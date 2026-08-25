@@ -10,6 +10,7 @@ import {
 } from "@/app/(dashboard)/obras/[id]/meta/acciones";
 import { CampoTexto } from "@/components/auth/CampoTexto";
 import { MODOS_OFRECIDOS, MODO_POR_DEFECTO } from "@/lib/meta-excel";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Carga del presupuesto meta desde el Excel de la plantilla.
@@ -21,6 +22,17 @@ import { MODOS_OFRECIDOS, MODO_POR_DEFECTO } from "@/lib/meta-excel";
 
 function Boton() {
   const { pending } = useFormStatus();
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `crearMeta` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   return (
     <button

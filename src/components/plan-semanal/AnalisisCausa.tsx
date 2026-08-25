@@ -8,6 +8,7 @@ import {
   accionAbrirAnalisis,
   accionCerrarAnalisis,
 } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * El analisis de causa raiz, pegado al Pareto.
@@ -49,6 +50,17 @@ export function AnalisisCausa({
   const [accion, setAccion] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pendiente, empezar] = useTransition();
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `abrirAnalisis` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   const abiertos = analisis.filter((a) => !a.cerrado);
   const cerrados = analisis.filter((a) => a.cerrado);

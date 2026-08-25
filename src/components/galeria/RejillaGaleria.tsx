@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { agruparFotos, etiquetaGrupo, type AgrupacionGaleria } from "@/lib/galeria";
 import type { ResultadoGaleria } from "@/services/galeria.service";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * La rejilla de la galeria: agrupada por periodo, con visor a pantalla
@@ -60,7 +61,7 @@ export function RejillaGaleria({
   fotos,
   agrupacion,
   sufijoSrc = "",
-  acciones,
+  acciones: accionesRecibidas,
 }: {
   fotos: FotoRejilla[];
   agrupacion: AgrupacionGaleria;
@@ -71,6 +72,17 @@ export function RejillaGaleria({
   /// Indice sobre la lista PLANA, para que el visor recorra toda la galeria
   /// sin frenar en el borde de cada grupo.
   const [abierta, setAbierta] = useState<number | null>(null);
+
+  /*
+   * En una obra que no admite cambios se mira, no se toca: la rejilla se
+   * queda entera y lo que se cae son editar, eliminar y marcar visible.
+   * `subirFotoGaleria` y sus hermanas lo rechazan en el servidor.
+   *
+   * En la galeria PUBLICA no hay obra en el contexto, el hook devuelve null y
+   * esto no cambia nada: alli `acciones` ya viene sin definir.
+   */
+  const acciones =
+    useMotivoSinEscritura() === null ? accionesRecibidas : undefined;
 
   const grupos = agruparFotos(fotos, agrupacion);
   const indiceDe = new Map(fotos.map((f, i) => [f.id, i] as const));

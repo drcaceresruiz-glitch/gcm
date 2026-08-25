@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { LoaderCircle, UserRoundCheck, X } from "lucide-react";
 import { accionComprometerRestricciones } from "@/app/(dashboard)/obras/[id]/lookahead/acciones";
 import type { PersonaAsignable } from "@/services/lookahead.service";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * A quien le toca levantar estas restricciones, y para cuando.
@@ -46,6 +47,18 @@ export function PanelAsignar({
   const [error, setError] = useState<string | null>(null);
   const [hecho, setHecho] = useState<number | null>(null);
   const [pendiente, iniciar] = useTransition();
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `comprometerRestricciones` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: una obra PARALIZADA SI lo admite
+   * -cierra algo en curso, no abre trabajo nuevo-.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura({ permiteEnParalizada: true }) !== null;
+  if (sinEscritura) return null;
 
   const dentro = personas.filter((p) => !p.externo);
   const fuera = personas.filter((p) => p.externo);

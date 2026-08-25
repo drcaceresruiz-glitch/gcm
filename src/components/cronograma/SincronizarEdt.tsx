@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, CheckCircle2, LoaderCircle, RefreshCw } from "lucide-react";
 
 import { accionSincronizarEdt } from "@/app/(dashboard)/obras/[id]/cronograma/acciones-manual";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Poner la EDT al dia con el presupuesto.
@@ -19,6 +20,17 @@ export function SincronizarEdt({ obraId }: { obraId: string }) {
   const [hecho, setHecho] = useState<string | null>(null);
   const [sobrantes, setSobrantes] = useState<string[]>([]);
   const [yendo, ir] = useTransition();
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `sincronizarEdtConPresupuesto` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   function sincronizar() {
     setError(null);

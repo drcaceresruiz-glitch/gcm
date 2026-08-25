@@ -14,6 +14,7 @@ import { tipoCambio } from "@/utils/formato";
 import { hoy } from "@/utils/fechas";
 import { PanelResumen } from "@/components/revisiones/PanelResumen";
 import { FormularioRevision } from "@/components/revisiones/FormularioRevision";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Revisiones del presupuesto" };
 
@@ -75,6 +76,8 @@ export default async function RevisionesPage({
       <h2 className="text-xl font-semibold tracking-tight">
         Revisiones del presupuesto
       </h2>
+
+      <AvisoSinEscritura />
 
       {creada && (
         <p

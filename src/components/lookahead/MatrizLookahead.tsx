@@ -37,6 +37,7 @@ import {
 } from "@/app/(dashboard)/obras/[id]/lookahead/acciones";
 import { accionSubirEvidencia } from "@/app/(dashboard)/obras/[id]/evidencia/acciones";
 import type { LookaheadDatos } from "@/services/lookahead.service";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * La matriz del Lookahead: tareas de la ventana (filas) x los 7 flujos de
@@ -103,6 +104,21 @@ export function MatrizLookahead({
   //
   // Arranca con lo que diga el codigo QR, si se llego por uno.
   const [evidenciaEn, setEvidenciaEn] = useState<string | null>(abrirEvidencia);
+
+  /*
+   * DOS interruptores, porque esta pantalla mezcla las dos reglas del
+   * servidor. `sincronizarLookahead` -traer tareas nuevas- usa el criterio
+   * estricto: es abrir trabajo. Levantar restricciones, comprometerlas y
+   * subir evidencia pasan `{ permiteEnParalizada: true }`, porque son cerrar
+   * lo que ya estaba abierto, que es justo lo que hay que poder hacer
+   * mientras la obra esta parada.
+   *
+   * Un solo interruptor estricto habria apagado media pantalla en una obra
+   * PARALIZADA, y es la mitad que mas falta hace ahi.
+   */
+  const sinTraer = useMotivoSinEscritura() !== null;
+  const sinCerrar =
+    useMotivoSinEscritura({ permiteEnParalizada: true }) !== null;
   const router = useRouter();
   const ruta = usePathname();
   const {
@@ -355,7 +371,7 @@ export function MatrizLookahead({
             que prometio levantar, y son dos problemas distintos. */}
         <LiberacionATiempo datos={liberacion} />
 
-        {puedeGestionar && pendientesDeSincronizar > 0 && (
+        {puedeGestionar && !sinTraer && pendientesDeSincronizar > 0 && (
           <button
             type="button"
             onClick={sincronizar}
@@ -382,7 +398,7 @@ export function MatrizLookahead({
         <div className="flex flex-wrap items-center gap-3">
           {elegidas.size > 0 ? (
             <>
-              {puedeGestionar && (
+              {puedeGestionar && !sinTraer && (
                 <button
                   type="button"
                   onClick={() => setPanel("analizar")}
@@ -394,7 +410,7 @@ export function MatrizLookahead({
                 </button>
               )}
 
-              {puedeGestionar && conPendientes > 0 && (
+              {puedeGestionar && !sinCerrar && conPendientes > 0 && (
                 <button
                   type="button"
                   onClick={levantarTodas}
@@ -411,7 +427,7 @@ export function MatrizLookahead({
                 </button>
               )}
 
-              {puedeGestionar && conPendientes > 0 && (
+              {puedeGestionar && !sinCerrar && conPendientes > 0 && (
                 <button
                   type="button"
                   onClick={() => setPanel("asignar")}

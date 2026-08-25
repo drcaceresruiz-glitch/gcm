@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { AlertCircle, LoaderCircle, Trash2 } from "lucide-react";
 import { accionEliminarPlanSemanal } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Elimina una semana entera para rehacerla si se creo por error o quedo mal
@@ -24,6 +25,17 @@ export function BotonEliminarPlan({
   const [abierto, setAbierto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `eliminarPlanSemanal` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   function eliminar() {
     setError(null);

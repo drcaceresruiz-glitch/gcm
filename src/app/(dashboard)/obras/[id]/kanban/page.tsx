@@ -7,6 +7,7 @@ import { obtenerObra } from "@/services/obras.service";
 import { kanbanDeObra } from "@/services/kanban.service";
 import { puede } from "@/lib/rbac";
 import { TableroKanban } from "@/components/kanban/TableroKanban";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Kanban" };
 
@@ -57,6 +58,8 @@ export default async function KanbanPage({
           no. Cada tarjeta lleva a la pantalla donde se actúa sobre ella.
         </p>
       </div>
+
+      <AvisoSinEscritura />
 
       {total === 0 ? (
         // Un tablero vacio no se explica solo: o no hay cronograma, o la

@@ -20,6 +20,7 @@ import type { FotoResumen } from "@/services/evidencia.service";
 import type { CausaNoCumplimiento } from "@/generated/prisma/enums";
 import { cumplidoPorCantidad, cumplidoAlCerrar } from "@/lib/cierre-cantidad";
 import { esPositivo } from "@/lib/decimal";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Cerrar la semana: por cada compromiso, cumplido si/no; si no, su causa (CNC)
@@ -165,6 +166,18 @@ export function CierrePlanSemanal({
   const [sinAvance, setSinAvance] = useState<
     { compromisoId: string; descripcion: string }[] | null
   >(null);
+  /*
+   * En una obra que no admite cambios no se ofrece: `cerrarPlanSemanal` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: una obra PARALIZADA SI lo admite
+   * -cierra algo en curso, no abre trabajo nuevo-.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura =
+    useMotivoSinEscritura({ permiteEnParalizada: true }) !== null;
+  if (sinEscritura) return null;
 
   function set(id: string, cambios: Partial<Fila>) {
     setFilas((p) => p.map((f) => (f.id === id ? { ...f, ...cambios } : f)));

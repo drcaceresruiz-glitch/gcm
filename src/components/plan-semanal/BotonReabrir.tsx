@@ -3,11 +3,23 @@
 import { useState, useTransition } from "react";
 import { LoaderCircle, LockOpen } from "lucide-react";
 import { accionReabrirPlanSemanal } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /** Reabre una semana cerrada para corregir compromisos o su evaluacion. */
 export function BotonReabrir({ obraId, planId }: { obraId: string; planId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `reabrirPlanSemanal` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   function reabrir() {
     setError(null);

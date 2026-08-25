@@ -9,6 +9,7 @@ import { fechaLarga, hoy } from "@/utils/fechas";
 import { ParteDelDia } from "@/components/avance/ParteDelDia";
 import { fotosDeTareas, type FotoResumen } from "@/services/evidencia.service";
 import { accionSubirEvidencia } from "@/app/(dashboard)/obras/[id]/evidencia/acciones";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Parte del día" };
 
@@ -121,6 +122,8 @@ export default async function AvancePage({
           tarea no sé nada hoy», y eso también es un dato.
         </p>
       </div>
+
+      <AvisoSinEscritura />
 
       <div
         className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm"

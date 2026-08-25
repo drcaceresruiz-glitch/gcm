@@ -14,6 +14,7 @@ import { proximoCorte, corteSiguiente } from "@/lib/plan-semanal";
 import { MatrizLookahead } from "@/components/lookahead/MatrizLookahead";
 import { EnlaceBoton } from "@/components/ui/EnlaceBoton";
 import { QrCode } from "lucide-react";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Lookahead" };
 
@@ -80,6 +81,8 @@ export default async function LookaheadPage({
           )}
         </p>
       </div>
+
+      <AvisoSinEscritura />
 
       {/* Antes de la matriz: son las dos cifras que se miran para decidir si
           se puede comprometer, no un resumen de lo que ya se hizo. */}

@@ -14,6 +14,7 @@ import {
   accionSubirAdjuntoNota,
   accionEliminarAdjuntoNota,
 } from "./acciones";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Notas" };
 
@@ -49,6 +50,8 @@ export default async function NotasPage({
             : `${notas.length} nota${notas.length === 1 ? "" : "s"}.`}
         </p>
       </AcentoTitulo>
+
+      <AvisoSinEscritura />
 
       {notas.length === 0 && !puedeCrear && (
         <div

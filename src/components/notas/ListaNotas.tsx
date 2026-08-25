@@ -17,6 +17,7 @@ import { CATEGORIAS_NOTA } from "@/lib/notas";
 import type { NotaResumen, ResultadoNota } from "@/services/notas.service";
 import type { CategoriaNota } from "@/generated/prisma/enums";
 import { CampoTexto } from "@/components/auth/CampoTexto";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * La bitacora libre de la obra.
@@ -98,8 +99,8 @@ function ordenar(notas: NotaResumen[]): NotaResumen[] {
 export function ListaNotas({
   obraId,
   notas,
-  puedeCrear,
-  puedeGestionar,
+  puedeCrear: puedeCrearRecibido,
+  puedeGestionar: puedeGestionarRecibido,
   acciones,
 }: {
   obraId: string;
@@ -108,6 +109,16 @@ export function ListaNotas({
   puedeGestionar: boolean;
   acciones: AccionesNotas;
 }) {
+  /*
+   * En una obra que no admite cambios las notas se leen pero no se escriben:
+   * `crearNota`, `editarNota`, `alternarAtendida` y `eliminarNota` lo rechazan
+   * todas en el servidor. La lista se queda; se caen el formulario de arriba y
+   * los controles de cada nota.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  const puedeCrear = puedeCrearRecibido && !sinEscritura;
+  const puedeGestionar = puedeGestionarRecibido && !sinEscritura;
+
   const ahora = new Date();
   const ordenadas = ordenar(notas);
 

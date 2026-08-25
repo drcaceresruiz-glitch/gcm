@@ -130,19 +130,38 @@ proveedores (nuevo encargo, valorizar, cerrar, anular), valorizaciones
 movimientos (registrar, aprobar, eliminar borrador) y meta (aprobar, borrar,
 deducciones).
 
-**Sin cubrir todavia, y es mecanico:** cronograma, plan semanal, lookahead,
-parte del dia, notas, kanban, galeria, personal, equipo, evidencia,
-contractual, presupuesto y revisiones. El mecanismo ya esta; cada una es una
-linea mas el import. Se dejo fuera a proposito: son otros catorce sitios donde
-hay que mirar uno por uno que opciones usa su servicio, y meterlos a ciegas en
-el mismo diff era justo la forma de colar un boton escondido que si deberia
-estar.
+**Completado el mismo dia para TODAS las pantallas de la obra.** Se hizo con el
+mapa real, no a ojo: para cada componente se busco el servicio que hay al otro
+lado del boton y con que opciones llama a la guarda. 44 archivos.
 
-**Pendiente de mirar en pantalla.** La bateria G6 pasa entera (typecheck,
-lint, 3018 pruebas, build) pero la sesion del servidor de desarrollo caduco
-antes de poder verlo con los ojos en la obra OB-000004. Es lo primero que hay
-que hacer al retomar: entrar, abrir esa obra cerrada y comprobar que los
-botones no estan y que el cartel si.
+Lo que el mapa dejo claro y no era evidente:
+
+- **Cuatro servicios usan el criterio LAXO** (`{ permiteEnParalizada: true }`):
+  `quitarDeObra`, `subirEvidencia`, `aprobarMovimiento` y el cierre del plan
+  semanal, mas tres del Lookahead (`levantarRestricciones`,
+  `levantarTodasDeTareas`, `comprometerRestricciones`). Sus botones tienen que
+  SEGUIR VISIBLES en una obra paralizada: son cerrar lo que ya estaba abierto,
+  que es justo lo que hay que poder hacer mientras dure la parada.
+- **Tres pantallas mezclan los dos criterios y necesitan DOS interruptores.**
+  `PanelEquipo`: «Asignar» es estricto y «Quitar» es laxo, y es el mismo boton.
+  `MatrizLookahead`: traer tareas es estricto, levantar y comprometer son
+  laxos. `TablaCronograma`: la tabla se lee entera —es historia— y solo se cae
+  la columna de reportar avance.
+- **Hay pantallas que NO se tocan porque su servicio no guarda nada**: el pase
+  de personal, enviar el informe por correo o SMS, exportar la curva. Enviar un
+  informe de una obra cerrada es legitimo.
+
+**Y un hueco del SERVIDOR que salio de paso**: `generarContractualDesdeReal`
+NO llama a `motivoSiObraCerrada`. Se puede generar el contractual de una obra
+cerrada. No se toco aqui porque cambiar lo que el servidor acepta es otra cosa
+que esconder un boton, y mezclarlo habria hecho el cambio irrevisable. **Es lo
+siguiente que hay que mirar de esta linea.**
+
+**Pendiente de mirar en pantalla.** La bateria G6 pasa entera (typecheck, lint,
+3028 pruebas, build). Se vio con los ojos en proveedores, valorizaciones y
+ordenes; las demas no, porque `npm run build` invalida la sesion del servidor
+de desarrollo y no se pudo volver a entrar. Al retomar: entrar, abrir una obra
+cerrada y recorrer cronograma, plan semanal, lookahead, notas y galeria.
 
 ## El dinero de la obra, de punta a punta (23 de agosto de 2026)
 

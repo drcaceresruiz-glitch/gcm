@@ -7,6 +7,7 @@ import {
   accionMarcarEnEjecucion,
   type EstadoMarcha,
 } from "@/app/(dashboard)/obras/[id]/kanban/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Mover la tarjeta entre «Comprometida» y «En ejecución».
@@ -43,6 +44,17 @@ export function BotonEnEjecucion({
     enMarcha,
     (_actual, siguiente: boolean) => siguiente,
   );
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `marcarEnEjecucion` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   function enviar(datos: FormData) {
     marcarOptimista(!enMarcha);

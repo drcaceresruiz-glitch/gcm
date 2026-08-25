@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, LoaderCircle, TriangleAlert } from "lucide-react";
 import { accionCrearPlanSemanal } from "@/app/(dashboard)/obras/[id]/plan-semanal/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Crea una semana nueva. La fecha viene propuesta al proximo dia de corte de la
@@ -34,6 +35,17 @@ export function NuevaSemana({
   /// El aviso de numeracion, cuando la fecha deja el correlativo a contramano.
   const [aviso, setAviso] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `crearPlanSemanal` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   function crear(confirmado = false) {
     setError(null);

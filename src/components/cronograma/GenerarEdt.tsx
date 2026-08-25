@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ListTree, LoaderCircle } from "lucide-react";
 
 import { accionGenerarEdt } from "@/app/(dashboard)/obras/[id]/cronograma/acciones-manual";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Traer la EDT del presupuesto al cronograma.
@@ -18,6 +19,16 @@ export function GenerarEdt({ obraId }: { obraId: string }) {
   const router = useRouter();
   const [trabajando, iniciar] = useTransition();
   const [aviso, setAviso] = useState<{ texto: string; malo: boolean } | null>(null);
+  /*
+   * En una obra que no admite cambios no se ofrece: `generarEdtDesdePresupuesto` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   function pulsar() {
     setAviso(null);

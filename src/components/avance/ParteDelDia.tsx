@@ -14,6 +14,7 @@ import {
   type AccionSubirEvidencia,
 } from "@/components/evidencia/PanelEvidencia";
 import type { FotoResumen } from "@/services/evidencia.service";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * El barrido del dia: todas las tareas abiertas, una casilla cada una, un solo
@@ -115,6 +116,17 @@ export function ParteDelDia({
       }),
     };
   }, [grupos, escritos]);
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `registrarAvancesEnLote` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   function alTeclear(e: React.KeyboardEvent<HTMLInputElement>, uid: number) {
     if (e.key !== "Enter") return;

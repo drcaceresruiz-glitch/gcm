@@ -15,6 +15,7 @@ import {
   accionMarcarVisible,
   accionSubirFotoGaleria,
 } from "./acciones";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Galería" };
 
@@ -55,6 +56,8 @@ export default async function GaleriaPage({
             ` ${visibles} visible${visibles === 1 ? "" : "s"} para el cliente.`}
         </p>
       </AcentoTitulo>
+
+      <AvisoSinEscritura />
 
       {puedeGestionar && (
         <SubirFotosGaleria obraId={id} accion={accionSubirFotoGaleria} />

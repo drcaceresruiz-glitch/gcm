@@ -10,6 +10,7 @@ import {
   accionQuitarDeObra,
 } from "@/app/(dashboard)/obras/[id]/equipo/acciones";
 import type { MiembroObra } from "@/services/equipo.service";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Quien trabaja en esta obra.
@@ -45,6 +46,21 @@ export function PanelEquipo({
       if (!r.ok) setError(r.error);
     });
   }
+
+  /*
+   * DOS interruptores, y no uno, porque las dos mitades del boton no son la
+   * misma regla en el servidor: `asignarAObra` usa el criterio estricto
+   * -asignar a alguien es abrir trabajo nuevo- y `quitarDeObra` pasa
+   * `{ permiteEnParalizada: true }`, porque sacar a alguien de una obra parada
+   * es justo lo que hay que poder hacer mientras dure la parada.
+   *
+   * Con un solo interruptor, el estricto habria escondido «Quitar de la obra»
+   * en una obra PARALIZADA: una funcion que existe y que ademas es la que mas
+   * falta hace ahi.
+   */
+  const sinAsignar = useMotivoSinEscritura() !== null;
+  const sinQuitar =
+    useMotivoSinEscritura({ permiteEnParalizada: true }) !== null;
 
   // Los que ya lo ven todo van al final: no hay nada que decidir sobre ellos.
   const orden = [...personas].sort((a, b) => {
@@ -92,7 +108,7 @@ export function PanelEquipo({
                 <Chip tono="neutro" icono={ShieldCheck}>
                   Ve todas las obras
                 </Chip>
-              ) : (
+              ) : (p.asignado ? sinQuitar : sinAsignar) ? null : (
                 <button
                   type="button"
                   disabled={enCurso === p.userId}

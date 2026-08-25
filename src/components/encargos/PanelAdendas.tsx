@@ -11,6 +11,7 @@ import {
 } from "@/app/(dashboard)/obras/[id]/proveedores/acciones-adendas";
 import type { AdendasDelEncargo } from "@/services/adendas.service";
 import { soles } from "@/utils/formato";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Los adicionales y deductivos de un contratista, con su circuito de firmas.
@@ -85,6 +86,16 @@ export function PanelAdendas({
   const [resolucion, accionResolver] = useActionState(accionResolverAdenda, {});
   /// Que adenda se esta rechazando: el motivo solo se pide al decir que no.
   const [rechazando, setRechazando] = useState<string | null>(null);
+  /*
+   * En una obra que no admite cambios no se ofrece: `crearAdenda` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   const { resumen, filas, montoVigente } = adendas;
   const hayCambios = filas.length > 0;

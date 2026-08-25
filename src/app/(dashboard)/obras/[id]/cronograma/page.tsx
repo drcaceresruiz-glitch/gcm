@@ -54,6 +54,7 @@ import {
 } from "@/services/hitos.service";
 import { hitosPropuestos } from "@/services/hitos-predictivos.service";
 import { listarTareasManuales } from "@/services/cronograma-manual.service";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Cronograma" };
 
@@ -200,6 +201,8 @@ export default async function CronogramaPage({
           )}
         </div>
       </div>
+
+      <AvisoSinEscritura />
 
       {cargado && (
         <Mensaje tono="exito" icono={<CheckCircle2 className="size-4 shrink-0" />}>

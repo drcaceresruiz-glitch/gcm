@@ -8,6 +8,7 @@ import type {
   EstadoLookahead,
   CausaNoCumplimiento,
 } from "@/generated/prisma/enums";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Planificar la semana: elegir tareas del cronograma (por uid) y/o anadir
@@ -143,6 +144,17 @@ export function FormularioPlanSemanal({
   // distintos entre renders —React lo trata como un fallo de pureza, y con
   // razon: la fila se remontaria sola y perderia el foco a media escritura—.
   const contador = useRef(0);
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `guardarCompromisos` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
   const nuevaKey = () => `n${(contador.current += 1)}`;
 
   function agregarTarea() {

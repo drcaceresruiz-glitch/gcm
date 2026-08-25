@@ -16,6 +16,7 @@ import {
   causasParaAnalizar,
   listarAnalisis,
 } from "@/services/causa-raiz.service";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Plan Semanal" };
 
@@ -68,6 +69,8 @@ export default async function PlanSemanalPage({
           />
         )}
       </div>
+
+      <AvisoSinEscritura />
 
       {/* El numero de una semana es el correlativo de creacion y no mira la
           fecha, asi que puede quedar cruzado con la de al lado. La lista se

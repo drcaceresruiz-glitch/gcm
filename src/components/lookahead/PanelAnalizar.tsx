@@ -9,6 +9,7 @@ import {
 } from "@/app/(dashboard)/obras/[id]/lookahead/acciones";
 import type { TipoRestriccion } from "@/generated/prisma/enums";
 import type { ResultadoAnalisis } from "@/services/lookahead.service";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Decir QUE flujos de restriccion aplican a las tareas elegidas.
@@ -53,6 +54,17 @@ export function PanelAnalizar({
   >(null);
   const [error, setError] = useState<string | null>(null);
   const [pendiente, iniciar] = useTransition();
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `fijarFlujos` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   function alternar(tipo: TipoRestriccion) {
     setElegidos((p) => {

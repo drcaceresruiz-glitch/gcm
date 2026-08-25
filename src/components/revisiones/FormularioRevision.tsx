@@ -15,6 +15,7 @@ import {
 import { sumar } from "@/lib/decimal";
 import { CampoTexto } from "@/components/auth/CampoTexto";
 import { CuadroCascadaComercial } from "@/components/revisiones/CuadroCascadaComercial";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * Alta de una revision del presupuesto.
@@ -302,6 +303,17 @@ export function FormularioRevision({
 
 function BotonCrear() {
   const { pending } = useFormStatus();
+
+  /*
+   * En una obra que no admite cambios no se ofrece: `crearRevision` lo
+   * rechaza, y un boton que siempre falla invita a probar. El motivo se
+   * explica una vez por pantalla, no en cada control.
+   * Mismas opciones que el servidor: sin excepciones.
+   * Va DESPUES del ultimo hook: un `return` por delante de una llamada a
+   * un hook cambia el orden entre renders y React lo prohibe.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   return (
     <button
