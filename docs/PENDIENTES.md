@@ -36,9 +36,37 @@ mapeo: **hoy una constructora no ve NADA de su propia licencia**, es
 informacion solo del operador, asi que no se le puede pedir que pague algo que
 no puede mirar. Ese es el paso 3 del plan, el de mas valor y ningun riesgo.
 
-**La cola acordada con el usuario, en este orden**: el asistente (hecho, aqui
-abajo), el fallo `81572617`, y luego exportar presupuesto y ordenes a Excel, la
-ventana del Lookahead por obra, y el modulo de PPC contra el de Causas.
+### La cola del 25 de agosto: HECHA ENTERA
+
+Se acordo por la tarde y se cerro el mismo dia. Cada una tiene su seccion mas
+abajo: el asistente y su pantalla, el fallo `81572617` buscado a fondo, el
+presupuesto y las ordenes en Excel, la ventana del Lookahead por obra, el
+modulo de PPC contra el de Causas, la deuda pequena entera —los modulos del
+tablero, `EnlaceBoton`, la ortografia y la cookie—, `docs/MANUAL.md` retirado
+y la curva S sombreada.
+
+**Todo esta en produccion**, incluida la migracion de `semanasLookahead`, que
+la aplica sola `desplegar.sh`.
+
+### Lo que queda, y que hace falta para cada cosa
+
+Ordenado por lo que se puede empezar antes. **Ninguna esta a medias**: las
+cuatro primeras esperan una decision, no trabajo.
+
+| Que | Que hace falta |
+|---|---|
+| **Cobrar la licencia** | Las cinco decisiones de arriba. El paso 3 del plan —la pantalla de licencia en modo lectura— se puede empezar sin ninguna de ellas. |
+| **Empresa de demostracion para el tutorial** | Decidir QUE es: ¿una empresa con datos falsos que se reinicia sola? ¿de solo lectura? ¿con un cartel de «demo»? La nota original es una linea de hace semanas y no dice ninguna de las tres. |
+| **Capturas y videos del manual** | Alguien que recorra la aplicacion y capture. El asistente no tiene navegador en esta sesion; el texto ya esta. |
+| **`/gerencia`: tendencia de PPC de cartera, BAC real, filtros, exportacion, pestanas** | Se dejaron fuera A PROPOSITO el 22 de agosto, con su motivo escrito (ver el punto 7). Reabrirlas es su propia conversacion, no un pendiente que arrastrar. |
+| **Fase 2** — documental con validacion de restricciones | Es el que cierra el circulo del Lookahead: hoy una restriccion de INFORMACION se levanta a mano diciendo «ya esta el plano» sin que nada lo compruebe. Con migracion. |
+| **Fase 3** — sectores de color en el PTS | Con migracion. |
+| **Fase 5** — motor de reglas | Sin definir. |
+
+Y tres que no dependen de escribir codigo: **ver el modelo de IA en
+produccion**, **imprimir un PDF en papel de verdad** —en pantalla ya se
+revisan, y asi se cazo el «UNDMETRADO»— y **`x-forwarded-for`**, que es una
+comprobacion de infraestructura y no de la aplicacion.
 
 ---
 

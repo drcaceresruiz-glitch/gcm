@@ -6,7 +6,7 @@ qué está construido así.
 **Lo que FALTA vive en [`PENDIENTES.md`](PENDIENTES.md)**, aparte, para poder
 tacharlo sin reescribir esto.
 
-Última actualización: 25 de agosto de 2026.
+Última actualización: 25 de agosto de 2026 (tarde).
 
 > **Este documento se escribió por capas y las más nuevas van arriba.** Las
 > secciones numeradas del final son del 8 de agosto; los anexos recogen lo
@@ -122,6 +122,24 @@ formulario. Trece enlaces que estaban a mano pasan por él.
 ortografía quedan cerradas —lo que se ve en pantalla ya está bien—, y la cookie
 vieja `gcm-tablero` se deja caducar sola, porque borrarla cuesta más código del
 que vale el problema.
+
+### Y lo último del día: GCM va a cobrar su licencia
+
+Se pidió «un carrito, un checkout o un botón de pago». Detrás de esas palabras
+había **tres productos distintos** —cobrar la licencia de GCM, un carrito de
+materiales para la obra, o cobrarle una valorización al cliente final— y el
+trabajo no se parece en nada. Elegido: **la licencia**.
+
+**No se tocó código a propósito.** El plan entero está en
+[`plan-cobro-licencia.md`](plan-cobro-licencia.md) y hay **cinco decisiones de
+negocio antes**, ninguna técnica: si una licencia vencida suspende sola —hoy el
+código dice que no, deliberadamente—, qué planes y a qué precio, la moneda,
+quién emite la factura electrónica, y si se guarda la tarjeta.
+
+El hallazgo del mapeo tampoco es técnico: **hoy una constructora no ve nada de
+su propia licencia**. Los tres campos son del área del operador. No se le puede
+pedir a alguien que pague algo que no puede mirar, así que esa pantalla es el
+primer paso del plan, el de más valor y ningún riesgo.
 
 ---
 
