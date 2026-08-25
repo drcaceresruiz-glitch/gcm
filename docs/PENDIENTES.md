@@ -3959,9 +3959,13 @@ reglas solo se han visto en pruebas.
   un componente de CLIENTE y en produccion solo recibe el hash-. Cuando alguien
   reporte un codigo:
 
-      grep 'GCM-FALLO 81572617' <la salida del servidor>
+      grep 'GCM-FALLO 81572617' ~/<carpeta de la app>/stderr.log
 
-  y sale la ruta, el mensaje y la pila. Comprobado de punta a punta: se hizo
+  y sale la ruta, el mensaje y la pila. **Ese es el archivo**: cPanel/Passenger
+  recoge ahi la salida del proceso -lo dice `infraestructura.md`, en el aviso de
+  no poner un espejo con borrado sobre esa carpeta-. Se comprobo antes de
+  prometerlo: un gancho que escribe en un sitio que nadie guarda no sirve de
+  nada. Comprobado de punta a punta: se hizo
   reventar una pagina a proposito y el codigo de la pantalla y el del log eran
   el mismo.
 
