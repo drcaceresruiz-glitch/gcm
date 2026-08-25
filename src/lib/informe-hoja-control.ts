@@ -1,4 +1,4 @@
-import { dividir, esCero, esPositivo, multiplicar } from "./decimal";
+import { esCero, esPositivo, porcentajeDe } from "./decimal";
 import { fechaCsv } from "./informe-documento";
 import type {
   CapituloDeLaBrecha,
@@ -76,17 +76,7 @@ function pct(valor: string): number {
  * calcular —presupuesto cero, importe ilegible—, y entonces la hoja lo dice.
  */
 export function porcentajeComprometido(e: EconomiaDelInforme): number | null {
-  // Cuatro decimales en la proporcion: al pasarla a porcentaje quedan dos,
-  // que es la precision con la que se lee un porcentaje impreso.
-  const proporcion = dividir(e.comprometido, e.presupuesto, 4);
-  if (proporcion === null) return null;
-  const cien = multiplicar(proporcion, "100", 2);
-  if (cien === null) return null;
-  // Aqui SI se convierte a number, y solo aqui: lo que sale de esta funcion
-  // es la longitud de una barra en el papel, no un importe con el que se
-  // vuelva a operar.
-  const n = Number(cien);
-  return Number.isFinite(n) ? n : null;
+  return porcentajeDe(e.comprometido, e.presupuesto);
 }
 
 /// Soles con separador de miles, que es como se leen en un informe impreso.

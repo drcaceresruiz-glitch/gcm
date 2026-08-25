@@ -222,6 +222,24 @@ export async function editarFotoGaleria(
   });
   if (!foto) return { ok: false, error: "Esa foto no existe." };
 
+  /*
+   * ALTERAR EL REGISTRO de una obra cerrada es lo que la propia guarda dice
+   * que no se puede: «el resultado de una obra cerrada es historia,
+   * modificarlo falsearia lo que de verdad paso». Una foto borrada o
+   * retitulada despues del cierre cambia lo que el expediente cuenta.
+   *
+   * `subirFotoGaleria` ya lo comprobaba; estas dos no, y esa incoherencia se
+   * vio recorriendo la aplicacion el 24 de agosto de 2026: subir se rechazaba
+   * y borrar pasaba.
+   *
+   * NO se cierran `marcarVisibleCliente` ni `gestionarEnlaceGaleria`: esas no
+   * tocan el registro, deciden que se COMPARTE. Dejar de publicar una foto o
+   * revocar el enlace del cliente tiene que funcionar siempre —son la salida
+   * de privacidad, y una obra cerrada es justo cuando se usan—.
+   */
+  const cerrada = await motivoSiObraCerrada(sesion, foto.projectId);
+  if (cerrada) return { ok: false, error: cerrada };
+
   await prisma.fotoGaleria.update({
     where: { id: foto.id },
     data: {
@@ -297,6 +315,17 @@ export async function marcarVisibleCliente(
     select: { id: true, projectId: true },
   });
   if (!foto) return { ok: false, error: "Esa foto no existe." };
+
+  /*
+   * ALTERAR EL REGISTRO de una obra cerrada es lo que la propia guarda dice
+   * que no se puede: «el resultado de una obra cerrada es historia,
+   * modificarlo falsearia lo que de verdad paso». Una foto borrada o
+   * retitulada despues del cierre cambia lo que el expediente cuenta.
+   *
+   * Ver el comentario de `editarFotoGaleria`: misma razon.
+   */
+  const cerrada = await motivoSiObraCerrada(sesion, foto.projectId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   await prisma.fotoGaleria.update({
     where: { id: foto.id },

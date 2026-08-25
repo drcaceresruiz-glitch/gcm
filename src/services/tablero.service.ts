@@ -3,7 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { alcanzaObra } from "@/lib/alcance-obras";
-import { restar } from "@/lib/decimal";
+import { porcentajeDe, restar } from "@/lib/decimal";
 import {
   agruparPorCapitulo,
   alertasDeAtraso,
@@ -689,13 +689,14 @@ async function presupuestoDeObra(
   const total = partidas.costoDirecto;
   const gastado = comprometido.total;
 
-  const numeroTotal = Number(total);
-
   return {
     total,
     comprometido: gastado,
     saldo: restar(total, gastado) ?? "0.00",
-    porcentaje: numeroTotal > 0 ? (Number(gastado) / numeroTotal) * 100 : 0,
+    // Con la aritmetica de importes, no en coma flotante: son dos cifras de
+    // dinero. `?? 0` porque sin presupuesto cargado la barra va a cero, que es
+    // lo que esta pantalla ensenaba ya.
+    porcentaje: porcentajeDe(gastado, total) ?? 0,
     partidas: partidas.partidas,
     sobregiradas: comprometido.sobregiradas.length,
   };

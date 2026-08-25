@@ -259,3 +259,35 @@ export function esCero(valor: string): boolean {
   const e = escalar(valor);
   return e !== null && e.valor === 0n;
 }
+
+/**
+ * Que porcentaje es `parte` de `total`, como numero.
+ *
+ * ES EL UNICO SITIO DONDE UNA PROPORCION DE DINERO SE VUELVE UN `number`, y
+ * por eso vive aqui y no en cinco pantallas. Estaba escrita cinco veces:
+ * probada y con aritmetica de importes en la hoja del informe, y en coma
+ * flotante -`Number(a) / Number(b) * 100`- en el panel, el tablero, la
+ * cobertura de encargos y la cartera de gerencia. Cinco copias de la misma
+ * idea, cuatro de ellas con el error que `lib/decimal` existe para evitar.
+ *
+ * La division se hace con cuatro decimales: al pasarla a porcentaje quedan
+ * dos, que es la precision con la que se lee un porcentaje.
+ *
+ * Devuelve `null` cuando NO SE PUEDE calcular -total cero o negativo, importe
+ * ilegible-, y nunca cero: un cero se lee como «no hay nada comprometido» y
+ * eso es una respuesta, no la ausencia de ella. Quien lo pinte decide que
+ * dice en su hueco.
+ *
+ * Lo que sale es la longitud de una barra o el numero de una etiqueta, no un
+ * importe con el que se vuelva a operar. Si hace falta seguir calculando, hay
+ * que quedarse con `dividir` y `multiplicar`.
+ */
+export function porcentajeDe(parte: string, total: string): number | null {
+  if (!esPositivo(total)) return null;
+  const proporcion = dividir(parte, total, 4);
+  if (proporcion === null) return null;
+  const cien = multiplicar(proporcion, "100", 2);
+  if (cien === null) return null;
+  const n = Number(cien);
+  return Number.isFinite(n) ? n : null;
+}

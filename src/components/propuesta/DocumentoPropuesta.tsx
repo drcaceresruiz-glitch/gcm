@@ -2,6 +2,7 @@ import { decimal, metrado, porcentaje, precio } from "@/utils/formato";
 import type { CascadaComercial, TipoImpuestoContractual } from "@/lib/presupuesto";
 import { SIMBOLO, type LineaDetalle, type Moneda } from "@/lib/propuesta-detalle";
 import type { EmisorPropuesta, Propuesta } from "@/services/propuesta.service";
+import { esCero, restar } from "@/lib/decimal";
 
 /**
  * La propuesta economica tal como se le entrega al cliente.
@@ -283,11 +284,23 @@ function Resumen({
   // salir sin decir en que moneda esta.
   const dinero = (valor: string) => `${simbolo} ${decimal(valor)}`;
 
-  const hayDescuento = Number(cascada.descuento) !== 0;
+  /*
+   * Las dos preguntas de dinero, resueltas RESTANDO y no con `Number`.
+   *
+   * Deciden que filas salen en el documento que se le manda al cliente: si
+   * aparece la linea de descuento y si el precio de venta se ensena aparte
+   * del valor de venta. `Number(a) !== Number(b)` sobre dos importes es el
+   * error que `lib/decimal` existe para evitar, y aqui se cobraba caro por
+   * partida doble: un descuento de cero podia salir impreso, y dos cifras
+   * iguales escritas con distinto numero de decimales -«92000» y
+   * «92000.00»- se enseñaban como si fueran distintas.
+   */
+  const hayDescuento = !esCero(cascada.descuento);
   const hayIgv = impuesto === "IGV";
   const hayRetencion = impuesto === "RENTA";
-  const precioDistinto =
-    Number(cascada.precioVenta) !== Number(cascada.valorVenta);
+  const precioDistinto = !esCero(
+    restar(cascada.precioVenta, cascada.valorVenta) ?? "0",
+  );
 
   return (
     <section className="mt-4 break-inside-avoid">

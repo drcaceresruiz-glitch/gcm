@@ -4,7 +4,7 @@ import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { filtroDeObras } from "@/lib/alcance-obras";
-import { sumar, restar, esPositivo } from "@/lib/decimal";
+import { esPositivo, porcentajeDe, restar, sumar } from "@/lib/decimal";
 import { alertasDeAtraso } from "@/lib/control-avance";
 import { medirAvance, type AvanceReportado } from "@/lib/cronograma";
 import { ponderarPorDuracion } from "@/lib/curva-s";
@@ -919,9 +919,13 @@ export async function sobregiroProyectadoDeCartera(
       }
     }
 
-    const presupuesto = Number(presupuestos.get(o.obraId)?.costoDirecto ?? "0");
-    const comprometido = Number(comprometidoDeCadaObra.get(o.obraId)?.total ?? "0");
-    const comprometidoPct = presupuesto > 0 ? (comprometido / presupuesto) * 100 : null;
+    // Con la aritmetica de importes, no en coma flotante. `null` cuando no se
+    // puede -sin presupuesto cargado-, que es distinto de cero y aqui ya se
+    // trataba asi: sin proporcion no hay desviacion que calcular.
+    const comprometidoPct = porcentajeDe(
+      comprometidoDeCadaObra.get(o.obraId)?.total ?? "0",
+      presupuestos.get(o.obraId)?.costoDirecto ?? "0",
+    );
 
     const desviacionPuntos =
       avanceFisicoPct !== null && comprometidoPct !== null

@@ -15,6 +15,7 @@ import {
 } from "@/app/(dashboard)/obras/[id]/proveedores/acciones";
 import { AltaRapidaProveedor } from "@/components/proveedores/AltaRapidaProveedor";
 import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
+import { dividir, multiplicar, sumar } from "@/lib/decimal";
 
 export interface ProveedorOpcion {
   id: string;
@@ -144,13 +145,23 @@ export function FormularioEncargo({
   // El presupuesto del frente elegido, para que se vea cuanto suma lo marcado
   // sin tener que guardar para descubrirlo.
   const presupuestoFrente = useMemo(() => {
-    let total = 0;
+    /*
+     * CON LA ARITMETICA DE IMPORTES, no acumulando en coma flotante.
+     *
+     * Estaba como `total += (Number(parcial) * Number(fraccion)) / 100` sobre
+     * un `let total = 0`. Con veinte partidas fraccionadas eso arrastra
+     * centimos, y la cifra que se ensena aqui es justo la que la persona
+     * compara con lo que va a pactar con el proveedor: si no cuadra con la
+     * que sale luego guardada, deja de fiarse de las dos.
+     */
+    const trozos: string[] = [];
     for (const p of partidas) {
       const fr = seleccion.get(p.id);
       if (fr === undefined) continue;
-      total += (Number(p.parcial) * Number(fr)) / 100;
+      const parte = multiplicar(dividir(String(fr), "100", 6) ?? "0", p.parcial, 2);
+      if (parte !== null) trozos.push(parte);
     }
-    return total;
+    return sumar(trozos);
   }, [partidas, seleccion]);
 
   /*
@@ -431,7 +442,7 @@ export function FormularioEncargo({
           </h3>
           <span className="text-sm tabular-nums">
             Presupuesto del frente:{" "}
-            <strong>{soles(presupuestoFrente.toFixed(2))}</strong>
+            <strong>{soles(presupuestoFrente)}</strong>
           </span>
         </div>
 

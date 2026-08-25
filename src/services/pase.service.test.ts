@@ -337,6 +337,89 @@ describe("crearPase: guardas de gestion", () => {
     expect(h.reg.create).toHaveLength(1);
     expect(h.reg.audit).toHaveLength(1);
   });
+
+  /*
+   * DAR UN PASE ES ABRIR TRABAJO. Un pase existe para que alguien documente
+   * en campo, y en una obra cerrada no hay campo que documentar.
+   *
+   * Se cierra SOLO aqui: `cambiarEstadoPase` -revocar- tiene que seguir
+   * funcionando con la obra en el estado que sea, y hay una prueba abajo que
+   * lo fija. Si algun dia alguien cierra tambien la revocacion, esa prueba se
+   * pondra roja, que es justo lo que tiene que pasar.
+   */
+  it("obra cerrada: no se da un pase nuevo", async () => {
+    h.cfg.paseFindFirst = null;
+    h.cfg.proyecto = { estado: "CERRADA", archivadaEn: null, company: { enMigracionAt: null } };
+    const r = await crearPase(sesion, "o1", datos as any);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("cerrada");
+    expect(h.reg.create).toHaveLength(0);
+  });
+
+  it("obra paralizada tampoco: dar un pase es abrir trabajo", async () => {
+    h.cfg.paseFindFirst = null;
+    h.cfg.proyecto = { estado: "PARALIZADA", archivadaEn: null, company: { enMigracionAt: null } };
+    const r = await crearPase(sesion, "o1", datos as any);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("paralizada");
+  });
+});
+
+describe("quitar el acceso NO depende del estado de la obra", () => {
+  /**
+   * Lo contrario del bloque de arriba, y por eso va aparte.
+   *
+   * EL AGUJERO QUE CIERRA, visto el 24 de agosto de 2026: la sesion de un
+   * pase SIGUE VALIENDO en una obra PARALIZADA —`obtenerPaseVigente` solo la
+   * invalida si la obra esta CERRADA o la empresa suspendida— y sin embargo
+   * revocarla se rechazaba por «obra paralizada». El titular seguia entrando
+   * y nadie podia echarlo.
+   *
+   * Quitar acceso solo RESTA: no falsea el expediente, asi que el estado de
+   * la obra no tiene por que impedirlo.
+   */
+  const conObra = (estado: string) => {
+    h.cfg.puede = ["lookahead:gestionar"];
+    h.cfg.paseFindFirst = {
+      id: "p1",
+      projectId: "o1",
+      activo: true,
+      project: { estado, archivadaEn: null, company: { enMigracionAt: null } },
+    };
+  };
+
+  it("con la obra PARALIZADA se revoca igual, que es el caso que fallaba", async () => {
+    conObra("PARALIZADA");
+    const r = await cambiarEstadoPase(sesion, "o1", "p1", false);
+    expect(r.ok).toBe(true);
+  });
+
+  it("con la obra CERRADA tambien", async () => {
+    conObra("CERRADA");
+    const r = await cambiarEstadoPase(sesion, "o1", "p1", false);
+    expect(r.ok).toBe(true);
+  });
+
+  it("pero DEVOLVER el acceso sigue siendo una escritura como las demas", async () => {
+    conObra("PARALIZADA");
+    const r = await cambiarEstadoPase(sesion, "o1", "p1", true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("paralizada");
+  });
+
+  it("una copia restaurada no admite ni quitar: no es una obra", async () => {
+    h.cfg.puede = ["lookahead:gestionar"];
+    h.cfg.paseFindFirst = {
+      id: "p1", projectId: "o1", activo: true,
+      project: {
+        estado: "CERRADA",
+        archivadaEn: new Date("2026-08-01"),
+        company: { enMigracionAt: null },
+      },
+    };
+    const r = await cambiarEstadoPase(sesion, "o1", "p1", false);
+    expect(r.ok).toBe(false);
+  });
 });
 
 describe("cambiarEstadoPase", () => {

@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
-  normalizarDecimal,
-  multiplicar,
-  sumar,
-  restar,
-  esPositivo,
-  esNegativo,
   esCero,
+  esNegativo,
+  esPositivo,
+  multiplicar,
+  normalizarDecimal,
+  porcentajeDe,
+  restar,
+  sumar,
 } from "./decimal";
 
 describe("normalizarDecimal", () => {
@@ -194,5 +195,46 @@ describe("sumar descarta operandos invalidos", () => {
   it("se salta lo que no puede sumar, sin avisar", () => {
     expect(sumar(["100.00", "--50.00"])).toBe("100.00");
     expect(sumar(["100.00", "abc", "25.00"])).toBe("125.00");
+  });
+});
+
+describe("porcentajeDe", () => {
+  /*
+   * ESTABA ESCRITA CINCO VECES, cuatro de ellas en coma flotante. Aqui vive
+   * la unica, y estas pruebas son las que impiden que alguien vuelva a
+   * resolverla con `Number(a) / Number(b) * 100` en la pantalla que le toque.
+   */
+  it("calcula la proporcion con la aritmetica de importes", () => {
+    expect(porcentajeDe("196400.50", "745553.36")).toBeCloseTo(26.34, 2);
+  });
+
+  it("acierta donde la coma flotante se desvia", () => {
+    // 0.1 + 0.2 !== 0.3 en binario; con importes, 70 de 700 son 10 exactos.
+    expect(porcentajeDe("0.30", "3.00")).toBe(10);
+    expect(porcentajeDe("70.00", "700.00")).toBe(10);
+  });
+
+  it("no le molestan los ceros del final: es el mismo dinero", () => {
+    expect(porcentajeDe("50", "200.0000")).toBe(porcentajeDe("50.00", "200"));
+  });
+
+  /**
+   * NULL Y NO CERO cuando no se puede calcular.
+   *
+   * Un cero se lee como «no hay nada comprometido», que es una respuesta.
+   * «No tengo presupuesto contra el que medirlo» es la ausencia de respuesta,
+   * y quien lo pinte tiene que poder decir cual de las dos es.
+   */
+  it("devuelve null sin total contra el que medir", () => {
+    expect(porcentajeDe("100.00", "0.00")).toBeNull();
+    expect(porcentajeDe("100.00", "-5.00")).toBeNull();
+  });
+
+  it("devuelve null con un importe ilegible", () => {
+    expect(porcentajeDe("no soy un numero", "100.00")).toBeNull();
+  });
+
+  it("pasa del 100 % cuando de verdad se ha pasado", () => {
+    expect(porcentajeDe("150.00", "100.00")).toBe(150);
   });
 });

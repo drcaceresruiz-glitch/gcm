@@ -4,7 +4,12 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { puede } from "@/lib/rbac";
 import { alcanzaObra, FUERA_DE_ALCANCE } from "@/lib/alcance-obras";
-import { motivoNoAdmiteCambios } from "@/lib/obras";
+import { motivoSiObraCerrada } from "@/services/obra-abierta";
+import {
+  EMPRESA_EN_MIGRACION,
+  motivoNoAdmiteCambios,
+  OBRA_ARCHIVADA,
+} from "@/lib/obras";
 import { isProduction } from "@/lib/env";
 import { generateToken, hashToken, generateNumericCode } from "@/lib/tokens";
 import {
@@ -143,6 +148,22 @@ export async function crearPase(
   // El alcance por obra, antes de consultar: esto se llama desde una accion
   // de servidor, que no pasa por el layout de la obra.
   if (!alcanzaObra(sesion, obraId)) return { ok: false, error: FUERA_DE_ALCANCE };
+
+  /*
+   * DAR UN PASE ES ABRIR TRABAJO, y en una obra que no admite cambios no hay
+   * trabajo que abrir: un pase existe para que alguien documente en campo.
+   *
+   * Solo AQUI, y no en `editarPase`, `eliminarPase` ni `cambiarEstadoPase`:
+   * esas tres CIERRAN -corregir un dato, limpiar, y sobre todo REVOCAR-, y
+   * revocarle el acceso a alguien tiene que funcionar siempre, con la obra en
+   * el estado que sea. Es la misma linea que parte el resto de la aplicacion.
+   *
+   * La pantalla publica del pase ya excluye las obras cerradas
+   * -`obraParaPase` filtra por `estado: { not: "CERRADA" }`-, asi que esto
+   * cierra la puerta que quedaba: crear el pase desde dentro.
+   */
+  const cerrada = await motivoSiObraCerrada(sesion, obraId);
+  if (cerrada) return { ok: false, error: cerrada };
 
   const obra = await prisma.project.findFirst({
     where: { id: obraId, companyId: sesion.companyId },
@@ -348,8 +369,8 @@ export async function eliminarPase(
   });
   if (!pase) return { ok: false, error: "Pase no encontrado." };
 
-  const noAdmite = motivoNoAdmiteCambios({
-    estado: pase.project.estado,
+  // Borrar un pase tambien QUITA acceso: misma puerta que revocar.
+  const noAdmite = motivoParaNoQuitarAcceso({
     archivadaEn: pase.project.archivadaEn,
     empresaEnMigracion: pase.project.company.enMigracionAt !== null,
   });
@@ -377,6 +398,30 @@ export async function eliminarPase(
   });
 
   return { ok: true };
+}
+
+/**
+ * Si se puede QUITAR el acceso de un pase, que no es lo mismo que darlo.
+ *
+ * REVOCAR Y BORRAR SON CERRAR, y hasta el 24 de agosto de 2026 pasaban por la
+ * misma guarda que crear y editar. El agujero era este: la sesion de un pase
+ * SIGUE VALIENDO en una obra PARALIZADA -`obtenerPaseVigente` solo la invalida
+ * si la obra esta CERRADA o la empresa suspendida-, pero `cambiarEstadoPase` y
+ * `eliminarPase` la rechazaban por «obra paralizada». O sea: el titular seguia
+ * entrando y nadie podia echarlo.
+ *
+ * Quitar acceso nunca falsea el expediente —solo resta—, asi que el estado de
+ * la obra no tiene por que impedirlo. Lo unico que lo bloquea es que esto no
+ * sea una obra viva sobre la que actuar: una copia restaurada de un respaldo,
+ * o la empresa entera congelada para exportarla.
+ */
+function motivoParaNoQuitarAcceso(obra: {
+  archivadaEn: Date | null;
+  empresaEnMigracion: boolean;
+}): string | null {
+  if (obra.empresaEnMigracion) return EMPRESA_EN_MIGRACION;
+  if (obra.archivadaEn) return OBRA_ARCHIVADA;
+  return null;
 }
 
 /**
@@ -410,11 +455,16 @@ export async function cambiarEstadoPase(
   });
   if (!previo) return { ok: false, error: "Pase no encontrado." };
 
-  const noAdmite = motivoNoAdmiteCambios({
+  const contexto = {
     estado: previo.project.estado,
     archivadaEn: previo.project.archivadaEn,
     empresaEnMigracion: previo.project.company.enMigracionAt !== null,
-  });
+  };
+  // Revocar QUITA acceso y va por la puerta de al lado; devolverlo lo DA, y
+  // esa si es una escritura como las demas.
+  const noAdmite = activo
+    ? motivoNoAdmiteCambios(contexto)
+    : motivoParaNoQuitarAcceso(contexto);
   if (noAdmite) return { ok: false, error: noAdmite };
 
   const { count } = await prisma.paseObra.updateMany({

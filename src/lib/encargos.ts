@@ -1,11 +1,12 @@
 import { montoVigente } from "@/lib/adendas";
 import {
-  sumar,
-  restar,
-  multiplicar,
   dividir,
-  esPositivo,
   esCero,
+  esPositivo,
+  multiplicar,
+  porcentajeDe,
+  restar,
+  sumar,
 } from "@/lib/decimal";
 
 /**
@@ -217,9 +218,9 @@ export interface Cobertura {
  * fraccionadas que suman de mas, o un frente contado dos veces—.
  */
 export function coberturaObra(total: string, asignado: string): Cobertura {
-  const numTotal = Number(total);
-  const porcentaje =
-    numTotal > 0 ? (Number(asignado) / numTotal) * 100 : 0;
+  // Con la aritmetica de importes: son dos cifras de dinero, y dividirlas en
+  // coma flotante es el error que `lib/decimal` existe para evitar.
+  const porcentaje = porcentajeDe(asignado, total) ?? 0;
 
   return {
     total,
