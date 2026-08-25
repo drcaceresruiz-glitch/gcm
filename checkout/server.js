@@ -413,6 +413,23 @@ app.post('/api/ipn', express.urlencoded({ extended: false, limit: '64kb' }), (re
 });
 
 /**
+ * GET /api/ipn — Solo para que se pueda COMPROBAR que la dirección existe.
+ *
+ * El Back Office avisa de que «las URL deben ser localizables desde nuestros
+ * servidores», y antes de dejar guardar la regla, Izipay visita la dirección con
+ * un GET normal. Sin esta ruta respondía 404 y el panel contestaba «Ha ocurrido
+ * un error de validación», que no dice cuál ni dónde: se pierde media tarde
+ * buscando un fallo de configuración que no existe.
+ *
+ * No hace nada más. Las notificaciones de verdad llegan por POST, firmadas, y
+ * las atiende el manejador de arriba. Este responde en texto plano y no revela
+ * nada de la tienda.
+ */
+app.get('/api/ipn', (_req, res) => {
+  res.status(200).type('text/plain').send('IPN de GCM operativo. Las notificaciones se reciben por POST.');
+});
+
+/**
  * /retorno — Adonde vuelve el COMPRADOR al pulsar «Volver a la tienda».
  *
  * No confundir con el IPN de arriba: esta la abre una persona en su navegador y
