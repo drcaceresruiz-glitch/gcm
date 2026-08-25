@@ -1,25 +1,31 @@
 /**
  * server.js — Servidor del checkout de GCM.
  *
- * QUÉ HACE. Sirve la página del checkout y habla con Izipay. Son tres rutas:
+ * QUÉ HACE. Sirve la página del checkout y habla con Izipay:
  *
  *   GET  /api/catalogo         qué se vende y a qué precio (lo dice el servidor)
  *   POST /api/create-payment   pide a Izipay el formToken del pago
- *   POST /api/validate-payment comprueba la firma de la respuesta del pago
+ *   POST /api/validate-payment comprueba la firma de la vuelta por el navegador
+ *   POST /api/ipn              la notificación de servidor a servidor
+ *   ANY  /retorno              adonde vuelve el comprador tras pagar
+ *   POST /api/reclamacion      el Libro de Reclamaciones
  *
- * POR QUÉ LA TERCERA, SI NO SE PIDIÓ. Sin ella el checkout no puede saber si un
- * pago fue de verdad: el navegador diría «pagado» porque el navegador lo dice, y
- * eso lo puede escribir cualquiera desde la consola. La firma HMAC es lo único
- * que distingue un cobro real de uno inventado, y comprobarla es el mínimo para
- * que esta página pueda enseñarse como un checkout terminado.
+ * LAS TRES FIRMAS, QUE ES LO QUE MÁS CUESTA VER. Un pago se puede confirmar por
+ * dos caminos y cada uno se firma con una clave distinta:
+ *
+ *   · navegador (validate-payment y /retorno) → clave HMAC-SHA-256
+ *   · notificación (api/ipn)                  → CONTRASEÑA de la API REST
+ *
+ * Quien manda es el IPN: el navegador puede no volver nunca —el comprador
+ * cierra la pestaña— y entonces el cobro existiría sin que nadie se enterase.
+ * La vuelta por el navegador solo sirve para enseñarle el resultado a la
+ * persona; ninguna decisión cuelga de ella.
  *
  * LO QUE ESTE SERVIDOR NO HACE TODAVÍA, y hay que añadir antes de cobrar de
  * verdad (está razonado en docs/plan-cobro-licencia.md):
- *   · El webhook de Izipay (IPN). La validación de aquí es la del navegador, y
- *     el navegador se cierra: si alguien paga y cierra la pestaña, nadie se
- *     entera. El webhook es el que avisa siempre.
- *   · Guardar el pedido antes de mandar a la pasarela, con su clave de
- *     idempotencia. Hoy no hay base de datos detrás de este checkout.
+ *   · Guardar el pedido ANTES de mandar a la pasarela, con su clave de
+ *     idempotencia. Hoy el pago se anota cuando vuelve, no cuando sale, así que
+ *     un pago iniciado y nunca terminado no deja rastro.
  *   · La emisión del comprobante electrónico.
  *
  * Se arranca con:  npm start   (o npm run dev)
@@ -32,9 +38,19 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const { buscarProducto, catalogoPublico, formatearPrecio } = require('./src/catalogo');
 const { revisarHoja, registrarHoja } = require('./src/reclamaciones');
+const { verificarFirma, resumirPago, registrarPago } = require('./src/pagos');
+const { paginaRetorno } = require('./src/pagina_retorno');
 
 const app = express();
 const PUERTO = process.env.PORT || 3001;
+
+/**
+ * Dónde queda publicado esto de cara a internet. Solo sirve para IMPRIMIR las
+ * URL exactas que hay que pegar en el Back Office de Izipay: nada del
+ * funcionamiento depende de ella. Se pide porque escribir a mano una URL de
+ * notificación es de las cosas que se equivocan una vez y cuestan una tarde.
+ */
+const URL_PUBLICA = (process.env.URL_PUBLICA || '').replace(/\/+$/, '');
 
 app.use(express.json({ limit: '32kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -334,14 +350,110 @@ app.post('/api/reclamacion', (req, res) => {
   }
 });
 
+/**
+ * POST /api/ipn — La notificación instantánea de Izipay (webhook).
+ *
+ * ESTE es el que manda. La validación del navegador puede no llegar nunca —el
+ * comprador cierra la pestaña— pero esta notificación llega siempre, de
+ * servidor a servidor, y se reintenta si no respondemos.
+ *
+ * Tres cosas que este manejador hace a propósito:
+ *
+ *  1. RESPONDE RÁPIDO y siempre 200 cuando la firma es buena, aunque el pago
+ *     venga rechazado: el 200 significa «recibí la notificación», no «el pago
+ *     salió bien». Devolver error por un pago rechazado hace que Izipay
+ *     reintente eternamente algo que ya está decidido.
+ *  2. VERIFICA LA FIRMA ANTES de mirar el contenido. Sin firma válida, 400 y no
+ *     se toca nada: esta URL es pública y cualquiera puede llamarla diciendo
+ *     que un pedido está pagado.
+ *  3. ES IDEMPOTENTE. La notificación repetida es lo normal, no la excepción.
+ *
+ * Llega como formulario (`application/x-www-form-urlencoded`), no como JSON,
+ * de ahí el middleware propio de la ruta.
+ */
+app.post('/api/ipn', express.urlencoded({ extended: false, limit: '64kb' }), (req, res) => {
+  const firma = verificarFirma(req.body ?? {}, { password: IZIPAY.clave, hmac: IZIPAY.hmac });
+  if (!firma.ok) {
+    console.warn('[ipn] notificación rechazada:', firma.motivo);
+    return res.status(400).send('firma invalida');
+  }
+
+  let resumen;
+  try {
+    resumen = resumirPago(req.body['kr-answer']);
+  } catch (e) {
+    console.error('[ipn] kr-answer ilegible pese a firma válida:', e);
+    return res.status(400).send('respuesta ilegible');
+  }
+
+  try {
+    const r = registrarPago(resumen, 'ipn');
+    console.log(`[ipn] ${resumen.estado} pedido=${resumen.pedido} ref=${resumen.referencia}` +
+                (r.nuevo ? '' : ' (repetida, no se vuelve a registrar)'));
+  } catch (e) {
+    // Si no se pudo escribir, se devuelve error A PROPÓSITO: así Izipay
+    // reintenta y el cobro no se pierde en silencio.
+    console.error('[ipn] no se pudo registrar el pago:', e);
+    return res.status(500).send('no registrado');
+  }
+
+  return res.status(200).send('OK');
+});
+
+/**
+ * /retorno — Adonde vuelve el COMPRADOR al pulsar «Volver a la tienda».
+ *
+ * No confundir con el IPN de arriba: esta la abre una persona en su navegador y
+ * puede no abrirla nunca. Aquí no se decide nada; se le enseña cómo quedó su
+ * compra. Se registra igual que el IPN, con origen distinto, por si llega antes
+ * que la notificación.
+ *
+ * Acepta POST (que es como la llama Izipay) y GET, para que abrir la URL a mano
+ * al configurarla no devuelva un 404 desconcertante.
+ */
+const manejarRetorno = (req, res) => {
+  const cuerpo = { ...(req.body ?? {}), ...(req.query ?? {}) };
+  let resumen = null;
+
+  if (cuerpo['kr-answer'] && cuerpo['kr-hash']) {
+    const firma = verificarFirma(cuerpo, { password: IZIPAY.clave, hmac: IZIPAY.hmac });
+    if (firma.ok) {
+      try {
+        resumen = resumirPago(cuerpo['kr-answer']);
+        registrarPago(resumen, 'retorno');
+      } catch (e) {
+        console.error('[retorno] no se pudo leer o registrar el pago:', e);
+        resumen = null;
+      }
+    } else {
+      // No se le enseña un resultado que no podemos probar: la página cae al
+      // mensaje de «no pudimos leer el resultado», que es la verdad.
+      console.warn('[retorno] firma inválida:', firma.motivo);
+    }
+  }
+
+  res.status(200).type('html').send(paginaRetorno(resumen));
+};
+
+app.post('/retorno', express.urlencoded({ extended: false, limit: '64kb' }), manejarRetorno);
+app.get('/retorno', manejarRetorno);
+
 // ---------------------------------------------------------------------------
 //  Arranque
 // ---------------------------------------------------------------------------
 
 app.listen(PUERTO, () => {
   console.log(`Checkout de GCM escuchando en http://localhost:${PUERTO}/checkout.html`);
+  const base = URL_PUBLICA || `http://localhost:${PUERTO}`;
+  console.log('');
+  console.log('  Para pegar en el Back Office de Izipay:');
+  console.log(`    URL de notificación al final del pago (IPN):  ${base}/api/ipn`);
+  console.log(`    URL de retorno de la tienda:                  ${base}/retorno`);
+  if (!URL_PUBLICA) {
+    console.log('    ↑ son las locales. Ponga URL_PUBLICA en .env para ver las de verdad.');
+  }
+  console.log('');
   if (FALTAN.length) {
-    console.warn('');
     console.warn('  ⚠  Faltan credenciales en .env: ' + FALTAN.join(', '));
     console.warn('     La página carga, pero /api/create-payment devolverá 503.');
     console.warn('     Copie .env.example a .env y pegue las credenciales de prueba.');
