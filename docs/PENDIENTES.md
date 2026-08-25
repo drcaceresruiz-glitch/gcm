@@ -4339,7 +4339,8 @@ reglas solo se han visto en pruebas.
   porque el alias `@/generated/prisma/client` esta prohibido a proposito-. Es
   `scripts/humo.ts` en pequeño y sin levantar el servidor.
 
-- **Ortografía: el sitio entero se escribió sin tildes** (convención heredada
+- ~~**Ortografía: el sitio entero se escribió sin tildes**~~ **CERRADO el 25 de
+  agosto de 2026** (ver el motivo al final de esta entrada). (convención heredada
   por miedo a la codificación, que ya no aplica: UTF-8 de punta a punta y
   prod lo sirve bien). El usuario lo señaló el 10 de agosto. **Tandas 1 y 2
   hechas y verificadas en prod** (portada, login, tablero, riel, pestañas, y
