@@ -6,6 +6,7 @@ import {
   accionGenerarContractual,
   type EstadoContractual,
 } from "@/app/(dashboard)/obras/[id]/contractual/acciones";
+import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
  * El segundo paso: confirmar.
@@ -48,6 +49,17 @@ export function ConfirmarContractual({
     accionGenerarContractual,
     {},
   );
+
+  /*
+   * En una obra que no admite cambios no se genera el contractual.
+   * `generarContractualDesdeReal` delega en `aplicarImportacion`, que si
+   * comprueba la guarda -conviene decirlo porque el propio archivo del
+   * contractual no la menciona y parece que no la tuviera-.
+   *
+   * Mismas opciones que el servidor: sin excepciones.
+   */
+  const sinEscritura = useMotivoSinEscritura() !== null;
+  if (sinEscritura) return null;
 
   if (!puedeGenerar) {
     return (

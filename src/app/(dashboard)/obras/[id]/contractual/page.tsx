@@ -8,6 +8,7 @@ import { previsualizarContractual } from "@/services/contractual.service";
 import { analizarRiesgoDeReemplazo } from "@/services/importacion.service";
 import { puede } from "@/lib/rbac";
 import { VistaPreviaContractual } from "@/components/contractual/VistaPreviaContractual";
+import { AvisoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 export const metadata: Metadata = { title: "Generar contractual" };
 
@@ -85,6 +86,8 @@ export default async function ContractualPage({
           capitulo. Todavia no se ha guardado nada.
         </p>
       </div>
+
+      <AvisoSinEscritura />
 
       <VistaPreviaContractual
         obraId={id}

@@ -151,11 +151,19 @@ Lo que el mapa dejo claro y no era evidente:
   de personal, enviar el informe por correo o SMS, exportar la curva. Enviar un
   informe de una obra cerrada es legitimo.
 
-**Y un hueco del SERVIDOR que salio de paso**: `generarContractualDesdeReal`
-NO llama a `motivoSiObraCerrada`. Se puede generar el contractual de una obra
-cerrada. No se toco aqui porque cambiar lo que el servidor acepta es otra cosa
-que esconder un boton, y mezclarlo habria hecho el cambio irrevisable. **Es lo
-siguiente que hay que mirar de esta linea.**
+**Un falso hallazgo que conviene dejar escrito**, porque el siguiente que mire
+va a tropezar igual: parecia que `generarContractualDesdeReal` no comprobaba la
+guarda —no la menciona por ningun sitio en `contractual.service.ts`— y se
+apunto como hueco del servidor. **Es falso**: delega en `aplicarImportacion`, y
+esa si la llama. El servidor esta bien; lo que faltaba era esconder el boton, y
+ya esta hecho.
+
+**Una pregunta abierta, no un fallo**: `pase.service` crea y edita pases de
+obra sin pasar por la guarda. Puede estar bien —revocar el pase de alguien
+DESPUES de cerrar la obra es exactamente lo que hay que poder hacer— o puede
+ser un olvido en la parte de crear. No se toco: cambiar lo que el servidor
+acepta pide decidir antes cual de las dos cosas es, y eso lo decide quien
+conozca como se usan los pases en obra.
 
 **Pendiente de mirar en pantalla.** La bateria G6 pasa entera (typecheck, lint,
 3028 pruebas, build). Se vio con los ojos en proveedores, valorizaciones y
