@@ -4527,7 +4527,7 @@ Nuevo, y sigue abierto:
 |---|---|---|
 | ~~—~~ | ~~Ventana del Lookahead **por obra**~~ **HECHA el 25 de agosto de 2026**: `Project.semanasLookahead`, NULL = no elegida. `?semanas=` sigue mandando encima, para asomarse sin cambiársela a nadie | Hecha |
 | — | Empresa de demostracion para el tutorial | No: identificarla por variable de entorno |
-| — | Sombrear el area entre plan y real en la curva S | No |
+| ~~—~~ | ~~Sombrear el area entre plan y real en la curva S~~ **HECHO el 25 de agosto de 2026**: rojo por detras, verde por delante, partida por los cruces (`bandasEntrePlanYReal`, pura y con pruebas). Solo hasta el ultimo avance medido | No |
 | ~~—~~ | ~~Exportar tablas a Excel (presupuesto y órdenes)~~ **HECHO el 25 de agosto de 2026.** Los tres presupuestos en `/obras/[id]/presupuesto/excel?doc=…` y las órdenes en `/obras/[id]/ordenes/excel`, esta última con los mismos filtros que la pantalla | No |
 | **Fase 2** | Documental: planos, protocolos y guias, con validacion automatica de restricciones | Si |
 | **Fase 3** | Sectores de color en el PTS y aviso cuando dos cuadrillas coinciden en el mismo sitio | Si |

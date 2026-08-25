@@ -9,6 +9,7 @@ import {
   serieCurvaS,
   serieRealPorFechas,
   type TareaParaCurva,
+  bandasEntrePlanYReal,
 } from "./curva-s";
 import type { AvanceReportado } from "./cronograma";
 
@@ -399,5 +400,160 @@ describe("serieRealPorFechas", () => {
       [dc("2026-08-06")],
     );
     expect(serie[0]!.valor).toBeCloseTo(30);
+  });
+});
+
+
+/**
+ * La banda entre el plan y el real. Lo que se prueba no es como se ve -eso es
+ * el SVG- sino lo unico que puede mentir: donde empieza, donde acaba y de que
+ * color es cada tramo.
+ */
+describe("la banda entre el plan y el real", () => {
+  const f = (iso: string) => new Date(`${iso}T00:00:00Z`);
+
+  it("no hay banda si alguna de las dos lineas no llega a dos puntos", () => {
+    const plan = [
+      { fecha: f("2026-01-01"), valor: 0 },
+      { fecha: f("2026-02-01"), valor: 50 },
+    ];
+    expect(bandasEntrePlanYReal(plan, [])).toEqual([]);
+    expect(bandasEntrePlanYReal(plan, [{ fecha: f("2026-01-15"), valor: 10 }])).toEqual([]);
+    expect(bandasEntrePlanYReal([], plan)).toEqual([]);
+  });
+
+  it("una obra siempre por detras da UNA banda de atraso", () => {
+    const bandas = bandasEntrePlanYReal(
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-03-01"), valor: 60 },
+      ],
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-03-01"), valor: 40 },
+      ],
+    );
+
+    expect(bandas).toHaveLength(1);
+    expect(bandas[0]!.atraso).toBe(true);
+  });
+
+  it("una obra siempre por delante da UNA banda de adelanto", () => {
+    const bandas = bandasEntrePlanYReal(
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-03-01"), valor: 40 },
+      ],
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-03-01"), valor: 60 },
+      ],
+    );
+
+    expect(bandas).toHaveLength(1);
+    expect(bandas[0]!.atraso).toBe(false);
+  });
+
+  /**
+   * El caso que obliga a partirla: adelantada primero y atrasada despues. Una
+   * sola mancha de un solo color mentiria sobre la mitad del recorrido.
+   */
+  it("se parte en el cruce, y cada mitad lleva su signo", () => {
+    const bandas = bandasEntrePlanYReal(
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-02-01"), valor: 50 },
+        { fecha: f("2026-03-01"), valor: 100 },
+      ],
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-02-01"), valor: 70 },
+        { fecha: f("2026-03-01"), valor: 80 },
+      ],
+    );
+
+    expect(bandas).toHaveLength(2);
+    expect(bandas[0]!.atraso).toBe(false);
+    expect(bandas[1]!.atraso).toBe(true);
+  });
+
+  /**
+   * El real acaba en el ultimo corte medido; el plan sigue hasta el final de
+   * obra. Pintar banda mas alla seria llamar «atraso» al trabajo que todavia
+   * no toca hacer.
+   */
+  it("no pasa del ultimo punto medido del real", () => {
+    const bandas = bandasEntrePlanYReal(
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-12-01"), valor: 100 },
+      ],
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-03-01"), valor: 10 },
+      ],
+    );
+
+    expect(bandas).toHaveLength(1);
+    const ultima = bandas[0]!.puntos.map((p) => p.fecha.getTime());
+    expect(Math.max(...ultima)).toBe(f("2026-03-01").getTime());
+  });
+
+  it("dos lineas pegadas no pintan nada", () => {
+    const misma = [
+      { fecha: f("2026-01-01"), valor: 0 },
+      { fecha: f("2026-03-01"), valor: 50 },
+    ];
+    expect(bandasEntrePlanYReal(misma, [...misma])).toEqual([]);
+  });
+
+  /**
+   * El poligono se cierra: ida por el plan y vuelta por el real. Sin la vuelta
+   * el SVG lo cerraria en linea recta y la banda no bordearia la curva real.
+   */
+  it("el poligono va por el plan y vuelve por el real", () => {
+    const bandas = bandasEntrePlanYReal(
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-02-01"), valor: 50 },
+        { fecha: f("2026-03-01"), valor: 90 },
+      ],
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-02-01"), valor: 20 },
+        { fecha: f("2026-03-01"), valor: 40 },
+      ],
+    );
+
+    const puntos = bandas[0]!.puntos;
+    expect(puntos).toHaveLength(6);
+    // Primera mitad: el plan, hacia adelante.
+    expect(puntos.slice(0, 3).map((p) => p.valor)).toEqual([0, 50, 90]);
+    // Segunda mitad: el real, de vuelta.
+    expect(puntos.slice(3).map((p) => p.valor)).toEqual([40, 20, 0]);
+  });
+
+  /**
+   * Las dos series se muestrean en la UNION de sus fechas: si solo se usaran
+   * las del plan, un quiebre del real entre dos puntos del plan se recortaria
+   * y la banda se despegaria de la linea que dice bordear.
+   */
+  it("recoge los quiebres del real aunque el plan no tenga punto ahi", () => {
+    const bandas = bandasEntrePlanYReal(
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-04-01"), valor: 90 },
+      ],
+      [
+        { fecha: f("2026-01-01"), valor: 0 },
+        { fecha: f("2026-02-01"), valor: 5 },
+        { fecha: f("2026-03-01"), valor: 8 },
+        { fecha: f("2026-04-01"), valor: 60 },
+      ],
+    );
+
+    const fechas = bandas[0]!.puntos.map((p) => p.fecha.getTime());
+    expect(fechas).toContain(f("2026-02-01").getTime());
+    expect(fechas).toContain(f("2026-03-01").getTime());
   });
 });

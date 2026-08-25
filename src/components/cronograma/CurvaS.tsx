@@ -5,7 +5,7 @@ import type { DatosCurva } from "@/services/cronograma.service";
 import { ExportarCurva } from "@/components/cronograma/ExportarCurva";
 import { fechaCorta, fechaCronograma, fechaLarga } from "@/utils/fechas";
 import { decimal } from "@/utils/formato";
-import { textoRitmo } from "@/lib/curva-s";
+import { bandasEntrePlanYReal, textoRitmo } from "@/lib/curva-s";
 
 /**
  * La curva de avance, dibujada a mano en SVG.
@@ -157,6 +157,18 @@ export function CurvaS({
 
   const trazo = (puntos: Punto[]) =>
     puntos.map((p) => `${x(p.fecha).toFixed(1)},${y(p.valor).toFixed(1)}`).join(" ");
+
+  /**
+   * El area entre las dos lineas: rojo donde se va por detras, verde donde se
+   * va por delante.
+   *
+   * Es la lectura que la gente hace del grafico con el dedo -«cuanto me
+   * separo»- y hasta ahora habia que estimarla a ojo entre dos lineas que
+   * ademas tienen grosores y estilos distintos. Solo cubre el tramo donde las
+   * dos existen; el reparto y los cruces los decide `bandasEntrePlanYReal`,
+   * que es logica pura y con pruebas.
+   */
+  const bandas = bandasEntrePlanYReal(plan, reales);
 
   const marcas = ampliada
     ? [0, maximo / 4, maximo / 2, (maximo * 3) / 4, maximo]
@@ -386,6 +398,17 @@ export function CurvaS({
               </text>
             )}
           </g>
+        ))}
+
+        {/* Debajo de las lineas y de los circulos, siempre: la banda es
+            contexto, y tapar la medida con su propio contexto es al reves. */}
+        {bandas.map((banda, i) => (
+          <polygon
+            key={i}
+            points={trazo(banda.puntos)}
+            fill={banda.atraso ? "var(--color-peligro)" : "var(--color-exito)"}
+            opacity={0.14}
+          />
         ))}
 
         <polyline
@@ -626,6 +649,13 @@ export function CurvaS({
           <Dato etiqueta="Ruta crítica" valor={`${totalCriticas} tareas`} />
           <Dato etiqueta="Cortes cargados" valor={String(datos.cortes.length)} />
         </dl>
+
+        <p className="text-xs opacity-60">
+          El área sombreada entre las dos líneas es la distancia al plan: en
+          rojo donde se va por detrás y en verde donde se va por delante. Solo
+          se pinta hasta el último avance medido — más allá no hay con qué
+          comparar.
+        </p>
 
         <p className="text-xs opacity-60">
           Los círculos huecos son el «% Planeado» que trae el archivo en cada

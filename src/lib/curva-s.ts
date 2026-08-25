@@ -405,3 +405,167 @@ export function textoRitmo(factor: number): string {
     ? porcentaje.toFixed(1)
     : porcentaje.toFixed(0);
 }
+
+
+// ---------------------------------------------------------------------------
+// La banda entre el plan y el real
+// ---------------------------------------------------------------------------
+
+export interface PuntoBanda {
+  fecha: Date;
+  valor: number;
+}
+
+export interface BandaAvance {
+  /**
+   * El poligono cerrado, en orden de dibujo: el PLAN de izquierda a derecha y
+   * el REAL de vuelta. Quien lo pinta solo tiene que aplicar sus escalas.
+   */
+  puntos: PuntoBanda[];
+  /// true = el real va por DEBAJO del plan. Es lo que decide el color.
+  atraso: boolean;
+}
+
+/**
+ * El area entre la linea del plan y la del real, partida por donde se cruzan.
+ *
+ * POR QUE PARTIDA Y NO UNA SOLA. Una obra puede ir adelantada en marzo y
+ * atrasada en junio, y una sola mancha de un solo color mentiria sobre la
+ * mitad del recorrido. Cada tramo lleva su propio signo, asi que el rojo
+ * significa siempre atraso y el verde siempre adelanto, sin excepciones que
+ * haya que recordar.
+ *
+ * SOLO DONDE LAS DOS LINEAS EXISTEN. El real acaba en el ultimo corte medido y
+ * el plan puede empezar antes o acabar despues; fuera de ese solape no hay
+ * banda, porque no hay dos cosas que comparar. Extenderla hasta el final del
+ * plan pintaria como «atraso» todo el trabajo que todavia no toca hacer.
+ *
+ * Las dos series se muestrean en la UNION de sus fechas -no en las de una
+ * sola- porque si no, un tramo largo del plan sin puntos intermedios recortaria
+ * los quiebres del real y la banda se separaria visiblemente de la linea que
+ * dice bordear.
+ */
+export function bandasEntrePlanYReal(
+  plan: readonly PuntoBanda[],
+  real: readonly PuntoBanda[],
+): BandaAvance[] {
+  if (plan.length < 2 || real.length < 2) return [];
+
+  const desde = Math.max(plan[0]!.fecha.getTime(), real[0]!.fecha.getTime());
+  const hasta = Math.min(
+    plan[plan.length - 1]!.fecha.getTime(),
+    real[real.length - 1]!.fecha.getTime(),
+  );
+  if (hasta <= desde) return [];
+
+  const fechas = [
+    ...new Set(
+      [...plan, ...real]
+        .map((p) => p.fecha.getTime())
+        .concat([desde, hasta])
+        .filter((t) => t >= desde && t <= hasta),
+    ),
+  ].sort((a, b) => a - b);
+
+  /// Cada muestra con su diferencia. `d > 0` = el real va por encima.
+  const muestras = fechas.map((t) => {
+    const p = valorInterpolado(plan, t);
+    const r = valorInterpolado(real, t);
+    return { t, plan: p, real: r, d: r - p };
+  });
+
+  /*
+   * Donde las dos lineas se cruzan se mete una muestra EXTRA, con las dos en
+   * el mismo valor. Sin ella el poligono del tramo que acaba y el del que
+   * empieza se solaparian en forma de lazo, y el cruce -que es justo el
+   * instante que interesa- saldria emborronado.
+   */
+  const conCruces: typeof muestras = [];
+  for (let i = 0; i < muestras.length; i++) {
+    const actual = muestras[i]!;
+    conCruces.push(actual);
+
+    const siguiente = muestras[i + 1];
+    if (!siguiente) continue;
+    if (actual.d === 0 || siguiente.d === 0) continue;
+    if (actual.d > 0 === siguiente.d > 0) continue;
+
+    // Interpolacion lineal de la DIFERENCIA: donde vale cero, se cruzan.
+    const f = actual.d / (actual.d - siguiente.d);
+    const t = actual.t + (siguiente.t - actual.t) * f;
+    const valor = actual.plan + (siguiente.plan - actual.plan) * f;
+    conCruces.push({ t, plan: valor, real: valor, d: 0 });
+  }
+
+  const bandas: BandaAvance[] = [];
+  let tramo: typeof conCruces = [];
+
+  const cerrar = () => {
+    // Con menos de dos muestras no hay area: un poligono de dos puntos es una
+    // raya, y dibujarla ensucia el grafico sin decir nada.
+    if (tramo.length < 2) {
+      tramo = [];
+      return;
+    }
+    const atraso = tramo.some((m) => m.d < 0);
+    // Solo el signo contrario no puede aparecer en el mismo tramo: si el tramo
+    // es todo ceros -las dos lineas pegadas- no hay area que pintar.
+    if (!atraso && !tramo.some((m) => m.d > 0)) {
+      tramo = [];
+      return;
+    }
+    bandas.push({
+      puntos: [
+        ...tramo.map((m) => ({ fecha: new Date(m.t), valor: m.plan })),
+        ...[...tramo].reverse().map((m) => ({ fecha: new Date(m.t), valor: m.real })),
+      ],
+      atraso,
+    });
+    tramo = [];
+  };
+
+  for (const m of conCruces) {
+    if (tramo.length === 0) {
+      tramo.push(m);
+      continue;
+    }
+    const signoTramo = tramo.find((x) => x.d !== 0)?.d ?? 0;
+    if (signoTramo === 0 || m.d === 0 || m.d > 0 === signoTramo > 0) {
+      tramo.push(m);
+      continue;
+    }
+    // Cambia el signo: se cierra el tramo en el cruce -que es la ultima
+    // muestra puesta- y el siguiente arranca en ese mismo punto, para que la
+    // banda quede continua.
+    const cruce = tramo[tramo.length - 1]!;
+    cerrar();
+    tramo = [cruce, m];
+  }
+  cerrar();
+
+  return bandas;
+}
+
+/**
+ * Valor de una serie en un instante cualquiera, interpolando entre los puntos
+ * que lo rodean. Fuera del tramo cubierto devuelve el extremo mas cercano:
+ * aqui solo se llama DENTRO del solape, asi que no llega a extrapolar.
+ */
+function valorInterpolado(puntos: readonly PuntoBanda[], t: number): number {
+  const primero = puntos[0]!;
+  const ultimo = puntos[puntos.length - 1]!;
+  if (t <= primero.fecha.getTime()) return primero.valor;
+  if (t >= ultimo.fecha.getTime()) return ultimo.valor;
+
+  for (let i = 1; i < puntos.length; i++) {
+    const a = puntos[i - 1]!;
+    const b = puntos[i]!;
+    if (t > b.fecha.getTime()) continue;
+
+    const tramo = b.fecha.getTime() - a.fecha.getTime();
+    if (tramo <= 0) return b.valor;
+    return a.valor + (b.valor - a.valor) * ((t - a.fecha.getTime()) / tramo);
+  }
+
+  return ultimo.valor;
+}
