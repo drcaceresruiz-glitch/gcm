@@ -686,9 +686,14 @@ como los casos aprendidos de CRIOCORD—. Se cambio solo lo visible.
 
 ### SIN CERRAR
 
-- **Ningun PDF se ha visto impreso.** Esta maquina no rasteriza PDF (sin
-  `pdftoppm` ni ImageMagick). Las pruebas afirman que nada se sale del papel,
-  pero la comparativa lleva una columna mas y es donde menos margen hay.
+- **Ningun PDF se ha visto impreso** —en papel de verdad—, pero desde el 24 de
+  agosto de 2026 SI se pueden ver en pantalla, y es lo que caza que algo se
+  salga: `Read` no rasteriza PDF en esta maquina, pero el visor de Chrome si.
+  **La receta**: generar el PDF con una prueba de vitest que llame a
+  `pintarDocumento`, escribirlo en `public/` y abrirlo en
+  `http://localhost:3000/<nombre>.pdf`. Asi se vieron la hoja de control con y
+  sin Last Planner. **Lo que sigue sin verse es la comparativa**, que lleva una
+  columna mas y es donde menos margen hay.
 - ~~**Los cuatro datos `data-manual`**~~ **HECHO.** Y el hallazgo fue que
   TRES YA ESTABAN en el modelo -`Company.ruc`, `Project.ubicacion`,
   `Cronograma.nombreProyecto`-: lo que faltaba no era guardarlos sino USARLOS,
@@ -946,10 +951,11 @@ que ningun elemento se dibuja por debajo del margen en el peor caso: anadir
 filas a una hoja de altura fija es exactamente como se sale algo por abajo, y
 un elemento con `y` negativa no da error, simplemente no se ve.
 
-**Lo que sigue anotado y sin arreglar**: el estado vacio de Last Planner ocupa
-~40 % del papel (honesto, pero mucho papel para cero informacion). El bloque
-nuevo equilibra un poco la hoja, porque cae en la mitad que estaba mas vacia,
-pero el desequilibrio sigue ahi en una obra sin semanas cerradas.
+**El estado vacio de Last Planner — ARREGLADO ese mismo dia, mas tarde.** Ver
+«Dejar de gastar media hoja del informe en decir que no hay nada que decir»:
+sin plan que dibujar, el dinero se lleva el ancho entero y el aviso baja a una
+franja al pie. Con la hoja para el solo caben doce capitulos de la brecha en
+vez de cinco.
 
 ---
 
