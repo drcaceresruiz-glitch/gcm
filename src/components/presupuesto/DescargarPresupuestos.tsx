@@ -1,4 +1,4 @@
-import { Download, FileText, Printer, Scale } from "lucide-react";
+import { Download, FileText, Printer, Scale, Sheet } from "lucide-react";
 
 import { EnviarPresupuesto } from "./EnviarPresupuesto";
 
@@ -13,6 +13,12 @@ import { EnviarPresupuesto } from "./EnviarPresupuesto";
  * "Ver" abre el PDF en el navegador -de ahi se imprime con Ctrl+P- y
  * "Descargar" lo guarda. Es la misma ruta con distinto parametro: no hay dos
  * documentos que puedan decir cosas distintas.
+ *
+ * "Excel" es el MISMO presupuesto en hoja de calculo, con las cifras como
+ * numero para poder trabajarlas. Sale de las mismas cifras que el PDF
+ * -`presupuesto-documento.service`-, asi que los dos no pueden discrepar. Y
+ * lleva el mismo rotulo de interno donde toca: un .xlsx se reenvia igual de
+ * facil que un .pdf.
  */
 export function DescargarPresupuestos({
   obraId,
@@ -28,6 +34,7 @@ export function DescargarPresupuestos({
   puedeEnviar: boolean;
 }) {
   const base = `/obras/${obraId}/presupuesto/pdf`;
+  const hoja = `/obras/${obraId}/presupuesto/excel`;
 
   return (
     <section className="space-y-3">
@@ -45,6 +52,7 @@ export function DescargarPresupuestos({
         nota="Para el cliente. Partidas, metrados y precios pactados, sin ninguna cifra de costo."
         icono={<FileText className="size-4" aria-hidden="true" />}
         href={`${base}?doc=contractual`}
+        excel={`${hoja}?doc=contractual`}
       />
 
       {puedeVerCosto && (
@@ -55,6 +63,7 @@ export function DescargarPresupuestos({
             interno
             icono={<FileText className="size-4" aria-hidden="true" />}
             href={`${base}?doc=meta`}
+            excel={`${hoja}?doc=meta`}
           />
           <Documento
             titulo="Contractual frente a meta"
@@ -62,6 +71,7 @@ export function DescargarPresupuestos({
             interno
             icono={<Scale className="size-4" aria-hidden="true" />}
             href={`${base}?doc=comparativa`}
+            excel={`${hoja}?doc=comparativa`}
           />
         </>
       )}
@@ -75,12 +85,15 @@ function Documento({
   titulo,
   nota,
   href,
+  excel,
   icono,
   interno,
 }: {
   titulo: string;
   nota: string;
   href: string;
+  /// La misma tabla en hoja de calculo. Mismo dato, otro envase.
+  excel: string;
   icono: React.ReactNode;
   interno?: boolean;
 }) {
@@ -127,12 +140,20 @@ function Documento({
           Ver e imprimir
         </a>
         <a
+          href={excel}
+          className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <Sheet className="size-4" aria-hidden="true" />
+          Excel
+        </a>
+        <a
           href={href}
           className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white"
           style={{ backgroundColor: "var(--color-marca-600)" }}
         >
           <Download className="size-4" aria-hidden="true" />
-          Descargar
+          Descargar PDF
         </a>
       </div>
     </div>

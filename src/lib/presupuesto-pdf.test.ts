@@ -41,7 +41,7 @@ const datos = (parcial: Partial<DatosPresupuesto> = {}): DatosPresupuesto => ({
     partida("1.1", "Cartel de obra", "700.00"),
     partida("1.2", "Cerco provisional", "1260.00"),
   ],
-  totales: [{ etiqueta: "TOTAL", importe: "S/ 1,960.00", destacado: true }],
+  totales: [{ etiqueta: "TOTAL", importe: "1960.00", destacado: true }],
   soloInterno: false,
   ...parcial,
 });
@@ -92,7 +92,7 @@ describe("el presupuesto en papel", () => {
     // Es el caso de una bolsa negativa: la obra pierde dinero, y eso no puede
     // salir del mismo color que todo lo demas.
     const el = hojas(
-      datos({ totales: [{ etiqueta: "BOLSA", importe: "-S/ 1,500.00", destacado: true }] }),
+      datos({ totales: [{ etiqueta: "BOLSA", importe: "-1500.00", destacado: true }] }),
     )[0]!.elementos;
     const cifra = el.find((e) => e.tipo === "texto" && e.texto.includes("1,500.00"));
 

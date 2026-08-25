@@ -1039,22 +1039,20 @@ function fechaFiltro(valor: string | undefined): Date | undefined {
  * propia consulta sobre TODAS las aprobadas—, asi que ni paginar ni filtrar
  * pueden mover la cifra de control de la obra.
  */
-export async function listarOrdenes(
+/**
+ * Que ordenes entran, segun los filtros de la pantalla.
+ *
+ * Extraida a proposito para que la EXPORTACION use exactamente el mismo
+ * criterio que la lista: si el Excel construyera su propio `where`, el dia que
+ * alguien afine un filtro en un sitio y no en el otro, la hoja descargada
+ * traeria un conjunto distinto del que se estaba mirando —y nadie lo notaria,
+ * porque las dos listas son creibles—.
+ */
+function whereDeOrdenes(
   sesion: SesionActiva,
   obraId: string,
-  opciones: FiltrosOrdenes = {},
-): Promise<Pagina<OrdenResumen>> {
-  const porPagina = opciones.porPagina ?? POR_PAGINA;
-
-  if (!puede(sesion, "orden:leer")) {
-    return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
-  }
-
-  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
-  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
-  // la regla 4 en `gcm-limites-de-capas`.
-  if (!alcanzaObra(sesion, obraId)) return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
-
+  opciones: FiltrosOrdenes,
+): Prisma.OrdenCompraWhereInput {
   const texto = opciones.q?.trim();
   const desde = fechaFiltro(opciones.desde);
   const hasta = fechaFiltro(opciones.hasta);
@@ -1063,7 +1061,7 @@ export async function listarOrdenes(
     (e) => e === opciones.estado,
   );
 
-  const where: Prisma.OrdenCompraWhereInput = {
+  return {
     projectId: obraId,
     companyId: sesion.companyId,
     ...(opciones.proveedorId ? { proveedorId: opciones.proveedorId } : {}),
@@ -1083,6 +1081,25 @@ export async function listarOrdenes(
         }
       : {}),
   };
+}
+
+export async function listarOrdenes(
+  sesion: SesionActiva,
+  obraId: string,
+  opciones: FiltrosOrdenes = {},
+): Promise<Pagina<OrdenResumen>> {
+  const porPagina = opciones.porPagina ?? POR_PAGINA;
+
+  if (!puede(sesion, "orden:leer")) {
+    return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
+  }
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return { filas: [], total: 0, pagina: 1, totalPaginas: 1 };
+
+  const where = whereDeOrdenes(sesion, obraId, opciones);
 
   // El `count` usa el MISMO `where`: si contara el total sin filtrar, el
   // numero de paginas no corresponderia con lo que hay que recorrer.
@@ -1094,29 +1111,86 @@ export async function listarOrdenes(
     where,
     // Por fecha y no por numero: el correlativo de las ordenes reales no es
     // cronologico y ordenar por el mentiria sobre la secuencia.
-    orderBy: [{ fecha: "desc" }, { createdAt: "desc" }],
+    orderBy: ORDEN_DE_LECTURA,
     skip: saltar(pagina, porPagina),
     take: porPagina,
-    select: {
-      id: true, numero: true, tipo: true, estado: true, origen: true,
-      fecha: true, descripcion: true, referencia: true, formaPago: true,
-      subtotal: true, descuentoComercial: true, tipoImpuesto: true,
-      neto: true, impuesto: true,
-      total: true, aprobadaAt: true, aprobadaPor: true, anuladaAt: true,
-      motivoAnulado: true,
-      proveedor: { select: { id: true, razonSocial: true, ruc: true } },
-      encargo: { select: { id: true, numero: true, descripcion: true } },
-      _count: { select: { lineas: true } },
-      imputaciones: {
-        select: {
-          importe: true,
-          partida: { select: { codigoPartida: true, descripcion: true } },
-        },
-      },
-    },
+    select: SELECT_RESUMEN,
   });
 
-  const resumenes = filas.map((o) => ({
+  return { filas: filas.map(aResumen), total, pagina, totalPaginas };
+}
+
+/**
+ * TODAS las ordenes que cumplen el filtro, sin paginar, para exportarlas.
+ *
+ * Mismo `where`, mismo orden y mismo mapeo que la lista de la pantalla: lo que
+ * se descarga es lo que se esta mirando, solo que entero.
+ *
+ * `TOPE_EXPORTACION` existe porque una obra de anos puede tener miles de
+ * ordenes y cada una arrastra sus imputaciones; el que se haya alcanzado se
+ * DICE —lo devuelve `truncado` y la hoja lo escribe—, que una exportacion
+ * recortada en silencio se lee igual que una completa.
+ */
+const TOPE_EXPORTACION = 5000;
+
+export async function ordenesParaExportar(
+  sesion: SesionActiva,
+  obraId: string,
+  opciones: FiltrosOrdenes = {},
+): Promise<{ filas: OrdenResumen[]; truncado: boolean }> {
+  if (!puede(sesion, "orden:leer")) return { filas: [], truncado: false };
+
+  // El alcance por obra, con la MISMA respuesta que «no tienes permiso»: las
+  // dos dicen «esto no es para ti» y distinguirlas ya seria contar algo. Ver
+  // la regla 4 en `gcm-limites-de-capas`.
+  if (!alcanzaObra(sesion, obraId)) return { filas: [], truncado: false };
+
+  const filas = await prisma.ordenCompra.findMany({
+    where: whereDeOrdenes(sesion, obraId, opciones),
+    orderBy: ORDEN_DE_LECTURA,
+    // Una de mas que el tope: asi se sabe que habia mas sin tener que contar
+    // aparte.
+    take: TOPE_EXPORTACION + 1,
+    select: SELECT_RESUMEN,
+  });
+
+  const truncado = filas.length > TOPE_EXPORTACION;
+
+  return {
+    filas: filas.slice(0, TOPE_EXPORTACION).map(aResumen),
+    truncado,
+  };
+}
+
+/// Por fecha y no por numero: el correlativo de las ordenes reales no es
+/// cronologico y ordenar por el mentiria sobre la secuencia.
+const ORDEN_DE_LECTURA = [
+  { fecha: "desc" },
+  { createdAt: "desc" },
+] satisfies Prisma.OrdenCompraOrderByWithRelationInput[];
+
+const SELECT_RESUMEN = {
+  id: true, numero: true, tipo: true, estado: true, origen: true,
+  fecha: true, descripcion: true, referencia: true, formaPago: true,
+  subtotal: true, descuentoComercial: true, tipoImpuesto: true,
+  neto: true, impuesto: true,
+  total: true, aprobadaAt: true, aprobadaPor: true, anuladaAt: true,
+  motivoAnulado: true,
+  proveedor: { select: { id: true, razonSocial: true, ruc: true } },
+  encargo: { select: { id: true, numero: true, descripcion: true } },
+  _count: { select: { lineas: true } },
+  imputaciones: {
+    select: {
+      importe: true,
+      partida: { select: { codigoPartida: true, descripcion: true } },
+    },
+  },
+} satisfies Prisma.OrdenCompraSelect;
+
+type FilaResumen = Prisma.OrdenCompraGetPayload<{ select: typeof SELECT_RESUMEN }>;
+
+function aResumen(o: FilaResumen): OrdenResumen {
+  return {
     id: o.id,
     numero: o.numero,
     tipo: o.tipo,
@@ -1149,9 +1223,7 @@ export async function listarOrdenes(
       descripcion: i.partida.descripcion,
       importe: i.importe.toString(),
     })),
-  }));
-
-  return { filas: resumenes, total, pagina, totalPaginas };
+  };
 }
 
 /**

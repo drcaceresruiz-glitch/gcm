@@ -1,3 +1,4 @@
+import { soles } from "../utils/formato";
 import { restar } from "./decimal";
 import type { ElementoPdf, OpcionesPdf, PaginaPdf, TintaPdf } from "./informe-pdf";
 import { aWinAnsi, partirEnLineas, type Medir } from "./pdf-texto";
@@ -69,9 +70,18 @@ export interface DatosPresupuesto {
   /// Una linea que explica de que documento se trata y para quien es.
   subtitulo: string;
   lineas: readonly LineaPresupuesto[];
-  /// Los totales del pie, en el orden en que se leen. `destacado` para el que
-  /// se mira primero.
-  totales: readonly { etiqueta: string; importe: string; destacado?: boolean }[];
+  /**
+   * Los totales del pie, en el orden en que se leen. `destacado` para el que
+   * se mira primero.
+   *
+   * El importe va CRUDO —"1960.00", no "S/ 1,960.00"— y lo formatea quien
+   * dibuja. Asi el mismo dato sirve al papel y a la hoja de calculo, donde
+   * tiene que entrar como numero para poder sumarse; si viniera ya formateado,
+   * el Excel tendria que deshacer el formato para volver a un numero, y ahi es
+   * donde una moneda o un separador de miles se convierte en una celda de
+   * texto que no suma. `null` = no hay cifra que dar.
+   */
+  totales: readonly { etiqueta: string; importe: string | null; destacado?: boolean }[];
   /// Se estampa en diagonal cuando el documento NO debe salir de la empresa.
   soloInterno: boolean;
 }
@@ -313,10 +323,10 @@ export function paginasDelPresupuesto(
     texto(cols.codigo, t.etiqueta, t.destacado ? 10 : 8, {
       negrita: t.destacado ?? false,
     });
-    texto(cols.parcial, t.importe, t.destacado ? 10 : 8, {
+    texto(cols.parcial, soles(t.importe), t.destacado ? 10 : 8, {
       derecha: true,
       negrita: t.destacado ?? false,
-      tinta: esNegativoTexto(t.importe) ? "peligro" : "tinta",
+      tinta: esNegativoTexto(t.importe ?? "") ? "peligro" : "tinta",
     });
     y -= t.destacado ? 18 : 14;
   }

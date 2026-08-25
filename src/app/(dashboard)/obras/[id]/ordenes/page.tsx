@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CheckCircle2, Plus } from "lucide-react";
+import { CheckCircle2, Plus, Sheet } from "lucide-react";
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import {
@@ -79,6 +79,16 @@ export default async function OrdenesPage({
   };
 
   const hayFiltro = Object.values(filtros).some(Boolean);
+
+  // La consulta que viaja al Excel: los filtros vigentes y nada mas. Se arma
+  // aqui y no en el componente para que salga de la MISMA variable que usa la
+  // lista, y no de una segunda lectura de la URL que podria discrepar.
+  const parametros = new URLSearchParams(
+    Object.entries(filtros).flatMap(([clave, valor]) =>
+      valor ? [[clave, valor] as [string, string]] : [],
+    ),
+  );
+  const consultaExcel = parametros.size > 0 ? `?${parametros}` : "";
 
   // El comprometido se calcula aparte y sobre la obra entera —encargos
   // vigentes mas ordenes sueltas aprobadas—: ni paginar ni filtrar el
@@ -176,7 +186,27 @@ export default async function OrdenesPage({
       </div>
 
       <section className="space-y-4">
-        <h3 className="text-lg font-semibold">Órdenes</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">Órdenes</h3>
+
+          {/*
+            La descarga se lleva los MISMOS filtros que se estan viendo, no la
+            obra entera: quien acaba de acotar por proveedor y por mes espera
+            bajarse eso. La pagina no viaja —una exportacion paginada no le
+            sirve a nadie—, asi que se baja el filtro completo aunque en
+            pantalla solo se vean cinco.
+          */}
+          {totalDeLaObra > 0 && (
+            <a
+              href={`/obras/${id}/ordenes/excel${consultaExcel}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium"
+              style={{ borderColor: "var(--borde)" }}
+            >
+              <Sheet className="size-4" aria-hidden="true" />
+              {hayFiltro ? "Descargar lo filtrado en Excel" : "Descargar en Excel"}
+            </a>
+          )}
+        </div>
 
         <FiltrosOrdenes proveedores={proveedores} />
 

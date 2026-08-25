@@ -32,6 +32,43 @@ ventana del Lookahead por obra, y el modulo de PPC contra el de Causas.
 
 ---
 
+## El presupuesto y las órdenes en Excel — 25 de agosto de 2026 (tarde)
+
+Pedido del 10 de agosto, y lo último que quedaba de aquella lista: la
+propuesta comercial ya salía en Excel y el informe semanal en CSV, pero el
+presupuesto y las órdenes no salían de ninguna forma que se pudiera trabajar.
+
+**Los tres presupuestos**, en `/obras/[id]/presupuesto/excel?doc=…`, misma
+forma y mismos permisos que la ruta del PDF de al lado. Y no «mismas cifras»
+por disciplina sino por construccion: se extrajo
+`presupuesto-documento.service` —el QUE dice cada documento— y de él salen
+tanto el PDF como el Excel. Era la condicion para no repetir el defecto del 24
+de agosto, cuando el informe semanal y su propia curva pesaban el avance con
+dos varas distintas dentro del MISMO PDF.
+
+Eso obligó a un cambio en `DatosPresupuesto.totales`: el importe va **crudo**
+—`"1960.00"`, no `"S/ 1,960.00"`— y lo formatea quien dibuja. Si viniera ya
+formateado, la hoja de cálculo tendría que deshacer el formato para volver a un
+número, y ahí es donde una moneda o un separador de miles convierte una celda
+en texto que no suma.
+
+**Las órdenes**, en `/obras/[id]/ordenes/excel`, con **dos hojas**: la lista de
+órdenes y —la que de verdad hacía falta— una fila por IMPUTACIÓN, que es lo que
+se cruza con el presupuesto para saber cuánto lleva comprometido cada partida y
+que en pantalla vive dentro de la tarjeta de cada orden, donde no se puede ni
+sumar ni ordenar. Se lleva los mismos filtros que se están viendo y sin
+paginar; el `where` se extrajo a `whereDeOrdenes` para que la lista y la
+descarga no puedan discrepar. Tope de 5.000 órdenes, y **si aprieta lo dice en
+la propia hoja**: una exportación recortada en silencio se lee igual que una
+completa.
+
+**Verificado pidiendo las rutas de verdad** contra el servidor y abriendo los
+`.xlsx` que devuelven: cero celdas de cifra salieron como texto, y el total del
+contractual (375.000,00) coincide al céntimo con la suma de las hojas según la
+base. `?doc=inventado` da 400 y una obra sin meta da 404 con su motivo.
+
+---
+
 ## El fallo `81572617`, buscado a fondo — 25 de agosto de 2026 (tarde)
 
 **Sigue sin reproducirse, y ahora se sabe donde NO esta.** Pero la busqueda
@@ -4384,7 +4421,7 @@ Nuevo, y sigue abierto:
 | — | Ventana del Lookahead **por obra** (hoy solo en la URL) | Si, una columna |
 | — | Empresa de demostracion para el tutorial | No: identificarla por variable de entorno |
 | — | Sombrear el area entre plan y real en la curva S | No |
-| — | Exportar tablas a Excel (presupuesto y órdenes) —pedido del 10 de agosto—. **Parcial al 21 de agosto**: la propuesta al cliente sale en Excel y el informe semanal en CSV; el presupuesto y las órdenes siguen sin exportarse | No |
+| ~~—~~ | ~~Exportar tablas a Excel (presupuesto y órdenes)~~ **HECHO el 25 de agosto de 2026.** Los tres presupuestos en `/obras/[id]/presupuesto/excel?doc=…` y las órdenes en `/obras/[id]/ordenes/excel`, esta última con los mismos filtros que la pantalla | No |
 | **Fase 2** | Documental: planos, protocolos y guias, con validacion automatica de restricciones | Si |
 | **Fase 3** | Sectores de color en el PTS y aviso cuando dos cuadrillas coinciden en el mismo sitio | Si |
 | ~~**Fase 4**~~ | ~~«Cumplio» calculado desde la cantidad ejecutada, linea de meta, causa raiz~~ **HECHA el 12 y el 18 de agosto** | No |
