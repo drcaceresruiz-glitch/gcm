@@ -322,6 +322,75 @@ describe("probar", () => {
     expect(estado.filas[0]?.ultimoError).toBeNull();
   });
 
+  /**
+   * LOS FALLOS DEL ENTORNO, EN EL IDIOMA DE LA APLICACION.
+   *
+   * `AbortSignal.timeout` y `fetch` lanzan en ingles y sin salida: «The
+   * operation was aborted due to timeout». Eso llegaba tal cual a la pantalla
+   * del asistente. Visto el 25 de agosto de 2026 preguntandole algo.
+   *
+   * Lo que se fija aqui no es el texto exacto sino la REGLA: un fallo del
+   * entorno se cuenta en español y dice que hacer; lo que responda el
+   * proveedor se deja como viene, porque ahi su texto es la unica pista real.
+   */
+  it("un tiempo agotado se cuenta en español, no con el mensaje del runtime", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(
+        Object.assign(new Error("The operation was aborted due to timeout"), {
+          name: "TimeoutError",
+        }),
+      ),
+    );
+    await guardarProveedorIa(ADMIN, DATOS_BUENOS);
+    const id = estado.filas[0]!.id;
+
+    const r = await probarProveedorIa(ADMIN, id);
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).not.toContain("aborted");
+      expect(r.error).toContain("tardó demasiado");
+      expect(r.error).toContain("Vuelve a intentarlo");
+    }
+  });
+
+  it("y una red caida tambien, sin hablar de «fetch failed»", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("fetch failed")),
+    );
+    await guardarProveedorIa(ADMIN, DATOS_BUENOS);
+    const id = estado.filas[0]!.id;
+
+    const r = await probarProveedorIa(ADMIN, id);
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).not.toContain("fetch");
+      expect(r.error).toContain("No se pudo contactar");
+    }
+  });
+
+  it("pero lo que responde el proveedor se deja como viene", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: () => Promise.resolve("model not found: gpt-inventado"),
+      }),
+    );
+    await guardarProveedorIa(ADMIN, DATOS_BUENOS);
+    const id = estado.filas[0]!.id;
+
+    const r = await probarProveedorIa(ADMIN, id);
+
+    expect(r.ok).toBe(false);
+    // Su texto es la unica pista de que modelo no existe: taparlo seria peor.
+    if (!r.ok) expect(r.error).toContain("model not found");
+  });
+
   it("en fallo, guarda el motivo del proveedor pero nunca la clave, y sugiere probar otro modelo", async () => {
     vi.stubGlobal(
       "fetch",

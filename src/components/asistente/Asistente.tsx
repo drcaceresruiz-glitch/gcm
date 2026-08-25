@@ -170,6 +170,21 @@ export function Asistente({
   );
   const [pendienteId, setPendienteId] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+
+  /**
+   * LO QUE SE TECLEO, GUARDADO AL ENVIAR Y NO LEIDO DESPUES.
+   *
+   * La burbuja del usuario se rellenaba leyendo el `<textarea>` en el efecto
+   * que corre cuando la accion YA respondio, y para entonces el campo esta
+   * vacio: React 19 limpia solo los formularios que usan una `action`. El
+   * resultado era que tu propia pregunta desaparecia de la conversacion
+   * -guardada en la base, invisible en la pantalla-. Visto el 25 de agosto de
+   * 2026 preguntandole algo al asistente.
+   *
+   * Es la misma familia que el formulario que se desmontaba antes de
+   * enviarse: leer el DOM despues de que React lo haya tocado.
+   */
+  const textoEnviadoRef = useRef("");
   // El ultimo mensajeAsistenteId para el que YA se agregaron las burbujas.
   // Aparte de `pendienteId` a proposito: `pendienteId` vuelve a `null` en
   // cuanto el turno termina, pero `estado.mensajeAsistenteId` (el de
@@ -207,9 +222,7 @@ export function Asistente({
     idAgregadoRef.current = estado.mensajeAsistenteId;
     setConversacionForzada(undefined);
 
-    const textoEnviado = formRef.current?.elements.namedItem("mensaje");
-    const texto =
-      textoEnviado instanceof HTMLTextAreaElement ? textoEnviado.value.trim() : "";
+    const texto = textoEnviadoRef.current;
 
     setMensajes((previos) => [
       ...previos,
@@ -327,7 +340,18 @@ export function Asistente({
         </p>
       )}
 
-      <form ref={formRef} action={enviar} className="space-y-2">
+      <form
+        ref={formRef}
+        action={enviar}
+        // Se captura AQUI, antes de que la accion corra y React limpie el
+        // formulario. Ver `textoEnviadoRef`.
+        onSubmit={(e) => {
+          const campo = e.currentTarget.elements.namedItem("mensaje");
+          textoEnviadoRef.current =
+            campo instanceof HTMLTextAreaElement ? campo.value.trim() : "";
+        }}
+        className="space-y-2"
+      >
         <input type="hidden" name="conversacionId" value={conversacionId ?? ""} />
         <textarea
           name="mensaje"

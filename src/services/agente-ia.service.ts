@@ -194,6 +194,46 @@ async function fetchConReintento(
   return ultima!;
 }
 
+/**
+ * Los fallos del ENTORNO, dichos en el idioma de la aplicacion.
+ *
+ * `AbortSignal.timeout` y `fetch` lanzan mensajes del runtime, en ingles y sin
+ * salida: «The operation was aborted due to timeout». Eso llegaba tal cual a
+ * la pantalla del asistente, dentro de una aplicacion que esta entera en
+ * español y que en todas partes dice que ha pasado y que hacer. Visto el 25 de
+ * agosto de 2026 preguntandole algo al asistente.
+ *
+ * ESTOS TEXTOS LLEVAN TILDES y el resto del archivo no: son de los pocos que
+ * una persona LEE en pantalla, igual que los cuatro de `motivoNoAdmiteCambios`.
+ *
+ * Solo se traducen los que salen del ENTORNO y sabemos nombrar. Lo que
+ * responda el proveedor -una clave mala, un modelo que no existe, un limite de
+ * uso- se deja como viene: ahi el texto del proveedor es la unica pista real
+ * de que pasa, y taparlo con una frase nuestra seria peor.
+ */
+function falloDelEntorno(error: unknown): string | null {
+  const nombre = error instanceof Error ? error.name : "";
+  const texto = error instanceof Error ? error.message : String(error);
+
+  if (nombre === "TimeoutError" || /aborted due to timeout/i.test(texto)) {
+    return (
+      "El proveedor de IA tardó demasiado en responder y se cortó la espera. " +
+      "Vuelve a intentarlo; si se repite, puede que su servicio esté lento."
+    );
+  }
+  if (nombre === "AbortError") {
+    return "La consulta se canceló antes de terminar. Vuelve a intentarlo.";
+  }
+  // `fetch` no distingue DNS de red caida ni de certificado: todo es esto.
+  if (/fetch failed|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN/i.test(texto)) {
+    return (
+      "No se pudo contactar con el proveedor de IA. Revisa la conexión del " +
+      "servidor y que la dirección configurada sea la correcta."
+    );
+  }
+  return null;
+}
+
 /// Recorta y quita cualquier rastro de la clave del texto de error de un
 /// proveedor ajeno — mismo cuidado que `probarRemitente` con la contrasena
 /// SMTP. `maxLargo` por defecto es el limite de `ultimoError`
@@ -275,6 +315,8 @@ async function probarClaude(config: ConfigLlamadaIa): Promise<RespuestaProveedor
     }
     return { ok: true };
   } catch (error) {
+    const propio = falloDelEntorno(error);
+    if (propio) return { ok: false, error: propio };
     const texto = error instanceof Error ? error.message : String(error);
     return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
   }
@@ -346,6 +388,8 @@ async function conversarClaude(
       .trim();
     return { tipo: "texto", texto: texto || "No tengo una respuesta para eso." };
   } catch (error) {
+    const propio = falloDelEntorno(error);
+    if (propio) return { ok: false, error: propio };
     const texto = error instanceof Error ? error.message : String(error);
     return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
   }
@@ -397,6 +441,8 @@ async function listarModelosClaude(config: ConfigListadoIa): Promise<RespuestaMo
     }
     return { ok: true, modelos };
   } catch (error) {
+    const propio = falloDelEntorno(error);
+    if (propio) return { ok: false, error: propio };
     const texto = error instanceof Error ? error.message : String(error);
     return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
   }
@@ -441,6 +487,8 @@ async function listarModelosOpenAiCompatible(
     }
     return { ok: true, modelos };
   } catch (error) {
+    const propio = falloDelEntorno(error);
+    if (propio) return { ok: false, error: propio };
     const texto = error instanceof Error ? error.message : String(error);
     return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
   }
@@ -481,6 +529,8 @@ async function probarOpenAiCompatible(
     }
     return { ok: true };
   } catch (error) {
+    const propio = falloDelEntorno(error);
+    if (propio) return { ok: false, error: propio };
     const texto = error instanceof Error ? error.message : String(error);
     return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
   }
@@ -595,6 +645,8 @@ async function conversarOpenAiCompatible(
     const texto = (mensaje.content ?? "").trim();
     return { tipo: "texto", texto: texto || "No tengo una respuesta para eso." };
   } catch (error) {
+    const propio = falloDelEntorno(error);
+    if (propio) return { ok: false, error: propio };
     const texto = error instanceof Error ? error.message : String(error);
     return { ok: false, error: mensajeSaneado(texto, config.apiKey) };
   }
