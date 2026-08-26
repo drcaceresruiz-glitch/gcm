@@ -122,10 +122,24 @@ function fact_construir(array $pedido, string $serie, int $correlativo): Invoice
     $esFactura = fact_es_factura($pedido);
     $m = fact_desglosar((int)$pedido['importeCentimos']);
 
+    // LA DESCRIPCIÓN NO PUEDE IR VACÍA. SUNAT rechaza con el código 2026 («El
+    // XML no contiene el tag cac:Item/cbc:Description») y no es hipotético:
+    // pasó con un pedido antiguo, de los que no guardaban qué se había
+    // comprado. `??` no basta —una cadena vacía no es null—, así que se
+    // comprueba que quede algo escrito.
+    $descripcion = trim((string)($pedido['productoNombre'] ?? ''));
+    if ($descripcion === '') {
+        $descripcion = 'Producto o servicio';
+    }
+    $codigo = trim((string)($pedido['productoId'] ?? ''));
+    if ($codigo === '') {
+        $codigo = 'GCM';
+    }
+
     $detalle = (new SaleDetail())
-        ->setCodProducto(mb_substr((string)($pedido['productoId'] ?? 'GCM'), 0, 30))
+        ->setCodProducto(mb_substr($codigo, 0, 30))
         ->setUnidad('ZZ')                       // servicio
-        ->setDescripcion(mb_substr((string)($pedido['productoNombre'] ?? 'Producto'), 0, 250))
+        ->setDescripcion(mb_substr($descripcion, 0, 250))
         ->setCantidad(1)
         ->setMtoValorUnitario(fact_soles($m['base']))
         ->setMtoValorVenta(fact_soles($m['base']))

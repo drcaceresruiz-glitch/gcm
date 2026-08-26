@@ -687,7 +687,9 @@ app.get('/admin/pedido/:pedido', (req, res) => {
   const registro = compras().find((p) => p.pedido === req.params.pedido);
   if (!registro) return res.status(404).type('html').send(panel.paginaCompras(compras(), {}));
   res.type('html').send(panel.paginaPedido(registro, {
-    mensaje: req.query.ok ? String(req.query.ok).slice(0, 200) : null,
+    mensaje: req.query.ok ? String(req.query.ok).slice(0, 300)
+      : req.query.err ? String(req.query.err).slice(0, 300) : null,
+    mensajeMalo: Boolean(req.query.err),
     comprobante: comprobantes.comprobanteDe(registro.pedido),
     facturadorListo: comprobantes.configurado(),
   }));
@@ -747,7 +749,10 @@ app.post('/admin/pedido/:pedido/facturar', formularioAdmin, async (req, res) => 
     ? (asiento.repetido ? `Este pedido ya tenía ${comprobantes.nombrar(asiento)}.`
       : `Emitido: ${comprobantes.nombrar(asiento)}.`)
     : `No se pudo emitir: ${asiento.motivo}`;
-  return res.redirect(`${volver}?ok=${encodeURIComponent(aviso)}`);
+  // Un fallo se enseña en rojo. Salió verde la primera vez que SUNAT rechazó
+  // un comprobante, y un error con aspecto de éxito es peor que ningún aviso.
+  const parametro = asiento.ok ? 'ok' : 'err';
+  return res.redirect(`${volver}?${parametro}=${encodeURIComponent(aviso)}`);
 });
 
 app.post('/admin/pedido/:pedido/entregado', formularioAdmin,

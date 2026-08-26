@@ -182,7 +182,7 @@ ${filas}</table></div>`
 
 /* -------------------------------------------------------- detalle de un pedido */
 
-function paginaPedido(p, { mensaje = null, comprobante = null, facturadorListo = false } = {}) {
+function paginaPedido(p, { mensaje = null, mensajeMalo = false, comprobante = null, facturadorListo = false } = {}) {
   const pagos = p.pagos.map((x) => `<tr>
     <td>${e(fecha(x.registradoEn))}</td>
     <td>${e(x.estado || '—')}${x.detalleEstado ? ` <span class="apagado">(${e(x.detalleEstado)})</span>` : ''}</td>
@@ -197,7 +197,7 @@ function paginaPedido(p, { mensaje = null, comprobante = null, facturadorListo =
   </tr>`).join('');
 
   return pagina(`Pedido ${p.pedido}`, `
-${mensaje ? `<div class="aviso bien">${e(mensaje)}</div>` : ''}
+${mensaje ? `<div class="aviso ${mensajeMalo ? 'mal' : 'bien'}">${e(mensaje)}</div>` : ''}
 <p><a href="/admin">← Volver a las compras</a></p>
 <h1>${e(p.pedido)} ${etiqueta(p.estado)}</h1>
 <p class="guia">Iniciado el ${e(fecha(p.creadoEn))}${p.modo === 'TEST' ? ' · transacción de PRUEBA' : ''}</p>
