@@ -234,6 +234,60 @@ ${nombreDoc ? `<p style="margin:0 0 14px;color:#5d6f6c;font-size:13px">
   });
 }
 
+/**
+ * El comprobante, cuando sale DESPUÉS del aviso de compra.
+ *
+ * POR QUÉ HACE FALTA UN CORREO APARTE. El aviso de compra se manda en cuanto
+ * se confirma el pago, lleve comprobante o no —quien acaba de pagar tiene
+ * derecho a saberlo, aunque su boleta tarde—. Pero si la boleta sale más
+ * tarde, ese aviso ya se envió, y sin este correo el comprobante NO LLEGABA
+ * NUNCA: se quedaba emitido en SUNAT y guardado en el servidor, sin que el
+ * comprador lo recibiera. Pasó con la primera venta real, que estuvo un día
+ * entera esperando a que SUNAT activara un permiso.
+ *
+ * Entregar el comprobante no es una cortesía: es obligación de quien vende.
+ */
+async function avisarComprobante({ pedido, comprobante, xml }) {
+  if (!comprobante || !comprobante.ok) {
+    return { ok: false, motivo: 'No hay comprobante que enviar.' };
+  }
+  const nombreDoc = `${comprobante.tipo} ${comprobante.serie}-${comprobante.numero}`;
+
+  const cuerpo = `
+<p style="margin:0 0 16px">Aquí tiene el comprobante electrónico de su compra.</p>
+${tabla([
+    ['Pedido', e(pedido.pedido)],
+    ['Comprobante', e(nombreDoc)],
+    ['Importe', e(formatearPrecio(pedido.importeCentimos || 0, pedido.moneda || 'PEN'))],
+  ])}
+${xml ? `<p style="margin:0 0 14px;color:#5d6f6c;font-size:13px">
+  Va adjunto en formato XML, que es el documento con validez ante SUNAT.</p>`
+    : `<p style="margin:0 0 14px;color:#5d6f6c;font-size:13px">
+  Si necesita el archivo XML, respóndanos y se lo enviamos.</p>`}
+<p style="margin:0;color:#5d6f6c;font-size:13px">
+  Si algo no cuadra, responda a este correo y lo revisamos.</p>`;
+
+  const adjuntos = [];
+  if (xml) {
+    adjuntos.push({
+      filename: `${COMERCIO.ruc}-${comprobante.serie}-${comprobante.numero}.xml`,
+      content: xml,
+      contentType: 'application/xml',
+    });
+  }
+
+  return enviar({
+    para: pedido.correo,
+    asunto: `Su ${comprobante.tipo.toLowerCase()} ${comprobante.serie}-${comprobante.numero}`
+      + ` · pedido ${pedido.pedido}`,
+    html: plantilla('Su comprobante', cuerpo),
+    texto: `Comprobante ${nombreDoc} del pedido ${pedido.pedido}, por `
+      + `${formatearPrecio(pedido.importeCentimos || 0, pedido.moneda || 'PEN')}.`
+      + (xml ? ' Va adjunto en XML.' : ''),
+    adjuntos,
+  });
+}
+
 /** Al administrador, con cada venta. Lo que hay que hacer, en el asunto. */
 async function avisarAdminCompra({ pedido, comprobante, panelUrl }) {
   const nombreDoc = comprobante && comprobante.ok
@@ -331,5 +385,6 @@ ${tabla([
 
 module.exports = {
   configurado, comprobar, enviar,
-  avisarCompra, avisarAdminCompra, copiaReclamacion, avisarAdminReclamacion,
+  avisarCompra,
+  avisarComprobante, avisarAdminCompra, copiaReclamacion, avisarAdminReclamacion,
 };

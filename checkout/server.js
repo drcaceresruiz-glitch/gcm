@@ -285,26 +285,73 @@ function facturar(idPedido, origen = 'automático') {
       // acaba de pagar y tiene derecho a saber que su pago llegó, aunque su
       // factura tenga que salir más tarde. Callarse porque falló otra cosa es
       // lo peor que se puede hacer aquí.
-      if (!correo.configurado()) return;
-
-      const xml = asiento && asiento.ok ? await comprobantes.descargarXml(idPedido) : null;
-      const yaAvisado = registro.eventos.some((ev) => ev.tipo === 'correo_comprador');
-      if (!yaAvisado) {
-        const r = await correo.avisarCompra({ pedido: registro, comprobante: asiento, xml });
-        registrarEvento({
-          pedido: idPedido,
-          tipo: r.ok ? 'correo_comprador' : 'nota',
-          detalle: r.ok
-            ? `Aviso de compra enviado a ${registro.correo}`
-            : 'No se pudo avisar al comprador: ' + (r.motivo || 'sin detalle'),
-          quien: origen,
-        });
-      }
-      await correo.avisarAdminCompra({ pedido: registro, comprobante: asiento, panelUrl: URL_PUBLICA });
+      await avisarDeLoQueFalte(registro, asiento, origen);
     } catch (e) {
       console.error('[comprobante] error inesperado con', idPedido, e);
     }
   });
+}
+
+/**
+ * Manda los correos que este pedido todavía no ha recibido.
+ *
+ * DOS CORREOS DISTINTOS, CADA UNO CON SU MARCA. El aviso de compra sale en
+ * cuanto se confirma el pago, lleve comprobante o no; el comprobante sale
+ * cuando existe. Cuando salen a la vez —lo normal— van juntos en un solo
+ * correo, y se anotan las dos marcas.
+ *
+ * EL HUECO QUE ESTO CIERRA. Antes bastaba con haber avisado de la compra para
+ * no mandar nada más, así que un comprobante emitido MÁS TARDE no llegaba
+ * nunca: se quedaba en SUNAT y en el servidor, y el comprador sin él. Pasó con
+ * la primera venta real, que esperó un día a que SUNAT activara un permiso.
+ * Entregar el comprobante no es una cortesía, es obligación de quien vende.
+ *
+ * Se llama desde los DOS caminos —el automático al cobrar y el botón «Emitir
+ * ahora» del panel—, porque el segundo no mandaba ningún correo en absoluto.
+ */
+async function avisarDeLoQueFalte(registro, asiento, origen) {
+  if (!correo.configurado()) return;
+
+  const idPedido = registro.pedido;
+  const hayComprobante = !!(asiento && asiento.ok);
+  const xml = hayComprobante ? await comprobantes.descargarXml(idPedido) : null;
+
+  const tiene = (tipo) => registro.eventos.some((ev) => ev.tipo === tipo);
+  const yaAvisado = tiene('correo_comprador');
+  const yaMandadoComprobante = tiene('correo_comprobante');
+
+  if (!yaAvisado) {
+    const r = await correo.avisarCompra({ pedido: registro, comprobante: asiento, xml });
+    registrarEvento({
+      pedido: idPedido,
+      tipo: r.ok ? 'correo_comprador' : 'nota',
+      detalle: r.ok
+        ? `Aviso de compra enviado a ${registro.correo}`
+        : 'No se pudo avisar al comprador: ' + (r.motivo || 'sin detalle'),
+      quien: origen,
+    });
+    // Si ese aviso ya llevaba el comprobante, no hace falta un segundo correo.
+    if (r.ok && hayComprobante) {
+      registrarEvento({
+        pedido: idPedido,
+        tipo: 'correo_comprobante',
+        detalle: `Comprobante ${comprobantes.nombrar(asiento)} enviado con el aviso de compra`,
+        quien: origen,
+      });
+    }
+  } else if (hayComprobante && !yaMandadoComprobante) {
+    const r = await correo.avisarComprobante({ pedido: registro, comprobante: asiento, xml });
+    registrarEvento({
+      pedido: idPedido,
+      tipo: r.ok ? 'correo_comprobante' : 'nota',
+      detalle: r.ok
+        ? `Comprobante ${comprobantes.nombrar(asiento)} enviado a ${registro.correo}`
+        : 'No se pudo enviar el comprobante: ' + (r.motivo || 'sin detalle'),
+      quien: origen,
+    });
+  }
+
+  await correo.avisarAdminCompra({ pedido: registro, comprobante: asiento, panelUrl: URL_PUBLICA });
 }
 
 /**
@@ -956,6 +1003,14 @@ app.post('/admin/pedido/:pedido/facturar', formularioAdmin, async (req, res) => 
       quien: 'administrador',
     });
   }
+  // Y SE AVISA. Este botón emitía el comprobante y no mandaba ningún correo:
+  // el comprador se quedaba sin su boleta y aquí parecía que todo estaba
+  // hecho. Se piden los eventos de nuevo porque acabamos de escribir uno.
+  if (asiento.ok) {
+    const alDia = compras().find((p) => p.pedido === req.params.pedido) || registro;
+    await avisarDeLoQueFalte(alDia, asiento, 'administrador');
+  }
+
   const aviso = asiento.ok
     ? (asiento.repetido ? `Este pedido ya tenía ${comprobantes.nombrar(asiento)}.`
       : `Emitido: ${comprobantes.nombrar(asiento)}.`)
