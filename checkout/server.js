@@ -38,8 +38,12 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const { buscarProducto, catalogoPublico, formatearPrecio } = require('./src/catalogo');
 const { revisarHoja, registrarHoja } = require('./src/reclamaciones');
-const { verificarFirma, resumirPago, registrarPago } = require('./src/pagos');
+const { verificarFirma, resumirPago, registrarPago, LIBRO_PAGOS } = require('./src/pagos');
 const { paginaRetorno } = require('./src/pagina_retorno');
+const { registrarPedido, registrarEvento, consolidar, leerLineas } = require('./src/pedidos');
+const { LIBRO: LIBRO_RECLAMACIONES } = require('./src/reclamaciones');
+const sesion = require('./src/admin_sesion');
+const panel = require('./src/panel_admin');
 
 const app = express();
 const PUERTO = process.env.PORT || 3001;
@@ -236,6 +240,26 @@ app.post('/api/create-payment', async (req, res) => {
   const { nombre, apellido } = partirNombre(nombres);
 
   const pedido = referenciaPedido();
+
+  // EL PEDIDO SE ANOTA ANTES DE HABLAR CON LA PASARELA, no cuando vuelve. Un
+  // comprador al que le rechacen la tarjeta, o que cierre la pestaña delante
+  // del formulario, dejaba de existir para nosotros: no había a quién
+  // responderle ni forma de saber cuántos lo intentan y no lo consiguen —que es
+  // el número que dice si el checkout está roto—.
+  //
+  // Falla en blando: si no se puede escribir el registro, el cobro sigue
+  // adelante. Perder la anotación de un pedido es malo; impedir una venta por
+  // eso es peor.
+  try {
+    registrarPedido({
+      pedido,
+      producto,
+      comprador: { correo, nombres, documento, telefono },
+      modo: MODO,
+    });
+  } catch (err) {
+    console.error('[pedidos] no se pudo anotar el pedido', pedido, err);
+  }
 
   const carga = {
     amount: producto.precioCentimos,   // el importe lo pone el servidor
@@ -532,6 +556,123 @@ app.post('/retorno', express.urlencoded({ extended: false, limit: '64kb' }), man
 app.get('/retorno', manejarRetorno);
 
 // ---------------------------------------------------------------------------
+//  El panel del administrador
+// ---------------------------------------------------------------------------
+/**
+ * Todo lo que cuelga de /admin exige sesión, y la sesión exige que exista una
+ * contraseña en el `.env`. Sin ella el panel no se abre: enseña nombres,
+ * documentos, correos y teléfonos de compradores, y eso no puede quedar
+ * accesible porque alguien olvidara rellenar una variable.
+ *
+ * Se dibuja en el servidor y las acciones son formularios normales. Un panel
+ * que se mira cinco veces al día no necesita una API aparte que asegurar.
+ */
+const formularioAdmin = express.urlencoded({ extended: false, limit: '32kb' });
+
+/** El estado de todas las compras, recalculado en cada visita. */
+function compras() {
+  return consolidar(leerLineas(LIBRO_PAGOS));
+}
+
+// Ni buscadores ni intermediarios deben guardar nada de aquí.
+app.use('/admin', (_req, res, siguiente) => {
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  res.set('Cache-Control', 'no-store');
+  siguiente();
+});
+
+app.get('/admin/entrar', (_req, res) => res.redirect('/admin'));
+
+app.post('/admin/entrar', formularioAdmin, (req, res) => {
+  if (!sesion.claveConfigurada()) {
+    return res.status(503).type('html').send(panel.paginaSinConfigurar());
+  }
+  const espera = sesion.frenado(req);
+  if (espera) {
+    return res.status(429).type('html').send(panel.paginaEntrar({ espera }));
+  }
+  if (!sesion.claveCorrecta(req.body?.clave)) {
+    sesion.anotarFallo(req);
+    // El mensaje no distingue «contraseña incorrecta» de nada más: no hay nada
+    // que confirmarle a quien está probando.
+    return res.status(401).type('html').send(panel.paginaEntrar({ error: 'No se pudo entrar.' }));
+  }
+  sesion.olvidarFallos(req);
+  res.set('Set-Cookie', sesion.cookieDeEntrada());
+  return res.redirect('/admin');
+});
+
+app.post('/admin/salir', formularioAdmin, (_req, res) => {
+  res.set('Set-Cookie', sesion.cookieDeSalida());
+  return res.redirect('/admin');
+});
+
+/** De aquí para abajo, sin sesión no se pasa. */
+app.use('/admin', (req, res, siguiente) => {
+  if (!sesion.claveConfigurada()) {
+    return res.status(503).type('html').send(panel.paginaSinConfigurar());
+  }
+  if (!sesion.sesionValida(req)) {
+    return res.status(401).type('html').send(panel.paginaEntrar({ espera: sesion.frenado(req) }));
+  }
+  return siguiente();
+});
+
+app.get('/admin', (req, res) => {
+  const filtro = String(req.query.estado || '');
+  res.type('html').send(panel.paginaCompras(compras(), {
+    filtro,
+    mensaje: req.query.ok ? String(req.query.ok).slice(0, 120) : null,
+  }));
+});
+
+app.get('/admin/ayuda', (_req, res) => {
+  res.type('html').send(panel.paginaAyuda({ urlPublica: URL_PUBLICA }));
+});
+
+app.get('/admin/reclamaciones', (_req, res) => {
+  res.type('html').send(panel.paginaReclamaciones(leerLineas(LIBRO_RECLAMACIONES)));
+});
+
+app.get('/admin/pedido/:pedido', (req, res) => {
+  const registro = compras().find((p) => p.pedido === req.params.pedido);
+  if (!registro) return res.status(404).type('html').send(panel.paginaCompras(compras(), {}));
+  res.type('html').send(panel.paginaPedido(registro, {
+    mensaje: req.query.ok ? String(req.query.ok).slice(0, 120) : null,
+  }));
+});
+
+/**
+ * Las tres acciones sobre un pedido. Ninguna corrige nada: las tres AÑADEN un
+ * evento. Por eso marcar dos veces «entregado» no rompe nada y el historial
+ * enseña que se hizo dos veces, que es la verdad.
+ */
+function accionSobrePedido(tipo, mensaje) {
+  return (req, res) => {
+    const existe = compras().some((p) => p.pedido === req.params.pedido);
+    if (!existe) return res.redirect('/admin');
+    const detalle = String(req.body?.detalle ?? '').trim().slice(0, 600) || null;
+    if (tipo !== 'entregado' && !detalle) {
+      return res.redirect(`/admin/pedido/${encodeURIComponent(req.params.pedido)}`);
+    }
+    try {
+      registrarEvento({ pedido: req.params.pedido, tipo, detalle });
+    } catch (e) {
+      console.error('[panel] no se pudo anotar el evento:', e);
+    }
+    return res.redirect(
+      `/admin/pedido/${encodeURIComponent(req.params.pedido)}?ok=${encodeURIComponent(mensaje)}`);
+  };
+}
+
+app.post('/admin/pedido/:pedido/entregado', formularioAdmin,
+  accionSobrePedido('entregado', 'Marcado como entregado.'));
+app.post('/admin/pedido/:pedido/comprobante', formularioAdmin,
+  accionSobrePedido('comprobante', 'Comprobante anotado.'));
+app.post('/admin/pedido/:pedido/nota', formularioAdmin,
+  accionSobrePedido('nota', 'Nota guardada.'));
+
+// ---------------------------------------------------------------------------
 //  Arranque
 // ---------------------------------------------------------------------------
 
@@ -544,6 +685,11 @@ app.listen(PUERTO, () => {
   console.log(`    URL de retorno de la tienda:                  ${base}/retorno`);
   if (!URL_PUBLICA) {
     console.log('    ↑ son las locales. Ponga URL_PUBLICA en .env para ver las de verdad.');
+  }
+  console.log('');
+  console.log(`  Panel del administrador:  ${base}/admin`);
+  if (!sesion.claveConfigurada()) {
+    console.warn('    ⚠  cerrado: falta ADMIN_PASSWORD en .env');
   }
   console.log('');
   if (FALTAN.length) {

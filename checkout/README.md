@@ -37,6 +37,9 @@ la cara de quien está pagando.
 | `public/checkout.html` | La página de compra. Autocontenida salvo el cliente de Izipay. |
 | `public/terminos.html` · `public/devoluciones.html` | Las dos páginas legales que Izipay exige ver enlazadas. |
 | `public/reclamaciones.html` | La hoja de reclamación virtual (Ley 29571). |
+| `src/pedidos.js` | El pedido desde que empieza, y el estado de cada compra. |
+| `src/admin_sesion.js` | Quién puede entrar al panel. |
+| `src/panel_admin.js` | Las pantallas del panel del administrador. |
 | `.env.example` | Qué credenciales hacen falta y de dónde salen. |
 | `datos/` | El libro escrito. **No se versiona**: lleva datos personales. |
 
@@ -51,6 +54,25 @@ la cara de quien está pagando.
 - `GET|POST /retorno` — adonde vuelve el comprador tras pagar.
 - `POST /api/reclamacion` — registra una hoja del Libro de Reclamaciones. No
   depende de la pasarela: se puede reclamar precisamente porque el pago falló.
+- `GET /admin` — **el panel del administrador**: compras, estado de cada pago,
+  entrega, comprobante, reclamaciones y el guion de atención. Exige
+  `ADMIN_PASSWORD`; sin ella devuelve 503 y no se abre.
+
+### El panel
+
+Tres estados, y ninguno se guarda: se calculan leyendo `pedidos.jsonl`,
+`pagos.jsonl` y `eventos.jsonl`.
+
+| Estado | Qué significa |
+|---|---|
+| **Sin pagar** | Se empezó el pedido y todavía no consta cobro. |
+| **Abandonado** | Igual, pero pasó más de una hora. |
+| **Falta entregar** | Hay un cobro `PAID` **con firma válida**. Es lo que hay que atender. |
+| **Entregado** | Alguien pulsó el botón después de mandar el producto. |
+
+Nada se corrige encima: marcar, anotar un comprobante o dejar una nota **añaden
+un evento**. Por eso el historial enseña también las equivocaciones, que es
+justamente para lo que sirve un historial.
 
 ### Las dos URL que van al Back Office
 
@@ -111,11 +133,11 @@ está razonado en `docs/plan-cobro-licencia.md`:
 1. **Los precios son DE PRUEBA** (S/ 5.00 y S/ 10.00), puestos así para las
    transacciones de certificación de Izipay. Sustituirlos por la tarifa real en
    `src/catalogo.js` antes de abrir el checkout al público.
-2. **Guardar el pedido ANTES de mandarlo a la pasarela.** Hoy el cobro se anota
-   cuando vuelve (por el IPN o por el retorno), no cuando sale: un pago iniciado
-   y nunca terminado no deja rastro. El modelo (`PagoLicencia`, con clave de
-   idempotencia) ya está propuesto en el plan. `datos/pagos.jsonl` es el registro
-   mínimo mientras tanto, no una base de datos.
+2. **Una base de datos de verdad.** El pedido ya se anota antes de ir a la
+   pasarela (`datos/pedidos.jsonl`), así que un pago iniciado y nunca terminado
+   sí deja rastro. Lo que sigue faltando es dónde vive todo eso: tres `.jsonl`
+   que solo crecen bastan para decenas de pedidos al mes y dejan de bastar
+   mucho antes de lo que parece —cada visita al panel los lee enteros—.
 4. **La copia por correo del Libro de Reclamaciones.** El reglamento obliga a
    entregarla en el acto; hoy la hoja se registra y se anota en el log, pero no
    sale ningún correo porque no hay remitente configurado. La página ya no dice
