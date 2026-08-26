@@ -93,9 +93,14 @@ function fact_del_modo_actual(array $fila): bool
 /**
  * El siguiente correlativo de una serie, DENTRO del modo actual.
  *
- * Cuenta TODAS las líneas de emisión de esa serie, fallidas incluidas: un
- * número que se mandó a SUNAT y fue rechazado no se reutiliza, porque no hay
- * forma de saber desde aquí si SUNAT llegó a registrarlo.
+ * Cuenta las líneas de emisión de esa serie, LAS FALLIDAS INCLUIDAS: un número
+ * que SUNAT procesó y rechazó no se reutiliza, porque desde aquí no hay forma
+ * de saber si llegó a registrarlo.
+ *
+ * La excepción son las marcadas `no_entregado`: esas ni salieron del servidor
+ * o SUNAT las rechazó antes de mirarlas —un fallo de perfil, de autenticación
+ * o del propio servicio—, así que su número sigue libre y se vuelve a usar.
+ * Quemarlo abriría un hueco en una serie que tiene que ser correlativa.
  *
  * Lo emitido en beta NO cuenta: si contara, la primera boleta real saldría con
  * el número siguiente al de las pruebas —B001-3 en vez de B001-1— y la serie
@@ -106,6 +111,9 @@ function fact_siguiente_correlativo(string $serie): int
     $mayor = 0;
     foreach (fact_leer_libro() as $fila) {
         if (($fila['tipo'] ?? '') !== 'emision' || !fact_del_modo_actual($fila)) {
+            continue;
+        }
+        if (($fila['estado'] ?? '') === 'no_entregado') {
             continue;
         }
         if (($fila['serie'] ?? '') === $serie && (int)($fila['correlativo'] ?? 0) > $mayor) {
@@ -133,7 +141,7 @@ function fact_comprobante_de(string $pedido): ?array
     foreach (fact_leer_libro() as $fila) {
         if (($fila['tipo'] ?? '') === 'emision'
             && ($fila['pedido'] ?? '') === $pedido
-            && ($fila['estado'] ?? '') !== 'fallido'
+            && !in_array($fila['estado'] ?? '', ['fallido', 'no_entregado'], true)
             && fact_del_modo_actual($fila)) {
             return $fila;
         }
@@ -184,7 +192,7 @@ function fact_boletas_sin_resumir(string $fecha): array
         if (($fila['tipo'] ?? '') === 'emision'
             && ($fila['documento'] ?? '') === 'boleta'
             && ($fila['fechaEmision'] ?? '') === $fecha
-            && ($fila['estado'] ?? '') !== 'fallido'
+            && !in_array($fila['estado'] ?? '', ['fallido', 'no_entregado'], true)
             && fact_del_modo_actual($fila)) {
             $emisiones[$clave] = $fila;
         }

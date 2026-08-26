@@ -98,6 +98,32 @@ foreach (['beta', 'produccion'] as $modo) {
         7, fact_comprobante_de('VIEJO-1')['correlativo'] ?? null);
 }
 
+// --- Un envio que SUNAT no llego a procesar NO gasta su numero ---------------
+// Paso de verdad: la primera boleta real salio con SUNAT 0111 «no tiene el
+// perfil para enviar comprobantes electronicos». SUNAT ni la miro, asi que no
+// existe para ella; si su numero se quemara, la serie real habria empezado en
+// el 2 y con un hueco que hay que explicar.
+fact_modo_forzado('produccion');
+file_put_contents($libro, json_encode([
+    'tipo' => 'emision', 'pedido' => 'DCR-0111', 'documento' => 'boleta', 'serie' => 'B900',
+    'correlativo' => 1, 'estado' => 'no_entregado', 'fechaEmision' => '2026-08-26',
+    'modo' => 'produccion',
+], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+
+comprobar('lo que SUNAT no proceso deja su numero libre', 1, fact_siguiente_correlativo('B900'));
+comprobar('y no cuenta como comprobante del pedido', null, fact_comprobante_de('DCR-0111'));
+comprobar('ni se manda en el resumen diario del dia',
+    0, count(fact_boletas_sin_resumir('2026-08-26')));
+
+// Un rechazo de contenido SI lo gasta: ahi SUNAT si lo proceso.
+file_put_contents($libro, json_encode([
+    'tipo' => 'emision', 'pedido' => 'DCR-2026', 'documento' => 'boleta', 'serie' => 'B901',
+    'correlativo' => 1, 'estado' => 'fallido', 'fechaEmision' => '2026-08-26',
+    'modo' => 'produccion',
+], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+
+comprobar('un rechazo de SUNAT si gasta su numero', 2, fact_siguiente_correlativo('B901'));
+
 // Limpieza.
 array_map('unlink', glob($temporal . '/datos/*') ?: []);
 @rmdir($temporal . '/datos');
