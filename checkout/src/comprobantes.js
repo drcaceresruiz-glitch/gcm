@@ -167,10 +167,29 @@ async function emitir(pedido) {
   return asiento;
 }
 
+/**
+ * Trae el XML firmado de un pedido ya emitido, para adjuntarlo al correo del
+ * comprador. Devuelve null si no hay: un correo sin adjunto es mejor que
+ * ningún correo.
+ */
+async function descargarXml(idPedido) {
+  if (!configurado()) return null;
+  try {
+    const r = await llamar('xml', { pedido: idPedido });
+    const d = r.datos || {};
+    return d.ok && typeof d.xml === 'string' ? d.xml : null;
+  } catch (e) {
+    console.warn('[comprobante] no se pudo traer el XML de', idPedido, e.message);
+    return null;
+  }
+}
+
 /** Cómo se llama un comprobante para enseñarlo: «BOLETA B001-7». */
 function nombrar(asiento) {
   if (!asiento || !asiento.ok) return null;
   return `${asiento.tipo} ${asiento.serie}-${asiento.numero}`;
 }
 
-module.exports = { emitir, configurado, comprobanteDe, nombrar, leerLibro, estadoServicio, LIBRO };
+module.exports = {
+  emitir, configurado, comprobanteDe, nombrar, leerLibro, estadoServicio, descargarXml, LIBRO,
+};

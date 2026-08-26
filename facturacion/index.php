@@ -19,6 +19,7 @@
  *   POST ?accion=emitir    emite la factura o la boleta de un pedido
  *   POST ?accion=resumen   informa a SUNAT las boletas de un día
  *   POST ?accion=ticket    pregunta por el resultado de un resumen
+ *   POST ?accion=xml       devuelve el XML firmado de un pedido ya emitido
  */
 
 declare(strict_types=1);
@@ -104,6 +105,34 @@ if ($accion === 'resumen') {
     }
     $r = fact_resumen_diario($fecha);
     fact_responder($r['ok'] ? 200 : 502, $r);
+}
+
+if ($accion === 'xml') {
+    // El XML firmado ES el comprobante: es lo que se le manda al comprador.
+    // Se devuelve solo el de un pedido YA emitido —nunca se firma nada aquí—,
+    // y el nombre del archivo se compone desde el libro, no desde lo que llegue
+    // en la petición: que nadie pueda pedir «../../.env» por esta puerta.
+    $cuerpo = fact_cuerpo();
+    $idPedido = trim((string)($cuerpo['pedido'] ?? ''));
+    if ($idPedido === '') {
+        fact_responder(400, ['ok' => false, 'error' => 'Falta el pedido.']);
+    }
+    $comprobante = fact_comprobante_de($idPedido);
+    if ($comprobante === null) {
+        fact_responder(404, ['ok' => false, 'error' => 'Ese pedido no tiene comprobante emitido.']);
+    }
+    $ruta = fact_datos_dir() . '/xml/' . basename((string)$comprobante['nombreXml']) . '.xml';
+    if (!is_readable($ruta)) {
+        fact_responder(404, ['ok' => false, 'error' => 'El XML de ese comprobante no está en el servidor.']);
+    }
+    fact_responder(200, [
+        'ok' => true,
+        'nombre' => basename($comprobante['nombreXml']) . '.xml',
+        'documento' => $comprobante['documento'] ?? null,
+        'serie' => $comprobante['serie'] ?? null,
+        'correlativo' => $comprobante['correlativo'] ?? null,
+        'xml' => file_get_contents($ruta),
+    ]);
 }
 
 if ($accion === 'ticket') {

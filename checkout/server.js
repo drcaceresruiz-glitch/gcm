@@ -43,6 +43,7 @@ const { paginaRetorno } = require('./src/pagina_retorno');
 const { registrarPedido, registrarEvento, consolidar, leerLineas } = require('./src/pedidos');
 const { LIBRO: LIBRO_RECLAMACIONES } = require('./src/reclamaciones');
 const comprobantes = require('./src/comprobantes');
+const correo = require('./src/correo');
 const sesion = require('./src/admin_sesion');
 const panel = require('./src/panel_admin');
 
@@ -227,34 +228,58 @@ app.get('/api/catalogo', (_req, res) => {
  * su evento en el historial del pedido, y desde el panel se reintenta.
  */
 function facturar(idPedido, origen = 'automático') {
-  if (!idPedido || !comprobantes.configurado()) return;
+  if (!idPedido) return;
 
   setImmediate(async () => {
     try {
       const registro = compras().find((p) => p.pedido === idPedido);
       if (!registro) return;
-      if (comprobantes.comprobanteDe(idPedido)) return;   // ya tiene uno
 
-      const asiento = await comprobantes.emitir(registro);
-      if (asiento.ok) {
-        registrarEvento({
-          pedido: idPedido,
-          tipo: 'comprobante',
-          detalle: comprobantes.nombrar(asiento),
-          quien: origen,
-        });
-        console.log(`[comprobante] ${comprobantes.nombrar(asiento)} para ${idPedido}`);
-      } else {
-        registrarEvento({
-          pedido: idPedido,
-          tipo: 'nota',
-          detalle: 'No se pudo emitir el comprobante: ' + (asiento.motivo || 'sin detalle'),
-          quien: origen,
-        });
-        console.error(`[comprobante] ${idPedido} falló:`, asiento.motivo);
+      // 1. El comprobante.
+      let asiento = comprobantes.comprobanteDe(idPedido);
+      if (!asiento && comprobantes.configurado()) {
+        asiento = await comprobantes.emitir(registro);
+        if (asiento.ok) {
+          registrarEvento({
+            pedido: idPedido,
+            tipo: 'comprobante',
+            detalle: comprobantes.nombrar(asiento),
+            quien: origen,
+          });
+          console.log(`[comprobante] ${comprobantes.nombrar(asiento)} para ${idPedido}`);
+        } else {
+          registrarEvento({
+            pedido: idPedido,
+            tipo: 'nota',
+            detalle: 'No se pudo emitir el comprobante: ' + (asiento.motivo || 'sin detalle'),
+            quien: origen,
+          });
+          console.error(`[comprobante] ${idPedido} falló:`, asiento.motivo);
+        }
       }
+
+      // 2. Los correos. VAN AUNQUE EL COMPROBANTE HAYA FALLADO: el comprador
+      // acaba de pagar y tiene derecho a saber que su pago llegó, aunque su
+      // factura tenga que salir más tarde. Callarse porque falló otra cosa es
+      // lo peor que se puede hacer aquí.
+      if (!correo.configurado()) return;
+
+      const xml = asiento && asiento.ok ? await comprobantes.descargarXml(idPedido) : null;
+      const yaAvisado = registro.eventos.some((ev) => ev.tipo === 'correo_comprador');
+      if (!yaAvisado) {
+        const r = await correo.avisarCompra({ pedido: registro, comprobante: asiento, xml });
+        registrarEvento({
+          pedido: idPedido,
+          tipo: r.ok ? 'correo_comprador' : 'nota',
+          detalle: r.ok
+            ? `Aviso de compra enviado a ${registro.correo}`
+            : 'No se pudo avisar al comprador: ' + (r.motivo || 'sin detalle'),
+          quien: origen,
+        });
+      }
+      await correo.avisarAdminCompra({ pedido: registro, comprobante: asiento, panelUrl: URL_PUBLICA });
     } catch (e) {
-      console.error('[comprobante] error inesperado emitiendo', idPedido, e);
+      console.error('[comprobante] error inesperado con', idPedido, e);
     }
   });
 }
@@ -474,6 +499,20 @@ app.post('/api/reclamacion', (req, res) => {
     // mientras no haya correo configurado. Sin esto, una reclamación podría
     // quedarse esperando sin que nadie se entere de que llegó.
     console.log(`[libro] hoja ${constancia.correlativo} de ${revision.datos.correo}`);
+
+    // LA COPIA SE MANDA DESPUÉS DE REGISTRAR Y SIN ESPERARLA. El reglamento
+    // obliga a entregarla, pero un servidor de correo caído no puede impedir
+    // que se registre una reclamación: eso dejaría al consumidor sin las dos
+    // cosas. Queda anotado en el log, y la hoja está guardada de todas formas.
+    setImmediate(async () => {
+      const r = await correo.copiaReclamacion({ hoja: revision.datos, constancia });
+      if (!r.ok) {
+        console.error(`[libro] ¡COPIA NO ENVIADA! ${constancia.correlativo} → `
+          + `${revision.datos.correo}. Mándela a mano. Motivo: ${r.motivo}`);
+      }
+      await correo.avisarAdminReclamacion({ hoja: revision.datos, constancia });
+    });
+
     return res.json(constancia);
   } catch (e) {
     console.error('[libro] no se pudo registrar la hoja:', e);
@@ -780,6 +819,11 @@ app.listen(PUERTO, () => {
   console.log(`  Panel del administrador:  ${base}/admin`);
   if (!comprobantes.configurado()) {
     console.warn('    ⚠  boletas y facturas a mano: falta FACTURACION_URL / FACTURACION_CLAVE en .env');
+  }
+  if (!correo.configurado()) {
+    console.warn('    ⚠  NO SALE NINGÚN CORREO: falta CORREO_HOST / CORREO_USUARIO / CORREO_CLAVE en .env');
+    console.warn('       El comprador no recibirá su comprobante y la copia de las');
+    console.warn('       hojas de reclamación hay que mandarla a mano.');
   }
   if (!sesion.claveConfigurada()) {
     console.warn('    ⚠  cerrado: falta ADMIN_PASSWORD en .env');

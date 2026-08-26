@@ -297,8 +297,9 @@ function paginaReclamaciones(hojas) {
   return pagina('Reclamaciones', `
 <h1>Libro de Reclamaciones</h1>
 <p class="guia">Hojas registradas, de la más reciente a la más antigua.</p>
-<div class="aviso ojo"><b>El plazo es de quince (15) días hábiles</b> desde que se registra la hoja, y hoy
-<b>la copia al reclamante hay que mandarla a mano</b>: el envío automático de correo todavía no está montado.</div>
+<div class="aviso ojo"><b>El plazo es de quince (15) días hábiles</b> desde que se registra la hoja.
+La copia al reclamante sale por correo al registrarse; si el envío falla, queda anotado en el registro del
+servidor y hay que mandarla a mano.</div>
 ${hojas.length
     ? `<div class="tabla-scroll"><table>
   <tr><th>Número</th><th>Quién</th><th>Tipo</th><th>Qué dice</th></tr>${filas}</table></div>`
@@ -333,7 +334,8 @@ function paginaAyuda({ urlPublica = '' } = {}) {
     <li><b>Licencia de la App Web:</b> cree la cuenta del cliente en GCM y mándele por correo su acceso.
       Los Términos prometen la activación en un máximo de <b>24 horas hábiles</b>.</li>
     <li><b>Software autoinstalable:</b> mándele el enlace de descarga y el manual de instalación.</li>
-    <li>Escríbale desde su correo al que dejó en el formulario, y ponga el número de pedido en el asunto.</li>
+    <li>Escríbale al correo que dejó en el formulario —le llega ya un aviso de compra con su comprobante,
+      así que basta con responder a ese mismo hilo— y ponga el número de pedido en el asunto.</li>
     <li>Vuelva al pedido y pulse <b>«Marcar como entregado»</b>. Esa marca es lo que distingue lo hecho
       de lo pendiente.</li>
   </ol>
@@ -359,7 +361,8 @@ function paginaAyuda({ urlPublica = '' } = {}) {
   <ol class="pasos">
     <li><b>Correo de la tienda:</b> el que figura en el pie de las páginas legales.</li>
     <li><b>Libro de Reclamaciones:</b> ${urlPublica ? `<a href="${e(urlPublica)}/reclamaciones.html">${e(urlPublica)}/reclamaciones.html</a>` : '<code>/reclamaciones.html</code>'}.
-      Se responde en <b>quince días hábiles</b> como máximo, y hoy la copia al reclamante se manda a mano.</li>
+      Se responde en <b>quince días hábiles</b> como máximo. La copia al reclamante y el aviso a usted salen
+      solos por correo.</li>
     <li><b>Devoluciones:</b> los plazos y los supuestos están en la página de Políticas de Devolución.
       Una devolución se tramita desde el Back Office de Izipay, no desde aquí.</li>
   </ol>
@@ -368,8 +371,8 @@ function paginaAyuda({ urlPublica = '' } = {}) {
 <div class="caja">
   <h2 style="margin-top:0">Lo que este panel todavía NO hace</h2>
   <ol class="pasos">
-    <li><b>No manda ningún correo.</b> Ni al comprador ni a usted. Los avisos de compra hay que verlos
-      entrando aquí, y la entrega se escribe a mano.</li>
+    <li><b>No entrega el producto.</b> Al comprador le llega el aviso de su compra y su comprobante, pero la
+      licencia o el instalador se los manda usted a mano.</li>
     <li><b>No manda el producto.</b> La licencia o el instalador se envían a mano; el comprobante sí sale solo.</li>
     <li><b>No devuelve dinero.</b> Eso se hace en el Back Office de Izipay.</li>
   </ol>

@@ -38,7 +38,9 @@ la cara de quien está pagando.
 | `public/terminos.html` · `public/devoluciones.html` | Las dos páginas legales que Izipay exige ver enlazadas. |
 | `public/reclamaciones.html` | La hoja de reclamación virtual (Ley 29571). |
 | `src/pedidos.js` | El pedido desde que empieza, y el estado de cada compra. |
-| `src/comprobantes.js` | La boleta o la factura, emitida sola contra NubeFact. |
+| `src/comprobantes.js` | Pide la boleta o la factura al servicio de facturación. |
+| `src/correo.js` | Los cuatro correos: al comprador, al administrador y las reclamaciones. |
+| `src/comercio.js` | Quién vende: razón social, RUC, domicilio. En un solo sitio. |
 | `src/admin_sesion.js` | Quién puede entrar al panel. |
 | `src/panel_admin.js` | Las pantallas del panel del administrador. |
 | `.env.example` | Qué credenciales hacen falta y de dónde salen. |
@@ -139,15 +141,9 @@ está razonado en `docs/plan-cobro-licencia.md`:
    sí deja rastro. Lo que sigue faltando es dónde vive todo eso: tres `.jsonl`
    que solo crecen bastan para decenas de pedidos al mes y dejan de bastar
    mucho antes de lo que parece —cada visita al panel los lee enteros—.
-4. **La copia por correo del Libro de Reclamaciones.** El reglamento obliga a
-   entregarla en el acto; hoy la hoja se registra y se anota en el log, pero no
-   sale ningún correo porque no hay remitente configurado. La página ya no dice
-   que la copia se envió —enuncia el envío en futuro y pone el correlativo por
-   delante—, así que **mientras esto no esté montado la copia hay que mandarla a
-   mano**. Hacen falta tres cosas: una cuenta de correo del propio cPanel (p. ej.
-   `reclamos@drcaceresruiz.com`), sus credenciales SMTP en `.env`, y el envío en
-   `src/reclamaciones.js` justo después de escribir la hoja —fallando en blando:
-   si el correo no sale, la hoja YA está registrada y eso no se pierde.
+4. **La representación impresa del comprobante.** Al comprador se le manda el
+   XML firmado, que es el documento con validez, pero un PDF legible es lo que
+   la gente espera recibir. Falta generarlo.
 5. **El comprobante electrónico: ya se emite solo.** Al confirmarse el pago se
    pide a NubeFact la **factura** (si el comprador puso RUC) o la **boleta** (si
    puso DNI o nada). El precio publicado lleva el IGV dentro, así que el importe
