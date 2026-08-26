@@ -88,11 +88,25 @@ function fact_siguiente_correlativo(string $serie): int
     return $mayor + 1;
 }
 
-/** ¿Este pedido ya tiene comprobante? Devuelve la emisión, o null. */
+/**
+ * ¿Este pedido ya tiene comprobante VÁLIDO? Devuelve la emisión, o null.
+ *
+ * UN INTENTO FALLIDO NO CUENTA, y pasarlo por alto costó caro: al reintentar
+ * un pedido cuya primera emisión SUNAT había rechazado, esta función devolvía
+ * aquel registro, `fact_emitir()` lo daba por «ya emitido» y contestaba que
+ * todo estaba bien sin haber llamado a SUNAT. El panel enseñaba en verde
+ * «Emitido: BOLETA B001-1» y no existía ninguna boleta.
+ *
+ * Su número sí queda gastado —eso es deliberado, está en
+ * `fact_siguiente_correlativo()`—: lo que no puede es hacerse pasar por un
+ * comprobante emitido.
+ */
 function fact_comprobante_de(string $pedido): ?array
 {
     foreach (fact_leer_libro() as $fila) {
-        if (($fila['tipo'] ?? '') === 'emision' && ($fila['pedido'] ?? '') === $pedido) {
+        if (($fila['tipo'] ?? '') === 'emision'
+            && ($fila['pedido'] ?? '') === $pedido
+            && ($fila['estado'] ?? '') !== 'fallido') {
             return $fila;
         }
     }
