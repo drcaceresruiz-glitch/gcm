@@ -84,6 +84,17 @@
   }
   .marca b { font-size: 17px; letter-spacing: -.01em; }
   .marca small { display: block; color: var(--apagado); font-size: 12px; line-height: 1.2; }
+  .barra-dcha { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: flex-end; }
+  .volver {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--acento); font-size: 13px; font-weight: 600; text-decoration: none;
+    padding: 6px 10px; border-radius: 8px;
+  }
+  .volver:hover { background: color-mix(in oklab, var(--acento) 10%, transparent); }
+  /* En pantallas estrechas el aviso del candado sobra antes que la salida:
+     quien está en el móvil necesita más poder volver que leer quién cobra,
+     que además vuelve a decirse en el pie. */
+  @media (max-width: 560px) { .barra-dcha .candado { display: none; } }
 
   .candado {
     display: inline-flex; align-items: center; gap: 7px;
@@ -129,6 +140,11 @@
     font-size: 11px; font-weight: 700; letter-spacing: .09em;
     text-transform: uppercase; color: var(--marca-600);
   }
+  h2.grupo {
+    margin: 22px 0 10px; font-size: 13px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--apagado);
+  }
+  h2.grupo:first-child { margin-top: 0; }
   .producto h3 { margin: 5px 0 5px; font-size: 16.5px; line-height: 1.3; }
   .producto p { margin: 0; color: var(--apagado); font-size: 14px; }
   .producto .precio {
@@ -288,12 +304,25 @@
         <small>Gestor de Construcción y Mantenimiento</small>
       </span>
     </div>
-    <span class="candado">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
-        <rect x="4" y="10.5" width="16" height="11" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
-      </svg>
-      Pago seguro procesado por Izipay
-    </span>
+    <div class="barra-dcha">
+      <!-- POR DÓNDE SE SALE. La tienda se abre desde el menú de
+           drcaceresruiz.com en la MISMA pestaña, así que tiene que haber una
+           puerta de vuelta: sin ella, quien entra a mirar un precio se queda
+           dentro y solo le queda el botón de atrás del navegador. -->
+      <a class="volver" href="https://drcaceresruiz.com">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>
+        </svg>
+        Volver al inicio
+      </a>
+      <span class="candado">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+          <rect x="4" y="10.5" width="16" height="11" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
+        </svg>
+        Pago seguro procesado por Izipay
+      </span>
+    </div>
   </div>
 </header>
 
@@ -474,6 +503,7 @@ const $ = (sel) => document.querySelector(sel);
 
 const estado = {
   productos: [],
+  grupos: [],
   elegido: null,
   clavePublica: null,
   krCargado: false,
@@ -504,24 +534,60 @@ function marcarError(campo, mensaje) {
 
 /* ------------------------------------------------------------------ catálogo */
 
+/**
+ * Pinta el catálogo agrupado por categoría.
+ *
+ * El titulillo de la categoría solo se pinta si hay MÁS DE UN grupo: con uno
+ * solo, encabezar la única sección que existe no separa nada de nada.
+ *
+ * Se construye con `textContent`, no metiendo el nombre del producto en una
+ * plantilla de HTML: los nombres los escribe una persona desde el panel, y
+ * bastaría un producto llamado con etiquetas para que se ejecutaran aquí.
+ */
 function pintarProductos() {
   const caja = $('#productos');
   caja.innerHTML = '';
+  const conTitulo = estado.grupos.length > 1;
 
-  for (const p of estado.productos) {
-    const etiqueta = document.createElement('label');
-    etiqueta.className = 'producto';
-    etiqueta.innerHTML = `
-      <input type="radio" name="producto" value="${p.id}">
-      <span class="cat">${p.categoria}</span>
-      <h3>${p.nombre}</h3>
-      <p>${p.resumen}</p>
-      <span class="precio">
-        <b>${p.precioTexto}</b>
-        <span>${p.igvIncluido ? 'IGV incluido' : 'más IGV'}</span>
-      </span>`;
-    etiqueta.querySelector('input').addEventListener('change', () => elegir(p.id));
-    caja.appendChild(etiqueta);
+  for (const grupo of estado.grupos) {
+    if (conTitulo) {
+      const titulo = document.createElement('h2');
+      titulo.className = 'grupo';
+      titulo.textContent = grupo.nombre;
+      caja.appendChild(titulo);
+    }
+
+    for (const p of grupo.productos) {
+      const etiqueta = document.createElement('label');
+      etiqueta.className = 'producto';
+
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'producto';
+      radio.value = p.id;
+      radio.addEventListener('change', () => elegir(p.id));
+
+      const cat = document.createElement('span');
+      cat.className = 'cat';
+      cat.textContent = grupo.nombre;
+
+      const h3 = document.createElement('h3');
+      h3.textContent = p.nombre;
+
+      const resumen = document.createElement('p');
+      resumen.textContent = p.resumen;
+
+      const precio = document.createElement('span');
+      precio.className = 'precio';
+      const importe = document.createElement('b');
+      importe.textContent = p.precioTexto;
+      const nota = document.createElement('span');
+      nota.textContent = p.igvIncluido ? 'IGV incluido' : 'más IGV';
+      precio.append(importe, nota);
+
+      etiqueta.append(radio, cat, h3, resumen, precio);
+      caja.appendChild(etiqueta);
+    }
   }
 }
 
@@ -661,6 +727,7 @@ async function iniciar() {
 
     estado.clavePublica = config.clavePublica;
     estado.productos = catalogo.productos || [];
+    estado.grupos = catalogo.grupos || [];
 
     if (!estado.productos.length) {
       $('#cargandoCatalogo').textContent = 'No hay productos disponibles en este momento.';

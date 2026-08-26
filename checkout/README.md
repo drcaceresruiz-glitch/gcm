@@ -30,7 +30,8 @@ la cara de quien está pagando.
 | Archivo | Qué es |
 |---|---|
 | `server.js` | El servidor: catálogo, pago, webhook, retorno y reclamaciones. |
-| `src/catalogo.js` | **El único sitio donde vive un precio.** |
+| `src/catalogo.js` | **El único sitio donde vive un precio.** Lee el catálogo. |
+| `src/catalogo_edicion.js` | Crear, cambiar y retirar productos y categorías. |
 | `src/pagos.js` | Verificación de firma, resumen del cobro e idempotencia. |
 | `src/pagina_retorno.js` | La página que ve el comprador al volver de pagar. |
 | `src/reclamaciones.js` | El Libro de Reclamaciones: validación, correlativo y escritura. |
@@ -60,6 +61,29 @@ la cara de quien está pagando.
 - `GET /admin` — **el panel del administrador**: compras, estado de cada pago,
   entrega, comprobante, reclamaciones y el guion de atención. Exige
   `ADMIN_PASSWORD`; sin ella devuelve 503 y no se abre.
+
+### El catálogo
+
+Productos y categorías se crean y se editan **desde el panel**
+(`/admin/catalogo`), no tocando código. Viven en `datos/catalogo.json`.
+
+**Por qué un JSON y no un `.jsonl` como todo lo demás.** Los otros libros son
+REGISTROS: solo crecen, porque anotan hechos y un hecho no se corrige. El
+catálogo es lo contrario, es ESTADO — un precio se cambia, un producto se
+retira. Se escribe entero, con temporal y renombrado: o está el catálogo viejo
+o está el nuevo, nunca medio archivo.
+
+La primera vez se **siembra** con los dos productos que ya estaban a la venta:
+desplegar esto no puede dejar la tienda sin nada que vender.
+
+**Retirar no es borrar.** Retirar quita el producto de la tienda y lo deja en el
+panel; los pedidos antiguos se siguen viendo bien y puede volver a ponerse a la
+venta. Borrar también se puede, y tampoco afecta a lo ya vendido —cada pedido
+guarda su copia del nombre y del precio—, pero es lo excepcional.
+
+Un producto **retirado no se puede comprar**: `buscarProducto()` solo devuelve
+los activos, y esa es su gracia. Para el panel, que sí necesita abrir uno
+retirado, está `buscarCualquierProducto()`.
 
 ### El panel
 
@@ -134,8 +158,8 @@ Esto es un checkout que funciona, no el circuito de cobro completo. Lo que queda
 está razonado en `docs/plan-cobro-licencia.md`:
 
 1. **Los precios son DE PRUEBA** (S/ 5.00 y S/ 10.00), puestos así para las
-   transacciones de certificación de Izipay. Sustituirlos por la tarifa real en
-   `src/catalogo.js` antes de abrir el checkout al público.
+   transacciones de certificación de Izipay. Se cambian desde el panel, en
+   Catálogo, antes de abrir el checkout al público.
 2. **Una base de datos de verdad.** El pedido ya se anota antes de ir a la
    pasarela (`datos/pedidos.jsonl`), así que un pago iniciado y nunca terminado
    sí deja rastro. Lo que sigue faltando es dónde vive todo eso: tres `.jsonl`
@@ -168,9 +192,12 @@ página de retorno, y la validación de la firma del pago.
 
 ---
 
-## Cuando toque añadir categorías y edición
+## Lo que falta en el catálogo
 
-`src/catalogo.js` se sustituye por una tabla. La forma de cada producto ya es la
-que tendría una fila —`id`, `categoria`, `nombre`, `resumen`, `detalle`,
-`precioCentimos`, `moneda`, `vigencia`, `entrega`—, así que ni el checkout ni el
-servidor tienen que rehacerse: cambia de dónde sale el catálogo, no qué es.
+**El carrito.** Hoy se compra **un producto por pedido**: se elige uno y se paga.
+Comprar varios de una vez exige que el pedido tenga líneas, que el importe sea
+una suma y que el comprobante lleve un `SaleDetail` por línea. Es la siguiente
+fase, y toca el cobro, no solo la tienda.
+
+**Las imágenes.** Un producto se describe con texto: nombre, resumen y una lista
+de lo que incluye. No hay fotos.

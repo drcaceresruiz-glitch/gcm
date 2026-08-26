@@ -14,6 +14,7 @@
  */
 
 const { formatearPrecio } = require('./catalogo');
+const { aTextoPrecio } = require('./catalogo_edicion');
 
 /** Escapa texto para meterlo en HTML. Se usa SIEMPRE, sin excepciones. */
 function e(v) {
@@ -86,6 +87,7 @@ function pagina(titulo, cuerpo, { sesion = true } = {}) {
 <title>${e(titulo)} · Panel GCM</title><style>${ESTILO}</style></head><body>
 ${sesion ? `<header><b>Panel de la tienda</b><nav>
 <a href="/admin">Compras</a>
+<a href="/admin/catalogo">Catálogo</a>
 <a href="/admin/reclamaciones">Reclamaciones</a>
 <a href="/admin/ayuda">Cómo se atiende</a>
 <a href="/">Ver la tienda</a>
@@ -307,6 +309,165 @@ ${hojas.length
 `);
 }
 
+/* ----------------------------------------------------------------- catálogo */
+
+/**
+ * Lo que se vende: productos y categorías, con lo que hace falta para
+ * cambiarlo.
+ *
+ * El PRECIO va grande y a la derecha, y el estado al lado: son los dos datos
+ * por los que se entra aquí. Lo demás —resumen, vigencia, entrega— se ve al
+ * abrir el producto.
+ */
+function paginaCatalogo(productos, cats, { mensaje = null, mensajeMalo = false, errorCat = null } = {}) {
+  const cuantos = (id) => productos.filter((p) => p.categoria === id).length;
+
+  const filas = productos.map((p) => {
+    const cat = cats.find((c) => c.id === p.categoria);
+    return `<tr>
+      <td><a href="/admin/catalogo/producto/${encodeURIComponent(p.id)}"><b>${e(p.nombre)}</b></a>
+        ${p.resumen ? `<br><span class="apagado">${e(p.resumen)}</span>` : ''}</td>
+      <td>${cat ? e(cat.nombre) : '<span class="apagado">sin categoría</span>'}</td>
+      <td style="white-space:nowrap"><b>${e(formatearPrecio(p.precioCentimos, p.moneda))}</b>
+        <br><span class="apagado">IGV incluido</span></td>
+      <td>${p.activo
+        ? '<span class="et entregado">a la venta</span>'
+        : '<span class="et abandonado">retirado</span>'}</td>
+      <td><form method="post" action="/admin/catalogo/producto/${encodeURIComponent(p.id)}/activar" style="margin:0">
+        <input type="hidden" name="activo" value="${p.activo ? 'no' : 'si'}">
+        <button class="suave">${p.activo ? 'Retirar' : 'Poner a la venta'}</button>
+      </form></td>
+    </tr>`;
+  }).join('');
+
+  const filasCat = cats.map((c) => `<tr>
+    <td><b>${e(c.nombre)}</b></td>
+    <td class="apagado">${cuantos(c.id)} producto(s)</td>
+    <td><form method="post" action="/admin/catalogo/categoria/${encodeURIComponent(c.id)}/borrar" style="margin:0"
+      onsubmit="return confirm('¿Borrar la categoría «${e(c.nombre)}»?${cuantos(c.id)
+        ? ' Sus ' + cuantos(c.id) + ' producto(s) NO se borran: pasarán a aparecer bajo «Otros».' : ''}')">
+      <button class="suave">Borrar</button></form></td>
+  </tr>`).join('');
+
+  return pagina('Catálogo', `
+${mensaje ? `<div class="aviso ${mensajeMalo ? 'mal' : 'bien'}">${e(mensaje)}</div>` : ''}
+<h1>Catálogo</h1>
+<p class="guia">Lo que la tienda ofrece. Los precios que ponga aquí son los que se cobran: el navegador
+nunca manda un importe, solo el producto elegido.</p>
+
+<p><a href="/admin/catalogo/producto/nuevo"><button>Nuevo producto</button></a></p>
+
+${productos.length ? `<div class="tabla-scroll"><table>
+<tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Estado</th><th></th></tr>
+${filas}</table></div>`
+    : '<div class="caja apagado">Todavía no hay ningún producto.</div>'}
+
+<h2>Categorías</h2>
+<p class="guia">Sirven para agrupar los productos en la tienda. Una categoría sin productos a la venta no
+se enseña.</p>
+
+<div class="caja">
+  ${cats.length ? `<table><tr><th>Nombre</th><th>Contiene</th><th></th></tr>${filasCat}</table>`
+    : '<p class="apagado" style="margin:0 0 14px">Todavía no hay categorías.</p>'}
+  ${errorCat ? `<div class="aviso mal" style="margin:14px 0 0">${e(errorCat)}</div>` : ''}
+  <form class="linea" method="post" action="/admin/catalogo/categoria" style="margin-top:14px">
+    <input type="text" name="nombre" maxlength="60" placeholder="Nombre de la categoría" required>
+    <button class="suave">Añadir categoría</button>
+  </form>
+</div>
+
+<div class="caja">
+  <h2 style="margin-top:0">Retirar no es borrar</h2>
+  <p style="margin:0 0 10px"><b>Retirar</b> quita el producto de la tienda y lo deja aquí: los pedidos
+  antiguos se siguen viendo bien y puede volver a ponerlo a la venta cuando quiera. Es lo que se usa
+  casi siempre.</p>
+  <p style="margin:0" class="apagado">Borrar del todo está dentro de cada producto, y tampoco afecta a
+  los pedidos ya hechos: cada pedido guarda su propia copia del nombre y del precio que se cobró.</p>
+</div>
+`);
+}
+
+/** El formulario de un producto. Sirve para crear y para editar. */
+function paginaProducto(p, cats, { errores = {}, valores = null, esNuevo = false } = {}) {
+  const v = valores || (p ? {
+    nombre: p.nombre, resumen: p.resumen, categoria: p.categoria,
+    precio: aTextoPrecio(p.precioCentimos), vigencia: p.vigencia, entrega: p.entrega,
+    detalle: p.detalle.join('\n'), activo: p.activo ? 'si' : 'no', orden: String(p.orden || ''),
+  } : { activo: 'si' });
+
+  const err = (campo) => errores[campo]
+    ? `<span style="display:block;color:var(--mal);font-size:13px;margin-top:4px">${e(errores[campo])}</span>` : '';
+  const val = (campo) => e(v[campo] ?? '');
+
+  const opciones = ['<option value="">— sin categoría —</option>']
+    .concat(cats.map((c) => `<option value="${e(c.id)}"${v.categoria === c.id ? ' selected' : ''}>${e(c.nombre)}</option>`))
+    .join('');
+
+  return pagina(esNuevo ? 'Nuevo producto' : p.nombre, `
+<p><a href="/admin/catalogo">← Volver al catálogo</a></p>
+<h1>${esNuevo ? 'Nuevo producto' : e(p.nombre)}</h1>
+${!esNuevo ? `<p class="guia">Identificador: <code>${e(p.id)}</code> — no cambia, porque es lo que viaja
+a la pasarela y al comprobante.</p>` : ''}
+
+<form method="post" action="/admin/catalogo/producto${esNuevo ? '' : '/' + encodeURIComponent(p.id)}">
+  <div class="caja">
+    <p style="margin:0 0 4px"><b>Nombre</b> · sale en la tienda y en el comprobante</p>
+    <input type="text" name="nombre" maxlength="120" required style="width:100%" value="${val('nombre')}">
+    ${err('nombre')}
+
+    <p style="margin:16px 0 4px"><b>Precio en soles</b> · con el IGV ya dentro</p>
+    <input type="text" name="precio" maxlength="14" required placeholder="349.00" value="${val('precio')}"
+           style="width:160px" inputmode="decimal">
+    ${err('precio')}
+    <span class="apagado" style="display:block;margin-top:4px">Es lo que se le cobra al comprador. Sin sumas
+    posteriores: el IGV se descuenta de este importe al emitir la boleta o la factura.</span>
+
+    <p style="margin:16px 0 4px"><b>Categoría</b></p>
+    <select name="categoria" style="font:inherit;padding:9px 11px;border:1px solid var(--linea);border-radius:8px">
+      ${opciones}
+    </select>
+    ${err('categoria')}
+
+    <p style="margin:16px 0 4px"><b>Resumen</b> · una línea bajo el nombre</p>
+    <input type="text" name="resumen" maxlength="200" style="width:100%" value="${val('resumen')}">
+
+    <p style="margin:16px 0 4px"><b>Qué incluye</b> · una cosa por línea</p>
+    <textarea name="detalle" style="min-height:120px">${val('detalle')}</textarea>
+
+    <p style="margin:16px 0 4px"><b>Vigencia</b></p>
+    <input type="text" name="vigencia" maxlength="120" style="width:100%"
+           placeholder="12 meses desde la activación" value="${val('vigencia')}">
+
+    <p style="margin:16px 0 4px"><b>Entrega</b> · qué recibe y cuándo</p>
+    <input type="text" name="entrega" maxlength="200" style="width:100%"
+           placeholder="Activación en un máximo de 24 horas hábiles" value="${val('entrega')}">
+
+    <p style="margin:16px 0 4px"><b>Estado</b></p>
+    <select name="activo" style="font:inherit;padding:9px 11px;border:1px solid var(--linea);border-radius:8px">
+      <option value="si"${v.activo !== 'no' ? ' selected' : ''}>A la venta</option>
+      <option value="no"${v.activo === 'no' ? ' selected' : ''}>Retirado</option>
+    </select>
+
+    <p style="margin:16px 0 4px"><b>Orden</b> · más bajo, más arriba en la tienda</p>
+    <input type="text" name="orden" maxlength="4" style="width:90px" inputmode="numeric" value="${val('orden')}">
+
+    <p style="margin:20px 0 0"><button>${esNuevo ? 'Crear el producto' : 'Guardar los cambios'}</button></p>
+  </div>
+</form>
+
+${esNuevo ? '' : `<div class="caja">
+  <h2 style="margin-top:0">Borrar del todo</h2>
+  <p style="margin:0 0 12px">Normalmente no hace falta: con <b>retirarlo</b> desaparece de la tienda y
+  sigue aquí. Borrarlo no afecta a los pedidos ya hechos —cada pedido guarda su copia del nombre y del
+  precio— pero no se puede deshacer.</p>
+  <form method="post" action="/admin/catalogo/producto/${encodeURIComponent(p.id)}/borrar"
+        onsubmit="return confirm('¿Borrar «${e(p.nombre)}» del catálogo? No se puede deshacer.')">
+    <button class="suave">Borrar este producto</button>
+  </form>
+</div>`}
+`);
+}
+
 /* -------------------------------------------------------------------- ayuda */
 
 function paginaAyuda({ urlPublica = '' } = {}) {
@@ -381,6 +542,8 @@ function paginaAyuda({ urlPublica = '' } = {}) {
 }
 
 module.exports = {
+  paginaCatalogo,
+  paginaProducto,
   paginaEntrar,
   paginaSinConfigurar,
   paginaCompras,
