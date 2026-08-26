@@ -124,6 +124,39 @@ file_put_contents($libro, json_encode([
 
 comprobar('un rechazo de SUNAT si gasta su numero', 2, fact_siguiente_correlativo('B901'));
 
+// --- Y lo mismo para lo anotado ANTES de que existiera «no_entregado» --------
+// Aquellas emisiones se marcaron «fallido» aunque SUNAT las hubiera rechazado
+// en la puerta. El libro no se corrige, solo crece, asi que la unica forma de
+// cerrar ese hueco es deducirlo del motivo, que si guarda el codigo. Paso con
+// la primera boleta real: rechazada con «SUNAT 0111» antes del arreglo.
+file_put_contents($libro, json_encode([
+    'tipo' => 'emision', 'pedido' => 'DCR-VIEJO', 'documento' => 'boleta', 'serie' => 'B902',
+    'correlativo' => 1, 'estado' => 'fallido', 'fechaEmision' => '2026-08-26', 'modo' => 'produccion',
+    'motivo' => 'SUNAT 0111: No tiene el perfil para enviar comprobantes electronicos'
+        . ' - Detalle: Rejected by policy.',
+], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+
+comprobar('un «fallido» viejo por 0111 deja su numero libre', 1, fact_siguiente_correlativo('B902'));
+comprobar('y no cuenta como comprobante', null, fact_comprobante_de('DCR-VIEJO'));
+
+// Pero un «fallido» viejo por CONTENIDO si lo gasta: SUNAT si lo proceso.
+file_put_contents($libro, json_encode([
+    'tipo' => 'emision', 'pedido' => 'DCR-VIEJO2', 'documento' => 'boleta', 'serie' => 'B903',
+    'correlativo' => 1, 'estado' => 'fallido', 'fechaEmision' => '2026-08-26', 'modo' => 'produccion',
+    'motivo' => 'SUNAT 2026: El XML no contiene el tag cac:Item/cbc:Description',
+], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+
+comprobar('un «fallido» viejo por contenido si gasta su numero', 2, fact_siguiente_correlativo('B903'));
+
+// Y uno sin motivo legible se da por gastado: ante la duda, no reutilizar.
+file_put_contents($libro, json_encode([
+    'tipo' => 'emision', 'pedido' => 'DCR-VIEJO3', 'documento' => 'boleta', 'serie' => 'B904',
+    'correlativo' => 1, 'estado' => 'fallido', 'fechaEmision' => '2026-08-26', 'modo' => 'produccion',
+    'motivo' => 'Error al emitir: algo raro',
+], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+
+comprobar('sin motivo legible se da por gastado', 2, fact_siguiente_correlativo('B904'));
+
 // Limpieza.
 array_map('unlink', glob($temporal . '/datos/*') ?: []);
 @rmdir($temporal . '/datos');

@@ -91,6 +91,38 @@ function fact_del_modo_actual(array $fila): bool
 }
 
 /**
+ * ¿Esta emisión gastó su número, o sigue libre?
+ *
+ * Gasta el número todo lo que SUNAT llegó a procesar, aunque lo rechazara: no
+ * hay forma de saber desde aquí si lo registró. NO lo gasta lo que SUNAT ni
+ * miró.
+ *
+ * SE DECIDE AL LEER, NO AL ESCRIBIR, y esa es la gracia. Las emisiones
+ * anteriores a que existiera `no_entregado` se anotaron como `fallido` aunque
+ * SUNAT las hubiera rechazado en la puerta, así que mirar solo la etiqueta
+ * dejaría huecos que ya no se pueden cerrar —el libro no se corrige, solo
+ * crece—. El motivo sí guarda el código que devolvió SUNAT, y de ahí se
+ * deduce lo mismo: pasó de verdad con la primera boleta real, rechazada con
+ * «SUNAT 0111» antes del arreglo, que si no habría dejado la serie empezando
+ * en el 2.
+ */
+function fact_gasto_su_numero(array $fila): bool
+{
+    if (($fila['estado'] ?? '') === 'no_entregado') {
+        return false;
+    }
+    if (($fila['estado'] ?? '') !== 'fallido') {
+        return true;
+    }
+    // «SUNAT 0111: No tiene el perfil...» -> 111, dentro de 100-999.
+    if (preg_match('/^SUNAT\s+(\d+)\s*:/', (string)($fila['motivo'] ?? ''), $c)) {
+        $codigo = (int)$c[1];
+        return !($codigo >= 100 && $codigo <= 999);
+    }
+    return true;
+}
+
+/**
  * El siguiente correlativo de una serie, DENTRO del modo actual.
  *
  * Cuenta las líneas de emisión de esa serie, LAS FALLIDAS INCLUIDAS: un número
@@ -113,7 +145,7 @@ function fact_siguiente_correlativo(string $serie): int
         if (($fila['tipo'] ?? '') !== 'emision' || !fact_del_modo_actual($fila)) {
             continue;
         }
-        if (($fila['estado'] ?? '') === 'no_entregado') {
+        if (!fact_gasto_su_numero($fila)) {
             continue;
         }
         if (($fila['serie'] ?? '') === $serie && (int)($fila['correlativo'] ?? 0) > $mayor) {
@@ -143,7 +175,7 @@ function fact_comprobante_de(string $pedido): ?array
             && ($fila['pedido'] ?? '') === $pedido
             && !in_array($fila['estado'] ?? '', ['fallido', 'no_entregado'], true)
             && fact_del_modo_actual($fila)) {
-            return $fila;
+            return $fila;   // los estados descartados nunca son un comprobante
         }
     }
     return null;
