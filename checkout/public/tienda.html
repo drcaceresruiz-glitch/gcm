@@ -155,11 +155,9 @@
 <script>
 const $ = (sel) => document.querySelector(sel);
 
-/* Cuántos productos entran en una página de categoría, y cuántos se asoman de
-   cada categoría en la vista «Todo». Números pequeños a propósito: la página
-   tiene que seguir siendo cómoda el día que haya cincuenta productos. */
+/* Cuántos productos entran en una página. Un número pequeño a propósito: la
+   página tiene que seguir siendo cómoda el día que haya cincuenta productos. */
 const POR_PAGINA = 12;
-const MUESTRA_EN_TODO = 6;
 
 const vista = {
   /** id del grupo activo, o '' para «Todo». */
@@ -229,64 +227,48 @@ function tarjetaDe(p, nombreGrupo) {
   return tarjeta;
 }
 
-function rejillaDe(productos, nombreGrupo) {
-  const caja = document.createElement('div');
-  caja.className = 'productos';
-  for (const p of productos) caja.appendChild(tarjetaDe(p, nombreGrupo));
-  return caja;
-}
-
 /**
- * La vista «Todo»: una sección por categoría, cada una con SU PROPIA rejilla.
- * El título va fuera de la rejilla —antes se metía dentro, como una celda más,
- * y descuadraba los productos—. De cada categoría se asoman unos pocos; si hay
- * más, un «Ver los N» lleva a su pestaña.
+ * UNA SOLA rejilla, siempre. La primera versión pintaba la vista «Todo» como
+ * secciones apiladas, una por categoría; con una o dos cosas por categoría,
+ * cada fila quedaba con una tarjeta solitaria y el catálogo parecía una lista
+ * vertical. La categoría ya está dicha dos veces —en las pestañas y en el
+ * rotulito de cada tarjeta—, así que el titulillo de sección no ganaba nada.
+ *
+ * En «Todo» van todos los productos seguidos, en el orden del catálogo; con
+ * una pestaña elegida, solo los suyos, con su título y su cuenta. Las dos
+ * vistas se paginan igual.
  */
-function pintarTodo(caja) {
-  const conTitulo = Tienda.grupos.length > 1;
-  for (const grupo of Tienda.grupos) {
-    const seccion = document.createElement('section');
-    seccion.className = 'seccion-cat';
+function pintarVista(caja) {
+  const grupo = vista.grupo ? Tienda.grupos.find((g) => g.id === vista.grupo) : null;
+  if (vista.grupo && !grupo) vista.grupo = '';
 
-    if (conTitulo) {
-      const h2 = document.createElement('h2');
-      h2.textContent = grupo.nombre;
-      if (grupo.productos.length > MUESTRA_EN_TODO) {
-        const ver = document.createElement('button');
-        ver.type = 'button';
-        ver.className = 'ver-todos';
-        ver.textContent = `Ver los ${grupo.productos.length}`;
-        ver.addEventListener('click', () => cambiarGrupo(grupo.id));
-        h2.appendChild(ver);
-      }
-      seccion.appendChild(h2);
-    }
+  const entradas = grupo
+    ? grupo.productos.map((p) => ({ p, nombreGrupo: grupo.nombre }))
+    : Tienda.grupos.flatMap((g) => g.productos.map((p) => ({ p, nombreGrupo: g.nombre })));
 
-    seccion.appendChild(rejillaDe(grupo.productos.slice(0, MUESTRA_EN_TODO), grupo.nombre));
-    caja.appendChild(seccion);
-  }
-  $('#paginacion').hidden = true;
-}
-
-/** La vista de UNA categoría, paginada de POR_PAGINA en POR_PAGINA. */
-function pintarGrupo(caja) {
-  const grupo = Tienda.grupos.find((g) => g.id === vista.grupo);
-  if (!grupo) { vista.grupo = ''; pintarTodo(caja); return; }
-
-  const paginas = Math.max(1, Math.ceil(grupo.productos.length / POR_PAGINA));
+  const paginas = Math.max(1, Math.ceil(entradas.length / POR_PAGINA));
   vista.pagina = Math.min(Math.max(1, vista.pagina), paginas);
   const desde = (vista.pagina - 1) * POR_PAGINA;
 
   const seccion = document.createElement('section');
   seccion.className = 'seccion-cat';
-  const h2 = document.createElement('h2');
-  h2.textContent = grupo.nombre;
-  const cuantos = document.createElement('span');
-  cuantos.className = 'cuantos';
-  cuantos.textContent = grupo.productos.length === 1
-    ? '1 producto' : `${grupo.productos.length} productos`;
-  h2.appendChild(cuantos);
-  seccion.append(h2, rejillaDe(grupo.productos.slice(desde, desde + POR_PAGINA), grupo.nombre));
+  if (grupo) {
+    const h2 = document.createElement('h2');
+    h2.textContent = grupo.nombre;
+    const cuantos = document.createElement('span');
+    cuantos.className = 'cuantos';
+    cuantos.textContent = grupo.productos.length === 1
+      ? '1 producto' : `${grupo.productos.length} productos`;
+    h2.appendChild(cuantos);
+    seccion.appendChild(h2);
+  }
+
+  const rejilla = document.createElement('div');
+  rejilla.className = 'productos';
+  for (const { p, nombreGrupo } of entradas.slice(desde, desde + POR_PAGINA)) {
+    rejilla.appendChild(tarjetaDe(p, nombreGrupo));
+  }
+  seccion.appendChild(rejilla);
   caja.appendChild(seccion);
 
   pintarPaginacion(paginas);
@@ -349,8 +331,7 @@ function cambiarGrupo(id) {
 function pintarCatalogo() {
   const caja = $('#catalogo');
   caja.innerHTML = '';
-  if (vista.grupo) pintarGrupo(caja);
-  else pintarTodo(caja);
+  pintarVista(caja);
   pintarBotones();
 }
 
