@@ -92,7 +92,7 @@ function fact_endpoint(): string
 function fact_ruta_certificado(): string
 {
     $nombre = fact_cfg('CERT_ARCHIVO', 'certificado.pem');
-    return FACT_BASE . '/certificados/' . basename($nombre);
+    return fact_cfg('CERT_DIR', FACT_BASE . '/certificados') . '/' . basename($nombre);
 }
 
 function fact_datos_dir(): string
@@ -131,13 +131,26 @@ function fact_datos_certificado(): ?array
     }
 
     $sujeto = $datos['subject'] ?? [];
-    // El RUC va en `serialNumber` en los certificados tributarios de SUNAT.
-    // Se admite que no esté: hay emisores cuyo certificado lo lleva solo en el
-    // nombre común, y entonces se enseña ese y que lo juzgue quien mira.
+
+    // DÓNDE ESTÁ EL RUC. No hay un solo sitio: unos certificados lo ponen en
+    // `serialNumber`, y los tributarios que emite RENIEC lo llevan DENTRO del
+    // nombre común —«||USO TRIBUTARIO|| APELLIDOS NOMBRES CDT 15606050906»—.
+    // La primera versión solo miraba `serialNumber` y con un certificado de
+    // esos contestaba «no consta», que es peor que no preguntar: la
+    // comprobación de si el certificado es del RUC emisor quedaba muda justo
+    // cuando hacía falta. Se recorren todos los campos del sujeto.
+    //
+    // Un RUC peruano son once dígitos que empiezan por 10, 15, 16, 17 o 20;
+    // exigirlo evita confundirlo con cualquier otro número largo del nombre.
     $ruc = '';
-    foreach (['serialNumber', 'SN', 'OU'] as $campo) {
-        $valor = (string)($sujeto[$campo] ?? '');
-        if (preg_match('/\b(\d{11})\b/', $valor, $c)) {
+    $orden = ['serialNumber', 'SN', 'CN', 'OU', 'O'];
+    $campos = $orden + array_keys($sujeto);
+    foreach ($campos as $campo) {
+        $valor = $sujeto[$campo] ?? '';
+        if (!is_string($valor)) {
+            continue;
+        }
+        if (preg_match('/(?<!\d)((?:10|15|16|17|20)\d{9})(?!\d)/', $valor, $c)) {
             $ruc = $c[1];
             break;
         }
