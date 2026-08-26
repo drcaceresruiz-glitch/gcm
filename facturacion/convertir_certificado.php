@@ -15,6 +15,17 @@
  * LA CONTRASEÑA NO SE GUARDA EN NINGÚN SITIO: se usa para descifrar y se
  * descarta. No se escribe en el `.env`, ni en un registro, ni en el disco.
  *
+ * DOS INTENTOS, Y EL SEGUNDO ES EL QUE SUELE FUNCIONAR. Los certificados de
+ * SUNAT vienen cifrados con algoritmos antiguos (RC2, 3DES) que OpenSSL 3
+ * desactivó por defecto. `openssl_pkcs12_read()` falla con un
+ * «digital envelope routines::unsupported» que parece una contraseña
+ * equivocada y no lo es. Por eso, si el primer intento falla, se prueba con la
+ * línea de órdenes de OpenSSL y su opción `-legacy`, que sí los abre.
+ *
+ * Y la contraseña se le pasa por VARIABLE DE ENTORNO, no en la línea de
+ * órdenes: los argumentos de un proceso los ve cualquiera que liste los
+ * procesos del servidor; su entorno, no.
+ *
  * Y ESTÁ PROTEGIDO POR LA MISMA CLAVE DEL SERVICIO (`CLAVE_API` del `.env`),
  * que hay que escribir abajo. Falla cerrado: sin clave configurada no se abre.
  */
@@ -22,6 +33,61 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/src/config.php';
+
+/**
+ * Segundo intento: la línea de órdenes de OpenSSL, con `-legacy`.
+ *
+ * Devuelve el PEM, o null con el motivo en `$detalle`.
+ */
+function fact_convertir_con_openssl(string $pfx, string $clave, ?string &$detalle): ?string
+{
+    $detalle = null;
+    if (!function_exists('proc_open')) {
+        $detalle = 'este servidor no permite ejecutar programas desde PHP (proc_open deshabilitado)';
+        return null;
+    }
+
+    // Se prueba primero CON -legacy (OpenSSL 3) y luego sin él (OpenSSL 1.x,
+    // donde esa opción no existe y sobra).
+    foreach ([true, false] as $conLegacy) {
+        $orden = 'openssl pkcs12' . ($conLegacy ? ' -legacy' : '')
+            . ' -in ' . escapeshellarg($pfx) . ' -nodes -passin env:FACT_PFX_PASS';
+
+        $tuberias = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proceso = @proc_open(
+            $orden,
+            $tuberias,
+            $canales,
+            null,
+            ['FACT_PFX_PASS' => $clave, 'PATH' => getenv('PATH') ?: '/usr/bin:/bin:/usr/local/bin']
+        );
+        if (!is_resource($proceso)) {
+            $detalle = 'no se pudo ejecutar openssl';
+            continue;
+        }
+        $salida = stream_get_contents($canales[1]);
+        $errores = stream_get_contents($canales[2]);
+        fclose($canales[1]);
+        fclose($canales[2]);
+        $codigo = proc_close($proceso);
+
+        if ($codigo === 0 && str_contains($salida, 'PRIVATE KEY')) {
+            // La línea de órdenes intercala «Bag Attributes», «subject=»,
+            // «issuer=»… entre los bloques. La librería de firma espera PEM y
+            // nada más, así que se dejan solo los bloques.
+            preg_match_all('/-----BEGIN [^-]+-----.*?-----END [^-]+-----/s', $salida, $bloques);
+            return $bloques[0] ? implode("\n", $bloques[0]) . "\n" : $salida;
+        }
+        // «Mac verify error» / «invalid password» sí es la contraseña: no tiene
+        // sentido reintentar sin -legacy.
+        if (stripos($errores, 'verify error') !== false || stripos($errores, 'invalid password') !== false) {
+            $detalle = 'la contraseña del certificado no es correcta';
+            return null;
+        }
+        $detalle = trim($errores) !== '' ? trim(explode("\n", trim($errores))[0]) : 'openssl no devolvió el certificado';
+    }
+    return null;
+}
 
 header('X-Robots-Tag: noindex, nofollow');
 header('Cache-Control: no-store');
@@ -48,22 +114,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pfx = $origenes[0];
         $contenido = file_get_contents($pfx);
         $partes = [];
+        $pem = '';
+        $porLaViaAntigua = false;
+
         // La contraseña puede ser vacía en algunos certificados: se admite.
-        if ($contenido === false || !openssl_pkcs12_read($contenido, $partes, $claveCert)) {
-            $mensaje = 'No se pudo abrir el certificado. Casi siempre es la contraseña. '
-                . 'Detalle de OpenSSL: ' . (openssl_error_string() ?: 'sin detalle');
-        } else {
+        if ($contenido !== false && openssl_pkcs12_read($contenido, $partes, $claveCert)) {
             $pem = ($partes['pkey'] ?? '') . ($partes['cert'] ?? '');
             foreach (($partes['extracerts'] ?? []) as $extra) {
                 $pem .= $extra;
             }
+        } else {
+            // Casi siempre es el cifrado antiguo, no la contraseña.
+            $errorPhp = openssl_error_string() ?: '';
+            $detalle = null;
+            $pem = (string)fact_convertir_con_openssl($pfx, $claveCert, $detalle);
+            $porLaViaAntigua = trim($pem) !== '';
+            if (!$porLaViaAntigua) {
+                $mensaje = 'No se pudo abrir el certificado. '
+                    . ($detalle ? ucfirst($detalle) . '.' : 'Revise la contraseña.')
+                    . (str_contains($errorPhp, 'unsupported')
+                        ? ' (Su certificado usa un cifrado antiguo y este servidor no pudo abrirlo'
+                          . ' por ninguna de las dos vías.)'
+                        : '');
+            }
+        }
+
+        if ($mensaje === null) {
             if (trim($pem) === '') {
                 $mensaje = 'El certificado se abrió pero venía vacío. Vuelva a descargarlo de SUNAT.';
             } else {
                 file_put_contents($destino, $pem);
                 @chmod($destino, 0600);
-                $mensaje = 'Certificado convertido. Ahora borre el .pfx y borre este archivo '
-                    . '(convertir_certificado.php).';
+                $mensaje = 'Certificado convertido'
+                    . ($porLaViaAntigua ? ' (con la vía para cifrado antiguo)' : '')
+                    . '. Ahora borre el .pfx y borre este archivo (convertir_certificado.php).';
                 $tipo = 'bien';
                 $hecho = true;
             }
