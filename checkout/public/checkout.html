@@ -586,14 +586,6 @@ function cargarKrypton() {
 async function dibujarPago(formToken) {
   await cargarKrypton();
 
-  // BORRAR ANTES DE PINTAR. `KR.renderElements` sobre un formulario ya dibujado
-  // no vuelve a dibujarlo: devuelve el error «No se puede llamar a
-  // KR.renderElements si un formulario ya está renderizado». Pasa en cuanto se
-  // pulsa «Continuar al pago» dos veces, o se corrige un dato y se reintenta.
-  // Cada intento pide un formToken nuevo, así que el formulario anterior
-  // siempre sobra: se quita sin preguntar.
-  try { await KR.removeForms(); } catch { /* no había ninguno */ }
-
   await KR.setFormConfig({
     formToken,
     'kr-language': 'es-PE',
@@ -638,6 +630,20 @@ async function dibujarPago(formToken) {
       return false;   // false = no recargar la página; lo gestionamos nosotros
     });
   }
+
+  // BORRAR JUSTO ANTES DE PINTAR, y no antes de `setFormConfig`.
+  //
+  // El cliente de Izipay dibuja el formulario ÉL SOLO en cuanto recibe el
+  // formToken: para cuando llegamos a `renderElements` ya está puesto, y
+  // entonces devuelve, en rojo y dentro del recuadro de la tarjeta, «No se
+  // puede llamar a KR.renderElements si un formulario ya está renderizado».
+  // Salía siempre, ya en el primer intento — no era cosa de reintentar.
+  //
+  // Limpiar aquí lo deja resuelto en los dos casos: el auto-dibujado que
+  // acaba de hacer `setFormConfig`, y el formulario del intento anterior
+  // cuando se corrige un dato y se vuelve a pulsar. Cada intento pide un
+  // formToken nuevo, así que lo que hubiera antes siempre sobra.
+  try { await KR.removeForms(); } catch { /* no había ninguno */ }
 
   await KR.renderElements('.kr-embedded');
   $('#zonaPago').hidden = false;
