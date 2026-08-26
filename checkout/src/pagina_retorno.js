@@ -76,7 +76,7 @@ function paginaRetorno(resumen) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Resultado de su pago · GCM</title>
+<title>Resultado de su pago · drcaceresruiz.com</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="/icono.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/legal.css">
@@ -120,8 +120,8 @@ function paginaRetorno(resumen) {
 <header class="barra">
   <div class="contenedor">
     <a class="marca" href="/checkout.html">
-      <span class="sello" aria-hidden="true">GCM</span>
-      <span><b>GCM</b><small>Gestor de Construcción y Mantenimiento</small></span>
+      <span class="sello" aria-hidden="true">DR</span>
+      <span><b>drcaceresruiz.com</b><small>Tienda oficial</small></span>
     </a>
     <a class="volver" href="/checkout.html">← Volver a la tienda</a>
   </div>

@@ -90,12 +90,23 @@ function fact_empresa(): Company
  */
 function fact_cliente(array $datos): Client
 {
-    $documento = preg_replace('/\D/', '', (string)($datos['documento'] ?? ''));
+    // Alfanumérico, no solo dígitos: el carné de extranjería y el pasaporte
+    // llevan letras, y quitárselas los convertía en un número que no existe.
+    $documento = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)($datos['documento'] ?? '')));
     $nombre = trim((string)($datos['nombres'] ?? ''));
 
-    if (strlen($documento) === 11) {
+    // Catálogo 06 de SUNAT: 1 DNI, 4 carné de extranjería, 6 RUC, 7 pasaporte,
+    // 0 sin documento. Si el checkout declaró el tipo, manda él; los pedidos
+    // de antes del selector no lo traen y se infiere por el largo, como
+    // siempre se hizo.
+    $declarado = strtolower(trim((string)($datos['tipoDocumento'] ?? '')));
+    $mapa = ['dni' => '1', 'ce' => '4', 'pasaporte' => '7', 'ruc' => '6'];
+
+    if ($documento !== '' && isset($mapa[$declarado])) {
+        $tipo = $mapa[$declarado];
+    } elseif (ctype_digit($documento) && strlen($documento) === 11) {
         $tipo = '6';
-    } elseif (strlen($documento) === 8) {
+    } elseif (ctype_digit($documento) && strlen($documento) === 8) {
         $tipo = '1';
     } else {
         $tipo = '0';
@@ -113,6 +124,11 @@ function fact_cliente(array $datos): Client
 /** ¿A este pedido le toca factura? Solo si el comprador dio un RUC. */
 function fact_es_factura(array $pedido): bool
 {
+    $declarado = strtolower(trim((string)($pedido['tipoDocumento'] ?? '')));
+    if ($declarado !== '') {
+        return $declarado === 'ruc';
+    }
+    // Pedidos de antes del selector de tipo: 11 dígitos era RUC.
     return strlen(preg_replace('/\D/', '', (string)($pedido['documento'] ?? ''))) === 11;
 }
 

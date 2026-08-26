@@ -86,6 +86,7 @@ function registrarPedido({ pedido, lineas, totalCentimos, moneda, comprador, mod
     moneda,
     nombres: comprador.nombres || null,
     correo: comprador.correo,
+    tipoDocumento: comprador.tipoDocumento || null,
     documento: comprador.documento || null,
     telefono: comprador.telefono || null,
   });
@@ -160,6 +161,7 @@ function consolidar(pagos = []) {
         moneda: pago.moneda ?? null,
         nombres: null,
         correo: pago.correo ?? null,
+        tipoDocumento: null,
         documento: pago.documento ?? null,
         telefono: null,
         pagos: [],

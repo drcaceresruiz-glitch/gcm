@@ -1,8 +1,14 @@
-# Checkout de GCM
+# Tienda de drcaceresruiz.com
 
-Checkout en soles (PEN) para los dos productos que hoy se venden: la **Licencia de
-la App Web GCM** y el **Software Descargable Autoinstalable GCM**. El cobro lo
+Tienda en soles (PEN). Hoy vende dos productos —la **Licencia de la App Web GCM**
+y el **Software Descargable Autoinstalable GCM**—, pero la marca de la tienda es
+la del sitio, drcaceresruiz.com: GCM es un producto, no el vendedor. El cobro lo
 procesa **Izipay** con su formulario embebido.
+
+Dos páginas: el **catálogo** (`/`), con categorías, pestañas y paginación, y el
+**pago** (`/pagar`), con el carrito, los datos de facturación y la tarjeta. El
+carrito viaja entre ambas por `localStorage` (`public/comun.js`); lo que se
+cobra lo calcula siempre el servidor.
 
 Es una aplicación **aparte de la app Next.js**: su propio servidor Express, su
 propio `package.json` y sus propias páginas. Se despliega y se reinicia sin tocar
@@ -16,7 +22,7 @@ GCM, que es justo lo que se quiere de algo que cobra.
 cd checkout
 npm install
 cp .env.example .env      # y pegue dentro las credenciales de PRUEBAS de Izipay
-npm start                 # http://localhost:3001/checkout.html
+npm start                 # http://localhost:3001/
 ```
 
 Sin `.env`, la página carga igual y avisa: `/api/create-payment` devuelve 503 y el
@@ -36,7 +42,10 @@ la cara de quien está pagando.
 | `src/pagos.js` | Verificación de firma, resumen del cobro e idempotencia. |
 | `src/pagina_retorno.js` | La página que ve el comprador al volver de pagar. |
 | `src/reclamaciones.js` | El Libro de Reclamaciones: validación, correlativo y escritura. |
-| `public/checkout.html` | La página de compra. Autocontenida salvo el cliente de Izipay. |
+| `public/tienda.html` | El catálogo: categorías, pestañas, paginación y carrito. |
+| `public/pagar.html` | El pago: carrito, datos de facturación y la tarjeta de Izipay. |
+| `public/comun.js` · `public/tienda.css` | El carrito y la hoja de estilos que comparten las dos páginas. |
+| `src/documentos.js` | Los tipos de documento (DNI, carné de extranjería, pasaporte, RUC) y sus reglas. |
 | `public/terminos.html` · `public/devoluciones.html` | Las dos páginas legales que Izipay exige ver enlazadas. |
 | `public/reclamaciones.html` | La hoja de reclamación virtual (Ley 29571). |
 | `src/pedidos.js` | El pedido desde que empieza, y el estado de cada compra. |
@@ -52,7 +61,7 @@ la cara de quien está pagando.
 
 - `GET /api/config` — clave pública de Izipay y si el servidor está configurado.
 - `GET /api/catalogo` — productos con su precio ya formateado.
-- `POST /api/create-payment` — recibe `{ producto, nombres, correo, documento, telefono }`
+- `POST /api/create-payment` — recibe `{ carrito, nombres, correo, tipoDocumento, documento, telefono }`
   y devuelve el `formToken`.
 - `POST /api/validate-payment` — comprueba la firma de la vuelta por el navegador.
 - `POST /api/ipn` — **la notificación de servidor a servidor. Es la que manda.**

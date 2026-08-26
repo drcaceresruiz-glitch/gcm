@@ -15,6 +15,7 @@
 
 const { formatearPrecio } = require('./catalogo');
 const { aTextoPrecio } = require('./catalogo_edicion');
+const { etiquetaDocumento, llevaFactura } = require('./documentos');
 
 /** Escapa texto para meterlo en HTML. Se usa SIEMPRE, sin excepciones. */
 function e(v) {
@@ -84,7 +85,7 @@ function pagina(titulo, cuerpo, { sesion = true } = {}) {
   return `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>${e(titulo)} · Panel GCM</title><style>${ESTILO}</style></head><body>
+<title>${e(titulo)} · Panel de ventas</title><style>${ESTILO}</style></head><body>
 ${sesion ? `<header><b>Panel de la tienda</b><nav>
 <a href="/admin">Compras</a>
 <a href="/admin/catalogo">Catálogo</a>
@@ -212,8 +213,8 @@ guardar los pedidos al iniciarse, así que faltan los datos que escribió el com
   <table>
     <tr><th>Nombre</th><td>${e(p.nombres || '—')}</td></tr>
     <tr><th>Correo</th><td><a href="mailto:${e(p.correo || '')}">${e(p.correo || '—')}</a></td></tr>
-    <tr><th>DNI / RUC</th><td>${e(p.documento || '—')}
-      ${p.documento && p.documento.length === 11 ? ' <span class="et pagado">lleva factura</span>' : ''}</td></tr>
+    <tr><th>Documento</th><td>${e(etiquetaDocumento(p.tipoDocumento, p.documento))}
+      ${llevaFactura(p.tipoDocumento, p.documento) ? ' <span class="et pagado">lleva factura</span>' : ''}</td></tr>
     <tr><th>Teléfono</th><td>${e(p.telefono || '—')}</td></tr>
     <tr><th>Importe</th><td><b>${p.importeCentimos == null ? '—' : e(formatearPrecio(p.importeCentimos))}</b></td></tr>
     <tr><th>Comprobante</th><td>${comprobante && comprobante.ok
@@ -272,7 +273,7 @@ guardar los pedidos al iniciarse, así que faltan los datos que escribió el com
     : facturadorListo
       ? `<form class="linea" method="post" action="/admin/pedido/${encodeURIComponent(p.pedido)}/facturar">
            <button${p.pagado ? '' : ' class="suave" disabled'}>Emitir ${
-             String(p.documento || '').length === 11 ? 'factura' : 'boleta'} ahora</button>
+             llevaFactura(p.tipoDocumento, p.documento) ? 'factura' : 'boleta'} ahora</button>
            <span class="apagado">Se emite sola al confirmarse el pago; esto es por si aquella vez falló.</span>
          </form>`
       : `<div class="aviso ojo">La emisión automática está apagada: faltan <code>FACTURACION_URL</code> y

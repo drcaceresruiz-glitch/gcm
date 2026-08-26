@@ -1,0 +1,348 @@
+/* tienda.css — La hoja común de la tienda de drcaceresruiz.com.
+   La comparten la página del catálogo (tienda.html) y la del pago (pagar.html):
+   antes cada página llevaba su copia de todo esto dentro de un <style>, y
+   cambiar un color era cambiarlo dos veces o dejarlas desparejas. */
+
+/* Paleta heredada de la app GCM (src/app/globals.css): el teal en oklch, con
+   los mismos valores, para que la tienda no parezca de otro sitio. */
+:root {
+  --marca-50:  oklch(0.97 0.02 195);
+  --marca-100: oklch(0.93 0.05 195);
+  --marca-500: oklch(0.62 0.11 195);
+  --marca-600: oklch(0.54 0.10 195);
+  --marca-700: oklch(0.45 0.09 195);
+  --marca-900: oklch(0.30 0.06 195);
+
+  --exito:   oklch(0.62 0.15 150);
+  --alerta:  oklch(0.78 0.16 75);
+  --peligro: oklch(0.58 0.19 25);
+
+  /* Neutros con una pizca del tono de la marca: un gris puro al lado de un
+     teal se ve sucio. */
+  --fondo:    oklch(0.98 0.004 195);
+  --tarjeta:  oklch(1 0 0);
+  --hundido:  oklch(0.965 0.006 195);
+  --tinta:    oklch(0.24 0.015 195);
+  --apagado:  oklch(0.52 0.015 195);
+  --linea:    oklch(0.90 0.008 195);
+
+  --sombra: 0 1px 2px oklch(0.24 0.015 195 / 0.06), 0 4px 16px oklch(0.24 0.015 195 / 0.05);
+  --radio: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--tinta);
+  font: 400 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--marca-700); }
+:focus-visible { outline: 2px solid var(--marca-600); outline-offset: 2px; border-radius: 4px; }
+
+.contenedor { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+/* ------------------------------------------------------------------ cabecera */
+header.barra {
+  background: var(--tarjeta);
+  border-bottom: 1px solid var(--linea);
+}
+header.barra .contenedor {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; min-height: 68px; flex-wrap: wrap;
+}
+.marca { display: flex; align-items: center; gap: 11px; color: inherit; text-decoration: none; }
+.marca .sello {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: linear-gradient(140deg, var(--marca-500), var(--marca-700));
+  color: #fff; display: grid; place-items: center;
+  font-weight: 700; font-size: 13px; letter-spacing: .02em;
+}
+.marca b { font-size: 17px; letter-spacing: -.01em; }
+.marca small { display: block; color: var(--apagado); font-size: 12px; line-height: 1.2; }
+.barra-dcha { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: flex-end; }
+.volver {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--marca-700); font-size: 13px; font-weight: 600; text-decoration: none;
+  padding: 6px 10px; border-radius: 8px;
+}
+.volver:hover { background: var(--marca-50); }
+/* En pantallas estrechas el aviso del candado sobra antes que la salida:
+   quien está en el móvil necesita más poder volver que leer quién cobra,
+   que además vuelve a decirse en el pie. */
+@media (max-width: 560px) { .barra-dcha .candado { display: none; } }
+
+.candado {
+  display: inline-flex; align-items: center; gap: 7px;
+  color: var(--marca-700); background: var(--marca-50);
+  border: 1px solid var(--marca-100);
+  padding: 6px 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600;
+}
+
+/* --------------------------------------------------------------------- pasos */
+.titulo { margin: 34px 0 4px; font-size: 25px; letter-spacing: -.015em; }
+.bajada { margin: 0 0 26px; color: var(--apagado); max-width: 62ch; }
+
+.paso {
+  display: flex; align-items: center; gap: 9px;
+  margin: 0 0 13px; font-size: 12px; font-weight: 700;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--marca-700);
+}
+.paso .n {
+  width: 21px; height: 21px; border-radius: 50%;
+  background: var(--marca-600); color: #fff;
+  display: grid; place-items: center; font-size: 11.5px; letter-spacing: 0;
+}
+
+/* ----------------------------------------------------------------- catálogo */
+/* Cada categoría es una SECCIÓN con su título fuera de la rejilla y su rejilla
+   de productos dentro. Antes los títulos se metían como celdas de una única
+   rejilla y la descuadraban: el título ocupaba el hueco de un producto. */
+.seccion-cat { margin: 0 0 30px; }
+.seccion-cat > h2 {
+  margin: 0 0 12px; font-size: 14px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--apagado);
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+.seccion-cat > h2 .cuantos { font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 13px; }
+.seccion-cat .ver-todos {
+  font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none;
+  color: var(--marca-700); background: none; border: 0; padding: 0;
+  cursor: pointer; text-decoration: underline; font-family: inherit;
+}
+
+.productos { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+
+.producto {
+  position: relative; display: flex; flex-direction: column;
+  background: var(--tarjeta); border: 1.5px solid var(--linea);
+  border-radius: var(--radio); padding: 17px 19px;
+  box-shadow: var(--sombra); transition: border-color .15s, box-shadow .15s;
+}
+.producto:hover { border-color: var(--marca-500); }
+
+.producto .cat {
+  font-size: 11px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--marca-600);
+}
+.producto h3 { margin: 5px 0 5px; font-size: 16.5px; line-height: 1.3; }
+.producto p { margin: 0; color: var(--apagado); font-size: 14px; }
+.producto ul.incluye { margin: 8px 0 0; padding-left: 18px; color: var(--apagado); font-size: 13px; }
+.producto ul.incluye li { margin: 2px 0; }
+.producto .precio {
+  margin-top: auto; padding-top: 12px;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  border-top: 1px solid var(--linea);
+}
+.producto .precio-caja { margin-top: 12px; }
+.producto .precio b { font-size: 22px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.producto .precio span { color: var(--apagado); font-size: 12.5px; }
+.producto .anadir {
+  margin-top: 10px; font: inherit; font-size: 13.5px; font-weight: 600;
+  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--marca-500);
+  background: #fff; color: var(--marca-600); cursor: pointer;
+}
+.producto .anadir:hover { background: color-mix(in oklab, var(--marca-500) 8%, #fff); }
+.producto .anadir.dentro { background: var(--marca-50); border-color: var(--marca-600); color: var(--marca-700); }
+
+/* Pestañas de categoría. Con una sola categoría no se pintan: no separan nada. */
+.pestanas { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+.pestanas button {
+  font: inherit; font-size: 13.5px; font-weight: 600;
+  padding: 7px 15px; border-radius: 999px; border: 1px solid var(--linea);
+  background: var(--tarjeta); color: var(--tinta); cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.pestanas button:hover { border-color: var(--marca-500); }
+.pestanas button[aria-selected="true"] {
+  background: var(--marca-600); border-color: var(--marca-600); color: #fff;
+}
+
+/* Paginación. Solo aparece cuando una categoría tiene más productos de los
+   que caben en una página; hasta entonces no ocupa sitio. */
+.paginacion {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin: 22px 0 0; flex-wrap: wrap;
+}
+.paginacion button {
+  min-width: 36px; height: 36px; padding: 0 10px;
+  font: inherit; font-size: 14px; font-weight: 600;
+  border: 1px solid var(--linea); border-radius: 9px;
+  background: var(--tarjeta); color: var(--tinta); cursor: pointer;
+}
+.paginacion button:hover:not(:disabled) { border-color: var(--marca-500); }
+.paginacion button[aria-current="page"] {
+  background: var(--marca-600); border-color: var(--marca-600); color: #fff;
+}
+.paginacion button:disabled { opacity: .4; cursor: not-allowed; }
+.paginacion .de { color: var(--apagado); font-size: 13px; margin: 0 6px; }
+
+/* Barra del carrito, fija abajo. Es la puerta a la página de pago: el catálogo
+   ya no cobra nada. */
+.barra-carrito {
+  position: sticky; bottom: 0; z-index: 5;
+  background: var(--tarjeta); border-top: 1px solid var(--linea);
+  box-shadow: 0 -4px 16px oklch(0.24 0.015 195 / 0.07);
+}
+.barra-carrito[hidden] { display: none; }
+.barra-carrito .contenedor {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; padding-top: 12px; padding-bottom: 12px; flex-wrap: wrap;
+}
+.barra-carrito .resumen-carrito { font-size: 14.5px; }
+.barra-carrito .resumen-carrito b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.barra-carrito .ir-pagar {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: inherit; font-size: 15px; font-weight: 600; text-decoration: none;
+  color: #fff; background: var(--marca-600);
+  padding: 11px 22px; border-radius: 10px; transition: background .15s;
+}
+.barra-carrito .ir-pagar:hover { background: var(--marca-700); }
+
+/* ------------------------------------------------------------------- rejilla */
+.rejilla {
+  display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+  gap: 22px; align-items: start; margin-top: 30px;
+}
+@media (max-width: 880px) { .rejilla { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--tarjeta); border: 1px solid var(--linea);
+  border-radius: var(--radio); padding: 22px 24px; box-shadow: var(--sombra);
+}
+.panel h2 { margin: 0 0 3px; font-size: 17px; }
+.panel .nota { margin: 0 0 18px; color: var(--apagado); font-size: 13.5px; }
+
+/* --------------------------------------------------------------- el carrito */
+.linea-carrito {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--linea);
+}
+.linea-carrito:first-child { padding-top: 0; }
+.linea-carrito .quien { flex: 1; min-width: 0; }
+.linea-carrito .quien b { display: block; font-size: 14.5px; line-height: 1.3; }
+.linea-carrito .quien small { color: var(--apagado); font-size: 12.5px; }
+.linea-carrito .importe { font-weight: 600; font-size: 14.5px; white-space: nowrap; }
+.paso-cant { display: flex; align-items: center; gap: 4px; }
+.paso-cant button {
+  width: 26px; height: 26px; padding: 0; border-radius: 7px; border: 1px solid var(--linea);
+  background: #fff; color: var(--tinta); font-size: 15px; line-height: 1; cursor: pointer;
+}
+.paso-cant button:hover { border-color: var(--marca-500); }
+.paso-cant span { min-width: 18px; text-align: center; font-size: 14px; font-weight: 600; }
+.vacio { color: var(--apagado); font-size: 14px; margin: 0 0 4px; }
+
+.resumen .total {
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--linea);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+}
+.resumen .total span { font-weight: 600; }
+.resumen .total b { font-size: 26px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+/* --------------------------------------------------------------- formulario */
+.campo { margin-bottom: 15px; }
+.campo label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+.campo label .opt { font-weight: 400; color: var(--apagado); }
+.campo input, .campo select {
+  width: 100%; padding: 11px 13px; font: inherit; font-size: 15px;
+  color: var(--tinta); background: var(--tarjeta);
+  border: 1px solid var(--linea); border-radius: 9px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.campo input:focus, .campo select:focus {
+  outline: none; border-color: var(--marca-600);
+  box-shadow: 0 0 0 3px oklch(0.62 0.11 195 / .16);
+}
+.campo input[aria-invalid="true"] { border-color: var(--peligro); }
+.campo .error { display: none; margin-top: 5px; font-size: 12.5px; color: var(--peligro); }
+.campo .pista { display: block; margin-top: 5px; font-size: 12.5px; color: var(--apagado); }
+.campo input[aria-invalid="true"] ~ .error { display: block; }
+.dos { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+@media (max-width: 520px) { .dos { grid-template-columns: 1fr; } }
+
+.btn {
+  width: 100%; padding: 13px 18px; font: inherit; font-size: 15.5px; font-weight: 600;
+  color: #fff; background: var(--marca-600); border: 0; border-radius: 10px;
+  cursor: pointer; transition: background .15s;
+}
+.btn:hover:not(:disabled) { background: var(--marca-700); }
+.btn:disabled { background: var(--apagado); cursor: not-allowed; opacity: .65; }
+
+.aviso {
+  margin-top: 16px; padding: 11px 14px; border-radius: 9px;
+  background: var(--hundido); border: 1px solid var(--linea);
+  font-size: 13px; color: var(--apagado);
+}
+.aviso.malo { background: oklch(0.58 0.19 25 / .07); border-color: oklch(0.58 0.19 25 / .3); color: var(--peligro); }
+.aviso.bien { background: oklch(0.62 0.15 150 / .08); border-color: oklch(0.62 0.15 150 / .3); color: oklch(0.42 0.13 150); }
+
+/* ----------------------------------------------------- formulario de pago */
+#zonaPago { margin-top: 20px; }
+#zonaPago[hidden] { display: none; }
+.separador {
+  display: flex; align-items: center; gap: 12px;
+  margin: 20px 0 16px; color: var(--apagado); font-size: 12px;
+  font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+}
+.separador::before, .separador::after {
+  content: ""; flex: 1; height: 1px; background: var(--linea);
+}
+.esperando { text-align: center; color: var(--apagado); font-size: 14px; padding: 22px 0; }
+
+/* ----------------------------------------------------------------------- pie */
+footer.pie { margin-top: 46px; border-top: 1px solid var(--linea); background: var(--tarjeta); }
+footer.pie .contenedor { padding-top: 26px; padding-bottom: 34px; }
+.enlaces { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.enlace-legal {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 15px; border: 1px solid var(--linea); border-radius: 9px;
+  background: var(--fondo); color: var(--tinta);
+  font-size: 13.5px; font-weight: 600; text-decoration: none;
+  transition: border-color .15s, color .15s;
+}
+.enlace-legal:hover { border-color: var(--marca-600); color: var(--marca-700); }
+.enlace-legal svg { flex-shrink: 0; color: var(--marca-600); }
+.enlace-legal.libro { border-color: var(--marca-600); color: var(--marca-700); }
+.enlace-legal.libro:hover { background: var(--marca-50); }
+.identidad { color: var(--apagado); font-size: 12.5px; line-height: 1.7; }
+.identidad b { color: var(--tinta); }
+
+/* ------------------------------------------- AVISO del Libro de Reclamaciones
+   Es el cartel que exige INDECOPI, no una decoración. Por eso se reproduce con
+   su texto y su composición —título, libro, el párrafo del Código y la línea
+   de la denuncia por negativa de entrega— en vez de resumirlo en un enlace.
+   El reglamento pide que el aviso virtual sea legible y visible; de ahí que
+   tenga borde, aire propio y no se mezcle con el resto del pie. */
+.pie-abajo {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px; align-items: start;
+}
+@media (max-width: 720px) {
+  .pie-abajo { grid-template-columns: 1fr; }
+  .aviso-libro { margin: 0 auto; }
+}
+
+.aviso-libro {
+  display: block; text-decoration: none; color: inherit;
+  width: 268px; padding: 20px 20px 13px;
+  background: #fff; border: 1px solid oklch(0.80 0.01 195);
+  border-radius: 4px; text-align: center;
+  transition: box-shadow .15s, border-color .15s;
+}
+.aviso-libro:hover { border-color: var(--marca-600); box-shadow: var(--sombra); }
+.aviso-libro h3 {
+  margin: 0 0 14px; font-size: 25px; line-height: 1.1;
+  font-weight: 800; letter-spacing: -.01em; color: #1a9ae8;
+}
+.aviso-libro svg { display: block; margin: 0 auto 14px; }
+.aviso-libro p {
+  margin: 0; font-size: 12.5px; line-height: 1.5; color: #1a1a1a;
+}
+.aviso-libro small {
+  display: block; margin-top: 14px; font-size: 8.5px; line-height: 1.4;
+  color: oklch(0.55 0.01 195);
+}

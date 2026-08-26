@@ -30,6 +30,7 @@ const nodemailer = require('nodemailer');
 const { COMERCIO } = require('./comercio');
 const { formatearPrecio } = require('./catalogo');
 const { lineasDe } = require('./pedidos');
+const { etiquetaDocumento } = require('./documentos');
 
 let transporte = null;
 
@@ -222,7 +223,7 @@ ${nombreDoc ? `<p style="margin:0 0 14px;color:#5d6f6c;font-size:13px">
 
   return enviar({
     para: pedido.correo,
-    asunto: `Su compra en GCM · pedido ${pedido.pedido}`,
+    asunto: `Su compra en drcaceresruiz.com · pedido ${pedido.pedido}`,
     html: plantilla('Pago confirmado', cuerpo),
     texto: `Hemos recibido su pago del pedido ${pedido.pedido} `
       + `(${lineasDe(pedido).map((l) => `${l.nombre} x${l.cantidad}`).join('; ')}` 
@@ -245,7 +246,7 @@ ${tabla([
     ['Pedido', e(pedido.pedido)],
     ['Comprador', e(pedido.nombres || '—')],
     ['Correo', e(pedido.correo || '—')],
-    ['DNI / RUC', e(pedido.documento || '—')],
+    ['Documento', e(etiquetaDocumento(pedido.tipoDocumento, pedido.documento))],
     ['Comprobante', e(nombreDoc)],
     pedido.modo && pedido.modo !== 'PRODUCTION' ? ['Modo', e(pedido.modo)] : null,
   ])}

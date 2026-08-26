@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pagar · drcaceresruiz.com</title>
+<meta name="description" content="Pago seguro de su compra en la tienda de drcaceresruiz.com, en soles.">
+
+<!--
+  El PAGO de la tienda de drcaceresruiz.com.
+
+  Aquí llega quien ya eligió en el catálogo (/): revisa su carrito, deja sus
+  datos de facturación y paga. El carrito se comparte con el catálogo por
+  localStorage (comun.js); lo que se cobra lo calcula SIEMPRE el servidor a
+  partir de los identificadores y cantidades — de esta página no sale ningún
+  precio.
+
+  El orden de carga importa: primero se pregunta al servidor por su
+  configuración y su catálogo; solo entonces se carga el cliente de Izipay,
+  porque necesita la clave pública ya en el atributo del <script>. Cargarlo
+  antes obligaría a escribir la clave en el HTML, y entonces cambiarla de
+  pruebas a producción sería editar esta página en vez de tocar el .env.
+-->
+
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://static.micuentaweb.pe">
+<link rel="stylesheet" href="https://static.micuentaweb.pe/static/js/krypton-client/V4.0/ext/classic-reset.css">
+<link rel="stylesheet" href="tienda.css">
+</head>
+<body>
+
+<header class="barra">
+  <div class="contenedor">
+    <a class="marca" href="/">
+      <span class="sello" aria-hidden="true">DR</span>
+      <span>
+        <b>drcaceresruiz.com</b>
+        <small>Tienda oficial</small>
+      </span>
+    </a>
+    <div class="barra-dcha">
+      <a class="volver" href="/">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>
+        </svg>
+        Seguir comprando
+      </a>
+      <span class="candado">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+          <rect x="4" y="10.5" width="16" height="11" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
+        </svg>
+        Pago seguro procesado por Izipay
+      </span>
+    </div>
+  </div>
+</header>
+
+<main class="contenedor">
+  <h1 class="titulo">Finalice su compra</h1>
+  <p class="bajada">
+    Todos los precios están en soles peruanos (PEN) e incluyen el IGV: lo que ve es lo que
+    se cobra. El pago lo procesa Izipay, y los datos de su tarjeta no se guardan en
+    nuestros servidores.
+  </p>
+
+  <div class="rejilla">
+
+    <!-- ═══ Paso 1 · el carrito ═══════════════════════════════════════════ -->
+    <section class="panel">
+      <div class="paso"><span class="n">1</span> Su carrito</div>
+      <h2>Lo que va a llevar</h2>
+      <p class="nota">Puede ajustar cantidades aquí, o <a href="/">volver al catálogo</a> a añadir más.</p>
+
+      <div class="resumen">
+        <div id="carritoLineas"></div>
+        <div class="total">
+          <span>Total a pagar</span>
+          <b id="resTotal">—</b>
+        </div>
+        <p class="nota" style="margin:6px 0 0">Precios en soles, con IGV incluido.</p>
+      </div>
+    </section>
+
+    <!-- ═══ Paso 2 · datos, y paso 3 · tarjeta ════════════════════════════ -->
+    <section class="panel">
+      <div class="paso"><span class="n">2</span> Sus datos</div>
+      <h2>Datos de facturación</h2>
+      <p class="nota">Necesarios para emitirle el comprobante y enviarle el acceso.</p>
+
+      <form id="formulario" novalidate>
+        <div class="campo">
+          <label for="nombres">Nombres y apellidos <span class="opt">· opcional</span></label>
+          <input type="text" id="nombres" name="nombres" autocomplete="name" maxlength="120"
+                 placeholder="Ej.: María Quispe Rojas">
+          <span class="error" id="err-nombres"></span>
+        </div>
+
+        <div class="campo">
+          <label for="correo">Correo electrónico <span aria-hidden="true">*</span></label>
+          <input type="email" id="correo" name="correo" autocomplete="email" maxlength="120"
+                 required placeholder="nombre@empresa.com">
+          <span class="error" id="err-correo"></span>
+        </div>
+
+        <div class="dos">
+          <div class="campo">
+            <label for="tipoDocumento">Documento <span class="opt">· opcional</span></label>
+            <select id="tipoDocumento" name="tipoDocumento">
+              <option value="">Sin documento</option>
+              <option value="dni">DNI</option>
+              <option value="ce">Carné de extranjería</option>
+              <option value="pasaporte">Pasaporte</option>
+              <option value="ruc">RUC</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="documento">Número <span class="opt">· opcional</span></label>
+            <input type="text" id="documento" name="documento" maxlength="12"
+                   placeholder="Elija primero el tipo" aria-describedby="pista-doc">
+            <span class="error" id="err-documento"></span>
+            <!-- El comprobante se decide con este campo, así que se dice AQUÍ y no
+                 en los términos: con RUC sale factura, con lo demás, boleta.
+                 Enterarse después de pagar obliga a anular el comprobante y
+                 emitir otro. -->
+            <span class="pista" id="pista-doc">Con RUC se emite factura; con los demás, boleta.</span>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="telefono">Teléfono <span class="opt">· opcional</span></label>
+          <input type="tel" id="telefono" name="telefono" autocomplete="tel" maxlength="25"
+                 placeholder="999 999 999">
+          <span class="error" id="err-telefono"></span>
+        </div>
+
+        <button class="btn" type="submit" id="continuar">Continuar al pago</button>
+        <p class="aviso" id="avisoForm" hidden></p>
+      </form>
+
+      <!-- Formulario de tarjeta. Lo inyecta Izipay dentro de .kr-embedded: esta
+           página no dibuja ni lee ningún campo de tarjeta.
+
+           El envoltorio #micuentawebstd_rest_wrapper es el del ejemplo oficial
+           (izipay-pe/Embedded-PaymentForm-JavaScript). Se respeta el nombre a
+           propósito: si soporte de Izipay mira este código, encuentra la
+           estructura que espera y no una equivalente pero distinta. -->
+      <div id="zonaPago" hidden>
+        <div class="separador">Datos de la tarjeta</div>
+        <div id="micuentawebstd_rest_wrapper">
+          <div class="kr-embedded"></div>
+        </div>
+        <p class="aviso" id="avisoPago" hidden></p>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="pie">
+  <div class="contenedor">
+    <div class="enlaces">
+      <a class="enlace-legal" href="terminos.html">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>
+          <path d="M9 13h6M9 17h4"/>
+        </svg>
+        Términos y Condiciones
+      </a>
+      <a class="enlace-legal" href="devoluciones.html">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
+        </svg>
+        Políticas de Devolución
+      </a>
+      <!-- AVISO VIRTUAL del Libro de Reclamaciones. El reglamento pide que sea
+           legible, visible y fácilmente accesible; por eso va en el pie de todas
+           las páginas y con el mismo peso que los otros dos, no escondido. -->
+      <a class="enlace-legal libro" href="reclamaciones.html">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M12 6.5S9.5 4.5 4 4.5v13c5.5 0 8 2 8 2s2.5-2 8-2v-13c-5.5 0-8 2-8 2z"/><path d="M12 6.5v13"/>
+        </svg>
+        Libro de Reclamaciones
+      </a>
+    </div>
+
+    <div class="pie-abajo">
+    <p class="identidad">
+      <b>Yudelvis Cáceres Ruiz</b> · RUC 15606050906<br>
+      Av. Alameda 1 N.° 200, Condominio Villanova 4, Torre 6, Dpto. 405, Callao, Callao — Perú<br>
+      Consultas: <a href="mailto:drcaceresruiz@gmail.com">drcaceresruiz@gmail.com</a> · <a href="tel:+51963076640">+51 963 076 640</a><br>
+      <span style="opacity:.8">Pagos procesados por Izipay. Esta tienda no almacena datos de tarjetas.</span>
+    </p>
+
+    <a class="aviso-libro" href="reclamaciones.html">
+      <h3>Libro de<br>Reclamaciones</h3>
+      <svg width="112" height="74" viewBox="0 0 112 74" fill="none" aria-hidden="true">
+        <!-- Libro abierto, dibujado a mano: dos páginas en perspectiva sobre su
+             tapa. En SVG y no como imagen para que no dependa de ningún archivo
+             ni se vea borroso en una pantalla de más densidad. -->
+        <ellipse cx="56" cy="69" rx="47" ry="4" fill="#000" opacity=".12"/>
+        <path d="M56 20c-9-7-24-11-40-11v44c16 0 31 4 40 11V20z" fill="#fdfdfd" stroke="#9aa3ad" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M56 20c9-7 24-11 40-11v44c-16 0-31 4-40 11V20z" fill="#fdfdfd" stroke="#9aa3ad" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M56 26c-8-6-21-9-34-9.5M56 34c-8-6-21-9-34-9.5M56 42c-8-6-21-9-34-9.5" stroke="#d3d9df" stroke-width="1.2" stroke-linecap="round"/>
+        <path d="M56 26c8-6 21-9 34-9.5M56 34c8-6 21-9 34-9.5M56 42c8-6 21-9 34-9.5" stroke="#d3d9df" stroke-width="1.2" stroke-linecap="round"/>
+        <path d="M16 53c14 0 31 4 40 11 9-7 26-11 40-11l6 5c-16 0-33 4-46 12-13-8-30-12-46-12l6-5z" fill="#3a556e"/>
+        <path d="M56 20v44" stroke="#9aa3ad" stroke-width="1.4"/>
+      </svg>
+      <p>
+        Conforme a lo establecido en el Código de Protección y Defensa del
+        Consumidor, este establecimiento cuenta con un Libro de Reclamaciones
+        Virtual a tu disposición. Solicítalo para registrar una queja o reclamo.
+      </p>
+      <small>
+        En caso de negativa de entrega del libro escribe a
+        libroreclamaciones@indecopi.gob.pe
+      </small>
+    </a>
+    </div>
+  </div>
+</footer>
+
+<script src="comun.js"></script>
+<script>
+const $ = (sel) => document.querySelector(sel);
+
+const estado = {
+  clavePublica: null,
+  krCargado: false,
+  krEscuchando: false,
+};
+
+/* Qué se le pide a cada tipo de documento. La validación de verdad la hace el
+   servidor; esto solo evita el viaje cuando el error es evidente. */
+const DOCUMENTOS = {
+  dni:       { pista: '8 dígitos',                largo: 8,  numerico: true },
+  ruc:       { pista: '11 dígitos',               largo: 11, numerico: true },
+  ce:        { pista: 'letras y números, 6 a 12', largo: 12, numerico: false },
+  pasaporte: { pista: 'letras y números, 5 a 12', largo: 12, numerico: false },
+};
+
+/* ---------------------------------------------------------------- utilidades */
+
+function mostrarAviso(elemento, texto, tipo) {
+  elemento.textContent = texto;
+  elemento.className = 'aviso' + (tipo ? ' ' + tipo : '');
+  elemento.hidden = !texto;
+}
+
+function limpiarErrores() {
+  for (const campo of ['nombres', 'correo', 'documento', 'telefono']) {
+    $('#' + campo).removeAttribute('aria-invalid');
+    $('#err-' + campo).textContent = '';
+  }
+}
+
+function marcarError(campo, mensaje) {
+  const entrada = $('#' + campo);
+  if (!entrada) return;
+  entrada.setAttribute('aria-invalid', 'true');
+  $('#err-' + campo).textContent = mensaje;
+}
+
+/* El campo del número se acomoda al tipo elegido: teclado numérico para DNI y
+   RUC, libre para carné y pasaporte, y deshabilitado si no hay tipo. */
+function acomodarDocumento() {
+  const tipo = $('#tipoDocumento').value;
+  const entrada = $('#documento');
+  const regla = DOCUMENTOS[tipo];
+
+  entrada.disabled = !regla;
+  if (!regla) {
+    entrada.value = '';
+    entrada.placeholder = 'Elija primero el tipo';
+    entrada.removeAttribute('inputmode');
+  } else {
+    entrada.placeholder = regla.pista;
+    entrada.maxLength = regla.largo;
+    if (regla.numerico) entrada.setAttribute('inputmode', 'numeric');
+    else entrada.removeAttribute('inputmode');
+  }
+  entrada.removeAttribute('aria-invalid');
+  $('#err-documento').textContent = '';
+}
+
+/* -------------------------------------------------------------------- carrito */
+
+function pintarCarrito() {
+  const caja = $('#carritoLineas');
+  const lineas = Tienda.lineas();
+  caja.innerHTML = '';
+
+  if (!lineas.length) {
+    const vacio = document.createElement('p');
+    vacio.className = 'vacio';
+    vacio.textContent = 'Su carrito está vacío.';
+    const enlace = document.createElement('a');
+    enlace.href = '/';
+    enlace.textContent = 'Vuelva al catálogo para elegir sus productos.';
+    caja.append(vacio, enlace);
+    $('#resTotal').textContent = '—';
+  } else {
+    for (const { p, cantidad, importe } of lineas) {
+      const fila = document.createElement('div');
+      fila.className = 'linea-carrito';
+
+      const quien = document.createElement('div');
+      quien.className = 'quien';
+      const nombre = document.createElement('b');
+      nombre.textContent = p.nombre;
+      const unitario = document.createElement('small');
+      unitario.textContent = `${p.precioTexto} cada uno`;
+      quien.append(nombre, unitario);
+
+      const pasos = document.createElement('div');
+      pasos.className = 'paso-cant';
+      const menos = document.createElement('button');
+      menos.type = 'button';
+      menos.textContent = '−';
+      menos.setAttribute('aria-label', `Quitar uno de ${p.nombre}`);
+      menos.addEventListener('click', () => cambiar(p.id, cantidad - 1));
+      const cuantos = document.createElement('span');
+      cuantos.textContent = String(cantidad);
+      const mas = document.createElement('button');
+      mas.type = 'button';
+      mas.textContent = '+';
+      mas.setAttribute('aria-label', `Añadir uno más de ${p.nombre}`);
+      mas.addEventListener('click', () => cambiar(p.id, cantidad + 1));
+      pasos.append(menos, cuantos, mas);
+
+      const total = document.createElement('span');
+      total.className = 'importe';
+      total.textContent = soles(importe);
+
+      fila.append(quien, pasos, total);
+      caja.appendChild(fila);
+    }
+
+    $('#resTotal').textContent = soles(Tienda.totalCentimos());
+  }
+
+  $('#continuar').disabled = !lineas.length;
+}
+
+function cambiar(id, cantidad) {
+  Tienda.cambiarCantidad(id, cantidad);
+  pintarCarrito();
+
+  // Tocar el carrito invalida el formulario de tarjeta ya dibujado: ese
+  // formToken se pidió por un importe que ya no es el que hay que cobrar.
+  ocultarPago();
+}
+
+function ocultarPago() {
+  $('#zonaPago').hidden = true;
+  mostrarAviso($('#avisoPago'), '', null);
+  if (window.KR && estado.krCargado) {
+    try { KR.removeForms(); } catch { /* no había formulario dibujado */ }
+  }
+}
+
+/* ------------------------------------------------- cliente JavaScript de Izipay */
+
+/** Carga el script de Izipay una sola vez, ya con la clave pública puesta. */
+function cargarKrypton() {
+  if (estado.krCargado) return Promise.resolve();
+  return new Promise((resolver, rechazar) => {
+    const s = document.createElement('script');
+    s.src = 'https://static.micuentaweb.pe/static/js/krypton-client/V4.0/stable/kr-payment-form.min.js';
+    s.setAttribute('kr-public-key', estado.clavePublica);
+    s.setAttribute('kr-language', 'es-PE');
+    // Sin `kr-post-url-success`: ese atributo es del modo REDIRECCIÓN, que
+    // recarga la página contra una URL propia. Aquí el resultado se recoge en
+    // KR.onSubmit y se valida por AJAX, así que ponerlo vacío solo confundiría.
+    s.onload = () => {
+      const tema = document.createElement('script');
+      tema.src = 'https://static.micuentaweb.pe/static/js/krypton-client/V4.0/ext/classic.js';
+      tema.onload = () => { estado.krCargado = true; resolver(); };
+      tema.onerror = () => rechazar(new Error('No se pudo cargar el tema del formulario.'));
+      document.head.appendChild(tema);
+    };
+    s.onerror = () => rechazar(new Error('No se pudo cargar el formulario de pago.'));
+    document.head.appendChild(s);
+  });
+}
+
+/** Dibuja el formulario de tarjeta y engancha la validación del resultado. */
+async function dibujarPago(formToken) {
+  await cargarKrypton();
+
+  await KR.setFormConfig({
+    formToken,
+    'kr-language': 'es-PE',
+  });
+
+  // Lo que devuelve Izipay al terminar el pago se manda AL SERVIDOR para que
+  // compruebe su firma. Que el navegador diga «pagado» no prueba nada: esa
+  // línea la puede escribir cualquiera desde la consola.
+  // UNA SOLA VEZ. Los manejadores de KR.onSubmit se acumulan: engancharlo en
+  // cada intento haría que un pago se validase dos y tres veces contra el
+  // servidor.
+  if (!estado.krEscuchando) {
+    estado.krEscuchando = true;
+    KR.onSubmit(async (evento) => {
+      try {
+        const r = await fetch('/api/validate-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            'kr-answer': evento.rawClientAnswer,
+            'kr-hash': evento.hash,
+            'kr-hash-key': evento.hashKey,
+          }),
+        });
+        const datos = await r.json();
+
+        if (datos.pagado) {
+          KR.removeForms();
+          // El carrito ya se cobró: vaciarlo evita que un segundo intento
+          // distraído vuelva a cobrar lo mismo.
+          Tienda.carrito = {};
+          Tienda.guardarCarrito();
+          mostrarAviso($('#avisoPago'),
+            `Pago confirmado. Pedido ${datos.pedido || ''}. Le enviamos el comprobante y las instrucciones a su correo.`,
+            'bien');
+        } else {
+          mostrarAviso($('#avisoPago'),
+            datos.error || `El pago no se completó (estado: ${datos.estado || 'desconocido'}). Puede intentarlo de nuevo.`,
+            'malo');
+        }
+      } catch {
+        mostrarAviso($('#avisoPago'),
+          'El pago se realizó, pero no pudimos confirmarlo aquí. No vuelva a pagar: escríbanos y lo verificamos.',
+          'malo');
+      }
+      return false;   // false = no recargar la página; lo gestionamos nosotros
+    });
+  }
+
+  // BORRAR JUSTO ANTES DE PINTAR, y no antes de `setFormConfig`.
+  //
+  // El cliente de Izipay dibuja el formulario ÉL SOLO en cuanto recibe el
+  // formToken: para cuando llegamos a `renderElements` ya está puesto, y
+  // entonces devuelve, en rojo y dentro del recuadro de la tarjeta, «No se
+  // puede llamar a KR.renderElements si un formulario ya está renderizado».
+  // Salía siempre, ya en el primer intento — no era cosa de reintentar.
+  //
+  // Limpiar aquí lo deja resuelto en los dos casos: el auto-dibujado que
+  // acaba de hacer `setFormConfig`, y el formulario del intento anterior
+  // cuando se corrige un dato y se vuelve a pulsar. Cada intento pide un
+  // formToken nuevo, así que lo que hubiera antes siempre sobra.
+  try { await KR.removeForms(); } catch { /* no había ninguno */ }
+
+  await KR.renderElements('.kr-embedded');
+  $('#zonaPago').hidden = false;
+  $('#zonaPago').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ------------------------------------------------------------------ arranque */
+
+async function iniciar() {
+  try {
+    const [config] = await Promise.all([
+      fetch('/api/config').then((r) => r.json()),
+      Tienda.cargarCatalogo(),
+    ]);
+
+    estado.clavePublica = config.clavePublica;
+    pintarCarrito();
+    acomodarDocumento();
+
+    if (!config.configurado) {
+      mostrarAviso($('#avisoForm'),
+        'La pasarela todavía no está configurada en este servidor. Complete el archivo .env con las credenciales de Izipay.',
+        'malo');
+      $('#continuar').disabled = true;
+    }
+  } catch {
+    mostrarAviso($('#avisoForm'), 'No se pudo cargar la página. Recárguela.', 'malo');
+  }
+}
+
+$('#tipoDocumento').addEventListener('change', acomodarDocumento);
+
+/* ------------------------------------------------------------------- envío */
+
+$('#formulario').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  limpiarErrores();
+  mostrarAviso($('#avisoForm'), '', null);
+
+  const lineas = Tienda.lineas();
+  if (!lineas.length) {
+    mostrarAviso($('#avisoForm'), 'Su carrito está vacío: elija primero algún producto.', 'malo');
+    return;
+  }
+
+  const boton = $('#continuar');
+  boton.disabled = true;
+  boton.textContent = 'Preparando el pago…';
+
+  try {
+    const r = await fetch('/api/create-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // Se mandan los IDENTIFICADORES y las cantidades, nunca precios ni
+      // totales. Lo que se cobra lo calcula el servidor con su catálogo.
+      body: JSON.stringify({
+        carrito: lineas.map((l) => ({ producto: l.p.id, cantidad: l.cantidad })),
+        nombres: $('#nombres').value,
+        correo: $('#correo').value,
+        tipoDocumento: $('#tipoDocumento').value,
+        documento: $('#documento').value,
+        telefono: $('#telefono').value,
+      }),
+    });
+    const datos = await r.json();
+
+    if (!r.ok) {
+      if (datos.campos) {
+        for (const [campo, mensaje] of Object.entries(datos.campos)) marcarError(campo, mensaje);
+      }
+      mostrarAviso($('#avisoForm'), datos.error || 'No se pudo iniciar el pago.', 'malo');
+      return;
+    }
+
+    await dibujarPago(datos.formToken);
+    mostrarAviso($('#avisoForm'),
+      'Complete los datos de su tarjeta en el recuadro de abajo para terminar.', null);
+  } catch (err) {
+    mostrarAviso($('#avisoForm'), err.message || 'No se pudo contactar con el servidor.', 'malo');
+  } finally {
+    boton.disabled = false;
+    boton.textContent = 'Continuar al pago';
+  }
+});
+
+iniciar();
+</script>
+</body>
+</html>
