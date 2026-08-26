@@ -118,7 +118,13 @@ está razonado en `docs/plan-cobro-licencia.md`:
    mínimo mientras tanto, no una base de datos.
 4. **La copia por correo del Libro de Reclamaciones.** El reglamento obliga a
    entregarla en el acto; hoy la hoja se registra y se anota en el log, pero no
-   sale ningún correo porque no hay remitente configurado.
+   sale ningún correo porque no hay remitente configurado. La página ya no dice
+   que la copia se envió —enuncia el envío en futuro y pone el correlativo por
+   delante—, así que **mientras esto no esté montado la copia hay que mandarla a
+   mano**. Hacen falta tres cosas: una cuenta de correo del propio cPanel (p. ej.
+   `reclamos@drcaceresruiz.com`), sus credenciales SMTP en `.env`, y el envío en
+   `src/reclamaciones.js` justo después de escribir la hoja —fallando en blando:
+   si el correo no sale, la hoja YA está registrada y eso no se pierde.
 5. **El comprobante electrónico.** El régimen ya lo permite (MYPE Tributario,
    afecto a IGV, boleta y factura), pero emitirlo sigue siendo manual: nada en
    este checkout habla con un OSE/PSE todavía.
