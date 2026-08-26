@@ -36,7 +36,11 @@ require('dotenv').config();
 const express = require('express');
 const crypto = require('node:crypto');
 const path = require('node:path');
-const { buscarProducto, catalogoPublico, formatearPrecio } = require('./src/catalogo');
+const {
+  buscarProducto, buscarCualquierProducto, catalogoPublico, formatearPrecio,
+  categorias, todosLosProductos, productosALaVenta,
+} = require('./src/catalogo');
+const catalogoEdicion = require('./src/catalogo_edicion');
 const { revisarHoja, registrarHoja } = require('./src/reclamaciones');
 const { verificarFirma, resumirPago, registrarPago, LIBRO_PAGOS } = require('./src/pagos');
 const { paginaRetorno } = require('./src/pagina_retorno');
@@ -211,7 +215,10 @@ app.get('/api/config', (_req, res) => {
 
 /** El catálogo. Los precios salen de aquí, nunca del navegador. */
 app.get('/api/catalogo', (_req, res) => {
-  res.json({ productos: catalogoPublico() });
+  // Se manda AGRUPADO por categoría y también en plano. La página necesita lo
+  // primero para pintar y lo segundo para buscar el elegido sin recorrer
+  // grupos; calcularlo aquí evita que la página tenga que aplanar nada.
+  res.json({ grupos: catalogoPublico(), productos: productosALaVenta() });
 });
 
 /**
@@ -712,6 +719,121 @@ app.get('/admin', (req, res) => {
     filtro,
     mensaje: req.query.ok ? String(req.query.ok).slice(0, 120) : null,
   }));
+});
+
+/* ----------------------------------------------------------------- catálogo */
+/**
+ * Lo que se vende, editable.
+ *
+ * Cambiar un precio aquí cambia lo que se le cobra a la siguiente persona: por
+ * eso vive detrás de la misma puerta que el resto del panel y no en un archivo
+ * suelto. La regla de que el importe lo pone el servidor no se toca — solo
+ * cambia de dónde lo saca el servidor.
+ */
+app.get('/admin/catalogo', (req, res) => {
+  res.type('html').send(panel.paginaCatalogo(todosLosProductos(), categorias(), {
+    mensaje: req.query.ok ? String(req.query.ok).slice(0, 200)
+      : req.query.err ? String(req.query.err).slice(0, 200) : null,
+    mensajeMalo: Boolean(req.query.err),
+  }));
+});
+
+app.get('/admin/catalogo/producto/nuevo', (_req, res) => {
+  res.type('html').send(panel.paginaProducto(null, categorias(), { esNuevo: true }));
+});
+
+app.get('/admin/catalogo/producto/:id', (req, res) => {
+  const producto = buscarCualquierProducto(req.params.id);
+  if (!producto) return res.redirect('/admin/catalogo?err=' + encodeURIComponent('Ese producto ya no existe.'));
+  res.type('html').send(panel.paginaProducto(producto, categorias(), {}));
+});
+
+/** Alta y edición comparten manejador: el identificador decide cuál es cuál. */
+function guardarProducto(esNuevo) {
+  return (req, res) => {
+    const id = esNuevo ? null : req.params.id;
+    const anterior = esNuevo ? null : buscarCualquierProducto(id);
+    if (!esNuevo && !anterior) {
+      return res.redirect('/admin/catalogo?err=' + encodeURIComponent('Ese producto ya no existe.'));
+    }
+
+    const revision = catalogoEdicion.revisarProducto(req.body ?? {}, { id });
+    if (revision.errores) {
+      return res.status(400).type('html').send(panel.paginaProducto(anterior, categorias(), {
+        errores: revision.errores,
+        valores: req.body ?? {},
+        esNuevo,
+      }));
+    }
+
+    try {
+      const guardado = catalogoEdicion.guardarProducto(revision.datos);
+      const aviso = esNuevo ? `Creado: ${guardado.nombre}.` : `Guardado: ${guardado.nombre}.`;
+      return res.redirect('/admin/catalogo?ok=' + encodeURIComponent(aviso));
+    } catch (e) {
+      console.error('[catalogo] no se pudo guardar el producto:', e);
+      return res.redirect('/admin/catalogo?err=' + encodeURIComponent('No se pudo guardar: ' + e.message));
+    }
+  };
+}
+
+app.post('/admin/catalogo/producto', formularioAdmin, guardarProducto(true));
+app.post('/admin/catalogo/producto/:id', formularioAdmin, guardarProducto(false));
+
+app.post('/admin/catalogo/producto/:id/activar', formularioAdmin, (req, res) => {
+  const producto = buscarCualquierProducto(req.params.id);
+  if (!producto) return res.redirect('/admin/catalogo');
+  const activo = req.body?.activo === 'si';
+  try {
+    catalogoEdicion.activarProducto(producto.id, activo);
+  } catch (e) {
+    console.error('[catalogo] no se pudo cambiar el estado:', e);
+    return res.redirect('/admin/catalogo?err=' + encodeURIComponent('No se pudo cambiar: ' + e.message));
+  }
+  const aviso = activo ? `«${producto.nombre}» ya está a la venta.` : `«${producto.nombre}» queda retirado.`;
+  return res.redirect('/admin/catalogo?ok=' + encodeURIComponent(aviso));
+});
+
+app.post('/admin/catalogo/producto/:id/borrar', formularioAdmin, (req, res) => {
+  const producto = buscarCualquierProducto(req.params.id);
+  if (!producto) return res.redirect('/admin/catalogo');
+  try {
+    catalogoEdicion.borrarProducto(producto.id);
+  } catch (e) {
+    console.error('[catalogo] no se pudo borrar el producto:', e);
+    return res.redirect('/admin/catalogo?err=' + encodeURIComponent('No se pudo borrar: ' + e.message));
+  }
+  return res.redirect('/admin/catalogo?ok=' + encodeURIComponent(`Borrado: ${producto.nombre}.`));
+});
+
+app.post('/admin/catalogo/categoria', formularioAdmin, (req, res) => {
+  const revision = catalogoEdicion.revisarCategoria(req.body ?? {});
+  if (revision.errores) {
+    return res.status(400).type('html').send(panel.paginaCatalogo(todosLosProductos(), categorias(), {
+      errorCat: revision.errores.nombre,
+    }));
+  }
+  try {
+    catalogoEdicion.guardarCategoria(revision.datos);
+  } catch (e) {
+    console.error('[catalogo] no se pudo guardar la categoría:', e);
+    return res.redirect('/admin/catalogo?err=' + encodeURIComponent('No se pudo guardar: ' + e.message));
+  }
+  return res.redirect('/admin/catalogo?ok=' + encodeURIComponent(`Categoría «${revision.datos.nombre}» añadida.`));
+});
+
+app.post('/admin/catalogo/categoria/:id/borrar', formularioAdmin, (req, res) => {
+  const cuantos = catalogoEdicion.productosDeCategoria(req.params.id);
+  try {
+    catalogoEdicion.borrarCategoria(req.params.id);
+  } catch (e) {
+    console.error('[catalogo] no se pudo borrar la categoría:', e);
+    return res.redirect('/admin/catalogo?err=' + encodeURIComponent('No se pudo borrar: ' + e.message));
+  }
+  const aviso = cuantos
+    ? `Categoría borrada. Sus ${cuantos} producto(s) aparecen ahora bajo «Otros».`
+    : 'Categoría borrada.';
+  return res.redirect('/admin/catalogo?ok=' + encodeURIComponent(aviso));
 });
 
 app.get('/admin/ayuda', (_req, res) => {
