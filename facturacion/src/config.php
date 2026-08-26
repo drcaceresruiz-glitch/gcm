@@ -168,6 +168,51 @@ function fact_datos_certificado(): ?array
 }
 
 /**
+ * El usuario que se le manda a SUNAT, y qué tiene de raro.
+ *
+ * SUNAT NO RECIBE EL USUARIO SECUNDARIO A SECAS: recibe el RUC pegado delante
+ * -«15606050906DRCACERE»-. Esa union la hace la libreria, asi que en la
+ * configuracion van por separado... y ahi esta la trampa: quien escribe el
+ * usuario ya concatenado acaba mandando el RUC dos veces
+ * («1560605090615606050906DRCACERE») y SUNAT contesta lo mismo que si no
+ * tuviera permisos. Nada en pantalla decia cual de las dos cosas pasaba.
+ *
+ * SUNAT ademas pide el usuario en MAYUSCULAS y de 8 caracteres o mas. Un
+ * usuario en minusculas o corto se rechaza igual, y tampoco se veia.
+ *
+ * Devuelve lo que se envia y una lista de reparos. No decide nada: solo lo
+ * enseña, para poder compararlo con lo que dice el portal de SUNAT.
+ */
+function fact_usuario_sunat(): array
+{
+    $ruc = fact_cfg('RUC');
+    $usuario = fact_cfg('SOL_USUARIO');
+    $reparos = [];
+
+    if ($usuario === '') {
+        return ['envia' => '', 'usuario' => '', 'reparos' => ['Falta SOL_USUARIO en el .env.']];
+    }
+
+    if ($ruc !== '' && str_starts_with($usuario, $ruc)) {
+        $reparos[] = 'SOL_USUARIO empieza por su RUC. El RUC se añade solo: quitelo y deje'
+            . ' unicamente el usuario secundario, o se enviara dos veces.';
+    }
+    if (mb_strlen($usuario) < 8) {
+        $reparos[] = 'El usuario secundario de SUNAT tiene 8 caracteres o mas, y este tiene '
+            . mb_strlen($usuario) . '.';
+    }
+    if ($usuario !== mb_strtoupper($usuario)) {
+        $reparos[] = 'SUNAT exige el usuario en MAYUSCULAS.';
+    }
+    if (trim($usuario) !== $usuario) {
+        $reparos[] = 'SOL_USUARIO tiene espacios al principio o al final.';
+    }
+
+    return ['envia' => $ruc . $usuario, 'usuario' => $usuario, 'reparos' => $reparos];
+}
+
+
+/**
  * ¿Hay con qué emitir?
  *
  * Se apoya en `fact_que_falta()` en vez de repetir la lista: durante las

@@ -564,6 +564,24 @@ ${!estado || estado.ok === false ? `<div class="aviso mal">
 </div>
 
 <div class="caja">
+  <h2 style="margin-top:0">Con qué usuario se entra a SUNAT</h2>
+  ${!estado.usuarioSunat ? '<p class="apagado" style="margin:0">El servicio no informa de esto todavía.</p>' : `
+  ${(estado.usuarioSunat.reparos || []).length
+    ? `<div class="aviso mal"><b>Revise el usuario de SUNAT.</b><ul style="margin:8px 0 0">${
+        estado.usuarioSunat.reparos.map((r) => `<li>${e(r)}</li>`).join('')}</ul></div>`
+    : ''}
+  <table>
+    ${fila('Usuario secundario', `<b>${e(estado.usuarioSunat.usuario || '—')}</b>`)}
+    ${fila('Lo que recibe SUNAT', estado.usuarioSunat.envia
+      ? `<b>${e(estado.usuarioSunat.envia)}</b>`
+      : '<span class="apagado">—</span>',
+      '<span class="apagado" style="display:block;margin-top:4px">SUNAT no recibe el usuario a secas: '
+      + 'lleva el RUC pegado delante. Esa unión la hace el sistema, así que en la configuración el '
+      + 'usuario va solo. Compare este texto con el usuario de su portal de SUNAT.</span>')}
+  </table>`}
+</div>
+
+<div class="caja">
   <h2 style="margin-top:0">El certificado con el que se firma</h2>
   ${!estado.certificado ? `<div class="aviso mal">No se pudo leer el certificado instalado.</div>` : `
   ${estado.certificado.ruc && estado.ruc && estado.certificado.ruc !== estado.ruc

@@ -91,6 +91,8 @@ if ($accion === 'estado') {
         // De quién es el certificado y hasta cuándo vale. En producción, su RUC
         // tiene que ser el mismo que el del emisor.
         'certificado' => fact_datos_certificado(),
+        // Que usuario recibe SUNAT de verdad, y que tiene de raro.
+        'usuarioSunat' => fact_usuario_sunat(),
         'falta' => $falta,
     ]);
 }
