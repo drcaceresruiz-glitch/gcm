@@ -128,6 +128,11 @@ async function emitir(pedido) {
       correo: pedido.correo || '',
       productoId: pedido.productoId || '',
       productoNombre: pedido.productoNombre || '',
+      // Cómo se cobró. El servicio se niega a emitir un comprobante REAL por un
+      // pago que no lo fue: la pasarela y la facturación se ponen en producción
+      // por separado, y en medio la tienda sigue cobrando con tarjetas de
+      // prueba mientras allí ya se emite de verdad.
+      modoPago: pedido.modo || '',
       // El detalle, para que el comprobante lleve una línea por producto. El
       // servicio sabe apañárselas sin esto —los pedidos anteriores al carrito
       // no lo tienen— pero entonces sale una sola línea con el resumen.

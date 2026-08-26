@@ -499,8 +499,9 @@ ${esNuevo ? '' : `<div class="caja">
  * recién puesto `SUNAT_MODO=produccion`, las dos series tienen que decir que
  * el próximo es el 1.
  */
-function paginaFacturacion({ estado = null } = {}) {
+function paginaFacturacion({ estado = null, modoPasarela = null } = {}) {
   const produccion = estado && estado.modo === 'produccion';
+  const cobroReal = modoPasarela === 'PRODUCTION';
   const falta = (estado && estado.falta) || [];
 
   const fila = (rotulo, valor, extra = '') =>
@@ -533,6 +534,33 @@ ${!estado || estado.ok === false ? `<div class="aviso mal">
         ? ' <span class="apagado">— cada una se informa en el acto</span>'
         : ' <span class="apagado">— agrupadas en el resumen del día siguiente</span>')}
   </table>
+</div>
+
+<div class="caja">
+  <h2 style="margin-top:0">Cómo se está cobrando</h2>
+  ${produccion && !cobroReal
+    ? `<div class="aviso ojo"><b>La tienda cobra con tarjetas de prueba y la facturación ya es real.</b>
+       Mientras siga así, <b>ninguna compra sacará comprobante</b>: el servicio se niega a emitir uno de
+       verdad por un cobro que no lo fue, y lo dirá en el pedido. Se arregla poniendo las claves de
+       producción de Izipay; los pedidos que queden sin comprobante se emiten después.</div>`
+    : !produccion && cobroReal
+      ? `<div class="aviso ojo"><b>La tienda cobra de verdad y la facturación está en pruebas.</b>
+         Las ventas reales que entren no tendrán comprobante válido ante SUNAT hasta que se pase la
+         facturación a producción.</div>`
+      : ''}
+  <table>
+    ${fila('Pasarela de pago (Izipay)', modoPasarela === 'PRODUCTION'
+      ? '<b>producción</b> <span class="et entregado">cobra de verdad</span>'
+      : modoPasarela === 'TEST'
+        ? '<b>pruebas</b> <span class="et prueba">no mueve dinero</span>'
+        : '<span class="apagado">no se pudo determinar</span>')}
+    ${fila('Facturación (SUNAT)', produccion
+      ? '<b>producción</b> <span class="et entregado">emite de verdad</span>'
+      : '<b>beta</b> <span class="et prueba">pruebas</span>')}
+  </table>
+  ${produccion && cobroReal
+    ? '<p class="apagado" style="margin-bottom:0">Los dos en producción: cada venta cobra dinero real y saca su comprobante ante SUNAT.</p>'
+    : ''}
 </div>
 
 <div class="caja">

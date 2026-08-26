@@ -112,6 +112,10 @@ if ($accion === 'emitir') {
 
     // Las líneas llegan como vienen y se limpian aquí: es la frontera del
     // servicio, y lo que entra por HTTP no se mete en un comprobante sin mirar.
+    // Cómo se cobró: PRODUCTION si el dinero fue real. Se limpia aquí, como
+    // todo lo que entra por HTTP; la decisión de qué hacer con él la toma
+    // fact_emitir().
+    $pedido['modoPago'] = mb_substr((string)($pedido['modoPago'] ?? ''), 0, 20);
     if (isset($pedido['lineas']) && is_array($pedido['lineas'])) {
         $limpias = [];
         foreach (array_slice($pedido['lineas'], 0, 50) as $l) {
