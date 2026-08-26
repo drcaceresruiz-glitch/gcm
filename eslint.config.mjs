@@ -34,6 +34,10 @@ const eslintConfig = [
       // codigo de verdad. Mismo motivo que la linea de arriba: auditarlo solo
       // sirve para que un script suelto tumbe el lint de main.
       "docs/informe-plantillas/**",
+      // El servicio de facturacion es PHP, y lo unico JavaScript que hay bajo
+      // esa carpeta es la libreria de terceros vendorizada (Greenter). Ni es
+      // nuestro ni se puede arreglar, igual que docs/COMUNIDADGIT.
+      "facturacion/**",
     ],
   },
 
@@ -140,8 +144,15 @@ const eslintConfig = [
      * dependencias de desarrollo. Van en JavaScript plano y CommonJS a
      * proposito: alli no hay `tsx` que compile TypeScript, y el paquete
      * desplegado tampoco es un modulo ES. `require` es lo correcto aqui.
+     *
+     * `checkout/` es exactamente el mismo caso, y por eso va aqui y no en una
+     * excepcion nueva: una aplicacion Express aparte, con su propio
+     * package.json, que corre en ese mismo Node de cPanel. Tumbo el lint de
+     * main en cuanto se fusiono —veintiocho errores de `require()`— porque
+     * ESLint audita el repositorio entero y estas son dos aplicaciones con
+     * convenciones distintas bajo el mismo techo.
      */
-    files: ["scripts/**/*.js"],
+    files: ["scripts/**/*.js", "checkout/**/*.js"],
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
 ];
