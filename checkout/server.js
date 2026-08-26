@@ -400,7 +400,22 @@ app.post('/api/reclamacion', (req, res) => {
  * de ahí el middleware propio de la ruta.
  */
 app.post('/api/ipn', express.urlencoded({ extended: false, limit: '64kb' }), (req, res) => {
-  const firma = verificarFirma(req.body ?? {}, CLAVES_VERIFICACION);
+  // SONDEO, NO NOTIFICACIÓN. Antes de aceptar una regla de notificación, Izipay
+  // llama a esta URL desde sus servidores con una petición VACÍA para ver si
+  // existe. Contestarle 400 («firma invalida») hacía que la marcase como «Esta
+  // URL no es accesible» y no dejase guardar la regla, con todo bien puesto.
+  //
+  // Un cuerpo sin NINGÚN campo kr-* no es una notificación mal firmada: es que
+  // no hay notificación. Se responde 200 y no se toca nada. Esto no afloja la
+  // seguridad —lo que sigue exigiendo firma válida es REGISTRAR un pago—: una
+  // notificación de verdad con firma mala se sigue rechazando abajo.
+  const cuerpo = req.body ?? {};
+  const traeAlgo = Object.keys(cuerpo).some((k) => k.startsWith('kr-'));
+  if (!traeAlgo) {
+    return res.status(200).type('text/plain').send('IPN de GCM operativo.');
+  }
+
+  const firma = verificarFirma(cuerpo, CLAVES_VERIFICACION);
   if (!firma.ok) {
     console.warn('[ipn] notificación rechazada:', firma.motivo);
     return res.status(400).send('firma invalida');
@@ -408,7 +423,7 @@ app.post('/api/ipn', express.urlencoded({ extended: false, limit: '64kb' }), (re
 
   let resumen;
   try {
-    resumen = resumirPago(req.body['kr-answer']);
+    resumen = resumirPago(cuerpo['kr-answer']);
   } catch (e) {
     console.error('[ipn] kr-answer ilegible pese a firma válida:', e);
     return res.status(400).send('respuesta ilegible');
