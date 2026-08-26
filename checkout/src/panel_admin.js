@@ -270,7 +270,25 @@ guardar los pedidos al iniciarse, así que faltan los datos que escribió el com
     <span class="apagado">Púlselo cuando le haya mandado la licencia o el instalador.</span>
   </form>
   ${comprobante && comprobante.ok
-    ? `<p class="apagado">El comprobante ya está emitido. No hay que hacer nada más con él.</p>`
+    ? (() => {
+        // YA EMITIDO NO ES YA ENTREGADO. Antes aquí solo ponía «no hay que
+        // hacer nada más con él», y el botón de emitir desaparecía: si el
+        // correo del comprobante no había salido —porque la boleta se emitió
+        // más tarde que el aviso de compra— no quedaba NINGUNA forma de
+        // mandárselo al comprador desde el panel. Entregarlo es obligación de
+        // quien vende, así que tiene su propio botón, y se puede repetir: un
+        // comprador que borró el correo lo pide, y hay que poder reenviárselo.
+        const enviado = p.eventos.find((ev) => ev.tipo === 'correo_comprobante');
+        return `<form class="linea" method="post"
+              action="/admin/pedido/${encodeURIComponent(p.pedido)}/enviar-comprobante">
+          <button${enviado ? ' class="suave"' : ''}>${
+            enviado ? 'Reenviar el comprobante' : 'Enviar el comprobante al comprador'}</button>
+          <span class="apagado">${enviado
+            ? `Ya se le envió a ${e(p.correo || 'su correo')}. Púlselo otra vez si lo ha perdido.`
+            : `<b>Todavía no se le ha enviado.</b> Irá a ${e(p.correo || 'su correo')} con el XML adjunto.`}
+          </span>
+        </form>`;
+      })()
     : facturadorListo
       ? `<form class="linea" method="post" action="/admin/pedido/${encodeURIComponent(p.pedido)}/facturar">
            <button${p.pagado ? '' : ' class="suave" disabled'}>Emitir ${

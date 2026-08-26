@@ -1021,6 +1021,49 @@ app.post('/admin/pedido/:pedido/facturar', formularioAdmin, async (req, res) => 
   return res.redirect(`${volver}?${parametro}=${encodeURIComponent(aviso)}`);
 });
 
+/**
+ * Manda —o vuelve a mandar— el comprobante al comprador.
+ *
+ * A MANO Y SIN CONDICIONES, a diferencia de avisarDeLoQueFalte(): esto lo
+ * pulsa una persona que ya ha decidido que hay que enviarlo. Repetirlo es
+ * legítimo —un comprador borra el correo y lo pide— así que no se comprueba
+ * si ya salió; lo que sí queda es la anotación de cada envío.
+ */
+app.post('/admin/pedido/:pedido/enviar-comprobante', formularioAdmin, async (req, res) => {
+  const volver = `/admin/pedido/${encodeURIComponent(req.params.pedido)}`;
+  const registro = compras().find((p) => p.pedido === req.params.pedido);
+  if (!registro) return res.redirect('/admin');
+
+  const fallar = (motivo) => res.redirect(`${volver}?err=${encodeURIComponent(motivo)}`);
+
+  if (!correo.configurado()) {
+    return fallar('El correo no está configurado en este servidor, así que no se puede enviar nada.');
+  }
+  const asiento = comprobantes.comprobanteDe(req.params.pedido);
+  if (!asiento || !asiento.ok) {
+    return fallar('Este pedido todavía no tiene comprobante emitido.');
+  }
+  if (!registro.correo) {
+    return fallar('Este pedido no tiene un correo al que enviarlo.');
+  }
+
+  const xml = await comprobantes.descargarXml(req.params.pedido);
+  const r = await correo.avisarComprobante({ pedido: registro, comprobante: asiento, xml });
+  registrarEvento({
+    pedido: req.params.pedido,
+    tipo: r.ok ? 'correo_comprobante' : 'nota',
+    detalle: r.ok
+      ? `Comprobante ${comprobantes.nombrar(asiento)} enviado a ${registro.correo}`
+        + (xml ? ' con el XML adjunto' : ' (sin el XML: no se pudo traer)')
+      : 'No se pudo enviar el comprobante: ' + (r.motivo || 'sin detalle'),
+    quien: 'administrador',
+  });
+
+  if (!r.ok) return fallar('No se pudo enviar: ' + (r.motivo || 'sin detalle'));
+  return res.redirect(`${volver}?ok=${encodeURIComponent(
+    `Comprobante enviado a ${registro.correo}.`)}`);
+});
+
 app.post('/admin/pedido/:pedido/entregado', formularioAdmin,
   accionSobrePedido('entregado', 'Marcado como entregado.'));
 app.post('/admin/pedido/:pedido/comprobante', formularioAdmin,
