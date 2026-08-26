@@ -578,7 +578,17 @@ ${!estado || estado.ok === false ? `<div class="aviso mal">
       '<span class="apagado" style="display:block;margin-top:4px">SUNAT no recibe el usuario a secas: '
       + 'lleva el RUC pegado delante. Esa unión la hace el sistema, así que en la configuración el '
       + 'usuario va solo. Compare este texto con el usuario de su portal de SUNAT.</span>')}
-  </table>`}
+    ${estado.claveSol ? fila('Clave', estado.claveSol.largo
+      ? `<b>${'•'.repeat(Math.min(20, estado.claveSol.largo))}</b> <span class="apagado">${
+          e(estado.claveSol.largo)} caracteres</span>`
+      : '<span class="apagado">no hay ninguna</span>',
+      '<span class="apagado" style="display:block;margin-top:4px">La clave no se enseña nunca. '
+      + 'Lo único que se ve es cuánto mide, para compararlo con la que usted cree haber escrito.</span>')
+      : ''}
+  </table>
+  ${estado.claveSol && (estado.claveSol.reparos || []).length
+    ? `<div class="aviso mal" style="margin-top:12px"><b>Revise la clave.</b><ul style="margin:8px 0 0">${
+        estado.claveSol.reparos.map((r) => `<li>${e(r)}</li>`).join('')}</ul></div>` : ''}`}
 </div>
 
 <div class="caja">

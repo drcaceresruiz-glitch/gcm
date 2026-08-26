@@ -93,6 +93,8 @@ if ($accion === 'estado') {
         'certificado' => fact_datos_certificado(),
         // Que usuario recibe SUNAT de verdad, y que tiene de raro.
         'usuarioSunat' => fact_usuario_sunat(),
+        // De la clave, solo cuanto mide y que tiene de raro. Nunca la clave.
+        'claveSol' => fact_huella_clave(),
         'falta' => $falta,
     ]);
 }
