@@ -356,3 +356,37 @@ footer.pie .contenedor { padding-top: 26px; padding-bottom: 34px; }
   display: block; margin-top: 14px; font-size: 8.5px; line-height: 1.4;
   color: oklch(0.55 0.01 195);
 }
+
+/* ---------------------------------------------- la página de «gracias» ----- */
+.gracias-cabeza { text-align: center; padding: 26px 0 6px; }
+.gracias-cabeza .bajada { margin-left: auto; margin-right: auto; }
+.marca-ok {
+  width: 58px; height: 58px; margin: 0 auto; border-radius: 50%;
+  display: grid; place-items: center;
+  background: color-mix(in oklab, var(--marca-500) 14%, #fff);
+  color: var(--marca-700);
+}
+.detalle-compra { width: 100%; border-collapse: collapse; margin: 4px 0 18px; }
+.detalle-compra th, .detalle-compra td {
+  text-align: left; padding: 9px 0; border-bottom: 1px solid var(--linea);
+  font-size: 14.5px; vertical-align: top;
+}
+.detalle-compra th {
+  color: var(--apagado); font-weight: 600; width: 42%; padding-right: 14px;
+}
+.detalle-compra .num { text-align: right; white-space: nowrap; }
+.detalle-compra.lineas th { width: auto; color: var(--apagado); font-size: 12px;
+  letter-spacing: .05em; text-transform: uppercase; }
+.detalle-compra tr:last-child th, .detalle-compra tr:last-child td { border-bottom: 0; }
+.btn-enlace {
+  display: inline-block; padding: 11px 20px; border-radius: 10px;
+  background: var(--marca-600); color: #fff; text-decoration: none; font-weight: 600;
+}
+.btn-enlace:hover { background: var(--marca-700); }
+
+/* En angosto, la etiqueta encima del dato: a 42% no le caben dos palabras. */
+@media (max-width: 430px) {
+  .detalle-compra:not(.lineas) th,
+  .detalle-compra:not(.lineas) td { display: block; width: auto; padding-bottom: 2px; }
+  .detalle-compra:not(.lineas) th { border-bottom: 0; padding-top: 10px; }
+}

@@ -420,8 +420,17 @@ async function dibujarPago(formToken) {
           // distraído vuelva a cobrar lo mismo.
           Tienda.carrito = {};
           Tienda.guardarCarrito();
+          // Y SE SALE DE ESTA PÁGINA. Quedarse aquí dejaba a quien acababa de
+          // pagar mirando el formulario de la tarjeta y su carrito, con un
+          // renglón verde debajo: sin saber qué había comprado, qué pasaba
+          // después ni a quién escribir. La confirmación es una página.
+          mostrarAviso($('#avisoPago'), 'Pago confirmado. Un momento…', 'bien');
+          if (datos.pedido) {
+            window.location.assign('/gracias?pedido=' + encodeURIComponent(datos.pedido));
+            return false;
+          }
           mostrarAviso($('#avisoPago'),
-            `Pago confirmado. Pedido ${datos.pedido || ''}. Le enviamos el comprobante y las instrucciones a su correo.`,
+            'Pago confirmado. Le enviamos el comprobante y las instrucciones a su correo.',
             'bien');
         } else {
           mostrarAviso($('#avisoPago'),

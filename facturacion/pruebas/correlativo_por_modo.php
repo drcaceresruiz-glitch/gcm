@@ -98,6 +98,65 @@ foreach (['beta', 'produccion'] as $modo) {
         7, fact_comprobante_de('VIEJO-1')['correlativo'] ?? null);
 }
 
+// --- Un envio que SUNAT no llego a procesar NO gasta su numero ---------------
+// Paso de verdad: la primera boleta real salio con SUNAT 0111 «no tiene el
+// perfil para enviar comprobantes electronicos». SUNAT ni la miro, asi que no
+// existe para ella; si su numero se quemara, la serie real habria empezado en
+// el 2 y con un hueco que hay que explicar.
+fact_modo_forzado('produccion');
+file_put_contents($libro, json_encode([
+    'tipo' => 'emision', 'pedido' => 'DCR-0111', 'documento' => 'boleta', 'serie' => 'B900',
+    'correlativo' => 1, 'estado' => 'no_entregado', 'fechaEmision' => '2026-08-26',
+    'modo' => 'produccion',
+], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+
+comprobar('lo que SUNAT no proceso deja su numero libre', 1, fact_siguiente_correlativo('B900'));
+comprobar('y no cuenta como comprobante del pedido', null, fact_comprobante_de('DCR-0111'));
+comprobar('ni se manda en el resumen diario del dia',
+    0, count(fact_boletas_sin_resumir('2026-08-26')));
+
+// Un rechazo de contenido SI lo gasta: ahi SUNAT si lo proceso.
+file_put_contents($libro, json_encode([
+    'tipo' => 'emision', 'pedido' => 'DCR-2026', 'documento' => 'boleta', 'serie' => 'B901',
+    'correlativo' => 1, 'estado' => 'fallido', 'fechaEmision' => '2026-08-26',
+    'modo' => 'produccion',
+], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+
+comprobar('un rechazo de SUNAT si gasta su numero', 2, fact_siguiente_correlativo('B901'));
+
+// --- Y lo mismo para lo anotado ANTES de que existiera «no_entregado» --------
+// Aquellas emisiones se marcaron «fallido» aunque SUNAT las hubiera rechazado
+// en la puerta. El libro no se corrige, solo crece, asi que la unica forma de
+// cerrar ese hueco es deducirlo del motivo, que si guarda el codigo. Paso con
+// la primera boleta real: rechazada con «SUNAT 0111» antes del arreglo.
+file_put_contents($libro, json_encode([
+    'tipo' => 'emision', 'pedido' => 'DCR-VIEJO', 'documento' => 'boleta', 'serie' => 'B902',
+    'correlativo' => 1, 'estado' => 'fallido', 'fechaEmision' => '2026-08-26', 'modo' => 'produccion',
+    'motivo' => 'SUNAT 0111: No tiene el perfil para enviar comprobantes electronicos'
+        . ' - Detalle: Rejected by policy.',
+], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+
+comprobar('un «fallido» viejo por 0111 deja su numero libre', 1, fact_siguiente_correlativo('B902'));
+comprobar('y no cuenta como comprobante', null, fact_comprobante_de('DCR-VIEJO'));
+
+// Pero un «fallido» viejo por CONTENIDO si lo gasta: SUNAT si lo proceso.
+file_put_contents($libro, json_encode([
+    'tipo' => 'emision', 'pedido' => 'DCR-VIEJO2', 'documento' => 'boleta', 'serie' => 'B903',
+    'correlativo' => 1, 'estado' => 'fallido', 'fechaEmision' => '2026-08-26', 'modo' => 'produccion',
+    'motivo' => 'SUNAT 2026: El XML no contiene el tag cac:Item/cbc:Description',
+], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+
+comprobar('un «fallido» viejo por contenido si gasta su numero', 2, fact_siguiente_correlativo('B903'));
+
+// Y uno sin motivo legible se da por gastado: ante la duda, no reutilizar.
+file_put_contents($libro, json_encode([
+    'tipo' => 'emision', 'pedido' => 'DCR-VIEJO3', 'documento' => 'boleta', 'serie' => 'B904',
+    'correlativo' => 1, 'estado' => 'fallido', 'fechaEmision' => '2026-08-26', 'modo' => 'produccion',
+    'motivo' => 'Error al emitir: algo raro',
+], JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+
+comprobar('sin motivo legible se da por gastado', 2, fact_siguiente_correlativo('B904'));
+
 // Limpieza.
 array_map('unlink', glob($temporal . '/datos/*') ?: []);
 @rmdir($temporal . '/datos');

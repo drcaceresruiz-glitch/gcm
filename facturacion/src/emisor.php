@@ -351,7 +351,8 @@ function fact_emitir(array $pedido): array
         $venta = fact_construir($pedido, $serie, $correlativo);
         $xml = $see->getXmlSigned($venta);
         if (!$xml) {
-            $asiento['estado'] = 'fallido';
+            // No salio nada hacia SUNAT: el numero sigue libre.
+            $asiento['estado'] = 'no_entregado';
             $asiento['motivo'] = 'No se pudo firmar el XML. Revise el certificado.';
             fact_anotar($asiento);
             return $asiento + ['ok' => false];
@@ -393,16 +394,50 @@ function fact_emitir(array $pedido): array
         // cuando la respuesta no incluyó el comprobante de recepción, o el
         // código de una falta de SOAP—. Se comprobó mirando qué devuelve de
         // verdad la librería cuando el envío no sale.
+        //
+        // Y ENTRE LOS RECHAZOS DE SUNAT HAY DOS CLASES, que deciden si el
+        // numero se pierde o no:
+        //
+        //   - 100-999 -> SUNAT NI MIRO EL COMPROBANTE. Son fallos de
+        //     autenticacion, de perfil o del propio servicio ("no tiene el
+        //     perfil para enviar comprobantes electronicos", "el sistema no
+        //     puede responder"). No hay constancia de recepcion porque no
+        //     hubo recepcion: el comprobante no existe para SUNAT y su
+        //     numero sigue libre.
+        //   - 1000 en adelante -> SUNAT SI LO PROCESO y lo rechazo por lo que
+        //     dice dentro. Ese numero se da por gastado.
+        //
+        // POR QUE ES SEGURO REUTILIZARLO en el primer caso, aun si esta
+        // clasificacion fallara: si SUNAT hubiera llegado a registrar ese
+        // numero, al reenviarlo contesta que ya esta registrado y el
+        // comprobante queda fallido. Nunca se duplica. El riesgo real es el
+        // contrario -quemar numeros que nadie uso y abrir huecos en una serie
+        // que tiene que ser correlativa-, y eso paso de verdad: la primera
+        // boleta real salio rechazada por un perfil de SUNAT que faltaba, y
+        // sin esto la serie habria empezado en el 2.
         if (!$resultado || !$resultado->isSuccess()) {
             $error = $resultado ? $resultado->getError() : null;
             $codigo = $error ? (string)$error->getCode() : '';
-            $loRechazoSunat = $codigo !== '' && ctype_digit($codigo);
+            $codigoNumero = ($codigo !== '' && ctype_digit($codigo)) ? (int)$codigo : -1;
+            $niLoMiro = $codigoNumero >= 100 && $codigoNumero <= 999;
+            $loRechazoSunat = $codigoNumero >= 1000;
 
-            $asiento['estado'] = ($loRechazoSunat || $esFactura) ? 'fallido' : 'pendiente_resumen';
+            if ($niLoMiro) {
+                $asiento['estado'] = 'no_entregado';
+            } elseif ($loRechazoSunat || $esFactura) {
+                $asiento['estado'] = 'fallido';
+            } else {
+                $asiento['estado'] = 'pendiente_resumen';
+            }
+
             $asiento['motivo'] = $error
-                ? (($loRechazoSunat ? 'SUNAT ' : 'Envío fallido [') . $codigo
-                    . ($loRechazoSunat ? ': ' : ']: ') . $error->getMessage())
-                : 'SUNAT no respondió al envío.';
+                ? (($codigoNumero >= 0 ? 'SUNAT ' : 'Envio fallido [') . $codigo
+                    . ($codigoNumero >= 0 ? ': ' : ']: ') . $error->getMessage()
+                    . ($niLoMiro
+                        ? ' - SUNAT no llego a procesarlo, asi que el numero '
+                            . $serie . '-' . $correlativo . ' sigue libre.'
+                        : ''))
+                : 'SUNAT no respondio al envio.';
             fact_anotar($asiento);
             return $asiento + ['ok' => $asiento['estado'] === 'pendiente_resumen'];
         }
