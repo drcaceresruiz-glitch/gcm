@@ -174,7 +174,7 @@
         <input type="email" id="correo" name="correo" maxlength="120" required autocomplete="email">
         <span class="error" id="err-correo"></span>
         <span class="error" style="display:block;color:var(--apagado);font-weight:400;">
-          A esta dirección le llega su copia de la hoja y, después, la respuesta.
+          A esta dirección le enviaremos la copia de su hoja y la respuesta.
         </span>
       </div>
 
@@ -264,8 +264,8 @@
     <b>Plazo de respuesta.</b> La reclamación será atendida en un plazo máximo de
     <b>quince (15) días hábiles</b>, improrrogable salvo que la naturaleza del caso lo
     justifique, en cuyo caso se le comunicará la ampliación antes del vencimiento.<br>
-    <b>Constancia.</b> Al registrarla recibirá en su correo una copia de esta hoja con su
-    número correlativo. Guárdelo: es el que identifica su caso.<br>
+    <b>Constancia.</b> Al registrarla se le asigna un número correlativo y se le enviará al
+    correo indicado una copia de esta hoja. Anote ese número: es el que identifica su caso.<br>
     <b>Conservación.</b> Esta hoja se conserva por dos (2) años, como exige el reglamento.<br>
     La presentación de un reclamo no impide acudir a otras vías de solución ni es requisito
     previo para denunciar ante <b>INDECOPI</b>.
@@ -336,8 +336,9 @@ $('#hoja').addEventListener('submit', async (e) => {
 
     mostrar(
       'Su hoja quedó registrada con el número <b>' + res.correlativo + '</b>, ' +
-      'el ' + res.fecha + '. Le enviamos una copia a <b>' + res.correo + '</b>. ' +
-      'Recibirá respuesta en un plazo máximo de 15 días hábiles.', 'bien');
+      'el ' + res.fecha + '. <b>Anote este número</b>: es el que identifica su caso. ' +
+      'Le enviaremos la copia de la hoja y la respuesta a <b>' + res.correo + '</b>, ' +
+      'en un plazo máximo de 15 días hábiles.', 'bien');
     $('#hoja').reset();
     $('#resultado').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch {
