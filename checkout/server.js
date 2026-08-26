@@ -774,7 +774,7 @@ app.listen(PUERTO, () => {
   console.log('');
   console.log(`  Panel del administrador:  ${base}/admin`);
   if (!comprobantes.configurado()) {
-    console.warn('    ⚠  boletas y facturas a mano: falta NUBEFACT_RUTA / NUBEFACT_TOKEN en .env');
+    console.warn('    ⚠  boletas y facturas a mano: falta FACTURACION_URL / FACTURACION_CLAVE en .env');
   }
   if (!sesion.claveConfigurada()) {
     console.warn('    ⚠  cerrado: falta ADMIN_PASSWORD en .env');

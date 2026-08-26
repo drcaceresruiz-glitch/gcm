@@ -217,10 +217,11 @@ guardar los pedidos al iniciarse, así que faltan los datos que escribió el com
     <tr><th>Importe</th><td>${p.importeCentimos == null ? '—' : e(formatearPrecio(p.importeCentimos))}</td></tr>
     <tr><th>Comprobante</th><td>${comprobante && comprobante.ok
       ? `<b>${e(comprobante.tipo)} ${e(comprobante.serie)}-${e(comprobante.numero)}</b>`
-        + (comprobante.aceptadaPorSunat === true ? ' <span class="et entregado">aceptado por SUNAT</span>'
-          : comprobante.aceptadaPorSunat === false ? ' <span class="et abandonado">rechazado por SUNAT</span>' : '')
-        + (comprobante.pdf ? ` · <a href="${e(comprobante.pdf)}" target="_blank" rel="noopener">PDF</a>` : '')
-        + (comprobante.enlace ? ` · <a href="${e(comprobante.enlace)}" target="_blank" rel="noopener">ver</a>` : '')
+        + (comprobante.estado === 'aceptado' ? ' <span class="et entregado">aceptado por SUNAT</span>'
+          : comprobante.estado === 'pendiente_resumen' ? ' <span class="et pagado">en el resumen diario</span>'
+          : comprobante.estado === 'fallido' ? ' <span class="et abandonado">rechazado</span>' : '')
+        + (comprobante.modo && comprobante.modo !== 'produccion'
+          ? ` <span class="et prueba">${e(comprobante.modo)}</span>` : '')
         + (comprobante.sunat ? `<br><span class="apagado">${e(comprobante.sunat)}</span>` : '')
       : e(p.comprobante || 'sin emitir')}</td></tr>
   </table>
@@ -254,9 +255,9 @@ guardar los pedidos al iniciarse, así que faltan los datos que escribió el com
              String(p.documento || '').length === 11 ? 'factura' : 'boleta'} ahora</button>
            <span class="apagado">Se emite sola al confirmarse el pago; esto es por si aquella vez falló.</span>
          </form>`
-      : `<div class="aviso ojo">La emisión automática está apagada: faltan <code>NUBEFACT_RUTA</code> y
-         <code>NUBEFACT_TOKEN</code> en el <code>.env</code>. Mientras tanto, emita el comprobante en NubeFact
-         y anote aquí su número.</div>`}
+      : `<div class="aviso ojo">La emisión automática está apagada: faltan <code>FACTURACION_URL</code> y
+         <code>FACTURACION_CLAVE</code> en el <code>.env</code>. Mientras tanto, emita el comprobante por su
+         cuenta y anote aquí su número.</div>`}
   <form method="post" action="/admin/pedido/${encodeURIComponent(p.pedido)}/comprobante" class="linea">
     <input type="text" name="detalle" maxlength="60" placeholder="N.º de un comprobante emitido a mano">
     <button class="suave">Anotar comprobante</button>
@@ -341,12 +342,15 @@ function paginaAyuda({ urlPublica = '' } = {}) {
 <div class="caja">
   <h2 style="margin-top:0">3. El comprobante</h2>
   <ol class="pasos">
-    <li><b>Se emite solo</b>, con NubeFact, en cuanto se confirma el pago. Normalmente no hay nada que hacer.</li>
+    <li><b>Se emite solo</b> en cuanto se confirma el pago, firmado con su certificado y enviado a SUNAT
+      directamente. Normalmente no hay nada que hacer.</li>
     <li>Si el comprador escribió un <b>RUC (11 dígitos)</b> sale <b>factura</b>; si dejó DNI o nada,
       <b>boleta</b>. El precio cobrado <b>ya lleva el IGV dentro</b>, así que no se le suma nada.</li>
-    <li>En el pedido verá su número, si SUNAT lo aceptó y el enlace al PDF.</li>
-    <li><b>Si falló</b> —NubeFact caído, correlativo desincronizado— el pedido lo dice en su historial y hay un
-      botón para <b>emitirlo ahora</b>. El pago no se ve afectado: el dinero ya entró.</li>
+    <li><b>Normalmente SUNAT lo acepta en el acto</b>, tanto la factura como la boleta, y el pedido lo dice.</li>
+    <li>Si una boleta aparece como <b>«en el resumen diario»</b>, es que su envío no llegó a salir: queda
+      firmada y válida, y el proceso automático la informa a SUNAT. No hay que hacer nada.</li>
+    <li><b>Si falló</b>, el pedido lo dice en su historial y hay un botón para <b>emitirlo ahora</b>. El pago no
+      se ve afectado: el dinero ya entró.</li>
   </ol>
 </div>
 

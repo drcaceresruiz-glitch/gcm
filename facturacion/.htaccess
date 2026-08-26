@@ -1,0 +1,21 @@
+# El servicio de facturación: sólo se entra por index.php y por el conversor.
+#
+# Lo que hay debajo de esta carpeta NO es público: el certificado es la firma
+# tributaria del emisor, y datos/ guarda los XML y los CDR de comprobantes con
+# nombre y documento de compradores. Se cierra todo y se abre lo justo.
+
+Options -Indexes
+
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "\.(jsonl|pem|pfx|p12|key|crt|log)$">
+    Require all denied
+</FilesMatch>
+
+# El cron no se ejecuta por web: lo comprueba también él mismo, pero mejor
+# que ni siquiera se pueda pedir.
+<Files "cron_facturacion.php">
+    Require all denied
+</Files>

@@ -1,0 +1,2 @@
+# Los módulos se incluyen desde index.php; no se piden directamente.
+Require all denied
