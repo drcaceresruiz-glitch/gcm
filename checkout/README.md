@@ -38,6 +38,7 @@ la cara de quien está pagando.
 | `public/terminos.html` · `public/devoluciones.html` | Las dos páginas legales que Izipay exige ver enlazadas. |
 | `public/reclamaciones.html` | La hoja de reclamación virtual (Ley 29571). |
 | `src/pedidos.js` | El pedido desde que empieza, y el estado de cada compra. |
+| `src/comprobantes.js` | La boleta o la factura, emitida sola contra NubeFact. |
 | `src/admin_sesion.js` | Quién puede entrar al panel. |
 | `src/panel_admin.js` | Las pantallas del panel del administrador. |
 | `.env.example` | Qué credenciales hacen falta y de dónde salen. |
@@ -147,9 +148,20 @@ está razonado en `docs/plan-cobro-licencia.md`:
    `reclamos@drcaceresruiz.com`), sus credenciales SMTP en `.env`, y el envío en
    `src/reclamaciones.js` justo después de escribir la hoja —fallando en blando:
    si el correo no sale, la hoja YA está registrada y eso no se pierde.
-5. **El comprobante electrónico.** El régimen ya lo permite (MYPE Tributario,
-   afecto a IGV, boleta y factura), pero emitirlo sigue siendo manual: nada en
-   este checkout habla con un OSE/PSE todavía.
+5. **El comprobante electrónico: ya se emite solo.** Al confirmarse el pago se
+   pide a NubeFact la **factura** (si el comprador puso RUC) o la **boleta** (si
+   puso DNI o nada). El precio publicado lleva el IGV dentro, así que el importe
+   gravado se DESCUENTA, y en céntimos: `total_gravada + total_igv` tiene que dar
+   exactamente `total` o NubeFact rechaza el comprobante.
+
+   El correlativo lo llevamos nosotros (`datos/comprobantes.jsonl`). Si el número
+   que toca ya existe en NubeFact —código 23, porque alguien emitió a mano o se
+   perdió el archivo— se reintenta con el siguiente en vez de dar la venta por no
+   facturada.
+
+   Emitir ocurre DESPUÉS de que el dinero entró, así que nunca tumba un cobro: si
+   NubeFact no responde, el fallo queda en el historial del pedido y hay un botón
+   en el panel para emitirlo cuando vuelva.
 6. **Las páginas legales son un borrador** redactado por un programador. La
    estructura y los plazos están, pero merecen una revisión legal.
 

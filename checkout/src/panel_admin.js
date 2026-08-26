@@ -182,7 +182,7 @@ ${filas}</table></div>`
 
 /* -------------------------------------------------------- detalle de un pedido */
 
-function paginaPedido(p, { mensaje = null } = {}) {
+function paginaPedido(p, { mensaje = null, comprobante = null, facturadorListo = false } = {}) {
   const pagos = p.pagos.map((x) => `<tr>
     <td>${e(fecha(x.registradoEn))}</td>
     <td>${e(x.estado || '—')}${x.detalleEstado ? ` <span class="apagado">(${e(x.detalleEstado)})</span>` : ''}</td>
@@ -215,7 +215,14 @@ guardar los pedidos al iniciarse, así que faltan los datos que escribió el com
     <tr><th>Teléfono</th><td>${e(p.telefono || '—')}</td></tr>
     <tr><th>Producto</th><td>${e(p.productoNombre || '—')}</td></tr>
     <tr><th>Importe</th><td>${p.importeCentimos == null ? '—' : e(formatearPrecio(p.importeCentimos))}</td></tr>
-    <tr><th>Comprobante</th><td>${e(p.comprobante || 'sin anotar')}</td></tr>
+    <tr><th>Comprobante</th><td>${comprobante && comprobante.ok
+      ? `<b>${e(comprobante.tipo)} ${e(comprobante.serie)}-${e(comprobante.numero)}</b>`
+        + (comprobante.aceptadaPorSunat === true ? ' <span class="et entregado">aceptado por SUNAT</span>'
+          : comprobante.aceptadaPorSunat === false ? ' <span class="et abandonado">rechazado por SUNAT</span>' : '')
+        + (comprobante.pdf ? ` · <a href="${e(comprobante.pdf)}" target="_blank" rel="noopener">PDF</a>` : '')
+        + (comprobante.enlace ? ` · <a href="${e(comprobante.enlace)}" target="_blank" rel="noopener">ver</a>` : '')
+        + (comprobante.sunat ? `<br><span class="apagado">${e(comprobante.sunat)}</span>` : '')
+      : e(p.comprobante || 'sin emitir')}</td></tr>
   </table>
 </div>
 
@@ -239,8 +246,19 @@ guardar los pedidos al iniciarse, así que faltan los datos que escribió el com
       ${p.entregado ? 'Ya marcado como entregado' : 'Marcar como entregado'}</button>
     <span class="apagado">Púlselo cuando le haya mandado la licencia o el instalador.</span>
   </form>
+  ${comprobante && comprobante.ok
+    ? `<p class="apagado">El comprobante ya está emitido. No hay que hacer nada más con él.</p>`
+    : facturadorListo
+      ? `<form class="linea" method="post" action="/admin/pedido/${encodeURIComponent(p.pedido)}/facturar">
+           <button${p.pagado ? '' : ' class="suave" disabled'}>Emitir ${
+             String(p.documento || '').length === 11 ? 'factura' : 'boleta'} ahora</button>
+           <span class="apagado">Se emite sola al confirmarse el pago; esto es por si aquella vez falló.</span>
+         </form>`
+      : `<div class="aviso ojo">La emisión automática está apagada: faltan <code>NUBEFACT_RUTA</code> y
+         <code>NUBEFACT_TOKEN</code> en el <code>.env</code>. Mientras tanto, emita el comprobante en NubeFact
+         y anote aquí su número.</div>`}
   <form method="post" action="/admin/pedido/${encodeURIComponent(p.pedido)}/comprobante" class="linea">
-    <input type="text" name="detalle" maxlength="60" placeholder="N.º de boleta o factura (ej. B001-45)">
+    <input type="text" name="detalle" maxlength="60" placeholder="N.º de un comprobante emitido a mano">
     <button class="suave">Anotar comprobante</button>
   </form>
   <form method="post" action="/admin/pedido/${encodeURIComponent(p.pedido)}/nota">
@@ -323,11 +341,12 @@ function paginaAyuda({ urlPublica = '' } = {}) {
 <div class="caja">
   <h2 style="margin-top:0">3. El comprobante</h2>
   <ol class="pasos">
-    <li>Si el comprador escribió un <b>RUC (11 dígitos)</b> corresponde <b>factura</b>; si dejó DNI o nada,
-      <b>boleta</b>. En el pedido se avisa de cuál toca.</li>
-    <li>El precio que se cobró <b>ya lleva el IGV dentro</b>: no hay que sumarle nada.</li>
-    <li>Emítalo y anote el número en el pedido, en «Anotar comprobante». Así queda claro cuáles están
-      facturados.</li>
+    <li><b>Se emite solo</b>, con NubeFact, en cuanto se confirma el pago. Normalmente no hay nada que hacer.</li>
+    <li>Si el comprador escribió un <b>RUC (11 dígitos)</b> sale <b>factura</b>; si dejó DNI o nada,
+      <b>boleta</b>. El precio cobrado <b>ya lleva el IGV dentro</b>, así que no se le suma nada.</li>
+    <li>En el pedido verá su número, si SUNAT lo aceptó y el enlace al PDF.</li>
+    <li><b>Si falló</b> —NubeFact caído, correlativo desincronizado— el pedido lo dice en su historial y hay un
+      botón para <b>emitirlo ahora</b>. El pago no se ve afectado: el dinero ya entró.</li>
   </ol>
 </div>
 
@@ -347,7 +366,7 @@ function paginaAyuda({ urlPublica = '' } = {}) {
   <ol class="pasos">
     <li><b>No manda ningún correo.</b> Ni al comprador ni a usted. Los avisos de compra hay que verlos
       entrando aquí, y la entrega se escribe a mano.</li>
-    <li><b>No emite comprobantes.</b> Se emiten fuera y aquí solo se anota el número.</li>
+    <li><b>No manda el producto.</b> La licencia o el instalador se envían a mano; el comprobante sí sale solo.</li>
     <li><b>No devuelve dinero.</b> Eso se hace en el Back Office de Izipay.</li>
   </ol>
 </div>

@@ -42,6 +42,7 @@ const { verificarFirma, resumirPago, registrarPago, LIBRO_PAGOS } = require('./s
 const { paginaRetorno } = require('./src/pagina_retorno');
 const { registrarPedido, registrarEvento, consolidar, leerLineas } = require('./src/pedidos');
 const { LIBRO: LIBRO_RECLAMACIONES } = require('./src/reclamaciones');
+const comprobantes = require('./src/comprobantes');
 const sesion = require('./src/admin_sesion');
 const panel = require('./src/panel_admin');
 
@@ -211,6 +212,52 @@ app.get('/api/config', (_req, res) => {
 app.get('/api/catalogo', (_req, res) => {
   res.json({ productos: catalogoPublico() });
 });
+
+/**
+ * Emite la boleta o la factura de un pedido que acaba de pagarse.
+ *
+ * NO SE ESPERA A QUE TERMINE, y no es descuido. Esto se llama justo después de
+ * anotar un cobro, dentro del webhook de Izipay: si nos quedáramos esperando a
+ * NubeFact, un facturador lento haría que Izipay diera la notificación por
+ * fallida y la reintentara —o peor, que el comprador viera un error en una
+ * compra que salió bien—. El dinero ya entró; el comprobante puede tardar unos
+ * segundos más.
+ *
+ * Por eso tampoco propaga nunca un error: cada intento, salga bien o mal, deja
+ * su evento en el historial del pedido, y desde el panel se reintenta.
+ */
+function facturar(idPedido, origen = 'automático') {
+  if (!idPedido || !comprobantes.configurado()) return;
+
+  setImmediate(async () => {
+    try {
+      const registro = compras().find((p) => p.pedido === idPedido);
+      if (!registro) return;
+      if (comprobantes.comprobanteDe(idPedido)) return;   // ya tiene uno
+
+      const asiento = await comprobantes.emitir(registro);
+      if (asiento.ok) {
+        registrarEvento({
+          pedido: idPedido,
+          tipo: 'comprobante',
+          detalle: comprobantes.nombrar(asiento),
+          quien: origen,
+        });
+        console.log(`[comprobante] ${comprobantes.nombrar(asiento)} para ${idPedido}`);
+      } else {
+        registrarEvento({
+          pedido: idPedido,
+          tipo: 'nota',
+          detalle: 'No se pudo emitir el comprobante: ' + (asiento.motivo || 'sin detalle'),
+          quien: origen,
+        });
+        console.error(`[comprobante] ${idPedido} falló:`, asiento.motivo);
+      }
+    } catch (e) {
+      console.error('[comprobante] error inesperado emitiendo', idPedido, e);
+    }
+  });
+}
 
 /**
  * POST /api/create-payment
@@ -388,7 +435,8 @@ app.post('/api/validate-payment', (req, res) => {
   // seguirá anotando lo que falte sin duplicar lo ya anotado.
   if (estado === 'PAID') {
     try {
-      registrarPago(resumirPago(respuesta, MODO), 'navegador');
+      const anotado = registrarPago(resumirPago(respuesta, MODO), 'navegador');
+      if (anotado.nuevo) facturar(anotado.pedido);
     } catch (e) {
       // Que no se pueda anotar no puede tumbar la confirmación en pantalla:
       // el cobro ya está hecho y el IPN lo recuperará.
@@ -490,6 +538,7 @@ app.post('/api/ipn', express.urlencoded({ extended: false, limit: '64kb' }), (re
     const r = registrarPago(resumen, 'ipn');
     console.log(`[ipn] ${resumen.estado} pedido=${resumen.pedido} ref=${resumen.referencia}` +
                 (r.nuevo ? '' : ' (repetida, no se vuelve a registrar)'));
+    if (r.nuevo && resumen.estado === 'PAID') facturar(resumen.pedido);
   } catch (e) {
     // Si no se pudo escribir, se devuelve error A PROPÓSITO: así Izipay
     // reintenta y el cobro no se pierde en silencio.
@@ -638,7 +687,9 @@ app.get('/admin/pedido/:pedido', (req, res) => {
   const registro = compras().find((p) => p.pedido === req.params.pedido);
   if (!registro) return res.status(404).type('html').send(panel.paginaCompras(compras(), {}));
   res.type('html').send(panel.paginaPedido(registro, {
-    mensaje: req.query.ok ? String(req.query.ok).slice(0, 120) : null,
+    mensaje: req.query.ok ? String(req.query.ok).slice(0, 200) : null,
+    comprobante: comprobantes.comprobanteDe(registro.pedido),
+    facturadorListo: comprobantes.configurado(),
   }));
 });
 
@@ -665,6 +716,40 @@ function accionSobrePedido(tipo, mensaje) {
   };
 }
 
+/**
+ * Emitir a mano el comprobante que no salió solo: NubeFact caído, un dato del
+ * comprador que hubo que corregir, o el correlativo desincronizado. Espera a la
+ * respuesta —aquí sí, porque hay alguien mirando la pantalla— y devuelve el
+ * resultado escrito en el aviso.
+ */
+app.post('/admin/pedido/:pedido/facturar', formularioAdmin, async (req, res) => {
+  const volver = `/admin/pedido/${encodeURIComponent(req.params.pedido)}`;
+  const registro = compras().find((p) => p.pedido === req.params.pedido);
+  if (!registro) return res.redirect('/admin');
+
+  let asiento;
+  try {
+    asiento = await comprobantes.emitir(registro);
+  } catch (e) {
+    console.error('[comprobante] error emitiendo a mano', req.params.pedido, e);
+    asiento = { ok: false, motivo: 'Error inesperado: ' + e.message };
+  }
+
+  if (asiento.ok && !asiento.repetido) {
+    registrarEvento({
+      pedido: req.params.pedido,
+      tipo: 'comprobante',
+      detalle: comprobantes.nombrar(asiento),
+      quien: 'administrador',
+    });
+  }
+  const aviso = asiento.ok
+    ? (asiento.repetido ? `Este pedido ya tenía ${comprobantes.nombrar(asiento)}.`
+      : `Emitido: ${comprobantes.nombrar(asiento)}.`)
+    : `No se pudo emitir: ${asiento.motivo}`;
+  return res.redirect(`${volver}?ok=${encodeURIComponent(aviso)}`);
+});
+
 app.post('/admin/pedido/:pedido/entregado', formularioAdmin,
   accionSobrePedido('entregado', 'Marcado como entregado.'));
 app.post('/admin/pedido/:pedido/comprobante', formularioAdmin,
@@ -688,6 +773,9 @@ app.listen(PUERTO, () => {
   }
   console.log('');
   console.log(`  Panel del administrador:  ${base}/admin`);
+  if (!comprobantes.configurado()) {
+    console.warn('    ⚠  boletas y facturas a mano: falta NUBEFACT_RUTA / NUBEFACT_TOKEN en .env');
+  }
   if (!sesion.claveConfigurada()) {
     console.warn('    ⚠  cerrado: falta ADMIN_PASSWORD en .env');
   }
