@@ -92,6 +92,16 @@ const IZIPAY = {
   hmacAlterna: process.env.IZIPAY_HMAC_SHA256_ALTERNA || '',
 };
 
+/**
+ * En qué modo opera este servidor, leído de su propia contraseña: Izipay las
+ * emite con el prefijo `testpassword_` o `prodpassword_`. Solo se usa como
+ * respaldo cuando la respuesta del pago no trae `mode`, para que en el libro
+ * nunca se confunda una prueba con una venta.
+ */
+const MODO = IZIPAY.clave.startsWith('prodpassword_') ? 'PRODUCTION'
+           : IZIPAY.clave.startsWith('testpassword_') ? 'TEST'
+           : null;
+
 /** Las claves con las que se puede verificar una notificación entrante. */
 const CLAVES_VERIFICACION = {
   password: [IZIPAY.clave, IZIPAY.claveAlterna],
@@ -354,7 +364,7 @@ app.post('/api/validate-payment', (req, res) => {
   // seguirá anotando lo que falte sin duplicar lo ya anotado.
   if (estado === 'PAID') {
     try {
-      registrarPago(resumirPago(respuesta), 'navegador');
+      registrarPago(resumirPago(respuesta, MODO), 'navegador');
     } catch (e) {
       // Que no se pueda anotar no puede tumbar la confirmación en pantalla:
       // el cobro ya está hecho y el IPN lo recuperará.

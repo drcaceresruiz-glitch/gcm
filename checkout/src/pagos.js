@@ -95,13 +95,17 @@ function verificarFirma(cuerpo, claves) {
  * últimos dígitos, la marca, el país del emisor) que aquí no hacen ninguna
  * falta. Lo que no se guarda no se puede filtrar.
  */
-function resumirPago(respuestaJson) {
+function resumirPago(respuestaJson, modoPorDefecto = null) {
   const d = JSON.parse(respuestaJson);
   const tx = Array.isArray(d.transactions) && d.transactions.length ? d.transactions[0] : {};
   return {
     pedido: d.orderDetails?.orderId ?? null,
     estado: d.orderStatus ?? null,            // PAID | UNPAID | RUNNING …
-    modo: d.mode ?? null,                     // TEST | PRODUCTION
+    // La respuesta que vuelve POR EL NAVEGADOR no siempre trae `mode`: en la
+    // primera prueba real se anotó `"modo":null`, y así una prueba y una venta
+    // de verdad quedan iguales en el libro. De ahí el respaldo: el modo en que
+    // opera el servidor, deducido de sus propias claves.
+    modo: d.mode ?? modoPorDefecto,           // TEST | PRODUCTION
     referencia: tx.uuid ?? null,              // el id del cargo en Izipay
     importeCentimos: tx.amount ?? d.orderDetails?.orderTotalAmount ?? null,
     moneda: tx.currency ?? d.orderDetails?.orderCurrency ?? null,
