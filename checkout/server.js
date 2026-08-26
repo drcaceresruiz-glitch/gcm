@@ -47,6 +47,7 @@ const { revisarDocumento } = require('./src/documentos');
 const { revisarHoja, registrarHoja } = require('./src/reclamaciones');
 const { verificarFirma, resumirPago, registrarPago, LIBRO_PAGOS } = require('./src/pagos');
 const { paginaRetorno } = require('./src/pagina_retorno');
+const { paginaGracias } = require('./src/pagina_gracias');
 const { registrarPedido, registrarEvento, consolidar, leerLineas, lineasDe } = require('./src/pedidos');
 const { LIBRO: LIBRO_RECLAMACIONES } = require('./src/reclamaciones');
 const comprobantes = require('./src/comprobantes');
@@ -851,6 +852,28 @@ app.post('/admin/catalogo/categoria/:id/borrar', formularioAdmin, (req, res) => 
     ? `Categoría borrada. Sus ${cuantos} producto(s) aparecen ahora bajo «Otros».`
     : 'Categoría borrada.';
   return res.redirect('/admin/catalogo?ok=' + encodeURIComponent(aviso));
+});
+
+/**
+ * GET /gracias?pedido=DCR-...
+ *
+ * Adonde llega el comprador cuando el cobro sale bien. Antes se quedaba en la
+ * pagina de pagar con un renglon verde bajo el formulario de la tarjeta, sin
+ * saber que habia comprado ni que pasaba despues.
+ *
+ * PUBLICA Y SIN SESION a proposito: quien acaba de pagar no tiene cuenta aqui.
+ * Por eso la pagina no ensena nombre, documento ni telefono, y tapa el correo
+ * -esta razonado en src/pagina_gracias.js-. El detalle sale del registro de
+ * pedidos, nunca de lo que traiga la direccion.
+ */
+app.get('/gracias', (req, res) => {
+  const idPedido = String(req.query.pedido || '').slice(0, 40);
+  const pedido = idPedido ? compras().find((p) => p.pedido === idPedido) : null;
+  res.type('html').send(paginaGracias({
+    pedido: pedido || null,
+    lineas: pedido ? lineasDe(pedido) : [],
+    comprobante: pedido ? comprobantes.comprobanteDe(pedido.pedido) : null,
+  }));
 });
 
 app.get('/admin/ayuda', (_req, res) => {
