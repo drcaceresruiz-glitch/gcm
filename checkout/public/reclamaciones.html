@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Libro de Reclamaciones · GCM</title>
+
+<!--
+  Libro de Reclamaciones VIRTUAL.
+
+  Obligatorio para todo proveedor con establecimiento abierto al público —y una
+  tienda en línea lo es—, según el Código de Protección y Defensa del Consumidor
+  (Ley 29571) y su reglamento (D.S. 011-2011-PCM). Los campos de esta hoja son
+  los que exige ese reglamento; no se han quitado ni añadido a gusto.
+
+  Dos cosas que la norma distingue y que la gente confunde, por eso están
+  explicadas arriba del formulario y no en letra pequeña:
+    · RECLAMO — disconformidad con el producto o el servicio.
+    · QUEJA   — malestar por la atención recibida.
+
+  El plazo de respuesta es de 15 días hábiles y NO se puede alargar en silencio.
+-->
+
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<link rel="stylesheet" href="legal.css">
+
+<style>
+  /* Solo lo propio del formulario: el resto lo pone legal.css. */
+  .documento { max-width: 780px; }
+
+  .explica {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px; margin: 22px 0 30px;
+  }
+  .explica div {
+    background: var(--tarjeta); border: 1px solid var(--linea);
+    border-radius: 11px; padding: 14px 16px;
+  }
+  .explica b { display: block; margin-bottom: 3px; }
+  .explica p { margin: 0; font-size: 14px; color: var(--apagado); }
+
+  fieldset {
+    border: 1px solid var(--linea); border-radius: 12px;
+    padding: 18px 20px 20px; margin: 0 0 20px; background: var(--tarjeta);
+  }
+  legend {
+    padding: 0 9px; font-size: 12px; font-weight: 700;
+    letter-spacing: .09em; text-transform: uppercase; color: var(--marca-700);
+  }
+
+  .campo { margin-bottom: 15px; }
+  .campo:last-child { margin-bottom: 0; }
+  .campo label { display: block; font-size: 13.5px; font-weight: 600; margin-bottom: 6px; }
+  .campo label .opt { font-weight: 400; color: var(--apagado); }
+  .campo input, .campo select, .campo textarea {
+    width: 100%; padding: 11px 13px; font: inherit; font-size: 15px;
+    color: var(--tinta); background: var(--tarjeta);
+    border: 1px solid var(--linea); border-radius: 9px;
+  }
+  .campo textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+  .campo input:focus, .campo select:focus, .campo textarea:focus {
+    outline: none; border-color: var(--marca-600);
+    box-shadow: 0 0 0 3px oklch(0.62 0.11 195 / .16);
+  }
+  .campo input[aria-invalid="true"], .campo textarea[aria-invalid="true"],
+  .campo select[aria-invalid="true"] { border-color: oklch(0.58 0.19 25); }
+  .campo .error { display: none; margin-top: 5px; font-size: 12.5px; color: oklch(0.58 0.19 25); }
+  .campo [aria-invalid="true"] ~ .error { display: block; }
+
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .tres { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 620px) { .dos, .tres { grid-template-columns: 1fr; } }
+
+  .opciones { display: grid; gap: 10px; }
+  .opcion {
+    display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+    border: 1.5px solid var(--linea); border-radius: 10px; padding: 12px 14px;
+  }
+  .opcion:has(input:checked) {
+    border-color: var(--marca-600);
+    box-shadow: 0 0 0 3px oklch(0.62 0.11 195 / .14);
+  }
+  .opcion input { margin-top: 3px; accent-color: var(--marca-600); }
+  .opcion b { display: block; font-size: 14.5px; }
+  .opcion span { font-size: 13px; color: var(--apagado); }
+
+  .btn {
+    padding: 13px 24px; font: inherit; font-size: 15.5px; font-weight: 600;
+    color: #fff; background: var(--marca-600); border: 0; border-radius: 10px; cursor: pointer;
+  }
+  .btn:hover:not(:disabled) { background: var(--marca-700); }
+  .btn:disabled { background: var(--apagado); cursor: not-allowed; opacity: .65; }
+
+  .aviso {
+    margin-top: 18px; padding: 13px 16px; border-radius: 10px;
+    border: 1px solid var(--linea); background: oklch(0.965 0.006 195);
+    font-size: 14px; color: var(--apagado);
+  }
+  .aviso.malo { background: oklch(0.58 0.19 25 / .07); border-color: oklch(0.58 0.19 25 / .3); color: oklch(0.46 0.17 25); }
+  .aviso.bien { background: oklch(0.62 0.15 150 / .08); border-color: oklch(0.62 0.15 150 / .3); color: oklch(0.40 0.12 150); }
+  .aviso b { color: inherit; }
+
+  .legal-nota {
+    margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--linea);
+    font-size: 13px; color: var(--apagado); line-height: 1.65;
+  }
+</style>
+</head>
+<body>
+
+<header class="barra">
+  <div class="contenedor">
+    <a class="marca" href="checkout.html">
+      <span class="sello" aria-hidden="true">GCM</span>
+      <span><b>GCM</b><small>Gestor de Construcción y Mantenimiento</small></span>
+    </a>
+    <a class="volver" href="checkout.html">← Volver al pago</a>
+  </div>
+</header>
+
+<main class="contenedor documento">
+  <h1>Libro de Reclamaciones</h1>
+  <p class="fecha">
+    Conforme al Código de Protección y Defensa del Consumidor (Ley 29571).
+    Yudelvis Cáceres Ruiz · RUC 15606050906.
+  </p>
+
+  <div class="explica">
+    <div>
+      <b>Reclamo</b>
+      <p>Disconformidad con el producto o el servicio que contrató.</p>
+    </div>
+    <div>
+      <b>Queja</b>
+      <p>Malestar por la atención recibida. No se refiere al producto.</p>
+    </div>
+  </div>
+
+  <form id="hoja" novalidate>
+
+    <fieldset>
+      <legend>1 · Identificación del consumidor</legend>
+
+      <div class="campo">
+        <label for="nombre">Nombre completo <span aria-hidden="true">*</span></label>
+        <input type="text" id="nombre" name="nombre" maxlength="150" required autocomplete="name">
+        <span class="error" id="err-nombre"></span>
+      </div>
+
+      <div class="tres">
+        <div class="campo">
+          <label for="tipoDoc">Documento <span aria-hidden="true">*</span></label>
+          <select id="tipoDoc" name="tipoDoc" required>
+            <option value="DNI">DNI</option>
+            <option value="CE">Carné de extranjería</option>
+            <option value="PAS">Pasaporte</option>
+            <option value="RUC">RUC</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="numDoc">Número <span aria-hidden="true">*</span></label>
+          <input type="text" id="numDoc" name="numDoc" maxlength="20" required inputmode="numeric">
+          <span class="error" id="err-numDoc"></span>
+        </div>
+        <div class="campo">
+          <label for="telefono">Teléfono <span class="opt">· opcional</span></label>
+          <input type="tel" id="telefono" name="telefono" maxlength="25" autocomplete="tel">
+          <span class="error" id="err-telefono"></span>
+        </div>
+      </div>
+
+      <div class="campo">
+        <label for="correo">Correo electrónico <span aria-hidden="true">*</span></label>
+        <input type="email" id="correo" name="correo" maxlength="120" required autocomplete="email">
+        <span class="error" id="err-correo"></span>
+        <span class="error" style="display:block;color:var(--apagado);font-weight:400;">
+          A esta dirección le enviaremos la copia de su hoja y la respuesta.
+        </span>
+      </div>
+
+      <div class="campo">
+        <label for="domicilio">Domicilio <span aria-hidden="true">*</span></label>
+        <input type="text" id="domicilio" name="domicilio" maxlength="200" required autocomplete="street-address">
+        <span class="error" id="err-domicilio"></span>
+      </div>
+
+      <div class="campo">
+        <label for="apoderado">
+          Si es menor de edad, nombre del padre, madre o apoderado
+          <span class="opt">· solo en ese caso</span>
+        </label>
+        <input type="text" id="apoderado" name="apoderado" maxlength="150">
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>2 · Identificación del bien contratado</legend>
+
+      <div class="opciones" style="margin-bottom:15px;">
+        <label class="opcion">
+          <input type="radio" name="bien" value="PRODUCTO" checked>
+          <span><b>Producto</b><span>Licencia de la app web o software autoinstalable.</span></span>
+        </label>
+        <label class="opcion">
+          <input type="radio" name="bien" value="SERVICIO">
+          <span><b>Servicio</b><span>Soporte, activación, atención u otro servicio.</span></span>
+        </label>
+      </div>
+
+      <div class="dos">
+        <div class="campo">
+          <label for="monto">Monto reclamado en soles <span class="opt">· opcional</span></label>
+          <input type="text" id="monto" name="monto" maxlength="12" inputmode="decimal" placeholder="349.00">
+          <span class="error" id="err-monto"></span>
+        </div>
+        <div class="campo">
+          <label for="pedidoRef">N.º de pedido <span class="opt">· opcional</span></label>
+          <input type="text" id="pedidoRef" name="pedidoRef" maxlength="30" placeholder="GCM-AAAAMMDD-XXXXXXXX">
+        </div>
+      </div>
+
+      <div class="campo">
+        <label for="descripcion">Descripción <span aria-hidden="true">*</span></label>
+        <textarea id="descripcion" name="descripcion" maxlength="1000" required
+                  placeholder="Qué producto o servicio contrató, y cuándo."></textarea>
+        <span class="error" id="err-descripcion"></span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>3 · Detalle de la reclamación</legend>
+
+      <div class="opciones" style="margin-bottom:15px;">
+        <label class="opcion">
+          <input type="radio" name="tipo" value="RECLAMO" checked>
+          <span><b>Reclamo</b><span>Disconformidad con el producto o el servicio.</span></span>
+        </label>
+        <label class="opcion">
+          <input type="radio" name="tipo" value="QUEJA">
+          <span><b>Queja</b><span>Malestar por la atención recibida.</span></span>
+        </label>
+      </div>
+
+      <div class="campo">
+        <label for="detalle">Detalle <span aria-hidden="true">*</span></label>
+        <textarea id="detalle" name="detalle" maxlength="2000" required
+                  placeholder="Explique qué ocurrió."></textarea>
+        <span class="error" id="err-detalle"></span>
+      </div>
+
+      <div class="campo">
+        <label for="pedido">Pedido del consumidor <span aria-hidden="true">*</span></label>
+        <textarea id="pedido" name="pedido" maxlength="1000" required
+                  placeholder="Qué solicita que se haga."></textarea>
+        <span class="error" id="err-pedido"></span>
+      </div>
+    </fieldset>
+
+    <button class="btn" type="submit" id="enviar">Registrar mi hoja de reclamación</button>
+    <div class="aviso" id="resultado" hidden></div>
+  </form>
+
+  <p class="legal-nota">
+    <b>Plazo de respuesta.</b> La reclamación será atendida en un plazo máximo de
+    <b>quince (15) días hábiles</b>, improrrogable salvo que la naturaleza del caso lo
+    justifique, en cuyo caso se le comunicará la ampliación antes del vencimiento.<br>
+    <b>Constancia.</b> Al registrarla se le asigna un número correlativo y se le enviará al
+    correo indicado una copia de esta hoja. Anote ese número: es el que identifica su caso.<br>
+    <b>Conservación.</b> Esta hoja se conserva por dos (2) años, como exige el reglamento.<br>
+    La presentación de un reclamo no impide acudir a otras vías de solución ni es requisito
+    previo para denunciar ante <b>INDECOPI</b>.
+  </p>
+</main>
+
+<footer class="pie">
+  <div class="contenedor">
+    <a href="checkout.html">Volver al pago</a> ·
+    <a href="terminos.html">Términos y Condiciones</a> ·
+    <a href="devoluciones.html">Políticas de Devolución</a>
+  </div>
+</footer>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const OBLIGATORIOS = ['nombre', 'numDoc', 'correo', 'domicilio', 'descripcion', 'detalle', 'pedido'];
+
+function limpiar() {
+  for (const c of OBLIGATORIOS.concat(['telefono', 'monto'])) {
+    const e = $('#' + c);
+    if (!e) continue;
+    e.removeAttribute('aria-invalid');
+    const err = $('#err-' + c);
+    if (err) err.textContent = '';
+  }
+}
+
+function marcar(campo, mensaje) {
+  const e = $('#' + campo);
+  if (!e) return;
+  e.setAttribute('aria-invalid', 'true');
+  const err = $('#err-' + campo);
+  if (err) err.textContent = mensaje;
+}
+
+function mostrar(texto, tipo) {
+  const caja = $('#resultado');
+  caja.innerHTML = texto;
+  caja.className = 'aviso' + (tipo ? ' ' + tipo : '');
+  caja.hidden = !texto;
+}
+
+$('#hoja').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  limpiar();
+  mostrar('', null);
+
+  const datos = Object.fromEntries(new FormData($('#hoja')).entries());
+
+  const boton = $('#enviar');
+  boton.disabled = true;
+  boton.textContent = 'Registrando…';
+
+  try {
+    const r = await fetch('/api/reclamacion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos),
+    });
+    const res = await r.json();
+
+    if (!r.ok) {
+      if (res.campos) for (const [c, m] of Object.entries(res.campos)) marcar(c, m);
+      mostrar(res.error || 'No se pudo registrar la hoja.', 'malo');
+      return;
+    }
+
+    mostrar(
+      'Su hoja quedó registrada con el número <b>' + res.correlativo + '</b>, ' +
+      'el ' + res.fecha + '. <b>Anote este número</b>: es el que identifica su caso. ' +
+      'Le enviaremos la copia de la hoja y la respuesta a <b>' + res.correo + '</b>, ' +
+      'en un plazo máximo de 15 días hábiles.', 'bien');
+    $('#hoja').reset();
+    $('#resultado').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch {
+    mostrar('No se pudo contactar con el servidor. Inténtelo de nuevo, por favor.', 'malo');
+  } finally {
+    boton.disabled = false;
+    boton.textContent = 'Registrar mi hoja de reclamación';
+  }
+});
+</script>
+</body>
+</html>

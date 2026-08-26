@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="GCM">
+  <!-- Icono de instalacion. En SVG y no en PNG a proposito: pesa 1 KB, se ve
+       nitido a cualquier tamano y no hay que mantener seis ficheros. -->
+  <rect width="512" height="512" rx="112" fill="#0f7186"/>
+  <!-- Casco de obra, el mismo simbolo de la cabecera. -->
+  <path d="M256 150c-62 0-112 50-112 112v34h224v-34c0-62-50-112-112-112z" fill="#ffffff"/>
+  <rect x="112" y="296" width="288" height="40" rx="20" fill="#ffffff"/>
+  <rect x="238" y="128" width="36" height="52" rx="18" fill="#ffffff"/>
+</svg>

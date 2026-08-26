@@ -1,0 +1,6 @@
+# Nada de esto sale del servidor.
+.env
+certificados/*
+!certificados/.htaccess
+datos/*
+!datos/.htaccess

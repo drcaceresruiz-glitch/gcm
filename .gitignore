@@ -111,3 +111,14 @@ next-env.d.ts
 /.claude/
 /.windsurf/
 skills-lock.json
+
+# El Libro de Reclamaciones y el registro de pagos llevan datos personales
+# (nombre, documento, domicilio, correo). No se versionan jamás: se respaldan
+# aparte.
+checkout/datos/
+
+# La regla `.env.*` de arriba se llevaba por delante el .env.example del
+# checkout, que es justo lo contrario de un secreto: es la plantilla vacía que
+# dice QUÉ credenciales hacen falta. Sin ella, quien clone no sabe qué pedirle a
+# Izipay. Se exceptúa a mano; el .env de verdad sigue ignorado.
+!checkout/.env.example

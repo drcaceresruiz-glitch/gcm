@@ -19,6 +19,7 @@ import {
   Sparkles,
   Settings,
   ShieldCheck,
+  Store,
   UserCircle,
   UsersRound,
   Users,
@@ -68,6 +69,19 @@ const ICONOS = {
   migracion: PackageOpen,
   soporte: LifeBuoy,
 } as const;
+
+/**
+ * La tienda donde se compran las licencias.
+ *
+ * Vive en otro dominio y en otra aplicacion —su propio Express, aparte de
+ * esta— asi que el enlace es externo y se abre en otra pestana: quien esta
+ * trabajando en una obra no quiere perder lo que tiene abierto por mirar un
+ * precio.
+ *
+ * Se puede cambiar sin tocar codigo con `NEXT_PUBLIC_URL_TIENDA`, porque una
+ * direccion no deberia exigir un despliegue.
+ */
+const URL_TIENDA = process.env.NEXT_PUBLIC_URL_TIENDA ?? "https://pagos.drcaceresruiz.com";
 
 /**
  * Los grupos del menu de empresa, en el orden en que se pintan.
@@ -248,6 +262,9 @@ export function Navegacion({
           <EnlaceMenu href="/cambiar-clave" icono={KeyRound}>
             Cambiar clave
           </EnlaceMenu>
+          <EnlaceExterno href={URL_TIENDA} icono={Store}>
+            Comprar licencia
+          </EnlaceExterno>
           <BotonSalir />
         </MenuDesplegable>
       </div>
@@ -344,6 +361,9 @@ export function Navegacion({
             <EnlaceMenu href="/cambiar-clave" icono={KeyRound}>
               Cambiar clave
             </EnlaceMenu>
+            <EnlaceExterno href={URL_TIENDA} icono={Store}>
+              Comprar licencia
+            </EnlaceExterno>
             <BotonSalir />
           </div>
         </div>
@@ -493,6 +513,36 @@ function EnlaceMenu({
         </span>
       )}
     </Link>
+  );
+}
+
+/**
+ * Como `EnlaceMenu`, pero para salir de la aplicacion.
+ *
+ * Etiqueta `<a>` y no `Link`: el enrutador de Next solo sabe de rutas de esta
+ * aplicacion, y la tienda es otra. `rel="noopener"` porque la pagina que se
+ * abre no tiene por que poder tocar esta.
+ */
+function EnlaceExterno({
+  href,
+  icono: Icono,
+  children,
+}: {
+  href: string;
+  icono: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      role="menuitem"
+      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm hover:bg-[color-mix(in_oklab,var(--borde)_50%,transparent)]"
+    >
+      <Icono className="size-4 shrink-0 opacity-70" />
+      <span className="flex-1">{children}</span>
+    </a>
   );
 }
 

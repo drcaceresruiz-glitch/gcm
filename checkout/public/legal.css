@@ -1,0 +1,66 @@
+/* Hoja compartida por las dos páginas legales.
+   Misma paleta que checkout.html, pero en un archivo aparte porque aquí sí hay
+   dos páginas que la comparten: duplicarla sería tener dos sitios donde
+   corregir el mismo color. */
+
+:root {
+  --marca-500: oklch(0.62 0.11 195);
+  --marca-600: oklch(0.54 0.10 195);
+  --marca-700: oklch(0.45 0.09 195);
+
+  --fondo:   oklch(0.98 0.004 195);
+  --tarjeta: oklch(1 0 0);
+  --tinta:   oklch(0.24 0.015 195);
+  --apagado: oklch(0.52 0.015 195);
+  --linea:   oklch(0.90 0.008 195);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--tinta);
+  font: 400 16px/1.7 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--marca-700); }
+:focus-visible { outline: 2px solid var(--marca-600); outline-offset: 2px; border-radius: 4px; }
+
+.contenedor { max-width: 780px; margin: 0 auto; padding: 0 20px; }
+
+/* --------------------------------------------------------------- cabecera */
+.barra { background: var(--tarjeta); border-bottom: 1px solid var(--linea); }
+.barra .contenedor {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; min-height: 68px; flex-wrap: wrap;
+}
+.marca { display: flex; align-items: center; gap: 11px; text-decoration: none; color: inherit; }
+.marca .sello {
+  width: 34px; height: 34px; border-radius: 9px;
+  background: linear-gradient(140deg, var(--marca-500), var(--marca-700));
+  color: #fff; display: grid; place-items: center;
+  font-weight: 700; font-size: 14px;
+}
+.marca b { font-size: 17px; letter-spacing: -.01em; }
+.marca small { display: block; color: var(--apagado); font-size: 12px; line-height: 1.2; }
+.volver { font-size: 13.5px; font-weight: 600; text-decoration: none; }
+.volver:hover { text-decoration: underline; }
+
+/* -------------------------------------------------------------- documento */
+.documento { padding: 38px 20px 60px; }
+.documento h1 { margin: 0 0 4px; font-size: 29px; letter-spacing: -.02em; text-wrap: balance; }
+.documento .fecha { margin: 0 0 30px; color: var(--apagado); font-size: 13.5px; }
+.documento h2 {
+  margin: 32px 0 10px; font-size: 18px; letter-spacing: -.01em;
+  padding-left: 11px; border-left: 3px solid var(--marca-600);
+  text-wrap: balance;
+}
+.documento p { margin: 0 0 12px; }
+.documento ul { margin: 0 0 12px; padding-left: 22px; display: grid; gap: 7px; }
+.documento li { padding-left: 2px; }
+
+/* -------------------------------------------------------------------- pie */
+.pie { border-top: 1px solid var(--linea); background: var(--tarjeta); }
+.pie .contenedor { padding: 22px 20px 30px; color: var(--apagado); font-size: 13.5px; }
