@@ -116,39 +116,93 @@ function fact_es_factura(array $pedido): bool
     return strlen(preg_replace('/\D/', '', (string)($pedido['documento'] ?? ''))) === 11;
 }
 
-/** Arma el comprobante completo, con su única línea de detalle. */
+/**
+ * Las líneas del pedido, en la forma en que este servicio las entiende.
+ *
+ * Un pedido puede traer varias (`lineas`) o venir de antes del carrito, con un
+ * solo producto en los campos sueltos. Se normalizan aquí para que el resto no
+ * tenga que preguntarse de cuál de las dos formas venía.
+ */
+function fact_lineas_de(array $pedido): array
+{
+    $crudas = $pedido['lineas'] ?? null;
+    if (!is_array($crudas) || !$crudas) {
+        $crudas = [[
+            'productoId' => $pedido['productoId'] ?? '',
+            'nombre' => $pedido['productoNombre'] ?? '',
+            'cantidad' => 1,
+            'precioUnitarioCentimos' => (int)($pedido['importeCentimos'] ?? 0),
+        ]];
+    }
+
+    $lineas = [];
+    foreach ($crudas as $l) {
+        // LA DESCRIPCIÓN NO PUEDE IR VACÍA. SUNAT rechaza con el código 2026
+        // («El XML no contiene el tag cac:Item/cbc:Description») y no es
+        // hipotético: pasó con un pedido antiguo, de los que no guardaban qué
+        // se había comprado. `??` no basta —una cadena vacía no es null—.
+        $descripcion = trim((string)($l['nombre'] ?? ''));
+        if ($descripcion === '') {
+            $descripcion = 'Producto o servicio';
+        }
+        $codigo = trim((string)($l['productoId'] ?? ''));
+        if ($codigo === '') {
+            $codigo = 'GCM';
+        }
+        $cantidad = max(1, (int)($l['cantidad'] ?? 1));
+        $unitario = (int)($l['precioUnitarioCentimos'] ?? 0);
+        if ($unitario <= 0) {
+            // Sin precio unitario, se deduce del importe de la línea.
+            $unitario = (int)round(((int)($l['importeCentimos'] ?? 0)) / $cantidad);
+        }
+
+        // EL REDONDEO SE HACE UNA VEZ, SOBRE EL PRECIO UNITARIO, y lo demás se
+        // multiplica. Si se redondeara el importe de la línea, el IGV de la
+        // línea dejaría de ser un múltiplo exacto del IGV unitario y las sumas
+        // del comprobante empezarían a bailar por céntimos.
+        $u = fact_desglosar($unitario);
+        $lineas[] = [
+            'codigo' => $codigo,
+            'descripcion' => $descripcion,
+            'cantidad' => $cantidad,
+            'unitTotal' => $u['total'],
+            'unitBase' => $u['base'],
+            'unitIgv' => $u['igv'],
+            'total' => $u['total'] * $cantidad,
+            'base' => $u['base'] * $cantidad,
+            'igv' => $u['igv'] * $cantidad,
+        ];
+    }
+    return $lineas;
+}
+
+/** Arma el comprobante completo, con una línea de detalle por producto. */
 function fact_construir(array $pedido, string $serie, int $correlativo): Invoice
 {
     $esFactura = fact_es_factura($pedido);
-    $m = fact_desglosar((int)$pedido['importeCentimos']);
+    $lineas = fact_lineas_de($pedido);
 
-    // LA DESCRIPCIÓN NO PUEDE IR VACÍA. SUNAT rechaza con el código 2026 («El
-    // XML no contiene el tag cac:Item/cbc:Description») y no es hipotético:
-    // pasó con un pedido antiguo, de los que no guardaban qué se había
-    // comprado. `??` no basta —una cadena vacía no es null—, así que se
-    // comprueba que quede algo escrito.
-    $descripcion = trim((string)($pedido['productoNombre'] ?? ''));
-    if ($descripcion === '') {
-        $descripcion = 'Producto o servicio';
-    }
-    $codigo = trim((string)($pedido['productoId'] ?? ''));
-    if ($codigo === '') {
-        $codigo = 'GCM';
-    }
+    $m = ['total' => 0, 'base' => 0, 'igv' => 0];
+    $detalles = [];
+    foreach ($lineas as $l) {
+        $m['total'] += $l['total'];
+        $m['base'] += $l['base'];
+        $m['igv'] += $l['igv'];
 
-    $detalle = (new SaleDetail())
-        ->setCodProducto(mb_substr($codigo, 0, 30))
-        ->setUnidad('ZZ')                       // servicio
-        ->setDescripcion(mb_substr($descripcion, 0, 250))
-        ->setCantidad(1)
-        ->setMtoValorUnitario(fact_soles($m['base']))
-        ->setMtoValorVenta(fact_soles($m['base']))
-        ->setMtoBaseIgv(fact_soles($m['base']))
-        ->setPorcentajeIgv(FACT_IGV_PORCENTAJE)
-        ->setIgv(fact_soles($m['igv']))
-        ->setTipAfeIgv('10')                    // gravado, operación onerosa
-        ->setTotalImpuestos(fact_soles($m['igv']))
-        ->setMtoPrecioUnitario(fact_soles($m['total']));
+        $detalles[] = (new SaleDetail())
+            ->setCodProducto(mb_substr($l['codigo'], 0, 30))
+            ->setUnidad('ZZ')                       // servicio
+            ->setDescripcion(mb_substr($l['descripcion'], 0, 250))
+            ->setCantidad($l['cantidad'])
+            ->setMtoValorUnitario(fact_soles($l['unitBase']))
+            ->setMtoValorVenta(fact_soles($l['base']))
+            ->setMtoBaseIgv(fact_soles($l['base']))
+            ->setPorcentajeIgv(FACT_IGV_PORCENTAJE)
+            ->setIgv(fact_soles($l['igv']))
+            ->setTipAfeIgv('10')                    // gravado, operación onerosa
+            ->setTotalImpuestos(fact_soles($l['igv']))
+            ->setMtoPrecioUnitario(fact_soles($l['unitTotal']));
+    }
 
     $leyenda = (new Legend())
         ->setCode('1000')                       // importe en letras: obligatoria
@@ -171,7 +225,7 @@ function fact_construir(array $pedido, string $serie, int $correlativo): Invoice
         ->setValorVenta(fact_soles($m['base']))
         ->setSubTotal(fact_soles($m['total']))
         ->setMtoImpVenta(fact_soles($m['total']))
-        ->setDetails([$detalle])
+        ->setDetails($detalles)
         ->setLegends([$leyenda]);
 }
 
@@ -220,7 +274,15 @@ function fact_emitir(array $pedido): array
     $esFactura = fact_es_factura($pedido);
     $serie = $esFactura ? fact_cfg('SERIE_FACTURA', 'F001') : fact_cfg('SERIE_BOLETA', 'B001');
     $correlativo = fact_siguiente_correlativo($serie);
-    $m = fact_desglosar((int)$pedido['importeCentimos']);
+
+    // Los importes salen de las LÍNEAS, no del total que llegó: así lo que se
+    // anota en el libro es exactamente lo que va en el XML.
+    $m = ['total' => 0, 'base' => 0, 'igv' => 0];
+    foreach (fact_lineas_de($pedido) as $l) {
+        $m['total'] += $l['total'];
+        $m['base'] += $l['base'];
+        $m['igv'] += $l['igv'];
+    }
     $nombreXml = fact_cfg('RUC') . '-' . ($esFactura ? '01' : '03') . '-' . $serie . '-' . $correlativo;
 
     $asiento = [

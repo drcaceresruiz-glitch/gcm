@@ -31,6 +31,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { resumirLineas } = require('./carrito');
 
 const DIRECTORIO = path.join(__dirname, '..', 'datos');
 const LIBRO_PEDIDOS = path.join(DIRECTORIO, 'pedidos.jsonl');
@@ -60,21 +61,54 @@ function anotar(archivo, fila) {
  *
  * NO GUARDA EL PRECIO QUE DIJO EL NAVEGADOR: guarda el del catálogo, que es el
  * único que vale. Y no guarda nada de la tarjeta, que aquí no llega nunca.
+ *
+ * GUARDA LAS LÍNEAS Y TAMBIÉN EL RESUMEN. `lineas` es el detalle —qué, cuánto
+ * y a qué precio cada cosa—, pero `productoNombre` e `importeCentimos` se
+ * siguen escribiendo porque los leen el panel, los correos y el comprobante, y
+ * porque los pedidos anteriores al carrito solo tienen eso. Un libro que solo
+ * crece convive siempre con sus propias versiones antiguas: la forma nueva
+ * tiene que poder leerse con los ojos de la vieja.
+ *
+ * Y cada línea guarda su COPIA del nombre y del precio. Si mañana se sube el
+ * precio o se retira el producto, este pedido sigue diciendo lo que se vendió
+ * y por cuánto — que es lo que hace falta para responder por él.
  */
-function registrarPedido({ pedido, producto, comprador, modo }) {
+function registrarPedido({ pedido, lineas, totalCentimos, moneda, comprador, modo }) {
   anotar(LIBRO_PEDIDOS, {
     creadoEn: new Date().toISOString(),
     pedido,
     modo: modo ?? null,
-    productoId: producto.id,
-    productoNombre: producto.nombre,
-    importeCentimos: producto.precioCentimos,
-    moneda: producto.moneda,
+    lineas,
+    // El resumen, para que lo ya escrito siga sirviendo.
+    productoId: lineas.length === 1 ? lineas[0].productoId : null,
+    productoNombre: resumirLineas(lineas),
+    importeCentimos: totalCentimos,
+    moneda,
     nombres: comprador.nombres || null,
     correo: comprador.correo,
     documento: comprador.documento || null,
     telefono: comprador.telefono || null,
   });
+}
+
+/**
+ * Las líneas de un pedido, venga de donde venga.
+ *
+ * Los pedidos anteriores al carrito no tienen `lineas`: se les fabrica una a
+ * partir de lo que sí guardaron. Así todo lo que las consume —panel, correos,
+ * comprobante— trata igual a un pedido de ayer y a uno de hoy.
+ */
+function lineasDe(pedido) {
+  if (Array.isArray(pedido?.lineas) && pedido.lineas.length) return pedido.lineas;
+  if (!pedido?.importeCentimos) return [];
+  return [{
+    productoId: pedido.productoId || '',
+    nombre: pedido.productoNombre || 'Producto o servicio',
+    cantidad: 1,
+    precioUnitarioCentimos: pedido.importeCentimos,
+    importeCentimos: pedido.importeCentimos,
+    moneda: pedido.moneda || 'PEN',
+  }];
 }
 
 /**
@@ -175,6 +209,7 @@ function pendientes(consolidados) {
 
 module.exports = {
   registrarPedido,
+  lineasDe,
   registrarEvento,
   consolidar,
   pendientes,

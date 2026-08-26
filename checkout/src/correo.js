@@ -29,6 +29,7 @@
 const nodemailer = require('nodemailer');
 const { COMERCIO } = require('./comercio');
 const { formatearPrecio } = require('./catalogo');
+const { lineasDe } = require('./pedidos');
 
 let transporte = null;
 
@@ -148,6 +149,37 @@ function tabla(filas) {
     + '</table>';
 }
 
+/**
+ * Qué se compró, línea a línea.
+ *
+ * Con un solo producto se enseña como una fila más, porque una tabla de
+ * cantidades para una sola cosa es ruido. Con varios, el comprador tiene
+ * derecho a ver qué le cobraron por cada uno.
+ */
+function detalleCompra(pedido) {
+  const lineas = lineasDe(pedido);
+  const moneda = pedido.moneda || 'PEN';
+  const total = formatearPrecio(pedido.importeCentimos || 0, moneda);
+
+  if (lineas.length <= 1) {
+    return tabla([
+      ['Producto', e(lineas[0] ? lineas[0].nombre : (pedido.productoNombre || '—'))],
+      ['Importe', e(total)],
+    ]);
+  }
+
+  const filas = lineas.map((l) => `<tr>
+    <td style="${FILA}">${e(l.nombre)}${l.cantidad > 1 ? ` <span style="color:#5d6f6c">× ${e(l.cantidad)}</span>` : ''}</td>
+    <td style="${FILA};text-align:right;white-space:nowrap">${e(formatearPrecio(l.importeCentimos, moneda))}</td>
+  </tr>`).join('');
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px">
+${filas}
+<tr><td style="${FILA};border-bottom:0;padding-top:10px"><b>Total</b></td>
+    <td style="${FILA};border-bottom:0;padding-top:10px;text-align:right"><b>${e(total)}</b></td></tr>
+</table>`;
+}
+
 /* ---------------------------------------------------------------- los tres */
 
 /**
@@ -163,10 +195,9 @@ async function avisarCompra({ pedido, comprobante, xml }) {
 
   const cuerpo = `
 <p style="margin:0 0 16px">Hemos recibido su pago. Gracias por su compra.</p>
+${detalleCompra(pedido)}
 ${tabla([
     ['Pedido', e(pedido.pedido)],
-    ['Producto', e(pedido.productoNombre || '—')],
-    ['Importe', e(formatearPrecio(pedido.importeCentimos || 0))],
     nombreDoc ? ['Comprobante', e(nombreDoc)] : null,
   ])}
 <p style="margin:0 0 14px">
@@ -194,7 +225,8 @@ ${nombreDoc ? `<p style="margin:0 0 14px;color:#5d6f6c;font-size:13px">
     asunto: `Su compra en GCM · pedido ${pedido.pedido}`,
     html: plantilla('Pago confirmado', cuerpo),
     texto: `Hemos recibido su pago del pedido ${pedido.pedido} `
-      + `(${pedido.productoNombre || ''}, ${formatearPrecio(pedido.importeCentimos || 0)}).`
+      + `(${lineasDe(pedido).map((l) => `${l.nombre} x${l.cantidad}`).join('; ')}` 
+      + `, ${formatearPrecio(pedido.importeCentimos || 0, pedido.moneda || 'PEN')}).`
       + (nombreDoc ? ` Comprobante: ${nombreDoc}.` : '')
       + ' Le enviaremos lo comprado en un plazo máximo de 24 horas hábiles.',
     adjuntos,
@@ -208,13 +240,12 @@ async function avisarAdminCompra({ pedido, comprobante, panelUrl }) {
 
   const cuerpo = `
 <p style="margin:0 0 16px">Hay una compra pagada pendiente de entregar.</p>
+${detalleCompra(pedido)}
 ${tabla([
     ['Pedido', e(pedido.pedido)],
     ['Comprador', e(pedido.nombres || '—')],
     ['Correo', e(pedido.correo || '—')],
     ['DNI / RUC', e(pedido.documento || '—')],
-    ['Producto', e(pedido.productoNombre || '—')],
-    ['Importe', e(formatearPrecio(pedido.importeCentimos || 0))],
     ['Comprobante', e(nombreDoc)],
     pedido.modo && pedido.modo !== 'PRODUCTION' ? ['Modo', e(pedido.modo)] : null,
   ])}
@@ -226,7 +257,8 @@ ${panelUrl ? `<p style="margin:0"><a href="${e(panelUrl)}/admin/pedido/${encodeU
     asunto: `Venta ${pedido.pedido} · ${formatearPrecio(pedido.importeCentimos || 0)} · falta entregar`,
     html: plantilla('Nueva venta', cuerpo),
     texto: `Compra pagada ${pedido.pedido} de ${pedido.correo}: `
-      + `${pedido.productoNombre || ''} ${formatearPrecio(pedido.importeCentimos || 0)}. `
+      + `${lineasDe(pedido).map((l) => `${l.nombre} x${l.cantidad}`).join('; ')} `
+      + `${formatearPrecio(pedido.importeCentimos || 0, pedido.moneda || 'PEN')}. `
       + `Comprobante: ${nombreDoc}. Falta entregar.`,
     responderA: pedido.correo,
   });

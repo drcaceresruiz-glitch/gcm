@@ -140,6 +140,32 @@
     font-size: 11px; font-weight: 700; letter-spacing: .09em;
     text-transform: uppercase; color: var(--marca-600);
   }
+  /* --- el carrito --------------------------------------------------------- */
+  .linea-carrito {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--linea);
+  }
+  .linea-carrito:first-child { padding-top: 0; }
+  .linea-carrito .quien { flex: 1; min-width: 0; }
+  .linea-carrito .quien b { display: block; font-size: 14.5px; line-height: 1.3; }
+  .linea-carrito .quien small { color: var(--apagado); font-size: 12.5px; }
+  .linea-carrito .importe { font-weight: 600; font-size: 14.5px; white-space: nowrap; }
+  .paso-cant { display: flex; align-items: center; gap: 4px; }
+  .paso-cant button {
+    width: 26px; height: 26px; padding: 0; border-radius: 7px; border: 1px solid var(--linea);
+    background: #fff; color: var(--tinta); font-size: 15px; line-height: 1; cursor: pointer;
+  }
+  .paso-cant button:hover { border-color: var(--marca-500); }
+  .paso-cant span { min-width: 18px; text-align: center; font-size: 14px; font-weight: 600; }
+  .vacio { color: var(--apagado); font-size: 14px; margin: 0 0 4px; }
+  .producto .anadir {
+    margin-top: 10px; font: inherit; font-size: 13.5px; font-weight: 600;
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--marca-500);
+    background: #fff; color: var(--marca-600); cursor: pointer;
+  }
+  .producto .anadir:hover { background: color-mix(in oklab, var(--marca-500) 8%, #fff); }
+  .producto ul.incluye { margin: 8px 0 0; padding-left: 18px; color: var(--apagado); font-size: 13px; }
+  .producto ul.incluye li { margin: 2px 0; }
   h2.grupo {
     margin: 22px 0 10px; font-size: 13px; font-weight: 700;
     letter-spacing: .06em; text-transform: uppercase; color: var(--apagado);
@@ -389,21 +415,17 @@
 
     <!-- ═══ Paso 3 · resumen + tarjeta ════════════════════════════════════ -->
     <section class="panel">
-      <div class="paso"><span class="n">3</span> Resumen y pago</div>
-      <h2 id="resNombre">Seleccione un producto</h2>
-      <p class="nota" id="resResumen">Elija arriba qué desea adquirir.</p>
+      <div class="paso"><span class="n">3</span> Su carrito</div>
+      <h2 id="resNombre">Su carrito</h2>
+      <p class="nota" id="resResumen">Añada arriba lo que desee adquirir.</p>
 
       <div class="resumen">
-        <dl>
-          <dt>Vigencia</dt><dd id="resVigencia">—</dd>
-          <dt>Entrega</dt><dd id="resEntrega">—</dd>
-          <dt>Moneda</dt><dd>Soles (PEN)</dd>
-        </dl>
+        <div id="carritoLineas"></div>
         <div class="total">
           <span>Total a pagar</span>
           <b id="resTotal">—</b>
         </div>
-        <ul id="resDetalle"></ul>
+        <p class="nota" style="margin:6px 0 0">Precios en soles, con IGV incluido.</p>
       </div>
 
       <!-- Formulario de tarjeta. Lo inyecta Izipay dentro de .kr-embedded: esta
@@ -504,7 +526,8 @@ const $ = (sel) => document.querySelector(sel);
 const estado = {
   productos: [],
   grupos: [],
-  elegido: null,
+  /** { idDeProducto: cantidad }. Lo que hay en el carrito ahora mismo. */
+  carrito: {},
   clavePublica: null,
   krCargado: false,
   krEscuchando: false,
@@ -558,14 +581,8 @@ function pintarProductos() {
     }
 
     for (const p of grupo.productos) {
-      const etiqueta = document.createElement('label');
-      etiqueta.className = 'producto';
-
-      const radio = document.createElement('input');
-      radio.type = 'radio';
-      radio.name = 'producto';
-      radio.value = p.id;
-      radio.addEventListener('change', () => elegir(p.id));
+      const tarjeta = document.createElement('article');
+      tarjeta.className = 'producto';
 
       const cat = document.createElement('span');
       cat.className = 'cat';
@@ -585,34 +602,184 @@ function pintarProductos() {
       nota.textContent = p.igvIncluido ? 'IGV incluido' : 'más IGV';
       precio.append(importe, nota);
 
-      etiqueta.append(radio, cat, h3, resumen, precio);
-      caja.appendChild(etiqueta);
+      tarjeta.append(cat, h3, resumen, precio);
+
+      // Qué incluye, vigencia y entrega viven AQUÍ, en la ficha del producto.
+      // Antes estaban en el panel de la derecha porque solo se podía comprar
+      // una cosa; con carrito, ese panel es la lista de lo elegido y no puede
+      // ser también la ficha de uno.
+      if (p.detalle && p.detalle.length) {
+        const ul = document.createElement('ul');
+        ul.className = 'incluye';
+        for (const linea of p.detalle) {
+          const li = document.createElement('li');
+          li.textContent = linea;
+          ul.appendChild(li);
+        }
+        tarjeta.appendChild(ul);
+      }
+      for (const [rotulo, valor] of [['Vigencia', p.vigencia], ['Entrega', p.entrega]]) {
+        if (!valor) continue;
+        const linea = document.createElement('p');
+        linea.style.cssText = 'margin:6px 0 0;font-size:13px;color:var(--apagado)';
+        const b = document.createElement('b');
+        b.textContent = rotulo + ': ';
+        linea.append(b, document.createTextNode(valor));
+        tarjeta.appendChild(linea);
+      }
+
+      const boton = document.createElement('button');
+      boton.type = 'button';
+      boton.className = 'anadir';
+      boton.dataset.producto = p.id;
+      boton.addEventListener('click', () => anadir(p.id));
+      tarjeta.appendChild(boton);
+
+      caja.appendChild(tarjeta);
     }
   }
 }
 
-function elegir(id) {
-  const p = estado.productos.find((x) => x.id === id);
-  if (!p) return;
-  estado.elegido = p;
+/* -------------------------------------------------------------------- carrito */
 
-  $('#resNombre').textContent = p.nombre;
-  $('#resResumen').textContent = p.resumen;
-  $('#resVigencia').textContent = p.vigencia;
-  $('#resEntrega').textContent = p.entrega;
-  $('#resTotal').textContent = p.precioTexto;
+/**
+ * El carrito se guarda en el navegador para que recargar la página no lo
+ * vacíe. Es una comodidad, nada más: lo que se cobra lo decide el servidor a
+ * partir de los identificadores y las cantidades que se le manden, así que
+ * manipular esto a mano no cambia ningún precio.
+ *
+ * Todo lo que toca `localStorage` va en try/catch: en una ventana privada, o
+ * con las cookies de sitio bloqueadas, hasta leerlo lanza.
+ */
+const LLAVE_CARRITO = 'gcm_carrito';
 
-  const lista = $('#resDetalle');
-  lista.innerHTML = '';
-  for (const linea of p.detalle) {
-    const li = document.createElement('li');
-    li.textContent = linea;
-    lista.appendChild(li);
+function guardarCarrito() {
+  try { localStorage.setItem(LLAVE_CARRITO, JSON.stringify(estado.carrito)); } catch { /* da igual */ }
+}
+
+function recuperarCarrito() {
+  let guardado = {};
+  try { guardado = JSON.parse(localStorage.getItem(LLAVE_CARRITO) || '{}'); } catch { guardado = {}; }
+
+  // Se descarta lo que ya no está a la venta: un producto retirado mientras el
+  // carrito dormía no puede quedarse dentro, o el pago se rechazaría entero al
+  // final, que es el peor momento para enterarse.
+  estado.carrito = {};
+  for (const [id, cantidad] of Object.entries(guardado || {})) {
+    const p = estado.productos.find((x) => x.id === id);
+    const n = Math.trunc(Number(cantidad));
+    if (p && Number.isFinite(n) && n >= 1) estado.carrito[id] = Math.min(n, 99);
+  }
+  guardarCarrito();
+}
+
+function cantidadDe(id) {
+  return estado.carrito[id] || 0;
+}
+
+function anadir(id) {
+  cambiarCantidad(id, cantidadDe(id) + 1);
+}
+
+function cambiarCantidad(id, cantidad) {
+  const n = Math.max(0, Math.min(99, Math.trunc(cantidad)));
+  if (n === 0) delete estado.carrito[id];
+  else estado.carrito[id] = n;
+  guardarCarrito();
+  pintarCarrito();
+
+  // Tocar el carrito invalida el formulario de tarjeta ya dibujado: ese
+  // formToken se pidió por un importe que ya no es el que hay que cobrar.
+  ocultarPago();
+}
+
+/** Las líneas del carrito, con su producto del catálogo y sus importes. */
+function lineasCarrito() {
+  return Object.entries(estado.carrito)
+    .map(([id, cantidad]) => {
+      const p = estado.productos.find((x) => x.id === id);
+      return p ? { p, cantidad, importe: p.precioCentimos * cantidad } : null;
+    })
+    .filter(Boolean);
+}
+
+function pintarCarrito() {
+  const caja = $('#carritoLineas');
+  const lineas = lineasCarrito();
+  caja.innerHTML = '';
+
+  if (!lineas.length) {
+    const vacio = document.createElement('p');
+    vacio.className = 'vacio';
+    vacio.textContent = 'Todavía no ha añadido nada.';
+    caja.appendChild(vacio);
+    $('#resTotal').textContent = '—';
+    $('#resResumen').textContent = 'Añada arriba lo que desee adquirir.';
+  } else {
+    for (const { p, cantidad, importe } of lineas) {
+      const fila = document.createElement('div');
+      fila.className = 'linea-carrito';
+
+      const quien = document.createElement('div');
+      quien.className = 'quien';
+      const nombre = document.createElement('b');
+      nombre.textContent = p.nombre;
+      const unitario = document.createElement('small');
+      unitario.textContent = `${p.precioTexto} cada uno`;
+      quien.append(nombre, unitario);
+
+      const pasos = document.createElement('div');
+      pasos.className = 'paso-cant';
+      const menos = document.createElement('button');
+      menos.type = 'button';
+      menos.textContent = '−';
+      menos.setAttribute('aria-label', `Quitar uno de ${p.nombre}`);
+      menos.addEventListener('click', () => cambiarCantidad(p.id, cantidad - 1));
+      const cuantos = document.createElement('span');
+      cuantos.textContent = String(cantidad);
+      const mas = document.createElement('button');
+      mas.type = 'button';
+      mas.textContent = '+';
+      mas.setAttribute('aria-label', `Añadir uno más de ${p.nombre}`);
+      mas.addEventListener('click', () => cambiarCantidad(p.id, cantidad + 1));
+      pasos.append(menos, cuantos, mas);
+
+      const total = document.createElement('span');
+      total.className = 'importe';
+      total.textContent = soles(importe);
+
+      fila.append(quien, pasos, total);
+      caja.appendChild(fila);
+    }
+
+    const suma = lineas.reduce((s, l) => s + l.importe, 0);
+    $('#resTotal').textContent = soles(suma);
+    const unidades = lineas.reduce((s, l) => s + l.cantidad, 0);
+    $('#resResumen').textContent = lineas.length === 1 && unidades === 1
+      ? 'Un producto en el carrito.'
+      : `${lineas.length} producto(s), ${unidades} unidad(es).`;
   }
 
-  // Cambiar de producto invalida el formulario de tarjeta ya dibujado: ese
-  // formToken se pidió por el importe del producto anterior.
-  ocultarPago();
+  // Los botones de cada ficha dicen si eso ya está dentro y cuántos.
+  for (const boton of document.querySelectorAll('.producto .anadir')) {
+    const n = cantidadDe(boton.dataset.producto);
+    boton.textContent = n ? `En el carrito (${n}) · añadir otro` : 'Añadir al carrito';
+  }
+
+  $('#continuar').disabled = !lineas.length;
+}
+
+/**
+ * Céntimos a texto, para no depender de que el servidor formatee cada suma.
+ *
+ * El servidor manda cada precio ya formateado, pero el TOTAL cambia con cada
+ * clic y pedírselo en cada uno sería una llamada por pulsación. Lo que se
+ * cobra lo sigue calculando él: esto es solo lo que se enseña mientras.
+ */
+function soles(centimos) {
+  return new Intl.NumberFormat('es-PE', {
+    style: 'currency', currency: 'PEN', minimumFractionDigits: 2,
+  }).format(centimos / 100);
 }
 
 function ocultarPago() {
@@ -735,11 +902,10 @@ async function iniciar() {
     }
 
     pintarProductos();
-    // El primero viene marcado: un checkout que arranca sin nada elegido obliga
-    // a un clic extra que no decide nada.
-    const primero = $('#productos input');
-    primero.checked = true;
-    elegir(primero.value);
+    // El carrito de la visita anterior, si lo hubiera, ya limpio de lo que
+    // haya dejado de estar a la venta.
+    recuperarCarrito();
+    pintarCarrito();
 
     if (!config.configurado) {
       mostrarAviso($('#avisoForm'),
@@ -759,8 +925,9 @@ $('#formulario').addEventListener('submit', async (e) => {
   limpiarErrores();
   mostrarAviso($('#avisoForm'), '', null);
 
-  if (!estado.elegido) {
-    mostrarAviso($('#avisoForm'), 'Elija primero un producto.', 'malo');
+  const lineas = lineasCarrito();
+  if (!lineas.length) {
+    mostrarAviso($('#avisoForm'), 'Añada primero algún producto al carrito.', 'malo');
     return;
   }
 
@@ -772,9 +939,10 @@ $('#formulario').addEventListener('submit', async (e) => {
     const r = await fetch('/api/create-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Se manda el IDENTIFICADOR del producto, nunca su precio.
+      // Se mandan los IDENTIFICADORES y las cantidades, nunca precios ni
+      // totales. Lo que se cobra lo calcula el servidor con su catálogo.
       body: JSON.stringify({
-        producto: estado.elegido.id,
+        carrito: lineas.map((l) => ({ producto: l.p.id, cantidad: l.cantidad })),
         nombres: $('#nombres').value,
         correo: $('#correo').value,
         documento: $('#documento').value,

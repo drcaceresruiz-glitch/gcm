@@ -32,6 +32,7 @@ la cara de quien está pagando.
 | `server.js` | El servidor: catálogo, pago, webhook, retorno y reclamaciones. |
 | `src/catalogo.js` | **El único sitio donde vive un precio.** Lee el catálogo. |
 | `src/catalogo_edicion.js` | Crear, cambiar y retirar productos y categorías. |
+| `src/carrito.js` | Varios productos en un pedido: valida y calcula los importes. |
 | `src/pagos.js` | Verificación de firma, resumen del cobro e idempotencia. |
 | `src/pagina_retorno.js` | La página que ve el comprador al volver de pagar. |
 | `src/reclamaciones.js` | El Libro de Reclamaciones: validación, correlativo y escritura. |
@@ -192,12 +193,37 @@ página de retorno, y la validación de la firma del pago.
 
 ---
 
-## Lo que falta en el catálogo
+## El carrito
 
-**El carrito.** Hoy se compra **un producto por pedido**: se elige uno y se paga.
-Comprar varios de una vez exige que el pedido tenga líneas, que el importe sea
-una suma y que el comprobante lleve un `SaleDetail` por línea. Es la siguiente
-fase, y toca el cobro, no solo la tienda.
+Se compran **varios productos en un mismo pedido**, con cantidades.
+
+**La regla no se afloja:** el navegador manda QUÉ y CUÁNTO —identificadores y
+cantidades—, nunca precios ni totales. `src/carrito.js` los busca en el
+catálogo, calcula, y **rechaza el carrito entero** si algo no cuadra: cobrar
+«lo que sí estaba disponible» y callarse el resto es peor que no cobrar,
+porque la persona pagó creyendo que llevaba otra cosa.
+
+**Todo en céntimos.** El importe de una línea es `precio × cantidad` en enteros
+y el total es la suma. Y en el comprobante, el redondeo del IGV se hace **una
+vez, sobre el precio unitario**, y lo demás se multiplica: si se redondeara el
+importe de la línea, el IGV dejaría de ser un múltiplo exacto del unitario y
+las sumas empezarían a bailar por céntimos. Comprobado con 3 × S/ 5.00 +
+1 × S/ 10.00 + 2 × S/ 349.99: base 614.39 + IGV 110.59 = **724.98** exacto.
+
+**Los pedidos antiguos siguen leyéndose.** Los anteriores al carrito no tienen
+`lineas`: `lineasDe()` les fabrica una a partir de lo que sí guardaron, así que
+panel, correos y comprobante tratan igual a un pedido de ayer y a uno de hoy. Y
+los nuevos siguen escribiendo `productoNombre` e `importeCentimos` como resumen,
+porque un libro que solo crece convive siempre con sus versiones antiguas.
+
+**Cada línea guarda su copia** del nombre y del precio: subir un precio hoy no
+cambia lo que dice un pedido de la semana pasada.
+
+El carrito del navegador se guarda en `localStorage` por comodidad —recargar no
+lo vacía— y al recuperarlo se descarta lo que ya no está a la venta, para no
+descubrirlo al pagar.
+
+## Lo que falta en el catálogo
 
 **Las imágenes.** Un producto se describe con texto: nombre, resumen y una lista
 de lo que incluye. No hay fotos.

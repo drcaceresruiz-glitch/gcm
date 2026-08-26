@@ -184,7 +184,7 @@ ${filas}</table></div>`
 
 /* -------------------------------------------------------- detalle de un pedido */
 
-function paginaPedido(p, { mensaje = null, mensajeMalo = false, comprobante = null, facturadorListo = false } = {}) {
+function paginaPedido(p, { mensaje = null, mensajeMalo = false, comprobante = null, facturadorListo = false, lineas = [] } = {}) {
   const pagos = p.pagos.map((x) => `<tr>
     <td>${e(fecha(x.registradoEn))}</td>
     <td>${e(x.estado || '—')}${x.detalleEstado ? ` <span class="apagado">(${e(x.detalleEstado)})</span>` : ''}</td>
@@ -215,8 +215,7 @@ guardar los pedidos al iniciarse, así que faltan los datos que escribió el com
     <tr><th>DNI / RUC</th><td>${e(p.documento || '—')}
       ${p.documento && p.documento.length === 11 ? ' <span class="et pagado">lleva factura</span>' : ''}</td></tr>
     <tr><th>Teléfono</th><td>${e(p.telefono || '—')}</td></tr>
-    <tr><th>Producto</th><td>${e(p.productoNombre || '—')}</td></tr>
-    <tr><th>Importe</th><td>${p.importeCentimos == null ? '—' : e(formatearPrecio(p.importeCentimos))}</td></tr>
+    <tr><th>Importe</th><td><b>${p.importeCentimos == null ? '—' : e(formatearPrecio(p.importeCentimos))}</b></td></tr>
     <tr><th>Comprobante</th><td>${comprobante && comprobante.ok
       ? `<b>${e(comprobante.tipo)} ${e(comprobante.serie)}-${e(comprobante.numero)}</b>`
         + (comprobante.estado === 'aceptado' ? ' <span class="et entregado">aceptado por SUNAT</span>'
@@ -227,6 +226,25 @@ guardar los pedidos al iniciarse, así que faltan los datos que escribió el com
         + (comprobante.sunat ? `<br><span class="apagado">${e(comprobante.sunat)}</span>` : '')
       : e(p.comprobante || 'sin emitir')}</td></tr>
   </table>
+</div>
+
+<div class="caja">
+  <h2 style="margin-top:0">Qué se compró</h2>
+  ${lineas.length ? `<div class="tabla-scroll"><table>
+  <tr><th>Producto</th><th style="text-align:right">Cantidad</th>
+      <th style="text-align:right">Precio</th><th style="text-align:right">Importe</th></tr>
+  ${lineas.map((l) => `<tr>
+    <td>${e(l.nombre)}${l.productoId ? `<br><span class="apagado">${e(l.productoId)}</span>` : ''}</td>
+    <td style="text-align:right">${e(l.cantidad)}</td>
+    <td style="text-align:right">${e(formatearPrecio(l.precioUnitarioCentimos, l.moneda || 'PEN'))}</td>
+    <td style="text-align:right"><b>${e(formatearPrecio(l.importeCentimos, l.moneda || 'PEN'))}</b></td>
+  </tr>`).join('')}
+  <tr><td colspan="3" style="text-align:right"><b>Total</b></td>
+      <td style="text-align:right"><b>${e(formatearPrecio(p.importeCentimos || 0, p.moneda || 'PEN'))}</b></td></tr>
+  </table></div>
+  <p class="apagado" style="margin-bottom:0">Estos importes son los del momento de la compra. Cambiar
+  hoy un precio en el catálogo no altera lo que ya se vendió.</p>`
+    : '<p class="apagado" style="margin:0">De este pedido no consta el detalle de lo comprado.</p>'}
 </div>
 
 <div class="caja">

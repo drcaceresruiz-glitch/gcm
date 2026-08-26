@@ -37,14 +37,15 @@ const express = require('express');
 const crypto = require('node:crypto');
 const path = require('node:path');
 const {
-  buscarProducto, buscarCualquierProducto, catalogoPublico, formatearPrecio,
+  buscarCualquierProducto, catalogoPublico, formatearPrecio,
   categorias, todosLosProductos, productosALaVenta,
 } = require('./src/catalogo');
 const catalogoEdicion = require('./src/catalogo_edicion');
+const { revisarCarrito, lineasPublicas } = require('./src/carrito');
 const { revisarHoja, registrarHoja } = require('./src/reclamaciones');
 const { verificarFirma, resumirPago, registrarPago, LIBRO_PAGOS } = require('./src/pagos');
 const { paginaRetorno } = require('./src/pagina_retorno');
-const { registrarPedido, registrarEvento, consolidar, leerLineas } = require('./src/pedidos');
+const { registrarPedido, registrarEvento, consolidar, leerLineas, lineasDe } = require('./src/pedidos');
 const { LIBRO: LIBRO_RECLAMACIONES } = require('./src/reclamaciones');
 const comprobantes = require('./src/comprobantes');
 const correo = require('./src/correo');
@@ -306,9 +307,10 @@ app.post('/api/create-payment', async (req, res) => {
     });
   }
 
-  const producto = buscarProducto(String(req.body?.producto ?? ''));
-  if (!producto) {
-    return res.status(400).json({ error: 'El producto elegido no existe.' });
+  // El navegador manda QUÉ y CUÁNTO; los precios y el total salen del catálogo.
+  const carrito = revisarCarrito(req.body ?? {});
+  if (carrito.error) {
+    return res.status(400).json({ error: carrito.error });
   }
 
   const revision = revisarComprador(req.body ?? {});
@@ -332,7 +334,9 @@ app.post('/api/create-payment', async (req, res) => {
   try {
     registrarPedido({
       pedido,
-      producto,
+      lineas: carrito.lineas,
+      totalCentimos: carrito.totalCentimos,
+      moneda: carrito.moneda,
       comprador: { correo, nombres, documento, telefono },
       modo: MODO,
     });
@@ -341,8 +345,8 @@ app.post('/api/create-payment', async (req, res) => {
   }
 
   const carga = {
-    amount: producto.precioCentimos,   // el importe lo pone el servidor
-    currency: producto.moneda,
+    amount: carrito.totalCentimos,     // el importe lo pone el servidor
+    currency: carrito.moneda,
     orderId: pedido,
     customer: {
       email: correo,
@@ -356,14 +360,15 @@ app.post('/api/create-payment', async (req, res) => {
         language: 'es',
       },
       shoppingCart: {
-        cartItemInfo: [
-          {
-            productLabel: producto.nombre,
-            productAmount: String(producto.precioCentimos),
-            productQty: 1,
-            productRef: producto.id,
-          },
-        ],
+        // Una entrada por línea: así el comprador ve en el formulario de
+        // Izipay lo mismo que puso en el carrito. `productAmount` es el
+        // precio UNITARIO —la cantidad va aparte—, no el importe de la línea.
+        cartItemInfo: carrito.lineas.map((l) => ({
+          productLabel: l.nombre,
+          productAmount: String(l.precioUnitarioCentimos),
+          productQty: l.cantidad,
+          productRef: l.productoId,
+        })),
       },
     },
   };
@@ -392,11 +397,9 @@ app.post('/api/create-payment', async (req, res) => {
       formToken: cuerpo.answer.formToken,
       clavePublica: IZIPAY.clavePublica,
       pedido,
-      producto: {
-        id: producto.id,
-        nombre: producto.nombre,
-        precioTexto: formatearPrecio(producto.precioCentimos),
-      },
+      lineas: lineasPublicas(carrito.lineas, carrito.moneda),
+      totalCentimos: carrito.totalCentimos,
+      totalTexto: formatearPrecio(carrito.totalCentimos, carrito.moneda),
     });
   } catch (e) {
     console.error('[izipay] CreatePayment no respondió:', e);
@@ -853,6 +856,7 @@ app.get('/admin/pedido/:pedido', (req, res) => {
     mensajeMalo: Boolean(req.query.err),
     comprobante: comprobantes.comprobanteDe(registro.pedido),
     facturadorListo: comprobantes.configurado(),
+    lineas: lineasDe(registro),
   }));
 });
 
