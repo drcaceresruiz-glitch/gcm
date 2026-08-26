@@ -115,7 +115,7 @@ header.barra .contenedor {
   cursor: pointer; text-decoration: underline; font-family: inherit;
 }
 
-.productos { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.productos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr)); gap: 14px; }
 
 .producto {
   position: relative; display: flex; flex-direction: column;
@@ -213,6 +213,9 @@ header.barra .contenedor {
 .panel {
   background: var(--tarjeta); border: 1px solid var(--linea);
   border-radius: var(--radio); padding: 22px 24px; box-shadow: var(--sombra);
+  /* Sin esto, en pantallas de 320px el panel del carrito no encogía por
+     debajo de su contenido y empujaba la página entera hacia los lados. */
+  min-width: 0;
 }
 .panel h2 { margin: 0 0 3px; font-size: 17px; }
 .panel .nota { margin: 0 0 18px; color: var(--apagado); font-size: 13.5px; }
@@ -224,9 +227,16 @@ header.barra .contenedor {
 }
 .linea-carrito:first-child { padding-top: 0; }
 .linea-carrito .quien { flex: 1; min-width: 0; }
-.linea-carrito .quien b { display: block; font-size: 14.5px; line-height: 1.3; }
+.linea-carrito .quien b { display: block; font-size: 14.5px; line-height: 1.3; overflow-wrap: break-word; }
 .linea-carrito .quien small { color: var(--apagado); font-size: 12.5px; }
 .linea-carrito .importe { font-weight: 600; font-size: 14.5px; white-space: nowrap; }
+/* En angosto, el nombre a lo ancho y debajo los botones con el importe: si
+   comparten fila, al nombre le quedan cuatro letras y se parte en vertical. */
+@media (max-width: 430px) {
+  .linea-carrito { flex-wrap: wrap; }
+  .linea-carrito .quien { flex: 1 1 100%; }
+  .linea-carrito .importe { margin-left: auto; }
+}
 .paso-cant { display: flex; align-items: center; gap: 4px; }
 .paso-cant button {
   width: 26px; height: 26px; padding: 0; border-radius: 7px; border: 1px solid var(--linea);
