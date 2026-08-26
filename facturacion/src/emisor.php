@@ -275,9 +275,6 @@ function fact_emitir(array $pedido): array
     if ($idPedido === '') {
         return ['ok' => false, 'motivo' => 'Falta el identificador del pedido.'];
     }
-    if (!fact_configurado()) {
-        return ['ok' => false, 'motivo' => 'Falta configurar: ' . implode('; ', fact_que_falta())];
-    }
     if ((int)($pedido['importeCentimos'] ?? 0) <= 0) {
         return ['ok' => false, 'motivo' => 'El pedido no tiene importe: no hay nada que facturar.'];
     }
@@ -285,6 +282,37 @@ function fact_emitir(array $pedido): array
     $yaEsta = fact_comprobante_de($idPedido);
     if ($yaEsta !== null) {
         return $yaEsta + ['ok' => true, 'repetido' => true];
+    }
+
+    // UN PAGO DE PRUEBA NO PUEDE ACABAR EN UN COMPROBANTE REAL.
+    //
+    // La pasarela y este servicio se ponen en producción por separado, y entre
+    // una cosa y otra hay un rato —a veces días— en que la tienda sigue
+    // cobrando con tarjetas de prueba mientras aquí ya se emite de verdad. Sin
+    // esta guarda, cualquiera de esas compras de mentira sacaba una boleta
+    // REAL ante SUNAT por una venta que nunca ocurrió, y eso solo se deshace
+    // con una nota de crédito.
+    //
+    // Se exige que el pago diga explícitamente que fue real. Si no lo dice
+    // —porque es un pedido viejo, o porque no se pudo averiguar—, no se emite:
+    // dejar una venta sin comprobante se arregla emitiéndolo cuando se aclare;
+    // emitir uno que no correspondía, no.
+    if (fact_es_produccion()) {
+        $modoPago = strtoupper(trim((string)($pedido['modoPago'] ?? '')));
+        if ($modoPago !== 'PRODUCTION') {
+            return [
+                'ok' => false,
+                'motivo' => 'El pago de este pedido no consta como real ('
+                    . ($modoPago !== '' ? $modoPago : 'sin dato')
+                    . '), y la facturación está en producción. No se emite un '
+                    . 'comprobante real por un cobro de prueba.',
+                'rechazadoPorModo' => true,
+            ];
+        }
+    }
+
+    if (!fact_configurado()) {
+        return ['ok' => false, 'motivo' => 'Falta configurar: ' . implode('; ', fact_que_falta())];
     }
 
     $esFactura = fact_es_factura($pedido);

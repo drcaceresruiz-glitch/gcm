@@ -857,6 +857,15 @@ app.get('/admin/ayuda', (_req, res) => {
   res.type('html').send(panel.paginaAyuda({ urlPublica: URL_PUBLICA }));
 });
 
+// El estado del servicio de facturación, para poder comprobar un paso a
+// producción ANTES de que salga el primer comprobante real.
+app.get('/admin/facturacion', async (_req, res) => {
+  const estado = await comprobantes.estadoServicio();
+  // El modo de la PASARELA va aparte: la pantalla compara los dos, porque el
+  // desajuste entre ellos es lo que hay que ver de un vistazo.
+  res.type('html').send(panel.paginaFacturacion({ estado, modoPasarela: MODO }));
+});
+
 app.get('/admin/reclamaciones', (_req, res) => {
   res.type('html').send(panel.paginaReclamaciones(leerLineas(LIBRO_RECLAMACIONES)));
 });

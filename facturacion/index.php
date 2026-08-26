@@ -71,13 +71,26 @@ if (!fact_autorizado()) {
 
 if ($accion === 'estado') {
     $falta = fact_que_falta();
+    $serieFactura = fact_cfg('SERIE_FACTURA', 'F001');
+    $serieBoleta = fact_cfg('SERIE_BOLETA', 'B001');
     fact_responder(200, [
         'ok' => true,
         'configurado' => fact_configurado() && !$falta,
         'modo' => fact_es_produccion() ? 'produccion' : 'beta',
         'endpoint' => fact_endpoint(),
-        'serieFactura' => fact_cfg('SERIE_FACTURA', 'F001'),
-        'serieBoleta' => fact_cfg('SERIE_BOLETA', 'B001'),
+        'ruc' => fact_cfg('RUC'),
+        'razonSocial' => fact_cfg('RAZON_SOCIAL'),
+        'serieFactura' => $serieFactura,
+        'serieBoleta' => $serieBoleta,
+        // Con qué número saldría el PRÓXIMO comprobante de cada serie. Es la
+        // única forma de comprobar un paso a producción sin vender de verdad:
+        // recién cambiado el modo, las dos tienen que decir 1.
+        'proximaFactura' => fact_siguiente_correlativo($serieFactura),
+        'proximaBoleta' => fact_siguiente_correlativo($serieBoleta),
+        'boletaEnvio' => fact_cfg('BOLETA_ENVIO', 'individual'),
+        // De quién es el certificado y hasta cuándo vale. En producción, su RUC
+        // tiene que ser el mismo que el del emisor.
+        'certificado' => fact_datos_certificado(),
         'falta' => $falta,
     ]);
 }
@@ -99,6 +112,10 @@ if ($accion === 'emitir') {
 
     // Las líneas llegan como vienen y se limpian aquí: es la frontera del
     // servicio, y lo que entra por HTTP no se mete en un comprobante sin mirar.
+    // Cómo se cobró: PRODUCTION si el dinero fue real. Se limpia aquí, como
+    // todo lo que entra por HTTP; la decisión de qué hacer con él la toma
+    // fact_emitir().
+    $pedido['modoPago'] = mb_substr((string)($pedido['modoPago'] ?? ''), 0, 20);
     if (isset($pedido['lineas']) && is_array($pedido['lineas'])) {
         $limpias = [];
         foreach (array_slice($pedido['lineas'], 0, 50) as $l) {

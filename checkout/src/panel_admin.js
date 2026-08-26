@@ -90,6 +90,7 @@ ${sesion ? `<header><b>Panel de la tienda</b><nav>
 <a href="/admin">Compras</a>
 <a href="/admin/catalogo">Catálogo</a>
 <a href="/admin/reclamaciones">Reclamaciones</a>
+<a href="/admin/facturacion">Facturación</a>
 <a href="/admin/ayuda">Cómo se atiende</a>
 <a href="/">Ver la tienda</a>
 <form method="post" action="/admin/salir" style="margin:0"><button class="suave">Salir</button></form>
@@ -489,6 +490,134 @@ ${esNuevo ? '' : `<div class="caja">
 
 /* -------------------------------------------------------------------- ayuda */
 
+/**
+ * El estado del servicio de facturación: en qué modo emite y con qué número.
+ *
+ * EXISTE PARA PODER COMPROBAR UN PASO A PRODUCCIÓN SIN VENDER NADA. Antes, la
+ * única forma de saber con qué número iba a salir el primer comprobante real
+ * era emitirlo — y si salía mal, ya estaba emitido. Aquí se ve de antemano:
+ * recién puesto `SUNAT_MODO=produccion`, las dos series tienen que decir que
+ * el próximo es el 1.
+ */
+function paginaFacturacion({ estado = null, modoPasarela = null } = {}) {
+  const produccion = estado && estado.modo === 'produccion';
+  const cobroReal = modoPasarela === 'PRODUCTION';
+  const falta = (estado && estado.falta) || [];
+
+  const fila = (rotulo, valor, extra = '') =>
+    `<tr><th>${e(rotulo)}</th><td>${valor}${extra}</td></tr>`;
+
+  return pagina('Facturación', `
+<h1>Facturación electrónica</h1>
+<p class="guia">Cómo está configurado el servicio que emite las boletas y facturas ante SUNAT.</p>
+
+${!estado || estado.ok === false ? `<div class="aviso mal">
+  No se pudo consultar el servicio de facturación.
+  ${e((estado && estado.motivo) || 'No respondió.')}</div>` : `
+
+<div class="caja">
+  <h2 style="margin-top:0">Dónde se está emitiendo</h2>
+  ${produccion
+    ? `<div class="aviso ojo"><b>SUNAT de verdad.</b> Cada comprobante que salga de aquí es un hecho
+       tributario: para deshacerlo hace falta una nota de crédito.</div>`
+    : `<div class="aviso">Entorno de <b>pruebas</b> de SUNAT. Lo que se emite aquí <b>no existe</b> para
+       SUNAT: sirve para equivocarse sin consecuencias.</div>`}
+  <table>
+    ${fila('Modo', produccion
+      ? '<b>producción</b> <span class="et entregado">real</span>'
+      : '<b>beta</b> <span class="et prueba">pruebas</span>')}
+    ${fila('RUC emisor', e(estado.ruc || '—'))}
+    ${fila('Razón social', e(estado.razonSocial || '—'))}
+    ${fila('Servidor de SUNAT', `<span class="apagado">${e(estado.endpoint || '—')}</span>`)}
+    ${fila('Envío de boletas', e(estado.boletaEnvio || '—'),
+      estado.boletaEnvio === 'individual'
+        ? ' <span class="apagado">— cada una se informa en el acto</span>'
+        : ' <span class="apagado">— agrupadas en el resumen del día siguiente</span>')}
+  </table>
+</div>
+
+<div class="caja">
+  <h2 style="margin-top:0">Cómo se está cobrando</h2>
+  ${produccion && !cobroReal
+    ? `<div class="aviso ojo"><b>La tienda cobra con tarjetas de prueba y la facturación ya es real.</b>
+       Mientras siga así, <b>ninguna compra sacará comprobante</b>: el servicio se niega a emitir uno de
+       verdad por un cobro que no lo fue, y lo dirá en el pedido. Se arregla poniendo las claves de
+       producción de Izipay; los pedidos que queden sin comprobante se emiten después.</div>`
+    : !produccion && cobroReal
+      ? `<div class="aviso ojo"><b>La tienda cobra de verdad y la facturación está en pruebas.</b>
+         Las ventas reales que entren no tendrán comprobante válido ante SUNAT hasta que se pase la
+         facturación a producción.</div>`
+      : ''}
+  <table>
+    ${fila('Pasarela de pago (Izipay)', modoPasarela === 'PRODUCTION'
+      ? '<b>producción</b> <span class="et entregado">cobra de verdad</span>'
+      : modoPasarela === 'TEST'
+        ? '<b>pruebas</b> <span class="et prueba">no mueve dinero</span>'
+        : '<span class="apagado">no se pudo determinar</span>')}
+    ${fila('Facturación (SUNAT)', produccion
+      ? '<b>producción</b> <span class="et entregado">emite de verdad</span>'
+      : '<b>beta</b> <span class="et prueba">pruebas</span>')}
+  </table>
+  ${produccion && cobroReal
+    ? '<p class="apagado" style="margin-bottom:0">Los dos en producción: cada venta cobra dinero real y saca su comprobante ante SUNAT.</p>'
+    : ''}
+</div>
+
+<div class="caja">
+  <h2 style="margin-top:0">El certificado con el que se firma</h2>
+  ${!estado.certificado ? `<div class="aviso mal">No se pudo leer el certificado instalado.</div>` : `
+  ${estado.certificado.ruc && estado.ruc && estado.certificado.ruc !== estado.ruc
+    ? `<div class="aviso mal"><b>El certificado no es del RUC emisor.</b> Está a nombre del RUC
+       ${e(estado.certificado.ruc)} y se está emitiendo como ${e(estado.ruc)}. En pruebas da igual;
+       en producción SUNAT rechaza <b>todo</b> lo que se firme así.</div>`
+    : ''}
+  ${estado.certificado.diasParaCaducar !== null && estado.certificado.diasParaCaducar <= 0
+    ? `<div class="aviso mal"><b>El certificado caducó.</b> Sin uno vigente no se puede emitir nada.</div>`
+    : estado.certificado.diasParaCaducar !== null && estado.certificado.diasParaCaducar <= 45
+      ? `<div class="aviso ojo"><b>Caduca en ${e(estado.certificado.diasParaCaducar)} día(s).</b>
+         Renuévelo en SUNAT antes de esa fecha: el día que venza, deja de poder emitir.</div>`
+      : ''}
+  <table>
+    ${fila('A nombre de', e(estado.certificado.titular || '—'))}
+    ${fila('RUC del certificado', estado.certificado.ruc
+      ? (estado.certificado.ruc === estado.ruc
+        ? `<b>${e(estado.certificado.ruc)}</b> <span class="et entregado">coincide con el emisor</span>`
+        : `<b>${e(estado.certificado.ruc)}</b> <span class="et abandonado">no es el del emisor</span>`)
+      : '<span class="apagado">no consta en el certificado</span>')}
+    ${fila('Lo emitió', `<span class="apagado">${e(estado.certificado.emisor || '—')}</span>`)}
+    ${fila('Vale hasta', e(estado.certificado.caduca || '—'),
+      estado.certificado.diasParaCaducar !== null && estado.certificado.diasParaCaducar > 0
+        ? ` <span class="apagado">— quedan ${e(estado.certificado.diasParaCaducar)} día(s)</span>` : '')}
+  </table>`}
+</div>
+
+<div class="caja">
+  <h2 style="margin-top:0">Con qué número sale el próximo</h2>
+  <table>
+    ${fila('Serie de facturas', `<b>${e(estado.serieFactura)}-${e(estado.proximaFactura)}</b>`)}
+    ${fila('Serie de boletas', `<b>${e(estado.serieBoleta)}-${e(estado.proximaBoleta)}</b>`)}
+  </table>
+  ${produccion && (estado.proximaFactura === 1 || estado.proximaBoleta === 1)
+    ? `<p class="apagado" style="margin-bottom:0">Una serie que empieza en <b>1</b> es una serie que aún
+       no ha emitido nada real. Es lo que debe ver justo después de pasar a producción.</p>`
+    : `<p class="apagado" style="margin-bottom:0">La numeración es correlativa y no se reutiliza: un
+       intento fallido gasta su número igual, porque desde aquí no hay forma de saber si SUNAT llegó a
+       registrarlo. Lo emitido en pruebas <b>no</b> gasta números de la numeración real.</p>`}
+</div>
+
+${falta.length ? `<div class="caja">
+  <h2 style="margin-top:0">Lo que falta para poder emitir</h2>
+  <div class="aviso mal">Mientras falte algo de esto, el servicio contesta que no está configurado y
+    <b>no emite nada</b>.</div>
+  <ul>${falta.map((f) => `<li><code>${e(f)}</code></li>`).join('')}</ul>
+</div>` : `<div class="caja">
+  <h2 style="margin-top:0">Lo que falta para poder emitir</h2>
+  <p style="margin:0">Nada: el servicio tiene certificado, clave SOL y todo lo demás.</p>
+</div>`}
+`}
+`);
+}
+
 function paginaAyuda({ urlPublica = '' } = {}) {
   return pagina('Cómo se atiende', `
 <h1>Cómo se atiende una compra</h1>
@@ -569,4 +698,5 @@ module.exports = {
   paginaPedido,
   paginaReclamaciones,
   paginaAyuda,
+  paginaFacturacion,
 };

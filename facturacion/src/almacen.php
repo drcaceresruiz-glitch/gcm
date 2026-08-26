@@ -14,6 +14,13 @@
  * envío falla, ese número queda gastado y marcado como fallido: es preferible
  * un hueco explicable a dos comprobantes con el mismo número.
  *
+ * BETA Y PRODUCCIÓN SON DOS UNIVERSOS EN UN MISMO LIBRO. Lo emitido en el
+ * entorno de pruebas de SUNAT no existe para SUNAT, así que no puede gastar
+ * números de la numeración real: el día que se pasa a producción, la serie
+ * empieza en 1 aunque en beta se hubiera llegado a 50. Por eso todo lo que
+ * cuenta o busca comprobantes mira SOLO los del modo en que se está
+ * operando, con `fact_del_modo_actual()`.
+ *
  * XML Y CDR SE GUARDAN EN DISCO. El XML firmado es el comprobante; el CDR es
  * la constancia de que SUNAT lo recibió. Hay obligación de conservarlos, y sin
  * ellos no se puede demostrar nada.
@@ -68,17 +75,37 @@ function fact_anotar(array $fila): void
 }
 
 /**
- * El siguiente correlativo de una serie.
+ * ¿Esta línea del libro pertenece al modo en que estamos operando?
+ *
+ * Una línea SIN `modo` es de una versión anterior a que se anotara, y se da
+ * por buena en los dos modos A PROPÓSITO. El criterio es el prudente en cada
+ * dirección: para el correlativo, contarla evita reutilizar un número que
+ * quizá sí se usó; para «¿ya tiene comprobante?», tenerla en cuenta evita
+ * emitir dos veces por la misma venta. Equivocarse hacia el otro lado cuesta
+ * un comprobante duplicado, que solo se deshace con una nota de crédito.
+ */
+function fact_del_modo_actual(array $fila): bool
+{
+    $modo = (string)($fila['modo'] ?? '');
+    return $modo === '' || $modo === (fact_es_produccion() ? 'produccion' : 'beta');
+}
+
+/**
+ * El siguiente correlativo de una serie, DENTRO del modo actual.
  *
  * Cuenta TODAS las líneas de emisión de esa serie, fallidas incluidas: un
  * número que se mandó a SUNAT y fue rechazado no se reutiliza, porque no hay
  * forma de saber desde aquí si SUNAT llegó a registrarlo.
+ *
+ * Lo emitido en beta NO cuenta: si contara, la primera boleta real saldría con
+ * el número siguiente al de las pruebas —B001-3 en vez de B001-1— y la serie
+ * nacería con un hueco que SUNAT puede observar.
  */
 function fact_siguiente_correlativo(string $serie): int
 {
     $mayor = 0;
     foreach (fact_leer_libro() as $fila) {
-        if (($fila['tipo'] ?? '') !== 'emision') {
+        if (($fila['tipo'] ?? '') !== 'emision' || !fact_del_modo_actual($fila)) {
             continue;
         }
         if (($fila['serie'] ?? '') === $serie && (int)($fila['correlativo'] ?? 0) > $mayor) {
@@ -106,7 +133,8 @@ function fact_comprobante_de(string $pedido): ?array
     foreach (fact_leer_libro() as $fila) {
         if (($fila['tipo'] ?? '') === 'emision'
             && ($fila['pedido'] ?? '') === $pedido
-            && ($fila['estado'] ?? '') !== 'fallido') {
+            && ($fila['estado'] ?? '') !== 'fallido'
+            && fact_del_modo_actual($fila)) {
             return $fila;
         }
     }
@@ -120,6 +148,12 @@ function fact_estado(string $serie, int $correlativo): ?array
     $posteriores = [];
     foreach (fact_leer_libro() as $fila) {
         if (($fila['serie'] ?? '') !== $serie || (int)($fila['correlativo'] ?? -1) !== $correlativo) {
+            continue;
+        }
+        // El B001-2 de las pruebas y el B001-2 real son dos comprobantes
+        // distintos con el mismo número: mezclar sus historiales daría por
+        // aceptado uno que nunca se envió.
+        if (($fila['tipo'] ?? '') === 'emision' && !fact_del_modo_actual($fila)) {
             continue;
         }
         if (($fila['tipo'] ?? '') === 'emision') {
@@ -150,7 +184,8 @@ function fact_boletas_sin_resumir(string $fecha): array
         if (($fila['tipo'] ?? '') === 'emision'
             && ($fila['documento'] ?? '') === 'boleta'
             && ($fila['fechaEmision'] ?? '') === $fecha
-            && ($fila['estado'] ?? '') !== 'fallido') {
+            && ($fila['estado'] ?? '') !== 'fallido'
+            && fact_del_modo_actual($fila)) {
             $emisiones[$clave] = $fila;
         }
         if (($fila['tipo'] ?? '') === 'resumen_enviado') {

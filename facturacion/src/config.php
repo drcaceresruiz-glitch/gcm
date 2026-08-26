@@ -50,8 +50,21 @@ function fact_env(): array
     return $valores;
 }
 
+/**
+ * Un valor de configuración.
+ *
+ * Una variable de entorno `FACT_<CLAVE>` pisa al `.env`. Va con prefijo a
+ * propósito: `RUC` o `SOL_CLAVE` a secas son nombres demasiado comunes para
+ * confiar en que nadie más los defina en un servidor compartido. Sirve para
+ * apuntar el servicio a otro sitio sin editar el archivo —y es lo que usan las
+ * pruebas para recorrer los dos modos sin tocar la configuración real—.
+ */
 function fact_cfg(string $clave, string $porDefecto = ''): string
 {
+    $delEntorno = getenv('FACT_' . $clave);
+    if (is_string($delEntorno) && $delEntorno !== '') {
+        return $delEntorno;
+    }
     $env = fact_env();
     return isset($env[$clave]) && $env[$clave] !== '' ? $env[$clave] : $porDefecto;
 }
@@ -79,12 +92,79 @@ function fact_endpoint(): string
 function fact_ruta_certificado(): string
 {
     $nombre = fact_cfg('CERT_ARCHIVO', 'certificado.pem');
-    return FACT_BASE . '/certificados/' . basename($nombre);
+    return fact_cfg('CERT_DIR', FACT_BASE . '/certificados') . '/' . basename($nombre);
 }
 
 function fact_datos_dir(): string
 {
-    return FACT_BASE . '/datos';
+    return fact_cfg('DATOS_DIR', FACT_BASE . '/datos');
+}
+
+/**
+ * A nombre de quién está el certificado instalado, y hasta cuándo vale.
+ *
+ * DOS PREGUNTAS QUE SOLO SE RESPONDEN MIRANDO EL ARCHIVO. La primera es de
+ * quién es: en el entorno de pruebas de SUNAT se puede emitir con el RUC de
+ * juguete 20000000001 firmando con cualquier certificado, y beta lo acepta;
+ * en producción, el RUC del certificado tiene que ser el del emisor o SUNAT
+ * rechaza todo. Enterarse ahí es enterarse tarde. La segunda es hasta cuándo:
+ * el certificado tributario de SUNAT dura tres años y el día que caduca deja
+ * de poder emitirse, sin más aviso que el rechazo.
+ *
+ * SOLO SE LEE LA PARTE PÚBLICA. El archivo lleva también la clave privada
+ * —la firma tributaria del emisor— y de ahí no sale nada: se recorta el
+ * bloque del certificado y se descarta el resto antes de mirarlo.
+ */
+function fact_datos_certificado(): ?array
+{
+    $ruta = fact_ruta_certificado();
+    if (!is_readable($ruta) || !function_exists('openssl_x509_parse')) {
+        return null;
+    }
+    $pem = (string)file_get_contents($ruta);
+    if (!preg_match('/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/s', $pem, $m)) {
+        return null;
+    }
+    $datos = openssl_x509_parse($m[0]);
+    if (!is_array($datos)) {
+        return null;
+    }
+
+    $sujeto = $datos['subject'] ?? [];
+
+    // DÓNDE ESTÁ EL RUC. No hay un solo sitio: unos certificados lo ponen en
+    // `serialNumber`, y los tributarios que emite RENIEC lo llevan DENTRO del
+    // nombre común —«||USO TRIBUTARIO|| APELLIDOS NOMBRES CDT 15606050906»—.
+    // La primera versión solo miraba `serialNumber` y con un certificado de
+    // esos contestaba «no consta», que es peor que no preguntar: la
+    // comprobación de si el certificado es del RUC emisor quedaba muda justo
+    // cuando hacía falta. Se recorren todos los campos del sujeto.
+    //
+    // Un RUC peruano son once dígitos que empiezan por 10, 15, 16, 17 o 20;
+    // exigirlo evita confundirlo con cualquier otro número largo del nombre.
+    $ruc = '';
+    $orden = ['serialNumber', 'SN', 'CN', 'OU', 'O'];
+    $campos = $orden + array_keys($sujeto);
+    foreach ($campos as $campo) {
+        $valor = $sujeto[$campo] ?? '';
+        if (!is_string($valor)) {
+            continue;
+        }
+        if (preg_match('/(?<!\d)((?:10|15|16|17|20)\d{9})(?!\d)/', $valor, $c)) {
+            $ruc = $c[1];
+            break;
+        }
+    }
+
+    $caduca = isset($datos['validTo_time_t']) ? (int)$datos['validTo_time_t'] : 0;
+
+    return [
+        'titular' => (string)($sujeto['CN'] ?? $sujeto['O'] ?? ''),
+        'ruc' => $ruc,
+        'emisor' => (string)(($datos['issuer'] ?? [])['CN'] ?? ''),
+        'caduca' => $caduca ? date('Y-m-d', $caduca) : '',
+        'diasParaCaducar' => $caduca ? (int)floor(($caduca - time()) / 86400) : null,
+    ];
 }
 
 /**
