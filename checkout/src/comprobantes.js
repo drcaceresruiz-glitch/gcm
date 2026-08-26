@@ -127,6 +127,10 @@ async function emitir(pedido) {
       correo: pedido.correo || '',
       productoId: pedido.productoId || '',
       productoNombre: pedido.productoNombre || '',
+      // El detalle, para que el comprobante lleve una línea por producto. El
+      // servicio sabe apañárselas sin esto —los pedidos anteriores al carrito
+      // no lo tienen— pero entonces sale una sola línea con el resumen.
+      lineas: Array.isArray(pedido.lineas) ? pedido.lineas : undefined,
     });
   } catch (err) {
     const fallo = {

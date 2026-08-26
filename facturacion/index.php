@@ -91,6 +91,25 @@ if ($accion === 'emitir') {
     if (($pedido['pedido'] ?? '') === '' || (int)($pedido['importeCentimos'] ?? 0) <= 0) {
         fact_responder(400, ['ok' => false, 'error' => 'Faltan el pedido o el importe.']);
     }
+    // Las líneas llegan como vienen y se limpian aquí: es la frontera del
+    // servicio, y lo que entra por HTTP no se mete en un comprobante sin mirar.
+    if (isset($pedido['lineas']) && is_array($pedido['lineas'])) {
+        $limpias = [];
+        foreach (array_slice($pedido['lineas'], 0, 50) as $l) {
+            if (!is_array($l)) {
+                continue;
+            }
+            $limpias[] = [
+                'productoId' => mb_substr((string)($l['productoId'] ?? ''), 0, 30),
+                'nombre' => mb_substr((string)($l['nombre'] ?? ''), 0, 250),
+                'cantidad' => max(1, min(9999, (int)($l['cantidad'] ?? 1))),
+                'precioUnitarioCentimos' => max(0, (int)($l['precioUnitarioCentimos'] ?? 0)),
+                'importeCentimos' => max(0, (int)($l['importeCentimos'] ?? 0)),
+            ];
+        }
+        $pedido['lineas'] = $limpias;
+    }
+
     $r = fact_emitir($pedido);
     fact_responder($r['ok'] ? 200 : 502, $r);
 }
