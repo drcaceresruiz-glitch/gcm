@@ -50,8 +50,21 @@ function fact_env(): array
     return $valores;
 }
 
+/**
+ * Un valor de configuración.
+ *
+ * Una variable de entorno `FACT_<CLAVE>` pisa al `.env`. Va con prefijo a
+ * propósito: `RUC` o `SOL_CLAVE` a secas son nombres demasiado comunes para
+ * confiar en que nadie más los defina en un servidor compartido. Sirve para
+ * apuntar el servicio a otro sitio sin editar el archivo —y es lo que usan las
+ * pruebas para recorrer los dos modos sin tocar la configuración real—.
+ */
 function fact_cfg(string $clave, string $porDefecto = ''): string
 {
+    $delEntorno = getenv('FACT_' . $clave);
+    if (is_string($delEntorno) && $delEntorno !== '') {
+        return $delEntorno;
+    }
     $env = fact_env();
     return isset($env[$clave]) && $env[$clave] !== '' ? $env[$clave] : $porDefecto;
 }
@@ -84,7 +97,7 @@ function fact_ruta_certificado(): string
 
 function fact_datos_dir(): string
 {
-    return FACT_BASE . '/datos';
+    return fact_cfg('DATOS_DIR', FACT_BASE . '/datos');
 }
 
 /**

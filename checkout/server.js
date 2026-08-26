@@ -857,6 +857,13 @@ app.get('/admin/ayuda', (_req, res) => {
   res.type('html').send(panel.paginaAyuda({ urlPublica: URL_PUBLICA }));
 });
 
+// El estado del servicio de facturación, para poder comprobar un paso a
+// producción ANTES de que salga el primer comprobante real.
+app.get('/admin/facturacion', async (_req, res) => {
+  const estado = await comprobantes.estadoServicio();
+  res.type('html').send(panel.paginaFacturacion({ estado }));
+});
+
 app.get('/admin/reclamaciones', (_req, res) => {
   res.type('html').send(panel.paginaReclamaciones(leerLineas(LIBRO_RECLAMACIONES)));
 });

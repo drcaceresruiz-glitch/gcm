@@ -71,13 +71,23 @@ if (!fact_autorizado()) {
 
 if ($accion === 'estado') {
     $falta = fact_que_falta();
+    $serieFactura = fact_cfg('SERIE_FACTURA', 'F001');
+    $serieBoleta = fact_cfg('SERIE_BOLETA', 'B001');
     fact_responder(200, [
         'ok' => true,
         'configurado' => fact_configurado() && !$falta,
         'modo' => fact_es_produccion() ? 'produccion' : 'beta',
         'endpoint' => fact_endpoint(),
-        'serieFactura' => fact_cfg('SERIE_FACTURA', 'F001'),
-        'serieBoleta' => fact_cfg('SERIE_BOLETA', 'B001'),
+        'ruc' => fact_cfg('RUC'),
+        'razonSocial' => fact_cfg('RAZON_SOCIAL'),
+        'serieFactura' => $serieFactura,
+        'serieBoleta' => $serieBoleta,
+        // Con qué número saldría el PRÓXIMO comprobante de cada serie. Es la
+        // única forma de comprobar un paso a producción sin vender de verdad:
+        // recién cambiado el modo, las dos tienen que decir 1.
+        'proximaFactura' => fact_siguiente_correlativo($serieFactura),
+        'proximaBoleta' => fact_siguiente_correlativo($serieBoleta),
+        'boletaEnvio' => fact_cfg('BOLETA_ENVIO', 'individual'),
         'falta' => $falta,
     ]);
 }
