@@ -339,6 +339,29 @@ app.post('/api/validate-payment', (req, res) => {
   }
 
   const estado = datos.orderStatus;   // PAID | UNPAID | RUNNING …
+
+  // SE ANOTA TAMBIÉN AQUÍ, aunque el que manda siga siendo el IPN.
+  //
+  // El formulario embebido nunca pasa por `/retorno`: `KR.onSubmit` devuelve
+  // false y la página no se recarga. Así que, sin regla de notificación
+  // configurada, un pago bueno no dejaba NINGÚN rastro en el servidor — el
+  // comprador veía «Pago confirmado», Izipay mandaba su correo, y aquí no
+  // había línea que enseñar. Pasó en la primera prueba real.
+  //
+  // Esto no convierte al navegador en la fuente de verdad: la firma ya está
+  // comprobada arriba, `registrarPago` es idempotente por referencia de
+  // transacción, y el IPN —que llega aunque el comprador cierre la pestaña—
+  // seguirá anotando lo que falte sin duplicar lo ya anotado.
+  if (estado === 'PAID') {
+    try {
+      registrarPago(resumirPago(respuesta), 'navegador');
+    } catch (e) {
+      // Que no se pueda anotar no puede tumbar la confirmación en pantalla:
+      // el cobro ya está hecho y el IPN lo recuperará.
+      console.error('[izipay] pago confirmado pero no anotado:', e);
+    }
+  }
+
   return res.json({
     pagado: estado === 'PAID',
     estado,
