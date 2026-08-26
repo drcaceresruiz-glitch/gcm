@@ -1,7 +1,8 @@
 /**
- * server.js — Servidor del checkout de GCM.
+ * server.js — Servidor de la tienda de drcaceresruiz.com.
  *
- * QUÉ HACE. Sirve la página del checkout y habla con Izipay:
+ * QUÉ HACE. Sirve la tienda en dos páginas —el catálogo (/) y el pago
+ * (/pagar)— y habla con Izipay:
  *
  *   GET  /api/catalogo         qué se vende y a qué precio (lo dice el servidor)
  *   POST /api/create-payment   pide a Izipay el formToken del pago
@@ -42,6 +43,7 @@ const {
 } = require('./src/catalogo');
 const catalogoEdicion = require('./src/catalogo_edicion');
 const { revisarCarrito, lineasPublicas } = require('./src/carrito');
+const { revisarDocumento } = require('./src/documentos');
 const { revisarHoja, registrarHoja } = require('./src/reclamaciones');
 const { verificarFirma, resumirPago, registrarPago, LIBRO_PAGOS } = require('./src/pagos');
 const { paginaRetorno } = require('./src/pagina_retorno');
@@ -67,19 +69,25 @@ app.use(express.json({ limit: '32kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 /**
- * La RAÍZ enseña la tienda.
+ * La RAÍZ enseña el catálogo y /pagar cobra.
  *
- * Sin esto, entrar a https://pagos.drcaceresruiz.com devolvía el «Cannot GET /»
- * de Express: la página existía, pero solo en /checkout.html. Eso no es un
- * detalle estético — es lo que ve Izipay cuando comprueba la URL declarada de la
- * tienda, y lo que le hace responder «dominio desconocido o inaccesible».
- * También es lo que vería cualquiera que teclee la dirección sin la página.
+ * Son dos páginas a propósito: quien entra a mirar precios no tiene por qué
+ * convivir con el formulario de facturación, y el día que haya muchos
+ * productos el catálogo necesita su propio aire (categorías, paginación).
  *
- * Se sirve el archivo, no un redirect: un comprobador automático que sigue la
- * dirección tiene que encontrar la tienda ahí mismo, con un 200, sin saltos.
+ * La raíz se sirve como archivo, no como redirect: es la URL declarada de la
+ * tienda en Izipay, y su comprobador tiene que encontrarla ahí mismo, con un
+ * 200, sin saltos. /checkout.html era la dirección antigua de todo junto;
+ * se redirige para que un marcador viejo no acabe en un 404.
  */
 app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'checkout.html'));
+  res.sendFile(path.join(__dirname, 'public', 'tienda.html'));
+});
+app.get('/pagar', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'pagar.html'));
+});
+app.get('/checkout.html', (_req, res) => {
+  res.redirect(301, '/');
 });
 
 // ---------------------------------------------------------------------------
@@ -161,20 +169,26 @@ function revisarComprador(cuerpo) {
   else if (!RE_CORREO.test(correo)) errores.correo = 'Ese correo no parece válido.';
 
   const nombres = limpiar(cuerpo.nombres, 120);
-  const documento = limpiar(cuerpo.documento, 20);
   const telefono = limpiar(cuerpo.telefono, 25);
 
-  // DNI son 8 dígitos y RUC son 11. Si escribieron algo, tiene que ser una de
-  // las dos cosas; si no escribieron nada, se deja pasar.
-  if (documento && !/^\d{8}$|^\d{11}$/.test(documento)) {
-    errores.documento = 'El DNI tiene 8 dígitos y el RUC, 11.';
-  }
+  // El documento se valida según su tipo (DNI, carné de extranjería,
+  // pasaporte o RUC); sin nada escrito, se deja pasar. Las reglas viven en
+  // src/documentos.js, que es también quien mantiene la compatibilidad con
+  // las llamadas que traen solo el número, como antes del selector.
+  const doc = revisarDocumento(limpiar(cuerpo.tipoDocumento, 12), limpiar(cuerpo.documento, 20));
+  if (doc.error) errores.documento = doc.error;
   if (telefono && !/^[\d\s+()-]{6,25}$/.test(telefono)) {
     errores.telefono = 'Ese teléfono no parece válido.';
   }
 
   if (Object.keys(errores).length) return { errores };
-  return { datos: { correo, nombres, documento, telefono } };
+  return {
+    datos: {
+      correo, nombres, telefono,
+      tipoDocumento: doc.tipoDocumento || '',
+      documento: doc.documento || '',
+    },
+  };
 }
 
 /**
@@ -198,7 +212,7 @@ function referenciaPedido() {
     String(f.getMonth() + 1).padStart(2, '0'),
     String(f.getDate()).padStart(2, '0'),
   ].join('');
-  return `GCM-${ymd}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+  return `DCR-${ymd}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +331,7 @@ app.post('/api/create-payment', async (req, res) => {
   if (revision.errores) {
     return res.status(400).json({ error: 'Revise los datos del formulario.', campos: revision.errores });
   }
-  const { correo, nombres, documento, telefono } = revision.datos;
+  const { correo, nombres, tipoDocumento, documento, telefono } = revision.datos;
   const { nombre, apellido } = partirNombre(nombres);
 
   const pedido = referenciaPedido();
@@ -337,7 +351,7 @@ app.post('/api/create-payment', async (req, res) => {
       lineas: carrito.lineas,
       totalCentimos: carrito.totalCentimos,
       moneda: carrito.moneda,
-      comprador: { correo, nombres, documento, telefono },
+      comprador: { correo, nombres, tipoDocumento, documento, telefono },
       modo: MODO,
     });
   } catch (err) {
@@ -566,7 +580,7 @@ app.post('/api/ipn', express.urlencoded({ extended: false, limit: '64kb' }), (re
   const cuerpo = req.body ?? {};
   const traeAlgo = Object.keys(cuerpo).some((k) => k.startsWith('kr-'));
   if (!traeAlgo) {
-    return res.status(200).type('text/plain').send('IPN de GCM operativo.');
+    return res.status(200).type('text/plain').send('IPN de la tienda operativo.');
   }
 
   const firma = verificarFirma(cuerpo, CLAVES_VERIFICACION);
@@ -612,7 +626,7 @@ app.post('/api/ipn', express.urlencoded({ extended: false, limit: '64kb' }), (re
  * nada de la tienda.
  */
 app.get('/api/ipn', (_req, res) => {
-  res.status(200).type('text/plain').send('IPN de GCM operativo. Las notificaciones se reciben por POST.');
+  res.status(200).type('text/plain').send('IPN de la tienda operativo. Las notificaciones se reciben por POST.');
 });
 
 /**
@@ -932,7 +946,7 @@ app.post('/admin/pedido/:pedido/nota', formularioAdmin,
 // ---------------------------------------------------------------------------
 
 app.listen(PUERTO, () => {
-  console.log(`Checkout de GCM escuchando en http://localhost:${PUERTO}/checkout.html`);
+  console.log(`Tienda de drcaceresruiz.com escuchando en http://localhost:${PUERTO}/`);
   const base = URL_PUBLICA || `http://localhost:${PUERTO}`;
   console.log('');
   console.log('  Para pegar en el Back Office de Izipay:');

@@ -91,6 +91,12 @@ if ($accion === 'emitir') {
     if (($pedido['pedido'] ?? '') === '' || (int)($pedido['importeCentimos'] ?? 0) <= 0) {
         fact_responder(400, ['ok' => false, 'error' => 'Faltan el pedido o el importe.']);
     }
+    // El tipo de documento del comprador llega del checkout y aquí solo se
+    // acepta del catálogo conocido: cualquier otra cosa se descarta y el
+    // emisor volverá a inferir por el largo del número, como siempre hizo.
+    $tipoDoc = strtolower(trim((string)($pedido['tipoDocumento'] ?? '')));
+    $pedido['tipoDocumento'] = in_array($tipoDoc, ['dni', 'ce', 'pasaporte', 'ruc'], true) ? $tipoDoc : '';
+
     // Las líneas llegan como vienen y se limpian aquí: es la frontera del
     // servicio, y lo que entra por HTTP no se mete en un comprobante sin mirar.
     if (isset($pedido['lineas']) && is_array($pedido['lineas'])) {

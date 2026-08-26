@@ -122,6 +122,7 @@ async function emitir(pedido) {
       pedido: pedido.pedido,
       importeCentimos: pedido.importeCentimos,
       moneda: pedido.moneda || 'PEN',
+      tipoDocumento: pedido.tipoDocumento || '',
       documento: pedido.documento || '',
       nombres: pedido.nombres || '',
       correo: pedido.correo || '',
