@@ -101,6 +101,60 @@ function fact_datos_dir(): string
 }
 
 /**
+ * A nombre de quién está el certificado instalado, y hasta cuándo vale.
+ *
+ * DOS PREGUNTAS QUE SOLO SE RESPONDEN MIRANDO EL ARCHIVO. La primera es de
+ * quién es: en el entorno de pruebas de SUNAT se puede emitir con el RUC de
+ * juguete 20000000001 firmando con cualquier certificado, y beta lo acepta;
+ * en producción, el RUC del certificado tiene que ser el del emisor o SUNAT
+ * rechaza todo. Enterarse ahí es enterarse tarde. La segunda es hasta cuándo:
+ * el certificado tributario de SUNAT dura tres años y el día que caduca deja
+ * de poder emitirse, sin más aviso que el rechazo.
+ *
+ * SOLO SE LEE LA PARTE PÚBLICA. El archivo lleva también la clave privada
+ * —la firma tributaria del emisor— y de ahí no sale nada: se recorta el
+ * bloque del certificado y se descarta el resto antes de mirarlo.
+ */
+function fact_datos_certificado(): ?array
+{
+    $ruta = fact_ruta_certificado();
+    if (!is_readable($ruta) || !function_exists('openssl_x509_parse')) {
+        return null;
+    }
+    $pem = (string)file_get_contents($ruta);
+    if (!preg_match('/-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----/s', $pem, $m)) {
+        return null;
+    }
+    $datos = openssl_x509_parse($m[0]);
+    if (!is_array($datos)) {
+        return null;
+    }
+
+    $sujeto = $datos['subject'] ?? [];
+    // El RUC va en `serialNumber` en los certificados tributarios de SUNAT.
+    // Se admite que no esté: hay emisores cuyo certificado lo lleva solo en el
+    // nombre común, y entonces se enseña ese y que lo juzgue quien mira.
+    $ruc = '';
+    foreach (['serialNumber', 'SN', 'OU'] as $campo) {
+        $valor = (string)($sujeto[$campo] ?? '');
+        if (preg_match('/\b(\d{11})\b/', $valor, $c)) {
+            $ruc = $c[1];
+            break;
+        }
+    }
+
+    $caduca = isset($datos['validTo_time_t']) ? (int)$datos['validTo_time_t'] : 0;
+
+    return [
+        'titular' => (string)($sujeto['CN'] ?? $sujeto['O'] ?? ''),
+        'ruc' => $ruc,
+        'emisor' => (string)(($datos['issuer'] ?? [])['CN'] ?? ''),
+        'caduca' => $caduca ? date('Y-m-d', $caduca) : '',
+        'diasParaCaducar' => $caduca ? (int)floor(($caduca - time()) / 86400) : null,
+    ];
+}
+
+/**
  * ¿Hay con qué emitir?
  *
  * Se apoya en `fact_que_falta()` en vez de repetir la lista: durante las

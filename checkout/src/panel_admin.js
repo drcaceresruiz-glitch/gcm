@@ -536,6 +536,34 @@ ${!estado || estado.ok === false ? `<div class="aviso mal">
 </div>
 
 <div class="caja">
+  <h2 style="margin-top:0">El certificado con el que se firma</h2>
+  ${!estado.certificado ? `<div class="aviso mal">No se pudo leer el certificado instalado.</div>` : `
+  ${estado.certificado.ruc && estado.ruc && estado.certificado.ruc !== estado.ruc
+    ? `<div class="aviso mal"><b>El certificado no es del RUC emisor.</b> Está a nombre del RUC
+       ${e(estado.certificado.ruc)} y se está emitiendo como ${e(estado.ruc)}. En pruebas da igual;
+       en producción SUNAT rechaza <b>todo</b> lo que se firme así.</div>`
+    : ''}
+  ${estado.certificado.diasParaCaducar !== null && estado.certificado.diasParaCaducar <= 0
+    ? `<div class="aviso mal"><b>El certificado caducó.</b> Sin uno vigente no se puede emitir nada.</div>`
+    : estado.certificado.diasParaCaducar !== null && estado.certificado.diasParaCaducar <= 45
+      ? `<div class="aviso ojo"><b>Caduca en ${e(estado.certificado.diasParaCaducar)} día(s).</b>
+         Renuévelo en SUNAT antes de esa fecha: el día que venza, deja de poder emitir.</div>`
+      : ''}
+  <table>
+    ${fila('A nombre de', e(estado.certificado.titular || '—'))}
+    ${fila('RUC del certificado', estado.certificado.ruc
+      ? (estado.certificado.ruc === estado.ruc
+        ? `<b>${e(estado.certificado.ruc)}</b> <span class="et entregado">coincide con el emisor</span>`
+        : `<b>${e(estado.certificado.ruc)}</b> <span class="et abandonado">no es el del emisor</span>`)
+      : '<span class="apagado">no consta en el certificado</span>')}
+    ${fila('Lo emitió', `<span class="apagado">${e(estado.certificado.emisor || '—')}</span>`)}
+    ${fila('Vale hasta', e(estado.certificado.caduca || '—'),
+      estado.certificado.diasParaCaducar !== null && estado.certificado.diasParaCaducar > 0
+        ? ` <span class="apagado">— quedan ${e(estado.certificado.diasParaCaducar)} día(s)</span>` : '')}
+  </table>`}
+</div>
+
+<div class="caja">
   <h2 style="margin-top:0">Con qué número sale el próximo</h2>
   <table>
     ${fila('Serie de facturas', `<b>${e(estado.serieFactura)}-${e(estado.proximaFactura)}</b>`)}

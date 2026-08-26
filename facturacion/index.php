@@ -88,6 +88,9 @@ if ($accion === 'estado') {
         'proximaFactura' => fact_siguiente_correlativo($serieFactura),
         'proximaBoleta' => fact_siguiente_correlativo($serieBoleta),
         'boletaEnvio' => fact_cfg('BOLETA_ENVIO', 'individual'),
+        // De quién es el certificado y hasta cuándo vale. En producción, su RUC
+        // tiene que ser el mismo que el del emisor.
+        'certificado' => fact_datos_certificado(),
         'falta' => $falta,
     ]);
 }
