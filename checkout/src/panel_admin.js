@@ -270,7 +270,25 @@ guardar los pedidos al iniciarse, así que faltan los datos que escribió el com
     <span class="apagado">Púlselo cuando le haya mandado la licencia o el instalador.</span>
   </form>
   ${comprobante && comprobante.ok
-    ? `<p class="apagado">El comprobante ya está emitido. No hay que hacer nada más con él.</p>`
+    ? (() => {
+        // YA EMITIDO NO ES YA ENTREGADO. Antes aquí solo ponía «no hay que
+        // hacer nada más con él», y el botón de emitir desaparecía: si el
+        // correo del comprobante no había salido —porque la boleta se emitió
+        // más tarde que el aviso de compra— no quedaba NINGUNA forma de
+        // mandárselo al comprador desde el panel. Entregarlo es obligación de
+        // quien vende, así que tiene su propio botón, y se puede repetir: un
+        // comprador que borró el correo lo pide, y hay que poder reenviárselo.
+        const enviado = p.eventos.find((ev) => ev.tipo === 'correo_comprobante');
+        return `<form class="linea" method="post"
+              action="/admin/pedido/${encodeURIComponent(p.pedido)}/enviar-comprobante">
+          <button${enviado ? ' class="suave"' : ''}>${
+            enviado ? 'Reenviar el comprobante' : 'Enviar el comprobante al comprador'}</button>
+          <span class="apagado">${enviado
+            ? `Ya se le envió a ${e(p.correo || 'su correo')}. Púlselo otra vez si lo ha perdido.`
+            : `<b>Todavía no se le ha enviado.</b> Irá a ${e(p.correo || 'su correo')} con el XML adjunto.`}
+          </span>
+        </form>`;
+      })()
     : facturadorListo
       ? `<form class="linea" method="post" action="/admin/pedido/${encodeURIComponent(p.pedido)}/facturar">
            <button${p.pagado ? '' : ' class="suave" disabled'}>Emitir ${
@@ -561,6 +579,34 @@ ${!estado || estado.ok === false ? `<div class="aviso mal">
   ${produccion && cobroReal
     ? '<p class="apagado" style="margin-bottom:0">Los dos en producción: cada venta cobra dinero real y saca su comprobante ante SUNAT.</p>'
     : ''}
+</div>
+
+<div class="caja">
+  <h2 style="margin-top:0">Con qué usuario se entra a SUNAT</h2>
+  ${!estado.usuarioSunat ? '<p class="apagado" style="margin:0">El servicio no informa de esto todavía.</p>' : `
+  ${(estado.usuarioSunat.reparos || []).length
+    ? `<div class="aviso mal"><b>Revise el usuario de SUNAT.</b><ul style="margin:8px 0 0">${
+        estado.usuarioSunat.reparos.map((r) => `<li>${e(r)}</li>`).join('')}</ul></div>`
+    : ''}
+  <table>
+    ${fila('Usuario secundario', `<b>${e(estado.usuarioSunat.usuario || '—')}</b>`)}
+    ${fila('Lo que recibe SUNAT', estado.usuarioSunat.envia
+      ? `<b>${e(estado.usuarioSunat.envia)}</b>`
+      : '<span class="apagado">—</span>',
+      '<span class="apagado" style="display:block;margin-top:4px">SUNAT no recibe el usuario a secas: '
+      + 'lleva el RUC pegado delante. Esa unión la hace el sistema, así que en la configuración el '
+      + 'usuario va solo. Compare este texto con el usuario de su portal de SUNAT.</span>')}
+    ${estado.claveSol ? fila('Clave', estado.claveSol.largo
+      ? `<b>${'•'.repeat(Math.min(20, estado.claveSol.largo))}</b> <span class="apagado">${
+          e(estado.claveSol.largo)} caracteres</span>`
+      : '<span class="apagado">no hay ninguna</span>',
+      '<span class="apagado" style="display:block;margin-top:4px">La clave no se enseña nunca. '
+      + 'Lo único que se ve es cuánto mide, para compararlo con la que usted cree haber escrito.</span>')
+      : ''}
+  </table>
+  ${estado.claveSol && (estado.claveSol.reparos || []).length
+    ? `<div class="aviso mal" style="margin-top:12px"><b>Revise la clave.</b><ul style="margin:8px 0 0">${
+        estado.claveSol.reparos.map((r) => `<li>${e(r)}</li>`).join('')}</ul></div>` : ''}`}
 </div>
 
 <div class="caja">

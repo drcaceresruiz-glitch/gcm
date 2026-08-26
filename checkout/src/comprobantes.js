@@ -194,6 +194,30 @@ async function descargarXml(idPedido) {
   }
 }
 
+/**
+ * La representación impresa, en bytes.
+ *
+ * El XML es el comprobante; esto es el papel que se le entrega al comprador,
+ * porque un XML no lo abre nadie. Viaja en base64 —la interfaz habla JSON— y
+ * se devuelve ya decodificado, listo para adjuntar.
+ *
+ * FALLA EN BLANDO, como el XML: si no se puede componer, el correo sale igual
+ * con lo que haya. Quedarse sin avisar de una compra porque no salió un PDF
+ * sería mucho peor que un correo sin PDF.
+ */
+async function descargarPdf(idPedido) {
+  if (!configurado()) return null;
+  try {
+    const r = await llamar('pdf', { pedido: idPedido });
+    const d = r.datos || {};
+    if (!d.ok || typeof d.pdfBase64 !== 'string') return null;
+    return Buffer.from(d.pdfBase64, 'base64');
+  } catch (e) {
+    console.warn('[comprobante] no se pudo traer el PDF de', idPedido, e.message);
+    return null;
+  }
+}
+
 /** Cómo se llama un comprobante para enseñarlo: «BOLETA B001-7». */
 function nombrar(asiento) {
   if (!asiento || !asiento.ok) return null;
@@ -201,5 +225,5 @@ function nombrar(asiento) {
 }
 
 module.exports = {
-  emitir, configurado, comprobanteDe, nombrar, leerLibro, estadoServicio, descargarXml, LIBRO,
+  emitir, configurado, comprobanteDe, nombrar, leerLibro, estadoServicio, descargarXml, descargarPdf, LIBRO,
 };

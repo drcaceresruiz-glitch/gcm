@@ -168,6 +168,108 @@ function fact_datos_certificado(): ?array
 }
 
 /**
+ * El usuario que se le manda a SUNAT, y qué tiene de raro.
+ *
+ * SUNAT NO RECIBE EL USUARIO SECUNDARIO A SECAS: recibe el RUC pegado delante
+ * -«15606050906DRCACERE»-. Esa union la hace la libreria, asi que en la
+ * configuracion van por separado... y ahi esta la trampa: quien escribe el
+ * usuario ya concatenado acaba mandando el RUC dos veces
+ * («1560605090615606050906DRCACERE») y SUNAT contesta lo mismo que si no
+ * tuviera permisos. Nada en pantalla decia cual de las dos cosas pasaba.
+ *
+ * SUNAT ademas pide el usuario en MAYUSCULAS y de 8 caracteres o mas. Un
+ * usuario en minusculas o corto se rechaza igual, y tampoco se veia.
+ *
+ * Devuelve lo que se envia y una lista de reparos. No decide nada: solo lo
+ * enseña, para poder compararlo con lo que dice el portal de SUNAT.
+ */
+function fact_usuario_sunat(): array
+{
+    $ruc = fact_cfg('RUC');
+    $usuario = fact_cfg('SOL_USUARIO');
+    $reparos = [];
+
+    if ($usuario === '') {
+        return ['envia' => '', 'usuario' => '', 'reparos' => ['Falta SOL_USUARIO en el .env.']];
+    }
+
+    if ($ruc !== '' && str_starts_with($usuario, $ruc)) {
+        $reparos[] = 'SOL_USUARIO empieza por su RUC. El RUC se añade solo: quitelo y deje'
+            . ' unicamente el usuario secundario, o se enviara dos veces.';
+    }
+    if (mb_strlen($usuario) < 8) {
+        $reparos[] = 'El usuario secundario de SUNAT tiene 8 caracteres o mas, y este tiene '
+            . mb_strlen($usuario) . '.';
+    }
+    if ($usuario !== mb_strtoupper($usuario)) {
+        $reparos[] = 'SUNAT exige el usuario en MAYUSCULAS.';
+    }
+    if (trim($usuario) !== $usuario) {
+        $reparos[] = 'SOL_USUARIO tiene espacios al principio o al final.';
+    }
+
+    return ['envia' => $ruc . $usuario, 'usuario' => $usuario, 'reparos' => $reparos];
+}
+
+/**
+ * La huella de la clave SOL: cuanto mide y que tiene de raro. NUNCA la clave.
+ *
+ * LA CLAVE ES LO UNICO QUE NO SE PUEDE MIRAR, y por eso su fallo -«0102:
+ * usuario o contraseña incorrectos»- se diagnostica a ciegas: se vuelve a
+ * escribir, se prueba, y si sigue mal no se sabe si esta mal copiada, si el
+ * archivo se la comio o si de verdad es otra. Esto no la enseña; enseña lo
+ * justo para comparar con lo que uno cree haber escrito.
+ *
+ * Los dos reparos son los dos unicos casos en que el lector de `.env` ALTERA
+ * lo escrito: unas comillas alrededor se quitan, y un espacio al final se
+ * recorta. Todo lo demas -almohadillas, iguales, dolares, acentos, espacios
+ * por el medio- sobrevive intacto; esta comprobado.
+ */
+function fact_huella_clave(): array
+{
+    $env = fact_env();
+    $crudo = $env['SOL_CLAVE'] ?? null;      // tal cual lo devuelve el lector
+    $clave = fact_cfg('SOL_CLAVE');
+    $reparos = [];
+
+    if ($clave === '') {
+        return ['largo' => 0, 'reparos' => ['Falta SOL_CLAVE en el .env.']];
+    }
+
+    // La linea original, para ver lo que el lector pudo haberse comido.
+    $linea = '';
+    $ruta = FACT_BASE . '/.env';
+    if (is_readable($ruta)) {
+        foreach (file($ruta, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $l) {
+            if (str_starts_with(ltrim($l), 'SOL_CLAVE=')) {
+                $linea = substr(ltrim($l), strlen('SOL_CLAVE='));
+                break;
+            }
+        }
+    }
+
+    if ($linea !== '' && $linea !== $clave) {
+        if (strlen($linea) >= 2 && ($linea[0] === '"' || $linea[0] === "'")) {
+            $reparos[] = 'La clave esta entre comillas en el .env y las comillas se quitan al'
+                . ' leerla. Si forman parte de la clave, no estan llegando; si no, sobran.';
+        } elseif (trim($linea) !== $linea) {
+            $reparos[] = 'La clave tiene espacios al principio o al final en el .env, y se'
+                . ' recortan al leerla.';
+        }
+    }
+
+    // SUNAT pide entre 6 y 12 caracteres para la clave de un usuario secundario.
+    $largo = strlen($clave);
+    if ($largo < 6 || $largo > 12) {
+        $reparos[] = 'SUNAT pide una clave de 6 a 12 caracteres para el usuario secundario, y'
+            . ' esta tiene ' . $largo . '.';
+    }
+
+    return ['largo' => $largo, 'reparos' => $reparos];
+}
+
+
+/**
  * ¿Hay con qué emitir?
  *
  * Se apoya en `fact_que_falta()` en vez de repetir la lista: durante las
