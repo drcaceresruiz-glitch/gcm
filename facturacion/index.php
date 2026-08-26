@@ -181,6 +181,41 @@ if ($accion === 'xml') {
     ]);
 }
 
+if ($accion === 'pdf') {
+    // La REPRESENTACIÓN IMPRESA. El documento con validez es el XML; esto es
+    // el papel que se le entrega a quien compra, porque nadie abre un XML.
+    // Se compone leyendo ese mismo XML —no el libro—, así que enseña lo que se
+    // envió de verdad y no lo que creemos haber enviado.
+    //
+    // Va en base64 porque esta interfaz habla JSON: un PDF crudo no cabe en un
+    // campo de texto sin romperlo.
+    $cuerpo = fact_cuerpo();
+    $idPedido = trim((string)($cuerpo['pedido'] ?? ''));
+    if ($idPedido === '') {
+        fact_responder(400, ['ok' => false, 'error' => 'Falta el pedido.']);
+    }
+    $comprobante = fact_comprobante_de($idPedido);
+    if ($comprobante === null) {
+        fact_responder(404, ['ok' => false, 'error' => 'Ese pedido no tiene comprobante emitido.']);
+    }
+    require_once __DIR__ . '/src/pdf.php';
+    $pdf = fact_pdf_de_pedido($idPedido);
+    if ($pdf === null) {
+        fact_responder(404, [
+            'ok' => false,
+            'error' => 'No se pudo componer el PDF: falta el XML de ese comprobante o no se pudo leer.',
+        ]);
+    }
+    fact_responder(200, [
+        'ok' => true,
+        'nombre' => basename((string)$comprobante['nombreXml']) . '.pdf',
+        'documento' => $comprobante['documento'] ?? null,
+        'serie' => $comprobante['serie'] ?? null,
+        'correlativo' => $comprobante['correlativo'] ?? null,
+        'pdfBase64' => base64_encode($pdf),
+    ]);
+}
+
 if ($accion === 'ticket') {
     $cuerpo = fact_cuerpo();
     $ticket = trim((string)($cuerpo['ticket'] ?? ''));

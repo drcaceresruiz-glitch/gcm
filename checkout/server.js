@@ -314,14 +314,22 @@ async function avisarDeLoQueFalte(registro, asiento, origen) {
 
   const idPedido = registro.pedido;
   const hayComprobante = !!(asiento && asiento.ok);
-  const xml = hayComprobante ? await comprobantes.descargarXml(idPedido) : null;
+  // El XML es el comprobante; el PDF es el papel que se lee. Van los dos, y
+  // en paralelo: son dos viajes al servicio de facturación y no dependen uno
+  // del otro. Si alguno falla vuelve null y el correo sale con lo que haya.
+  const [xml, pdf] = hayComprobante
+    ? await Promise.all([
+      comprobantes.descargarXml(idPedido),
+      comprobantes.descargarPdf(idPedido),
+    ])
+    : [null, null];
 
   const tiene = (tipo) => registro.eventos.some((ev) => ev.tipo === tipo);
   const yaAvisado = tiene('correo_comprador');
   const yaMandadoComprobante = tiene('correo_comprobante');
 
   if (!yaAvisado) {
-    const r = await correo.avisarCompra({ pedido: registro, comprobante: asiento, xml });
+    const r = await correo.avisarCompra({ pedido: registro, comprobante: asiento, xml, pdf });
     registrarEvento({
       pedido: idPedido,
       tipo: r.ok ? 'correo_comprador' : 'nota',
@@ -340,7 +348,7 @@ async function avisarDeLoQueFalte(registro, asiento, origen) {
       });
     }
   } else if (hayComprobante && !yaMandadoComprobante) {
-    const r = await correo.avisarComprobante({ pedido: registro, comprobante: asiento, xml });
+    const r = await correo.avisarComprobante({ pedido: registro, comprobante: asiento, xml, pdf });
     registrarEvento({
       pedido: idPedido,
       tipo: r.ok ? 'correo_comprobante' : 'nota',
@@ -1047,14 +1055,17 @@ app.post('/admin/pedido/:pedido/enviar-comprobante', formularioAdmin, async (req
     return fallar('Este pedido no tiene un correo al que enviarlo.');
   }
 
-  const xml = await comprobantes.descargarXml(req.params.pedido);
-  const r = await correo.avisarComprobante({ pedido: registro, comprobante: asiento, xml });
+  const [xml, pdf] = await Promise.all([
+    comprobantes.descargarXml(req.params.pedido),
+    comprobantes.descargarPdf(req.params.pedido),
+  ]);
+  const r = await correo.avisarComprobante({ pedido: registro, comprobante: asiento, xml, pdf });
   registrarEvento({
     pedido: req.params.pedido,
     tipo: r.ok ? 'correo_comprobante' : 'nota',
     detalle: r.ok
       ? `Comprobante ${comprobantes.nombrar(asiento)} enviado a ${registro.correo}`
-        + (xml ? ' con el XML adjunto' : ' (sin el XML: no se pudo traer)')
+        + ` (${[pdf ? 'PDF' : null, xml ? 'XML' : null].filter(Boolean).join(' y ') || 'sin adjuntos'})`
       : 'No se pudo enviar el comprobante: ' + (r.motivo || 'sin detalle'),
     quien: 'administrador',
   });

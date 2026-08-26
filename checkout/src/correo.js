@@ -111,6 +111,29 @@ async function enviar({ para, asunto, html, texto, adjuntos = [], responderA }) 
 
 /* ------------------------------------------------------------- presentación */
 
+/**
+ * Los adjuntos de un comprobante: el PDF para leerlo y el XML que vale.
+ *
+ * EL ORDEN IMPORTA, aunque parezca cosmetico: el primero es el que los
+ * clientes de correo enseñan y previsualizan, y lo que el comprador quiere ver
+ * es su boleta, no un archivo de etiquetas. El XML va detras, que es el
+ * documento con validez ante SUNAT y hay que entregarlo igual.
+ *
+ * Cada uno va si esta: que falte el PDF no quita el XML, ni al reves.
+ */
+function adjuntosDe(comprobante, xml, pdf) {
+  if (!comprobante || !comprobante.ok) return [];
+  const base = `${COMERCIO.ruc}-${comprobante.serie}-${comprobante.numero}`;
+  const lista = [];
+  if (pdf) {
+    lista.push({ filename: `${base}.pdf`, content: pdf, contentType: 'application/pdf' });
+  }
+  if (xml) {
+    lista.push({ filename: `${base}.xml`, content: xml, contentType: 'application/xml' });
+  }
+  return lista;
+}
+
 function e(v) {
   return String(v ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -190,7 +213,7 @@ ${filas}
  * porque la entrega todavía la hace una persona. Prometer «en 24 horas
  * hábiles» es lo que dicen los Términos, así que es lo que se repite aquí.
  */
-async function avisarCompra({ pedido, comprobante, xml }) {
+async function avisarCompra({ pedido, comprobante, xml, pdf }) {
   const nombreDoc = comprobante && comprobante.ok
     ? `${comprobante.tipo} ${comprobante.serie}-${comprobante.numero}` : null;
 
@@ -212,14 +235,7 @@ ${nombreDoc ? `<p style="margin:0 0 14px;color:#5d6f6c;font-size:13px">
 <p style="margin:0;color:#5d6f6c;font-size:13px">
   Si algo no cuadra, responda a este correo y lo revisamos.</p>`;
 
-  const adjuntos = [];
-  if (xml && nombreDoc) {
-    adjuntos.push({
-      filename: `${COMERCIO.ruc}-${comprobante.serie}-${comprobante.numero}.xml`,
-      content: xml,
-      contentType: 'application/xml',
-    });
-  }
+  const adjuntos = adjuntosDe(comprobante, xml, pdf);
 
   return enviar({
     para: pedido.correo,
@@ -247,7 +263,7 @@ ${nombreDoc ? `<p style="margin:0 0 14px;color:#5d6f6c;font-size:13px">
  *
  * Entregar el comprobante no es una cortesía: es obligación de quien vende.
  */
-async function avisarComprobante({ pedido, comprobante, xml }) {
+async function avisarComprobante({ pedido, comprobante, xml, pdf }) {
   if (!comprobante || !comprobante.ok) {
     return { ok: false, motivo: 'No hay comprobante que enviar.' };
   }
@@ -267,14 +283,7 @@ ${xml ? `<p style="margin:0 0 14px;color:#5d6f6c;font-size:13px">
 <p style="margin:0;color:#5d6f6c;font-size:13px">
   Si algo no cuadra, responda a este correo y lo revisamos.</p>`;
 
-  const adjuntos = [];
-  if (xml) {
-    adjuntos.push({
-      filename: `${COMERCIO.ruc}-${comprobante.serie}-${comprobante.numero}.xml`,
-      content: xml,
-      contentType: 'application/xml',
-    });
-  }
+  const adjuntos = adjuntosDe(comprobante, xml, pdf);
 
   return enviar({
     para: pedido.correo,
