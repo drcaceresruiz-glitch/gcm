@@ -477,6 +477,7 @@ const estado = {
   elegido: null,
   clavePublica: null,
   krCargado: false,
+  krEscuchando: false,
 };
 
 /* ---------------------------------------------------------------- utilidades */
@@ -585,6 +586,14 @@ function cargarKrypton() {
 async function dibujarPago(formToken) {
   await cargarKrypton();
 
+  // BORRAR ANTES DE PINTAR. `KR.renderElements` sobre un formulario ya dibujado
+  // no vuelve a dibujarlo: devuelve el error «No se puede llamar a
+  // KR.renderElements si un formulario ya está renderizado». Pasa en cuanto se
+  // pulsa «Continuar al pago» dos veces, o se corrige un dato y se reintenta.
+  // Cada intento pide un formToken nuevo, así que el formulario anterior
+  // siempre sobra: se quita sin preguntar.
+  try { await KR.removeForms(); } catch { /* no había ninguno */ }
+
   await KR.setFormConfig({
     formToken,
     'kr-language': 'es-PE',
@@ -593,36 +602,42 @@ async function dibujarPago(formToken) {
   // Lo que devuelve Izipay al terminar el pago se manda AL SERVIDOR para que
   // compruebe su firma. Que el navegador diga «pagado» no prueba nada: esa
   // línea la puede escribir cualquiera desde la consola.
-  KR.onSubmit(async (evento) => {
-    try {
-      const r = await fetch('/api/validate-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          'kr-answer': evento.rawClientAnswer,
-          'kr-hash': evento.hash,
-          'kr-hash-key': evento.hashKey,
-        }),
-      });
-      const datos = await r.json();
+  // UNA SOLA VEZ. Los manejadores de KR.onSubmit se acumulan: engancharlo en
+  // cada intento haría que un pago se validase dos y tres veces contra el
+  // servidor.
+  if (!estado.krEscuchando) {
+    estado.krEscuchando = true;
+    KR.onSubmit(async (evento) => {
+      try {
+        const r = await fetch('/api/validate-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            'kr-answer': evento.rawClientAnswer,
+            'kr-hash': evento.hash,
+            'kr-hash-key': evento.hashKey,
+          }),
+        });
+        const datos = await r.json();
 
-      if (datos.pagado) {
-        KR.removeForms();
+        if (datos.pagado) {
+          KR.removeForms();
+          mostrarAviso($('#avisoPago'),
+            `Pago confirmado. Pedido ${datos.pedido || ''}. Le enviamos el comprobante y las instrucciones a su correo.`,
+            'bien');
+        } else {
+          mostrarAviso($('#avisoPago'),
+            datos.error || `El pago no se completó (estado: ${datos.estado || 'desconocido'}). Puede intentarlo de nuevo.`,
+            'malo');
+        }
+      } catch {
         mostrarAviso($('#avisoPago'),
-          `Pago confirmado. Pedido ${datos.pedido || ''}. Le enviamos el comprobante y las instrucciones a su correo.`,
-          'bien');
-      } else {
-        mostrarAviso($('#avisoPago'),
-          datos.error || `El pago no se completó (estado: ${datos.estado || 'desconocido'}). Puede intentarlo de nuevo.`,
+          'El pago se realizó, pero no pudimos confirmarlo aquí. No vuelva a pagar: escríbanos y lo verificamos.',
           'malo');
       }
-    } catch {
-      mostrarAviso($('#avisoPago'),
-        'El pago se realizó, pero no pudimos confirmarlo aquí. No vuelva a pagar: escríbanos y lo verificamos.',
-        'malo');
-    }
-    return false;   // false = no recargar la página; lo gestionamos nosotros
-  });
+      return false;   // false = no recargar la página; lo gestionamos nosotros
+    });
+  }
 
   await KR.renderElements('.kr-embedded');
   $('#zonaPago').hidden = false;
