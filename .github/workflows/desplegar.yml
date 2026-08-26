@@ -27,8 +27,16 @@ on:
     # entero y lo resubia por FTP —y cada subida es otra tirada de dados con
     # el fallo conocido de que el FTP deja caer archivos—. Se desplegaba
     # produccion para nada, y con riesgo.
+    #
+    # Lo mismo vale para `checkout/` y `facturacion/`: son dos aplicaciones
+    # aparte, con su propio despliegue, y nada de lo que hay ahi entra en el
+    # build de GCM. Sin este filtro, cambiar un precio de la tienda
+    # reconstruia GCM entero y lo resubia por FTP —otra tirada de dados con
+    # el fallo conocido— para no cambiar nada.
     paths-ignore:
       - "movil/**"
+      - "checkout/**"
+      - "facturacion/**"
       - ".github/workflows/apk-emisor-sms.yml"
   workflow_dispatch:
 
