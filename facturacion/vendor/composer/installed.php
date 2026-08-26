@@ -173,9 +173,9 @@
             'dev_requirement' => false,
         ),
         'symfony/finder' => array(
-            'pretty_version' => 'v8.1.5',
-            'version' => '8.1.5.0',
-            'reference' => '8d7acede2b2ae07605783d1c43e49b5767036474',
+            'pretty_version' => 'v6.4.44',
+            'version' => '6.4.44.0',
+            'reference' => '211b28d13d044dacdc00c1629a3bbcff27dc793a',
             'type' => 'library',
             'install_path' => __DIR__ . '/../symfony/finder',
             'aliases' => array(),

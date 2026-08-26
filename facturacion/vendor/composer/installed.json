@@ -1062,26 +1062,26 @@
         },
         {
             "name": "symfony/finder",
-            "version": "v8.1.5",
-            "version_normalized": "8.1.5.0",
+            "version": "v6.4.44",
+            "version_normalized": "6.4.44.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/finder.git",
-                "reference": "8d7acede2b2ae07605783d1c43e49b5767036474"
+                "reference": "211b28d13d044dacdc00c1629a3bbcff27dc793a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/finder/zipball/8d7acede2b2ae07605783d1c43e49b5767036474",
-                "reference": "8d7acede2b2ae07605783d1c43e49b5767036474",
+                "url": "https://api.github.com/repos/symfony/finder/zipball/211b28d13d044dacdc00c1629a3bbcff27dc793a",
+                "reference": "211b28d13d044dacdc00c1629a3bbcff27dc793a",
                 "shasum": ""
             },
             "require": {
-                "php": ">=8.4.1"
+                "php": ">=8.1"
             },
             "require-dev": {
-                "symfony/filesystem": "^7.4|^8.0"
+                "symfony/filesystem": "^6.0|^7.0"
             },
-            "time": "2026-08-21T12:16:08+00:00",
+            "time": "2026-08-21T10:00:03+00:00",
             "type": "library",
             "installation-source": "source",
             "autoload": {
@@ -1109,7 +1109,7 @@
             "description": "Finds files and directories via an intuitive fluent interface",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/finder/tree/v8.1.5"
+                "source": "https://github.com/symfony/finder/tree/v6.4.44"
             },
             "funding": [
                 {
