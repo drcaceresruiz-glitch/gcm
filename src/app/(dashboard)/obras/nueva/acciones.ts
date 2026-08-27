@@ -84,6 +84,7 @@ export async function accionCrearObra(
       ),
       // La meta se fija HOY: es la fecha en que se asume el compromiso.
       fechaMeta: new Date().toISOString().slice(0, 10),
+      soloEstructura: datos.get("soloEstructura") === "si",
     });
 
     if (!carga.ok) {
@@ -100,14 +101,20 @@ export async function accionCrearObra(
     /*
      * CON ALGO QUE REVISAR, A LA META; SI NO, AL CONTRACTUAL.
      *
-     * El destino normal es el contractual, que es el paso siguiente. Pero si
-     * alguna descripcion se guardo recortada hay texto del presupuesto que ya
-     * no esta, y eso se mira en la meta -donde estan las lineas y se pueden
-     * corregir una a una-. Mandar a alguien a decidir recargos sin haberle
-     * dicho que su Excel entro incompleto es enseñarle cifras sobre un
-     * presupuesto que todavia no ha visto.
+     * El destino normal es el contractual, que es el paso siguiente. Se
+     * desvia a la meta en dos casos, y por la misma razon: alli estan las
+     * lineas y alli se arregla.
+     *
+     * - Si alguna descripcion se guardo recortada, hay texto del presupuesto
+     *   que ya no esta y conviene mirarlo.
+     * - Si hay partidas SIN PRECIO -siempre, cuando se cargo solo la
+     *   estructura- el contractual no tiene nada que recargar todavia: se
+     *   generaria una linea base de cero.
+     *
+     * Mandar a alguien a decidir recargos sobre un presupuesto que aun no
+     * tiene precios es enseñarle cifras que no significan nada.
      */
-    if (carga.recortadas.length > 0) {
+    if (carga.recortadas.length > 0 || carga.sinPrecio > 0) {
       redirect(
         `/obras/${resultado.id}/meta?creada=${carga.version}` +
           avisoDeRecorte(carga.recortadas),

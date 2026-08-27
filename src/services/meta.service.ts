@@ -785,6 +785,32 @@ export async function aprobarMeta(
   const cerrada = await motivoSiObraCerrada(sesion, meta.projectId);
   if (cerrada) return { ok: false, error: cerrada };
 
+  /*
+   * UNA META EN CERO NO SE CONGELA.
+   *
+   * Aprobar es lo que la vuelve inmutable y lo que hace que la bolsa
+   * signifique algo. Una meta sin un solo precio no puede significar nada: la
+   * bolsa saldria igual al contractual entero, es decir, un margen perfecto
+   * inventado, y para deshacerlo habria que cargar otra version.
+   *
+   * Se cierra desde el 27 de agosto de 2026, con «cargar solo la estructura»:
+   * hasta entonces no habia forma de que una meta naciera sin precios, y
+   * ahora es un camino normal —se sube el arbol y se valoriza dentro—. Se
+   * comprueba el TOTAL y no partida por partida a proposito: hay presupuestos
+   * donde una partida no lleva precio propio legitimamente (el desglose de un
+   * paquete a suma alzada), y exigirselos uno a uno rechazaria metas
+   * correctas.
+   */
+  if (!esPositivo(meta.costoTotal.toString())) {
+    return {
+      ok: false,
+      error:
+        "Esta meta no tiene ni un precio: su costo es cero. Complétala en la " +
+        "tabla de abajo antes de aprobarla; una meta sin costo dejaria la " +
+        "bolsa de la obra valiendo el contrato entero.",
+    };
+  }
+
   // Solo la ultima. Congelar una version antigua teniendo un borrador mas
   // nuevo dejaria gobernando una meta ya superada, porque `metaQueManda`
   // toma la aprobada de version mas alta.

@@ -520,3 +520,122 @@ describe("descripciones mas largas de lo que cabe", () => {
     expect(r.descripcionesRecortadas).toEqual([5]);
   });
 });
+
+/**
+ * SOLO LA ESTRUCTURA: el arbol sin una sola cifra de dinero.
+ *
+ * Pedido el 27 de agosto de 2026 para quien ya tiene su presupuesto en su
+ * propio Excel: que se traiga capitulos, partidas y subpartidas, y que los
+ * precios se pongan despues dentro de GCM. Dos cosas que aqui NO son error:
+ * que falten la unidad y la cantidad.
+ */
+describe("cargar solo la estructura", () => {
+  const ESTRUCTURA: (string | number | null)[][] = [
+    ["1", "CAPITULO I: ESTRUCTURAS", null, null, null, null],
+    ["1.01", "Concreto en zapatas", "m3", 12.5, null, null],
+    ["1.02", "Acero corrugado", null, null, null, null],
+    ["7.02.00", "REDES DE DESAGUE", null, null, null, null],
+    ["7.02.01", "Corte de piso de concreto", "ml", 42, null, null],
+    ["7.02.02", "Tuberia de 4 pulgadas", "ml", 10, null, null],
+    ["11.01", "DRYWALL", null, null, null, null],
+    ["11.01.01", "Tabique ST e=10cm", "m2", 120, null, null],
+  ];
+
+  it("un presupuesto sin precios entra entero, y no como puros titulos", async () => {
+    const libro = await construirLibro(ESTRUCTURA);
+
+    const r = await analizarExcel(libro, { soloEstructura: true });
+
+    expect(r.errores).toEqual([]);
+    expect(r.filas).toHaveLength(ESTRUCTURA.length);
+    // Sin esto -la regla S10 de «sin cifras es un subtitulo»- las ocho filas
+    // entraban como capitulos y no habia forma de ponerles precio despues.
+    expect(r.totalPartidas).toBe(5);
+    expect(r.totalCapitulos).toBe(3);
+  });
+
+  it("agrupa lo que tiene hijas y lo que lo dice su codigo", async () => {
+    const r = await analizarExcel(await construirLibro(ESTRUCTURA), {
+      soloEstructura: true,
+    });
+    const tipo = (codigo: string) =>
+      r.filas.find((f) => f.codigo === codigo)?.tipo;
+
+    expect(tipo("1")).toBe("CAPITULO");         // un solo segmento
+    expect(tipo("7.02.00")).toBe("CAPITULO");   // termina en cero
+    expect(tipo("11.01")).toBe("CAPITULO");     // tiene hijas mas abajo
+    expect(tipo("11.01.01")).toBe("PARTIDA");   // hoja del arbol
+    expect(tipo("1.02")).toBe("PARTIDA");       // hoja, y sin unidad ni cantidad
+  });
+
+  it("una partida sin unidad ni cantidad NO es un error", async () => {
+    const r = await analizarExcel(await construirLibro(ESTRUCTURA), {
+      soloEstructura: true,
+    });
+    const suelta = r.filas.find((f) => f.codigo === "1.02");
+
+    expect(r.errores).toEqual([]);
+    expect(suelta?.tipo).toBe("PARTIDA");
+    expect(suelta?.unidad).toBeNull();
+    expect(suelta?.metrado).toBeNull();
+    // Y sin avisos: en este modo falta todo a proposito.
+    expect(suelta?.aviso).toBeUndefined();
+  });
+
+  it("la unidad y la cantidad SI viajan: son medida, no dinero", async () => {
+    const r = await analizarExcel(await construirLibro(ESTRUCTURA), {
+      soloEstructura: true,
+    });
+    const corte = r.filas.find((f) => f.codigo === "7.02.01");
+
+    expect(corte?.unidad).toBe("ml");
+    expect(corte?.metrado).toBe("42.00");
+  });
+
+  it("IGNORA los precios aunque el archivo los traiga", async () => {
+    const libro = await construirLibro([
+      ["1", "CAPITULO I", null, null, null, null],
+      ["1.01", "Concreto en zapatas", "m3", 12.5, 420, 5250],
+    ]);
+
+    const r = await analizarExcel(libro, { soloEstructura: true });
+    const partida = r.filas.find((f) => f.codigo === "1.01");
+
+    expect(partida?.precioUnitario).toBeNull();
+    expect(partida?.parcial).toBeNull();
+    // Y por tanto no hay ninguna cifra ajena que pueda descuadrar la meta.
+    expect(r.montoTotal).toBe("0.00");
+  });
+
+  it("reconoce la tabla aunque solo traiga codigo y descripcion", async () => {
+    const libro = await construirLibro(
+      [
+        ["1", "CAPITULO I: ESTRUCTURAS"],
+        ["1.01", "Concreto en zapatas"],
+      ],
+      { cabecera: ["Item", "Descripción"] },
+    );
+
+    const r = await analizarExcel(libro, { soloEstructura: true });
+
+    expect(r.filaCabecera).toBe(4);
+    expect(r.errores).toEqual([]);
+    expect(r.totalPartidas).toBe(1);
+  });
+
+  it("sin el modo, ese mismo archivo sigue pidiendo una columna de cifras", async () => {
+    const libro = await construirLibro(
+      [
+        ["1", "CAPITULO I: ESTRUCTURAS"],
+        ["1.01", "Concreto en zapatas"],
+      ],
+      { cabecera: ["Item", "Descripción"] },
+    );
+
+    const r = await analizarExcel(libro);
+
+    // No se relaja para todo el mundo: una lista de dos columnas no es un
+    // presupuesto, y confundirla con uno seria peor que rechazarla.
+    expect(r.filaCabecera).toBeNull();
+  });
+});

@@ -37,6 +37,8 @@ export async function accionImportarMeta(
     mesesPlazo: String(datos.get("mesesPlazo") ?? ""),
     fechaMeta: String(datos.get("fechaMeta") ?? ""),
     notas: String(datos.get("notas") ?? ""),
+    // La casilla del formulario. Solo llega cuando esta marcada.
+    soloEstructura: datos.get("soloEstructura") === "si",
   });
 
   if (!r.ok) return { error: r.error };

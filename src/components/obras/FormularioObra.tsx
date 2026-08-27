@@ -221,12 +221,39 @@ export function FormularioObra({
                     }}
                   />
                   <p className="text-xs opacity-60">
-                    Descárgala en{" "}
+                    Puedes subir tu propio Excel —la primera hoja del archivo—
+                    o descargar la{" "}
                     <a href="/plantilla-meta" className="underline underline-offset-2">
                       plantilla del presupuesto meta
                     </a>
                     . El plazo en meses sale de las fechas de arriba.
                   </p>
+                </div>
+
+                {/* La misma casilla que en la pantalla de la meta, con el
+                    mismo texto: quien adjunta aqui su Excel tiene que poder
+                    decidir lo mismo que quien lo sube alli, y enterarse de lo
+                    mismo antes de subirlo. */}
+                <div className="space-y-1.5">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      name="soloEstructura"
+                      value="si"
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium">
+                        Cargar solo la estructura, sin precios
+                      </span>
+                      <span className="block text-xs text-pretty opacity-60">
+                        Trae los capítulos, partidas y subpartidas con sus
+                        descripciones. No carga precios ni importes aunque el
+                        archivo los traiga: los pones después, en la pantalla
+                        del presupuesto meta.
+                      </span>
+                    </span>
+                  </label>
                 </div>
 
                 <div className="space-y-1.5">

@@ -43,6 +43,8 @@ export type ResultadoCarga =
        * seria guardar un alcance a medias sin que nadie se entere.
        */
       recortadas: number[];
+      /// Partidas que entraron sin importe y hay que completar dentro de GCM.
+      sinPrecio: number;
     }
   | { ok: false; error: string };
 
@@ -52,6 +54,15 @@ export interface EntradaCargaMeta {
   mesesPlazo: string;
   fechaMeta: string;
   notas?: string | null;
+  /**
+   * Traerse SOLO el arbol: capitulos, partidas y subpartidas, sin un precio.
+   *
+   * Lo elige quien sube el archivo, y se pregunta en vez de adivinarse: desde
+   * fuera no hay forma de saber si un Excel es la plantilla de GCM o el
+   * presupuesto de otra oficina, y acertar por descarte con el dinero de una
+   * obra no es una apuesta que valga la pena.
+   */
+  soloEstructura?: boolean;
 }
 
 export async function cargarMetaDesdeExcel(
@@ -92,7 +103,10 @@ export async function cargarMetaDesdeExcel(
     // `propiasDeLaMeta`: en la hoja de la meta, una fila con importe y sin
     // codigo no es una nota, es un costo real que el contrato no desglosa.
     // Ahi viven tambien el residente, la camioneta y las polizas.
-    costo = await analizarExcel(contenido, { propiasDeLaMeta: true });
+    costo = await analizarExcel(contenido, {
+      propiasDeLaMeta: true,
+      soloEstructura: entrada.soloEstructura === true,
+    });
   } catch {
     // No se expone el error interno: un archivo corrupto no debe revelar
     // detalles de la libreria ni del servidor.
@@ -203,6 +217,10 @@ export async function cargarMetaDesdeExcel(
     ok: true,
     version: resultado.version,
     recortadas: costo.descripcionesRecortadas,
+    // Cuantas esperan precio. Con `soloEstructura` son todas, y es el numero
+    // que la pantalla necesita para poder decir cuanto falta.
+    sinPrecio: items.filter((i) => i.tipo === "PARTIDA" && i.parcial === null)
+      .length,
   };
 }
 

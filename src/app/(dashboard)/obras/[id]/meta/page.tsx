@@ -24,6 +24,7 @@ import {
 } from "@/components/meta/PanelDeducciones";
 import { TablaMetaEditable } from "@/components/meta/TablaMetaEditable";
 import { AvisoImportesRepetidos } from "@/components/meta/AvisoImportesRepetidos";
+import { AvisoSinPrecio } from "@/components/meta/AvisoSinPrecio";
 import { repetidosDeLaMeta } from "@/lib/repetidos-de-la-meta";
 import { lineasDelBorrador } from "@/services/meta-edicion.service";
 import { FormularioMeta } from "@/components/meta/FormularioMeta";
@@ -198,6 +199,16 @@ export default async function MetaPage({
    * sobre lineas que ya estan en memoria: no cuesta una consulta mas.
    */
   const repetidos = repetidosDeLaMeta(borrador?.lineas ?? []);
+
+  /*
+   * Cuantas partidas del borrador esperan precio.
+   *
+   * Se cuenta aqui, sobre lo guardado, y no se arrastra desde la carga: asi
+   * baja sola segun se completan y llega a cero sin que nadie cierre nada.
+   * Solo PARTIDAS: un capitulo no lleva importe propio.
+   */
+  const partidas = (borrador?.lineas ?? []).filter((l) => l.tipo === "PARTIDA");
+  const sinPrecio = partidas.filter((l) => l.parcial === null).length;
   const puedeCrear = puede(sesion, "meta:crear");
   const puedeAprobar = puede(sesion, "meta:aprobar");
 
@@ -365,6 +376,14 @@ export default async function MetaPage({
           concretas, y lo que hay debajo es exactamente la tabla donde se
           corrigen. Un aviso lejos de lo que hay que tocar se lee y se olvida.
           Se recalcula en cada visita, asi que desaparece solo al corregir. */}
+      {/* PRIMERO LO QUE FALTA, DESPUES LO QUE CHIRRIA.
+          Sin precios no hay nada que revisar todavia: pedir que se mire un
+          importe repetido antes de que existan los importes es mandar a
+          alguien a un sitio donde no hay nada. */}
+      {borrador && (
+        <AvisoSinPrecio cuantas={sinPrecio} total={partidas.length} />
+      )}
+
       {borrador && <AvisoImportesRepetidos repetidos={repetidos} />}
 
       {/* Las lineas del borrador, corregibles. Van ANTES del bloque de

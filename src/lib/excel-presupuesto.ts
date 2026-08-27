@@ -386,7 +386,19 @@ function leerFechaDetallada(valor: unknown): LecturaFecha {
  * No se asume que la cabecera este en la fila 1: las exportaciones de S10
  * traen titulo de obra, cliente y fecha antes de la tabla.
  */
-function detectarCabecera(hoja: ExcelJS.Worksheet): {
+function detectarCabecera(
+  hoja: ExcelJS.Worksheet,
+  /**
+   * En modo estructura basta con codigo y descripcion.
+   *
+   * Se pide una columna de cifras para no confundir con una tabla de
+   * presupuesto cualquier lista que tenga un numero y un texto al lado. Pero
+   * quien sube SOLO la estructura puede traer justo eso -codigo y
+   * descripcion- y exigirle una columna de metrado que no tiene seria
+   * rechazarle el archivo por no traer lo que hemos dicho que no hace falta.
+   */
+  soloEstructura = false,
+): {
   filaCabecera: number | null;
   mapa: Map<string, number>;
 } {
@@ -428,7 +440,8 @@ function detectarCabecera(hoja: ExcelJS.Worksheet): {
 
     // Con codigo, descripcion y al menos un dato economico ya es una tabla
     // de presupuesto reconocible.
-    if (mapa.has("codigo") && mapa.has("descripcion") && (mapa.has("metrado") || mapa.has("precioUnitario"))) {
+    const conCifras = mapa.has("metrado") || mapa.has("precioUnitario");
+    if (mapa.has("codigo") && mapa.has("descripcion") && (conCifras || soloEstructura)) {
       return { filaCabecera: n, mapa };
     }
   }
@@ -446,17 +459,50 @@ function clasificarCodigo(
   codigo: string,
   tieneDatosEconomicos: boolean,
   tieneImporte: boolean,
+  /**
+   * Solo en modo estructura: si alguna otra fila cuelga de esta.
+   *
+   * Es la señal que sustituye al dinero cuando no hay dinero. Sin cifras que
+   * mirar, lo unico que distingue un titulo de una partida es si algo cuelga
+   * de el: `11.01 DRYWALL` agrupa a `11.01.01`, y `11.14.16` no agrupa a
+   * nadie, asi que es donde acaba el arbol y donde ira un precio.
+   */
+  esPadre = false,
+  soloEstructura = false,
 ): { tipo: TipoFila; nivel: number } {
   const segmentos = codigo.split(".");
   const ultimo = segmentos.at(-1) ?? "";
   const nivel = Math.max(0, segmentos.length - 1);
 
-  // Si la fila lleva un importe propio, es costeable, y manda sobre
-  // cualquier convencion de codigo. En los presupuestos reales hay grupos
-  // como "7.02.00 REDES DE DESAGUE" que llevan el precio del subcontrato a
-  // suma alzada mientras sus hijas solo detallan el alcance. Tratarlos como
-  // capitulo por terminar en cero descartaria ese dinero.
-  if (tieneImporte) {
+  /*
+   * EN MODO ESTRUCTURA MANDA EL CODIGO Y NADA MAS.
+   *
+   * Se sale antes de mirar `tieneImporte`, porque en este modo no se lee
+   * ninguno; y antes de la regla S10 de «sin datos economicos es un
+   * subtitulo», que aqui clasificaria el presupuesto ENTERO como titulos:
+   * es justo lo que impedia cargar un presupuesto sin precios.
+   *
+   * Capitulo es lo que agrupa (`esPadre`) y lo que lo dice por convencion
+   * -un solo segmento, o terminado en cero como `7.02.00`-. El resto son
+   * hojas del arbol, y una hoja es una partida a la que se le podra poner
+   * su unidad, su cantidad y su precio dentro de GCM.
+   */
+  if (esPadre) return { tipo: "CAPITULO", nivel };
+
+  /*
+   * Si la fila lleva un importe propio, es costeable, y manda sobre
+   * cualquier convencion de codigo. En los presupuestos reales hay grupos
+   * como "7.02.00 REDES DE DESAGUE" que llevan el precio del subcontrato a
+   * suma alzada mientras sus hijas solo detallan el alcance. Tratarlos como
+   * capitulo por terminar en cero descartaria ese dinero.
+   *
+   * SALVO EN MODO ESTRUCTURA, donde ese importe no se va a traer: mirarlo
+   * aqui convertiria «7.02.00 REDES DE DESAGUE» en una partida que espera un
+   * precio, cuando lo que es -y lo que su codigo dice que es- es el titulo
+   * del grupo que tiene debajo. El dinero del archivo no decide nada cuando
+   * el dinero del archivo no se importa.
+   */
+  if (tieneImporte && !soloEstructura) {
     return { tipo: "PARTIDA", nivel };
   }
 
@@ -466,11 +512,19 @@ function clasificarCodigo(
     return { tipo: "CAPITULO", nivel };
   }
 
-  // Señal de contenido: en el formato S10 los niveles intermedios como
-  // "01.02" son subtitulos que agrupan, sin metrado ni precio. Una fila sin
-  // datos economicos agrupa; no es una partida a la que se le pueda exigir
-  // un metrado.
-  if (!tieneDatosEconomicos) {
+  /*
+   * Señal de contenido: en el formato S10 los niveles intermedios como
+   * "01.02" son subtitulos que agrupan, sin metrado ni precio. Una fila sin
+   * datos economicos agrupa; no es una partida a la que se le pueda exigir
+   * un metrado.
+   *
+   * NO EN MODO ESTRUCTURA, donde ninguna fila trae datos economicos y esta
+   * regla convertiria el presupuesto entero en titulos. Alli ya se decidio
+   * arriba: agrupa lo que tiene hijas o lo dice su codigo, y el resto son
+   * partidas -aunque lleguen sin unidad y sin cantidad, que es exactamente lo
+   * que se pidio que no diera error-.
+   */
+  if (!tieneDatosEconomicos && !soloEstructura) {
     return { tipo: "CAPITULO", nivel };
   }
 
@@ -486,6 +540,30 @@ export interface OpcionesAnalisis {
    * subtitulo, y recogerla ahi meteria texto suelto en el arbol de partidas.
    */
   propiasDeLaMeta?: boolean;
+  /**
+   * SOLO LA ESTRUCTURA: se trae el arbol y no una sola cifra.
+   *
+   * Se lee hasta la columna de cantidad -codigo, descripcion, unidad y
+   * metrado- y se ignoran el precio unitario y el importe **aunque vengan en
+   * el archivo**. Los precios se ponen despues, dentro de GCM.
+   *
+   * PEDIDO EL 27 DE AGOSTO DE 2026, y resuelve dos cosas de una vez:
+   *
+   * - **Traerse un presupuesto ajeno sin heredar sus cuentas.** Ese dia se
+   *   comparo un presupuesto real contra lo que GCM contaba y no cuadraba:
+   *   el Excel dejaba subcapitulos enteros fuera de sus propios totales -les
+   *   faltaba la formula- y no restaba sus descuentos comerciales. Importar
+   *   solo la estructura corta ese problema de raiz: no hay cifra ajena que
+   *   pueda discrepar, porque no se trae ninguna.
+   * - **Cargar lo que hoy no se puede cargar.** Sin esto, una fila sin
+   *   cifras se clasifica como CAPITULO -convencion del formato S10- y a un
+   *   capitulo no se le puede poner importe despues. Un presupuesto sin
+   *   precios entraba entero como titulos y no habia forma de valorizarlo.
+   *
+   * Aqui el tipo se decide SOLO POR EL CODIGO: manda la forma del arbol, no
+   * si la fila trae dinero.
+   */
+  soloEstructura?: boolean;
 }
 
 export async function analizarExcel(
@@ -508,7 +586,10 @@ export async function analizarExcel(
     };
   }
 
-  const { filaCabecera, mapa } = detectarCabecera(hoja);
+  const { filaCabecera, mapa } = detectarCabecera(
+    hoja,
+    opciones.soloEstructura === true,
+  );
 
   if (filaCabecera === null) {
     return {
@@ -533,6 +614,31 @@ export async function analizarExcel(
 
   const filas: FilaImportada[] = [];
   const codigosVistos = new Map<string, number>();
+
+  /**
+   * Que codigos agrupan a otros. Solo hace falta en modo estructura.
+   *
+   * Se resuelve en una pasada previa porque la respuesta esta MAS ABAJO en el
+   * documento: cuando se lee `11.01 DRYWALL` todavia no se sabe que existe
+   * `11.01.01`, y sin eso la fila se clasificaria como partida y acabaria
+   * pidiendo un precio que nunca va a tener.
+   *
+   * Se guardan los PREFIJOS, no los codigos: de `11.01.01` salen `11` y
+   * `11.01`, que son sus dos padres. Asi la pregunta «¿este agrupa?» es una
+   * consulta al conjunto y no un recorrido por fila.
+   */
+  const codigosPadre = new Set<string>();
+  if (opciones.soloEstructura) {
+    const columnaCodigo = mapa.get("codigo")!;
+    for (let n = filaCabecera + 1; n <= hoja.rowCount; n++) {
+      const codigo = textoCelda(hoja.getRow(n).getCell(columnaCodigo)).trim();
+      if (!CODIGO_VALIDO.test(codigo)) continue;
+      const partes = codigo.split(".");
+      for (let i = 1; i < partes.length; i++) {
+        codigosPadre.add(partes.slice(0, i).join("."));
+      }
+    }
+  }
 
   let filasTextoOmitidas = 0;
   const descripcionesRecortadas: number[] = [];
@@ -816,11 +922,17 @@ export async function analizarExcel(
       codigo,
       tieneDatosEconomicos,
       tieneImporte,
+      codigosPadre.has(codigo),
+      opciones.soloEstructura === true,
     );
     const registro = construirFila({
       hoja, fila, n, mapa, codigo, descripcion, tipo, nivel,
-      combinacion: combinaciones.get(n) ?? null,
+      // Las celdas combinadas reparten un IMPORTE, y en modo estructura no se
+      // trae ninguno: mirarlas solo serviria para marcar como «alcance» filas
+      // que aqui son partidas normales a la espera de su precio.
+      combinacion: opciones.soloEstructura ? null : (combinaciones.get(n) ?? null),
       fechaInicio, fechaFin,
+      soloEstructura: opciones.soloEstructura === true,
     });
 
     if (registro) {
@@ -910,6 +1022,8 @@ interface ArgsFila {
   /// Ya leidas y validadas por quien llama (van juntas o ninguna).
   fechaInicio: string | null;
   fechaFin: string | null;
+  /// Se trae el arbol y ni una cifra de dinero. Ver `OpcionesAnalisis`.
+  soloEstructura?: boolean;
 }
 
 /**
@@ -936,6 +1050,33 @@ function construirFila(args: ArgsFila): FilaImportada | null {
     const col = mapa.get(campo);
     return col ? valorCelda(fila.getCell(col)) : null;
   };
+
+  /**
+   * SOLO LA ESTRUCTURA: hasta la columna de cantidad y ni un paso mas.
+   *
+   * Se corta aqui, antes de cualquier cuenta, y por eso no hay forma de que
+   * una cifra del archivo se cuele: no se leen ni el precio unitario ni el
+   * importe AUNQUE el Excel los traiga. La unidad y el metrado si viajan
+   * -son medida, no dinero- y pueden faltar sin que pase nada: es una
+   * partida a la que todavia no se le ha puesto nada, no un error.
+   *
+   * Tampoco se avisa de lo que falta. En este modo falta TODO a proposito, y
+   * un aviso por linea seria un aviso en cada linea: lo que hay que contar
+   * -cuantas partidas esperan precio- se dice una sola vez en la pantalla.
+   */
+  if (args.soloEstructura) {
+    return {
+      fila: n, codigo, tipo,
+      modalidad: "PRECIOS_UNITARIOS",
+      descripcion: desc, nivel,
+      unidad: (String(leer("unidad") ?? "").trim().slice(0, MAX_UNIDAD)) || null,
+      metrado: normalizarDecimal(leer("metrado"), 2),
+      precioUnitario: null,
+      parcial: null,
+      porcentajeRecargo: normalizarDecimal(leer("recargo"), 2),
+      fechaInicio, fechaFin,
+    };
+  }
 
   // Los capitulos solo agrupan: su importe es la suma de sus partidas y no
   // se toma del Excel, donde suele venir como subtotal ya calculado. Una

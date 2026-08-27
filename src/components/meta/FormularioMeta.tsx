@@ -146,8 +146,46 @@ export function FormularioMeta({
           style={{ borderColor: "var(--borde)" }}
         />
         <p className="text-xs opacity-70">
-          La hoja «Costo Directo» del libro, con las fórmulas ya hechas.
+          Si usas la plantilla, la hoja «Costo Directo» del libro. Si subes tu
+          propio Excel, la <strong>primera hoja</strong> del archivo, y con los
+          códigos en números separados por puntos: 1, 1.01, 1.01.02.
         </p>
+      </div>
+
+      {/*
+        SOLO LA ESTRUCTURA.
+        Se PREGUNTA en vez de adivinarse. Desde fuera no hay forma de saber si
+        un archivo es la plantilla de GCM o el presupuesto de otra oficina, y
+        acertar por descarte con el dinero de una obra no es una apuesta que
+        valga la pena. El texto dice lo que va a pasar ANTES de que pase: lo
+        que mas desconcierta de este modo es subir un Excel lleno de precios y
+        ver la meta en cero sin haber avisado.
+      */}
+      <div
+        className="space-y-2 rounded-lg border p-4"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <label className="flex cursor-pointer items-start gap-3">
+          <input
+            type="checkbox"
+            name="soloEstructura"
+            value="si"
+            className="mt-1"
+          />
+          <span>
+            <span className="block text-sm font-medium">
+              Cargar solo la estructura, sin precios
+            </span>
+            <span className="block text-xs text-pretty opacity-70">
+              Para traerte un presupuesto que ya tienes hecho en tu propio
+              Excel. Se cargan los <strong>capítulos, partidas, subpartidas y
+              sus descripciones</strong>, con la unidad y la cantidad si están.
+              No se carga ningún precio ni importe, aunque el archivo los
+              traiga: los pones después aquí, línea a línea. Tampoco pasa nada
+              si a alguna partida le falta la unidad o la cantidad.
+            </span>
+          </span>
+        </label>
       </div>
 
       <CampoTexto
