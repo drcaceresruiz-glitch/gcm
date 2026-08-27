@@ -22,3 +22,5 @@
 - [Vitest no carga el .env](vitest-no-carga-el-env.md) — para tocar la base o descifrar desde una prueba hay que leer el .env a mano, tambien CORREO_CLAVE_CIFRADO
 - [El push cierra las sesiones abiertas](push-cierra-las-sesiones-abiertas.md) — el gancho de pre-push construye; no empujar mientras alguien recorre la aplicacion
 - [Heredoc se rompe con plantillas JS](heredoc-se-rompe-con-plantillas-js.md) — un `<<'EOF'` con `${...}` dentro de backticks falla; escribir el script con Write
+- [Explicar sin jerga](explicar-sin-jerga.md) — el usuario pidio el 27/08/2026 que se le cuente el sintoma, no la ruta del archivo
+- [Ejercitar un servicio fuera de Next](ejercitar-un-servicio-fuera-de-next.md) — como reproducir un fallo que solo aparece al guardar, con tsx y un stub de server-only
