@@ -62,9 +62,36 @@ CUENTA_INTENTOS="$RAIZ/tmp/intentos-migracion"
 # llene la bitacora y encadene arranques de Prisma sin fin.
 INTENTOS_MAXIMOS=30
 
+# Cuanto se espera antes de dar por muerto un paquete reservado. Un despliegue
+# entero tarda menos de dos minutos; quince es holgura de sobra para no pisar
+# uno que de verdad se este aplicando.
+MINUTOS_PARA_RESCATE=15
+
 # Sin paquete no hay nada que hacer. Es el caso normal: el cron corre cada
 # minuto y despliegues hay pocos.
-[ -f "$PAQUETE" ] || exit 0
+#
+# PERO «SIN PAQUETE» TIENE DOS SIGNIFICADOS, y confundirlos costo una tarde
+# entera el 27/08/2026. El paquete se reserva renombrandolo a `.desplegando`
+# nada mas cogerlo. Si el proceso muere DE VERDAD a mitad -no que falle: que lo
+# maten- nadie deshace ese renombrado: `devolver_paquete` solo corre por la
+# rama de fallo de migracion, y a un proceso muerto no le queda rama. El cron
+# pasa entonces cada minuto, no ve ningun `gcm.tar.gz`, y se va. Para siempre.
+#
+# Aquel dia el hosting agoto su tope de procesos y mato el despliegue en seco
+# —la bitacora se corta a media linea, sin error—; el paquete se quedo
+# reservado y el servidor no volvio a desplegar hasta que una persona lo
+# renombro a mano. Este bloque es esa persona.
+RESCATE=0
+if [ ! -f "$PAQUETE" ]; then
+  # Nada reservado tampoco: no hay despliegue en marcha y no hay nada que hacer.
+  [ -f "$EN_CURSO" ] || exit 0
+
+  # Reservado hace poco: hay un despliegue EN CURSO de verdad. No se toca, que
+  # es justo lo que el candado impide y aqui se repite por si acaso.
+  [ -z "$(find "$EN_CURSO" -maxdepth 0 -mmin -"$MINUTOS_PARA_RESCATE" 2>/dev/null)" ] || exit 0
+
+  RESCATE=1
+fi
 
 mkdir -p "$RAIZ/tmp"
 
@@ -133,6 +160,25 @@ if ! mkdir "$CANDADO" 2>/dev/null; then
   fi
 fi
 trap 'rm -rf "$CANDADO"' EXIT
+
+# EL RESCATE, ya con el candado en la mano.
+#
+# Se limita a devolver el paquete a la cola y salir: NO lo aplica en el mismo
+# pase. Si lo que mato al anterior sigue ahi -el tope de procesos del hosting,
+# por ejemplo- volver a intentarlo en caliente es exactamente lo que encadena
+# arranques y agrava la causa. El cron pasa dentro de un minuto y para entonces
+# la maquina ha respirado.
+#
+# Cuenta como intento, y por eso llama a `devolver_paquete` en vez de hacer el
+# `mv` a pelo: un paquete que muere en seco una y otra vez se detiene solo a los
+# treinta, en lugar de rescatarse en bucle hasta el fin de los tiempos.
+if [ "$RESCATE" = "1" ]; then
+  registrar "AVISO: habia un paquete reservado sin tocar desde hace mas de" \
+            "$MINUTOS_PARA_RESCATE minutos. El despliegue anterior murio sin poder" \
+            "devolverlo (proceso matado, no fallo). Se devuelve a la cola."
+  devolver_paquete
+  exit 0
+fi
 
 # Se deja constancia ANTES de hacer nada, y no solo al terminar.
 #
@@ -223,7 +269,46 @@ fi
 # configurar deje de recibir despliegues.
 CONFIG_DESPLIEGUE="$HOME/.gcm-despliegue.env"
 
-if [ ! -r "$CONFIG_DESPLIEGUE" ]; then
+# LA FIRMA DE LAS MIGRACIONES: para no arrancar Prisma cuando no hay nada que
+# migrar, que es la mayoria de los despliegues.
+#
+# `npx --yes prisma@7 migrate deploy` es, con diferencia, el paso mas caro de
+# todo esto: arranca npm, node y el schema-engine, tres procesos que en un
+# hosting compartido se pagan del mismo cupo que la aplicacion. El 27/08/2026
+# ese arranque murio a medias por agotar el tope de procesos de la cuenta y
+# dejo el despliegue parado; el paquete de aquel dia NO traia ni una migracion
+# nueva. Se jugo el sitio entero por un trabajo que no habia que hacer.
+#
+# La firma es la lista de carpetas de `prisma/migrations`. Se guarda al migrar
+# con exito y se compara con la del paquete nuevo. Iguales -> no hay nada
+# pendiente -> no se arranca Prisma.
+#
+# POR QUE ASI Y NO PREGUNTANDOLE A LA BASE: preguntar exige el cliente `mysql`,
+# parsear la URL y acertar con la clave; cada una de esas tres cosas es otra
+# forma de equivocarse, y equivocarse aqui significa saltarse una migracion
+# —codigo nuevo contra tablas viejas, que es la caida mas cara que tiene este
+# sistema—. Comparar dos listas de directorios no puede fallar.
+#
+# Y ES CONSERVADOR POR CONSTRUCCION: se salta el paso SOLO si la lista es
+# identica a la de la ultima vez que `migrate deploy` termino bien. Sin marca
+# previa, migra. Si la lista cambia en cualquier sentido -una mas, una menos,
+# un rollback-, migra. Migrar de mas es gratis; migrar de menos, no.
+FIRMA_MIGRACIONES="$RAIZ/tmp/migraciones-aplicadas"
+
+firma_del_paquete() {
+  # `LC_ALL=C` para que el orden no dependa del idioma del servidor: la misma
+  # lista tiene que dar la misma firma aqui y en la maquina de al lado.
+  ls -1 "$NUEVO/prisma/migrations" 2>/dev/null | LC_ALL=C sort | md5sum | cut -d' ' -f1
+}
+
+FIRMA_NUEVA="$(firma_del_paquete)"
+FIRMA_PREVIA="$(cat "$FIRMA_MIGRACIONES" 2>/dev/null || echo "")"
+
+# Una firma vacia significa que no se pudo leer el directorio: no se sabe que
+# migraciones trae el paquete, asi que no se decide nada y se migra.
+if [ -n "$FIRMA_NUEVA" ] && [ "$FIRMA_NUEVA" = "$FIRMA_PREVIA" ]; then
+  registrar "OK: el paquete no trae migraciones nuevas; no se arranca Prisma."
+elif [ ! -r "$CONFIG_DESPLIEGUE" ]; then
   registrar "AVISO: falta $CONFIG_DESPLIEGUE. Se aplica el paquete SIN migrar:" \
             "si esta version trae migraciones, hay que correr 'migrate deploy' a mano."
 else
@@ -269,6 +354,10 @@ else
     npx --yes prisma@7 migrate deploy 2>&1
   ) >> "$BITACORA" 2>&1; then
     registrar "OK: migraciones al dia."
+    # Se anota DESPUES del exito y nunca antes: la firma significa «estas
+    # migraciones ya estan aplicadas», y escribirla sin haberlo comprobado
+    # convertiria el atajo de arriba en una forma de saltarse una migracion.
+    [ -n "$FIRMA_NUEVA" ] && printf '%s\n' "$FIRMA_NUEVA" > "$FIRMA_MIGRACIONES"
   else
     registrar "ERROR: 'migrate deploy' fallo. NO se aplica el paquete;" \
               "la version anterior sigue sirviendo. Detalle justo arriba."
