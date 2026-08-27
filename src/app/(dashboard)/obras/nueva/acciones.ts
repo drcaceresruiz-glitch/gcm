@@ -8,6 +8,7 @@ import {
   cargarMetaDesdeExcel,
   mesesEntre,
 } from "@/services/meta-desde-excel";
+import { avisoDeRecorte } from "@/lib/meta-excel";
 
 /**
  * Alta de obras, con el presupuesto meta opcional en la misma tacada.
@@ -95,6 +96,24 @@ export async function accionCrearObra(
     }
 
     revalidatePath(`/obras/${resultado.id}`);
+
+    /*
+     * CON ALGO QUE REVISAR, A LA META; SI NO, AL CONTRACTUAL.
+     *
+     * El destino normal es el contractual, que es el paso siguiente. Pero si
+     * alguna descripcion se guardo recortada hay texto del presupuesto que ya
+     * no esta, y eso se mira en la meta -donde estan las lineas y se pueden
+     * corregir una a una-. Mandar a alguien a decidir recargos sin haberle
+     * dicho que su Excel entro incompleto es enseñarle cifras sobre un
+     * presupuesto que todavia no ha visto.
+     */
+    if (carga.recortadas.length > 0) {
+      redirect(
+        `/obras/${resultado.id}/meta?creada=${carga.version}` +
+          avisoDeRecorte(carga.recortadas),
+      );
+    }
+
     // Con presupuesto ya dentro, lo siguiente es el contractual: es donde se
     // deciden los recargos mirando la bolsa.
     redirect(`/obras/${resultado.id}/contractual`);

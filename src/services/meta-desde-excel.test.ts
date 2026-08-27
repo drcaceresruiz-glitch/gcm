@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { mesesEntre, validarArchivoMeta } from "@/lib/meta-excel";
+import { avisoDeRecorte, mesesEntre, validarArchivoMeta } from "@/lib/meta-excel";
 
 /**
  * Lo que se decide sobre el Excel de la meta antes de abrirlo.
@@ -85,5 +85,34 @@ describe("el plazo que se propone al crear la obra", () => {
     // Daria un plazo invalido y la carga se rechazaria con un mensaje sobre
     // los meses, que no es el problema.
     expect(Number(mesesEntre(dia("2026-01-01"), dia("2026-01-02")))).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * El aviso de descripciones recortadas, camino de la pantalla.
+ *
+ * Se prueba aqui porque lo usan los DOS caminos que cargan el Excel -el alta
+ * de obra y la pantalla de la meta-, igual que la validacion de arriba.
+ */
+describe("el aviso de las descripciones recortadas", () => {
+  it("no dice nada cuando no se recorto ninguna", () => {
+    expect(avisoDeRecorte([])).toBe("");
+  });
+
+  it("lleva el total y las filas donde mirarlas", () => {
+    const parametros = new URLSearchParams(avisoDeRecorte([276, 290, 293]));
+
+    expect(parametros.get("recortadas")).toBe("3");
+    expect(parametros.get("filas")).toBe("276,290,293");
+  });
+
+  it("con muchas, nombra unas pocas pero el total sigue siendo el de verdad", () => {
+    const muchas = Array.from({ length: 40 }, (_, i) => i + 10);
+    const parametros = new URLSearchParams(avisoDeRecorte(muchas));
+
+    // El total NO se recorta: es lo que impide que el aviso diga «12
+    // descripciones» cuando fueron cuarenta.
+    expect(parametros.get("recortadas")).toBe("40");
+    expect(parametros.get("filas")?.split(",")).toHaveLength(12);
   });
 });

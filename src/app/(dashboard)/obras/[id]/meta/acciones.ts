@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { obtenerSesion } from "@/services/sesion.service";
 import { aprobarMeta, eliminarBorrador } from "@/services/meta.service";
 import { cargarMetaDesdeExcel } from "@/services/meta-desde-excel";
+import { avisoDeRecorte } from "@/lib/meta-excel";
 
 /**
  * Las acciones de la pantalla del presupuesto meta.
@@ -42,7 +43,9 @@ export async function accionImportarMeta(
 
   revalidatePath(`/obras/${obraId}`);
   revalidatePath(`/obras/${obraId}/meta`);
-  redirect(`/obras/${obraId}/meta?creada=${r.version}`);
+  redirect(
+    `/obras/${obraId}/meta?creada=${r.version}${avisoDeRecorte(r.recortadas)}`,
+  );
 }
 
 export async function accionAprobarMeta(

@@ -100,6 +100,10 @@ export default async function MetaPage({
     eliminada?: string;
     /// El Excel adjunto en el alta de obra no se pudo cargar. Ver abajo.
     fallo?: string;
+    /// Cuantas descripciones se guardaron recortadas, y las primeras filas
+    /// donde mirarlas. Los pone `avisoDeRecorte`.
+    recortadas?: string;
+    filas?: string;
   }>;
 }) {
   const sesion = await obtenerSesion();
@@ -169,7 +173,21 @@ export default async function MetaPage({
     );
   }
 
-  const { creada, aprobada, eliminada, fallo } = await searchParams;
+  const { creada, aprobada, eliminada, fallo, recortadas, filas } =
+    await searchParams;
+
+  /*
+   * Cuantas descripciones entraron recortadas.
+   *
+   * Se lee de la direccion, asi que puede traer cualquier cosa: se exige un
+   * numero positivo y las filas se filtran a numeros. Lo que no cuadre no
+   * enseña un aviso raro, no enseña ninguno.
+   */
+  const cuantasRecortadas = Number(recortadas);
+  const filasRecortadas = (filas ?? "")
+    .split(",")
+    .map((f) => Number(f))
+    .filter((f) => Number.isInteger(f) && f > 0);
   const puedeCrear = puede(sesion, "meta:crear");
   const puedeAprobar = puede(sesion, "meta:aprobar");
 
@@ -236,6 +254,46 @@ export default async function MetaPage({
       )}
 
       {creada && <AvisoHecho texto={`Meta v${creada} cargada como borrador.`} />}
+
+      {/*
+        EL PRESUPUESTO ENTRO, PERO NO ENTERO.
+        La descripcion de una partida cabe hasta 500 caracteres, y en los
+        presupuestos reales hay celdas con el alcance tecnico completo dentro.
+        Antes eso tumbaba la carga con un error que no nombraba ni el archivo
+        ni la fila; ahora la partida entra con su importe -que es lo que no se
+        puede perder- y aqui se dice cual mirar. Va en amarillo y no en rojo a
+        proposito: no hay nada roto, hay algo que revisar.
+      */}
+      {Number.isInteger(cuantasRecortadas) && cuantasRecortadas > 0 && (
+        <p
+          role="alert"
+          className="rounded-xl border p-4 text-sm text-pretty"
+          style={{
+            borderColor: "var(--color-alerta)",
+            backgroundColor:
+              "color-mix(in oklab, var(--color-alerta) 12%, transparent)",
+          }}
+        >
+          <strong>
+            {cuantasRecortadas === 1
+              ? "Una descripción era demasiado larga y se guardó recortada."
+              : `${cuantasRecortadas} descripciones eran demasiado largas y se guardaron recortadas.`}
+          </strong>{" "}
+          El importe y el metrado entraron completos; lo que se cortó es el
+          texto, a partir de los 500 caracteres.{" "}
+          {filasRecortadas.length > 0 && (
+            <>
+              En el Excel {filasRecortadas.length === 1 ? "es la fila" : "son las filas"}{" "}
+              {filasRecortadas.join(", ")}
+              {cuantasRecortadas > filasRecortadas.length
+                ? ` y ${cuantasRecortadas - filasRecortadas.length} más.`
+                : "."}{" "}
+            </>
+          )}
+          Si ahí iba el alcance contratado, su sitio son las especificaciones:
+          revísalas abajo y acórtalas en el Excel si quieres volver a subirlo.
+        </p>
+      )}
       {aprobada && (
         <AvisoHecho
           texto={`Meta v${aprobada} aprobada. Queda congelada e inmutable.`}

@@ -440,3 +440,83 @@ describe("fechas opcionales de inicio y fin", () => {
     expect(r.errores[0]!.mensaje).toContain("antes de empezar");
   });
 });
+
+/**
+ * Descripciones que no caben en la base.
+ *
+ * El caso que tumbaba la pantalla entera el 27 de agosto de 2026: un
+ * presupuesto real con el alcance tecnico completo escrito dentro de la celda
+ * de descripcion. La columna admite 500 caracteres, nadie recortaba, y
+ * MariaDB respondia con un P2000 que subia hasta la frontera de error.
+ */
+describe("descripciones mas largas de lo que cabe", () => {
+  /// Del largo de la mayor del presupuesto que lo destapo: 1264 caracteres.
+  const LARGUISIMA = "TABLERO DE CONTROL Y DIFERENCIAL DE PRESION - ".padEnd(
+    1264,
+    "x",
+  );
+
+  it("recorta la descripcion a 500 y dice en que fila", async () => {
+    const libro = await construirLibro([
+      ["10.0", "CAPITULO X: EQUIPAMIENTO", null, null, null, null],
+      ["10.1", LARGUISIMA, "und", 1, 4200, 4200],
+    ]);
+
+    const r = await analizarExcel(libro);
+
+    expect(r.errores).toHaveLength(0);
+    expect(r.filas[1]?.descripcion).toHaveLength(500);
+    // La fila del EXCEL -tres titulos, la cabecera en la 4, el capitulo en la
+    // 5 y la partida en la 6-, no el indice de la lista: es lo unico con lo
+    // que alguien puede ir a buscarla en su archivo.
+    expect(r.descripcionesRecortadas).toEqual([6]);
+  });
+
+  it("la partida entra entera: lo que se recorta es el texto, no el importe", async () => {
+    const libro = await construirLibro([
+      ["10.1", LARGUISIMA, "und", 2, 4200, 8400],
+    ]);
+
+    const r = await analizarExcel(libro);
+
+    expect(r.totalPartidas).toBe(1);
+    expect(r.filas[0]?.parcial).toBe("8400.00");
+    expect(r.filas[0]?.metrado).toBe("2.00");
+    expect(r.montoTotal).toBe("8400.00");
+  });
+
+  it("lo cuenta como aviso de la fila, no como error", async () => {
+    const libro = await construirLibro([
+      ["10.1", LARGUISIMA, "und", 1, 4200, 4200],
+    ]);
+
+    const r = await analizarExcel(libro);
+
+    expect(r.errores).toHaveLength(0);
+    expect(r.filas[0]?.aviso).toContain(String(LARGUISIMA.length));
+    expect(r.filas[0]?.aviso).toContain("500");
+  });
+
+  it("una descripcion que cabe no se toca ni se apunta", async () => {
+    const libro = await construirLibro([
+      ["10.1", "Suministro de luces de emergencia", "und", 11, 380, 4180],
+    ]);
+
+    const r = await analizarExcel(libro);
+
+    expect(r.filas[0]?.descripcion).toBe("Suministro de luces de emergencia");
+    expect(r.descripcionesRecortadas).toEqual([]);
+  });
+
+  it("tambien recorta los costos propios de la meta, que van a la misma columna", async () => {
+    const libro = await construirLibro([
+      [null, LARGUISIMA, "mes", 6, 7700, 46200],
+    ]);
+
+    const r = await analizarExcel(libro, { propiasDeLaMeta: true });
+
+    expect(r.propiasDeLaMeta).toHaveLength(1);
+    expect(r.propiasDeLaMeta[0]?.descripcion).toHaveLength(500);
+    expect(r.descripcionesRecortadas).toEqual([5]);
+  });
+});

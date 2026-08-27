@@ -96,6 +96,15 @@ export interface ResultadoAnalisis {
    * del importador se preguntara que hacer con una partida sin sitio.
    */
   propiasDeLaMeta: FilaPropiaDeLaMeta[];
+  /**
+   * Filas cuya descripcion no cabia y se guardo recortada.
+   *
+   * Van APARTE del `aviso` de cada fila, aunque tambien se anote alli: los
+   * avisos por fila no llegan hoy a ninguna pantalla, y este recorte SI tiene
+   * que verse -es texto del presupuesto que ya no esta-. Se lleva el numero
+   * de fila del Excel, que es lo unico con lo que alguien puede ir a mirarla.
+   */
+  descripcionesRecortadas: number[];
   /// Partidas ocultas en el Excel: quedaron fuera de alcance y no se importan.
   filasOcultas: number;
   /// Importe que suman esas partidas ocultas, para que se vea que se dejo fuera.
@@ -123,6 +132,29 @@ const CODIGO_VALIDO = /^\d+(\.\d+)*$/;
  */
 const MAX_UNIDAD = 20;
 const MAX_CODIGO = 32;
+
+/**
+ * Lo que aguanta la descripcion, y por que su fallo era el mas caro de los tres.
+ *
+ * `PresupuestoMetaItem.descripcion` y `WbsItem.descripcion` son ambas
+ * VarChar(500). Hasta el 27 de agosto de 2026 este limite NO se miraba aqui:
+ * el codigo y la unidad si, la descripcion no. Y una descripcion larga no da
+ * un error de fila como los otros dos —llega hasta el `createMany`, MariaDB
+ * responde P2000 y la EXCEPCION SE COME LA PANTALLA ENTERA—: quien adjuntaba
+ * el Excel en el alta de obra veia «Esta pantalla no se pudo cargar», sin
+ * mencion del archivo ni de la fila.
+ *
+ * Paso con un presupuesto real de 400 partidas donde ocho traian el alcance
+ * tecnico completo dentro de la celda de descripcion —la mayor, 1264
+ * caracteres con la lista de llaves y diferenciales de un tablero—. Es lo
+ * normal en un presupuesto de verdad, no un archivo mal hecho.
+ *
+ * Se RECORTA y se avisa, como la unidad: la partida y su importe valen mas
+ * que el parrafo de alcance, y perder el presupuesto entero por un texto
+ * largo es la peor de las opciones. Las filas recortadas viajan en
+ * `descripcionesRecortadas` para que la pantalla pueda nombrarlas.
+ */
+const MAX_DESCRIPCION = 500;
 
 export interface Combinacion {
   /// Fila que posee el valor; el resto lo comparten.
@@ -472,7 +504,7 @@ export async function analizarExcel(
       filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0,
       totalPartidas: 0, montoTotal: "0.00", montoSinRepetidos: "0.00",
       gruposRepetidos: [], filasTextoOmitidas: 0, propiasDeLaMeta: [],
-      filasOcultas: 0, importeOculto: "0.00",
+      descripcionesRecortadas: [], filasOcultas: 0, importeOculto: "0.00",
     };
   }
 
@@ -490,7 +522,7 @@ export async function analizarExcel(
       filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0,
       totalPartidas: 0, montoTotal: "0.00", montoSinRepetidos: "0.00",
       gruposRepetidos: [], filasTextoOmitidas: 0, propiasDeLaMeta: [],
-      filasOcultas: 0, importeOculto: "0.00",
+      descripcionesRecortadas: [], filasOcultas: 0, importeOculto: "0.00",
     };
   }
 
@@ -503,6 +535,7 @@ export async function analizarExcel(
   const codigosVistos = new Map<string, number>();
 
   let filasTextoOmitidas = 0;
+  const descripcionesRecortadas: number[] = [];
   const propiasDeLaMeta: FilaPropiaDeLaMeta[] = [];
   let filasOcultas = 0;
   const importesOcultos: string[] = [];
@@ -633,9 +666,15 @@ export async function analizarExcel(
           (parcial !== null && unidad !== null);
 
         if (esCosto) {
+          // El mismo tope que en las partidas con codigo: estas se guardan en
+          // la MISMA columna, y olvidarlo aqui dejaria media puerta abierta.
+          if (descripcion.trim().length > MAX_DESCRIPCION) {
+            descripcionesRecortadas.push(n);
+          }
+
           propiasDeLaMeta.push({
             fila: n,
-            descripcion,
+            descripcion: descripcion.trim().slice(0, MAX_DESCRIPCION),
             unidad,
             metrado,
             precioUnitario,
@@ -785,8 +824,19 @@ export async function analizarExcel(
     });
 
     if (registro) {
-      filas.push(registro);
+      // El recorte lo hace `normalizarDescripcion`; aqui se DEJA CONSTANCIA.
+      // Sin esto la partida entraria con el alcance a medias y nadie lo
+      // sabria: es justo el fallo silencioso que este proyecto persigue.
+      if (descripcion.trim().length > MAX_DESCRIPCION) {
+        descripcionesRecortadas.push(n);
+        const nota =
+          `La descripcion tenia ${descripcion.trim().length} caracteres y se guardo ` +
+          `recortada a ${MAX_DESCRIPCION}. Si ahi va el alcance contratado, su sitio ` +
+          `son las especificaciones, no el nombre de la partida.`;
+        registro.aviso = registro.aviso ? `${registro.aviso} ${nota}` : nota;
+      }
 
+      filas.push(registro);
     }
   }
 
@@ -837,6 +887,10 @@ export async function analizarExcel(
     gruposRepetidos: repetidos,
     filasTextoOmitidas,
     propiasDeLaMeta,
+    // Ordenadas: se leen como se recorre el Excel, de arriba abajo. Las
+    // partidas con codigo y los costos propios se apuntan en dos sitios
+    // distintos del bucle, asi que sin esto saldrian entremezcladas.
+    descripcionesRecortadas: [...descripcionesRecortadas].sort((a, b) => a - b),
     filasOcultas,
     importeOculto: sumar(importesOcultos),
   };
@@ -866,7 +920,9 @@ interface ArgsFila {
  * siglas ni unidades legitimas de construccion (PVC, SAP, m2, kg).
  */
 function normalizarDescripcion(texto: string, tipo: TipoFila): string {
-  const limpio = texto.trim();
+  // El recorte va ANTES de las mayusculas: asi lo que se guarda mide lo que
+  // se prometio medir pase lo que pase con el idioma.
+  const limpio = texto.trim().slice(0, MAX_DESCRIPCION);
   if (!limpio) return limpio;
   if (tipo === "CAPITULO") return limpio.toLocaleUpperCase("es");
   return limpio.charAt(0).toLocaleUpperCase("es") + limpio.slice(1);

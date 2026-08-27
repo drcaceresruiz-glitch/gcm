@@ -32,7 +32,18 @@ import {
 export { mesesEntre, validarArchivoMeta, MODOS } from "@/lib/meta-excel";
 
 export type ResultadoCarga =
-  | { ok: true; version: number }
+  | {
+      ok: true;
+      version: number;
+      /**
+       * Filas del Excel cuya descripcion se guardo recortada.
+       *
+       * Viaja hasta la pantalla porque es texto del presupuesto que ya no
+       * esta: la carga salio bien y por eso NO es un error, pero callarlo
+       * seria guardar un alcance a medias sin que nadie se entere.
+       */
+      recortadas: number[];
+    }
   | { ok: false; error: string };
 
 export interface EntradaCargaMeta {
@@ -160,14 +171,61 @@ export async function cargarMetaDesdeExcel(
     };
   });
 
-  const resultado = await crearMeta(sesion, obraId, {
-    modo,
-    fechaMeta: entrada.fechaMeta,
-    mesesPlazo,
-    notas: entrada.notas?.trim() || null,
-    items,
-  });
+  /**
+   * La escritura, con red.
+   *
+   * `crearMeta` valida lo suyo y devuelve `{ok:false}` con su motivo, pero lo
+   * que MariaDB rechaza no pasa por ahi: sale como excepcion desde el
+   * `createMany`, sube por la Server Action y tumba la pantalla con el
+   * «Esta pantalla no se pudo cargar» generico. Paso el 27 de agosto de 2026
+   * con un presupuesto de 400 partidas y ocho descripciones larguisimas
+   * (P2000): ni el archivo ni la fila aparecian por ningun lado.
+   *
+   * Aquellas ya no llegan -se recortan al analizar-, pero esto se queda: es
+   * la unica forma de que el SIGUIENTE dato que no quepa se cuente como un
+   * archivo que corregir y no como una aplicacion rota.
+   */
+  let resultado: Awaited<ReturnType<typeof crearMeta>>;
+  try {
+    resultado = await crearMeta(sesion, obraId, {
+      modo,
+      fechaMeta: entrada.fechaMeta,
+      mesesPlazo,
+      notas: entrada.notas?.trim() || null,
+      items,
+    });
+  } catch (e) {
+    return { ok: false, error: motivoDeGuardado(e) };
+  }
 
   if (!resultado.ok) return { ok: false, error: resultado.error };
-  return { ok: true, version: resultado.version };
+  return {
+    ok: true,
+    version: resultado.version,
+    recortadas: costo.descripcionesRecortadas,
+  };
+}
+
+/**
+ * Traduce a castellano el fallo de guardar, sin filtrar detalles del servidor.
+ *
+ * Se nombra la COLUMNA cuando Prisma la da (P2000 la trae): «no cabe en
+ * descripcion» le dice a alguien que mire su Excel, mientras que «error al
+ * guardar» solo puede acabar en una llamada. Del resto no se dice nada
+ * tecnico a proposito -es lo mismo que hace la lectura del archivo unas
+ * lineas mas arriba-.
+ */
+function motivoDeGuardado(e: unknown): string {
+  const err = e as { code?: string; meta?: { column_name?: unknown } };
+
+  if (err?.code === "P2000") {
+    const columna =
+      typeof err.meta?.column_name === "string" ? err.meta.column_name : null;
+    return columna
+      ? `Un valor de la columna «${columna}» es demasiado largo para guardarlo. ` +
+          "Acortalo en el Excel y vuelve a subirlo."
+      : "Un valor del archivo es demasiado largo para guardarlo.";
+  }
+
+  return "No se pudo guardar el presupuesto. Revisa el archivo y vuelve a intentarlo.";
 }

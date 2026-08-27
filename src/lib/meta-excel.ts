@@ -100,6 +100,32 @@ export function validarArchivoMeta(archivo: unknown): ValidacionArchivo {
 }
 
 /**
+ * Cuantas filas recortadas se nombran en la direccion de la pantalla.
+ *
+ * Un presupuesto con doscientas descripciones larguisimas produciria una URL
+ * de varios miles de caracteres -que algunos servidores cortan-, y nadie lee
+ * doscientos numeros. Se nombran unas pocas y el TOTAL viaja aparte, que es
+ * lo que impide que el aviso mienta cuando hay mas de las que caben.
+ */
+const FILAS_NOMBRADAS = 12;
+
+/**
+ * El aviso de descripciones recortadas, como parametros de la direccion.
+ *
+ * Vive aqui, con lo demas que comparten el alta de obra y la pantalla de la
+ * meta: las dos cargan el mismo Excel y las dos tienen que contar lo mismo
+ * despues. Cadena vacia si no hubo recortes, para poder concatenarla sin
+ * preguntar.
+ */
+export function avisoDeRecorte(recortadas: readonly number[]): string {
+  if (recortadas.length === 0) return "";
+  return (
+    `&recortadas=${recortadas.length}` +
+    `&filas=${recortadas.slice(0, FILAS_NOMBRADAS).join(",")}`
+  );
+}
+
+/**
  * Meses entre dos fechas, a 30 dias.
  *
  * A 30 dias y no por meses de calendario, que es como lo hace el resto del
