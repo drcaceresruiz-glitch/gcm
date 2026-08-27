@@ -3,9 +3,34 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 25 de agosto de 2026 (tarde).
+Ultima revision: 27 de agosto de 2026 (noche).
 
-## AL ABRIR LA PROXIMA SESION (despues del 25 de agosto de 2026)
+## AL ABRIR LA PROXIMA SESION (despues del 27 de agosto de 2026)
+
+**No queda nada a medias.** El dia se cerro con lo pedido hecho, probado y
+publicado (`d5356f8` corriendo en produccion, `/api/health` en verde). El
+relato completo esta en el anexo del 27 de agosto de `ESTADO.md`; aqui solo lo
+que hay que TENER PRESENTE:
+
+1. **El hosting se quedo sin cupo de procesos y bloqueo la cuenta entera** al
+   publicar por la tarde: ni Terminal, ni gestor de Node, ni *Resource Usage*
+   —todos con `cagefs_enter: Unable to fork`—. La web siguio sirviendo. La
+   causa esta cerrada en `scripts/desplegar.sh` (no se arranca Prisma sin
+   migraciones nuevas, y un paquete matado a medias vuelve solo a la cola),
+   pero si vuelve a pasar por otro motivo, el rescate sin consola esta en la
+   memoria `rescatar-el-hosting-sin-consola`. **Ampliar el plan NO lo arregla.**
+2. **El plan de hosting se amplio ese dia.** Conviene mirar si hacia falta de
+   verdad o fue por el bloqueo: la causa era un proceso colgado, no el tamaño
+   del plan.
+3. **El Excel del cliente vive en `docs/` sin subir al repositorio**
+   (`PPTO DE OBRA CRIOCORD 2026.06.02.xlsx`). Se dejo fuera a proposito, son
+   datos comerciales de un tercero. Decidir si se guarda ahi o se borra.
+4. **La descripcion de una partida se recorta a 500 caracteres.** Se eligio
+   recortar y avisar en vez de ampliar la columna, con el usuario decidiendo.
+   Si algun dia molesta, la alternativa era ampliar `descripcion` en
+   `PresupuestoMetaItem` **y** en `WbsItem`, las dos, con migracion.
+
+## Lo que quedaba del 25 de agosto de 2026
 
 **No queda ninguna tarea a medias.** El recorrido como residente —lo unico
 pendiente por la manana— se hizo entero y esta cerrado mas abajo. Lo que sigue
@@ -901,7 +926,14 @@ en «mes» de donde sacarlo: un cero diria que alargarse sale gratis.
 
 Sin migracion de datos, pedido asi. La lista vieja queda en `audit_log`.
 
-### Pegar una fila en el Excel no va, insertarla si
+### ~~Pegar una fila en el Excel no va, insertarla si~~ — SUPERADO el 27 de agosto de 2026
+
+> **La plantilla ya no se protege**, así que pegar funciona sin rodeos. El
+> cliente pidió justo eso —traerse su presupuesto entero pegándolo— y enseñar
+> un menú para esquivar una protección propia era reconocer que la protección
+> sobraba. Lo que sigue se deja porque explica de dónde salía el problema, pero
+> **la conclusión de abajo ya no vale**: no hay que ir a «Insertar celdas
+> copiadas» ni desproteger nada. Ver el anexo del 27 de agosto en `ESTADO.md`.
 
 Un dia despues de decir «copia una fila vacia y pegala», la captura: «La celda
 o el grafico que intenta cambiar estan en una hoja protegida». Insertar filas YA

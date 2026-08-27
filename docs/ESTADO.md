@@ -6,17 +6,133 @@ qué está construido así.
 **Lo que FALTA vive en [`PENDIENTES.md`](PENDIENTES.md)**, aparte, para poder
 tacharlo sin reescribir esto.
 
-Última actualización: 25 de agosto de 2026 (tarde).
+Última actualización: 27 de agosto de 2026 (noche).
 
 > **Este documento se escribió por capas y las más nuevas van arriba.** Las
 > secciones numeradas del final son del 8 de agosto; los anexos recogen lo
 > ocurrido después. **Ante una contradicción, manda siempre el anexo más
-> reciente**, que es el del 25 de agosto.
+> reciente**, que es el del 27 de agosto.
 >
 > Entre el 12 y el 21 de agosto entraron 297 commits y el sistema cambió de
 > forma en cosas de fondo —el contractual ahora se genera desde el presupuesto
 > real, y los gastos generales dejaron de ser de la obra—. Si algo de más
 > abajo te suena raro, comprueba primero si el anexo lo desmiente.
+
+---
+
+## Anexo — 27 de agosto de 2026
+
+El día del **presupuesto de un cliente de verdad**, y de un incidente de
+hosting que se llevó la tarde. Empezó con una pregunta de producto —«mi cliente
+quiere pegar en la plantilla el presupuesto que ya tiene en su Excel»— y acabó
+con el servidor bloqueado para cualquier tarea automática.
+
+### El fallo: una descripción larga tumbaba la pantalla entera
+
+Adjuntar el Excel al crear una obra terminaba en «Esta pantalla no se pudo
+cargar», sin nombrar el archivo ni la fila. **No era la pantalla: era el
+guardado.** Ocho partidas de un presupuesto real de 400 líneas traían el
+alcance técnico completo dentro de la celda de descripción —la mayor, 1.264
+caracteres con la lista de llaves y diferenciales de un tablero— contra un
+`VarChar(500)`. MariaDB responde `P2000`, la excepción sube por la Server
+Action y se lleva la pantalla por delante.
+
+El código y la unidad **sí** se comprobaban al analizar; la descripción no. Es
+el mismo agujero que se cerró el 20/08 para las otras dos columnas, con una
+diferencia que lo hacía peor: aquellas daban un error de fila, y esta mataba la
+carga sin decir dónde.
+
+Ahora se recorta a 500 al analizar —como ya hacían los importadores del
+cronograma— y **la partida entra con su importe y su metrado**, que es lo que
+no se puede perder. Las filas recortadas viajan hasta la pantalla de la meta,
+que dice cuántas fueron y en cuáles mirar; y cuando hay recortes, el alta de
+obra lleva a la meta en vez de al contractual, porque no se manda a nadie a
+decidir recargos sin avisarle antes de que su Excel entró incompleto. Queda
+además la red para el siguiente dato que no quepa: lo que MariaDB rechace se
+cuenta como un archivo que corregir, nombrando la columna, no como una
+aplicación rota.
+
+### El descubrimiento: el Excel propio del cliente entra sin plantilla
+
+Se pasó por el importador el presupuesto real —**400 partidas, 40 capítulos,
+S/ 806.497,45**— sin tocarle una celda: cabecera encontrada en la fila 10,
+columnas reconocidas (ITEM, DESCRIPCIÓN, UND, CANT, PRECIO UNIT., SUB-TOTAL) y
+**cero errores**. Ochenta partidas venían sin precio y entraron igual, listas
+para completarlas en la web.
+
+Eso desmintió un texto de la propia aplicación: el cartel de la pantalla de la
+meta decía «usa siempre la plantilla; un Excel propio suele colar errores que
+el importador no puede ver». Ya no es verdad y se cambió. Mandar a alguien a
+rehacer su presupuesto en nuestra plantilla, sabiendo esto, es hacerle perder
+la tarde.
+
+### Lo que se pidió después, en el orden en que se pidió
+
+**Los importes repetidos, que se detectaban y no se enseñaban.** El importador
+los encontraba desde el primer día —síntoma de fórmula arrastrada— y calculaba
+hasta el total alternativo sin ellos. No lo leía nadie: se devolvía y se perdía
+al salir del servicio. En este presupuesto son tres grupos y ocho líneas,
+**2.201,01 contados de más**. Ahora se avisa encima de la tabla del borrador,
+se calcula al pintar —así aparece también en metas cargadas antes y desaparece
+solo al corregir— y no se corrige por cuenta propia: dos partidas pueden costar
+lo mismo de forma legítima.
+
+**El despliegue, que se jugaba el cupo del hosting en cada publicación.** Ya no
+arranca Prisma si el paquete trae las mismas migraciones que la última vez que
+se migró con éxito, y un paquete matado a medias vuelve solo a la cola a los
+quince minutos. Y se le escribió un banco de pruebas —`scripts/probar-desplegar.sh`,
+colgado de la batería— porque era el archivo cuyo fallo sale más caro y no
+tenía ni una prueba: corre solo, en producción, cada minuto.
+
+**La plantilla, sin candado.** Era la petición original. Nacía protegida y
+pegar escribe sobre las celdas de destino, así que Excel lo cortaba; el 23/08
+eso se había resuelto enseñando el menú «Insertar celdas copiadas». Enseñar un
+rodeo para esquivar una protección propia es reconocer que la protección sobra.
+Se quitó y se quedaron el gris y las notas, que avisan sin impedir. Lo que se
+pierde al pegar son las fórmulas, y no cuesta un sol: el importador recalcula.
+**Probado y no supuesto**: hay un caso que simula el pegado —datos escritos
+encima, fórmulas borradas— y comprueba que los importes salen iguales.
+
+### El incidente: la cuenta del hosting bloqueada
+
+Al publicar el arreglo, el despliegue murió **en seco** a media línea de la
+bitácora: sin error, sin «falló», sin nada. El paquete no traía ni una
+migración nueva y aun así se arrancó `npx prisma@7 migrate deploy` —npm, node y
+el schema-engine, tres procesos del mismo cupo que la aplicación—, y ahí se
+agotó el tope de procesos del LVE. A partir de ese momento la cuenta no podía
+arrancar nada: ni el Terminal de cPanel, ni el gestor de Node, ni
+*Resource Usage*, todos con `cagefs_enter: Unable to fork`. **La web siguió
+sirviendo** —su proceso ya estaba vivo— pero los dos crons dejaron de correr, y
+eso se vio desde fuera: `/api/health` pasó de `reloj: vivo` a `reloj: parado`.
+
+Dos cosas que no lo arreglaron y conviene no repetir: **ampliar el plan de
+hosting** —da cupo nuevo, no libera lo colgado— y pulsar botones de cPanel, que
+casi todos necesitan arrancar un proceso.
+
+Lo que sí: apartar el paquete de la cola renombrándolo desde el Administrador
+de archivos, reiniciar la aplicación creando `tmp/restart.txt` ahí mismo, y
+devolver el paquete. Entró solo en el minuto siguiente. Está en las memorias
+como [`rescatar-el-hosting-sin-consola`].
+
+Hay un segundo modo de fallo que salió a la luz y ya está cerrado: el paquete
+se reserva renombrándolo nada más cogerlo, y si el proceso **falla** hay una
+rama que lo devuelve, pero si lo **matan** no queda rama que corra. El cron
+pasaba cada minuto, no veía ningún `gcm.tar.gz` y se iba. Para siempre.
+
+### Lo que hay que llevarse del día
+
+- **«Esta pantalla no se pudo cargar» puede no ser la pantalla.** El código de
+  `/obras/nueva` era idéntico al de producción y en local no fallaba: el fallo
+  vivía en la escritura, y solo aparecía con ese archivo y con la base delante.
+  Para ejercitar un servicio de verdad fuera de Next hace falta un montaje que
+  ni vitest ni `tsx` a secas dan; está en las memorias.
+- **Un aviso que nadie lee no existe.** Los importes repetidos llevaban
+  semanas calculándose para nada. Antes de añadir una detección nueva, mirar si
+  la anterior llegó a alguna pantalla.
+- **Y el usuario lo dijo con todas las letras**: «no entiendo nada de lo que me
+  dices». Las respuestas iban llenas de rutas de archivo y números de línea. La
+  misma información contada por el síntoma sí funcionó, y la conversación
+  avanzó. Está en las memorias como [`explicar-sin-jerga`].
 
 ---
 

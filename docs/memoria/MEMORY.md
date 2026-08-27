@@ -24,3 +24,4 @@
 - [Heredoc se rompe con plantillas JS](heredoc-se-rompe-con-plantillas-js.md) — un `<<'EOF'` con `${...}` dentro de backticks falla; escribir el script con Write
 - [Explicar sin jerga](explicar-sin-jerga.md) — el usuario pidio el 27/08/2026 que se le cuente el sintoma, no la ruta del archivo
 - [Ejercitar un servicio fuera de Next](ejercitar-un-servicio-fuera-de-next.md) — como reproducir un fallo que solo aparece al guardar, con tsx y un stub de server-only
+- [Rescatar el hosting sin consola](rescatar-el-hosting-sin-consola.md) — «Unable to fork»: ampliar el plan no lo arregla; apartar el paquete, reiniciar por archivo y devolverlo
