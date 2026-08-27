@@ -30,6 +30,44 @@ que hay que TENER PRESENTE:
    Si algun dia molesta, la alternativa era ampliar `descripcion` en
    `PresupuestoMetaItem` **y** en `WbsItem`, las dos, con migracion.
 
+### ABIERTO Y SIN CERRAR: el total de GCM no coincide con el del Excel del cliente
+
+Salio al final del 27 de agosto, tirando del hilo que abrio el usuario: «esta
+siendo sumada en su nivel madre». Tiene razon —el presupuesto pone el importe
+en el subcapitulo (`7.02.00 REDES DE DESAGUE = 13.109,04`) y debajo cuelga el
+desglose con metrado y sin precio— y **GCM lo trata bien**: cuenta el paquete
+una vez y no cuenta las hijas. Eso esta comprobado.
+
+Lo que NO cuadra es el total. GCM cuenta **806.497,45**; sumando los totales
+por capitulo que enseña el propio Excel salen **754.517,45**. Tres tramos de
+esa diferencia, con lo que se sabe de cada uno:
+
+- **CONFIRMADO — el Excel no suma varios subcapitulos.** El total del capitulo
+  11 (166.942,42) se compone solo de `11.01`, `11.02`, `11.03` y el descuento:
+  la columna TOTALES esta VACIA en `11.04 PISOS`, `11.05`, `11.06 PINTURA`,
+  `11.07 PUERTAS`, `11.11`, `11.12 MELAMINE`, `11.13` y `11.14 VARIOS`, y
+  todos ellos tienen partidas con importe. GCM las cuenta; el Excel no. Es un
+  fallo del presupuesto del cliente, no de GCM, pero hay que decirselo.
+- **CONFIRMADO — los descuentos comerciales.** Hay partidas negativas
+  (`2.07`, `4.xx`, `5.xx`, `7.09.02 = -3.600`, `11.01.10 = -5.000`). GCM las
+  resta; los totales por capitulo del Excel no las incluyen. El capitulo 7
+  cuadra al centimo con el Excel si se ignora su descuento.
+- **SIN RESOLVER — `11.03` y los bloques de `8.01`/`8.02`.** En `11.03
+  ACABADOS ESPECIALES` el Excel enseña 80.072,84 y GCM cuenta 24.364,01. Es la
+  diferencia mas grande y no esta explicada. Los de `8.01`/`8.02` rondan los
+  -4.500 y -4.700, que huele a descuento pero no esta comprobado.
+
+**OJO CON LA MEDICION, que ya fallo una vez esta noche.** El script de
+comparacion trataba los codigos terminados en `.0` (`8.01.0`) como si fueran
+`.00`, y por eso dio «GCM cuenta 0» en dos bloques enteros que si estaba
+contando. Antes de reportar cifras de conjunto hay que arreglar eso y volver a
+medir. Lo de arriba marcado como CONFIRMADO se leyo directamente del Excel, sin
+pasar por ese script.
+
+**Por que importa:** si el cliente aprueba una meta de 806 mil creyendo que su
+presupuesto son 754 mil, la bolsa de esa obra nace mintiendo. Antes de tocar
+codigo hay que decidir CON EL USUARIO que cifra manda.
+
 ## Lo que quedaba del 25 de agosto de 2026
 
 **No queda ninguna tarea a medias.** El recorrido como residente —lo unico
