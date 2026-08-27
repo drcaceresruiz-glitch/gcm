@@ -444,9 +444,18 @@ export default async function MetaPage({
           {/* La plantilla, ANTES del formulario y en todas las versiones.
               Estaba como enlace pequeño al pie y su mención desaparecia desde
               la v2, asi que quien cargaba una version nueva subia su propio
-              Excel: de ahi salen casi todos los fallos del importador
-              —capitulos sin subtotal, formulas sin resultado calculado, meses
-              que exceden el plazo—, y ninguno da error al subir. */}
+              Excel sin saber siquiera que existia una plantilla.
+
+              ESTE TEXTO DECIA «usa siempre la plantilla; un Excel propio
+              suele colar errores que el importador no puede ver», y se cambio
+              el 27/08/2026 porque ya no era verdad. Ese dia se paso por el
+              importador un presupuesto real de otra oficina -400 partidas, 40
+              capitulos- y entro entero, sin un solo error: se reconocen las
+              cabeceras que usa cada oficina, se calcula el parcial que falte,
+              y ahora se AVISA de lo que antes se callaba -descripciones
+              recortadas, importes repetidos-. Mandar a alguien a rehacer su
+              presupuesto en nuestra plantilla, sabiendo eso, es hacerle
+              perder la tarde. */}
           <div
             className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4"
             style={{
@@ -455,10 +464,13 @@ export default async function MetaPage({
             }}
           >
             <p className="max-w-xl text-sm text-pretty">
-              <strong>Usa siempre la plantilla.</strong> Trae la hoja «Costo
-              Directo» con las fórmulas ya hechas y las celdas que no se
-              tocan bloqueadas. Un Excel propio suele colar errores que el
-              importador no puede ver.
+              <strong>¿Ya tienes el presupuesto en tu propio Excel?</strong>{" "}
+              Súbelo tal cual: se reconocen las cabeceras habituales (Ítem,
+              Descripción, Und, Cantidad, P.U., Parcial) aunque vayan en otro
+              orden, y lo que no cuadre se avisa aquí. La plantilla es para
+              quien empieza de cero: trae las columnas con las fórmulas hechas
+              y explica cada una. Ya no está protegida, así que también puedes
+              pegar dentro tu presupuesto entero.
             </p>
             <a
               href={`/plantilla-meta?meses=${mesesSugeridos}&obra=${id}`}

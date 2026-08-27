@@ -438,50 +438,43 @@ describe("cuantas filas vienen listas, y con que", () => {
   });
 });
 
-describe("la proteccion deja salir", () => {
+describe("nada estorba al llenar la hoja", () => {
   /*
-   * Reportado el 23 de agosto de 2026 con captura: copiar una fila y darle a
-   * Pegar sale «La celda o el gráfico que intenta cambiar están en una hoja
-   * protegida». No es un permiso que falte -insertar SI esta permitido-: es
-   * que pegar ESCRIBE sobre las celdas de formula, que estan bloqueadas. La
-   * operacion que funciona es «Insertar celdas copiadas».
+   * ESTE BLOQUE CAMBIO DE BANDO EL 27/08/2026, y conviene saber por que.
    *
-   * Lo que se fija aqui es lo unico que puede regresar en silencio: que
-   * insertar siga permitido y que no aparezca una contraseña.
+   * Nacio defendiendo la proteccion: que dejara insertar filas y que no
+   * pidiera contraseña. Venia del reporte del 23 de agosto -copiar una fila y
+   * darle a Pegar salia «La celda o el grafico que intenta cambiar estan en
+   * una hoja protegida»-, que entonces se resolvio enseñando el menu que si
+   * funcionaba.
+   *
+   * El cliente pidio despues lo que ese rodeo escondia: traerse su
+   * presupuesto entero pegandolo. Asi que ahora se fija lo contrario -que no
+   * haya proteccion ninguna- y lo que se conserva de aquello es lo unico que
+   * de verdad importaba: que se puedan añadir filas donde haga falta y que la
+   * leyenda diga como, sin procedimientos de tres pasos.
    */
-  it("permite insertar filas y no pide contraseña", async () => {
+  it("no hay proteccion que quitar, ni con contraseña ni sin ella", async () => {
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(await generarPlantillaMeta());
 
-    // Solo la hoja de datos: «Instrucciones» es texto y no se protege.
-    for (const hoja of [libro.worksheets[0]!]) {
-      // `sheetProtection` existe al cargar pero los tipos de ExcelJS no lo
-      // declaran; de ahi el puente.
-      const p = (
-        hoja as unknown as {
-          sheetProtection?: {
-            insertRows?: boolean;
-            deleteRows?: boolean;
-            spinCount?: number;
-          };
-        }
-      ).sheetProtection;
-      expect(p?.insertRows).toBe(true);
-      expect(p?.deleteRows).toBe(true);
-      // Una hoja protegida CON contraseña no se puede desbloquear, y entonces
-      // el aviso de Excel no tiene salida.
-      expect(p?.spinCount).toBeUndefined();
-    }
+    // `sheetProtection` existe al cargar pero los tipos de ExcelJS no lo
+    // declaran; de ahi el puente.
+    const p = (
+      libro.worksheets[0]! as unknown as { sheetProtection?: unknown }
+    ).sheetProtection;
+
+    expect(p).toBeFalsy();
   });
 
-  it("la leyenda dice lo simple: insertar y escribir", async () => {
+  it("la leyenda dice lo simple: pega lo tuyo y escribe", async () => {
     /*
-     * Ayer decia «copia una fila vacia y usa Insertar celdas copiadas». Era
+     * Antes decia «copia una fila vacia y usa Insertar celdas copiadas». Era
      * cierto y era innecesario: el importador YA calcula el parcial con el
-     * metrado y el precio cuando la celda viene vacia, asi que una fila
-     * insertada en blanco entra bien. Se estaba enseñando un procedimiento de
-     * tres pasos para un problema que no existia, y el usuario lo dijo: «no
-     * me queda claro como agregar filas, se me hace dificil».
+     * metrado y el precio cuando la celda viene vacia. Se estaba enseñando un
+     * procedimiento de tres pasos para un problema que no existia, y el
+     * usuario lo dijo: «no me queda claro como agregar filas, se me hace
+     * dificil».
      *
      * El truco de copiar la fila sigue documentado en la hoja de
      * instrucciones, donde toca: sirve para VER el parcial en Excel, no para
@@ -491,7 +484,7 @@ describe("la proteccion deja salir", () => {
     await libro.xlsx.load(await generarPlantillaMeta());
     const leyenda = String(libro.worksheets[0]!.getCell("A3").value);
 
-    expect(leyenda).toContain("Insertar");
+    expect(leyenda).toContain("Pega aquí");
     expect(leyenda).toContain("GCM lo calcula");
     // Y no vuelve a pedir el rodeo como si fuera obligatorio.
     expect(leyenda).not.toContain("Insertar celdas copiadas");
@@ -725,5 +718,139 @@ describe("el recargo que genera el presupuesto contractual", () => {
 
     expect(r.columnasDetectadas["parcial"]).toBe("Parcial");
     expect(r.montoTotal).toBe(TOTAL_COSTO_EJEMPLO);
+  });
+});
+
+/**
+ * La hoja se entrega SIN protección.
+ *
+ * Pedido por el cliente el 27 de agosto de 2026: quiere pegar de una vez los
+ * capitulos, partidas y subpartidas que ya tiene en su propio Excel, y una
+ * hoja protegida corta el pegado en cuanto toca una celda con formula. Antes
+ * habia que enseñar el rodeo de «Insertar celdas copiadas»; ahora no hay
+ * rodeo que enseñar.
+ */
+describe("la plantilla se puede llenar pegando", () => {
+  const hojaCosto = async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    return libro.worksheets[0]!;
+  };
+
+  it("la hoja no viene protegida", async () => {
+    const h = await hojaCosto();
+
+    // ExcelJS marca la hoja protegida con `sheetProtection` en el modelo. Sin
+    // proteccion no escribe el elemento, asi que llega vacio.
+    const modelo = h as unknown as { sheetProtection?: unknown };
+    expect(modelo.sheetProtection).toBeFalsy();
+  });
+
+  it("las celdas calculadas siguen avisando con gris y nota", async () => {
+    const h = await hojaCosto();
+
+    // La columna Parcial de la primera fila de datos: se calcula sola.
+    const parcial = h.getRow(5).getCell(6);
+    expect(parcial.fill).toBeTruthy();
+    expect(String(parcial.note ?? "")).not.toBe("");
+  });
+
+  it("la leyenda invita a pegar y explica que el Parcial se recalcula", async () => {
+    const h = await hojaCosto();
+    const leyenda = String(h.getCell("A3").value ?? "");
+
+    expect(leyenda).toContain("Pega aquí tus capítulos");
+    expect(leyenda).toContain("no está protegida");
+    // Lo que evita el susto al ver la columna gris en blanco despues de pegar.
+    expect(leyenda).toContain("GCM lo calcula");
+  });
+
+  it("ya no manda a nadie al menu de «Insertar celdas copiadas» para pegar", async () => {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const instrucciones = libro.worksheets.find((h) => h.name === "Instrucciones")!;
+
+    let texto = "";
+    instrucciones.eachRow((fila) => {
+      texto += String(fila.getCell(2).value ?? "") + "\n";
+    });
+
+    // El rodeo sigue mencionado como truco para VER el Parcial al insertar una
+    // fila, que es legitimo; lo que no puede quedar es la vieja advertencia de
+    // que la hoja esta protegida, porque ya no lo esta.
+    expect(texto).not.toContain("Desproteger hoja");
+    expect(texto).toContain("la hoja no está protegida");
+  });
+});
+
+/**
+ * PEGAR ENCIMA NO CUESTA DINERO, y es lo que sostiene que la hoja ya no se
+ * proteja.
+ *
+ * Al pegar desde otro Excel, las celdas de destino se sobrescriben: las
+ * columnas Parcial y Contractual pierden su formula y se quedan en blanco.
+ * El argumento del cambio es que eso da igual porque el importador recalcula.
+ * Aqui se comprueba en vez de suponerlo: se simula el pegado -datos escritos
+ * encima, formulas borradas- y se pasa el archivo por el importador de verdad.
+ */
+describe("un presupuesto pegado encima de la plantilla", () => {
+  /** Escribe una partida como la escribiria un pegado: sin formulas. */
+  async function plantillaConPegado(): Promise<ArrayBuffer> {
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(await generarPlantillaMeta());
+    const hoja = libro.worksheets[0]!;
+
+    // Tres filas del presupuesto de otra oficina, pegadas sobre las primeras
+    // filas de datos. Se machaca TODO lo que un pegado machacaria, incluida
+    // la columna Parcial con su formula.
+    const pegado: [string, string, string, number, number][] = [
+      ["1", "CAPITULO I: ESTRUCTURAS", "", 0, 0],
+      ["1.01", "Concreto f'c=210 en zapatas", "m3", 12.5, 420],
+      ["1.02", "Acero corrugado fy=4200", "kg", 850, 6.2],
+    ];
+
+    pegado.forEach(([codigo, descripcion, unidad, metrado, precio], i) => {
+      const fila = hoja.getRow(5 + i);
+      fila.getCell(1).value = codigo;
+      fila.getCell(2).value = descripcion;
+      fila.getCell(3).value = unidad || null;
+      fila.getCell(4).value = metrado || null;
+      fila.getCell(5).value = precio || null;
+      // Lo que hace el pegado y no se puede evitar: la formula se va.
+      fila.getCell(6).value = null;
+      fila.getCell(8).value = null;
+    });
+
+    return (await libro.xlsx.writeBuffer()) as ArrayBuffer;
+  }
+
+  it("entra sin errores aunque la columna Parcial quede vacia", async () => {
+    const r = await analizarExcel(await plantillaConPegado(), {
+      propiasDeLaMeta: true,
+    });
+
+    expect(r.errores).toEqual([]);
+  });
+
+  it("los importes salen igual: se calculan con el metrado y el precio", async () => {
+    const r = await analizarExcel(await plantillaConPegado(), {
+      propiasDeLaMeta: true,
+    });
+
+    const concreto = r.filas.find((f) => f.codigo === "1.01");
+    const acero = r.filas.find((f) => f.codigo === "1.02");
+
+    // 12,5 x 420 y 850 x 6,20, hechos por el importador y no por Excel.
+    expect(concreto?.parcial).toBe("5250.00");
+    expect(acero?.parcial).toBe("5270.00");
+  });
+
+  it("el capitulo pegado sigue siendo un capitulo, no una partida", async () => {
+    const r = await analizarExcel(await plantillaConPegado(), {
+      propiasDeLaMeta: true,
+    });
+
+    expect(r.filas.find((f) => f.codigo === "1")?.tipo).toBe("CAPITULO");
+    expect(r.filas.find((f) => f.codigo === "1.01")?.tipo).toBe("PARTIDA");
   });
 });

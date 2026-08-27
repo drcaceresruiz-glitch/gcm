@@ -56,16 +56,22 @@ const FILAS_PREPARADAS = 400;
 const GRIS_CALCULADO = "FFF1F3F5";
 
 /**
- * Marca una celda como CALCULADA: gris, bloqueada y con su explicacion.
+ * Marca una celda como CALCULADA: gris, con su explicacion y con el flag.
  *
- * El usuario pidio que lo que no se puede tocar no se pueda tocar. En un
- * Excel eso son tres cosas a la vez, y las tres hacen falta: el color avisa
- * antes de escribir, el bloqueo lo impide, y el comentario dice por que. Solo
- * con color se escribe encima igual; solo con bloqueo parece que el archivo
- * esta roto.
+ * EL COLOR Y LA NOTA AVISAN; YA NO IMPIDEN NADA, y ese cambio tiene fecha y
+ * dueño. Naciendo, esta plantilla protegia la hoja para que lo calculado no se
+ * pudiera tocar. El 27 de agosto de 2026 el cliente pidio lo contrario: quiere
+ * PEGAR de una sentada los capitulos, partidas y subpartidas que ya tiene en
+ * su propio Excel, y pegar escribe sobre las celdas de destino -incluidas las
+ * de formula-, asi que la hoja protegida lo cortaba con «la celda que intenta
+ * cambiar esta en una hoja protegida». Se prefiere que la plantilla se pueda
+ * llenar de golpe: la fila que pierde su formula no pierde su dinero, porque
+ * `analizarExcel` recalcula el Parcial con el metrado y el precio.
  *
- * La proteccion va SIN contraseña a proposito: no es seguridad, es evitar el
- * accidente. Quien sepa lo que hace puede quitarla en dos clics.
+ * El flag `locked` se conserva aunque la hoja ya no se proteja. No cuesta
+ * nada, sigue diciendo QUE celda es de que tipo -que es como esta escrita la
+ * bateria de esta plantilla- y vuelve a tener efecto el dia que alguien
+ * proteja la hoja por su cuenta.
  */
 function marcarCalculada(celda: ExcelJS.Cell, nota: string): void {
   celda.protection = { locked: true };
@@ -399,7 +405,11 @@ const INSTRUCCIONES: readonly (readonly [string, string])[] = [
   ],
   [
     "3b. Añadir filas (es más fácil de lo que parece)",
-    "Al final: escribe en la primera fila vacía, ya hay 400 listas. En medio: botón derecho sobre el número de la fila > Insertar, y escribe. Ya está. Aunque la fila nueva salga sin fórmula y el Parcial se quede en blanco, GCM lo calcula al importar con el metrado y el precio unitario, y el TOTAL del pie también la cuenta. Si además quieres ver el Parcial en la pantalla de Excel, copia antes una fila vacía (clic en su número, Ctrl+C) y usa «Insertar celdas copiadas» en vez de «Insertar»: así la fórmula viaja con ella. Y si Excel se pone pesado con que la hoja está protegida: Revisar > Desproteger hoja, no pide contraseña.",
+    "Al final: escribe en la primera fila vacía, ya hay 400 listas. En medio: botón derecho sobre el número de la fila > Insertar, y escribe. Ya está. Aunque la fila nueva salga sin fórmula y el Parcial se quede en blanco, GCM lo calcula al importar con el metrado y el precio unitario, y el TOTAL del pie también la cuenta. Si además quieres ver el Parcial en la pantalla de Excel, copia antes una fila vacía (clic en su número, Ctrl+C) y usa «Insertar celdas copiadas» en vez de «Insertar»: así la fórmula viaja con ella.",
+  ],
+  [
+    "3c. ¿Ya tienes el presupuesto en tu propio Excel?",
+    "Pégalo aquí y ya está: la hoja no está protegida, así que puedes traerte capítulos, partidas y subpartidas de una sola vez. Solo cuida que cada cosa caiga en su columna (Ítem, Descripción, Und., Metrado, Precio Unitario) y que los códigos sean números con puntos: 1, 1.01, 1.01.02. Al pegar encima, las columnas grises pierden su fórmula y se quedan en blanco: no importa, GCM las recalcula al importar. Y si prefieres no pegar nada: sube tu propio Excel tal cual, sin esta plantilla, que el importador reconoce las cabeceras más habituales (Item, Descripción, Und, Cantidad, P.U., Parcial) aunque estén en otro orden o con otro nombre.",
   ],
   [
     "4. Lo que NO pongas se nota",
@@ -596,8 +606,11 @@ export async function generarPlantillaMeta(
      * propia, y un porcentaje unico por capitulo obliga a inventarse la
      * media.
      *
-     * Una fila SIN Item se queda bloqueada, y no por descuido: no se le
-     * factura al cliente linea a linea, asi que no hay nada que recargar.
+     * Una fila SIN Item se queda marcada como calculada, y no por descuido:
+     * no se le factura al cliente linea a linea, asi que no hay nada que
+     * recargar. Desde que la hoja no se protege eso ya no lo impide -el gris
+     * y la nota avisan, no prohiben-, pero el servicio la rechaza igual: un
+     * recargo sin codigo no tiene contra que aplicarse.
      */
     if (f.codigo !== "") {
       fila.getCell(7).numFmt = "#,##0.00";
@@ -758,46 +771,38 @@ export async function generarPlantillaMeta(
   for (const hoja of [costo]) {
     const leyenda = hoja.getCell("A3");
     leyenda.value =
-      "Las celdas en gris se calculan solas. Escribe solo en las blancas. " +
+      "Las celdas en gris se calculan solas: puedes escribir o pegar encima, pero pierden la fórmula. " +
+      "¿Ya tienes tu presupuesto en otro Excel? Pega aquí tus capítulos y partidas de una vez, en las columnas que les toquen: la hoja no está protegida. " +
+      "Aunque el Parcial se quede en blanco no pierdes nada, GCM lo calcula con el metrado y el precio al importar. " +
       "Hay " + FILAS_PREPARADAS + " filas listas: usa las que necesites y deja el resto vacías. " +
-      "¿Te falta una en medio? Insértala como siempre (botón derecho sobre el número de fila > Insertar) y escribe: aunque el Parcial se quede en blanco, GCM lo calcula con el metrado y el precio. " +
       "Las filas SIN Ítem son costos propios (sueldos, alquileres, pólizas): cuestan, pero no se le facturan al cliente línea a línea. " +
       "Las fechas son opcionales, van en las partidas (01/08/2026) y las dos o ninguna.";
     leyenda.font = { italic: true, size: 10, color: { argb: "FF667788" } };
 
     /**
-     * Se protege la hoja pero se DEJA insertar filas.
+     * LA HOJA NO SE PROTEGE, y esto es lo que costo el candado.
      *
-     * Cada obra tiene un numero distinto de partidas, asi que impedirlo
-     * convertiria la plantilla en una camisa de fuerza. Al insertar dentro
-     * del bloque, Excel copia la formula de la fila de arriba y ajusta solo
-     * el rango de los totales.
+     * Nacio protegida -sin contraseña, para evitar el accidente de escribir
+     * encima de una formula- y con permiso explicito para insertar filas. El
+     * 23 de agosto de 2026 se reporto que PEGAR seguia fallando, y se
+     * documento como una limitacion de Excel: pegar escribe sobre las celdas
+     * de destino y las de formula estaban bloqueadas, asi que la unica
+     * operacion que funcionaba era «Insertar celdas copiadas». La leyenda
+     * llego a explicar ese menu.
      *
-     * OJO CON LO QUE «PERMITIR INSERTAR» NO ARREGLA, que costo un reporte el
-     * 23 de agosto de 2026: PEGAR una fila encima de otra sigue fallando, y
-     * seguira fallando siempre. Pegar ESCRIBE sobre las celdas de destino, y
-     * las de formula (Parcial y Contractual) estan bloqueadas; Excel corta
-     * con «La celda o el gráfico que intenta cambiar están en una hoja
-     * protegida». No es un permiso que falte: es que pegar y insertar son
-     * operaciones distintas. La que funciona es «Insertar celdas copiadas»,
-     * que crea la fila en vez de machacar una. Por eso la leyenda nombra el
-     * menu exacto —decir «copia y pega» mandaba justo a la que falla—.
+     * El 27 de agosto el cliente pidio lo que ese rodeo escondia: quiere
+     * traerse de una vez los capitulos, partidas y subpartidas que ya tiene
+     * en su Excel, pegandolos. Enseñar un truco de menu para esquivar una
+     * proteccion que ponemos nosotros es reconocer que la proteccion sobra.
      *
-     * Sin contraseña: esto evita el accidente, no es seguridad. Y se dice en
-     * la leyenda, porque una proteccion de la que no se sabe salir deja de
-     * ser una red y pasa a ser un muro.
+     * QUE SE PIERDE Y POR QUE COMPENSA: pegar encima machaca las formulas del
+     * Parcial y del Contractual, y esa columna se queda en blanco en Excel.
+     * No se pierde ni un sol: `analizarExcel` calcula el Parcial con el
+     * metrado y el precio cuando no viene, y el Contractual lo recalcula GCM
+     * de todos modos al importar -el archivo muestra, el importador manda-.
+     * El gris y las notas siguen ahi para avisar de que esas celdas se
+     * calculan solas.
      */
-    hoja.protect("", {
-      selectLockedCells: true,
-      selectUnlockedCells: true,
-      formatCells: true,
-      formatColumns: true,
-      formatRows: true,
-      insertRows: true,
-      deleteRows: true,
-      sort: true,
-      autoFilter: true,
-    });
   }
 
   const instrucciones = libro.addWorksheet("Instrucciones");
