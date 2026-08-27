@@ -23,6 +23,8 @@ import {
   type LineaPropia,
 } from "@/components/meta/PanelDeducciones";
 import { TablaMetaEditable } from "@/components/meta/TablaMetaEditable";
+import { AvisoImportesRepetidos } from "@/components/meta/AvisoImportesRepetidos";
+import { repetidosDeLaMeta } from "@/lib/repetidos-de-la-meta";
 import { lineasDelBorrador } from "@/services/meta-edicion.service";
 import { FormularioMeta } from "@/components/meta/FormularioMeta";
 import { AccionesMeta } from "@/components/meta/AccionesMeta";
@@ -188,6 +190,14 @@ export default async function MetaPage({
     .split(",")
     .map((f) => Number(f))
     .filter((f) => Number.isInteger(f) && f > 0);
+  /*
+   * Los importes repetidos se calculan al PINTAR, no se guardan.
+   *
+   * Asi el aviso se va solo en cuanto alguien corrige la linea, y aparece
+   * tambien en las metas cargadas antes de que esto existiera. Es una pasada
+   * sobre lineas que ya estan en memoria: no cuesta una consulta mas.
+   */
+  const repetidos = repetidosDeLaMeta(borrador?.lineas ?? []);
   const puedeCrear = puede(sesion, "meta:crear");
   const puedeAprobar = puede(sesion, "meta:aprobar");
 
@@ -349,6 +359,13 @@ export default async function MetaPage({
           )}
         </section>
       )}
+
+      {/* IMPORTES REPETIDOS, JUSTO ENCIMA DE LAS LINEAS.
+          Aqui y no arriba del todo: el aviso pide ir a mirar unas partidas
+          concretas, y lo que hay debajo es exactamente la tabla donde se
+          corrigen. Un aviso lejos de lo que hay que tocar se lee y se olvida.
+          Se recalcula en cada visita, asi que desaparece solo al corregir. */}
+      {borrador && <AvisoImportesRepetidos repetidos={repetidos} />}
 
       {/* Las lineas del borrador, corregibles. Van ANTES del bloque de
           aprobar: primero se revisa lo que se va a congelar, y despues se
