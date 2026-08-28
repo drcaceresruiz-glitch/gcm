@@ -1160,6 +1160,90 @@ const META = (
       </p>
     </S>
 
+    <S titulo="Lo que cobra el contratista de cada capítulo">
+      <Clave>
+        Un capítulo subcontratado <strong>no cuesta lo que suman sus
+        partidas</strong>. El contratista rebaja un porcentaje y, sobre el
+        importe ya descontado, suma sus gastos generales y su utilidad. Eso es
+        lo que hay que pagarle, y ese es el costo real del capítulo.
+      </Clave>
+      <p>La cascada, con un ejemplo:</p>
+      <Tabla
+        cabeceras={["Concepto", "Importe"]}
+        filas={[
+          ["Partidas cotizadas", "20.000,00"],
+          ["− 5 % de descuento", "−1.000,00"],
+          ["+ 8 % de gastos generales", "+1.520,00"],
+          ["+ 10 % de utilidad", "+1.900,00"],
+          ["A pagarle", "22.420,00"],
+        ]}
+      />
+      <p>
+        Los dos márgenes se calculan <strong>sobre el importe ya
+        descontado</strong>, no uno encima del otro. Es la convención del
+        formato peruano, y la diferencia no es pequeña: encadenarlos daría
+        22.572 en lugar de 22.420.
+      </p>
+
+      <p className="font-medium">Dónde se pone</p>
+      <p>
+        En la <strong>fila del capítulo</strong>, con el botón del apretón de
+        manos. Si un capítulo lo cubren dos o tres contratistas,{" "}
+        <strong>cada uno en su subcapítulo</strong> con los suyos: manda el más
+        cercano, así que no se pisan.
+      </p>
+      <p>
+        También se puede traer desde el Excel: la plantilla tiene tres columnas
+        —<strong>% Dcto</strong>, <strong>% GG</strong> y{" "}
+        <strong>% Utilidad</strong>— y la hoja enseña el neto en la cabecera
+        del capítulo, para compararlo de un vistazo con el total de la
+        cotización.
+      </p>
+
+      <p className="font-medium">Qué hace GCM con eso</p>
+      <p>
+        <strong>Lo reparte entre las partidas del capítulo.</strong> Cada una
+        pasa a valer lo que de verdad cuesta, y por eso las valorizaciones
+        llegan al 100 % de lo pactado: si las partidas se quedaran en el precio
+        de cotización, terminar el capítulo entero sumaría 20.000 cuando se
+        deben 22.420.
+      </p>
+      <p>
+        El <strong>metrado y el precio del contratista no se tocan</strong>: son
+        los que se comparan en obra. Lo que cambia es el importe.
+      </p>
+      <p>
+        Y <strong>no aparece ninguna tarea nueva en el cronograma</strong>. Un
+        descuento no es trabajo que ejecutar, es precio.
+      </p>
+
+      <p className="font-medium">No se confunde con el recargo al cliente</p>
+      <p>
+        Son <strong>dos cascadas encadenadas</strong> y miran a lados opuestos.
+        Primero se sabe lo que cuesta —lo que cobra el contratista— y solo
+        después lo que se cobra —el recargo del capítulo, que genera el
+        contractual—. Siguiendo el ejemplo, con un 20 % de recargo:
+      </p>
+      <Tabla
+        cabeceras={["", "Importe"]}
+        filas={[
+          ["Cotizado por el contratista", "20.000,00"],
+          ["Lo que se le paga", "22.420,00"],
+          ["Lo que se le cobra al cliente", "26.904,00"],
+        ]}
+      />
+
+      <p className="font-medium">Cambiarlo después</p>
+      <p>
+        Se puede corregir cuando se quiera, sin volver al Excel. Al cambiar un
+        porcentaje, GCM <strong>rehace la cuenta desde el precio de la
+        cotización</strong>, no desde el importe ya ajustado — así corregir un
+        5 % a un 7 % da lo mismo que haberlo puesto al 7 % desde el principio.
+        Y quitando los tres, las partidas vuelven exactamente a lo que cotizó
+        el contratista.
+      </p>
+    </S>
+
     <S titulo="Lo que sale mal">
       <SaleMal
         casos={[
@@ -3550,8 +3634,10 @@ export const CAPITULOS: CapituloManual[] = [
     resumen:
       "El presupuesto meta y el contractual que sale de él: la bolsa " +
       "operativa, por qué los sueldos y las pólizas también son costo de la obra y por qué la meta sí " +
-      "se puede re-fijar. Y cómo traerte un presupuesto que ya tienes en tu " +
-      "propio Excel, ordenarlo aquí dentro y ponerle los precios.",
+      "se puede re-fijar. Cómo entra lo que cobra cada contratista —su " +
+      "descuento, sus gastos generales y su utilidad— y por qué eso no se " +
+      "confunde con el recargo al cliente. Y cómo traerte un presupuesto que " +
+      "ya tienes en tu propio Excel, ordenarlo aquí dentro y ponerle los precios.",
     contenido: META,
   },
   {
