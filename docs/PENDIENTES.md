@@ -91,6 +91,29 @@ aqui, lo que hay que saber para continuar:
    alfa de Cronbach NO aplica al instrumento principal: registra hechos
    observables, no constructos latentes.
 
+### CORRECCION del 28/08/2026: el arreglo de niveles alcanza menos de lo que dijo su commit
+
+`ac2fa8d` afirma que, con un subcapitulo escrito `7.02.00`, «la EDT del
+cronograma colgaba esas partidas del capitulo y no de su subcapitulo». **No es
+cierto, y conviene que quede escrito.**
+
+Al revisar el radio de los cambios se vio que la importacion **no guarda el
+nivel que calcula el importador**: guarda `calcularProfundidades(codigos)`, y
+el `parentId` sale de `codigoPadre`. Las dos funciones trabajan sobre el CODIGO
+y ya entendian las cabeceras terminadas en cero desde antes. Asi que la
+jerarquia guardada, la EDT y el plegado de la pantalla del presupuesto **ya
+estaban bien**.
+
+Lo que estaba plano era la **vista previa del importador** —lo que se ve al
+subir el archivo, antes de guardar— y el modo «solo estructura». El arreglo
+sigue valiendo; lo que no vale es el alcance que se le atribuyo.
+
+**De donde salio el error:** se midio `analizarExcel` -que devuelve el nivel del
+importador- y se extrapolo al resto del sistema sin comprobar que ese nivel
+fuera el que se guarda. Es el mismo fallo de metodo de siempre: medir una cosa
+y afirmar sobre otra. Lo que habria bastado: seguir el dato hasta donde se
+escribe.
+
 ### CERRADO el 28 de agosto de 2026: el total de GCM no coincide con el del Excel del cliente
 
 **Explicado al centimo, y en todos los tramos se equivoca el Excel.** GCM
