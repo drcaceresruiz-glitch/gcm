@@ -91,7 +91,29 @@ aqui, lo que hay que saber para continuar:
    alfa de Cronbach NO aplica al instrumento principal: registra hechos
    observables, no constructos latentes.
 
-### ABIERTO Y SIN CERRAR: el total de GCM no coincide con el del Excel del cliente
+### CERRADO el 28 de agosto de 2026: el total de GCM no coincide con el del Excel del cliente
+
+**Explicado al centimo, y en todos los tramos se equivoca el Excel.** GCM
+cuenta 806.497,45 y la suma de los capitulos del documento da 754.517,45. Los
+51.980 de diferencia salen de cuatro cosas: un capitulo cuya formula deja fuera
+41 partidas con precio, seis descuentos comerciales que ningun total resta, una
+formula que abarca DOS columnas y se traga los precios unitarios de la de al
+lado, y un capitulo sin formula de total.
+
+**El metodo, que es lo reutilizable:** se abrio el archivo con Excel y se leyo
+LA FORMULA de cada celda de total, no su resultado. Un rango que se queda corto
+no se ve mirando cifras; se ve mirando la formula. La comparacion partida por
+partida solo dice DONDE esta la diferencia, no por que.
+
+El informe completo, con la cuenta y que hay que decidir con el cliente, se le
+entrego aparte: no se versiona aqui porque son datos comerciales de un tercero
+y este repositorio es publico.
+
+**Lo unico que queda es una DECISION del cliente**, no trabajo: si las 41
+partidas del capitulo 11 entran en el alcance, y si los descuentos comerciales
+son firmes.
+
+### El relato de como se llego (se mantiene por el metodo)
 
 Salio al final del 27 de agosto, tirando del hilo que abrio el usuario: «esta
 siendo sumada en su nivel madre». Tiene razon —el presupuesto pone el importe
@@ -121,16 +143,19 @@ esa diferencia, con lo que se sabe de cada uno:
   El total del capitulo 11 tiene el problema simetrico: `SUM(G315:G358)` deja
   fuera todo lo que esta por debajo de la fila 358 -las mesas, la melamine, el
   estante y los varios-, que son los ~69 mil que GCM contaba de mas.
-- **PENDIENTE — los bloques de `8.01`/`8.02`.** Diferencias de -4.500 y -4.700
-  que huelen a descuento comercial, sin comprobar. Es el mismo tipo de
-  revision: leer la formula de la celda de total y ver que rango cubre.
+- **RESUELTO — los bloques de `8.01`/`8.02` eran los descuentos, y algo mas.**
+  Los -4.700 y -4.500 son sus dos descuentos comerciales, que GCM resta. Pero
+  al leer la formula aparecio lo que nadie buscaba: el total del capitulo 8 es
+  `SUM(H118:I233)` y abarca DOS columnas, asi que se traga 2.140,30 de precios
+  unitarios sueltos que alguien dejo en la columna de al lado -sin cabecera, 24
+  numeros-. Y su rango termina una fila antes del descuento de 4.500. El
+  capitulo suma 6.640,30 de mas.
 
-**OJO CON LA MEDICION, que ya fallo una vez esta noche.** El script de
-comparacion trataba los codigos terminados en `.0` (`8.01.0`) como si fueran
-`.00`, y por eso dio «GCM cuenta 0» en dos bloques enteros que si estaba
-contando. Antes de reportar cifras de conjunto hay que arreglar eso y volver a
-medir. Lo de arriba marcado como CONFIRMADO se leyo directamente del Excel, sin
-pasar por ese script.
+**OJO CON LA MEDICION, que ya fallo una vez.** El script de comparacion
+trataba los codigos terminados en `.0` (`8.01.0`) como si fueran `.00`, y por
+eso dio «GCM cuenta 0» en dos bloques enteros que si estaba contando. El cierre
+del 28 de agosto NO paso por ese script: se leyeron las formulas abriendo el
+archivo con Excel, que es la unica forma de ver un rango que se queda corto.
 
 **Por que importa:** si el cliente aprueba una meta de 806 mil creyendo que su
 presupuesto son 754 mil, la bolsa de esa obra nace mintiendo. Antes de tocar
