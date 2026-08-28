@@ -108,9 +108,31 @@ export function sumarHojas(nodos: readonly NodoImporte[]): string {
 export function aportantes<T extends NodoImporte>(
   nodos: readonly T[],
 ): T[] {
-  const codigos = new Set(nodos.map((n) => n.codigo));
+  const cubiertos = cubiertosPorDescendientes(nodos);
+  return nodos.filter((n) => n.parcial !== null && !cubiertos.has(n.codigo));
+}
 
-  // Ancestros que quedan cubiertos por alguna descendiente con importe.
+/**
+ * Los codigos cuya cifra es un SUBTOTAL y no un precio: los que tienen alguna
+ * descendiente costeada.
+ *
+ * Es el corazon de `aportantes`, expuesto aparte porque el IMPORTADOR necesita
+ * la misma pregunta antes de decidir si una fila es capitulo o partida.
+ *
+ * Y es la unica forma de distinguirlas. Dos filas identicas en el papel:
+ *
+ *   "1.0  CAPITULO I ........ 12.765"   <- subtotal de sus partidas
+ *   "7.02.00  REDES DE DESAGUE  13.109" <- precio del subcontrato completo
+ *
+ * El codigo no las separa -las dos acaban en cero- y el importe tampoco. Lo
+ * que las separa es lo que tienen DEBAJO: si las hijas llevan precio, la
+ * cifra de arriba es la suma de ellas; si las hijas solo describen alcance,
+ * la cifra de arriba es el precio y no hay que perderla.
+ */
+export function cubiertosPorDescendientes(
+  nodos: readonly NodoImporte[],
+): Set<string> {
+  const codigos = new Set(nodos.map((n) => n.codigo));
   const cubiertos = new Set<string>();
 
   for (const nodo of nodos) {
@@ -132,7 +154,7 @@ export function aportantes<T extends NodoImporte>(
     }
   }
 
-  return nodos.filter((n) => n.parcial !== null && !cubiertos.has(n.codigo));
+  return cubiertos;
 }
 
 /**
@@ -380,4 +402,53 @@ export function quienSeQuedaLaNumeracion(
   }
 
   return null;
+}
+
+/**
+ * Cuanto suma cada capitulo: el dinero de todo lo que cuelga de el.
+ *
+ * PARA QUE UN CAPITULO ENSENE SU TOTAL. Un presupuesto donde las cabeceras
+ * salen en blanco obliga a sumar a mano para saber cuanto vale un capitulo, y
+ * es lo primero que mira quien revisa: cuanto pesa cada frente.
+ *
+ * SE APOYA EN `aportantes` Y NO EN UNA SUMA PROPIA, y esa es toda la gracia.
+ * Si esto sumara por su cuenta -«todo lo que empieza por 7.»- un grupo con
+ * importe propio Y con hijas costeadas contaria las dos cosas, y el capitulo
+ * enseñaria mas dinero del que el sistema cuenta en el costo directo. Dos
+ * cifras que se contradicen en la misma pantalla son peores que una cifra
+ * ausente: la de arriba parece la buena porque es la que se lee primero.
+ *
+ * Con este criterio la propiedad se cumple sola: **la suma de los capitulos de
+ * primer nivel es exactamente el costo directo**, sin importar de que
+ * profundidad cuelgue cada partida ni por que via entro el presupuesto.
+ *
+ * Un mismo importe se acumula en TODOS sus ancestros, no solo en el
+ * inmediato: un capitulo tiene que valer lo que valen sus subcapitulos
+ * enteros, y en los presupuestos reales hay tres y cuatro niveles.
+ *
+ * Los descuentos comerciales -importes negativos- restan, que es lo que hacen
+ * en el papel. Un capitulo cuyo unico contenido sea un descuento sale en
+ * negativo, y esta bien que se vea.
+ */
+export function subtotalesPorAncestro(
+  nodos: readonly NodoImporte[],
+): Map<string, string> {
+  const codigos = new Set(nodos.map((n) => n.codigo));
+  const acumulado = new Map<string, string[]>();
+
+  for (const nodo of aportantes(nodos)) {
+    let padre = codigoPadre(nodo.codigo, codigos);
+    while (padre) {
+      const previo = acumulado.get(padre) ?? [];
+      previo.push(nodo.parcial!);
+      acumulado.set(padre, previo);
+      padre = codigoPadre(padre, codigos);
+    }
+  }
+
+  const subtotales = new Map<string, string>();
+  for (const [codigo, importes] of acumulado) {
+    subtotales.set(codigo, sumar(importes));
+  }
+  return subtotales;
 }

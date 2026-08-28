@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { sumar } from "@/lib/decimal";
 import {
   aportantes,
   codigoPadre,
   siguienteCodigoHijo,
   quienSeQuedaLaNumeracion,
   LARGO_MAXIMO_CODIGO,
+  subtotalesPorAncestro,
   sumarHojas,
   subtotalesPorRama,
   type NodoImporte,
@@ -285,5 +287,99 @@ describe("siguienteCodigoHijo y la anchura de la columna", () => {
 
     expect(propuesto).not.toBeNull();
     expect(propuesto!.length).toBeLessThanOrEqual(LARGO_MAXIMO_CODIGO);
+  });
+});
+
+describe("subtotal de cada capitulo", () => {
+  it("un capitulo vale lo que suman sus partidas", () => {
+    const s = subtotalesPorAncestro([
+      { codigo: "1.0", parcial: null },
+      { codigo: "1.01", parcial: "100.00" },
+      { codigo: "1.02", parcial: "250.50" },
+      { codigo: "2.0", parcial: null },
+      { codigo: "2.01", parcial: "1000.00" },
+    ]);
+
+    expect(s.get("1.0")).toBe("350.50");
+    expect(s.get("2.0")).toBe("1000.00");
+  });
+
+  it("el capitulo suma tambien lo que cuelga de sus subcapitulos", () => {
+    /*
+     * Tres niveles. El capitulo no ve directamente a "7.02.01": cuelga de
+     * "7.02.00", que cuelga de "7.0". Si solo se acumulara en el padre
+     * inmediato, el capitulo saldria en blanco teniendo dinero debajo.
+     */
+    const s = subtotalesPorAncestro([
+      { codigo: "7.0", parcial: null },
+      { codigo: "7.01", parcial: "500.00" },
+      { codigo: "7.02.00", parcial: null },
+      { codigo: "7.02.01", parcial: "300.00" },
+      { codigo: "7.02.02", parcial: "200.00" },
+    ]);
+
+    expect(s.get("7.02.00")).toBe("500.00");
+    expect(s.get("7.0")).toBe("1000.00");
+  });
+
+  it("un grupo con importe propio y con hijas costeadas no se cuenta dos veces", () => {
+    /*
+     * El caso que inflaba CRIOCORD de 754 mil a 1,8 millones. La hija manda
+     * sobre el padre, asi que el capitulo vale 300, no 1300.
+     */
+    const nodos = [
+      { codigo: "11.0", parcial: null },
+      { codigo: "11.03", parcial: "1000.00" },
+      { codigo: "11.03.01", parcial: "300.00" },
+    ];
+
+    expect(subtotalesPorAncestro(nodos).get("11.0")).toBe("300.00");
+    expect(sumarHojas(nodos)).toBe("300.00");
+  });
+
+  it("la suma de los capitulos de primer nivel ES el costo directo", () => {
+    /*
+     * La propiedad que hace que la pantalla no pueda contradecirse. Se
+     * comprueba sobre una estructura con de todo: varios niveles, un grupo
+     * cubierto por su hija y un descuento comercial.
+     */
+    const nodos = [
+      { codigo: "1.0", parcial: null },
+      { codigo: "1.01", parcial: "7700.00" },
+      { codigo: "1.02", parcial: "2750.00" },
+      { codigo: "2.0", parcial: null },
+      { codigo: "2.01", parcial: "1575.00" },
+      { codigo: "2.02", parcial: "-500.00" },
+      { codigo: "3.0", parcial: null },
+      { codigo: "3.01.00", parcial: "9999.00" },
+      { codigo: "3.01.01", parcial: "1200.00" },
+      { codigo: "3.01.02", parcial: "800.00" },
+    ];
+
+    const s = subtotalesPorAncestro(nodos);
+    const primerNivel = sumar(
+      ["1.0", "2.0", "3.0"].map((c) => s.get(c) ?? "0"),
+    );
+
+    expect(primerNivel).toBe(sumarHojas(nodos));
+    expect(primerNivel).toBe("13525.00");
+  });
+
+  it("un capitulo cuyo unico contenido es un descuento sale en negativo", () => {
+    const s = subtotalesPorAncestro([
+      { codigo: "5.0", parcial: null },
+      { codigo: "5.01", parcial: "-3600.00" },
+    ]);
+
+    expect(s.get("5.0")).toBe("-3600.00");
+  });
+
+  it("un capitulo vacio no aparece, para poder dejar la celda en blanco", () => {
+    const s = subtotalesPorAncestro([
+      { codigo: "9.0", parcial: null },
+      { codigo: "9.01", parcial: null },
+    ]);
+
+    expect(s.has("9.0")).toBe(false);
   });
 });

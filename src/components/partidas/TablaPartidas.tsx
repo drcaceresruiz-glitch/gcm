@@ -14,6 +14,7 @@ import {
 import type { PartidaFila } from "@/services/obras.service";
 import { soles, decimal, metrado as fmtMetrado } from "@/utils/formato";
 import { filtrarPartidas } from "@/lib/partidas-filtro";
+import { subtotalesPorAncestro } from "@/lib/jerarquia-partidas";
 import { CeldaEditable } from "@/components/partidas/CeldaEditable";
 import { ControlesPartidas } from "@/components/partidas/ControlesPartidas";
 import {
@@ -115,6 +116,27 @@ export function TablaPartidas({ obraId, filas, editable, onAnadirEn }: Props) {
    * de una fila son las siguientes con nivel mayor, hasta encontrar una de
    * nivel igual o menor. Se resuelve en una pasada.
    */
+  /*
+   * Lo que suma cada capitulo: el dinero de todo lo que cuelga de el.
+   *
+   * Se calcula sobre TODAS las filas y no sobre las visibles: un capitulo
+   * plegado o filtrado sigue valiendo lo mismo, y hacerlo depender de lo que
+   * se ve en pantalla convertiria el subtotal en un numero que cambia al
+   * buscar.
+   */
+  const subtotales = useMemo(
+    () =>
+      subtotalesPorAncestro(
+        filas.map((f) => ({
+          codigo: f.codigoPartida,
+          // Los capitulos no llevan cifra propia, el mismo criterio que el
+          // resto del sistema. Si la llevaran, se contaria dos veces.
+          parcial: f.tipo === "PARTIDA" ? f.parcial : null,
+        })),
+      ),
+    [filas],
+  );
+
   const { visibles, conHijos } = useMemo(() => {
     const visibles = new Set<string>();
     const conHijos = new Set<string>();
@@ -425,7 +447,9 @@ export function TablaPartidas({ obraId, filas, editable, onAnadirEn }: Props) {
                     >
                       {esCapitulo ? (
                         <span className="block text-right">
-                          {f.parcial ? soles(f.parcial, "") : ""}
+                          {subtotales.has(f.codigoPartida)
+                            ? soles(subtotales.get(f.codigoPartida)!, "")
+                            : ""}
                         </span>
                       ) : (
                         <CeldaEditable

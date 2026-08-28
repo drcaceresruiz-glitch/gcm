@@ -383,16 +383,19 @@ describe("el TOTAL del pie cuenta lo mismo que GCM", () => {
     expect(celda.formula).not.toContain('<>""');
   });
 
-  it("y cuenta tambien una fila sin formula, por su metrado y precio", async () => {
+  it("suma la columna Parcial saltandose los capitulos", async () => {
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(await generarPlantillaMeta());
     const f = libro.worksheets[0]!.getRow(406).getCell(6).value as {
       formula?: string;
     };
 
-    // El segundo sumando: las filas cuyo Parcial NO es un numero se cuentan
-    // por D x E, que es lo mismo que hace el importador.
-    expect(f.formula).toContain("1-IF(ISNUMBER($F$5:$F$404),1,0)");
+    /*
+     * Ya no hacen falta dos sumandos: cada fila trae su Parcial calculado
+     * -la partida multiplica, el capitulo suma sus hijas-, asi que el total
+     * solo tiene que saltarse las cabeceras para no contar dos veces.
+     */
+    expect(f.formula).toBe("SUMPRODUCT($D$5:$D$404,$E$5:$E$404)");
   });
 
   it("sin `N(rango)`, que solo funciona dentro de Excel", async () => {
@@ -425,7 +428,18 @@ describe("cuantas filas vienen listas, y con que", () => {
     const contractual = ultima.getCell(8).value as { formula?: string };
 
     expect(parcial?.formula).toContain("D404*E404");
-    expect(contractual?.formula).toContain("SUMPRODUCT");
+    expect(contractual?.formula).toContain("$F404*(1+$G404/100)");
+
+    /*
+     * Y NO suma nada, porque no tiene nada debajo. Con el rango al reves
+     * -`$A$405:$A$404`- Excel lo ordena solo y acaba incluyendo esta misma
+     * fila: referencia circular.
+     */
+    expect(parcial?.formula).not.toContain("$A$405");
+
+    // La penultima si suma: ahi todavia puede colgar algo.
+    const penultima = hoja.getRow(403).getCell(6).value as { formula?: string };
+    expect(penultima?.formula).toContain("SUMPRODUCT(");
   });
 
   it("caben las 368 partidas de una obra real, con sitio de sobra", async () => {
@@ -515,7 +529,28 @@ describe("las formulas de la plantilla se abren en cualquier programa", () => {
 
     expect(formulas.length).toBeGreaterThan(0);
     expect(formulas.filter((f) => /N\(\$?[A-Z]+\$?\d+:/.test(f))).toEqual([]);
-    expect(formulas.some((f) => f.includes("ISNUMBER("))).toBe(true);
+    /*
+     * NI UN `SUMPRODUCT` CON UN `IF` DENTRO, que es la version cara de la
+     * misma leccion. `IF(ISNUMBER(rango),rango,0)` dentro de un SUMPRODUCT
+     * solo se evalua como matriz si la formula se introduce como matricial;
+     * escrita normal, Excel devuelve #!VALOR! y el TOTAL COSTO DIRECTO de la
+     * plantilla salia **0,00** en el archivo que se descargaba.
+     *
+     * No lo cazo ninguna prueba porque ExcelJS NO CALCULA: lee el resultado
+     * que nosotros escribimos junto a la formula, asi que la bateria veia el
+     * numero correcto mientras el usuario abria un cero. Comprobar la forma
+     * es lo unico que se puede hacer sin Excel delante; cuando se toquen
+     * estas formulas, hay que abrir el archivo de verdad.
+     */
+    const matricialEncubierta = formulas.filter((f) => {
+      const i = f.indexOf("SUMPRODUCT(");
+      if (i < 0) return false;
+      // Un `IF` sobre una CELDA es inofensivo -el prefijo del capitulo sale
+      // asi-. El que rompe es el que abarca un RANGO, porque solo se evalua
+      // elemento a elemento en una formula matricial.
+      return /IF\([^()]*\$?[A-Z]+\$?\d+:/.test(f.slice(i));
+    });
+    expect(matricialEncubierta).toEqual([]);
   });
 
   it("las celdas calculadas traen su resultado, para que se vean sin recalcular", async () => {

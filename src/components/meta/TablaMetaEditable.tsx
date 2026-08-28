@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   AlertCircle,
@@ -25,6 +25,7 @@ import {
 } from "@/app/(dashboard)/obras/[id]/meta/acciones-lineas";
 import type { LineaDeLaMeta } from "@/services/meta-edicion.service";
 import { soles } from "@/utils/formato";
+import { subtotalesPorAncestro } from "@/lib/jerarquia-partidas";
 import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
@@ -54,6 +55,28 @@ export function TablaMetaEditable({
 }) {
   const [editando, setEditando] = useState<string | null>(null);
   const [anadiendo, setAnadiendo] = useState(false);
+
+  /*
+   * Lo que suma cada capitulo. Mismo criterio que el costo directo -manda
+   * `subtotalesPorAncestro`- para que la cifra de la cabecera y el total del
+   * pie no puedan contradecirse.
+   *
+   * Las lineas SIN codigo son costos propios de la meta: no cuelgan de ningun
+   * capitulo y por eso no entran en ningun subtotal, aunque si cuenten en el
+   * total de la meta. Es correcto: no pertenecen al arbol del contrato.
+   */
+  const subtotales = useMemo(
+    () =>
+      subtotalesPorAncestro(
+        lineas
+          .filter((l) => l.codigoRef !== null)
+          .map((l) => ({
+            codigo: l.codigoRef!,
+            parcial: l.tipo === "PARTIDA" ? l.parcial : null,
+          })),
+      ),
+    [lineas],
+  );
 
   /*
    * En una obra que no admite cambios no se ofrece: `editarLineaMeta` lo
@@ -229,7 +252,13 @@ export function TablaMetaEditable({
                     {l.precioUnitario ?? ""}
                   </td>
                   <td className="p-2 text-right tabular-nums">
-                    {l.parcial ? soles(l.parcial) : ""}
+                    {l.tipo === "CAPITULO"
+                      ? subtotales.has(l.codigoRef ?? "")
+                        ? soles(subtotales.get(l.codigoRef ?? "")!)
+                        : ""
+                      : l.parcial
+                        ? soles(l.parcial)
+                        : ""}
                   </td>
                   {puedeEditar && (
                     <td className="p-2">

@@ -145,19 +145,79 @@ function contractualEjemplo(f: FilaCosto): number {
  * plantilla se abre en lo que cada constructora tenga, no en lo que nosotros
  * suponemos.
  */
-function formulaContractual(
+/**
+ * El Parcial de una fila: suma si es capitulo, metrado x precio si es partida.
+ *
+ * UNA SOLA FORMULA PARA LAS DOS COSAS porque en las filas preparadas todavia
+ * no se sabe que se escribira: quien pegue ahi un capitulo tiene que ver su
+ * subtotal sin escribir nada, igual que quien pegue una partida ve su
+ * multiplicacion.
+ *
+ * **Suma HACIA ABAJO, desde la fila siguiente.** Si el rango incluyera la
+ * propia celda, Excel lo rechazaria por referencia circular —F del capitulo
+ * dependeria de F del capitulo—, y no vale con que el termino se multiplique
+ * por cero: la circularidad se detecta por la forma, no por el resultado. Las
+ * descendientes siempre estan debajo, asi que no se pierde nada.
+ *
+ * **Y descuenta las filas que son capitulos** con `RIGHT(...)<>".0"`. Sin eso,
+ * un capitulo con subcapitulos contaria dos veces el mismo dinero: una por el
+ * subcapitulo -que ya suma- y otra por cada partida suya. Excluyendolos, cada
+ * importe se cuenta una sola vez por hondo que cuelgue.
+ *
+ * El prefijo se deduce DENTRO de la formula, como en `formulaContractual`:
+ * "4.0" -> "4.", y un codigo sin punto -"4"- tambien es capitulo y da "4.".
+ *
+ * Es para que se VEA en la hoja. Al importar, GCM ignora el importe de los
+ * capitulos y lo recalcula por su cuenta: el archivo muestra, el importador
+ * manda. Por eso una hoja donde alguien pegue encima y se lleve la formula
+ * por delante no pierde ni un sol.
+ */
+function formulaParcial(
   fila: number,
-  primera: number,
   ultima: number,
 ): string {
+  /*
+   * LA ULTIMA FILA NO PUEDE SUMAR NADA: no tiene nada debajo.
+   *
+   * Sin esta salida el rango sale al reves -`$A$405:$A$404`-, y Excel lo
+   * ordena solo: pasa a ser `$A$404:$A$405`, que INCLUYE a la propia fila. La
+   * formula del Parcial acabaria leyendo el Parcial que esta calculando, que
+   * es una referencia circular en toda regla.
+   */
+  if (fila >= ultima) return `IF($B${fila}="","",D${fila}*E${fila})`;
+
+  const desde = fila + 1;
+  const codigos = `$A$${desde}:$A$${ultima}&""`;
   const pfx =
-    `IF(RIGHT($A${fila},2)=".0",LEFT($A${fila},LEN($A${fila})-1),$A${fila}&".")`;
-  return (
-    `IF($G${fila}="","",` +
-    `SUMPRODUCT((LEFT($A$${primera}:$A$${ultima},LEN(${pfx}))=${pfx})` +
-    `*IF(ISNUMBER($F$${primera}:$F$${ultima}),$F$${primera}:$F$${ultima},0))` +
-    `*(1+$G${fila}/100))`
-  );
+    `IF(RIGHT($A${fila}&"",2)=".0",` +
+    `LEFT($A${fila}&"",LEN($A${fila}&"")-1),$A${fila}&".")`;
+  const esCapitulo =
+    `OR(RIGHT($A${fila}&"",2)=".0",ISERROR(FIND(".",$A${fila}&"")))`;
+
+  /*
+   * Suma METRADO x PRECIO de las descendientes, no su columna Parcial.
+   *
+   * Parece un rodeo y es lo unico que aguanta. Sumar la columna Parcial
+   * obliga a filtrar el texto que hay en ella -las filas preparadas devuelven
+   * cadena vacia-, y ese filtro solo se puede escribir con un `IF` dentro del
+   * SUMPRODUCT, que es exactamente la formula matricial que devolvia
+   * #!VALOR! en Excel. Metrado y precio son numeros o celdas vacias: una
+   * celda vacia vale cero y no rompe nada.
+   *
+   * Ademas evita la circularidad -no lee la columna que esta calculando- y
+   * hace que un capitulo no cuente lo que ya conto un subcapitulo, porque las
+   * cabeceras no tienen ni metrado ni precio y aportan cero solas. Ni siquiera
+   * hace falta excluirlas.
+   */
+  const suma =
+    `SUMPRODUCT((LEFT(${codigos},LEN(${pfx}))=${pfx})` +
+    `*$D$${desde}:$D$${ultima}*$E$${desde}:$E$${ultima})`;
+
+  return `IF($B${fila}="","",IF(${esCapitulo},${suma},D${fila}*E${fila}))`;
+}
+
+function formulaContractual(fila: number): string {
+  return `IF($G${fila}="","",$F${fila}*(1+$G${fila}/100))`;
 }
 
 const CABECERAS_COSTO = [
@@ -563,6 +623,12 @@ export async function generarPlantillaMeta(
   for (const f of recortarAlPlazo(FILAS_COSTO, mesesObra)) {
     n++;
     const fila = costo.getRow(n);
+    // FORMATO TEXTO, y no es cosmetico. Sin el, Excel convierte "3.0" en el
+    // numero 3 en cuanto alguien lo escribe o lo pega, y entonces dos cosas
+    // se rompen a la vez: el codigo se muestra como "3", y los criterios con
+    // comodin de SUMIFS -"3.*"- dejan de casar, porque un comodin no compara
+    // contra numeros. El subtotal del capitulo salia 0,00.
+    fila.getCell(1).numFmt = "@";
     fila.getCell(1).value = f.codigo;
     fila.getCell(2).value = f.descripcion;
     if (f.unidad) fila.getCell(3).value = f.unidad;
@@ -571,7 +637,14 @@ export async function generarPlantillaMeta(
     // El parcial se CALCULA: metrado x precio. Antes era un numero escrito,
     // y quien cambiaba el precio se llevaba un parcial que ya no cuadraba.
     // Los capitulos suman sus hijas en vez de multiplicar.
-    if (f.metrado !== undefined && f.precioUnitario !== undefined) {
+    if (esCapituloCodigo(f)) {
+      // El capitulo ENSENA lo que suman sus partidas. Antes se quedaba en
+      // blanco y habia que sumar a mano para saber cuanto pesaba cada frente.
+      fila.getCell(6).value = {
+        formula: formulaParcial(n, ultimaFila),
+        result: subtotalEjemplo(f.codigo),
+      };
+    } else if (f.metrado !== undefined && f.precioUnitario !== undefined) {
       // La formula lleva su RESULTADO: ExcelJS no calcula, y un archivo con
       // formulas sin resultado se lee como celdas vacias si se sube sin
       // abrirlo antes en Excel.
@@ -592,7 +665,8 @@ export async function generarPlantillaMeta(
     for (const col of [1, 2, 3, 4, 5, 9, 10]) marcarEditable(fila.getCell(col));
     marcarCalculada(
       fila.getCell(6),
-      "Se calcula solo: metrado x precio unitario. No escribas aquí.",
+      "Se calcula solo: en una partida, metrado x precio unitario; en un " +
+        "capítulo, la suma de todo lo que cuelga de él. No escribas aquí.",
     );
 
     /*
@@ -624,6 +698,10 @@ export async function generarPlantillaMeta(
     }
 
     fila.getCell(3).alignment = { horizontal: "center" };
+    // El codigo va como TEXTO: es donde se pega el presupuesto ajeno, y con
+    // formato general Excel convierte "3.0" en 3 y "4.02" en 4,02, con lo que
+    // los subtotales por capitulo dejan de encontrar a sus partidas.
+    fila.getCell(1).numFmt = "@";
     fila.getCell(4).numFmt = "#,##0.00";
     fila.getCell(5).numFmt = "#,##0.00";
     fila.getCell(6).numFmt = "#,##0.00";
@@ -636,7 +714,7 @@ export async function generarPlantillaMeta(
       // presupuesto contractual. Las partidas no lo llevan.
       if (f.recargo !== undefined) fila.getCell(7).value = f.recargo;
       fila.getCell(8).value = {
-        formula: formulaContractual(n, primeraFila, ultimaFila),
+        formula: formulaContractual(n),
         result: contractualEjemplo(f),
       };
       fila.getCell(8).numFmt = "#,##0.00";
@@ -671,12 +749,12 @@ export async function generarPlantillaMeta(
     fila.getCell(6).numFmt = "#,##0.00";
     // Sin descripcion el importador la salta, asi que la formula puede estar
     // puesta desde el principio: aparece sola en cuanto se escribe la linea.
-    fila.getCell(6).value = { formula: `IF(B${f}="","",D${f}*E${f})`, result: "" };
+    fila.getCell(6).value = { formula: formulaParcial(f, ultimaFila), result: "" };
     // El recargo y su contractual: en blanco hasta que la fila sea capitulo.
     fila.getCell(7).numFmt = "#,##0.00";
     fila.getCell(8).numFmt = "#,##0.00";
     fila.getCell(8).value = {
-      formula: formulaContractual(f, primeraFila, ultimaFila),
+      formula: formulaContractual(f),
       result: "",
     };
     marcarEditable(fila.getCell(7));
@@ -689,7 +767,8 @@ export async function generarPlantillaMeta(
     for (const col of [1, 2, 3, 4, 5, 9, 10]) marcarEditable(fila.getCell(col));
     marcarCalculada(
       fila.getCell(6),
-      "Se calcula solo: metrado x precio unitario. No escribas aquí.",
+      "Se calcula solo: en una partida, metrado x precio unitario; en un " +
+        "capítulo, la suma de todo lo que cuelga de él. No escribas aquí.",
     );
   }
 
@@ -731,19 +810,40 @@ export async function generarPlantillaMeta(
     0,
   );
 
-  const rango = (col: string) =>
-    `$${col}$${primeraFila}:$${col}$${ultimaFila}`;
-  const numero = (col: string) =>
-    `IF(ISNUMBER(${rango(col)}),${rango(col)},0)`;
-  /// Un capitulo no se cuenta: sus hijas ya estan en la suma.
-  const noEsCapitulo = `(RIGHT(${rango("A")},2)<>".0")`;
+  /**
+   * EL TOTAL SUMA METRADO x PRECIO DE TODA LA TABLA.
+   *
+   * Ni un comodin ni una condicion, y las dos ausencias estan pagadas con
+   * sangre:
+   *
+   * - **Sin condicion**, porque cualquier filtro sobre la columna Parcial hay
+   *   que escribirlo con un `IF` dentro del SUMPRODUCT -las filas preparadas
+   *   devuelven cadena vacia y el texto rompe el producto-, y esa formula
+   *   solo se evalua bien si se introduce como matricial. Escrita normal daba
+   *   #!VALOR!, y el TOTAL COSTO DIRECTO de la plantilla descargada salia
+   *   **0,00**.
+   * - **Sin comodin**, porque Excel convierte "3.0" en el numero 3 en cuanto
+   *   alguien lo escribe, y un criterio con comodin -"<>*.0"- no compara
+   *   contra numeros: los capitulos dejaban de excluirse y el total contaba
+   *   su subtotal ADEMAS del de sus partidas. Se vio sumando 13.200 donde
+   *   habia 6.600.
+   *
+   * Metrado y precio son numeros o celdas vacias, siempre. Y las cabeceras no
+   * llevan ninguno de los dos, asi que quedan fuera solas: no hay nada que
+   * excluir y por tanto nada que se pueda escapar.
+   *
+   * A cambio, un importe escrito a mano ENCIMA de la formula del Parcial no
+   * entra en el total de la hoja. Es coherente con lo que la plantilla dice
+   * de esa columna -se calcula sola- y no afecta a lo que GCM cobra: al
+   * importar manda el archivo, y ahi el importe si se lee.
+   */
+  const rangoDE =
+    `SUMPRODUCT($D$${primeraFila}:$D$${ultimaFila},` +
+    `$E$${primeraFila}:$E$${ultimaFila})`;
 
   total.getCell(6).value = {
     result: Math.round(totalHojas * 100) / 100,
-    formula:
-      `SUMPRODUCT(${noEsCapitulo}*${numero("F")})+` +
-      `SUMPRODUCT(${noEsCapitulo}*(1-IF(ISNUMBER(${rango("F")}),1,0))*` +
-      `${numero("D")}*${numero("E")})`,
+    formula: rangoDE,
   };
 
   // El contractual total: la suma de los capitulos ya recargados. Solo los

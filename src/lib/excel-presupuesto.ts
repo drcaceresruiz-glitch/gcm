@@ -4,6 +4,7 @@ import {
   sumarHojas,
   detectarImportesRepetidos,
   type GrupoRepetido,
+  cubiertosPorDescendientes,
 } from "@/lib/jerarquia-partidas";
 
 /**
@@ -469,6 +470,13 @@ function clasificarCodigo(
    */
   esPadre = false,
   soloEstructura = false,
+  /**
+   * Si alguna descendiente de esta fila trae importe propio.
+   *
+   * Es lo que distingue un SUBTOTAL de un PRECIO cuando los dos vienen
+   * escritos igual. Ver `cubiertosPorDescendientes`.
+   */
+  cubiertaPorHijas = false,
 ): { tipo: TipoFila; nivel: number } {
   const segmentos = codigo.split(".");
   const ultimo = segmentos.at(-1) ?? "";
@@ -524,6 +532,24 @@ function clasificarCodigo(
    * del grupo que tiene debajo. El dinero del archivo no decide nada cuando
    * el dinero del archivo no se importa.
    */
+  /*
+   * SU CIFRA ES UN SUBTOTAL, no un precio: agrupa.
+   *
+   * Va ANTES de `tieneImporte` y por eso una plantilla puede enseñar el total
+   * de cada capitulo en su cabecera sin que el presupuesto se cuente dos
+   * veces al volver a subirla. Tambien recoge los presupuestos ajenos que
+   * traen subtotales por capitulo, que son casi todos.
+   *
+   * No pisa el caso de al lado -«7.02.00 REDES DE DESAGUE» con el precio del
+   * subcontrato y sus hijas describiendo alcance sin cifra-: alli ninguna
+   * hija tiene importe, asi que la fila no esta cubierta y sigue siendo la
+   * partida costeada que es. La diferencia la marca lo que hay DEBAJO, no la
+   * forma del codigo.
+   */
+  if (cubiertaPorHijas && !soloEstructura) {
+    return { tipo: "CAPITULO", nivel };
+  }
+
   if (tieneImporte && !soloEstructura) {
     return { tipo: "PARTIDA", nivel };
   }
@@ -661,6 +687,53 @@ export async function analizarExcel(
       }
     }
   }
+
+  /**
+   * Que filas traen un SUBTOTAL en vez de un precio.
+   *
+   * Misma idea que `codigosPadre` y misma razon para resolverla en una pasada
+   * previa: la respuesta esta mas abajo en el documento. Al leer «1.0 CAPITULO
+   * I ... 12.765» todavia no se sabe si sus partidas llevan precio, y de eso
+   * depende si esos 12.765 son la suma de ellas -y hay que descartarlos- o el
+   * precio de un paquete -y hay que conservarlos-.
+   *
+   * Sin esto, una plantilla que enseñe el total de cada capitulo se cuenta dos
+   * veces al volver a subirla, y lo mismo pasa con cualquier presupuesto ajeno
+   * que traiga subtotales por capitulo, que son casi todos.
+   */
+  const cubiertos = ((): ReadonlySet<string> => {
+    if (opciones.soloEstructura) return new Set<string>();
+
+    const columnaCodigo = mapa.get("codigo")!;
+    const columnaParcial = mapa.get("parcial");
+    const columnaMetrado = mapa.get("metrado");
+    const columnaPrecio = mapa.get("precioUnitario");
+
+    const nodos: { codigo: string; parcial: string | null }[] = [];
+    for (let n = filaCabecera + 1; n <= hoja.rowCount; n++) {
+      const fila = hoja.getRow(n);
+      const codigo = textoCelda(fila.getCell(columnaCodigo)).trim();
+      if (!CODIGO_VALIDO.test(codigo)) continue;
+
+      const leerDec = (col: number | undefined) =>
+        col ? normalizarDecimal(valorCelda(fila.getCell(col)), 4) : null;
+
+      // El importe efectivo de la fila: el subtotal si lo trae, y si no, lo
+      // que sale de multiplicar. Es el mismo orden que usa el bucle de abajo.
+      const parcial = leerDec(columnaParcial);
+      const importe =
+        parcial ??
+        (() => {
+          const m = leerDec(columnaMetrado);
+          const pu = leerDec(columnaPrecio);
+          return m !== null && pu !== null ? multiplicar(m, pu, 2) : null;
+        })();
+
+      nodos.push({ codigo, parcial: importe });
+    }
+
+    return cubiertosPorDescendientes(nodos);
+  })();
 
   let filasTextoOmitidas = 0;
   const descripcionesRecortadas: number[] = [];
@@ -946,6 +1019,7 @@ export async function analizarExcel(
       tieneImporte,
       codigosPadre.has(codigo),
       opciones.soloEstructura === true,
+      cubiertos.has(codigo),
     );
     const registro = construirFila({
       hoja, fila, n, mapa, codigo, descripcion, tipo, nivel,
