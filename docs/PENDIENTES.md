@@ -54,6 +54,18 @@ aqui, lo que hay que saber para continuar:
 3. **Los documentos de la tesis** (`MATRIZ DE CONSISTENCIA GCM.xlsx` y
    `FORMULAS GCM.docx`) estan en `docs/` SIN subir al repositorio, como el
    Excel del cliente. Decidir si se versionan.
+4. **El estudio sumo un cuarto objetivo especifico** el 28/08/2026: describir
+   la percepcion de utilidad y facilidad de uso, con una adaptacion del TAM de
+   Davis (1989). Va SIN hipotesis inferencial -es descriptivo- para no exigir
+   significacion sobre una muestra de cinco a quince personas. El cuestionario
+   y la ficha de validacion por juicio de expertos estan en `docs/tesis/`.
+   Falta: elegir a los tres expertos y aplicar.
+5. **Dos validaciones del instrumento principal siguen pendientes** y son de
+   campo: la V de Aiken sobre los indicadores (misma ficha) y el Kappa de
+   Cohen sobre la clasificacion de causas de no cumplimiento -dos personas
+   clasifican los mismos 30 a 50 incumplimientos y se mide su acuerdo-. El
+   alfa de Cronbach NO aplica al instrumento principal: registra hechos
+   observables, no constructos latentes.
 
 ### ABIERTO Y SIN CERRAR: el total de GCM no coincide con el del Excel del cliente
 
