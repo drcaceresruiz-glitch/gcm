@@ -87,6 +87,16 @@ const CAPITULO_DE_LA_SECCION: Record<string, string | null> = {
   plan: null,
   ejecucion: null,
   compras: null,
+  investigacion: null,
+
+  /*
+   * Los datos crudos para una investigacion NO tienen capitulo, y no es un
+   * olvido. El manual lo lee todo el mundo, y esta pantalla solo existe para
+   * quien opera GCM: un capitulo sobre exportar la obra entera en CSV le
+   * diria a cada residente que hay una puerta que no puede abrir. La pantalla
+   * se explica a si misma, que es donde hace falta.
+   */
+  investigacionDatos: null,
 
   tablero: "indicadores",
   meta: "meta",

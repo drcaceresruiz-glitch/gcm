@@ -80,3 +80,39 @@ export function generarCsv(filas: readonly (readonly CeldaCsv[])[]): string {
   const cuerpo = filas.map((f) => f.map(celdaCsv).join(";")).join("\r\n");
   return `${BOM}sep=;\r\n${cuerpo}\r\n`;
 }
+
+/**
+ * El mismo archivo, pero para un programa de estadistica y no para Excel.
+ *
+ * `generarCsv` escribe un BOM y una primera linea `sep=;`. Las dos cosas son
+ * correctas para Excel -sin ellas, un Excel en espanol parte mal las columnas
+ * y se come las tildes- y las dos ROMPEN a SPSS y a Minitab: el BOM ensucia el
+ * nombre de la primera variable y la linea `sep=;` entra como si fuera un caso
+ * mas, corriendo todo el archivo una fila.
+ *
+ * Por eso son dos funciones y no una con un parametro: son dos destinos con
+ * exigencias opuestas, y quien exporta para analizar no deberia tener que
+ * acordarse de apagar dos cosas.
+ *
+ * El separador SI se elige, porque ahi no hay una respuesta buena para todos:
+ * la coma es lo que esperan SPSS y Minitab por defecto, y el punto y coma es
+ * lo que necesita quien vaya a abrir el mismo archivo en un Excel en espanol
+ * para echarle un vistazo antes.
+ */
+export function generarCsvPlano(
+  filas: readonly (readonly CeldaCsv[])[],
+  separador: "," | ";" = ",",
+): string {
+  const escapar = (valor: CeldaCsv): string => {
+    const texto = celdaCsv(valor);
+    // `celdaCsv` entrecomilla mirando el punto y coma. Con coma como
+    // separador hay que entrecomillar tambien lo que la lleve dentro, o una
+    // descripcion con una coma partiria la fila en dos.
+    if (separador === "," && texto.includes(",") && !texto.startsWith('"')) {
+      return `"${texto.replaceAll('"', '""')}"`;
+    }
+    return texto;
+  };
+
+  return filas.map((f) => f.map(escapar).join(separador)).join("\r\n") + "\r\n";
+}

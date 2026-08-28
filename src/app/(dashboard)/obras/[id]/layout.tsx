@@ -330,6 +330,24 @@ export default async function ObraLayout({
         },
       ].filter(Boolean),
     },
+    /*
+     * SOLO PARA QUIEN OPERA GCM, y por eso es una fase aparte en vez de una
+     * seccion dentro de otra: no es una etapa del trabajo de la obra. Se cae
+     * entera para todos los demas —el `filter` de abajo quita las fases sin
+     * secciones— asi que ni siquiera aparece el rotulo del grupo.
+     */
+    {
+      clave: "investigacion",
+      titulo: "Investigación",
+      secciones: [
+        sesion.esOperador && {
+          clave: "investigacionDatos",
+          titulo: "Datos crudos",
+          pregunta: "para analizar fuera",
+          href: `${raiz}/investigacion`,
+        },
+      ].filter(Boolean),
+    },
   ].filter((f) => f.secciones.length > 0) as FaseMenu[];
 
   /**

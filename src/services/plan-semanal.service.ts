@@ -37,6 +37,7 @@ import type {
   CausaNoCumplimiento,
   EstadoLookahead,
 } from "@/generated/prisma/enums";
+import { anotarEjecucion } from "@/services/ejecucion-tarea.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import { fotosPorDestino, type FotoResumen } from "@/services/evidencia.service";
 import type { SesionActiva } from "@/services/sesion.service";
@@ -1241,6 +1242,11 @@ export async function cerrarPlanSemanal(
         where: { id: c.id },
         data: {
           cumplido,
+          // CUANDO se supo, no solo QUE paso. Es lo que permite medir despues
+          // cuanto tarda un equipo en cerrar su plan una vez terminada la
+          // semana: la latencia del ritual, que es de las primeras cosas que
+          // cambian cuando el sistema se usa de verdad.
+          cumplidoAt: new Date(),
           causa: cumplido ? null : (e?.causa ?? "OTRA"),
           notaCierre: e?.nota?.trim() ? e.nota.trim() : null,
           // Lo ejecutado de verdad. Si no se anota, se deja como estaba en vez
@@ -1295,6 +1301,11 @@ export async function cerrarPlanSemanal(
           planSemanalId: planId,
         },
       });
+
+      // Igual que en el parte del cronograma: de este avance sale tambien
+      // cuando arranco y cuando termino la tarea.
+      await anotarEjecucion(tx, obraId, c.uid, fechaAvance, Number(pct));
+
       avancesRegistrados += 1;
     }
 

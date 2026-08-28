@@ -45,6 +45,15 @@ const FUNCIONES: Readonly<Record<string, readonly string[]>> = {
     "alternarConstructora",
   ],
   "empresa-borrado.service.ts": ["motivoSiNoSePuedeBorrar"],
+  /// Los datos crudos de una obra para una investigacion: la radiografia mas
+  /// completa que existe de como trabaja una constructora. Ni el
+  /// administrador de la empresa entra aqui.
+  "investigacion.service.ts": [
+    "datosDelEstudio",
+    "fijarPuntoDeInterrupcion",
+    "marcarOrigenDeSemana",
+    "resumenDelEstudio",
+  ],
   "soporte.service.ts": [
     "hiloDeSoportePorOperador",
     "escribirSoportePorOperador",

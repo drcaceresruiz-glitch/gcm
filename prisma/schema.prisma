@@ -114,27 +114,25 @@ enum AuditAction {
 // ---------------------------------------------------------------------------
 
 model Company {
-  id          String  @id @default(cuid())
-  razonSocial String  @db.VarChar(200)
+  id                  String  @id @default(cuid())
+  razonSocial         String  @db.VarChar(200)
   /**
    * Que lleva el informe de obra de esta constructora.
-   *
    * `plantillaInforme` es un nombre para un conjunto de hojas (COMPLETA,
    * EJECUTIVA, OBRA) y `seccionesInformeOff` las que se apagan encima, por su
    * clave y separadas por comas. Se guarda lo APAGADO y no lo encendido: asi
    * una seccion nueva aparece por defecto en los informes de todo el mundo en
    * vez de quedarse invisible hasta que cada empresa la descubra.
-   *
    * Texto y no enum de Prisma para la plantilla: anadir una plantilla nueva
    * seria una migracion, y las reglas viven en `lib/plantilla-informe.ts`, que
    * ya descarta lo que no reconoce.
    */
   plantillaInforme    String? @db.VarChar(20)
   seccionesInformeOff String? @db.VarChar(200)
-  ruc         String  @unique @db.VarChar(11)
-  direccion   String? @db.VarChar(255)
-  telefono    String? @db.VarChar(30)
-  email       String? @db.VarChar(150)
+  ruc                 String  @unique @db.VarChar(11)
+  direccion           String? @db.VarChar(255)
+  telefono            String? @db.VarChar(30)
+  email               String? @db.VarChar(150)
 
   /// Quien firma las ordenes. Sale en el pie del documento que se le manda
   /// al proveedor, sobre la linea de firma.
@@ -545,23 +543,23 @@ model ConversacionAgente {
  * `agente-conversacion.service.ts`.
  */
 model MensajeAgente {
-  id             String    @id @default(cuid())
-  conversacionId String
-  rol            RolAgente
+  id                  String    @id @default(cuid())
+  conversacionId      String
+  rol                 RolAgente
   /// Vacio mientras el asistente sigue pensando.
-  contenido      String    @db.Text
+  contenido           String    @db.Text
   /// Nombres de las herramientas que se llamaron para responder esta vez,
   /// para poder decir "consultando el semaforo de cartera..." en la
   /// pantalla. Solo tiene sentido en filas ASISTENTE.
-  herramientas   Json?
+  herramientas        Json?
   /// Cuando se creo la fila: para USUARIO es el envio, para ASISTENTE el
   /// instante en que se encolo el turno.
-  iniciadoAt     DateTime  @default(now())
+  iniciadoAt          DateTime  @default(now())
   /// Null = todavia procesando. Solo tiene sentido en filas ASISTENTE -las
   /// de USUARIO nacen ya completas-.
-  terminadoAt    DateTime?
+  terminadoAt         DateTime?
   /// Por que no se pudo responder, si fallo. Nunca la clave del proveedor.
-  error          String?   @db.VarChar(500)
+  error               String?   @db.VarChar(500)
   /// Cuando el asistente, en vez de responder con texto final, PROPONE una
   /// escritura (Fase 2b): guarda {herramienta, datos} -los argumentos
   /// EXACTOS que se ejecutaran si el humano confirma-. Al confirmar se
@@ -622,23 +620,22 @@ model User {
   id        String @id @default(cuid())
   companyId String
 
-  nombres   String  @db.VarChar(100)
-  apellidos String  @db.VarChar(100)
-  tipoDoc   String  @db.VarChar(10)
-  numDoc    String  @db.VarChar(20)
-  cargo     String? @db.VarChar(100)
+  nombres     String  @db.VarChar(100)
+  apellidos   String  @db.VarChar(100)
+  tipoDoc     String  @db.VarChar(10)
+  numDoc      String  @db.VarChar(20)
+  cargo       String? @db.VarChar(100)
   /**
    * Numero de colegiatura profesional (CAP, CIP).
-   *
    * Lo pide el papel, no la aplicacion: un presupuesto o un informe firmado
    * por el residente lleva su colegiatura debajo del nombre, y sin ella el
    * documento no vale como el del ejemplo del cliente. Opcional porque no
    * todos los usuarios son colegiados -un administrativo no lo es-.
    */
   colegiatura String? @db.VarChar(30)
-  celular   String? @db.VarChar(30)
+  celular     String? @db.VarChar(30)
   /// UNICO POR EMPRESA, no en toda la instalacion. Ver `@@unique` al final.
-  email     String  @db.VarChar(150)
+  email       String  @db.VarChar(150)
 
   /// Foto de perfil, opcional. Se guarda como imagen embebida (data URL) y no
   /// como ruta a un archivo: todavia no hay infraestructura de subida
@@ -895,10 +892,9 @@ model Project {
   /// existian antes de introducirlo; las nuevas siempre lo llevan.
   correlativo String? @db.VarChar(20)
 
-  ubicacion String? @db.VarChar(255)
+  ubicacion           String? @db.VarChar(255)
   /**
    * Lo mismo que en la empresa, para esta obra en concreto.
-   *
    * NULL = hereda lo de la empresa, que es el caso normal. Cuando la obra
    * elige, manda ENTERA: su plantilla y sus apagadas, sin mezclar con las de
    * la empresa. Mezclarlas daria combinaciones que nadie eligio.
@@ -957,16 +953,28 @@ model Project {
 
   /**
    * Cuantas semanas mira el Lookahead de ESTA obra.
-   *
    * NULL = no se ha elegido, y entonces manda `SEMANAS_POR_DEFECTO`
    * (`lib/lookahead`). No lleva `@default(3)` a proposito: «no ha elegido» y
    * «eligio tres» no son lo mismo, y con un default no se podria cambiar
    * nunca el valor recomendado sin pisar la eleccion de quien quiso tres.
-   *
    * `?semanas=` en la URL sigue mandando sobre esto: sirve para mirar otra
    * ventana de paso, sin cambiarle la de la obra a todo el mundo.
    */
   semanasLookahead Int?
+
+  /// La semana en que esta obra empezo a gestionarse con GCM: el PUNTO DE
+  /// INTERRUPCION de un estudio de serie temporal.
+  ///
+  /// Vive en la obra y no en un parametro de la exportacion a proposito. Si
+  /// cada descarga pidiera la fecha de corte, la fase de cada dato dependeria
+  /// de lo que alguien tecleara ese dia: dos exportaciones del mismo estudio
+  /// podrian clasificar la misma semana en lados distintos, y no habria forma
+  /// de demostrar cual valia. Guardada aqui, la fase es un dato del sistema y
+  /// se puede auditar.
+  ///
+  /// NULL = esta obra no participa en ningun estudio. Entonces la exportacion
+  /// no inventa fases: sale la serie sin clasificar.
+  fechaInterrupcionEstudio DateTime? @db.Date
 
   /// El ultimo `uid` que se ha entregado a una tarea tecleada a mano. Va en
   /// NEGATIVO y solo baja: 0, -1, -2…
@@ -1013,6 +1021,7 @@ model Project {
   ordenes              OrdenCompra[]
   cronogramas          Cronograma[]
   avances              AvanceTarea[]
+  ejecucionTareas      EjecucionTarea[]
   mapeos               MapeoTareaPartida[]
   hitos                HitoObra[]
   encargos             EncargoProveedor[]
@@ -2027,6 +2036,91 @@ model DependenciaTarea {
   @@map("dependencias_tarea")
 }
 
+/// De donde salio la fecha real de una tarea.
+///
+/// SEPARA EL DATO DEL HABITO DE REPORTE, y por eso existe. Una fecha DERIVADA
+/// se dedujo de la serie de avance -el primer reporte por encima de cero, el
+/// reporte que llega al cien- y por tanto arrastra CUANDO se molesto alguien
+/// en abrir la aplicacion, no solo cuando ocurrio el trabajo. Una DECLARADA la
+/// escribio una persona diciendo el dia exacto.
+///
+/// Mezclarlas en una sola columna contamina cualquier medida de varianza
+/// temporal: la dispersion saldria de dos procesos distintos sumados. Con esto
+/// se pueden separar al analizar, que es lo unico que permite decir despues si
+/// la conclusion vale.
+/// De donde salen los datos de una semana del Last Planner.
+///
+/// GESTIONADO es lo normal: la semana se planifico, se comprometio y se cerro
+/// con la aplicacion, en su momento.
+///
+/// RECONSTRUIDO es una semana ANTERIOR a que la obra usara GCM, cargada
+/// despues a partir de actas de reunion, cuaderno de obra o planillas. Los
+/// datos pueden ser correctos y aun asi no son equivalentes: nadie tenia
+/// delante el tablero cuando se tomaron las decisiones de esa semana.
+///
+/// SE DISTINGUEN PORQUE MEZCLARLAS SIN MARCA INVALIDA CUALQUIER COMPARACION.
+/// Un estudio que compara «antes» con «despues» necesita poder demostrar cual
+/// es cual, y una serie donde no se sabe que semana se vivio con la
+/// herramienta no prueba nada. Tambien evita el error mas facil: dar por
+/// bueno un PPC reconstruido a mano como si fuera medido.
+enum OrigenDatosPlan {
+  GESTIONADO
+  RECONSTRUIDO
+}
+
+enum OrigenFechaReal {
+  DECLARADA
+  DERIVADA
+}
+
+/// Cuando ARRANCO y cuando TERMINO de verdad una tarea.
+///
+/// POR QUE NO VA DENTRO DE `TareaCronograma`, que es donde parece que deberia:
+/// esa tabla es la foto de UNA VERSION del cronograma, y cada reprogramacion
+/// importa una version nueva con tareas nuevas. Las fechas reales guardadas
+/// alli desaparecerian en la primera replanificacion —justo cuando mas
+/// interesa medir la desviacion—, y una serie temporal con un hueco en el
+/// medio no vale para nada.
+///
+/// Cuelga de la OBRA y del `uid` de la tarea, igual que `AvanceTarea` y por la
+/// misma razon: el `uid` es lo unico estable entre versiones del cronograma.
+///
+/// UNA FILA POR TAREA, y aqui SI se actualiza en vez de acumular historia
+/// —al contrario que `AvanceTarea`—: no es un diario, es el par de fechas que
+/// define la duracion real. La historia de como se fue reportando ya esta en
+/// los avances.
+///
+/// Las dos fechas son NULABLES y tienen que serlo: una tarea que no ha
+/// empezado no tiene fecha de inicio, y obligar a poner una obligaria a
+/// inventarsela, que es peor que el vacio. El analisis filtra por no nulos.
+model EjecucionTarea {
+  id        String @id @default(cuid())
+  projectId String
+
+  /// El `uid` de la tarea en el cronograma. Estable entre versiones.
+  uid Int
+
+  inicioReal DateTime? @db.Date
+  finReal    DateTime? @db.Date
+
+  /// Como se supo. Ver `OrigenFechaReal`: separa el dato del habito de reporte.
+  origenInicio OrigenFechaReal?
+  origenFin    OrigenFechaReal?
+
+  /// Quien declaro las fechas, cuando las declaro una persona.
+  declaradoPor String?   @db.VarChar(150)
+  declaradoAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, uid])
+  @@index([projectId])
+  @@map("ejecucion_tareas")
+}
+
 /// El avance que se reporta desde obra. Es lo que GCM posee.
 ///
 /// NO lleva clave foranea a `TareaCronograma`, y es deliberado: las versiones
@@ -2550,10 +2644,10 @@ model AdendaEncargo {
   /// un adicional, NEGATIVO en un deductivo.
   importe Decimal @db.Decimal(14, 2)
 
-  concepto String @db.VarChar(300)
+  concepto   String  @db.VarChar(300)
   /// Por que procede. En un adicional es donde se explica que alcance
   /// faltaba y por que no estaba en la orden.
-  motivo   String @db.Text
+  motivo     String  @db.Text
   /// La carta, acta o presupuesto del contratista que la sustenta.
   referencia String? @db.VarChar(120)
 
@@ -2569,11 +2663,11 @@ model AdendaEncargo {
   /// La segunda firma. Aprobar es irreversible: una adenda aprobada se
   /// corrige con otra de signo contrario, no deshaciendola. Mismo criterio
   /// que un movimiento presupuestal aprobado.
-  resueltaAt  DateTime?
-  resueltaPor String?   @db.VarChar(150)
+  resueltaAt    DateTime?
+  resueltaPor   String?   @db.VarChar(150)
   /// Por que se rechazo. Solo en RECHAZADA: un «no» sin motivo no sirve para
   /// negociar con el contratista despues.
-  motivoRechazo String? @db.Text
+  motivoRechazo String?   @db.Text
 
   encargo EncargoProveedor @relation(fields: [encargoId], references: [id], onDelete: Cascade)
   project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -2627,24 +2721,20 @@ model ValorizacionEncargo {
 
   /**
    * Lo que ese porcentaje valia EL DIA DEL CORTE, en soles y sin IGV.
-   *
    * NACE DE UN FALLO REAL, encontrado el 23 de agosto de 2026 al abrir las
    * adendas. Hasta ese dia la valorizacion guardaba solo el porcentaje y el
    * importe se recalculaba SIEMPRE contra el `montoContratado` de hoy
    * (`importeValorizado` en `lib/encargos.ts`). Con el monto fijo eso no se
    * notaba; en cuanto el contrato puede cambiar —que es justo lo que
    * introducen las adendas— revalua hacia atras:
-   *
-   *   Valorizo el 60 % de un contrato de 50.000 -> 30.000, y se le pago.
-   *   Entra un deductivo de -12.000 -> ese MISMO 60 % pasa a valer 22.800.
-   *   Sin que nadie toque esa valorizacion, el sistema empieza a decir que
-   *   se le pagaron 7.200 de mas.
-   *
+   * Valorizo el 60 % de un contrato de 50.000 -> 30.000, y se le pago.
+   * Entra un deductivo de -12.000 -> ese MISMO 60 % pasa a valer 22.800.
+   * Sin que nadie toque esa valorizacion, el sistema empieza a decir que
+   * se le pagaron 7.200 de mas.
    * Congelado aqui, una valorizacion vale lo que valia cuando se firmo, y las
    * siguientes se calculan sobre el monto vigente en SU momento. Es el mismo
    * criterio que `PresupuestoMeta.mesesPlazo`: lo que se congela es lo que
    * permite que la desviacion se vea.
-   *
    * Nullable solo por las que existieran antes de esta columna: quien las lea
    * cae al calculo antiguo. Las nuevas lo escriben siempre.
    */
@@ -2803,6 +2893,11 @@ model PlanSemanal {
 
   estado EstadoPlanSemanal @default(ABIERTO)
 
+  /// Si esta semana se vivio con GCM o se cargo despues desde actas.
+  /// Ver `OrigenDatosPlan`: sin esta marca, una serie temporal no puede
+  /// demostrar donde esta el punto de interrupcion.
+  origenDatos OrigenDatosPlan @default(GESTIONADO)
+
   notas String? @db.Text
 
   creadoPor  String    @db.VarChar(150)
@@ -2839,6 +2934,14 @@ model CompromisoSemanal {
 
   /// null = sin evaluar; true/false al cerrar la semana. De esto sale el PPC.
   cumplido Boolean?
+
+  /// Cuando se marco el cumplimiento (o el incumplimiento).
+  ///
+  /// `cumplido` dice QUE paso; esto dice CUANDO se supo. Sin esta fecha no se
+  /// puede medir la latencia entre que la semana termina y el equipo cierra su
+  /// plan, que es de las primeras cosas que cambian cuando un sistema de
+  /// gestion empieza a usarse de verdad.
+  cumplidoAt DateTime?
 
   /// Solo cuando `cumplido` es false: por que no se cumplio.
   causa CausaNoCumplimiento?
@@ -4092,9 +4195,9 @@ model PresupuestoMeta {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project              Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  items                PresupuestoMetaItem[]
-  deducciones          DeduccionCostoPropio[]
+  project     Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items       PresupuestoMetaItem[]
+  deducciones DeduccionCostoPropio[]
 
   @@unique([projectId, version])
   @@index([projectId])
@@ -4150,8 +4253,8 @@ model PresupuestoMetaItem {
   /// se escribe en la plantilla y lo que ensena la hoja, y guardarlo igual
   /// evita el error de cien veces, que en un presupuesto no da error: da una
   /// cifra creible y equivocada. Para calcular, `porcentajeAFraccion`.
-  porcentajeRecargo Decimal?          @db.Decimal(6, 3)
-  meta              PresupuestoMeta   @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
+  porcentajeRecargo Decimal?               @db.Decimal(6, 3)
+  meta              PresupuestoMeta        @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
   reparto           MetaItemPartida[]
   deducciones       DeduccionCostoPropio[]
 

@@ -120,7 +120,12 @@ export const TABLAS: readonly TablaRespaldo[] = [
     tabla: "projects",
     modelo: "project",
     refs: [],
-    fechas: ["fechaInicio", "fechaFinProgramada", "fechaEstimadaReanudacion"],
+    fechas: [
+      "fechaInicio",
+      "fechaFinProgramada",
+      "fechaEstimadaReanudacion",
+      "fechaInterrupcionEstudio",
+    ],
   },
   {
     tabla: "baselines",
@@ -357,6 +362,17 @@ export const TABLAS: readonly TablaRespaldo[] = [
     ],
     decimales: { porcentaje: 2 },
     fechas: ["fecha"],
+  },
+  /// Hermana de `avances_tarea`: las dos cuelgan de la obra por `uid` y las
+  /// dos cuentan como fue la ejecucion. Va en el respaldo porque las fechas
+  /// reales de arranque y termino no se pueden reconstruir desde ningun otro
+  /// sitio -se dedujeron de una serie de partes que puede haberse corregido
+  /// despues-, y perderlas al restaurar dejaria la obra sin su historia.
+  {
+    tabla: "ejecucion_tareas",
+    modelo: "ejecucionTarea",
+    refs: [{ campo: "projectId", a: "projects" }],
+    fechas: ["inicioReal", "finReal"],
   },
   {
     tabla: "fotos_evidencia",

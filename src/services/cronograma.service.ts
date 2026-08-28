@@ -20,6 +20,7 @@ import {
   type SenalDelPlan,
 } from "@/lib/parte-diario";
 import { capituloDeCadaTarea } from "@/lib/control-avance";
+import { anotarEjecucion } from "@/services/ejecucion-tarea.service";
 import { obtenerCalendario } from "@/services/calendario.service";
 import { hoy as hoyCalendario } from "@/utils/fechas";
 import {
@@ -1168,6 +1169,11 @@ export async function registrarAvance(
       },
       select: { id: true },
     });
+
+    // Y de paso, cuando arranco y cuando termino de verdad esta tarea. No es
+    // un dato mas que teclear: se deduce de este mismo parte. Ver
+    // `services/ejecucion-tarea.service`.
+    await anotarEjecucion(tx, obraId, datos.uid, fecha, Number(porcentaje));
 
     await tx.auditLog.create({
       data: {
