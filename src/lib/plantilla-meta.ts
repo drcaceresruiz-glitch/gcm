@@ -213,11 +213,25 @@ function formulaParcial(
     `SUMPRODUCT((LEFT(${codigos},LEN(${pfx}))=${pfx})` +
     `*$D$${desde}:$D$${ultima}*$E$${desde}:$E$${ultima})`;
 
-  return `IF($B${fila}="","",IF(${esCapitulo},${suma},D${fila}*E${fila}))`;
+  /*
+   * Y sobre esa suma, LO QUE COBRA EL CONTRATISTA: se rebaja el descuento y se
+   * suman sus dos margenes, los dos sobre el importe ya descontado. Asi la
+   * cabecera enseña lo que hay que PAGARLE, que es lo que se compara con el
+   * total de su cotizacion, y no la suma en bruto de unas partidas que nadie
+   * va a cobrar tal cual.
+   *
+   * `N()` convierte en cero la celda vacia. Aqui SI vale -y en las formulas
+   * que rompian, no- porque opera sobre UNA celda, no sobre un rango: lo que
+   * Excel solo evalua como matriz es `N(rango)`.
+   */
+  const conAjuste =
+    `(${suma})*(1-N($G${fila})/100)*(1+N($H${fila})/100+N($I${fila})/100)`;
+
+  return `IF($B${fila}="","",IF(${esCapitulo},${conAjuste},D${fila}*E${fila}))`;
 }
 
 function formulaContractual(fila: number): string {
-  return `IF($G${fila}="","",$F${fila}*(1+$G${fila}/100))`;
+  return `IF($J${fila}="","",$F${fila}*(1+$J${fila}/100))`;
 }
 
 const CABECERAS_COSTO = [
@@ -227,6 +241,19 @@ const CABECERAS_COSTO = [
   "Metrado",
   "Precio Unitario",
   "Parcial",
+  /*
+   * LO QUE COBRA EL CONTRATISTA (G, H, I), separado de lo que se le cobra al
+   * cliente (J). Son dos cascadas encadenadas y NO se mezclan: el contratista
+   * rebaja sus partidas y suma sus margenes -de ahi sale lo que hay que
+   * pagarle, que es el costo real del capitulo-, y solo despues se aplica el
+   * recargo con el que se genera el contractual.
+   *
+   * Van en la fila que AGRUPA: el capitulo si lo cubre un solo contratista, o
+   * cada subcapitulo cuando son varios.
+   */
+  "% Dcto",
+  "% GG",
+  "% Utilidad",
   "% Recargo",
   "Contractual",
   // Las dos siguientes van AL FINAL a proposito: `formulaContractual`
@@ -579,6 +606,7 @@ export async function generarPlantillaMeta(
   costo.columns = [
     { width: 10 }, { width: 56 }, { width: 8 },
     { width: 12 }, { width: 16 }, { width: 16 },
+    { width: 9 }, { width: 9 }, { width: 10 },
     { width: 12 }, { width: 18 },
     { width: 14 }, { width: 14 },
   ];
@@ -659,10 +687,10 @@ export async function generarPlantillaMeta(
     }
     // Opcionales: los ejemplos de FILAS_COSTO no las traen a proposito, para
     // que la plantilla misma demuestre que no hacen falta.
-    if (f.fechaInicio) fila.getCell(9).value = new Date(`${f.fechaInicio}T00:00:00.000Z`);
-    if (f.fechaFin) fila.getCell(10).value = new Date(`${f.fechaFin}T00:00:00.000Z`);
+    if (f.fechaInicio) fila.getCell(12).value = new Date(`${f.fechaInicio}T00:00:00.000Z`);
+    if (f.fechaFin) fila.getCell(13).value = new Date(`${f.fechaFin}T00:00:00.000Z`);
 
-    for (const col of [1, 2, 3, 4, 5, 9, 10]) marcarEditable(fila.getCell(col));
+    for (const col of [1, 2, 3, 4, 5, 12, 13]) marcarEditable(fila.getCell(col));
     marcarCalculada(
       fila.getCell(6),
       "Se calcula solo: en una partida, metrado x precio unitario; en un " +
@@ -687,11 +715,11 @@ export async function generarPlantillaMeta(
      * recargo sin codigo no tiene contra que aplicarse.
      */
     if (f.codigo !== "") {
-      fila.getCell(7).numFmt = "#,##0.00";
-      marcarEditable(fila.getCell(7));
+      fila.getCell(10).numFmt = "#,##0.00";
+      marcarEditable(fila.getCell(10));
     } else {
       marcarCalculada(
-        fila.getCell(7),
+        fila.getCell(10),
         "Una línea sin Ítem no se le factura al cliente línea a línea, así " +
           "que no se recarga: su costo se cubre con el recargo del resto.",
       );
@@ -705,25 +733,31 @@ export async function generarPlantillaMeta(
     fila.getCell(4).numFmt = "#,##0.00";
     fila.getCell(5).numFmt = "#,##0.00";
     fila.getCell(6).numFmt = "#,##0.00";
-    fila.getCell(9).numFmt = "dd/mm/yyyy";
-    fila.getCell(10).numFmt = "dd/mm/yyyy";
+    fila.getCell(12).numFmt = "dd/mm/yyyy";
+    fila.getCell(13).numFmt = "dd/mm/yyyy";
 
     const esCapitulo = esCapituloCodigo(f);
     if (esCapitulo) {
       // El recargo es lo UNICO que se escribe en un capitulo: de ahi sale el
       // presupuesto contractual. Las partidas no lo llevan.
-      if (f.recargo !== undefined) fila.getCell(7).value = f.recargo;
-      fila.getCell(8).value = {
+      if (f.recargo !== undefined) fila.getCell(10).value = f.recargo;
+      // Los tres del contratista, vacios y editables: se rellenan al vaciar
+      // su cotizacion.
+      for (const col of [7, 8, 9]) {
+        fila.getCell(col).numFmt = "#,##0.00";
+        marcarEditable(fila.getCell(col));
+      }
+      fila.getCell(11).value = {
         formula: formulaContractual(n),
         result: contractualEjemplo(f),
       };
-      fila.getCell(8).numFmt = "#,##0.00";
+      fila.getCell(11).numFmt = "#,##0.00";
       marcarCalculada(
-        fila.getCell(8),
+        fila.getCell(11),
         "Se calcula solo: el subtotal real del capítulo más su recargo.",
       );
 
-      for (let c = 1; c <= 10; c++) {
+      for (let c = 1; c <= 13; c++) {
         fila.getCell(c).font = { bold: true };
         fila.getCell(c).fill = {
           type: "pattern",
@@ -751,20 +785,22 @@ export async function generarPlantillaMeta(
     // puesta desde el principio: aparece sola en cuanto se escribe la linea.
     fila.getCell(6).value = { formula: formulaParcial(f, ultimaFila), result: "" };
     // El recargo y su contractual: en blanco hasta que la fila sea capitulo.
-    fila.getCell(7).numFmt = "#,##0.00";
-    fila.getCell(8).numFmt = "#,##0.00";
-    fila.getCell(8).value = {
+    for (const col of [7, 8, 9, 10]) {
+      fila.getCell(col).numFmt = "#,##0.00";
+      marcarEditable(fila.getCell(col));
+    }
+    fila.getCell(11).numFmt = "#,##0.00";
+    fila.getCell(11).value = {
       formula: formulaContractual(f),
       result: "",
     };
-    marcarEditable(fila.getCell(7));
     marcarCalculada(
-      fila.getCell(8),
+      fila.getCell(11),
       "Se calcula solo: el subtotal real del capítulo más su recargo.",
     );
-    fila.getCell(9).numFmt = "dd/mm/yyyy";
-    fila.getCell(10).numFmt = "dd/mm/yyyy";
-    for (const col of [1, 2, 3, 4, 5, 9, 10]) marcarEditable(fila.getCell(col));
+    fila.getCell(12).numFmt = "dd/mm/yyyy";
+    fila.getCell(13).numFmt = "dd/mm/yyyy";
+    for (const col of [1, 2, 3, 4, 5, 12, 13]) marcarEditable(fila.getCell(col));
     marcarCalculada(
       fila.getCell(6),
       "Se calcula solo: en una partida, metrado x precio unitario; en un " +
@@ -849,15 +885,15 @@ export async function generarPlantillaMeta(
   // El contractual total: la suma de los capitulos ya recargados. Solo los
   // capitulos llevan cifra en esa columna, asi que sumarla entera no cuenta
   // nada dos veces.
-  total.getCell(8).value = {
+  total.getCell(11).value = {
     result: FILAS_COSTO.filter(esCapituloCodigo).reduce(
       (s, f) => s + contractualEjemplo(f),
       0,
     ),
-    formula: `SUM($H$${primeraFila}:$H$${ultimaFila})`,
+    formula: `SUM($K$${primeraFila}:$K$${ultimaFila})`,
   };
-  total.getCell(8).numFmt = "#,##0.00";
-  total.getCell(8).font = { bold: true };
+  total.getCell(11).numFmt = "#,##0.00";
+  total.getCell(11).font = { bold: true };
   total.getCell(6).numFmt = "#,##0.00";
   total.getCell(6).font = { bold: true };
 

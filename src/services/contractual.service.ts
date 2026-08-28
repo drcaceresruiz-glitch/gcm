@@ -196,6 +196,9 @@ export async function generarContractualDesdeReal(
     // El recargo es del presupuesto real y ya se aplico: en el contractual no
     // queda nada que recargar, y arrastrarlo invitaria a aplicarlo dos veces.
     porcentajeRecargo: null,
+      descuentoContratista: null,
+      ggContratista: null,
+      utilidadContratista: null,
     fechaInicio: l.fechaInicio,
     fechaFin: l.fechaFin,
   }));

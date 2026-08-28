@@ -207,14 +207,14 @@ describe("la columna de recargo, y donde se puede escribir", () => {
 
   it("una PARTIDA acepta su propio recargo", async () => {
     const h = await hoja();
-    const g = h.getRow(filaDe(h, "Cartel de identificación")).getCell(7);
+    const g = h.getRow(filaDe(h, "Cartel de identificación")).getCell(10);
 
     expect(g.protection?.locked).toBe(false);
   });
 
   it("un CAPITULO tambien, como siempre", async () => {
     const h = await hoja();
-    const g = h.getRow(filaDe(h, "OBRAS PROVISIONALES")).getCell(7);
+    const g = h.getRow(filaDe(h, "OBRAS PROVISIONALES")).getCell(10);
 
     expect(g.protection?.locked).toBe(false);
   });
@@ -223,7 +223,7 @@ describe("la columna de recargo, y donde se puede escribir", () => {
     // No es un descuido que este bloqueada. Una linea sin Item no tiene
     // codigo con el que nombrarla, y el servicio la rechaza igual.
     const h = await hoja();
-    const g = h.getRow(filaDe(h, "Residente de obra")).getCell(7);
+    const g = h.getRow(filaDe(h, "Residente de obra")).getCell(10);
 
     // `locked: true` es el valor por defecto de Excel y el archivo no lo
     // escribe, asi que al releer viene `undefined`. Lo que se comprueba es
@@ -235,7 +235,7 @@ describe("la columna de recargo, y donde se puede escribir", () => {
 
   it("las filas vacias tambien la aceptan, sean lo que sean", async () => {
     const h = await hoja();
-    expect(h.getRow(200).getCell(7).protection?.locked).toBe(false);
+    expect(h.getRow(200).getCell(10).protection?.locked).toBe(false);
   });
 });
 
@@ -260,7 +260,7 @@ describe("un recargo escrito en una PARTIDA llega hasta el contractual", () => {
     // Fila 6, columna G: la partida 1.1 del ejemplo. Es literalmente la celda
     // de la captura.
     expect(hoja.getRow(6).getCell(1).value).toBe("1.1");
-    hoja.getRow(6).getCell(7).value = pct;
+    hoja.getRow(6).getCell(10).value = pct;
 
     const salida = await libro.xlsx.writeBuffer();
     return analizarExcel(
@@ -425,10 +425,10 @@ describe("cuantas filas vienen listas, y con que", () => {
     // Cabecera en la 4, asi que la ultima preparada es la 404.
     const ultima = hoja.getRow(404);
     const parcial = ultima.getCell(6).value as { formula?: string };
-    const contractual = ultima.getCell(8).value as { formula?: string };
+    const contractual = ultima.getCell(11).value as { formula?: string };
 
     expect(parcial?.formula).toContain("D404*E404");
-    expect(contractual?.formula).toContain("$F404*(1+$G404/100)");
+    expect(contractual?.formula).toContain("$F404*(1+$J404/100)");
 
     /*
      * Y NO suma nada, porque no tiene nada debajo. Con el rango al reves
@@ -561,7 +561,7 @@ describe("las formulas de la plantilla se abren en cualquier programa", () => {
     const hoja = libro.worksheets[0]!;
 
     // Fila 5 es el primer capitulo del ejemplo, con su 18 % de recargo.
-    const contractual = hoja.getRow(5).getCell("H").value as { result?: number };
+    const contractual = hoja.getRow(5).getCell("K").value as { result?: number };
     expect(contractual.result).toBeCloseTo(2312.8, 2);
   });
 });
@@ -589,8 +589,8 @@ describe("una fecha escrita como TEXTO", () => {
     });
     if (!filaPartida) throw new Error(`No se encontro la partida ${codigo}.`);
 
-    (filaPartida as ExcelJS.Row).getCell(9).value = inicio as never;
-    (filaPartida as ExcelJS.Row).getCell(10).value = fin as never;
+    (filaPartida as ExcelJS.Row).getCell(12).value = inicio as never;
+    (filaPartida as ExcelJS.Row).getCell(13).value = fin as never;
 
     return (await libro.xlsx.writeBuffer()) as ArrayBuffer;
   }
@@ -678,8 +678,8 @@ describe("las fechas opcionales de la plantilla meta", () => {
     });
     if (!filaPartida) throw new Error(`No se encontro la partida ${codigo} en la plantilla.`);
 
-    (filaPartida as ExcelJS.Row).getCell(9).value = fechaInicio;
-    (filaPartida as ExcelJS.Row).getCell(10).value = fechaFin;
+    (filaPartida as ExcelJS.Row).getCell(12).value = fechaInicio;
+    (filaPartida as ExcelJS.Row).getCell(13).value = fechaFin;
 
     return (await libro.xlsx.writeBuffer()) as ArrayBuffer;
   }
@@ -716,7 +716,7 @@ describe("las fechas opcionales de la plantilla meta", () => {
     hoja.eachRow((fila) => {
       if (fila.getCell(1).value === "1.1") filaPartida = fila;
     });
-    (filaPartida as unknown as ExcelJS.Row).getCell(9).value = new Date("2026-09-01T00:00:00.000Z");
+    (filaPartida as unknown as ExcelJS.Row).getCell(12).value = new Date("2026-09-01T00:00:00.000Z");
     // Fecha fin se deja en blanco a proposito.
 
     const r = await analizarExcel((await libro.xlsx.writeBuffer()) as ArrayBuffer);
@@ -853,7 +853,7 @@ describe("un presupuesto pegado encima de la plantilla", () => {
       fila.getCell(5).value = precio || null;
       // Lo que hace el pegado y no se puede evitar: la formula se va.
       fila.getCell(6).value = null;
-      fila.getCell(8).value = null;
+      fila.getCell(11).value = null;
     });
 
     return (await libro.xlsx.writeBuffer()) as ArrayBuffer;

@@ -706,3 +706,117 @@ describe("subcapitulos: donde queda cada uno en el arbol", () => {
     expect(r.montoTotal).toBe("2500.00");
   });
 });
+
+describe("lo que cobra el contratista, repartido entre sus partidas", () => {
+  const CABECERA = [
+    "Item", "Descripción", "Und.", "Metrado", "Precio Unitario", "Parcial",
+    "% Dcto", "% GG", "% Utilidad",
+  ];
+
+  it("el ejemplo de la cotizacion entra cuadrado", async () => {
+    /*
+     * 20.000 cotizados, 5% de descuento, 8% de gastos generales y 10% de
+     * utilidad dan 22.420 a pagar. Es lo que hay que ver en GCM: el costo del
+     * capitulo no es lo que suman sus partidas en el papel del contratista,
+     * es lo que se le va a pagar.
+     */
+    const r = await analizarExcel(
+      await construirLibro(
+        [
+          ["8", "INSTALACIONES ELECTRICAS", null, null, null, null, 5, 8, 10],
+          ["8.01", "Salidas de luz", "und", 100, 100, 10000],
+          ["8.02", "Tomacorrientes", "und", 60, 100, 6000],
+          ["8.03", "Tableros", "und", 4, 1000, 4000],
+        ],
+        { cabecera: CABECERA },
+      ),
+    );
+
+    expect(r.errores).toEqual([]);
+    expect(r.bloquesAjustados).toBe(1);
+    expect(r.montoTotal).toBe("22420.00");
+
+    const porCodigo = new Map(r.filas.map((f) => [f.codigo, f]));
+    expect(porCodigo.get("8.01")?.parcial).toBe("11210.00");
+    expect(porCodigo.get("8.02")?.parcial).toBe("6726.00");
+    expect(porCodigo.get("8.03")?.parcial).toBe("4484.00");
+  });
+
+  it("el metrado y el precio del contratista NO se tocan", async () => {
+    // Son los que se comparan en obra. Lo que cambia es el importe, y por eso
+    // la partida pasa a suma alzada: recalcularla borraria el ajuste.
+    const r = await analizarExcel(
+      await construirLibro(
+        [
+          ["8", "ELECTRICAS", null, null, null, null, 5, 8, 10],
+          ["8.01", "Salidas", "und", 100, 100, 10000],
+        ],
+        { cabecera: CABECERA },
+      ),
+    );
+
+    const p = r.filas.find((f) => f.codigo === "8.01")!;
+    expect(p.metrado).toBe("100.00");
+    expect(p.precioUnitario).toBe("100.00");
+    expect(p.parcial).toBe("11210.00");
+    expect(p.modalidad).toBe("SUMA_ALZADA");
+  });
+
+  it("dos contratistas en el mismo capitulo, cada uno en su subcapitulo", async () => {
+    /*
+     * El caso que hay que resolver sin inventar ningun concepto nuevo: manda
+     * el ancestro MAS CERCANO con porcentajes, asi que cada bloque se ajusta
+     * con los suyos y el capitulo de arriba no los pisa.
+     */
+    const r = await analizarExcel(
+      await construirLibro(
+        [
+          ["8", "INSTALACIONES ELECTRICAS", null, null, null, null, null, null, null],
+          ["8.01.0", "Baja tension - contratista A", null, null, null, null, 5, 8, 10],
+          ["8.01.01", "Salidas", "und", 100, 100, 10000],
+          ["8.02.0", "Data - contratista B", null, null, null, null, 0, 10, 10],
+          ["8.02.01", "Cableado", "und", 50, 100, 5000],
+        ],
+        { cabecera: CABECERA },
+      ),
+    );
+
+    const porCodigo = new Map(r.filas.map((f) => [f.codigo, f]));
+    expect(r.bloquesAjustados).toBe(2);
+    // A: 10.000 x 0,95 x 1,18 = 11.210
+    expect(porCodigo.get("8.01.01")?.parcial).toBe("11210.00");
+    // B: 5.000 x 1,20 = 6.000
+    expect(porCodigo.get("8.02.01")?.parcial).toBe("6000.00");
+    expect(r.montoTotal).toBe("17210.00");
+  });
+
+  it("sin porcentajes, el presupuesto entra exactamente igual que siempre", async () => {
+    const r = await analizarExcel(
+      await construirLibro(
+        [
+          ["8", "ELECTRICAS", null, null, null, null, null, null, null],
+          ["8.01", "Salidas", "und", 100, 100, 10000],
+        ],
+        { cabecera: CABECERA },
+      ),
+    );
+
+    expect(r.bloquesAjustados).toBe(0);
+    expect(r.filas.find((f) => f.codigo === "8.01")?.parcial).toBe("10000.00");
+    expect(r.filas.find((f) => f.codigo === "8.01")?.modalidad).toBe("PRECIOS_UNITARIOS");
+    expect(r.montoTotal).toBe("10000.00");
+  });
+
+  it("y sin esas columnas tampoco cambia nada", async () => {
+    // La plantilla vieja y los presupuestos ajenos que no las traen.
+    const r = await analizarExcel(
+      await construirLibro([
+        ["8", "ELECTRICAS", null, null, null, null],
+        ["8.01", "Salidas", "und", 100, 100, 10000],
+      ]),
+    );
+
+    expect(r.bloquesAjustados).toBe(0);
+    expect(r.montoTotal).toBe("10000.00");
+  });
+});

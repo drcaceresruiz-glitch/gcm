@@ -129,6 +129,41 @@ function recargarLinea(
   linea: LineaReal,
   factor: string,
 ): { precioUnitario: string | null; parcial: string | null } {
+  /*
+   * EL IMPORTE MANDA CUANDO NO SE EXPLICA POR LA MULTIPLICACION.
+   *
+   * Es la misma regla con la que el importador distingue una partida a suma
+   * alzada, y hace falta aqui desde que existen los porcentajes del
+   * contratista: al repartir su descuento y sus margenes entre las partidas,
+   * el importe deja de ser metrado x precio a proposito —el metrado y el
+   * precio siguen siendo los que el contratista cotizo, que es lo que se
+   * compara en obra—.
+   *
+   * Sin esto, el contractual recalculaba desde el precio de cotizacion y se
+   * comia el ajuste entero: 10.000 x 1,20 = 12.000 donde tenian que salir
+   * 13.452. El costo real se guardaba bien y el papel del cliente salia mal,
+   * que es la peor de las dos formas de fallar.
+   */
+  const calculado =
+    linea.metrado !== null && linea.precioUnitario !== null
+      ? multiplicar(linea.metrado, linea.precioUnitario, DECIMALES_IMPORTE)
+      : null;
+  const importeCerrado =
+    linea.parcial !== null && calculado !== null && calculado !== linea.parcial;
+
+  if (importeCerrado) {
+    const parcial = multiplicar(linea.parcial!, factor, DECIMALES_IMPORTE);
+    return {
+      // El precio se deriva del importe pactado, para no perder la columna:
+      // es lo que sale de repartir ese importe entre el mismo metrado.
+      precioUnitario:
+        parcial !== null && Number(linea.metrado) !== 0
+          ? dividir(parcial, linea.metrado!, DECIMALES_PRECIO)
+          : null,
+      parcial,
+    };
+  }
+
   if (linea.metrado !== null && linea.precioUnitario !== null) {
     const precio = multiplicar(linea.precioUnitario, factor, DECIMALES_PRECIO);
     if (precio === null) return { precioUnitario: null, parcial: null };

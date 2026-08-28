@@ -1,10 +1,16 @@
 import ExcelJS from "exceljs";
 import { normalizarDecimal, multiplicar, sumar } from "@/lib/decimal";
 import {
+  esNeutro,
+  repartir,
+  type AjusteContratista,
+} from "@/lib/cascada-contratista";
+import {
   sumarHojas,
   detectarImportesRepetidos,
   type GrupoRepetido,
   cubiertosPorDescendientes,
+  codigoPadre,
 } from "@/lib/jerarquia-partidas";
 
 /**
@@ -37,6 +43,17 @@ export interface FilaImportada {
   /// % de recargo con el que se genera el contractual. En un capitulo lo
   /// heredan sus partidas; en una partida gana sobre el de su capitulo.
   porcentajeRecargo: string | null;
+  /**
+   * Lo que cobra el CONTRATISTA de este bloque, en la fila que agrupa.
+   *
+   * No se confunden con `porcentajeRecargo`, que mira al otro lado: aquel es
+   * lo que se le carga al cliente, estos son lo que cobra quien ejecuta. Se
+   * leen del capitulo -o del subcapitulo, cuando un capitulo lo cubren dos
+   * contratistas- y se reparten entre sus partidas: ver `aplicarAjustes`.
+   */
+  descuentoContratista: string | null;
+  ggContratista: string | null;
+  utilidadContratista: string | null;
   /// Fecha opcional de la plantilla, "YYYY-MM-DD". Van juntas o ninguna: ver
   /// la validacion en `analizarExcel`. Sin ellas, la EDT sale `sinProgramar`
   /// como hoy; con ellas, `generarEdtDesdePresupuesto` programa la tarea de
@@ -77,6 +94,14 @@ export interface ResultadoAnalisis {
   totalCapitulos: number;
   totalPartidas: number;
   montoTotal: string;
+  /**
+   * Cuantos bloques traian los porcentajes del contratista y se repartieron.
+   *
+   * Se informa porque cambia los importes de las partidas respecto al archivo:
+   * quien carga tiene que poder ver que el ajuste se aplico, y a cuantos
+   * bloques, sin abrir el Excel a comparar.
+   */
+  bloquesAjustados: number;
   /// El mismo total contando una sola vez cada grupo de importes repetidos.
   montoSinRepetidos: string;
   /// Rachas de filas consecutivas con importe identico.
@@ -239,6 +264,31 @@ const ALIAS: Record<string, string[]> = {
   // habria hecho que se leyera como el parcial, e importar el presupuesto
   // ya inflado.
   recargo: ["% recargo", "recargo", "porcentaje recargo", "recargo %"],
+  /*
+   * LOS TRES DEL CONTRATISTA, que miran al otro lado que `recargo`.
+   *
+   * `recargo` es lo que la constructora le carga a SU cliente. Estos tres son
+   * lo que el contratista le cobra a ella: rebaja sus partidas un tanto por
+   * ciento y luego suma sus gastos generales y su utilidad sobre el importe
+   * ya descontado. Dos cascadas encadenadas, y confundirlas seria cobrarle al
+   * cliente el margen del subcontrato o pagarle al contratista el propio.
+   *
+   * Los alias evitan a proposito la palabra suelta "descuento": en un
+   * presupuesto real hay partidas llamadas "DESCUENTO COMERCIAL" y una
+   * cabecera asi se leeria como una columna de importes.
+   */
+  descuentoContratista: [
+    "% dcto", "% dcto.", "% descuento", "dcto contratista",
+    "descuento contratista", "% descuento contratista",
+  ],
+  ggContratista: [
+    "% gg", "% g.g.", "% gastos generales", "gastos generales contratista",
+    "gg contratista",
+  ],
+  utilidadContratista: [
+    "% utilidad", "% util", "% util.", "utilidad contratista",
+    "% utilidad contratista",
+  ],
   // Opcionales: si no aparecen, la EDT se genera igual que hoy (sin
   // programar). Van al final de la plantilla, nunca en medio, porque
   // `formulaContractual` referencia columnas por letra fija.
@@ -415,7 +465,8 @@ function detectarCabecera(
     // como sinonimo en dos campos distintos.
     const orden = [
       "metrado", "precioUnitario", "parcial", "unidad", "codigo", "descripcion",
-      "recargo", "fechaInicio", "fechaFin",
+      "recargo", "descuentoContratista", "ggContratista", "utilidadContratista",
+      "fechaInicio", "fechaFin",
     ];
 
     for (const campo of orden) {
@@ -595,6 +646,88 @@ function clasificarCodigo(
   return { tipo: "PARTIDA", nivel: nivelReal };
 }
 
+/** Los tres porcentajes del contratista, tal como vienen en la fila. */
+function ajusteDeLaFila(leer: (campo: string) => unknown): {
+  descuentoContratista: string | null;
+  ggContratista: string | null;
+  utilidadContratista: string | null;
+} {
+  return {
+    descuentoContratista: normalizarDecimal(leer("descuentoContratista"), 4),
+    ggContratista: normalizarDecimal(leer("ggContratista"), 4),
+    utilidadContratista: normalizarDecimal(leer("utilidadContratista"), 4),
+  };
+}
+
+/**
+ * Reparte entre las partidas lo que cobra el contratista de cada bloque.
+ *
+ * MANDA EL ANCESTRO MAS CERCANO QUE LLEVE PORCENTAJES. Es lo que resuelve el
+ * caso de un capitulo cubierto por dos contratistas sin inventar ningun
+ * concepto nuevo: cada uno va en su subcapitulo con los suyos, y una partida
+ * se ajusta por el subcapitulo del que cuelga, no por el capitulo de arriba.
+ * Si el capitulo entero es de un solo contratista, se ponen en el capitulo y
+ * todas sus partidas los heredan.
+ *
+ * SE APLICA AL IMPORTE DE LA PARTIDA, no a una nota al pie. El avance se
+ * valoriza partida a partida: con las partidas en su precio de cotizacion,
+ * terminar el capitulo entero sumaria lo cotizado y no lo pactado, y al
+ * contratista no se le llegaria a pagar nunca el cien por cien.
+ *
+ * El metrado y el precio unitario NO se tocan: siguen siendo los del
+ * contratista, que es lo que se compara en obra. Lo que cambia es el importe,
+ * y por eso la partida pasa a SUMA_ALZADA cuando el ajuste la desliga de su
+ * multiplicacion —si no, cualquier recalculo posterior borraria el ajuste sin
+ * decir nada—.
+ */
+function aplicarAjustes(filas: FilaImportada[]): number {
+  const codigos = new Set(filas.map((f) => f.codigo));
+  const porCodigo = new Map(filas.map((f) => [f.codigo, f]));
+
+  const ajusteDe = (f: FilaImportada): AjusteContratista => ({
+    descuento: f.descuentoContratista,
+    gastosGenerales: f.ggContratista,
+    utilidad: f.utilidadContratista,
+  });
+
+  /** El bloque al que pertenece cada fila: su ancestro con ajuste, o ella misma. */
+  const duenoDelAjuste = (f: FilaImportada): FilaImportada | null => {
+    if (!esNeutro(ajusteDe(f))) return f;
+    let padre = codigoPadre(f.codigo, codigos);
+    while (padre) {
+      const p = porCodigo.get(padre);
+      if (p && !esNeutro(ajusteDe(p))) return p;
+      padre = codigoPadre(padre, codigos);
+    }
+    return null;
+  };
+
+  // Las partidas de cada bloque, en el orden del documento.
+  const bloques = new Map<string, FilaImportada[]>();
+  for (const f of filas) {
+    if (f.tipo !== "PARTIDA" || f.parcial === null) continue;
+    const dueno = duenoDelAjuste(f);
+    if (!dueno) continue;
+    const grupo = bloques.get(dueno.codigo) ?? [];
+    grupo.push(f);
+    bloques.set(dueno.codigo, grupo);
+  }
+
+  for (const [codigo, partidas] of bloques) {
+    const dueno = porCodigo.get(codigo)!;
+    const ajustados = repartir(partidas.map((f) => f.parcial), ajusteDe(dueno));
+    partidas.forEach((f, i) => {
+      const nuevo = ajustados[i] ?? null;
+      if (nuevo === null || nuevo === f.parcial) return;
+      f.parcial = nuevo;
+      // Ya no es metrado x precio: si se recalculara, se perderia el ajuste.
+      if (f.modalidad === "PRECIOS_UNITARIOS") f.modalidad = "SUMA_ALZADA";
+    });
+  }
+
+  return bloques.size;
+}
+
 export interface OpcionesAnalisis {
   /**
    * Recoger las filas con cifras y sin codigo en vez de descartarlas.
@@ -645,6 +778,7 @@ export async function analizarExcel(
       filas: [], errores: [{ fila: 0, mensaje: "El archivo no contiene ninguna hoja." }],
       filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0,
       totalPartidas: 0, montoTotal: "0.00", montoSinRepetidos: "0.00",
+      bloquesAjustados: 0,
       gruposRepetidos: [], filasTextoOmitidas: 0, propiasDeLaMeta: [],
       descripcionesRecortadas: [], filasOcultas: 0, importeOculto: "0.00",
     };
@@ -666,6 +800,7 @@ export async function analizarExcel(
       }],
       filaCabecera: null, columnasDetectadas: {}, totalCapitulos: 0,
       totalPartidas: 0, montoTotal: "0.00", montoSinRepetidos: "0.00",
+      bloquesAjustados: 0,
       gruposRepetidos: [], filasTextoOmitidas: 0, propiasDeLaMeta: [],
       descripcionesRecortadas: [], filasOcultas: 0, importeOculto: "0.00",
     };
@@ -1064,6 +1199,16 @@ export async function analizarExcel(
     }
   }
 
+  /*
+   * Lo que cobra el contratista de cada bloque, repartido entre sus partidas.
+   *
+   * VA ANTES DE TODO LO QUE MIRA IMPORTES —los repetidos, el total, los
+   * subtotales— porque a partir de aqui el importe de una partida ES lo que
+   * hay que pagarle. Hacerlo despues dejaria el total del analisis contando
+   * el precio de cotizacion mientras las partidas guardan otro.
+   */
+  const bloquesAjustados = aplicarAjustes(filas);
+
   // Importes que se repiten en filas consecutivas: casi siempre una formula
   // arrastrada en el Excel. Se marcan y se ofrece el total sin ellos, para
   // que el usuario compare y decida.
@@ -1109,6 +1254,7 @@ export async function analizarExcel(
       ),
     ),
     gruposRepetidos: repetidos,
+    bloquesAjustados,
     filasTextoOmitidas,
     propiasDeLaMeta,
     // Ordenadas: se leen como se recorre el Excel, de arriba abajo. Las
@@ -1186,6 +1332,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
       precioUnitario: null,
       parcial: null,
       porcentajeRecargo: normalizarDecimal(leer("recargo"), 2),
+      ...ajusteDeLaFila(leer),
       fechaInicio, fechaFin,
     };
   }
@@ -1199,6 +1346,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
       fila: n, codigo, tipo, modalidad: "PRECIOS_UNITARIOS", descripcion: desc, nivel,
       unidad: null, metrado: null, precioUnitario: null, parcial: null,
       porcentajeRecargo: normalizarDecimal(leer("recargo"), 2),
+      ...ajusteDeLaFila(leer),
       fechaInicio, fechaFin,
     };
   }
@@ -1217,6 +1365,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
       fila: n, codigo, tipo, modalidad: "ALCANCE", descripcion: desc, nivel,
       unidad: null, metrado: null, precioUnitario: null, parcial: null,
       porcentajeRecargo: null,
+      ...ajusteDeLaFila(leer),
       fechaInicio, fechaFin,
       aviso: `Comparte importe con las filas ${combinacion.maestra} a ${combinacion.ultima} (${cuantas} lineas a suma alzada).`,
     };
@@ -1318,6 +1467,7 @@ function construirFila(args: ArgsFila): FilaImportada | null {
      * partida 1.1 desaparecia al importar, sin un solo aviso.
      */
     porcentajeRecargo: normalizarDecimal(leer("recargo"), 2),
+    ...ajusteDeLaFila(leer),
     fechaInicio, fechaFin,
     ...(avisos.length > 0 ? { aviso: avisos.join(" ") } : {}),
   };
