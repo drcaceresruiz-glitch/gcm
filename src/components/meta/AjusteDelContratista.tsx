@@ -135,11 +135,14 @@ export function AjusteDelContratista({
         style={{ background: "color-mix(in oklab, var(--borde) 25%, transparent)" }}
       >
         {[
-          ["Partidas cotizadas", c.cotizado, false],
+          ["Suma de sus partidas", c.cotizado, false],
           ["Descuento", c.descuento, false],
           ["Gastos generales", c.gastosGenerales, false],
           ["Utilidad", c.utilidad, false],
-          ["A pagarle", c.aPagar, true],
+          // El total de SU cotizacion, que es lo mismo que se le paga. Se
+          // rotula asi para que se compare con el papel sin dudar: la suma de
+          // las partidas NO es lo que el contratista cotiza.
+          ["Total de su cotización, a pagarle", c.aPagar, true],
         ].map(([rotulo, valor, fuerte]) => (
           <div
             key={rotulo as string}

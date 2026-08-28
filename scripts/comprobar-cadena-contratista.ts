@@ -165,8 +165,9 @@ async function main() {
       comprobar("total del contractual", total.toFixed(2), "29204.00");
 
       console.log("\n  la cadena completa:");
-      console.log("    cotizado por el contratista .... 20,000.00");
-      console.log("    lo que se le paga .............. 22,420.00   (-5% +8% +10%)");
+      console.log("    suma de sus partidas ........... 20,000.00");
+      console.log("    total de su cotizacion ......... 22,420.00   (-5% +8% +10%)");
+      console.log("      = lo que se le paga");
       console.log("    lo que se le cobra al cliente .. 26,904.00   (+20%)");
     }
 

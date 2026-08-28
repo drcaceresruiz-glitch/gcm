@@ -1175,7 +1175,7 @@ const META = (
           ["− 5 % de descuento", "−1.000,00"],
           ["+ 8 % de gastos generales", "+1.520,00"],
           ["+ 10 % de utilidad", "+1.900,00"],
-          ["A pagarle", "22.420,00"],
+          ["TOTAL de su cotización, y lo que se le paga", "22.420,00"],
         ]}
       />
       <p>
@@ -1227,11 +1227,18 @@ const META = (
       <Tabla
         cabeceras={["", "Importe"]}
         filas={[
-          ["Cotizado por el contratista", "20.000,00"],
-          ["Lo que se le paga", "22.420,00"],
+          ["Suma de sus partidas", "20.000,00"],
+          ["Total de su cotización, que es lo que se le paga", "22.420,00"],
           ["Lo que se le cobra al cliente", "26.904,00"],
         ]}
       />
+      <p className="opacity-70">
+        Ojo con el primer renglón: los 20.000 <strong>no son lo que cotiza el
+        contratista</strong>, son solo la suma de sus partidas. Su cotización
+        termina en 22.420, y eso es exactamente lo que se le va a pagar. Lo que
+        GCM hace es repartir esa diferencia entre las partidas, para que el
+        avance de cada una valorice sobre el precio de verdad.
+      </p>
 
       <p className="font-medium">Cambiarlo después</p>
       <p>
