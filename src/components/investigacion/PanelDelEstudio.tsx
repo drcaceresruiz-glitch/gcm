@@ -7,6 +7,7 @@ import {
   accionDeclararApertura,
   accionFijarInterrupcion,
   accionMarcarOrigen,
+  accionSembrarPiloto,
   type EstadoEstudio,
 } from "@/app/(dashboard)/obras/[id]/investigacion/acciones";
 
@@ -402,5 +403,93 @@ function DeclararApertura({
       )}
       {estado.ok && <Check className="size-3.5 opacity-60" aria-hidden="true" />}
     </form>
+  );
+}
+
+/**
+ * La obra de ensayo: crearla, ir a ella o borrarla.
+ *
+ * Sirve para verificar el analisis estadistico ANTES de tener una obra real
+ * midiendo. Los datos son simulados y deterministas: dos personas que la
+ * generen obtienen la misma muestra, asi que un resultado del ensayo se puede
+ * reproducir y discutir.
+ *
+ * SE DICE QUE SON SIMULADOS EN LA PROPIA TARJETA y el nombre de la obra
+ * empieza por «PILOTO». Una obra de mentira que no se anuncia acaba en un
+ * informe de gerencia.
+ */
+export function ObraDeEnsayo({
+  existente,
+}: {
+  /// El id de la obra piloto si ya esta creada.
+  existente: string | null;
+}) {
+  const [estado, sembrar] = useActionState<EstadoEstudio, FormData>(
+    accionSembrarPiloto,
+    {},
+  );
+
+  return (
+    <section
+      className="space-y-3 rounded-xl border p-5"
+      style={{ borderColor: "var(--borde)" }}
+    >
+      <div>
+        <h3 className="text-sm font-semibold">Obra de ensayo</h3>
+        <p className="mt-1 max-w-3xl text-sm text-pretty opacity-70">
+          Veinte semanas <strong>simuladas</strong> —diez antes de implantar y
+          diez después— para probar el análisis estadístico completo antes de
+          tener una obra real midiendo. Trae a propósito los casos incómodos:
+          una semana sin restricciones, otra con una sola, tareas sin terminar
+          y un análisis de causa raíz que no funcionó.
+        </p>
+        <p className="mt-1 max-w-3xl text-xs text-pretty opacity-60">
+          Los datos son deterministas: se regenera siempre igual, así que un
+          resultado del ensayo se puede reproducir. La obra se llama «PILOTO» y
+          nace en planificación, para que no se confunda con una real.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        {existente && (
+          <a
+            href={`/obras/${existente}/investigacion`}
+            className="text-sm font-medium underline underline-offset-2"
+          >
+            Ir a la obra de ensayo
+          </a>
+        )}
+
+        <form action={sembrar} className="flex flex-wrap items-center gap-2">
+          <button
+            type="submit"
+            name="accion"
+            value="sembrar"
+            className="rounded-lg border px-3 py-1.5 text-sm font-medium"
+            style={{ borderColor: "var(--borde)" }}
+          >
+            {existente ? "Regenerar" : "Crear la obra de ensayo"}
+          </button>
+
+          {existente && (
+            <button
+              type="submit"
+              name="accion"
+              value="borrar"
+              className="rounded-lg px-3 py-1.5 text-sm"
+              style={{ color: "var(--color-peligro)" }}
+            >
+              Borrarla
+            </button>
+          )}
+        </form>
+      </div>
+
+      {estado.error && (
+        <p role="alert" className="text-sm" style={{ color: "var(--color-peligro)" }}>
+          {estado.error}
+        </p>
+      )}
+    </section>
   );
 }

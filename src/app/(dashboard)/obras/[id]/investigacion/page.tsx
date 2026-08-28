@@ -6,11 +6,13 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import {
   analisisDelEstudio,
+  obraPilotoExistente,
   resumenDelEstudio,
 } from "@/services/investigacion.service";
 import { fechaCorta } from "@/utils/fechas";
 import {
   AnalisisDelEstudio,
+  ObraDeEnsayo,
   PanelDelEstudio,
 } from "@/components/investigacion/PanelDelEstudio";
 
@@ -47,9 +49,10 @@ export default async function InvestigacionPage({
   const obra = await obtenerObra(sesion, id);
   if (!obra) notFound();
 
-  const [resumen, analisis] = await Promise.all([
+  const [resumen, analisis, piloto] = await Promise.all([
     resumenDelEstudio(sesion, id),
     analisisDelEstudio(sesion, id),
+    obraPilotoExistente(sesion),
   ]);
   if (!resumen) notFound();
 
@@ -141,6 +144,8 @@ export default async function InvestigacionPage({
           cerrado: a.cerradoAt ? fechaCorta(a.cerradoAt) : "",
         }))}
       />
+
+      <ObraDeEnsayo existente={piloto?.id ?? null} />
 
       <section className="space-y-3">
         <div>

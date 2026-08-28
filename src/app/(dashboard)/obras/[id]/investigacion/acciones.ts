@@ -5,9 +5,11 @@ import { redirect } from "next/navigation";
 
 import { obtenerSesion } from "@/services/sesion.service";
 import {
+  borrarObraPiloto,
   declararAperturaDeAnalisis,
   fijarPuntoDeInterrupcion,
   marcarOrigenDeSemana,
+  sembrarObraPiloto,
 } from "@/services/investigacion.service";
 
 /**
@@ -92,4 +94,37 @@ export async function accionDeclararApertura(
 
   revalidatePath(`/obras/${obraId}/investigacion`);
   return { ok: true };
+}
+
+/**
+ * Crear o borrar la obra de ensayo del estudio.
+ *
+ * No cuelga de la obra que se esta mirando: crea otra, y por eso devuelve a
+ * donde ir. Vive aqui porque es donde tiene sentido -preparar el instrumento
+ * antes de tener datos reales- y porque la pantalla ya esta cerrada a quien
+ * opera GCM.
+ */
+export async function accionSembrarPiloto(
+  _previo: EstadoEstudio,
+  datos: FormData,
+): Promise<EstadoEstudio> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const borrar = datos.get("accion") === "borrar";
+
+  if (borrar) {
+    const r = await borrarObraPiloto(sesion);
+    if (!r.ok) return { error: r.error };
+    revalidatePath("/panel");
+    return { ok: true };
+  }
+
+  const r = await sembrarObraPiloto(sesion);
+  if (!r.ok) return { error: r.error };
+
+  revalidatePath("/panel");
+  // A la obra recien creada: lo primero que se quiere hacer con ella es mirar
+  // sus veinte semanas y descargar los archivos.
+  redirect(`/obras/${r.obraId}/investigacion`);
 }

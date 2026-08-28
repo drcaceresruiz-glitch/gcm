@@ -1,0 +1,35 @@
+archivo,variable,tipo,unidad,definicion
+(todos),obra_id,nominal,'-,Identificador de la obra.
+(todos),fase_estudio,nominal,PRE/POST,Fase respecto al punto de interrupcion (2026-03-20). La semana del punto de interrupcion cuenta como POST.
+(todos),semana_indice,escala,orden,"Posicion de la semana en la serie, ordenada por fecha de corte. Es el eje temporal del analisis; no coincide con semana_numero si se cargaron semanas historicas despues."
+(todos),semana_numero,escala,orden,"Numero correlativo del plan en la aplicacion, por orden de creacion."
+(todos),fecha_corte,escala,fecha ISO,Fecha de cierre de la semana del Last Planner (YYYY-MM-DD).
+(todos),origen_datos,nominal,'-,GESTIONADO: la semana se vivio con la aplicacion. RECONSTRUIDO: se cargo despues desde actas o cuaderno de obra.
+compromisos,cumplimiento,nominal,0/1,"1 si el compromiso se cumplio, 0 si no. Vacio si el plan no se ha cerrado."
+compromisos,causa_cod,nominal,1-9,"Causa de no cumplimiento: 1 PRERREQUISITO, 2 MATERIALES, 3 MANO_OBRA, 4 EQUIPOS, 5 INFORMACION, 6 CLIENTE_TERCEROS, 7 CLIMA, 8 REPROGRAMACION, 9 OTRA."
+compromisos,dias_cierre,escala,dias,Dias entre la fecha de corte y el momento en que se registro el cumplimiento.
+compromisos,cantidad_plan / cantidad_ejec,escala,segun unidad,Cantidad comprometida y ejecutada de la actividad.
+restricciones,retraso_dias,escala,dias,Dias entre la fecha comprometida de levantamiento y la fecha real de resolucion. Negativo = se libero antes. Vacio si falta alguna de las dos fechas.
+restricciones,les_dias,escala,dias,Limite superior de especificacion declarado para el analisis de capacidad. Valor usado en esta exportacion: 2.
+restricciones,fuera_especificacion,nominal,0/1,1 si retraso_dias supera les_dias.
+consolidado,ppc_pct,escala,%,Porcentaje de Plan Completado: compromisos cumplidos sobre compromisos evaluados.
+consolidado,tasa_liberacion_oportuna_pct,escala,%,"Restricciones resueltas dentro de su fecha comprometida, sobre las que completaron su ciclo esa semana."
+consolidado,retraso_media_dias,escala,dias,Media del retraso de liberacion de las restricciones de la semana.
+consolidado,retraso_desv_dias,escala,dias,Desviacion estandar MUESTRAL (n-1) del retraso. Vacia con menos de dos observaciones.
+consolidado,retraso_n,escala,conteo,Observaciones con ciclo completo sobre las que se calculan media y desviacion.
+aprendizaje,trc_pct,escala,%,"Tasa de recurrencia: frecuencia semanal de la causa despues del cierre del analisis sobre la de antes de su apertura, x100. Cerca de 0 = el patron dejo de repetirse. Vacia si falta alguna de las dos ventanas."
+aprendizaje,apertura_origen,nominal,'-,"DECLARADA: alguien declaro cuando se abrio de verdad el analisis, porque se cargo al reconstruir un periodo anterior. REGISTRO: la fecha es la del dia en que se escribio en el sistema."
+aprendizaje,lro_semanas,escala,semanas,Latencia de reaccion: semanas entre el primer evento del patron y la apertura formal del analisis de causa raiz.
+aprendizaje,cerrada / cerrada_a_tiempo,nominal,0/1,"Cierre de la accion correctiva. Agregando estas dos columnas se obtiene la TCAC: en esta exportacion, 66.7 % de cierre general y 33.3 % dentro de la fecha comprometida, sobre 3 acciones con fecha."
+aprendizaje,eventos_antes / semanas_antes,escala,conteo,Numerador y denominador de la frecuencia previa. Se publican para que la TRC se pueda recalcular y auditar.
+consolidado,hhi_causas,escala,indice,"Concentracion de las causas de la semana (Herfindahl-Hirschman): suma de los cuadrados de las proporciones. De 1/9 (repartido entre las nueve categorias) a 1,0 (todo por una sola). Un valor ALTO indica madurez: lo evitable ya se resolvio y queda lo externo."
+tareas,desv_fin_dias,escala,dias,Dias entre la fecha de fin PLANIFICADA y la real. Positivo = termino tarde. Vacio si la tarea no ha terminado.
+tareas,desv_inicio_dias,escala,dias,Dias entre la fecha de inicio planificada y la real. Positivo = arranco tarde.
+tareas,origen_inicio / origen_fin,nominal,'-,"DECLARADA: la fecha la escribio una persona. DERIVADA: se dedujo de los reportes de avance, asi que arrastra el habito de reporte del equipo. Filtrar por DECLARADA para el analisis fino."
+tareas,duracion_real_dias,escala,dias,"Dias de calendario entre inicio y fin reales, extremos incluidos: una tarea de un dia dura 1, no 0."
+tareas,(cronograma de referencia),'-,'-,"Las fechas planificadas salen de la version 1 del cronograma, marcada como LINEA BASE. Medir contra el cronograma vigente no serviria: cada reprogramacion mueve el plan hacia donde ya esta la obra y la desviacion tenderia a cero sola."
+(formato),codificacion,'-,'-,UTF-8 sin BOM. Separador de columnas segun el parametro sep (coma por defecto). Punto como separador decimal. Fechas en ISO YYYY-MM-DD.
+(formato),valores perdidos,'-,'-,"Celda VACIA, nunca cero ni -1. SPSS y JASP la leen como perdido por defecto; un cero se analizaria como un dato real."
+(formato),dicotomicas,'-,0/1,"Codificadas 0/1 y no TRUE/FALSE: asi entran como numericas y admiten media, que es lo que se usa para calcular proporciones."
+(formato),importacion SPSS,'-,'-,"Archivo > Abrir > Datos, tipo CSV. Marcar que la primera fila contiene los nombres de las variables y fijar el punto como separador decimal."
+(formato),importacion JASP,'-,'-,"Abrir el CSV directamente. JASP infiere el tipo de cada columna; revisar que las codificadas (causa_cod, cumplimiento) queden como nominales y no como escala."

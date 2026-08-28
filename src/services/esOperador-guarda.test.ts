@@ -55,6 +55,9 @@ const FUNCIONES: Readonly<Record<string, readonly string[]>> = {
     "resumenDelEstudio",
     "declararAperturaDeAnalisis",
     "analisisDelEstudio",
+    "sembrarObraPiloto",
+    "borrarObraPiloto",
+    "obraPilotoExistente",
   ],
   "soporte.service.ts": [
     "hiloDeSoportePorOperador",

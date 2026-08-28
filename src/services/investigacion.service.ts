@@ -948,3 +948,213 @@ export async function analisisDelEstudio(
     cerradoAt: f.cerradoAt,
   }));
 }
+
+/**
+ * Crear la obra de ensayo del estudio, con sus veinte semanas simuladas.
+ *
+ * PARA QUE ESTA EN LA APLICACION Y NO EN UN SCRIPT: los scripts corren contra
+ * la base local, y donde hace falta probar el analisis es donde estan los
+ * datos de verdad. Sin esto, verificar el instrumento antes de implantar
+ * obligaria a montar un entorno aparte.
+ *
+ * TRES GUARDAS PARA QUE NO SE CONFUNDA NUNCA CON UNA OBRA REAL: solo la crea
+ * quien opera GCM, su nombre empieza por un prefijo reconocible -y por el se
+ * borra-, y nace en estado PLANIFICACION. Los datos son deterministas, asi que
+ * dos personas que la generen obtienen la misma muestra y un resultado del
+ * ensayo se puede reproducir.
+ *
+ * Si ya existe, se borra y se vuelve a crear: repetir el ensayo tiene que
+ * partir siempre del mismo sitio.
+ */
+export async function sembrarObraPiloto(
+  sesion: SesionActiva,
+): Promise<{ ok: true; obraId: string } | { ok: false; error: string }> {
+  if (!sesion.esOperador) return { ok: false, error: SOLO_OPERADOR };
+
+  const { pilotoSimulado, corteDeSemana, NOMBRE_PILOTO, SEMANAS_PRE } = await import(
+    "@/lib/piloto-simulado"
+  );
+
+  await prisma.project.deleteMany({
+    where: { companyId: sesion.companyId, nombreObra: { startsWith: NOMBRE_PILOTO } },
+  });
+
+  const p = pilotoSimulado();
+
+  /*
+   * El piloto arranca un VIERNES fijo y no «hace veinte semanas»: si las
+   * fechas dependieran de cuando se pulsa el boton, dos ensayos no serian
+   * comparables y el diccionario de variables citaria fechas distintas cada
+   * vez.
+   */
+  const inicio = new Date("2026-01-09T00:00:00.000Z");
+  const corte = (n: number) => corteDeSemana(inicio, n);
+
+  const obra = await prisma.project.create({
+    data: {
+      companyId: sesion.companyId,
+      nombreObra: NOMBRE_PILOTO,
+      fechaInicio: new Date("2026-01-05T00:00:00.000Z"),
+      fechaFinProgramada: corte(20),
+      estado: "PLANIFICACION",
+      fechaInterrupcionEstudio: corte(SEMANAS_PRE),
+    },
+    select: { id: true },
+  });
+
+  for (const s of p.semanas) {
+    const plan = await prisma.planSemanal.create({
+      data: {
+        projectId: obra.id,
+        numero: s.indice + 1,
+        fechaCorte: corte(s.indice),
+        estado: "CERRADO",
+        origenDatos: s.reconstruida ? "RECONSTRUIDO" : "GESTIONADO",
+        creadoPor: "Obra de ensayo",
+        cerradoAt: corte(s.indice),
+      },
+      select: { id: true },
+    });
+
+    const causas = s.reconstruida ? p.causasPre : p.causasPost;
+
+    for (let k = 0; k < s.compromisos; k++) {
+      const cumplido = k < s.cumplidos;
+      await prisma.compromisoSemanal.create({
+        data: {
+          planSemanalId: plan.id,
+          descripcion: `Actividad ${k + 1} de la semana ${s.indice + 1}`,
+          cumplido,
+          cumplidoAt: corte(s.indice),
+          causa: cumplido
+            ? null
+            : (causas[(s.indice + k) % causas.length] as never),
+          zona: k % 2 === 0 ? "Piso 1" : "Piso 2",
+        },
+      });
+    }
+  }
+
+  for (const [i, r] of p.restricciones.entries()) {
+    const tarea = await prisma.lookaheadTask.create({
+      data: {
+        projectId: obra.id,
+        uid: i + 1,
+        zona: i % 2 === 0 ? "Piso 1" : "Piso 2",
+      },
+      select: { id: true },
+    });
+
+    const comprometida = corte(r.semana);
+    await prisma.restriccion.create({
+      data: {
+        lookaheadTaskId: tarea.id,
+        tipo: r.tipo as never,
+        fechaCompromiso: comprometida,
+        resuelta: r.retraso !== null,
+        resueltaAt:
+          r.retraso === null
+            ? null
+            : new Date(comprometida.getTime() + r.retraso * 86_400_000),
+      },
+    });
+  }
+
+  const cronograma = await prisma.cronograma.create({
+    data: {
+      projectId: obra.id,
+      version: 1,
+      fechaCorte: new Date("2026-01-05T00:00:00.000Z"),
+      nombreProyecto: NOMBRE_PILOTO,
+      importadoPor: "Obra de ensayo",
+      lineaBaseAt: new Date("2026-01-05T00:00:00.000Z"),
+    },
+    select: { id: true },
+  });
+
+  for (const t of p.tareas) {
+    const iniPlan = corte(t.semana);
+    const finPlan = new Date(iniPlan.getTime() + 4 * 86_400_000);
+
+    await prisma.tareaCronograma.create({
+      data: {
+        cronogramaId: cronograma.id,
+        uid: t.uid,
+        fila: t.uid,
+        codigo: t.codigo,
+        nombre: t.nombre,
+        nivel: 1,
+        inicio: iniPlan,
+        fin: finPlan,
+        duracionDias: 5,
+        porcentajePlaneado: 100,
+        porcentajeArchivo: 100,
+        esCritico: t.esCritico,
+      },
+    });
+
+    await prisma.ejecucionTarea.create({
+      data: {
+        projectId: obra.id,
+        uid: t.uid,
+        inicioReal: new Date(
+          iniPlan.getTime() + Math.min(t.desviacion ?? 2, 3) * 86_400_000,
+        ),
+        finReal:
+          t.desviacion === null
+            ? null
+            : new Date(finPlan.getTime() + t.desviacion * 86_400_000),
+        origenInicio: t.declarada ? "DECLARADA" : "DERIVADA",
+        origenFin: t.desviacion === null ? null : t.declarada ? "DECLARADA" : "DERIVADA",
+      },
+    });
+  }
+
+  for (const a of p.analisis) {
+    await prisma.analisisCausa.create({
+      data: {
+        projectId: obra.id,
+        causa: a.causa as never,
+        porQue: `Patron repetido de ${a.causa.toLowerCase().replace("_", " ")}.`,
+        accion: "Acción correctiva acordada en la reunión semanal.",
+        // La apertura DECLARADA, no la de registro: son analisis de un
+        // periodo anterior y sin esto su latencia saldria inventada.
+        aperturaDeclarada: corte(a.semanaApertura),
+        fechaCompromiso: corte(a.semanaCompromiso),
+        cerradoAt: a.semanaCierre === null ? null : corte(a.semanaCierre),
+        creadoPor: "Obra de ensayo",
+      },
+    });
+  }
+
+  return { ok: true, obraId: obra.id };
+}
+
+/** Borra la obra de ensayo. Se reconoce por su nombre, no por su id. */
+export async function borrarObraPiloto(
+  sesion: SesionActiva,
+): Promise<{ ok: true; borradas: number } | { ok: false; error: string }> {
+  if (!sesion.esOperador) return { ok: false, error: SOLO_OPERADOR };
+
+  const { NOMBRE_PILOTO } = await import("@/lib/piloto-simulado");
+
+  const r = await prisma.project.deleteMany({
+    where: { companyId: sesion.companyId, nombreObra: { startsWith: NOMBRE_PILOTO } },
+  });
+
+  return { ok: true, borradas: r.count };
+}
+
+/** Si la obra de ensayo existe ahora mismo, y donde esta. */
+export async function obraPilotoExistente(
+  sesion: SesionActiva,
+): Promise<{ id: string } | null> {
+  if (!sesion.esOperador) return null;
+
+  const { NOMBRE_PILOTO } = await import("@/lib/piloto-simulado");
+
+  return prisma.project.findFirst({
+    where: { companyId: sesion.companyId, nombreObra: { startsWith: NOMBRE_PILOTO } },
+    select: { id: true },
+  });
+}

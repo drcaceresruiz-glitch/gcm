@@ -1,0 +1,4 @@
+obra_id,analisis_id,causa_cod,causa_etiqueta,fecha_apertura,apertura_origen,semana_apertura,fase_estudio,fecha_compromiso,fecha_cierre,cerrada,cerrada_a_tiempo,lro_semanas,eventos_antes,semanas_antes,eventos_despues,semanas_despues,trc_pct
+cmtcgb19h0000cwpbnwzdc7hj,cmtcgb2gz00cncwpbaoieggpi,2,MATERIALES,2026-02-06,DECLARADA,5,PRE,2026-02-20,2026-02-20,1,1,4,2,4,8,13,123.08
+cmtcgb19h0000cwpbnwzdc7hj,cmtcgb2h800cocwpbna8q590x,3,MANO_OBRA,2026-02-27,DECLARADA,8,PRE,2026-03-13,2026-03-20,1,0,7,5,7,0,9,0.00
+cmtcgb19h0000cwpbnwzdc7hj,cmtcgb2hf00cpcwpbaxkif0fh,7,CLIMA,2026-04-17,DECLARADA,15,POST,2026-05-08,,0,,13,13,14,0,0,
