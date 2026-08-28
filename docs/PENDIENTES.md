@@ -30,6 +30,31 @@ que hay que TENER PRESENTE:
    Si algun dia molesta, la alternativa era ampliar `descripcion` en
    `PresupuestoMetaItem` **y** en `WbsItem`, las dos, con migracion.
 
+### Lo que quedo hecho la noche del 27, y con que sigue
+
+Tres tramos mas, todos publicados y en verde. El relato esta en `ESTADO.md`;
+aqui, lo que hay que saber para continuar:
+
+- **Cargar solo la estructura** de un Excel propio (sin precios) y **ordenar
+  el arbol dentro** (cuatro flechas por linea, renumeracion automatica). Con
+  eso, un presupuesto ajeno entra sin heredar sus cuentas y se valoriza
+  dentro.
+- **El modulo de investigacion**, solo para quien opera GCM: cinco archivos
+  CSV con los datos crudos de una obra, para una tesis de series cronologicas
+  interrumpidas. Vive en `Obra -> Investigacion -> Datos crudos`.
+
+**LO QUE FALTA AHI, y es de campo y no de codigo:**
+
+1. **Cp/Cpk necesita entre 25 y 30 observaciones por fase.** Hay que contar
+   cuantas restricciones con fecha comprometida Y fecha de resolucion tiene la
+   obra en cada periodo antes de comprometerse con ese objetivo especifico.
+2. **Si en el periodo PRE no se registraban restricciones con fecha
+   comprometida**, esa variable no se puede reconstruir y queda solo el PPC.
+   Es la primera pregunta que hay que hacerle a la obra.
+3. **Los documentos de la tesis** (`MATRIZ DE CONSISTENCIA GCM.xlsx` y
+   `FORMULAS GCM.docx`) estan en `docs/` SIN subir al repositorio, como el
+   Excel del cliente. Decidir si se versionan.
+
 ### ABIERTO Y SIN CERRAR: el total de GCM no coincide con el del Excel del cliente
 
 Salio al final del 27 de agosto, tirando del hilo que abrio el usuario: «esta

@@ -119,6 +119,88 @@ se reserva renombrándolo nada más cogerlo, y si el proceso **falla** hay una
 rama que lo devuelve, pero si lo **matan** no queda rama que corra. El cron
 pasaba cada minuto, no veía ningún `gcm.tar.gz` y se iba. Para siempre.
 
+### La noche del 27: la meta deja de exigir la plantilla, y la obra pasa a ser un instrumento
+
+El día siguió después del incidente del hosting, y cambió de tema tres veces.
+Queda todo aquí porque cada tramo se apoya en el anterior.
+
+**El presupuesto se puede traer sin sus cuentas.** Del descuadre de la mañana
+—el Excel del cliente dejaba subcapítulos fuera de sus propios totales y no
+restaba sus descuentos comerciales— salió la petición: que se pueda cargar
+*solo la estructura*. Con una casilla al subir el archivo entran capítulos,
+partidas, subpartidas y descripciones, con la unidad y la cantidad si están, y
+**ningún precio aunque el archivo los traiga**. Corta el problema de raíz: no
+hay cifra ajena que pueda discrepar porque no se trae ninguna.
+
+Sin esa casilla, un presupuesto sin precios era imposible de cargar: la
+convención de S10 —una fila sin cifras es un subtítulo— lo clasificaba entero
+como capítulos, y a un capítulo no se le puede poner importe después. En ese
+modo manda el código y solo el código: agrupa lo que tiene hijas y lo que lo
+dice su numeración; el resto son partidas que esperan su precio. Una meta cuyo
+costo es cero ya no se puede aprobar, porque dejaría la bolsa valiendo el
+contrato entero.
+
+**Y el árbol se puede ordenar dentro.** El presupuesto llegaba con la
+jerarquía en la maqueta y no en la numeración: `7.01.00 PRIMER PISO` agrupaba
+en el papel a `7.02.00 REDES DE DESAGUE`, pero por código eran hermanos. Cada
+línea del borrador tiene ahora cuatro flechas —subir, bajar, meter dentro,
+sacar— que mueven la rama entera, y después se renumera todo. El árbol vive en
+`(orden, nivel)` y el código se deriva: manipular códigos a mano es como se
+desordena un presupuesto sin que nadie lo note. Es capítulo lo que tiene algo
+dentro, y solo eso, así que «crear un capítulo» no necesita botón propio.
+
+Dos fallos que solo aparecieron al probarlo con el presupuesto real, y que
+conviene recordar: `contadores.length = n` deja huecos en un array y `map` se
+los salta —los códigos salían como `7..01`—; y `7.02.00` y `7.02.01` tienen
+los mismos tres segmentos, así que contando puntos caían al mismo nivel y las
+partidas no seguían a su cabecera al moverla.
+
+**Después, la obra como instrumento de medición.** Para una tesis de segunda
+especialidad con diseño de series cronológicas interrumpidas sobre el Last
+Planner, GCM exporta ahora los datos crudos de una obra: cinco archivos con
+una unidad de análisis cada uno —compromiso, restricción, semana, análisis de
+causa raíz y tarea— más un diccionario de variables que se genera con los
+datos, para que no pueda describir una versión distinta de la que se analizó.
+
+Faltaba una sola cosa en la base y era grande: **las fechas reales de inicio y
+fin de cada tarea**. Había fechas planificadas y una serie de reportes de
+avance, y deducir de ella cuándo empezó algo arrastra cuándo alguien abrió la
+aplicación, no cuándo ocurrió el trabajo. Ahora se deducen igual —nadie va a
+teclear dos fechas por tarea— pero se marcan como DERIVADAS, y quien declare
+una a mano manda sobre la deducción. Van en tabla propia colgada de la obra y
+no dentro de la tarea del cronograma: cada reprogramación importa una versión
+nueva, y allí desaparecerían en la primera replanificación.
+
+El punto de interrupción del estudio vive en la obra, no en un parámetro de la
+descarga: si cada exportación pidiera la fecha de corte, dos descargas podrían
+clasificar la misma semana en lados distintos. Y cada semana lleva si se
+GESTIONÓ con GCM o se RECONSTRUYÓ desde actas, porque mezclarlas sin marca
+invalida la comparación.
+
+**Todo esto es solo para quien opera GCM.** No es cortesía: de ahí sale la
+radiografía más completa que existe de cómo trabaja una constructora —cada
+compromiso, quién lo incumplió y por qué, semana a semana—. La condición de
+operador sale de una lista del servidor y no se puede conceder desde dentro,
+ni siquiera al administrador de la constructora.
+
+**Lo que hay que llevarse de esta parte del día:**
+
+- **Un `replace` sin comprobar es un fallo silencioso.** Dos veces se añadió
+  una columna a la migración SQL y el mismo cambio no encajó en
+  `schema.prisma`: la base y el esquema divergieron, y el error salió después
+  como «Unknown field» en producción de desarrollo. Para el esquema, edición
+  directa y verificar; los reemplazos por patrón necesitan asserción.
+- **Las guardas estructurales del proyecto funcionan.** Añadir una tabla
+  obligó a declararla en el respaldo y en la migración de empresa; añadir una
+  sección al menú obligó a decir en qué capítulo del manual se explica; añadir
+  una función que mira `esOperador` obligó a registrarla. Ninguna de las tres
+  se me habría ocurrido sola.
+- **Un formato de exportación no es un detalle.** El BOM y la línea `sep=`
+  que hacen correcto un CSV para Excel son exactamente lo que rompe SPSS y
+  JASP. Son dos destinos con exigencias opuestas y por eso son dos funciones.
+
+---
+
 ### Lo que hay que llevarse del día
 
 - **«Esta pantalla no se pudo cargar» puede no ser la pantalla.** El código de
