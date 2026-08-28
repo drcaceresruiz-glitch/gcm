@@ -183,3 +183,57 @@ export function indicePorSemana(
   orden.forEach((s, i) => mapa.set(s.fechaCorte.getTime(), i + 1));
   return mapa;
 }
+
+/**
+ * Con que trabajo se vivio una semana, y en que proporcion.
+ *
+ * PARA CONTESTAR LA OBJECION DE LA FASE CONSTRUCTIVA. Una obra no es
+ * homogenea en el tiempo: si el periodo previo del estudio cae en estructuras
+ * y el posterior en acabados, la mejora observada puede ser del tipo de
+ * trabajo y no de la herramienta. Con esta columna en la exportacion, quien
+ * analice PUEDE VER la composicion de cada fase en lugar de suponerla.
+ *
+ * Se emite la fase DOMINANTE y su porcentaje, no la lista entera: una semana
+ * suele tener un frente principal y restos de otro, y meter la lista completa
+ * en una celda de CSV la vuelve inservible como variable. El porcentaje es lo
+ * que avisa de cuando la dominante no representa a la semana -un 40 % dice
+ * «esta semana estuvo partida»-.
+ *
+ * Los compromisos sin fase NO cuentan en el denominador. Si contaran, una
+ * semana con dos tareas de estructuras y ocho sin clasificar diria «20 %
+ * estructuras», que suena a semana mixta cuando lo que pasa es que nadie
+ * relleno la fase. Se devuelve `n` aparte para poder ver sobre cuantos se
+ * calculo.
+ */
+export function faseDominante(
+  fases: readonly (string | null | undefined)[],
+): { fase: string | null; porcentaje: number | null; n: number } {
+  const conocidas = fases.filter(
+    (f): f is string => typeof f === "string" && f.trim().length > 0,
+  );
+  if (conocidas.length === 0) return { fase: null, porcentaje: null, n: 0 };
+
+  const cuenta = new Map<string, number>();
+  for (const f of conocidas) cuenta.set(f, (cuenta.get(f) ?? 0) + 1);
+
+  /*
+   * Empate: gana la primera por orden alfabetico, no la primera que aparecio.
+   * El orden de llegada depende de como se listen los compromisos, y entonces
+   * la misma semana daria fases distintas entre dos exportaciones.
+   */
+  let ganadora = "";
+  let maximo = -1;
+  for (const nombre of [...cuenta.keys()].sort()) {
+    const veces = cuenta.get(nombre) ?? 0;
+    if (veces > maximo) {
+      maximo = veces;
+      ganadora = nombre;
+    }
+  }
+
+  return {
+    fase: ganadora,
+    porcentaje: (maximo / conocidas.length) * 100,
+    n: conocidas.length,
+  };
+}

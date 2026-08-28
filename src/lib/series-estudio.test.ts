@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CODIGO_CAUSA,
   faseDeLaSemana,
+  faseDominante,
   indicePorSemana,
   num,
   resumir,
@@ -121,5 +122,53 @@ describe("codigos de las causas de no cumplimiento", () => {
     expect(CODIGO_CAUSA["PRERREQUISITO"]).toBe(1);
     expect(CODIGO_CAUSA["MANO_OBRA"]).toBe(3);
     expect(CODIGO_CAUSA["OTRA"]).toBe(9);
+  });
+});
+
+describe("fase constructiva dominante de una semana", () => {
+  it("devuelve la fase mas repetida y su porcentaje", () => {
+    const r = faseDominante(["ESTRUCTURAS", "ESTRUCTURAS", "ESTRUCTURAS", "ACABADOS"]);
+
+    expect(r.fase).toBe("ESTRUCTURAS");
+    expect(r.porcentaje).toBe(75);
+    expect(r.n).toBe(4);
+  });
+
+  it("los compromisos sin fase no entran en el denominador", () => {
+    /*
+     * Si contaran, dos tareas de estructuras entre ocho sin clasificar darian
+     * «20 % estructuras» -que suena a semana repartida- cuando lo que pasa es
+     * que nadie relleno la fase. El aviso tiene que ser `n`, no un porcentaje
+     * falso.
+     */
+    const r = faseDominante([
+      "ESTRUCTURAS", "ESTRUCTURAS",
+      null, null, null, null, null, null, undefined, "",
+    ]);
+
+    expect(r.fase).toBe("ESTRUCTURAS");
+    expect(r.porcentaje).toBe(100);
+    expect(r.n).toBe(2);
+  });
+
+  it("una semana sin ninguna fase declarada no inventa una", () => {
+    const r = faseDominante([null, undefined, "", "   "]);
+
+    expect(r.fase).toBeNull();
+    expect(r.porcentaje).toBeNull();
+    expect(r.n).toBe(0);
+  });
+
+  it("un empate se resuelve igual siempre, no por orden de llegada", () => {
+    /*
+     * Dos exportaciones de la misma semana tienen que dar la misma fase. Si
+     * ganara «la primera que aparecio», el resultado dependeria de como
+     * ordenase Prisma los compromisos.
+     */
+    const a = faseDominante(["ZAPATAS", "ACABADOS"]);
+    const b = faseDominante(["ACABADOS", "ZAPATAS"]);
+
+    expect(a.fase).toBe(b.fase);
+    expect(a.fase).toBe("ACABADOS");
   });
 });

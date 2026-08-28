@@ -7,6 +7,7 @@ import {
   CODIGO_CAUSA,
   GRUPO_CAUSA,
   faseDeLaSemana,
+  faseDominante,
   indicePorSemana,
   num,
   resumir,
@@ -164,6 +165,30 @@ export async function datosDelEstudio(
   });
 
   /*
+   * LA FASE CONSTRUCTIVA DE CADA TAREA, para poder decir con que trabajo se
+   * vivio cada semana.
+   *
+   * Una obra atraviesa fases de naturaleza distinta -tierras, estructuras,
+   * acabados- con rendimientos e incertidumbres propios. Si la fase previa
+   * del estudio cae en estructuras y la posterior en acabados, la mejora
+   * observada puede ser del tipo de trabajo y no de la herramienta, y esa
+   * objecion no se puede contestar despues: el dato hay que tenerlo.
+   *
+   * No se guarda una columna nueva porque el dato YA EXISTE en el lookahead
+   * (`faseBloque`), anclado al mismo uid que usa el compromiso semanal. Se
+   * deriva, y asi no hay dos sitios donde la fase de una tarea pueda decir
+   * cosas distintas.
+   */
+  const lookahead = await prisma.lookaheadTask.findMany({
+    where: { projectId: obraId, faseBloque: { not: null } },
+    select: { uid: true, faseBloque: true },
+  });
+  const faseDeUid = new Map<number, string>();
+  for (const t of lookahead) {
+    if (t.faseBloque !== null) faseDeUid.set(t.uid, t.faseBloque);
+  }
+
+  /*
    * EL CRONOGRAMA DE REFERENCIA ES LA LINEA BASE, y si no hay, la PRIMERA
    * version importada.
    *
@@ -300,6 +325,18 @@ export async function datosDelEstudio(
   // -------------------------------------------------------------------------
   // Consolidado: una fila por semana. Es la serie temporal.
   // -------------------------------------------------------------------------
+  /*
+   * EL INDICE DE LA PRIMERA SEMANA POSTERIOR A LA IMPLANTACION.
+   *
+   * De el sale `tiempo_post`, que es lo que permite analizar esto como la
+   * serie interrumpida que es y no como dos montones de numeros. Ver el
+   * comentario de las tres columnas mas abajo.
+   */
+  const primeraPost = planes
+    .filter((p) => fase(p.fechaCorte) === "POST")
+    .map((p) => indice.get(p.fechaCorte.getTime()) ?? 0)
+    .sort((a, b) => a - b)[0];
+
   const filasConsolidado = planes.map((p) => {
     const evaluados = p.compromisos.filter((c) => c.cumplido !== null);
     const cumplidos = evaluados.filter((c) => c.cumplido === true).length;
@@ -343,12 +380,62 @@ export async function datosDelEstudio(
     );
     const concentracion = hhi(porCausa);
 
+    const orden = indice.get(p.fechaCorte.getTime()) ?? 0;
+    const esPost = fase(p.fechaCorte) === "POST";
+
+    /*
+     * LAS TRES COLUMNAS DE LA REGRESION SEGMENTADA, calculadas aqui y no
+     * dejadas a mano en la hoja de calculo.
+     *
+     * Comparar la media de antes con la de despues responde «el promedio
+     * subio», pero NO responde «ya venia subiendo». Y suele venir subiendo: en
+     * la fase previa el equipo ya practica el ritual semanal y mejora por
+     * practicar, asi que una comparacion de medias le atribuye a la
+     * herramienta una pendiente que ya existia. Es la objecion de maduracion,
+     * y es la que hunde este tipo de estudios.
+     *
+     * Con `semana_indice` (el tiempo), `intervencion` (0 antes, 1 despues) y
+     * `tiempo_post` (0 antes; 1, 2, 3... desde la implantacion) una regresion
+     * corriente separa tres cosas: la tendencia que la obra ya traia, el salto
+     * al implantar y el cambio de pendiente posterior.
+     *
+     * Se emiten calculadas porque construirlas a mano es donde se cuela el
+     * error: `tiempo_post` cuenta desde la PRIMERA semana posterior, no desde
+     * el principio de la serie, y desplazarla una posicion cambia el
+     * coeficiente sin que nada avise.
+     *
+     * Sin punto de interrupcion declarado se emiten vacias, igual que
+     * `fase_estudio`: no hay dos tramos que separar, y un cero ahi diria
+     * «todas las semanas son previas», que es una afirmacion que nadie hizo.
+     */
+    const intervencion = interrupcion === null ? "" : esPost ? 1 : 0;
+    const tiempoPost =
+      interrupcion === null || primeraPost === undefined
+        ? ""
+        : esPost
+          ? orden - primeraPost + 1
+          : 0;
+
+    /*
+     * Con que trabajo se vivio la semana. Sale de las tareas comprometidas que
+     * tienen fase declarada en el lookahead; las lineas libres -sin uid- no
+     * pueden tenerla y no cuentan.
+     */
+    const composicion = faseDominante(
+      p.compromisos.map((c) => (c.uid === null ? null : faseDeUid.get(c.uid))),
+    );
+
     return [
       obra.id,
       indice.get(p.fechaCorte.getTime()) ?? "",
       p.numero,
       iso(p.fechaCorte),
       fase(p.fechaCorte),
+      intervencion,
+      tiempoPost,
+      composicion.fase ?? "",
+      num(composicion.porcentaje, 2),
+      composicion.n,
       p.origenDatos,
       p.estado,
       evaluados.length,
@@ -553,7 +640,9 @@ export async function datosDelEstudio(
         nombre: "dataset_consolidado",
         cabecera: [
           "obra_id", "semana_indice", "semana_numero", "fecha_corte",
-          "fase_estudio", "origen_datos", "estado_plan",
+          "fase_estudio", "intervencion", "tiempo_post",
+          "fase_constructiva", "fase_constructiva_pct", "fase_constructiva_n",
+          "origen_datos", "estado_plan",
           "compromisos_evaluados", "compromisos_cumplidos", "ppc_pct",
           "restricciones_semana", "restricciones_con_ciclo",
           "tasa_liberacion_oportuna_pct", "retraso_n", "retraso_media_dias",
@@ -649,6 +738,16 @@ function diccionario(
         `Limite superior de especificacion declarado para el analisis de capacidad. Valor usado en esta exportacion: ${lesDias}.`),
       v("restricciones", "fuera_especificacion", "nominal", "0/1",
         "1 si retraso_dias supera les_dias."),
+      v("consolidado", "intervencion", "nominal", "0/1",
+        "0 en las semanas previas a la implantacion, 1 desde la implantacion. Es el predictor del SALTO de nivel en la regresion segmentada. Vacio si la obra no tiene declarado el punto de interrupcion."),
+      v("consolidado", "tiempo_post", "escala", "semanas",
+        "0 en las semanas previas; 1, 2, 3... contando desde la PRIMERA semana con el sistema. Es el predictor del CAMBIO DE PENDIENTE. Junto con semana_indice (la tendencia previa) e intervencion (el salto), forma el modelo de series cronologicas interrumpidas: una regresion lineal con estos tres predictores separa la mejora que la obra ya traia de la que aporto la herramienta, que es la objecion de maduracion. Se emite calculado porque construirlo a mano es donde se cuela el error de desplazarlo una semana."),
+      v("consolidado", "fase_constructiva", "nominal", "-",
+        "Fase de obra dominante entre los compromisos de la semana (del campo faseBloque del lookahead). Permite declarar con que trabajo se vivio cada fase del estudio: si la fase previa cae en estructuras y la posterior en acabados, la mejora observada puede ser del tipo de trabajo y no de la herramienta."),
+      v("consolidado", "fase_constructiva_pct", "escala", "%",
+        "Que proporcion de los compromisos con fase declarada pertenece a la dominante. Un valor bajo avisa de que la semana estuvo repartida entre frentes y la dominante no la representa."),
+      v("consolidado", "fase_constructiva_n", "escala", "conteo",
+        "Sobre cuantos compromisos se calculo la fase. Los compromisos sin tarea del cronograma no tienen fase y no cuentan; si este numero es bajo frente a compromisos_evaluados, la fase de esa semana es poco fiable."),
       v("consolidado", "ppc_pct", "escala", "%",
         "Porcentaje de Plan Completado: compromisos cumplidos sobre compromisos evaluados."),
       v("consolidado", "tasa_liberacion_oportuna_pct", "escala", "%",

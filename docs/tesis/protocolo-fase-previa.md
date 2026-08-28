@@ -66,6 +66,19 @@ las tres últimas al cierre de la semana siguiente.
 
 **Semana n.º ____   Fecha de corte: __/__/____   Obra: ______________**
 
+**Fase constructiva de la semana:** ☐ Movimiento de tierras ☐ Cimentación
+☐ Estructuras ☐ Albañilería ☐ Instalaciones ☐ Acabados
+☐ Otra: ____________
+
+> **Se marca en qué está la obra esa semana, y se marca siempre.** Si la semana
+> está repartida entre dos frentes, se marca el principal. Este dato existe por
+> una razón concreta: una obra no es igual en el tiempo, y si el periodo previo
+> del estudio cae en estructuras y el posterior en acabados, alguien puede
+> objetar que la mejora es del tipo de trabajo y no del sistema. Teniéndolo
+> anotado, se contesta enseñando la composición de cada fase. **No se puede
+> reconstruir después**: es de las pocas cosas de este protocolo que, si no se
+> anota el día, se pierde.
+
 | # | Actividad comprometida | Responsable | Cant. | Unid. | Zona | ¿Cumplió? | Cant. ejec. | Causa (si no) |
 |---|---|---|---|---|---|---|---|---|
 | 1 | | | | | | ☐ Sí ☐ No | | |
@@ -150,6 +163,9 @@ y suele ser el dato más fácil de conseguir porque el cronograma ya existe.
 3. **Fijar el punto de interrupción** en la fecha de la primera semana
    gestionada con el sistema.
 4. Cargar las restricciones y las fechas reales de tareas.
+5. **Volcar la fase constructiva** de cada semana. En el sistema vive en el
+   campo *fase* de las tareas del lookahead, y la exportación la resume por
+   semana en la columna `fase_constructiva`.
 
 A partir de ahí, las dos fases salen de **la misma exportación y del mismo
 cálculo**, que es lo que hace comparables las series.

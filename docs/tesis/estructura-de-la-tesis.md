@@ -322,9 +322,14 @@ análisis con anterioridad a la recolección.
    identificados como **datos reconstruidos**, lo que permite que ambas fases
    se procesen mediante la misma exportación y el mismo procedimiento de
    cálculo.
-3. Implementación del sistema y capacitación del equipo.
-4. Registro de la fase posterior en operación normal.
-5. Exportación de los datos crudos y aplicación del cuestionario de percepción
+3. **Registro de la fase constructiva de cada semana** —movimiento de
+   tierras, estructuras, acabados—, con el fin de documentar la composición de
+   ambas fases del estudio y descartar que la variación observada responda al
+   cambio de naturaleza del trabajo. Este registro se establece desde la
+   primera semana de observación, dado que no admite reconstrucción posterior.
+4. Implementación del sistema y capacitación del equipo.
+5. Registro de la fase posterior en operación normal.
+6. Exportación de los datos crudos y aplicación del cuestionario de percepción
    al cierre del periodo.
 
 ### 7.7 Métodos de análisis de datos
@@ -344,15 +349,25 @@ siguiente procedimiento, establecido con anterioridad a la recolección:
 4. **Tamaño del efecto**: d de Cohen para contrastes paramétricos y correlación
    biserial de rangos para los no paramétricos, con sus intervalos de confianza
    al 95 %.
-5. **Contraste de la distribución de causas**: prueba chi-cuadrado de
+5. **Modelo de regresión segmentada**, en correspondencia con el diseño de
+   series cronológicas interrumpidas (Wagner, Soumerai, Zhang y Ross-Degnan,
+   2002). Se estima sobre la serie semanal con tres predictores —el tiempo
+   transcurrido, una variable dicotómica de intervención y el tiempo
+   transcurrido desde la intervención—, lo que permite estimar por separado la
+   tendencia preexistente, el cambio de nivel y el cambio de pendiente
+   asociados a la implementación. Su función es distinguir el efecto de la
+   intervención de la maduración propia del equipo, que la comparación de
+   medias no puede separar. Se verifica la independencia de los residuos
+   mediante el estadístico de Durbin-Watson.
+6. **Contraste de la distribución de causas**: prueba chi-cuadrado de
    homogeneidad sobre las causas agrupadas en controlables y no controlables,
    agrupación adoptada para satisfacer el supuesto de frecuencia esperada
    mínima y por corresponder a la predicción teórica.
-6. **Capacidad del proceso**: índice Cpk calculado mediante el método de
+7. **Capacidad del proceso**: índice Cpk calculado mediante el método de
    percentiles conforme a la norma ISO 22514, que no requiere supuesto
    distribucional, dada la asimetría positiva característica de los tiempos de
    respuesta en obra.
-7. **Análisis descriptivo del cuestionario** y estimación de confiabilidad.
+8. **Análisis descriptivo del cuestionario** y estimación de confiabilidad.
 
 Se adoptó un nivel de significación de α = 0,05.
 
