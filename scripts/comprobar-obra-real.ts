@@ -12,6 +12,7 @@
  * guardar, y son otro camino.
  */
 import { readFile } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
 
 import { prisma } from "@/lib/prisma";
 import { permisosDe } from "@/lib/rbac";
@@ -208,6 +209,45 @@ async function main() {
           ` | semanas: ${tablas.consolidado.filas.length}` +
           ` | variables en el diccionario: ${tablas.diccionario.filas.length}`,
       );
+    }
+    // 6. La PANTALLA, si el servidor de desarrollo esta levantado.
+    //
+    // Es lo unico que ninguna prueba caza: un cambio que consiste en ENSENAR
+    // algo pasa la bateria entera estando mal. Se abre con una sesion escrita
+    // a mano -la misma fila que escribe el login- y se busca el subtotal de un
+    // capitulo, que es lo que antes salia en blanco.
+    console.log("\n== LA PANTALLA DEL PRESUPUESTO");
+    const vivo = await fetch("http://localhost:3000/login", { redirect: "manual" })
+      .then(() => true)
+      .catch(() => false);
+    if (!vivo) {
+      console.log("  (sin servidor de desarrollo: `npm run dev` y repite para incluir esto)");
+    } else {
+      const token = randomBytes(32).toString("base64url");
+      const s = await prisma.session.create({
+        data: {
+          userId: usuario.id,
+          tokenHash: createHash("sha256").update(token).digest("hex"),
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+        select: { id: true },
+      });
+      try {
+        const r = await fetch(`http://localhost:3000/obras/${obraId}`, {
+          headers: { cookie: `gcm_sesion=${token}` },
+          redirect: "manual",
+        });
+        comprobar("la pantalla de la obra responde", r.status, 200);
+        if (r.status === 200) {
+          const texto = (await r.text()).replace(/<[^>]+>/g, " ").replace(/\\s+/g, " ");
+          // Los subtotales de dos capitulos, tal como los escribe `soles`.
+          comprobar("se ve el subtotal del capitulo 1 (11,165.00)", texto.includes("11,165.00"), true);
+          comprobar("se ve el subtotal del capitulo 12 (1,960.00)", texto.includes("1,960.00"), true);
+          comprobar("y el costo directo de la obra", texto.includes("806,497.45"), true);
+        }
+      } finally {
+        await prisma.session.delete({ where: { id: s.id } }).catch(() => {});
+      }
     }
   } finally {
     if (obraId) {
