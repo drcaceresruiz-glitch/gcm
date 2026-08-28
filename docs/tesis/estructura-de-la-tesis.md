@@ -305,11 +305,23 @@ análisis con anterioridad a la recolección.
 
 1. Delimitación del periodo de observación y registro de la semana de
    implementación como punto de interrupción de la serie.
-2. Registro de la fase previa. Cuando los datos de esta fase procedan de
-   fuentes documentales anteriores a la implementación —actas de reunión
-   semanal, cuaderno de obra o planillas de programación—, se incorporan al
-   sistema identificados como **datos reconstruidos**, quedando distinguidos de
-   los generados durante la operación del sistema.
+2. **Registro de la fase previa mediante Last Planner en soporte manual.**
+   Durante [n] semanas consecutivas se ejecuta el ciclo completo del Last
+   Planner —reunión semanal, compromisos, análisis de restricciones y registro
+   de causas de no cumplimiento— con formatos en papel, sin apoyo del sistema
+   informático.
+
+   Esta decisión es sustantiva y no operativa: al mantener el método en ambas
+   fases y variar únicamente el soporte, el efecto observado resulta atribuible
+   a la herramienta y no a la introducción simultánea de una metodología de
+   planificación. Adicionalmente, el conocimiento del equipo de estar siendo
+   observado —efecto Hawthorne— actúa en ambas fases por igual, quedando
+   controlado por diseño.
+
+   Los registros manuales se incorporan posteriormente al sistema,
+   identificados como **datos reconstruidos**, lo que permite que ambas fases
+   se procesen mediante la misma exportación y el mismo procedimiento de
+   cálculo.
 3. Implementación del sistema y capacitación del equipo.
 4. Registro de la fase posterior en operación normal.
 5. Exportación de los datos crudos y aplicación del cuestionario de percepción
