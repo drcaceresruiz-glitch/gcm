@@ -14,6 +14,7 @@ import {
   AnalisisDelEstudio,
   PanelDelEstudio,
 } from "@/components/investigacion/PanelDelEstudio";
+import { GuiaDelAnalisis } from "@/components/investigacion/GuiaDelAnalisis";
 
 export const metadata: Metadata = { title: "Datos para investigación" };
 
@@ -59,7 +60,7 @@ export default async function InvestigacionPage({
       tabla: "consolidado",
       titulo: "Serie semanal consolidada",
       detalle:
-        "Una fila por semana: PPC, tasa de liberación oportuna, y la media y la desviación estándar del retraso. Es el archivo de la serie temporal.",
+        "Una fila por semana: PPC, tasa de liberación oportuna, y la media y la desviación estándar del retraso. Trae ya calculadas las tres columnas de la regresión segmentada y la fase constructiva de cada semana. Es el archivo de la serie temporal.",
     },
     {
       tabla: "compromisos",
@@ -181,6 +182,8 @@ export default async function InvestigacionPage({
           ))}
         </ul>
       </section>
+
+      <GuiaDelAnalisis />
     </div>
   );
 }

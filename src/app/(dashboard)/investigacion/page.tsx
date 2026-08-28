@@ -10,6 +10,7 @@ import {
 } from "@/services/investigacion.service";
 import { fechaCorta } from "@/utils/fechas";
 import { ObraDeEnsayo } from "@/components/investigacion/PanelDelEstudio";
+import { GuiaDelEstudio } from "@/components/investigacion/GuiaDelEstudio";
 
 export const metadata: Metadata = { title: "Investigación" };
 
@@ -98,6 +99,8 @@ export default async function InvestigacionPage() {
           </ul>
         )}
       </section>
+
+      <GuiaDelEstudio />
     </div>
   );
 }
