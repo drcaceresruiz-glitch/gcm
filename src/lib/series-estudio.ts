@@ -132,6 +132,35 @@ export const CODIGO_CAUSA: Record<string, number> = {
   OTRA: 9,
 };
 
+/**
+ * Si la causa de un incumplimiento la controla la obra o no.
+ *
+ * PARA QUE UNA PRUEBA DE HOMOGENEIDAD TENGA SENTIDO. Con las nueve categorias
+ * sueltas, la tabla de contingencia se llena de celdas con frecuencia esperada
+ * menor que cinco -el chi-cuadrado deja de ser valido- y ademas no responde a
+ * ninguna pregunta: que MATERIALES baje y CLIMA suba no dice nada por si solo.
+ * Agrupadas si: la teoria predice que lo evitable desaparece y queda lo que la
+ * obra no controla, y eso es contrastable en una tabla de dos por dos.
+ *
+ * REPROGRAMACION va en EVITABLE aunque parezca de fuera: reprogramar es una
+ * decision de la propia obra, y contarla como externa seria absolver al
+ * sistema de planificacion de su propio fallo mas comun.
+ *
+ * OTRA no se clasifica. Meterla en cualquiera de los dos lados inventaria una
+ * atribucion que nadie hizo, y en el analisis se deja fuera del contraste.
+ */
+export const GRUPO_CAUSA: Record<string, "EVITABLE" | "EXTERNA" | "SIN_CLASIFICAR"> = {
+  PRERREQUISITO: "EVITABLE",
+  MATERIALES: "EVITABLE",
+  MANO_OBRA: "EVITABLE",
+  EQUIPOS: "EVITABLE",
+  INFORMACION: "EVITABLE",
+  REPROGRAMACION: "EVITABLE",
+  CLIENTE_TERCEROS: "EXTERNA",
+  CLIMA: "EXTERNA",
+  OTRA: "SIN_CLASIFICAR",
+};
+
 export interface SemanaOrdenable {
   fechaCorte: Date;
 }

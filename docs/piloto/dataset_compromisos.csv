@@ -1,266 +1,266 @@
-obra_id,semana_indice,semana_numero,fecha_corte,fase_estudio,origen_datos,compromiso_id,tarea_uid,descripcion,zona,proveedor_cod,cumplimiento,causa_cod,causa_etiqueta,cantidad_plan,cantidad_ejec,unidad,dias_cierre
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1a60002cwpb28w41nwz,,Actividad 1 de la semana 1,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1ac0003cwpbr2kflj9s,,Actividad 2 de la semana 1,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1ae0004cwpba2nvw0fo,,Actividad 3 de la semana 1,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1ah0005cwpbyg76gzh4,,Actividad 4 de la semana 1,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1al0006cwpbydhs4c3b,,Actividad 5 de la semana 1,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1ao0007cwpb6scl4ici,,Actividad 6 de la semana 1,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1ar0008cwpbxohy15bf,,Actividad 7 de la semana 1,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1aw0009cwpbjb5m8a7u,,Actividad incumplida 1 de la semana 1,Piso 1,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1b0000acwpbq6cl938o,,Actividad incumplida 2 de la semana 1,Piso 2,,0,3,MANO_OBRA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1b4000bcwpbsn5ewevs,,Actividad incumplida 3 de la semana 1,Piso 1,,0,1,PRERREQUISITO,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1b8000ccwpb8cwki8j2,,Actividad incumplida 4 de la semana 1,Piso 2,,0,5,INFORMACION,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtcgb1bd000dcwpb9571mqdb,,Actividad incumplida 5 de la semana 1,Piso 1,,0,4,EQUIPOS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1c1000fcwpbohiu5mjr,,Actividad 1 de la semana 2,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1c3000gcwpbfggohm35,,Actividad 2 de la semana 2,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1c8000hcwpb2lf8vkms,,Actividad 3 de la semana 2,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1ch000icwpbbuulpwqk,,Actividad 4 de la semana 2,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1cm000jcwpb1czfw1qs,,Actividad 5 de la semana 2,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1cr000kcwpbs02zflon,,Actividad 6 de la semana 2,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1cw000lcwpbjgamm5pd,,Actividad 7 de la semana 2,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1d0000mcwpbu3neot8z,,Actividad 8 de la semana 2,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1d6000ncwpb0908plci,,Actividad incumplida 1 de la semana 2,Piso 1,,0,3,MANO_OBRA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1d9000ocwpb0o5o8usm,,Actividad incumplida 2 de la semana 2,Piso 2,,0,1,PRERREQUISITO,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1df000pcwpbfhs08tsa,,Actividad incumplida 3 de la semana 2,Piso 1,,0,5,INFORMACION,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1di000qcwpbrwa27g1j,,Actividad incumplida 4 de la semana 2,Piso 2,,0,4,EQUIPOS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1dl000rcwpb6valpr6m,,Actividad incumplida 5 de la semana 2,Piso 1,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtcgb1dp000scwpb12y9yrgy,,Actividad incumplida 6 de la semana 2,Piso 2,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1e1000ucwpb3je2lkow,,Actividad 1 de la semana 3,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1e4000vcwpbn3mcl36y,,Actividad 2 de la semana 3,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1e7000wcwpbb57c0nm5,,Actividad 3 de la semana 3,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1eb000xcwpbc2dpbk7e,,Actividad 4 de la semana 3,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1ed000ycwpbei82ixk6,,Actividad 5 de la semana 3,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1ef000zcwpbvikqc8ag,,Actividad 6 de la semana 3,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1eh0010cwpbzw7luuhn,,Actividad incumplida 1 de la semana 3,Piso 1,,0,1,PRERREQUISITO,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1ej0011cwpbn26f75z8,,Actividad incumplida 2 de la semana 3,Piso 2,,0,5,INFORMACION,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1el0012cwpb4454qvik,,Actividad incumplida 3 de la semana 3,Piso 1,,0,4,EQUIPOS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1en0013cwpbpchjjs05,,Actividad incumplida 4 de la semana 3,Piso 2,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtcgb1eq0014cwpbrv5g2jun,,Actividad incumplida 5 de la semana 3,Piso 1,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1ez0016cwpbbk5wdpbz,,Actividad 1 de la semana 4,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1f10017cwpb6y1ddgwb,,Actividad 2 de la semana 4,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1f20018cwpb05yz4bnb,,Actividad 3 de la semana 4,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1f40019cwpbgcfv18v9,,Actividad 4 de la semana 4,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1f7001acwpb2aeqdsta,,Actividad 5 de la semana 4,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1fa001bcwpbhts82dqa,,Actividad 6 de la semana 4,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1fc001ccwpb34mt3mkj,,Actividad 7 de la semana 4,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1fe001dcwpbpuj60vbg,,Actividad 8 de la semana 4,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1fg001ecwpboxw94gnw,,Actividad incumplida 1 de la semana 4,Piso 1,,0,5,INFORMACION,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1fi001fcwpb502v559a,,Actividad incumplida 2 de la semana 4,Piso 2,,0,4,EQUIPOS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1fk001gcwpbsp1f2v1f,,Actividad incumplida 3 de la semana 4,Piso 1,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1fn001hcwpbucin8opw,,Actividad incumplida 4 de la semana 4,Piso 2,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtcgb1fr001icwpbctj1xovx,,Actividad incumplida 5 de la semana 4,Piso 1,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1fz001kcwpb2dc26fd3,,Actividad 1 de la semana 5,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1g1001lcwpbczddtmse,,Actividad 2 de la semana 5,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1g5001mcwpbtddqpjqj,,Actividad 3 de la semana 5,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1g7001ncwpbd9ecs5d4,,Actividad 4 de la semana 5,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1ga001ocwpbd6yq6n0m,,Actividad 5 de la semana 5,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1gd001pcwpbxifjszgx,,Actividad 6 de la semana 5,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1ge001qcwpbjq75muk6,,Actividad 7 de la semana 5,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1gg001rcwpbexc7509f,,Actividad 8 de la semana 5,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1gi001scwpbev97bzkb,,Actividad incumplida 1 de la semana 5,Piso 1,,0,4,EQUIPOS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1gk001tcwpbemoit23v,,Actividad incumplida 2 de la semana 5,Piso 2,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1gn001ucwpbnk98e32x,,Actividad incumplida 3 de la semana 5,Piso 1,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1gp001vcwpbcifs7zvr,,Actividad incumplida 4 de la semana 5,Piso 2,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1gq001wcwpb3rq5kpzo,,Actividad incumplida 5 de la semana 5,Piso 1,,0,3,MANO_OBRA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1gt001xcwpbksk8smrc,,Actividad incumplida 6 de la semana 5,Piso 2,,0,1,PRERREQUISITO,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtcgb1gv001ycwpbmm35ezy0,,Actividad incumplida 7 de la semana 5,Piso 1,,0,5,INFORMACION,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1h30020cwpbnj9xd946,,Actividad 1 de la semana 6,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1h50021cwpbfxhuxwt4,,Actividad 2 de la semana 6,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1h80022cwpbrny9wwin,,Actividad 3 de la semana 6,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1h90023cwpb7jakc5jt,,Actividad 4 de la semana 6,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1hb0024cwpb0mcf3s8u,,Actividad 5 de la semana 6,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1hc0025cwpbtpyfhca7,,Actividad 6 de la semana 6,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1he0026cwpb92iglgxr,,Actividad 7 de la semana 6,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1hg0027cwpbg6achj2c,,Actividad incumplida 1 de la semana 6,Piso 1,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1hk0028cwpb91ruhycj,,Actividad incumplida 2 de la semana 6,Piso 2,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1hm0029cwpbrujcaj90,,Actividad incumplida 3 de la semana 6,Piso 1,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1hp002acwpb11xf0plg,,Actividad incumplida 4 de la semana 6,Piso 2,,0,3,MANO_OBRA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtcgb1hr002bcwpb9e5147sx,,Actividad incumplida 5 de la semana 6,Piso 1,,0,1,PRERREQUISITO,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1hy002dcwpbne6jlrlu,,Actividad 1 de la semana 7,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1i1002ecwpbkxuhu0bk,,Actividad 2 de la semana 7,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1i2002fcwpb6zggasqj,,Actividad 3 de la semana 7,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1i4002gcwpbr42b8zwn,,Actividad 4 de la semana 7,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1i7002hcwpbeg7vrp38,,Actividad 5 de la semana 7,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1ia002icwpbxky4dkpo,,Actividad 6 de la semana 7,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1ic002jcwpblac869uf,,Actividad 7 de la semana 7,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1ie002kcwpbrnvkiuch,,Actividad 8 de la semana 7,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1ih002lcwpbu32ernbf,,Actividad 9 de la semana 7,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1ik002mcwpbntoyxy6f,,Actividad incumplida 1 de la semana 7,Piso 1,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1im002ncwpboxlg17p2,,Actividad incumplida 2 de la semana 7,Piso 2,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1in002ocwpb1hsxl0mc,,Actividad incumplida 3 de la semana 7,Piso 1,,0,3,MANO_OBRA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1ip002pcwpbjuzqqzr1,,Actividad incumplida 4 de la semana 7,Piso 2,,0,1,PRERREQUISITO,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtcgb1ir002qcwpbdnh2lxnh,,Actividad incumplida 5 de la semana 7,Piso 1,,0,5,INFORMACION,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1j0002scwpbus6cd3lz,,Actividad 1 de la semana 8,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1j2002tcwpbilo50uri,,Actividad 2 de la semana 8,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1j4002ucwpbhxib6a06,,Actividad 3 de la semana 8,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1j6002vcwpb4zmmmpey,,Actividad 4 de la semana 8,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1j8002wcwpb80qgx2qt,,Actividad 5 de la semana 8,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1ja002xcwpbcow02aq6,,Actividad 6 de la semana 8,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1je002ycwpby6dzq2ea,,Actividad 7 de la semana 8,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1jg002zcwpbm38exjmf,,Actividad incumplida 1 de la semana 8,Piso 1,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1jj0030cwpbtgi7ko29,,Actividad incumplida 2 de la semana 8,Piso 2,,0,3,MANO_OBRA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1jk0031cwpbmkiy6r7r,,Actividad incumplida 3 de la semana 8,Piso 1,,0,1,PRERREQUISITO,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1jm0032cwpba4bhj21v,,Actividad incumplida 4 de la semana 8,Piso 2,,0,5,INFORMACION,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1jo0033cwpbi4qx77sq,,Actividad incumplida 5 de la semana 8,Piso 1,,0,4,EQUIPOS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtcgb1jp0034cwpbme61r1ht,,Actividad incumplida 6 de la semana 8,Piso 2,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1jz0036cwpbqb9i6kuj,,Actividad 1 de la semana 9,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1k20037cwpblo5ljqpn,,Actividad 2 de la semana 9,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1k40038cwpb05kab8mp,,Actividad 3 de la semana 9,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1k60039cwpban9em4qs,,Actividad 4 de la semana 9,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1k9003acwpbh53g3e3f,,Actividad 5 de la semana 9,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1kd003bcwpbhnpqds82,,Actividad 6 de la semana 9,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1kg003ccwpbvkg5p9lh,,Actividad 7 de la semana 9,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1ki003dcwpb2xnpq68s,,Actividad incumplida 1 de la semana 9,Piso 1,,0,3,MANO_OBRA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1kk003ecwpblf5zhfwb,,Actividad incumplida 2 de la semana 9,Piso 2,,0,1,PRERREQUISITO,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1kl003fcwpbr6ggfk5k,,Actividad incumplida 3 de la semana 9,Piso 1,,0,5,INFORMACION,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1kn003gcwpbh1o520cr,,Actividad incumplida 4 de la semana 9,Piso 2,,0,4,EQUIPOS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtcgb1kp003hcwpblg5j2lgr,,Actividad incumplida 5 de la semana 9,Piso 1,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1ky003jcwpb3mmk8exv,,Actividad 1 de la semana 10,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1l0003kcwpb78ga3hiy,,Actividad 2 de la semana 10,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1l3003lcwpbmy4ych56,,Actividad 3 de la semana 10,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1l4003mcwpbrh8l6npx,,Actividad 4 de la semana 10,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1l7003ncwpbufjnxwh3,,Actividad 5 de la semana 10,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1la003ocwpb380ycxeg,,Actividad 6 de la semana 10,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1lc003pcwpbxk4wc9vq,,Actividad 7 de la semana 10,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1le003qcwpb9obbdxxw,,Actividad 8 de la semana 10,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1lf003rcwpbqca4v70u,,Actividad incumplida 1 de la semana 10,Piso 1,,0,1,PRERREQUISITO,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1lh003scwpboa8jenmk,,Actividad incumplida 2 de la semana 10,Piso 2,,0,5,INFORMACION,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1lj003tcwpbzv2remwy,,Actividad incumplida 3 de la semana 10,Piso 1,,0,4,EQUIPOS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1lk003ucwpb4uea4iej,,Actividad incumplida 4 de la semana 10,Piso 2,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1ln003vcwpb5hhkwa1r,,Actividad incumplida 5 de la semana 10,Piso 1,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtcgb1lq003wcwpb7c2m9eca,,Actividad incumplida 6 de la semana 10,Piso 2,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1lz003ycwpbcjnwd52e,,Actividad 1 de la semana 11,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1m0003zcwpbi1e4145m,,Actividad 2 de la semana 11,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1m20040cwpb4i6ihaun,,Actividad 3 de la semana 11,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1m60041cwpbh8643szd,,Actividad 4 de la semana 11,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1m90042cwpbdr5780l9,,Actividad 5 de la semana 11,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1mb0043cwpbvu15iw5j,,Actividad 6 de la semana 11,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1md0044cwpb39x306do,,Actividad 7 de la semana 11,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1mf0045cwpbbb7fk3az,,Actividad 8 de la semana 11,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1mh0046cwpb4z7ce17x,,Actividad 9 de la semana 11,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1mi0047cwpbivfyhgcs,,Actividad incumplida 1 de la semana 11,Piso 1,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1ml0048cwpb27awp0b4,,Actividad incumplida 2 de la semana 11,Piso 2,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1mn0049cwpbs7ct21tj,,Actividad incumplida 3 de la semana 11,Piso 1,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,11,11,2026-03-20,POST,GESTIONADO,cmtcgb1mp004acwpbhzh5fmwk,,Actividad incumplida 4 de la semana 11,Piso 2,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1mu004ccwpb4m8yiyt2,,Actividad 1 de la semana 12,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1mw004dcwpbkvxezcju,,Actividad 2 de la semana 12,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1my004ecwpbzt1ssk8u,,Actividad 3 de la semana 12,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1mz004fcwpbw2p911uq,,Actividad 4 de la semana 12,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1n3004gcwpb2hocc2tx,,Actividad 5 de la semana 12,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1n6004hcwpbnumrnlnz,,Actividad 6 de la semana 12,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1n8004icwpbvo3smy2b,,Actividad 7 de la semana 12,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1na004jcwpbygo9vxow,,Actividad 8 de la semana 12,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1nc004kcwpbwy0jpt3b,,Actividad 9 de la semana 12,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1nd004lcwpbb8vi76wk,,Actividad 10 de la semana 12,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1nf004mcwpbyqxnukk0,,Actividad 11 de la semana 12,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1nh004ncwpbmvyg5uyk,,Actividad incumplida 1 de la semana 12,Piso 1,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1nl004ocwpb55d3jpyn,,Actividad incumplida 2 de la semana 12,Piso 2,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,12,12,2026-03-27,POST,GESTIONADO,cmtcgb1nn004pcwpb1ptzk0dm,,Actividad incumplida 3 de la semana 12,Piso 1,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1nr004rcwpbpo799uxh,,Actividad 1 de la semana 13,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1nt004scwpbst89fdqu,,Actividad 2 de la semana 13,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1nv004tcwpbg19lixxp,,Actividad 3 de la semana 13,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1nw004ucwpblqmpeo2w,,Actividad 4 de la semana 13,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1nz004vcwpbf4htpjzd,,Actividad 5 de la semana 13,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1o2004wcwpbk61ee63f,,Actividad 6 de la semana 13,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1o4004xcwpbeunemwwy,,Actividad 7 de la semana 13,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1o7004ycwpbbh195sdh,,Actividad 8 de la semana 13,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1o9004zcwpbmepjydqm,,Actividad 9 de la semana 13,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1ob0050cwpbtgesrsqy,,Actividad 10 de la semana 13,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1oj0051cwpbyfb9df46,,Actividad incumplida 1 de la semana 13,Piso 1,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,13,13,2026-04-03,POST,GESTIONADO,cmtcgb1ol0052cwpbz7t0lu0a,,Actividad incumplida 2 de la semana 13,Piso 2,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1op0054cwpbz660v5eg,,Actividad 1 de la semana 14,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1os0055cwpb6zdpev8q,,Actividad 2 de la semana 14,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1ou0056cwpbzv73w1w7,,Actividad 3 de la semana 14,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1ox0057cwpb4mfzcn30,,Actividad 4 de la semana 14,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1oz0058cwpbb57y9ztk,,Actividad 5 de la semana 14,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1p10059cwpb9a5ptoco,,Actividad 6 de la semana 14,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1p4005acwpbk6xllct3,,Actividad 7 de la semana 14,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1p7005bcwpb7grrbclc,,Actividad 8 de la semana 14,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1pc005ccwpb3ie3zbau,,Actividad 9 de la semana 14,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1pg005dcwpbadeaynm5,,Actividad 10 de la semana 14,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1pi005ecwpbpdimx0w5,,Actividad 11 de la semana 14,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1pk005fcwpbv2ojpsnf,,Actividad 12 de la semana 14,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1pn005gcwpb77j7ar21,,Actividad incumplida 1 de la semana 14,Piso 1,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1pp005hcwpbk6fplfgm,,Actividad incumplida 2 de la semana 14,Piso 2,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,14,14,2026-04-10,POST,GESTIONADO,cmtcgb1pr005icwpbshl08m4w,,Actividad incumplida 3 de la semana 14,Piso 1,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1q7005kcwpb2w9str26,,Actividad 1 de la semana 15,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1qi005lcwpbk2ocrr4u,,Actividad 2 de la semana 15,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1qr005mcwpbpts4etag,,Actividad 3 de la semana 15,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1r1005ncwpb4y07y64o,,Actividad 4 de la semana 15,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1rb005ocwpbipc63wzb,,Actividad 5 de la semana 15,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1rh005pcwpbsbshozvv,,Actividad 6 de la semana 15,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1rq005qcwpb5uw99hiy,,Actividad 7 de la semana 15,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1rz005rcwpb81n6ofza,,Actividad 8 de la semana 15,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1s5005scwpba4wo297k,,Actividad 9 de la semana 15,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1sd005tcwpbr6nhjfvq,,Actividad incumplida 1 de la semana 15,Piso 1,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1si005ucwpbddbcoaod,,Actividad incumplida 2 de la semana 15,Piso 2,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1sk005vcwpb14f7csul,,Actividad incumplida 3 de la semana 15,Piso 1,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,15,15,2026-04-17,POST,GESTIONADO,cmtcgb1sq005wcwpbn6b0e9o4,,Actividad incumplida 4 de la semana 15,Piso 2,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1sz005ycwpbawk10k7d,,Actividad 1 de la semana 16,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1t1005zcwpb2j2hv5ou,,Actividad 2 de la semana 16,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1ta0060cwpb9r62631y,,Actividad 3 de la semana 16,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1tf0061cwpbjxygz4is,,Actividad 4 de la semana 16,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1th0062cwpb1bci3489,,Actividad 5 de la semana 16,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1tn0063cwpb5i90g5fv,,Actividad 6 de la semana 16,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1tt0064cwpbxx1flmpc,,Actividad 7 de la semana 16,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1tw0065cwpblldqjmma,,Actividad 8 de la semana 16,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1tz0066cwpbfubpjan6,,Actividad 9 de la semana 16,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1u60067cwpbxf2dbdqv,,Actividad 10 de la semana 16,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1uc0068cwpb4n5bpzic,,Actividad 11 de la semana 16,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1ue0069cwpbhdzruw5w,,Actividad 12 de la semana 16,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1uj006acwpb15adn3eb,,Actividad incumplida 1 de la semana 16,Piso 1,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,16,16,2026-04-24,POST,GESTIONADO,cmtcgb1ur006bcwpbhzicm8l6,,Actividad incumplida 2 de la semana 16,Piso 2,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1uv006dcwpb397iytak,,Actividad 1 de la semana 17,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1v2006ecwpb382lonw7,,Actividad 2 de la semana 17,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1v9006fcwpb9avhevvt,,Actividad 3 de la semana 17,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1vb006gcwpbvfs4bhvh,,Actividad 4 de la semana 17,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1vg006hcwpbuucci4v9,,Actividad 5 de la semana 17,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1vk006icwpb9yb6jd3w,,Actividad 6 de la semana 17,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1vn006jcwpbepjtk9fo,,Actividad 7 de la semana 17,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1vp006kcwpb9yjuf1h2,,Actividad 8 de la semana 17,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1vs006lcwpb4v7c8d8g,,Actividad 9 de la semana 17,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1vx006mcwpb4v74ce2l,,Actividad 10 de la semana 17,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1w6006ncwpbyjngl5fj,,Actividad incumplida 1 de la semana 17,Piso 1,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,17,17,2026-05-01,POST,GESTIONADO,cmtcgb1wi006ocwpbn4sd85jl,,Actividad incumplida 2 de la semana 17,Piso 2,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1wr006qcwpbs0eh6df7,,Actividad 1 de la semana 18,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1x0006rcwpb7sx75wi5,,Actividad 2 de la semana 18,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1x5006scwpbj9hr41zu,,Actividad 3 de la semana 18,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1x7006tcwpbm9et1hsr,,Actividad 4 de la semana 18,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1xd006ucwpb9tithzfp,,Actividad 5 de la semana 18,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1xj006vcwpbrwscdeor,,Actividad 6 de la semana 18,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1xn006wcwpb8pfytl5y,,Actividad 7 de la semana 18,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1xs006xcwpb775oo6h4,,Actividad 8 de la semana 18,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1y1006ycwpbns7cpey6,,Actividad 9 de la semana 18,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1y3006zcwpbw10sgxgs,,Actividad 10 de la semana 18,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1y60070cwpbcudnopbm,,Actividad 11 de la semana 18,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1ye0071cwpblrwcp3qx,,Actividad 12 de la semana 18,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1yh0072cwpbpx2ynsdi,,Actividad 13 de la semana 18,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1yj0073cwpbl8vuuuav,,Actividad incumplida 1 de la semana 18,Piso 1,,0,2,MATERIALES,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,18,18,2026-05-08,POST,GESTIONADO,cmtcgb1yl0074cwpbxxljj026,,Actividad incumplida 2 de la semana 18,Piso 2,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb1yz0076cwpb6tqga7uq,,Actividad 1 de la semana 19,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb1z10077cwpbbncn9thv,,Actividad 2 de la semana 19,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb1z50078cwpbvwukklhw,,Actividad 3 de la semana 19,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb1zc0079cwpb6iy8taev,,Actividad 4 de la semana 19,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb1zh007acwpb15wjhmyj,,Actividad 5 de la semana 19,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb1zj007bcwpbtr8porc9,,Actividad 6 de la semana 19,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb1zq007ccwpbn4458cvc,,Actividad 7 de la semana 19,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb1zy007dcwpb9ewn9x51,,Actividad 8 de la semana 19,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb201007ecwpbo5ricx8w,,Actividad 9 de la semana 19,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb20a007fcwpbxydix4nj,,Actividad 10 de la semana 19,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb20c007gcwpbwi642lwg,,Actividad 11 de la semana 19,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb20e007hcwpbjrvniiss,,Actividad incumplida 1 de la semana 19,Piso 1,,0,7,CLIMA,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,19,19,2026-05-15,POST,GESTIONADO,cmtcgb20g007icwpblgkie8pg,,Actividad incumplida 2 de la semana 19,Piso 2,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb20t007kcwpbjrnkktqt,,Actividad 1 de la semana 20,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb20v007lcwpbbp3jbi3r,,Actividad 2 de la semana 20,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb20y007mcwpbcusani0x,,Actividad 3 de la semana 20,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb214007ncwpbf25njdix,,Actividad 4 de la semana 20,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb21b007ocwpb3fisqazc,,Actividad 5 de la semana 20,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb21e007pcwpbzrhoxn6o,,Actividad 6 de la semana 20,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb21n007qcwpbw9wccwyb,,Actividad 7 de la semana 20,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb21q007rcwpb8c7ljae7,,Actividad 8 de la semana 20,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb21v007scwpbm9bna4tu,,Actividad 9 de la semana 20,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb222007tcwpbnjlybkqt,,Actividad 10 de la semana 20,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb227007ucwpbhrwnfjzb,,Actividad 11 de la semana 20,Piso 1,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb229007vcwpb51022i7l,,Actividad 12 de la semana 20,Piso 2,,1,,,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb22c007wcwpbuccfrpda,,Actividad incumplida 1 de la semana 20,Piso 1,,0,6,CLIENTE_TERCEROS,,,,0
-cmtcgb19h0000cwpbnwzdc7hj,20,20,2026-05-22,POST,GESTIONADO,cmtcgb22n007xcwpblucvotn4,,Actividad incumplida 2 de la semana 20,Piso 2,,0,7,CLIMA,,,,0
+obra_id,semana_indice,semana_numero,fecha_corte,fase_estudio,origen_datos,compromiso_id,tarea_uid,descripcion,zona,proveedor_cod,cumplimiento,causa_cod,causa_etiqueta,causa_grupo,cantidad_plan,cantidad_ejec,unidad,dias_cierre
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59lh0002xgpbxhw90aqu,,Actividad 1 de la semana 1,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59ll0003xgpbufac58bv,,Actividad 2 de la semana 1,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59ln0004xgpbb9yd6lve,,Actividad 3 de la semana 1,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59lq0005xgpb41ko6bht,,Actividad 4 de la semana 1,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59ls0006xgpbkir1432w,,Actividad 5 de la semana 1,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59lv0007xgpbo3zqwfdg,,Actividad 6 de la semana 1,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59lx0008xgpbb2psgiqm,,Actividad 7 de la semana 1,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59m00009xgpbusjkkahk,,Actividad 8 de la semana 1,Piso 2,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59m3000axgpbtajkoyuh,,Actividad 9 de la semana 1,Piso 1,,0,3,MANO_OBRA,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59m7000bxgpbcjluadyz,,Actividad 10 de la semana 1,Piso 2,,0,1,PRERREQUISITO,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59mc000cxgpbzpwafafi,,Actividad 11 de la semana 1,Piso 1,,0,5,INFORMACION,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,1,1,2026-01-09,PRE,RECONSTRUIDO,cmtck59mg000dxgpbpn4162zc,,Actividad 12 de la semana 1,Piso 2,,0,4,EQUIPOS,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59ml000fxgpb83ror1yu,,Actividad 1 de la semana 2,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59mo000gxgpbyj4gmxyq,,Actividad 2 de la semana 2,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59mq000hxgpbqbr1kln9,,Actividad 3 de la semana 2,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59ms000ixgpbbum8cx68,,Actividad 4 de la semana 2,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59mv000jxgpbdg6chvw0,,Actividad 5 de la semana 2,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59my000kxgpb16c0h6vh,,Actividad 6 de la semana 2,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59n1000lxgpbvlcjo1vl,,Actividad 7 de la semana 2,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59n4000mxgpb10ah1445,,Actividad 8 de la semana 2,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59n7000nxgpb8eyn2n8m,,Actividad 9 de la semana 2,Piso 1,,0,1,PRERREQUISITO,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59n9000oxgpbf3c62q14,,Actividad 10 de la semana 2,Piso 2,,0,5,INFORMACION,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59nc000pxgpbhfbyo0e1,,Actividad 11 de la semana 2,Piso 1,,0,4,EQUIPOS,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59ng000qxgpbeo5kxsdz,,Actividad 12 de la semana 2,Piso 2,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59nl000rxgpbuyinp2do,,Actividad 13 de la semana 2,Piso 1,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,2,2,2026-01-16,PRE,RECONSTRUIDO,cmtck59nn000sxgpbzcbp0yh1,,Actividad 14 de la semana 2,Piso 2,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59nt000uxgpbdxwjt7as,,Actividad 1 de la semana 3,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59nw000vxgpbm5xadseg,,Actividad 2 de la semana 3,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59o5000wxgpb9tbtt3qd,,Actividad 3 de la semana 3,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59o7000xxgpblhtu8z70,,Actividad 4 de la semana 3,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59o9000yxgpbk45wxhbe,,Actividad 5 de la semana 3,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59ob000zxgpblu1o7gs9,,Actividad 6 de la semana 3,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59od0010xgpbe64ck3og,,Actividad 7 de la semana 3,Piso 1,,0,3,MANO_OBRA,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59of0011xgpbztqw5q5u,,Actividad 8 de la semana 3,Piso 2,,0,1,PRERREQUISITO,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59og0012xgpb0nrd0t2z,,Actividad 9 de la semana 3,Piso 1,,0,5,INFORMACION,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59oi0013xgpbpxt1sh07,,Actividad 10 de la semana 3,Piso 2,,0,4,EQUIPOS,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,3,3,2026-01-23,PRE,RECONSTRUIDO,cmtck59ok0014xgpbnb0u9gfz,,Actividad 11 de la semana 3,Piso 1,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59on0016xgpb9l0k8z4m,,Actividad 1 de la semana 4,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59op0017xgpbdpy2zs4n,,Actividad 2 de la semana 4,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59or0018xgpb6hkh8gz7,,Actividad 3 de la semana 4,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59os0019xgpb5ng73ebm,,Actividad 4 de la semana 4,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59ou001axgpbdtvm7vp7,,Actividad 5 de la semana 4,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59ow001bxgpb8fjhfr1u,,Actividad 6 de la semana 4,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59ox001cxgpbhov73pl1,,Actividad 7 de la semana 4,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59oz001dxgpbwylxlc3t,,Actividad 8 de la semana 4,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59p0001exgpb1e97j8lj,,Actividad 9 de la semana 4,Piso 1,,0,4,EQUIPOS,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59p2001fxgpbzgtntbq5,,Actividad 10 de la semana 4,Piso 2,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59p3001gxgpbcnvd334f,,Actividad 11 de la semana 4,Piso 1,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59p5001hxgpbcp33fki9,,Actividad 12 de la semana 4,Piso 2,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,4,4,2026-01-30,PRE,RECONSTRUIDO,cmtck59p7001ixgpbei2uy6gf,,Actividad 13 de la semana 4,Piso 1,,0,3,MANO_OBRA,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pa001kxgpbdbt402yu,,Actividad 1 de la semana 5,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pd001lxgpb31bbcj0p,,Actividad 2 de la semana 5,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pe001mxgpb5eeiswll,,Actividad 3 de la semana 5,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pg001nxgpb14bkstye,,Actividad 4 de la semana 5,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pi001oxgpbvccm5iav,,Actividad 5 de la semana 5,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pj001pxgpbvnzn6mva,,Actividad 6 de la semana 5,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pl001qxgpb4x2w8yb5,,Actividad 7 de la semana 5,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pn001rxgpbgh5cl3p2,,Actividad 8 de la semana 5,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pp001sxgpbftp5eosu,,Actividad 9 de la semana 5,Piso 1,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pr001txgpbmwvo5wzv,,Actividad 10 de la semana 5,Piso 2,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pt001uxgpbhz6wha1z,,Actividad 11 de la semana 5,Piso 1,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pu001vxgpbb1cjchh8,,Actividad 12 de la semana 5,Piso 2,,0,3,MANO_OBRA,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59pw001wxgpbfj3r8viw,,Actividad 13 de la semana 5,Piso 1,,0,1,PRERREQUISITO,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59py001xxgpbs7pa7cv1,,Actividad 14 de la semana 5,Piso 2,,0,5,INFORMACION,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,5,5,2026-02-06,PRE,RECONSTRUIDO,cmtck59q0001yxgpb8vpz3qn6,,Actividad 15 de la semana 5,Piso 1,,0,4,EQUIPOS,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59q40020xgpbfma6hloi,,Actividad 1 de la semana 6,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59q60021xgpbl2gku4t1,,Actividad 2 de la semana 6,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59q70022xgpbxyw1duar,,Actividad 3 de la semana 6,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59q90023xgpb4mgwvs7r,,Actividad 4 de la semana 6,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59qa0024xgpbqkph8hy0,,Actividad 5 de la semana 6,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59qc0025xgpbflhiuln0,,Actividad 6 de la semana 6,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59qe0026xgpb9nosxxyx,,Actividad 7 de la semana 6,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59qf0027xgpbhidjlbda,,Actividad 8 de la semana 6,Piso 2,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59qh0028xgpbcsiqpt0s,,Actividad 9 de la semana 6,Piso 1,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59qj0029xgpbjifpwrht,,Actividad 10 de la semana 6,Piso 2,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59ql002axgpb5jqax6lg,,Actividad 11 de la semana 6,Piso 1,,0,3,MANO_OBRA,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,6,6,2026-02-13,PRE,RECONSTRUIDO,cmtck59qm002bxgpbo2d0a7t0,,Actividad 12 de la semana 6,Piso 2,,0,1,PRERREQUISITO,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59qq002dxgpb6rfzvv3n,,Actividad 1 de la semana 7,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59qr002exgpbpz5sr1l9,,Actividad 2 de la semana 7,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59qs002fxgpbxha2qpv1,,Actividad 3 de la semana 7,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59qu002gxgpbbabo8bl1,,Actividad 4 de la semana 7,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59qv002hxgpbhr3hloif,,Actividad 5 de la semana 7,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59qx002ixgpbygj7bm7x,,Actividad 6 de la semana 7,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59qz002jxgpbs6urejuj,,Actividad 7 de la semana 7,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59r1002kxgpb99lmi6la,,Actividad 8 de la semana 7,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59r3002lxgpbk56y4lsv,,Actividad 9 de la semana 7,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59r4002mxgpbkhd60k9y,,Actividad 10 de la semana 7,Piso 2,,0,3,MANO_OBRA,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59r6002nxgpbrrgwp9wz,,Actividad 11 de la semana 7,Piso 1,,0,1,PRERREQUISITO,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59r7002oxgpbqqzml9vo,,Actividad 12 de la semana 7,Piso 2,,0,5,INFORMACION,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59ra002pxgpb94tbwfmr,,Actividad 13 de la semana 7,Piso 1,,0,4,EQUIPOS,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,7,7,2026-02-20,PRE,RECONSTRUIDO,cmtck59rc002qxgpbx6keh27v,,Actividad 14 de la semana 7,Piso 2,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59rf002sxgpb6d60iznm,,Actividad 1 de la semana 8,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59rh002txgpb9g17hlt8,,Actividad 2 de la semana 8,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59rk002uxgpbf7cfumfl,,Actividad 3 de la semana 8,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59rn002vxgpbmf1z56cr,,Actividad 4 de la semana 8,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59rs002wxgpbaaff5swg,,Actividad 5 de la semana 8,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59rv002xxgpb37l8s1dn,,Actividad 6 de la semana 8,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59rw002yxgpbz09mgmud,,Actividad 7 de la semana 8,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59rz002zxgpbp1odh2vl,,Actividad 8 de la semana 8,Piso 2,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59s10030xgpbqjaqpfaz,,Actividad 9 de la semana 8,Piso 1,,0,3,MANO_OBRA,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59s30031xgpbvw5q4s2b,,Actividad 10 de la semana 8,Piso 2,,0,1,PRERREQUISITO,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59s40032xgpbiydtps8y,,Actividad 11 de la semana 8,Piso 1,,0,5,INFORMACION,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59s60033xgpbyqkx3q2o,,Actividad 12 de la semana 8,Piso 2,,0,4,EQUIPOS,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,8,8,2026-02-27,PRE,RECONSTRUIDO,cmtck59s70034xgpbtcnhywba,,Actividad 13 de la semana 8,Piso 1,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sa0036xgpbe5sg5abj,,Actividad 1 de la semana 9,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sc0037xgpbcp2r0lpj,,Actividad 2 de la semana 9,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sd0038xgpbej26pj5w,,Actividad 3 de la semana 9,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sg0039xgpb7zxregr2,,Actividad 4 de la semana 9,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sh003axgpbwyglmhah,,Actividad 5 de la semana 9,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sj003bxgpbckwfgia7,,Actividad 6 de la semana 9,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sk003cxgpbr1fwwf7m,,Actividad 7 de la semana 9,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sm003dxgpbwxlgqdiu,,Actividad 8 de la semana 9,Piso 2,,0,3,MANO_OBRA,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sn003exgpb5oho672d,,Actividad 9 de la semana 9,Piso 1,,0,1,PRERREQUISITO,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sp003fxgpbw2y3f91e,,Actividad 10 de la semana 9,Piso 2,,0,5,INFORMACION,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59sr003gxgpbq36z6i54,,Actividad 11 de la semana 9,Piso 1,,0,4,EQUIPOS,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,9,9,2026-03-06,PRE,RECONSTRUIDO,cmtck59st003hxgpb92sodpx7,,Actividad 12 de la semana 9,Piso 2,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59sy003jxgpbid6cf2s9,,Actividad 1 de la semana 10,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59sz003kxgpbra8sq17o,,Actividad 2 de la semana 10,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59t1003lxgpbaa9ikvez,,Actividad 3 de la semana 10,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59t2003mxgpbxkh08s9a,,Actividad 4 de la semana 10,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59t4003nxgpbkn1621oj,,Actividad 5 de la semana 10,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59t6003oxgpbuor9xq0n,,Actividad 6 de la semana 10,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59t8003pxgpbqxyrdml7,,Actividad 7 de la semana 10,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59t9003qxgpb09yunlhm,,Actividad 8 de la semana 10,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59tb003rxgpb5m6ye4vt,,Actividad 9 de la semana 10,Piso 1,,0,5,INFORMACION,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59td003sxgpbflm67vcy,,Actividad 10 de la semana 10,Piso 2,,0,4,EQUIPOS,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59te003txgpbd7jkrd94,,Actividad 11 de la semana 10,Piso 1,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59tg003uxgpbu6h0hh1t,,Actividad 12 de la semana 10,Piso 2,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59th003vxgpbc5adk8k3,,Actividad 13 de la semana 10,Piso 1,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,10,10,2026-03-13,PRE,RECONSTRUIDO,cmtck59tj003wxgpb0kg683lm,,Actividad 14 de la semana 10,Piso 2,,0,3,MANO_OBRA,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59tn003yxgpbrqspeij1,,Actividad 1 de la semana 11,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59tp003zxgpbwsm8r6as,,Actividad 2 de la semana 11,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59tr0040xgpbbrnjmslh,,Actividad 3 de la semana 11,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59ts0041xgpb3g7qs9e5,,Actividad 4 de la semana 11,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59tu0042xgpb35psgwuw,,Actividad 5 de la semana 11,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59tv0043xgpbxdp7yabj,,Actividad 6 de la semana 11,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59tx0044xgpbdvid4t80,,Actividad 7 de la semana 11,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59ty0045xgpbntzqj8x4,,Actividad 8 de la semana 11,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59u10046xgpbrsq8nfdj,,Actividad 9 de la semana 11,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59u20047xgpbwsrn4cyq,,Actividad 10 de la semana 11,Piso 2,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59u30048xgpbmcjxpn82,,Actividad 11 de la semana 11,Piso 1,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59u50049xgpb5n67e72n,,Actividad 12 de la semana 11,Piso 2,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,11,11,2026-03-20,POST,GESTIONADO,cmtck59u6004axgpbqzy0ibay,,Actividad 13 de la semana 11,Piso 1,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59u9004cxgpbfk3wql9l,,Actividad 1 de la semana 12,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59ub004dxgpbi7hjyon6,,Actividad 2 de la semana 12,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59uc004exgpbomjghuh2,,Actividad 3 de la semana 12,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59ud004fxgpbjm1zu45h,,Actividad 4 de la semana 12,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59uf004gxgpb4wpgb093,,Actividad 5 de la semana 12,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59ug004hxgpbulwikqke,,Actividad 6 de la semana 12,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59ui004ixgpbbju5jwwd,,Actividad 7 de la semana 12,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59uj004jxgpbz395bou9,,Actividad 8 de la semana 12,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59ul004kxgpbcinkp7ex,,Actividad 9 de la semana 12,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59um004lxgpbx5673q1y,,Actividad 10 de la semana 12,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59un004mxgpbukivf2zn,,Actividad 11 de la semana 12,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59up004nxgpb5yeklkej,,Actividad 12 de la semana 12,Piso 2,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59ur004oxgpb0eg2r1iq,,Actividad 13 de la semana 12,Piso 1,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,12,12,2026-03-27,POST,GESTIONADO,cmtck59us004pxgpbsayrvo2y,,Actividad 14 de la semana 12,Piso 2,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59uv004rxgpb7ny0dcmb,,Actividad 1 de la semana 13,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59ux004sxgpb9qteeyzu,,Actividad 2 de la semana 13,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59uy004txgpbklt92ywy,,Actividad 3 de la semana 13,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59v0004uxgpbrbr4zoz2,,Actividad 4 de la semana 13,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59v1004vxgpbahi90ftk,,Actividad 5 de la semana 13,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59v3004wxgpbc4acsmfc,,Actividad 6 de la semana 13,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59v4004xxgpbi7a2ub3u,,Actividad 7 de la semana 13,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59v6004yxgpb2salsklh,,Actividad 8 de la semana 13,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59v7004zxgpbh6ph0pb1,,Actividad 9 de la semana 13,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59v90050xgpbo13n7ze2,,Actividad 10 de la semana 13,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59va0051xgpbfqrz1al9,,Actividad 11 de la semana 13,Piso 1,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,13,13,2026-04-03,POST,GESTIONADO,cmtck59vc0052xgpb5ujxp00g,,Actividad 12 de la semana 13,Piso 2,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vf0054xgpb2rdlwqek,,Actividad 1 de la semana 14,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vg0055xgpb5ekgwju3,,Actividad 2 de la semana 14,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vi0056xgpbtm52tv13,,Actividad 3 de la semana 14,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vj0057xgpb6cdj34sk,,Actividad 4 de la semana 14,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vk0058xgpbe0px2u4e,,Actividad 5 de la semana 14,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vm0059xgpbjwwjhdbi,,Actividad 6 de la semana 14,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vn005axgpbzdnroqfd,,Actividad 7 de la semana 14,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vp005bxgpbsl9373a1,,Actividad 8 de la semana 14,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vr005cxgpbmz1v8kcp,,Actividad 9 de la semana 14,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vu005dxgpbozzx4irw,,Actividad 10 de la semana 14,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vw005exgpb0d5bnnpv,,Actividad 11 de la semana 14,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vx005fxgpb9kwbuz2e,,Actividad 12 de la semana 14,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59vy005gxgpbi54jcaek,,Actividad 13 de la semana 14,Piso 1,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59w0005hxgpb3dxkzs1y,,Actividad 14 de la semana 14,Piso 2,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,14,14,2026-04-10,POST,GESTIONADO,cmtck59w1005ixgpbgw334z4n,,Actividad 15 de la semana 14,Piso 1,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59w5005kxgpb69v0t47z,,Actividad 1 de la semana 15,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59w6005lxgpbf1hl59ki,,Actividad 2 de la semana 15,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59w8005mxgpbek3dac59,,Actividad 3 de la semana 15,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59w9005nxgpb1xqcseqf,,Actividad 4 de la semana 15,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59wb005oxgpbi5mtg3pu,,Actividad 5 de la semana 15,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59wc005pxgpb8ahn3xbe,,Actividad 6 de la semana 15,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59wd005qxgpbkhc9tv11,,Actividad 7 de la semana 15,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59wf005rxgpb8zvr3ymz,,Actividad 8 de la semana 15,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59wg005sxgpbk7v3vhpd,,Actividad 9 de la semana 15,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59wh005txgpb069i70ol,,Actividad 10 de la semana 15,Piso 2,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59wj005uxgpbc71im8k7,,Actividad 11 de la semana 15,Piso 1,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59wl005vxgpbphohk4zd,,Actividad 12 de la semana 15,Piso 2,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,15,15,2026-04-17,POST,GESTIONADO,cmtck59wm005wxgpb5fp5a7ew,,Actividad 13 de la semana 15,Piso 1,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59wp005yxgpbnu0axr9g,,Actividad 1 de la semana 16,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59wq005zxgpbc7a3lxo4,,Actividad 2 de la semana 16,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59ws0060xgpbvw4oqbq5,,Actividad 3 de la semana 16,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59wt0061xgpbvtiedh7k,,Actividad 4 de la semana 16,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59wu0062xgpb72dgwofy,,Actividad 5 de la semana 16,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59wv0063xgpbhm0uo9dk,,Actividad 6 de la semana 16,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59wx0064xgpbnblj8m89,,Actividad 7 de la semana 16,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59wy0065xgpbkxlq8y7y,,Actividad 8 de la semana 16,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59x00066xgpb1amasjvx,,Actividad 9 de la semana 16,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59x20067xgpb9o3pf0by,,Actividad 10 de la semana 16,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59x30068xgpbn33ml4nh,,Actividad 11 de la semana 16,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59x40069xgpbbus05f3y,,Actividad 12 de la semana 16,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59x6006axgpb3la72pw6,,Actividad 13 de la semana 16,Piso 1,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,16,16,2026-04-24,POST,GESTIONADO,cmtck59x7006bxgpbvloykgyu,,Actividad 14 de la semana 16,Piso 2,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xa006dxgpboff1emiv,,Actividad 1 de la semana 17,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xb006exgpb9aj9jhbx,,Actividad 2 de la semana 17,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xc006fxgpbia0q6gd2,,Actividad 3 de la semana 17,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xe006gxgpb9cczen44,,Actividad 4 de la semana 17,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xf006hxgpb6cwmjn5v,,Actividad 5 de la semana 17,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xh006ixgpbvb85r2bw,,Actividad 6 de la semana 17,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xi006jxgpbs63ucfql,,Actividad 7 de la semana 17,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xk006kxgpbvbi1gg8n,,Actividad 8 de la semana 17,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xl006lxgpbi4h5c5zl,,Actividad 9 de la semana 17,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xm006mxgpbwkm12ogx,,Actividad 10 de la semana 17,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xo006nxgpb3y9wtm9w,,Actividad 11 de la semana 17,Piso 1,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,17,17,2026-05-01,POST,GESTIONADO,cmtck59xp006oxgpbgpnd13ct,,Actividad 12 de la semana 17,Piso 2,,0,2,MATERIALES,EVITABLE,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59xs006qxgpb2jo4si7r,,Actividad 1 de la semana 18,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59xt006rxgpbxlbbxbk8,,Actividad 2 de la semana 18,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59xv006sxgpbafd7sbyv,,Actividad 3 de la semana 18,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59xw006txgpbkbmlxag0,,Actividad 4 de la semana 18,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59xy006uxgpbrejsc0xm,,Actividad 5 de la semana 18,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59xz006vxgpbr9yq5jxd,,Actividad 6 de la semana 18,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59y1006wxgpby2bwuwrm,,Actividad 7 de la semana 18,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59y2006xxgpbmaqhdrr5,,Actividad 8 de la semana 18,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59y3006yxgpbji79sg4p,,Actividad 9 de la semana 18,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59y5006zxgpbv54abf3b,,Actividad 10 de la semana 18,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59y60070xgpbicwu5nci,,Actividad 11 de la semana 18,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59y70071xgpbzv856tg8,,Actividad 12 de la semana 18,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59y90072xgpba18civok,,Actividad 13 de la semana 18,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59yc0073xgpb4wae15cj,,Actividad 14 de la semana 18,Piso 2,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,18,18,2026-05-08,POST,GESTIONADO,cmtck59yd0074xgpb10f4mcfp,,Actividad 15 de la semana 18,Piso 1,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yg0076xgpbxaelbn23,,Actividad 1 de la semana 19,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yh0077xgpbcd7qyz3e,,Actividad 2 de la semana 19,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yi0078xgpbozlywjrh,,Actividad 3 de la semana 19,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yk0079xgpb2wykr8uc,,Actividad 4 de la semana 19,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yl007axgpb1ffa7gls,,Actividad 5 de la semana 19,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59ym007bxgpbi1swmliz,,Actividad 6 de la semana 19,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yn007cxgpbke23wjy7,,Actividad 7 de la semana 19,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yp007dxgpbfgjc4503,,Actividad 8 de la semana 19,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yr007exgpbyq9bqw8y,,Actividad 9 de la semana 19,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59ys007fxgpbncf9nse8,,Actividad 10 de la semana 19,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yu007gxgpbet0czfmw,,Actividad 11 de la semana 19,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yv007hxgpb2ghgwcvq,,Actividad 12 de la semana 19,Piso 2,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,19,19,2026-05-15,POST,GESTIONADO,cmtck59yx007ixgpb7tbb2g7b,,Actividad 13 de la semana 19,Piso 1,,0,7,CLIMA,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59yz007kxgpbmxt674iu,,Actividad 1 de la semana 20,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59z1007lxgpb77p29m8g,,Actividad 2 de la semana 20,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59z2007mxgpbkumkeglu,,Actividad 3 de la semana 20,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59z3007nxgpblf8n3a6e,,Actividad 4 de la semana 20,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59z5007oxgpba3v0s6dw,,Actividad 5 de la semana 20,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59z7007pxgpbef4pxf1j,,Actividad 6 de la semana 20,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59z8007qxgpb506wip15,,Actividad 7 de la semana 20,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59z9007rxgpb9vwyhp3j,,Actividad 8 de la semana 20,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59zb007sxgpbnnju4avh,,Actividad 9 de la semana 20,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59zc007txgpbqm0mflym,,Actividad 10 de la semana 20,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59ze007uxgpb1cl3kqhl,,Actividad 11 de la semana 20,Piso 1,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59zf007vxgpbqqyjx840,,Actividad 12 de la semana 20,Piso 2,,1,,,,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59zg007wxgpb6dcdmwu4,,Actividad 13 de la semana 20,Piso 1,,0,6,CLIENTE_TERCEROS,EXTERNA,,,,0
+cmtck59kx0000xgpbxk8eymvl,20,20,2026-05-22,POST,GESTIONADO,cmtck59zi007xxgpbgips9mfp,,Actividad 14 de la semana 20,Piso 2,,0,2,MATERIALES,EVITABLE,,,,0

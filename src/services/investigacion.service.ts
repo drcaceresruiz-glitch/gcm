@@ -5,6 +5,7 @@ import { diasEntre } from "@/lib/ejecucion-real";
 import { hhi, lro, tcac, trc } from "@/lib/aprendizaje";
 import {
   CODIGO_CAUSA,
+  GRUPO_CAUSA,
   faseDeLaSemana,
   indicePorSemana,
   num,
@@ -250,6 +251,7 @@ export async function datosDelEstudio(
       SI_NO(c.cumplido),
       c.causa ? (CODIGO_CAUSA[c.causa] ?? "") : "",
       c.causa ?? "",
+      c.causa ? (GRUPO_CAUSA[c.causa] ?? "") : "",
       num(c.cantidadPlan === null ? null : Number(c.cantidadPlan), 4),
       num(c.cantidadEjec === null ? null : Number(c.cantidadEjec), 4),
       c.unidad ?? "",
@@ -533,7 +535,7 @@ export async function datosDelEstudio(
           "obra_id", "semana_indice", "semana_numero", "fecha_corte",
           "fase_estudio", "origen_datos", "compromiso_id", "tarea_uid",
           "descripcion", "zona", "proveedor_cod", "cumplimiento",
-          "causa_cod", "causa_etiqueta", "cantidad_plan", "cantidad_ejec",
+          "causa_cod", "causa_etiqueta", "causa_grupo", "cantidad_plan", "cantidad_ejec",
           "unidad", "dias_cierre",
         ],
         filas: filasCompromisos,
@@ -635,6 +637,8 @@ function diccionario(
         "1 si el compromiso se cumplio, 0 si no. Vacio si el plan no se ha cerrado."),
       v("compromisos", "causa_cod", "nominal", "1-9",
         "Causa de no cumplimiento: 1 PRERREQUISITO, 2 MATERIALES, 3 MANO_OBRA, 4 EQUIPOS, 5 INFORMACION, 6 CLIENTE_TERCEROS, 7 CLIMA, 8 REPROGRAMACION, 9 OTRA."),
+      v("compromisos", "causa_grupo", "nominal", "-",
+        "EVITABLE (prerrequisito, materiales, mano de obra, equipos, informacion, reprogramacion) o EXTERNA (cliente/terceros, clima). Es la agrupacion con la que se contrasta si lo evitable desaparece: con las nueve categorias sueltas, la tabla de contingencia queda con celdas de frecuencia esperada menor que cinco y el chi-cuadrado deja de ser valido. OTRA sale como SIN_CLASIFICAR y se deja fuera del contraste."),
       v("compromisos", "dias_cierre", "escala", "dias",
         "Dias entre la fecha de corte y el momento en que se registro el cumplimiento."),
       v("compromisos", "cantidad_plan / cantidad_ejec", "escala", "segun unidad",
