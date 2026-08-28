@@ -355,6 +355,66 @@ const PRESUPUESTO = (
       </p>
     </S>
 
+    <S titulo="Cómo está contratada: precios unitarios o suma alzada">
+      <p>
+        Cada partida se registra de una de las dos formas, y no es una etiqueta
+        informativa: cambia qué se teclea, qué se calcula solo y qué pasa
+        cuando lo ejecutado no coincide con lo previsto.
+      </p>
+      <Tabla
+        cabeceras={["", "Precios unitarios", "Suma alzada"]}
+        filas={[
+          ["Qué se escribe", "Metrado y precio unitario", "El importe cerrado"],
+          ["El importe", "Se calcula: metrado × precio", "Se teclea; no se calcula"],
+          ["El metrado", "Manda: se mide y se valoriza", "Referencial"],
+          ["Si se ejecuta más", "El costo sube", "El importe no cambia"],
+          ["Quién asume el riesgo", "El cliente", "El contratista"],
+        ]}
+      />
+      <p>
+        Al añadir una partida, el selector <strong>«Cómo está contratada»</strong>{" "}
+        cambia el formulario: en suma alzada desaparece el precio unitario y
+        aparece <strong>«Importe cerrado»</strong>. Los dos campos no se enseñan
+        a la vez a propósito — invitaría a rellenarlos y a esperar que cuadren.
+      </p>
+      <p>
+        Se puede corregir después: la columna <strong>Modalidad</strong> de la
+        tabla del presupuesto lleva un desplegable.
+      </p>
+
+      <p className="font-medium">Al cargar un Excel, GCM lo deduce solo</p>
+      <Tabla
+        cabeceras={["Lo que trae la fila", "Cómo queda registrada"]}
+        filas={[
+          ["Importe, pero falta el metrado o el precio unitario", "Suma alzada"],
+          ["Los tres, pero el importe NO es metrado × precio", "Suma alzada"],
+          ["Unidad global: glb, global, glg", "Suma alzada"],
+          ["Metrado, sin importe ni precio", "Alcance"],
+          ["Metrado y precio que explican el importe", "Precios unitarios"],
+        ]}
+      />
+      <p>
+        El segundo caso es el que más aparece en los presupuestos reales. Si el
+        archivo dice <em>metrado 1 × precio 5.000 = 4.800</em>, GCM{" "}
+        <strong>respeta los 4.800 del documento</strong> y avisa de que no
+        cuadra con la multiplicación. Recalcularlo sobrescribiría un precio ya
+        pactado — y en un presupuesto real eso movía varios millones.
+      </p>
+
+      <p className="font-medium">El tercer caso: las filas de alcance</p>
+      <p>
+        Debajo de una partida a suma alzada suelen ir líneas que{" "}
+        <strong>describen qué incluye</strong> el precio: llevan metrado para
+        detallar el alcance, pero no importe propio — su dinero vive en la
+        partida de arriba. Se les puede reportar avance, no gasto.
+      </p>
+      <p>
+        Y <strong>no bajan a la EDT</strong>: describen, no son trabajo que
+        programar. La tarea del cronograma es la partida a suma alzada, que es
+        la que lleva el precio.
+      </p>
+    </S>
+
     <S titulo="El contractual sale del real, no al revés">
       <p>
         Desde agosto de 2026 el orden es este: primero entra el{" "}
@@ -3500,7 +3560,8 @@ export const CAPITULOS: CapituloManual[] = [
     pregunta: "cuánto cuesta",
     paraQuien: "Quien crea la obra y carga su presupuesto.",
     resumen:
-      "El árbol de capítulos y partidas, cómo el contractual se genera " +
+      "El árbol de capítulos y partidas, cómo se registra una partida a " +
+      "precios unitarios o a suma alzada, cómo el contractual se genera " +
       "desde el real, la regla que impide contar dinero dos veces y la " +
       "línea base.",
     contenido: PRESUPUESTO,
