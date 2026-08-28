@@ -609,6 +609,223 @@ const DINERO = (
 // Capitulo: el cronograma y el avance
 // ---------------------------------------------------------------------------
 
+const EDT = (
+  <>
+    <S titulo="El presupuesto ya es la EDT">
+      <Clave>
+        <strong>No se arma dos veces.</strong> La estructura de desglose del
+        trabajo no se teclea aparte del presupuesto: <em>es</em> el
+        presupuesto. El capítulo es la rama, la partida costeada es el paquete
+        de trabajo y sus subpartidas son las tareas. Lo único que se añade
+        encima son las <strong>fechas</strong>.
+      </Clave>
+      <p>
+        Escribir la misma estructura en dos sitios —una en el presupuesto y
+        otra en el cronograma— garantiza que algún día discrepen, y entonces
+        nadie sabe cuál manda. Aquí se escribe una vez.
+      </p>
+      <p>La equivalencia, línea por línea:</p>
+      <Tabla
+        cabeceras={["En el presupuesto", "En la EDT", "Lleva fecha"]}
+        filas={[
+          ["CAPÍTULO IV: Estructuras", "Rama", "No: la hereda"],
+          ["4.01 Concreto en zapatas (con precio)", "Paquete de trabajo, el entregable", "No: la hereda"],
+          ["4.01.01 Encofrado", "Tarea", "Sí"],
+          ["4.01.02 Acero", "Tarea", "Sí"],
+          ["4.01.03 Vaciado", "Tarea", "Sí"],
+        ]}
+      />
+      <p>
+        Un paquete toma el inicio de su primera tarea y el fin de la última, y
+        un capítulo lo mismo respecto a sus paquetes. Así cada fecha vive en un
+        solo sitio y no puede contradecirse a sí misma.
+      </p>
+    </S>
+
+    <S titulo="Cómo se numera">
+      <p>
+        La jerarquía sale del <strong>código</strong>, no de ningún campo
+        aparte: cada punto es un nivel. <code>4</code> es capítulo,{" "}
+        <code>4.01</code> cuelga de él, <code>4.01.02</code> cuelga de{" "}
+        <code>4.01</code>. No hay límite práctico de profundidad.
+      </p>
+      <p>
+        Se admiten las <strong>dos convenciones</strong> que conviven en los
+        presupuestos peruanos, y dibujan el mismo árbol:
+      </p>
+      <Tabla
+        cabeceras={["Forma", "Ejemplo", "Qué es"]}
+        filas={[
+          ["Nivel por punto", "7.01 · 7.01.01", "El subcapítulo tiene un segmento menos que sus partidas"],
+          ["Cabecera en cero", "7.02.00 · 7.02.01", "El cero final marca que encabeza al grupo 7.02"],
+        ]}
+      />
+      <p>
+        <code>7.02.00</code> y <code>7.02.01</code> tienen los mismos tres
+        números, pero el cero final delata que la primera es la cabecera: se
+        coloca <strong>un escalón por encima</strong> de las{" "}
+        <code>7.02.xx</code>, igual que <code>7.01</code>.
+      </p>
+    </S>
+
+    <S titulo="La regla de oro: el dinero decide">
+      <Clave>
+        <strong>Quien es paquete de trabajo lo decide el importe, no la forma
+        del árbol.</strong> Una fila con precio y sin ninguna descendiente con
+        precio es un paquete: lleva fecha, se puede comprometer en el plan
+        semanal y valoriza. Todo lo demás agrupa.
+      </Clave>
+      <p>
+        Parece un detalle y no lo es. Si se llamara «paquete» a «la que no tiene
+        subpartidas colgando», dos casos habituales saldrían mal:
+      </p>
+      <ul className="list-disc space-y-2 pl-5">
+        <li>
+          <strong>Una partida a suma alzada con su alcance detallado debajo.</strong>{" "}
+          El precio está arriba y las subpartidas solo describen qué entra en
+          él. La forma diría que las tareas son esas subpartidas sin cifra; el
+          dinero dice que el paquete es la de arriba. GCM deja fuera de la EDT
+          las líneas de alcance: describen, no se ejecutan.
+        </li>
+        <li>
+          <strong>Una partida con un descuento comercial colgando.</strong> El
+          descuento es negativo y no sustituye a la partida: la ajusta. Las dos
+          siguen contando.
+        </li>
+      </ul>
+      <p>
+        La consecuencia práctica: <strong>una partida costeada nunca queda
+        marcada como resumen</strong>. Si lo estuviera, saldría de la
+        valorización, del plan semanal y de la curva — sin dar ningún error.
+      </p>
+    </S>
+
+    <S titulo="Hasta dónde descomponer">
+      <p>
+        La pregunta que más se repite. El criterio no es teórico:
+      </p>
+      <Recorrido
+        pasos={[
+          <>
+            <strong>Baja un nivel más si no puedes medir el avance</strong> de
+            esa línea con una sola cifra. «Estructuras» no se mide; «vaciado de
+            zapatas, 12 m³» sí.
+          </>,
+          <>
+            <strong>Baja un nivel más si no puedes poner un solo
+            responsable.</strong> Si el encofrado lo hace un frente y el acero
+            otro, son dos tareas.
+          </>,
+          <>
+            <strong>Para cuando la línea dure menos de lo que dura tu semana
+            de planificación.</strong> Descomponer por debajo de eso llena el
+            plan semanal de ruido y nadie lo mantiene.
+          </>,
+          <>
+            <strong>Para cuando el precio deja de tener sentido propio.</strong>{" "}
+            Si tienes que inventar cómo repartir un precio entre dos líneas, esas
+            dos líneas son una.
+          </>,
+        ]}
+      />
+      <p>
+        En obra de edificación, lo normal son tres niveles: capítulo,
+        subcapítulo por frente o por piso, y partida. Cuatro cuando hay varias
+        zonas.
+      </p>
+    </S>
+
+    <S titulo="Qué hace GCM con esto">
+      <Recorrido
+        pasos={[
+          <>
+            <strong>Cargas el presupuesto</strong>, con la plantilla o con tu
+            propio Excel. Cada capítulo enseña lo que suman sus partidas.
+          </>,
+          <>
+            <strong>Generas la EDT desde el presupuesto</strong> — en el
+            cronograma, si la obra no trae uno de Project. Trae la estructura y
+            el enlace con el dinero, pero <strong>ninguna fecha</strong>: esas
+            tareas quedan marcadas «sin programar», no alertan y no mueven
+            ningún índice hasta que alguien las programe. Una fecha de relleno
+            no es un plan, y el sistema no finge que lo sea.
+          </>,
+          <>
+            <strong>Pones las fechas en las tareas.</strong> Solo en las hojas:
+            los paquetes y los capítulos las heredan solos.
+          </>,
+          <>
+            <strong>El presupuesto sigue vivo y la EDT lo sigue.</strong> Al
+            añadir o corregir partidas, la estructura del cronograma se pone al
+            día sola, sin pulsar nada. Lo que ya tiene avance no se toca, y lo
+            que no se puede decidir solo se rechaza entero y se explica.
+          </>,
+        ]}
+      />
+      <p>
+        La EDT se genera sobre un cronograma <strong>vacío</strong>. Si ya hay
+        uno con plan —importado de Project o tecleado—, mezclar filas generadas
+        con filas escritas deja una estructura que nadie puede leer; para eso
+        está la puesta al día, que va aparte y con su propia regla.
+      </p>
+    </S>
+
+    <S titulo="Lo que sale mal">
+      <SaleMal
+        casos={[
+          {
+            hace: "Poner el importe en el capítulo Y en sus partidas",
+            pasa: (
+              <>
+                Es el error más caro del presupuesto. GCM lo resuelve —cuenta la
+                partida y anula al capítulo, porque la hija manda sobre la
+                madre—, así que el total sale bien. Pero el papel del que
+                copiaste miente: si el cliente aprueba un monto que suma las dos
+                cosas, la obra nace con una bolsa que no existe.
+              </>
+            ),
+          },
+          {
+            hace: "Descomponer hasta la última actividad",
+            pasa: (
+              <>
+                Una EDT con seiscientas líneas no se mantiene: nadie actualiza
+                el avance de todas, el plan semanal se vuelve ilegible y el PPC
+                deja de medir nada. Si una línea dura menos que tu semana de
+                planificación, sobra.
+              </>
+            ),
+          },
+          {
+            hace: "Dejar partidas sin precio esperando ponerlo después",
+            pasa: (
+              <>
+                Sin importe no son paquetes de trabajo, así que{" "}
+                <strong>no bajan a la EDT</strong> y no aparecen en el
+                cronograma. Es correcto —no se programa lo que no está
+                costeado—, pero conviene saberlo: si cargaste solo la estructura,
+                pon los precios antes de generar la EDT.
+              </>
+            ),
+          },
+          {
+            hace: "Reordenar el presupuesto cuando la obra ya avanza",
+            pasa: (
+              <>
+                Cambiar el código de una partida cambia de quién cuelga. La
+                puesta al día respeta lo que ya tiene avance, pero una partida
+                que desaparece del presupuesto deja su tarea como{" "}
+                <strong>sobrante</strong>: no se borra, se nombra, para que
+                alguien decida.
+              </>
+            ),
+          },
+        ]}
+      />
+    </S>
+  </>
+);
+
 const CRONOGRAMA = (
   <>
     <Clave>
@@ -3308,6 +3525,18 @@ export const CAPITULOS: CapituloManual[] = [
       "Base más ajustes igual a vigente: los tres tipos de movimiento, por " +
       "qué ninguno se deshace y cuándo nacen las partidas de un adicional.",
     contenido: MOVIMIENTOS,
+  },
+  {
+    slug: "edt",
+    titulo: "Armar la EDT del presupuesto",
+    pregunta: "cómo se estructura el trabajo",
+    paraQuien: "Quien arma el presupuesto y quien planifica.",
+    resumen:
+      "La estructura de desglose del trabajo no se teclea aparte: es el " +
+      "presupuesto. Qué es capítulo, qué es paquete de trabajo y qué es " +
+      "tarea, cómo se numera, hasta dónde conviene descomponer, y por qué " +
+      "quien lleva el precio es quien lleva la fecha.",
+    contenido: EDT,
   },
   {
     slug: "cronograma",
