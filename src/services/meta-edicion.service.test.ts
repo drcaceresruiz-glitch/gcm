@@ -15,6 +15,9 @@ interface Fila {
   id: string;
   presupuestoMetaId: string;
   codigoRef: string | null;
+  /// Como en la base, donde tiene default 0. Sin esto el doble no se parecia
+  /// a lo que devuelve Prisma y la renumeracion salia con NaN.
+  nivel: number;
   tipo: "CAPITULO" | "PARTIDA";
   descripcion: string;
   unidad?: string | null;
@@ -133,6 +136,7 @@ beforeEach(() => {
       id: "cap",
       presupuestoMetaId: "meta-1",
       codigoRef: "1.0",
+      nivel: 0,
       tipo: "CAPITULO",
       descripcion: "PRELIMINARES",
       parcial: null,
@@ -141,6 +145,7 @@ beforeEach(() => {
       id: "p1",
       presupuestoMetaId: "meta-1",
       codigoRef: "1.1",
+      nivel: 1,
       tipo: "PARTIDA",
       descripcion: "Cartel de obra",
       unidad: "und",
@@ -154,6 +159,7 @@ beforeEach(() => {
       id: "res",
       presupuestoMetaId: "meta-1",
       codigoRef: null,
+      nivel: 0,
       tipo: "PARTIDA",
       descripcion: "Residente de obra",
       unidad: "mes",
@@ -323,6 +329,7 @@ describe("anadir una linea", () => {
     expect(r.ok).toBe(true);
     expect(estado.creadas[0]).toMatchObject({
       codigoRef: "1.2",
+      nivel: 1,
       tipo: "PARTIDA",
       parcial: "1260.00",
     });
@@ -364,13 +371,33 @@ describe("quitar una linea", () => {
     expect(estado.costoGuardado).not.toBeNull();
   });
 
-  it("un CAPITULO no se borra desde aqui", async () => {
-    // Sus partidas se quedarian sin sitio y sin recargo, que es de donde sale
-    // el contractual.
+  /*
+   * ESTA PRUEBA CAMBIO DE BANDO EL 27/08/2026.
+   *
+   * Defendia que un capitulo NO se pudiera borrar, y el motivo era bueno
+   * mientras el arbol solo se podia mirar: sus partidas se quedaban sin sitio
+   * y sin recargo. Desde que hay renumeracion eso se resuelve solo -las de
+   * dentro suben un escalon y se renumera entero-, asi que ahora se comprueba
+   * lo contrario, y sobre todo lo que NO debe pasar: que se lleve por delante
+   * lo que tenia dentro.
+   */
+  it("un capitulo se borra y lo que tenia dentro se queda", async () => {
     const r = await eliminarLineaDeMeta(sesion, "obra-1", "cap");
 
-    expect(r.ok).toBe(false);
-    expect(estado.borradas).toHaveLength(0);
+    expect(r.ok).toBe(true);
+    // Se borra el titulo y NADA mas: llevarse veinte partidas en un clic no
+    // se puede deshacer y nadie lo espera.
+    expect(estado.borradas).toEqual(["cap"]);
+  });
+
+  it("al borrar el capitulo, sus partidas suben y se renumeran", async () => {
+    await eliminarLineaDeMeta(sesion, "obra-1", "cap");
+
+    // `p1` colgaba de `cap` (1.0 -> 1.1). Sin el titulo pasa a ser raiz, y su
+    // codigo deja de ser un "1.1" que ya no cuelga de ningun "1".
+    const p1 = estado.actualizadas.find((a) => a.id === "p1");
+    expect(p1?.data.nivel).toBe(0);
+    expect(p1?.data.codigoRef).toBe("1");
   });
 });
 

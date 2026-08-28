@@ -924,6 +924,102 @@ const META = (
         ]}
       />
     </S>
+
+    <S titulo="Traerte un presupuesto que ya tienes en tu propio Excel">
+      <p>
+        No hace falta rehacerlo en nuestra plantilla. Al subir el archivo —al
+        crear la obra o en la pantalla de la meta— hay una casilla:{" "}
+        <strong>«Cargar solo la estructura, sin precios»</strong>. Con ella se
+        traen los <strong>capítulos, partidas, subpartidas y sus
+        descripciones</strong>, con la unidad y la cantidad si están, y{" "}
+        <strong>ningún precio ni importe</strong>, aunque el archivo los traiga.
+        Los precios se ponen después, aquí dentro.
+      </p>
+      <p>
+        Se pregunta en vez de adivinarse: desde fuera no hay forma de saber si
+        un Excel es nuestra plantilla o el presupuesto de otra oficina. Y sirve
+        para las dos cosas que suelen fallar al traer un presupuesto ajeno:
+      </p>
+      <ul>
+        <li>
+          <strong>No heredas sus cuentas.</strong> En un presupuesto real que
+          se probó, el propio Excel dejaba subcapítulos enteros fuera de sus
+          totales —les faltaba la fórmula— y no restaba sus descuentos
+          comerciales. Si no se trae ninguna cifra, no hay ninguna que pueda
+          discrepar.
+        </li>
+        <li>
+          <strong>Entra aunque no tenga precios.</strong> Sin la casilla, una
+          fila sin cantidad ni precio se lee como un título —es la convención
+          de los presupuestos de S10— y un título no admite importe: el
+          presupuesto entraba entero como capítulos y no había forma de
+          valorizarlo.
+        </li>
+      </ul>
+      <p>
+        Tampoco es un error que a una partida le falten la unidad o la
+        cantidad. En este modo falta todo a propósito.
+      </p>
+      <p>
+        <strong>Una meta cuyo costo es cero no se puede aprobar.</strong>{" "}
+        Aprobar es lo que la congela, y sin un solo precio la bolsa saldría
+        igual al contrato entero: un margen perfecto inventado.
+      </p>
+    </S>
+
+    <S titulo="Ordenar el árbol: mover líneas y renumerar">
+      <p>
+        Un presupuesto que llega de fuera trae la jerarquía en la{" "}
+        <strong>maqueta</strong> —sangrías, negritas, una fila «PRIMER PISO»
+        encima de tres bloques— y no siempre en la numeración. En un caso real,
+        <code>7.01.00 PRIMER PISO</code> agrupaba en el papel a{" "}
+        <code>7.02.00 REDES DE DESAGUE</code>, pero por código eran hermanos:{" "}
+        <code>7.01</code> y <code>7.02</code> están al mismo nivel. GCM solo
+        puede fiarse de los números, así que dibuja ese árbol y no el de la
+        obra.
+      </p>
+      <p>
+        Se arregla dentro, con las <strong>cuatro flechas</strong> de cada
+        línea del borrador:
+      </p>
+      <ul>
+        <li>
+          <strong>↑ y ↓</strong> — mueven la línea entre sus hermanas. Se
+          llevan consigo todo lo que tenga dentro: mover un capítulo sin sus
+          partidas las dejaría colgando de quien quede encima, que es cambiar
+          de sitio dinero ajeno.
+        </li>
+        <li>
+          <strong>→</strong> — la mete dentro de la línea de arriba. Es la que
+          resuelve el caso de «PRIMER PISO».
+        </li>
+        <li>
+          <strong>←</strong> — la saca un nivel hacia fuera.
+        </li>
+      </ul>
+      <p>
+        Después de cada movimiento <strong>se renumera todo</strong>: 1, 1.01,
+        1.01.01, 2… No se renumera solo lo movido porque el código ES la
+        posición en el árbol, y en cuanto algo cambia de sitio los demás dejan
+        de describirlo. Por eso los códigos no se teclean: salen solos.
+      </p>
+      <p>
+        <strong>Es capítulo lo que tiene algo dentro</strong>, y solo eso. Por
+        eso no hay un botón de «crear capítulo»: se añade una línea y se le
+        mete algo debajo. Y por eso, cuando una partida con importe pasa a
+        tener hijas, <strong>pierde su importe</strong> —un capítulo vale la
+        suma de los suyos— y la pantalla lo dice en ese momento.
+      </p>
+      <p>
+        <strong>Borrar un capítulo no borra lo que tiene dentro:</strong> sus
+        partidas suben un nivel y se renumera. Llevarse veinte partidas por
+        delante en un clic no se puede deshacer y nadie lo espera.
+      </p>
+      <p>
+        Todo esto es sobre el <strong>borrador</strong>. Una meta aprobada está
+        congelada: para cambiarla se carga una versión nueva.
+      </p>
+    </S>
   </>
 );
 
@@ -3177,7 +3273,8 @@ export const CAPITULOS: CapituloManual[] = [
     resumen:
       "El presupuesto meta y el contractual que sale de él: la bolsa " +
       "operativa, por qué los sueldos y las pólizas también son costo de la obra y por qué la meta sí " +
-      "se puede re-fijar.",
+      "se puede re-fijar. Y cómo traerte un presupuesto que ya tienes en tu " +
+      "propio Excel, ordenarlo aquí dentro y ponerle los precios.",
     contenido: META,
   },
   {

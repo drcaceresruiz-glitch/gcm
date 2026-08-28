@@ -8,6 +8,13 @@ import {
   normalizarDecimal,
 } from "@/lib/decimal";
 import { cifrasDeLaMeta } from "@/lib/costo-meta";
+import {
+  lineasQuePierdenImporte,
+  mover,
+  quitar,
+  renumerar,
+  type Direccion,
+} from "@/lib/arbol-meta";
 import { metaQueManda } from "@/services/meta.service";
 import { motivoSiObraCerrada } from "@/services/obra-abierta";
 import type { SesionActiva } from "@/services/sesion.service";
@@ -341,25 +348,200 @@ export async function eliminarLineaDeMeta(
   const borrador = await borradorEditable(sesion, obraId);
   if (!borrador.ok) return borrador;
 
-  const linea = await prisma.presupuestoMetaItem.findFirst({
-    where: { id: lineaId, presupuestoMetaId: borrador.metaId },
-    select: { id: true, tipo: true },
+  const filas = await prisma.presupuestoMetaItem.findMany({
+    where: { presupuestoMetaId: borrador.metaId },
+    orderBy: { orden: "asc" },
+    select: { id: true, nivel: true, tipo: true, codigoRef: true },
   });
+
+  const linea = filas.find((f) => f.id === lineaId);
   if (!linea) return { ok: false, error: "Esa línea no es de esta meta." };
 
-  if (linea.tipo === "CAPITULO") {
-    return {
-      ok: false,
-      error:
-        "Un capítulo no se borra desde aquí: sus partidas se quedarían sin " +
-        "sitio y sin recargo. Para eso se carga una versión nueva de la meta.",
-    };
-  }
+  /*
+   * UN CAPITULO YA SE PUEDE BORRAR, y hasta el 27 de agosto de 2026 no.
+   *
+   * El motivo de entonces era bueno: «sus partidas se quedarian sin sitio y
+   * sin recargo». Lo era porque el arbol solo se podia mirar, no tocar, y
+   * borrar el titulo dejaba las suyas colgando de quien quedara encima. Desde
+   * que hay renumeracion eso se arregla solo: las que colgaban de el suben un
+   * escalon y se renumera entero, que es exactamente lo que uno espera al
+   * borrar un titulo intermedio.
+   *
+   * NO se borran las de dentro. Borrar un capitulo y llevarse veinte partidas
+   * por delante en un solo clic es la clase de gesto que no se puede deshacer
+   * y que nadie espera: se quita el titulo y su contenido se queda.
+   */
+  const delArbol = filas.filter((f) => f.codigoRef !== null);
+  const esDelArbol = linea.codigoRef !== null;
 
   await prisma.$transaction(async (tx) => {
     await tx.presupuestoMetaItem.delete({ where: { id: linea.id } });
+
+    if (esDelArbol) {
+      const quedan = renumerar(
+        quitar(
+          delArbol.map((f) => ({
+            id: f.id,
+            nivel: f.nivel ?? 0,
+            tipo: f.tipo as "CAPITULO" | "PARTIDA",
+            codigo: f.codigoRef,
+          })),
+          linea.id,
+        ),
+      );
+
+      for (const [i, l] of quedan.entries()) {
+        await tx.presupuestoMetaItem.update({
+          where: { id: l.id },
+          data: {
+            codigoRef: l.codigo,
+            nivel: l.nivel,
+            tipo: l.tipo,
+            orden: i,
+            ...(l.tipo === "CAPITULO"
+              ? { parcial: null, metrado: null, precioUnitario: null }
+              : {}),
+          },
+        });
+      }
+    }
+
     await recalcularCosto(tx, borrador.metaId);
   });
 
   return { ok: true };
+}
+
+/**
+ * Mover una linea del borrador: subir, bajar, meter dentro o sacar.
+ *
+ * POR QUE HACE FALTA, con el caso que lo pidio delante: un presupuesto de otra
+ * oficina trae la jerarquia en la maqueta y no en la numeracion. `PRIMER PISO`
+ * agrupa en el papel a `REDES DE DESAGUE`, pero sus codigos —`7.01.00` y
+ * `7.02.00`— son de hermanos, y GCM solo puede dibujar el arbol de los
+ * numeros. Antes de esto, la unica salida era renumerar el Excel a mano y
+ * volver a subirlo.
+ *
+ * SE MUEVE LA RAMA ENTERA. Mover un capitulo sin sus partidas las dejaria
+ * colgando de quien quede encima, que es cambiar de sitio dinero ajeno sin
+ * que nadie lo haya pedido.
+ *
+ * Y SE RENUMERA TODO DESPUES, no solo lo movido: los codigos son la posicion
+ * en el arbol, asi que en cuanto algo cambia de sitio dejan de describirlo.
+ * Renumerar entero es lo unico que garantiza que no queden dos `7.02.00` ni
+ * un `7.03` que ya no viene detras de ningun `7.02`.
+ *
+ * El tipo se recalcula solo: es capitulo lo que tiene hijas. Por eso «crear un
+ * capitulo» no necesita boton propio —se añade una linea y se le mete algo
+ * debajo— y por eso no puede quedar un capitulo vacio fingiendo ser un titulo.
+ * Cuando una partida con importe pasa a capitulo, PIERDE ese importe: un
+ * capitulo vale la suma de los suyos. Se avisa en el resultado, porque son
+ * miles de soles que dejan de estar sin que nadie los haya tocado.
+ */
+export async function moverLineaDeMeta(
+  sesion: SesionActiva,
+  obraId: string,
+  lineaId: string,
+  direccion: Direccion,
+): Promise<
+  | { ok: true; aviso: string | null }
+  | { ok: false; error: string }
+> {
+  const borrador = await borradorEditable(sesion, obraId);
+  if (!borrador.ok) return borrador;
+
+  const filas = await prisma.presupuestoMetaItem.findMany({
+    where: { presupuestoMetaId: borrador.metaId },
+    orderBy: { orden: "asc" },
+    select: { id: true, nivel: true, tipo: true, codigoRef: true, parcial: true },
+  });
+
+  /*
+   * LAS LINEAS PROPIAS DE LA META NO ENTRAN EN EL ARBOL.
+   *
+   * Son las que no tienen codigo -un sueldo, un alquiler, una poliza-: cuestan
+   * y suman, pero no cuelgan de ningun capitulo del contrato. Meterlas en la
+   * renumeracion les inventaria un codigo, y con codigo pasarian a compararse
+   * contra el contractual, que es justo lo que no son. Se quedan donde estan y
+   * conservan su orden.
+   */
+  const delArbol = filas.filter((f) => f.codigoRef !== null);
+  if (!delArbol.some((f) => f.id === lineaId)) {
+    return {
+      ok: false,
+      error:
+        "Esa línea no se puede mover: es un costo propio de la meta y no " +
+        "cuelga de ningún capítulo.",
+    };
+  }
+
+  const movido = mover(
+    delArbol.map((f) => ({
+      id: f.id,
+      nivel: f.nivel ?? 0,
+      tipo: f.tipo as "CAPITULO" | "PARTIDA",
+      codigo: f.codigoRef,
+    })),
+    lineaId,
+    direccion,
+  );
+  if (!movido.ok) return { ok: false, error: movido.error };
+
+  const antes = delArbol.map((f) => ({
+    id: f.id,
+    nivel: f.nivel,
+    tipo: f.tipo as "CAPITULO" | "PARTIDA",
+    codigo: f.codigoRef,
+  }));
+  const despues = renumerar(movido.lineas);
+
+  const conImporte = new Set(
+    filas.filter((f) => f.parcial !== null).map((f) => f.id),
+  );
+  const pierden = lineasQuePierdenImporte(antes, despues, conImporte);
+
+  await prisma.$transaction(async (tx) => {
+    for (const [i, l] of despues.entries()) {
+      await tx.presupuestoMetaItem.update({
+        where: { id: l.id },
+        data: {
+          codigoRef: l.codigo,
+          nivel: l.nivel,
+          tipo: l.tipo,
+          orden: i,
+          // Un capitulo no lleva importe propio: vale lo que suman los suyos.
+          ...(l.tipo === "CAPITULO"
+            ? { parcial: null, metrado: null, precioUnitario: null }
+            : {}),
+        },
+      });
+    }
+
+    /*
+     * Las lineas propias van DETRAS, conservando su orden entre ellas.
+     *
+     * No compiten por un sitio en el arbol porque no estan en el, pero el
+     * `orden` es unico en la tabla y tienen que caer en alguna parte. Al final
+     * es donde menos estorban y donde ya se pintan hoy.
+     */
+    const propias = filas.filter((f) => f.codigoRef === null);
+    for (const [i, f] of propias.entries()) {
+      await tx.presupuestoMetaItem.update({
+        where: { id: f.id },
+        data: { orden: despues.length + i },
+      });
+    }
+
+    await recalcularCosto(tx, borrador.metaId);
+  });
+
+  return {
+    ok: true,
+    aviso:
+      pierden.length === 0
+        ? null
+        : pierden.length === 1
+          ? "Una partida pasó a ser capítulo y se le quitó el importe: ahora vale la suma de lo que tiene dentro."
+          : `${pierden.length} partidas pasaron a ser capítulo y se les quitó el importe: ahora valen la suma de lo que tienen dentro.`,
+  };
 }

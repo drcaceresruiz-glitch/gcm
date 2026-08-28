@@ -487,6 +487,28 @@ function clasificarCodigo(
    * hojas del arbol, y una hoja es una partida a la que se le podra poner
    * su unidad, su cantidad y su precio dentro de GCM.
    */
+  if (soloEstructura) {
+    /*
+     * LA CABECERA DE UN GRUPO VIVE UN ESCALON POR ENCIMA DE SU CONTENIDO.
+     *
+     * `7.02.00 REDES DE DESAGUE` y `7.02.01 Corte de piso` tienen los mismos
+     * tres segmentos, asi que contando puntos salen al MISMO nivel: el arbol
+     * quedaba plano y las trece partidas del bloque no seguian a su cabecera
+     * al moverla. Se vio en el ensayo con un presupuesto real.
+     *
+     * El cero final es lo que la delata: `7.02.00` es la cabecera del grupo
+     * `7.02`, asi que su sitio es el de `7.02` -un escalon mas afuera- y las
+     * `7.02.xx` cuelgan de ella. Igual con `8.01.0` sobre `8.01.2`.
+     */
+    const ultimoEsCero = segmentos.length > 1 && Number(ultimo) === 0;
+    const nivelReal = ultimoEsCero ? Math.max(0, nivel - 1) : nivel;
+
+    if (esPadre || ultimoEsCero || segmentos.length === 1) {
+      return { tipo: "CAPITULO", nivel: nivelReal };
+    }
+    return { tipo: "PARTIDA", nivel: nivelReal };
+  }
+
   if (esPadre) return { tipo: "CAPITULO", nivel };
 
   /*

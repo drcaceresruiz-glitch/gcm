@@ -2,12 +2,25 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, Check, LoaderCircle, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  LoaderCircle,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import {
   accionAnadirLineaMeta,
   accionEditarLineaMeta,
   accionEliminarLineaMeta,
+  accionMoverLineaMeta,
   type EstadoLinea,
 } from "@/app/(dashboard)/obras/[id]/meta/acciones-lineas";
 import type { LineaDeLaMeta } from "@/services/meta-edicion.service";
@@ -88,6 +101,77 @@ export function TablaMetaEditable({
         />
       )}
 
+      {/*
+        COMO SE USA ESTA TABLA, escrito donde se usa.
+        Va en la pantalla y no solo en el manual: quien acaba de subir un Excel
+        con 400 lineas y ve cuatro flechas nuevas no va a abrir el manual, va a
+        pulsar. Es un `details` para que no estorbe a quien ya lo sabe.
+      */}
+      {puedeEditar && (
+        <details
+          className="rounded-xl border px-4 py-3 text-sm"
+          style={{ borderColor: "var(--borde)" }}
+        >
+          <summary className="cursor-pointer font-medium">
+            Cómo ordenar y completar el presupuesto
+          </summary>
+
+          <div className="mt-3 space-y-3 text-pretty opacity-80">
+            <p>
+              Cada línea es un <strong>capítulo</strong> (un título que agrupa)
+              o una <strong>partida</strong> (lo que se mide y se cobra). No se
+              elige: <strong>es capítulo lo que tiene algo dentro</strong>. Si
+              metes una partida debajo de otra, la de arriba pasa a ser capítulo
+              sola —y pierde su importe, porque un capítulo vale la suma de lo
+              que tiene dentro—.
+            </p>
+
+            <div>
+              <p className="font-medium">Las cuatro flechas de cada fila</p>
+              <ul className="mt-1 ml-4 list-disc space-y-1">
+                <li>
+                  <strong>↑ y ↓</strong> mueven la línea entre sus hermanas, sin
+                  cambiar de quién cuelga. Se lleva consigo todo lo que tenga
+                  dentro.
+                </li>
+                <li>
+                  <strong>→</strong> la mete dentro de la línea de arriba. Es lo
+                  que se usa cuando el Excel traía «PRIMER PISO» y debajo, al
+                  mismo nivel, los bloques que en realidad cuelgan de él.
+                </li>
+                <li>
+                  <strong>←</strong> la saca un nivel hacia fuera.
+                </li>
+              </ul>
+            </div>
+
+            <p>
+              <strong>Los códigos se renumeran solos</strong> después de cada
+              movimiento: 1, 1.01, 1.01.01, 2… No hace falta teclearlos ni
+              cuadrarlos a mano, y por eso no se pueden editar.
+            </p>
+
+            <p>
+              <strong>Para completar precios</strong>, pulsa el lápiz de la
+              línea y escribe la unidad, la cantidad y el precio unitario. El
+              importe lo calcula GCM multiplicando. Solo se teclea a mano cuando
+              la partida va a suma alzada, sin cantidad.
+            </p>
+
+            <p>
+              <strong>Al borrar un capítulo</strong> no se borra lo que tiene
+              dentro: sus partidas suben un nivel y se renumera todo.
+            </p>
+
+            <p className="opacity-80">
+              Todo esto es sobre el <strong>borrador</strong>. Cuando apruebas
+              la meta queda congelada y ya no se toca: para cambiarla se carga
+              una versión nueva.
+            </p>
+          </div>
+        </details>
+      )}
+
       <div
         className="overflow-x-auto rounded-xl border"
         style={{ borderColor: "var(--borde)" }}
@@ -150,6 +234,12 @@ export function TablaMetaEditable({
                   {puedeEditar && (
                     <td className="p-2">
                       <div className="flex items-center justify-end gap-1">
+                        {/* Mover solo tiene sentido en el arbol. Una linea
+                            propia de la meta no cuelga de ningun capitulo, asi
+                            que no hay adonde moverla. */}
+                        {l.codigoRef !== null && (
+                          <Mover obraId={obraId} linea={l} />
+                        )}
                         <button
                           type="button"
                           onClick={() => setEditando(l.id)}
@@ -158,9 +248,7 @@ export function TablaMetaEditable({
                         >
                           <Pencil className="size-4" aria-hidden="true" />
                         </button>
-                        {l.tipo !== "CAPITULO" && (
-                          <BotonEliminar obraId={obraId} linea={l} />
-                        )}
+                        <BotonEliminar obraId={obraId} linea={l} />
                       </div>
                     </td>
                   )}
@@ -383,6 +471,70 @@ function BotonEliminar({
       >
         No
       </button>
+    </form>
+  );
+}
+
+
+/**
+ * Las cuatro flechas que colocan una linea en el arbol.
+ *
+ * VAN JUNTAS Y EN ESTE ORDEN —subir, bajar, meter dentro, sacar— porque es el
+ * orden en que se usan: primero se pone la linea donde va y despues se decide
+ * de quien cuelga.
+ *
+ * El movimiento se hace con el arbol ENTERO en el servidor, no aqui: mover en
+ * la pantalla y guardar despues obligaria a llevar dos copias del presupuesto
+ * y a decidir cual manda cuando alguien recarga a medias.
+ *
+ * Si el movimiento no cabe —la primera de un bloque no se puede subir— el
+ * servidor devuelve el motivo y se enseña ahi mismo, en vez de dejar el boton
+ * sin hacer nada, que es como se aprende a desconfiar de una pantalla.
+ */
+function Mover({ obraId, linea }: { obraId: string; linea: LineaDeLaMeta }) {
+  const [estado, accion] = useActionState<EstadoLinea, FormData>(
+    accionMoverLineaMeta,
+    {},
+  );
+
+  const flechas = [
+    { direccion: "subir", Icono: ChevronUp, texto: "Subir" },
+    { direccion: "bajar", Icono: ChevronDown, texto: "Bajar" },
+    { direccion: "sangrar", Icono: ChevronRight, texto: "Meter dentro de la de arriba" },
+    { direccion: "quitar-sangria", Icono: ChevronLeft, texto: "Sacar un nivel" },
+  ] as const;
+
+  return (
+    <form action={accion} className="flex items-center gap-0.5">
+      <input type="hidden" name="obraId" value={obraId} />
+      <input type="hidden" name="lineaId" value={linea.id} />
+
+      {(estado.error || estado.aviso) && (
+        <span
+          role="alert"
+          className="mr-1 max-w-56 text-xs text-pretty"
+          style={{
+            color: estado.error ? "var(--color-peligro)" : undefined,
+            opacity: estado.error ? 1 : 0.7,
+          }}
+        >
+          {estado.error ?? estado.aviso}
+        </span>
+      )}
+
+      {flechas.map(({ direccion, Icono, texto }) => (
+        <button
+          key={direccion}
+          type="submit"
+          name="direccion"
+          value={direccion}
+          className="rounded p-1 opacity-60 hover:opacity-100"
+          title={`${texto} — ${linea.descripcion.slice(0, 40)}`}
+          aria-label={`${texto}: ${linea.descripcion.slice(0, 40)}`}
+        >
+          <Icono className="size-4" aria-hidden="true" />
+        </button>
+      ))}
     </form>
   );
 }
