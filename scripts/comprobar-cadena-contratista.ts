@@ -21,6 +21,7 @@ import { generarEdtDesdePresupuesto } from "@/services/edt.service";
 import { sumarHojas } from "@/lib/jerarquia-partidas";
 import { previsualizarContractual } from "@/services/contractual.service";
 import { cargarMetaDesdeExcel } from "@/services/meta-desde-excel";
+import { fijarAjusteDelContratista } from "@/services/meta-edicion.service";
 
 let ok = 0;
 let mal = 0;
@@ -138,7 +139,7 @@ async function main() {
 
     const itemsMeta = await prisma.presupuestoMetaItem.findMany({
       where: { meta: { projectId: obraId } },
-      select: { codigoRef: true, parcial: true },
+      select: { id: true, codigoRef: true, parcial: true },
     });
     const m = new Map(itemsMeta.map((i) => [i.codigoRef, i]));
     comprobar(
@@ -167,6 +168,56 @@ async function main() {
       console.log("    cotizado por el contratista .... 20,000.00");
       console.log("    lo que se le paga .............. 22,420.00   (-5% +8% +10%)");
       console.log("    lo que se le cobra al cliente .. 26,904.00   (+20%)");
+    }
+
+    console.log("\n== Y SE PUEDE CAMBIAR DESDE LA PANTALLA");
+    const capitulo = itemsMeta.find((i) => i.codigoRef === "8");
+    if (capitulo) {
+      const cambio = await fijarAjusteDelContratista(sesion, obraId, capitulo.id, {
+        descuento: "10",
+        gastosGenerales: "8",
+        utilidad: "10",
+      });
+      comprobar("el cambio se guardo", cambio.ok, true);
+      if (!cambio.ok) console.log("       motivo:", cambio.error);
+
+      const tras = await prisma.presupuestoMetaItem.findMany({
+        where: { meta: { projectId: obraId } },
+        select: { codigoRef: true, parcial: true, parcialCotizado: true },
+      });
+      const t = new Map(tras.map((i) => [i.codigoRef, i]));
+      // 10.000 x 0,90 x 1,18 = 10.620 -> se recalcula DESDE LA COTIZACION,
+      // no encadenando el factor nuevo sobre el importe ya ajustado.
+      comprobar("8.01 se recalculo desde la cotizacion", Number(t.get("8.01")?.parcial).toFixed(2), "10620.00");
+      comprobar("y conserva el precio del papel", Number(t.get("8.01")?.parcialCotizado).toFixed(2), "10000.00");
+
+      const quitado = await fijarAjusteDelContratista(sesion, obraId, capitulo.id, {
+        descuento: "",
+        gastosGenerales: "",
+        utilidad: "",
+      });
+      comprobar("se puede quitar", quitado.ok, true);
+      const limpias = await prisma.presupuestoMetaItem.findMany({
+        where: { meta: { projectId: obraId } },
+        select: { codigoRef: true, parcial: true, parcialCotizado: true },
+      });
+      const l = new Map(limpias.map((i) => [i.codigoRef, i]));
+      comprobar("8.01 vuelve a la cotizacion", Number(l.get("8.01")?.parcial).toFixed(2), "10000.00");
+      comprobar("y se retira el precio guardado", l.get("8.01")?.parcialCotizado, null);
+
+      const enPartida = await fijarAjusteDelContratista(sesion, obraId, m.get("8.01")!.id, {
+        descuento: "5",
+        gastosGenerales: "",
+        utilidad: "",
+      });
+      comprobar("en una PARTIDA se rechaza", enPartida.ok, false);
+
+      const fuera = await fijarAjusteDelContratista(sesion, obraId, capitulo.id, {
+        descuento: "150",
+        gastosGenerales: "",
+        utilidad: "",
+      });
+      comprobar("un descuento del 150% se rechaza", fuera.ok, false);
     }
 
     console.log("\n== Y LA EDT NO SE ENTERA DE NADA");

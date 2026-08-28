@@ -174,3 +174,118 @@ export function repartir(
   }
   return ajustados;
 }
+
+export interface LineaDeBloque {
+  codigo: string;
+  /// El importe que se ensena hoy, ya ajustado si lo estaba.
+  parcial: string | null;
+  /// El precio del papel del contratista, si esta partida se ajusto alguna vez.
+  parcialCotizado: string | null;
+}
+
+export interface LineaRecalculada {
+  codigo: string;
+  parcial: string | null;
+  /// null cuando el bloque se queda sin ajuste: ya no hay nada que deshacer.
+  parcialCotizado: string | null;
+}
+
+/**
+ * Vuelve a repartir un bloque con OTROS porcentajes.
+ *
+ * SIEMPRE SE PARTE DEL PRECIO COTIZADO, nunca del importe que se ensena. Es lo
+ * que hace que cambiar un descuento del 5 al 7 sea una operacion limpia y no
+ * una acumulacion: aplicar el nuevo factor sobre el importe ya ajustado
+ * encadenaria los dos, y el presupuesto se alejaria de la cotizacion un poco
+ * mas en cada correccion. La primera vez que un bloque recibe ajuste, su
+ * precio de hoy ES el cotizado.
+ *
+ * Al quitar los porcentajes -dejarlos vacios o en cero- las partidas vuelven
+ * exactamente a lo que cotizo el contratista y el precio guardado se retira:
+ * sin ajuste no hay nada que deshacer, y dejarlo ahi seria guardar un dato que
+ * ya no significa nada.
+ */
+export function recalcularBloque(
+  lineas: readonly LineaDeBloque[],
+  ajuste: AjusteContratista,
+): LineaRecalculada[] {
+  const bases = lineas.map((l) => l.parcialCotizado ?? l.parcial);
+
+  if (esNeutro(ajuste)) {
+    return lineas.map((l, i) => ({
+      codigo: l.codigo,
+      parcial: bases[i] ?? null,
+      parcialCotizado: null,
+    }));
+  }
+
+  const ajustados = repartir(bases, ajuste);
+  return lineas.map((l, i) => ({
+    codigo: l.codigo,
+    parcial: ajustados[i] ?? null,
+    parcialCotizado: bases[i] ?? null,
+  }));
+}
+
+export interface LineaConAjuste {
+  codigo: string;
+  tipo: "CAPITULO" | "PARTIDA";
+  parcial: string | null;
+  parcialCotizado: string | null;
+  ajuste: AjusteContratista;
+}
+
+/**
+ * Que partidas pertenecen al bloque de cada contratista.
+ *
+ * MANDA EL ANCESTRO MAS CERCANO QUE LLEVE PORCENTAJES. Es la regla que
+ * resuelve un capitulo cubierto por dos contratistas sin inventar ningun
+ * concepto: cada uno va en su subcapitulo con los suyos, y una partida
+ * pertenece al subcapitulo del que cuelga, no al capitulo de arriba.
+ *
+ * Vive aqui y no en el servicio porque la necesitan los dos lados: el servicio
+ * para recalcular al guardar, y la pantalla para ensenar cuanto suma el bloque
+ * antes de tocar nada. Dos copias de esta regla acabarian discrepando el dia
+ * que alguien afine una sola.
+ */
+export function bloquesDeContratista(
+  lineas: readonly LineaConAjuste[],
+  codigoPadreDe: (codigo: string) => string | null,
+): Map<string, string[]> {
+  const porCodigo = new Map(lineas.map((l) => [l.codigo, l]));
+  const bloques = new Map<string, string[]>();
+
+  for (const l of lineas) {
+    if (l.tipo !== "PARTIDA") continue;
+
+    let padre = codigoPadreDe(l.codigo);
+    while (padre) {
+      const p = porCodigo.get(padre);
+      if (p && !esNeutro(p.ajuste)) {
+        const grupo = bloques.get(padre) ?? [];
+        grupo.push(l.codigo);
+        bloques.set(padre, grupo);
+        break;
+      }
+      padre = codigoPadreDe(padre);
+    }
+  }
+
+  return bloques;
+}
+
+/** Lo que suman, en el papel del contratista, las partidas de un bloque. */
+export function cotizadoDelBloque(
+  lineas: readonly LineaConAjuste[],
+  codigos: readonly string[],
+): string {
+  const porCodigo = new Map(lineas.map((l) => [l.codigo, l]));
+  return sumar(
+    codigos
+      .map((c) => {
+        const l = porCodigo.get(c);
+        return l?.parcialCotizado ?? l?.parcial ?? null;
+      })
+      .filter((v): v is string => v !== null),
+  );
+}

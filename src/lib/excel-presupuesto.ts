@@ -54,6 +54,15 @@ export interface FilaImportada {
   descuentoContratista: string | null;
   ggContratista: string | null;
   utilidadContratista: string | null;
+  /**
+   * Lo que costaba la partida ANTES del ajuste de su contratista.
+   *
+   * Solo lo llevan las partidas de un bloque ajustado, y se guarda porque sin
+   * el no se puede DESHACER: cambiar el descuento de un 5 a un 7 desde la
+   * pantalla obliga a volver al precio del papel, y el reparto no es
+   * reversible al centimo -la ultima partida absorbe el resto del redondeo-.
+   */
+  parcialCotizado: string | null;
   /// Fecha opcional de la plantilla, "YYYY-MM-DD". Van juntas o ninguna: ver
   /// la validacion en `analizarExcel`. Sin ellas, la EDT sale `sinProgramar`
   /// como hoy; con ellas, `generarEdtDesdePresupuesto` programa la tarea de
@@ -651,11 +660,14 @@ function ajusteDeLaFila(leer: (campo: string) => unknown): {
   descuentoContratista: string | null;
   ggContratista: string | null;
   utilidadContratista: string | null;
+  parcialCotizado: string | null;
 } {
   return {
     descuentoContratista: normalizarDecimal(leer("descuentoContratista"), 4),
     ggContratista: normalizarDecimal(leer("ggContratista"), 4),
     utilidadContratista: normalizarDecimal(leer("utilidadContratista"), 4),
+    // Lo rellena `aplicarAjustes` al repartir; aqui todavia no se sabe.
+    parcialCotizado: null,
   };
 }
 
@@ -719,6 +731,8 @@ function aplicarAjustes(filas: FilaImportada[]): number {
     partidas.forEach((f, i) => {
       const nuevo = ajustados[i] ?? null;
       if (nuevo === null || nuevo === f.parcial) return;
+      // El precio del papel del contratista, antes de tocarlo.
+      f.parcialCotizado = f.parcial;
       f.parcial = nuevo;
       // Ya no es metrado x precio: si se recalculara, se perderia el ajuste.
       if (f.modalidad === "PRECIOS_UNITARIOS") f.modalidad = "SUMA_ALZADA";

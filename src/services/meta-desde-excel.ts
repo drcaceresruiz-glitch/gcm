@@ -158,6 +158,10 @@ export async function cargarMetaDesdeExcel(
         precioUnitario: propia.precioUnitario,
         parcial: propia.parcial,
         porcentajeRecargo: null,
+        descuentoContratista: null,
+        ggContratista: null,
+        utilidadContratista: null,
+        parcialCotizado: null,
         fechaInicio: null,
         fechaFin: null,
       };
@@ -180,6 +184,13 @@ export async function cargarMetaDesdeExcel(
       // El recargo puede venir en un capitulo o en una partida suelta; el
       // motor resuelve la precedencia. Se copia tal cual llego.
       porcentajeRecargo: f.porcentajeRecargo,
+      // Lo que cobra su contratista: los porcentajes en la fila que agrupa y
+      // el precio del papel en cada partida ajustada. Se copian tal cual
+      // para que la pantalla pueda ensenarlos y recalcularlos.
+      descuentoContratista: f.descuentoContratista,
+      ggContratista: f.ggContratista,
+      utilidadContratista: f.utilidadContratista,
+      parcialCotizado: f.parcialCotizado,
       fechaInicio: f.fechaInicio,
       fechaFin: f.fechaFin,
     };

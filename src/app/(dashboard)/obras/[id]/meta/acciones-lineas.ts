@@ -7,6 +7,7 @@ import { obtenerSesion } from "@/services/sesion.service";
 import {
   anadirLineaAMeta,
   editarLineaDeMeta,
+  fijarAjusteDelContratista,
   eliminarLineaDeMeta,
   moverLineaDeMeta,
 } from "@/services/meta-edicion.service";
@@ -141,4 +142,33 @@ export async function accionMoverLineaMeta(
   revalidatePath(`/obras/${obraId}/meta`);
   revalidatePath(`/obras/${obraId}/contractual`);
   return r.aviso ? { ok: true, aviso: r.aviso } : { ok: true };
+}
+
+/**
+ * Fijar lo que cobra el contratista de un capitulo, desde la pantalla.
+ *
+ * Se revalida tambien el contractual: cambiar estos porcentajes cambia el
+ * costo real, y el contractual se genera encima de el.
+ */
+export async function accionAjusteDelContratista(
+  _previo: EstadoLinea,
+  datos: FormData,
+): Promise<EstadoLinea> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const obraId = texto(datos, "obraId");
+  const lineaId = texto(datos, "lineaId");
+  if (!obraId || !lineaId) return { error: "Falta el capítulo." };
+
+  const r = await fijarAjusteDelContratista(sesion, obraId, lineaId, {
+    descuento: texto(datos, "descuento"),
+    gastosGenerales: texto(datos, "gastosGenerales"),
+    utilidad: texto(datos, "utilidad"),
+  });
+  if (!r.ok) return { error: r.error };
+
+  revalidatePath(`/obras/${obraId}/meta`);
+  revalidatePath(`/obras/${obraId}/contractual`);
+  return { ok: true };
 }

@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Handshake,
   LoaderCircle,
   Pencil,
   Plus,
@@ -25,7 +26,13 @@ import {
 } from "@/app/(dashboard)/obras/[id]/meta/acciones-lineas";
 import type { LineaDeLaMeta } from "@/services/meta-edicion.service";
 import { soles } from "@/utils/formato";
-import { subtotalesPorAncestro } from "@/lib/jerarquia-partidas";
+import { codigoPadre, subtotalesPorAncestro } from "@/lib/jerarquia-partidas";
+import {
+  bloquesDeContratista,
+  cotizadoDelBloque,
+  esNeutro,
+} from "@/lib/cascada-contratista";
+import { AjusteDelContratista } from "@/components/meta/AjusteDelContratista";
 import { useMotivoSinEscritura } from "@/components/obras/EscrituraDeLaObra";
 
 /**
@@ -54,6 +61,7 @@ export function TablaMetaEditable({
   puedeEditar: boolean;
 }) {
   const [editando, setEditando] = useState<string | null>(null);
+  const [ajustando, setAjustando] = useState<string | null>(null);
   const [anadiendo, setAnadiendo] = useState(false);
 
   /*
@@ -65,6 +73,70 @@ export function TablaMetaEditable({
    * capitulo y por eso no entran en ningun subtotal, aunque si cuenten en el
    * total de la meta. Es correcto: no pertenecen al arbol del contrato.
    */
+  /*
+   * Que partidas cubre cada contratista y cuanto sumaban en su cotizacion.
+   *
+   * La regla vive en `bloquesDeContratista` y NO se copia aqui: el servicio
+   * usa la misma al guardar, y dos copias acabarian discrepando el dia que
+   * alguien afine una sola.
+   */
+  const bloques = useMemo(() => {
+    const conCodigo = lineas
+      .filter((l) => l.codigoRef !== null)
+      .map((l) => ({
+        codigo: l.codigoRef!,
+        tipo: l.tipo,
+        parcial: l.parcial,
+        parcialCotizado: l.parcialCotizado,
+        ajuste: {
+          descuento: l.descuentoContratista,
+          gastosGenerales: l.ggContratista,
+          utilidad: l.utilidadContratista,
+        },
+      }));
+    const codigos = new Set(conCodigo.map((l) => l.codigo));
+    const mapa = bloquesDeContratista(conCodigo, (c) => codigoPadre(c, codigos));
+
+    const cotizado = new Map<string, string>();
+    for (const [jefe, partidas] of mapa) {
+      cotizado.set(jefe, cotizadoDelBloque(conCodigo, partidas));
+    }
+    return cotizado;
+  }, [lineas]);
+
+  /**
+   * Lo que sumaria el bloque de un capitulo que TODAVIA no tiene porcentajes.
+   *
+   * Hace falta para poder abrir el formulario la primera vez: sin ajuste no
+   * hay bloque, y sin bloque no habria cifra que ensenar mientras se teclea.
+   * Se toman todas sus partidas, que es lo que pasaria a ser su bloque.
+   */
+  const cotizadoSinAjuste = useMemo(() => {
+    const conCodigo = lineas.filter((l) => l.codigoRef !== null);
+    const codigos = new Set(conCodigo.map((l) => l.codigoRef!));
+    return (codigo: string): string => {
+      const suyas = conCodigo.filter((l) => {
+        if (l.tipo !== "PARTIDA") return false;
+        let padre = codigoPadre(l.codigoRef!, codigos);
+        while (padre) {
+          if (padre === codigo) return true;
+          padre = codigoPadre(padre, codigos);
+        }
+        return false;
+      });
+      return cotizadoDelBloque(
+        suyas.map((l) => ({
+          codigo: l.codigoRef!,
+          tipo: l.tipo,
+          parcial: l.parcial,
+          parcialCotizado: l.parcialCotizado,
+          ajuste: { descuento: null, gastosGenerales: null, utilidad: null },
+        })),
+        suyas.map((l) => l.codigoRef!),
+      );
+    };
+  }, [lineas]);
+
   const subtotales = useMemo(
     () =>
       subtotalesPorAncestro(
@@ -228,6 +300,24 @@ export function TablaMetaEditable({
                     />
                   </td>
                 </tr>
+              ) : ajustando === l.id ? (
+                <tr key={l.id}>
+                  <td colSpan={puedeEditar ? 7 : 6} className="p-0">
+                    <AjusteDelContratista
+                      obraId={obraId}
+                      lineaId={l.id}
+                      capitulo={`${l.codigoRef ?? ""} ${l.descripcion}`.trim()}
+                      cotizado={
+                        bloques.get(l.codigoRef ?? "") ??
+                        cotizadoSinAjuste(l.codigoRef ?? "")
+                      }
+                      descuento={l.descuentoContratista ?? ""}
+                      gastosGenerales={l.ggContratista ?? ""}
+                      utilidad={l.utilidadContratista ?? ""}
+                      alTerminar={() => setAjustando(null)}
+                    />
+                  </td>
+                </tr>
               ) : (
                 <tr
                   key={l.id}
@@ -268,6 +358,32 @@ export function TablaMetaEditable({
                             que no hay adonde moverla. */}
                         {l.codigoRef !== null && (
                           <Mover obraId={obraId} linea={l} />
+                        )}
+                        {/* Lo que cobra el contratista se pone en la fila que
+                            agrupa: en una partida suelta no hay bloque que
+                            ajustar, y el servicio lo rechaza igual. */}
+                        {l.tipo === "CAPITULO" && l.codigoRef !== null && (
+                          <button
+                            type="button"
+                            onClick={() => setAjustando(l.id)}
+                            className="rounded p-1 opacity-70 hover:opacity-100"
+                            aria-label={`Lo que cobra el contratista de ${l.descripcion}`}
+                            title="Lo que cobra el contratista"
+                          >
+                            <Handshake
+                              className="size-4"
+                              aria-hidden="true"
+                              style={
+                                esNeutro({
+                                  descuento: l.descuentoContratista,
+                                  gastosGenerales: l.ggContratista,
+                                  utilidad: l.utilidadContratista,
+                                })
+                                  ? undefined
+                                  : { color: "var(--color-marca-600)" }
+                              }
+                            />
+                          </button>
                         )}
                         <button
                           type="button"

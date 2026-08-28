@@ -171,7 +171,15 @@ export const TABLAS: readonly TablaRespaldo[] = [
       { campo: "parentId", a: "wbs_items" },
       { campo: "origenMovimientoId", a: "movimientos_presupuestales" },
     ],
-    decimales: { metrado: 4, precioUnitario: 4, parcial: 2 },
+    decimales: {
+      metrado: 4, precioUnitario: 4, parcial: 2,
+      // Lo que cobra el contratista del bloque, y el precio del que se
+      // partio: sin el, cambiar un porcentaje no se puede recalcular.
+      parcialCotizado: 2,
+      porcentajeDescuentoContratista: 3,
+      porcentajeGastosGeneralesContratista: 3,
+      porcentajeUtilidadContratista: 3,
+    },
     fechas: ["fechaInicioPlan", "fechaFinPlan"],
   },
   {
@@ -208,7 +216,13 @@ export const TABLAS: readonly TablaRespaldo[] = [
     tabla: "presupuesto_meta_items",
     modelo: "presupuestoMetaItem",
     refs: [{ campo: "presupuestoMetaId", a: "presupuestos_meta" }],
-    decimales: { metrado: 4, precioUnitario: 4, parcial: 2, porcentajeRecargo: 3 },
+    decimales: {
+      metrado: 4, precioUnitario: 4, parcial: 2, porcentajeRecargo: 3,
+      parcialCotizado: 2,
+      porcentajeDescuentoContratista: 3,
+      porcentajeGastosGeneralesContratista: 3,
+      porcentajeUtilidadContratista: 3,
+    },
     fechas: ["fechaInicioPlan", "fechaFinPlan"],
   },
   {

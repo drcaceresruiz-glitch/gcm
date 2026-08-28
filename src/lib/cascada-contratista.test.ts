@@ -5,6 +5,7 @@ import {
   cascadaDelContratista,
   esNeutro,
   factorDe,
+  recalcularBloque,
   repartir,
   SIN_AJUSTE,
 } from "./cascada-contratista";
@@ -148,5 +149,63 @@ describe("el factor", () => {
     const f = factorDe({ descuento: "3.7", gastosGenerales: "6.3", utilidad: "11.9" });
 
     expect(f.split(".")[1]?.length).toBe(8);
+  });
+});
+
+describe("volver a repartir un bloque con otros porcentajes", () => {
+  const bloque = [
+    { codigo: "8.01", parcial: "11210.00", parcialCotizado: "10000.00" },
+    { codigo: "8.02", parcial: "6726.00", parcialCotizado: "6000.00" },
+    { codigo: "8.03", parcial: "4484.00", parcialCotizado: "4000.00" },
+  ];
+
+  it("SE PARTE DEL PRECIO COTIZADO, no del importe que se ensena", () => {
+    /*
+     * Si el nuevo factor se aplicara sobre el importe ya ajustado, los dos se
+     * encadenarian y el presupuesto se alejaria de la cotizacion un poco mas
+     * en cada correccion. Cambiar el descuento del 5 al 10 tiene que dar lo
+     * mismo que haberlo puesto al 10 desde el principio.
+     */
+    const r = recalcularBloque(bloque, {
+      descuento: "10",
+      gastosGenerales: "8",
+      utilidad: "10",
+    });
+
+    // 10.000 x 0,90 x 1,18 = 10.620
+    expect(r[0]!.parcial).toBe("10620.00");
+    expect(r[0]!.parcialCotizado).toBe("10000.00");
+    expect(sumar(r.map((l) => l.parcial!))).toBe("21240.00");
+  });
+
+  it("quitar los porcentajes devuelve las partidas a la cotizacion", () => {
+    const r = recalcularBloque(bloque, SIN_AJUSTE);
+
+    expect(r.map((l) => l.parcial)).toEqual(["10000.00", "6000.00", "4000.00"]);
+    // Y se retira el precio guardado: sin ajuste no hay nada que deshacer.
+    expect(r.every((l) => l.parcialCotizado === null)).toBe(true);
+  });
+
+  it("la primera vez, el precio de hoy ES el cotizado", () => {
+    const sinAjustar = [
+      { codigo: "8.01", parcial: "10000.00", parcialCotizado: null },
+      { codigo: "8.02", parcial: "6000.00", parcialCotizado: null },
+      { codigo: "8.03", parcial: "4000.00", parcialCotizado: null },
+    ];
+
+    const r = recalcularBloque(sinAjustar, ELECTRICAS);
+
+    expect(r.map((l) => l.parcial)).toEqual(["11210.00", "6726.00", "4484.00"]);
+    expect(r.map((l) => l.parcialCotizado)).toEqual(["10000.00", "6000.00", "4000.00"]);
+  });
+
+  it("cambiar dos veces no acumula", () => {
+    const unaVez = recalcularBloque(bloque, { descuento: "10", gastosGenerales: null, utilidad: null });
+    const otraVez = recalcularBloque(
+      unaVez.map((l) => ({ codigo: l.codigo, parcial: l.parcial, parcialCotizado: l.parcialCotizado })),
+      { descuento: "10", gastosGenerales: null, utilidad: null },
+    );
+
+    expect(otraVez.map((l) => l.parcial)).toEqual(unaVez.map((l) => l.parcial));
   });
 });

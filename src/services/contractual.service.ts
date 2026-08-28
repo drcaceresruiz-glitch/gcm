@@ -199,6 +199,7 @@ export async function generarContractualDesdeReal(
       descuentoContratista: null,
       ggContratista: null,
       utilidadContratista: null,
+      parcialCotizado: null,
     fechaInicio: l.fechaInicio,
     fechaFin: l.fechaFin,
   }));

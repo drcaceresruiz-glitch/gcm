@@ -1123,6 +1123,32 @@ model WbsItem {
   /// el arbol completo en cada consulta de tablero.
   parcial        Decimal? @db.Decimal(14, 2)
 
+  /// Lo que costaba esta partida ANTES de aplicarle lo que cobra su
+  /// contratista. Solo lo llevan las partidas de un bloque con ajuste.
+  ///
+  /// Sin esto el ajuste no se puede DESHACER: con solo el importe ya
+  /// repartido, cambiar el descuento de un 5 a un 7 obligaria a adivinar de
+  /// donde se partio, y el reparto no es reversible al centimo -la ultima
+  /// partida del bloque absorbe el resto del redondeo-. Se guarda el precio
+  /// del papel del contratista y se recalcula siempre desde el.
+  parcialCotizado Decimal? @db.Decimal(14, 2)
+
+  /**
+   * Lo que cobra el contratista de este bloque. SOLO EN LA FILA QUE AGRUPA.
+   *
+   * Van en el capitulo cuando lo cubre un solo contratista, o en cada
+   * subcapitulo cuando son varios: manda el ancestro mas cercano que los
+   * lleve. Se guardan COMO PORCENTAJE, no como fraccion —5.000 son 5%—, que
+   * es lo que se escribe en la plantilla y lo que ensena la pantalla.
+   *
+   * No se confunden con `porcentajeRecargo` de la meta, que mira al otro
+   * lado: aquel es lo que se le carga al cliente, estos lo que cobra quien
+   * ejecuta. Ver `lib/cascada-contratista`.
+   */
+  porcentajeDescuentoContratista        Decimal? @db.Decimal(6, 3)
+  porcentajeGastosGeneralesContratista  Decimal? @db.Decimal(6, 3)
+  porcentajeUtilidadContratista         Decimal? @db.Decimal(6, 3)
+
   /// Fecha opcional que trajo el presupuesto (plantilla meta o contractual),
   /// no una fecha real de ejecucion -este modelo no tiene ninguna-. Solo
   /// aplica a las HOJAS (aportantes): "generarEdtDesdePresupuesto" las usa
@@ -4269,6 +4295,23 @@ model PresupuestoMetaItem {
   /// evita el error de cien veces, que en un presupuesto no da error: da una
   /// cifra creible y equivocada. Para calcular, `porcentajeAFraccion`.
   porcentajeRecargo Decimal?               @db.Decimal(6, 3)
+
+  /// Lo que costaba esta linea antes del ajuste de su contratista. Ver
+  /// `WbsItem.parcialCotizado`: sin el, cambiar un porcentaje no se puede
+  /// recalcular porque el reparto no es reversible al centimo.
+  parcialCotizado Decimal? @db.Decimal(14, 2)
+
+  /**
+   * Lo que cobra el contratista de este bloque, en la fila que agrupa.
+   *
+   * Mismo significado y mismas reglas que en `WbsItem`: van en el capitulo o
+   * en el subcapitulo, manda el ancestro mas cercano, y no se confunden con
+   * `porcentajeRecargo` de arriba, que mira al cliente y no al contratista.
+   */
+  porcentajeDescuentoContratista       Decimal? @db.Decimal(6, 3)
+  porcentajeGastosGeneralesContratista Decimal? @db.Decimal(6, 3)
+  porcentajeUtilidadContratista        Decimal? @db.Decimal(6, 3)
+
   meta              PresupuestoMeta        @relation(fields: [presupuestoMetaId], references: [id], onDelete: Cascade)
   reparto           MetaItemPartida[]
   deducciones       DeduccionCostoPropio[]

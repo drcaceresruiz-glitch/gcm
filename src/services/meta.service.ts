@@ -438,6 +438,20 @@ export interface EntradaItemMeta {
   /// accion no lo copiaba). Siendo obligatorio, quien construya la entrada
   /// tiene que decidir, y `tsc` senala el sitio si alguien lo olvida.
   porcentajeRecargo: string | null;
+  /**
+   * Lo que cobra el contratista de este bloque, y el precio del que se partio.
+   *
+   * OBLIGATORIOS POR LA MISMA RAZON QUE EL RECARGO, y no es teorica: al
+   * anadirlos, `parcialCotizado` se perdio exactamente igual —el importador lo
+   * calculaba, el mapeo de `meta-desde-excel` lo copiaba, y aqui se caia sin
+   * que nada fallara—. El sintoma tampoco avisaba: la meta guardaba el importe
+   * ajustado y, al cambiar un porcentaje desde la pantalla, el factor nuevo se
+   * encadenaba sobre el viejo. Siendo obligatorios, `tsc` señala cada sitio.
+   */
+  parcialCotizado: string | null;
+  descuentoContratista: string | null;
+  ggContratista: string | null;
+  utilidadContratista: string | null;
   /// Opcional, "YYYY-MM-DD". Van juntas o ninguna -ya validado por quien
   /// arma la entrada, aqui solo se guardan.
   fechaInicio?: string | null;
@@ -712,6 +726,13 @@ export async function crearMeta(
         precioUnitario: i.precioUnitario ?? null,
         parcial: i.parcial,
         porcentajeRecargo: i.porcentajeRecargo ?? null,
+        // Lo que cobra el contratista del bloque, y el precio del papel del
+        // que se partio. Sin esto, cambiar un porcentaje desde la pantalla
+        // encadenaria el factor nuevo sobre el ya aplicado.
+        parcialCotizado: i.parcialCotizado ?? null,
+        porcentajeDescuentoContratista: i.descuentoContratista ?? null,
+        porcentajeGastosGeneralesContratista: i.ggContratista ?? null,
+        porcentajeUtilidadContratista: i.utilidadContratista ?? null,
         // "YYYY-MM-DD" a medianoche UTC, no `new Date(iso)` local: es una
         // columna `@db.Date` y el dia no debe correrse por la zona horaria
         // de Peru. Mismo patron que `cronograma-manual.service.ts`.

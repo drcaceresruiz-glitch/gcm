@@ -159,6 +159,7 @@ function capitulo(codigo: string, descripcion: string): FilaImportada {
       descuentoContratista: null,
       ggContratista: null,
       utilidadContratista: null,
+      parcialCotizado: null,
     fechaInicio: null,
     fechaFin: null,
   };
@@ -180,6 +181,7 @@ function partida(codigo: string, parcial: string): FilaImportada {
       descuentoContratista: null,
       ggContratista: null,
       utilidadContratista: null,
+      parcialCotizado: null,
     fechaInicio: null,
     fechaFin: null,
   };

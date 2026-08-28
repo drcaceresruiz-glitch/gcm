@@ -329,6 +329,12 @@ export async function aplicarImportacion(
             metrado: f.metrado,
             precioUnitario: f.precioUnitario,
             parcial: f.parcial,
+            // Lo que cobra su contratista, para poder ensenarlo y cambiarlo
+            // despues sin volver al Excel.
+            parcialCotizado: f.parcialCotizado,
+            porcentajeDescuentoContratista: f.descuentoContratista,
+            porcentajeGastosGeneralesContratista: f.ggContratista,
+            porcentajeUtilidadContratista: f.utilidadContratista,
             // "YYYY-MM-DD" a medianoche UTC: es una columna `@db.Date` y el
             // dia no debe correrse por la zona horaria de Peru (mismo
             // patron que `cronograma-manual.service.ts`).

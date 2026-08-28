@@ -8,6 +8,8 @@ import {
   normalizarDecimal,
 } from "@/lib/decimal";
 import { cifrasDeLaMeta } from "@/lib/costo-meta";
+import { recalcularBloque } from "@/lib/cascada-contratista";
+import { codigoPadre } from "@/lib/jerarquia-partidas";
 import {
   lineasQuePierdenImporte,
   mover,
@@ -46,6 +48,12 @@ export interface LineaDeLaMeta {
   precioUnitario: string | null;
   parcial: string | null;
   porcentajeRecargo: string | null;
+  /// El precio del papel del contratista, si esta linea lleva ajuste.
+  parcialCotizado: string | null;
+  /// Los tres del contratista, en la fila que agrupa.
+  descuentoContratista: string | null;
+  ggContratista: string | null;
+  utilidadContratista: string | null;
   orden: number;
 }
 
@@ -84,6 +92,10 @@ export async function lineasDelBorrador(
       precioUnitario: f.precioUnitario?.toString() ?? null,
       parcial: f.parcial?.toString() ?? null,
       porcentajeRecargo: f.porcentajeRecargo?.toString() ?? null,
+      parcialCotizado: f.parcialCotizado?.toString() ?? null,
+      descuentoContratista: f.porcentajeDescuentoContratista?.toString() ?? null,
+      ggContratista: f.porcentajeGastosGeneralesContratista?.toString() ?? null,
+      utilidadContratista: f.porcentajeUtilidadContratista?.toString() ?? null,
       orden: f.orden,
     })),
   };
@@ -544,4 +556,129 @@ export async function moverLineaDeMeta(
           ? "Una partida pasó a ser capítulo y se le quitó el importe: ahora vale la suma de lo que tiene dentro."
           : `${pierden.length} partidas pasaron a ser capítulo y se les quitó el importe: ahora valen la suma de lo que tienen dentro.`,
   };
+}
+
+/**
+ * Fijar lo que cobra el contratista de un bloque, y repartirlo.
+ *
+ * SE PONE EN LA FILA QUE AGRUPA -el capitulo si lo cubre un solo contratista,
+ * o el subcapitulo cuando son varios- y afecta a las partidas que cuelgan de
+ * ella hasta el siguiente bloque con porcentajes propios: manda el ancestro
+ * MAS CERCANO. Es lo que permite dos contratistas en un capitulo sin inventar
+ * ningun concepto nuevo.
+ *
+ * El importe de cada partida se recalcula SIEMPRE desde el precio cotizado,
+ * nunca desde el que se ensena: aplicar el factor nuevo sobre el ya ajustado
+ * encadenaria los dos y el presupuesto se alejaria de la cotizacion un poco
+ * mas en cada correccion. Ver `recalcularBloque`.
+ */
+export async function fijarAjusteDelContratista(
+  sesion: SesionActiva,
+  obraId: string,
+  lineaId: string,
+  datos: { descuento: string; gastosGenerales: string; utilidad: string },
+): Promise<ResultadoLinea> {
+  const borrador = await borradorEditable(sesion, obraId);
+  if (!borrador.ok) return borrador;
+
+  const pct = (valor: string, nombre: string) => {
+    const limpio = valor.trim();
+    if (limpio === "") return { ok: true as const, valor: null };
+    const n = normalizarDecimal(limpio, 3);
+    if (n === null) return { ok: false as const, error: `El ${nombre} no es un número.` };
+    // Un descuento del 120 % dejaria el capitulo en negativo, y un margen de
+    // mil por ciento es siempre un cero de mas. Se rechaza en vez de guardar
+    // una cifra creible y equivocada.
+    if (Number(n) < 0 || Number(n) > 100) {
+      return { ok: false as const, error: `El ${nombre} va de 0 a 100.` };
+    }
+    return { ok: true as const, valor: n };
+  };
+
+  const d = pct(datos.descuento, "descuento");
+  if (!d.ok) return d;
+  const g = pct(datos.gastosGenerales, "porcentaje de gastos generales");
+  if (!g.ok) return g;
+  const u = pct(datos.utilidad, "porcentaje de utilidad");
+  if (!u.ok) return u;
+
+  const linea = await prisma.presupuestoMetaItem.findFirst({
+    where: { id: lineaId, presupuestoMetaId: borrador.metaId },
+    select: { id: true, tipo: true, codigoRef: true },
+  });
+  if (!linea) return { ok: false, error: "Esa línea no es de esta meta." };
+  if (linea.tipo !== "CAPITULO" || linea.codigoRef === null) {
+    return {
+      ok: false,
+      error:
+        "Lo que cobra el contratista se pone en el capítulo o subcapítulo que " +
+        "agrupa sus partidas, no en una partida suelta.",
+    };
+  }
+
+  const todas = await prisma.presupuestoMetaItem.findMany({
+    where: { presupuestoMetaId: borrador.metaId, codigoRef: { not: null } },
+    select: {
+      id: true, codigoRef: true, tipo: true, parcial: true, parcialCotizado: true,
+      porcentajeDescuentoContratista: true,
+      porcentajeGastosGeneralesContratista: true,
+      porcentajeUtilidadContratista: true,
+    },
+    orderBy: { orden: "asc" },
+  });
+
+  const ajuste = { descuento: d.valor, gastosGenerales: g.valor, utilidad: u.valor };
+  const codigos = new Set(todas.map((t) => t.codigoRef!));
+
+  /** El bloque: las partidas cuyo ancestro con porcentajes es ESTA linea. */
+  const delBloque = todas.filter((t) => {
+    if (t.tipo !== "PARTIDA" || t.codigoRef === null) return false;
+    let padre = codigoPadre(t.codigoRef, codigos);
+    while (padre) {
+      const p = todas.find((x) => x.codigoRef === padre);
+      if (!p) break;
+      // El primero que lleve porcentajes manda. Si es este, la partida es suya.
+      const suyo = p.id === linea.id;
+      const tieneAjuste =
+        p.porcentajeDescuentoContratista !== null ||
+        p.porcentajeGastosGeneralesContratista !== null ||
+        p.porcentajeUtilidadContratista !== null;
+      if (suyo) return true;
+      if (tieneAjuste) return false;
+      padre = codigoPadre(padre, codigos);
+    }
+    return false;
+  });
+
+  const recalculadas = recalcularBloque(
+    delBloque.map((t) => ({
+      codigo: t.codigoRef!,
+      parcial: t.parcial?.toString() ?? null,
+      parcialCotizado: t.parcialCotizado?.toString() ?? null,
+    })),
+    ajuste,
+  );
+
+  await prisma.$transaction(async (tx) => {
+    await tx.presupuestoMetaItem.update({
+      where: { id: linea.id },
+      data: {
+        porcentajeDescuentoContratista: ajuste.descuento,
+        porcentajeGastosGeneralesContratista: ajuste.gastosGenerales,
+        porcentajeUtilidadContratista: ajuste.utilidad,
+      },
+    });
+
+    for (const [i, r] of recalculadas.entries()) {
+      const original = delBloque[i]!;
+      await tx.presupuestoMetaItem.update({
+        where: { id: original.id },
+        data: { parcial: r.parcial, parcialCotizado: r.parcialCotizado },
+      });
+    }
+
+    await recalcularCosto(tx, borrador.metaId);
+  });
+
+  return { ok: true };
 }
