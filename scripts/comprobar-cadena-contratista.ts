@@ -22,6 +22,7 @@ import { sumarHojas } from "@/lib/jerarquia-partidas";
 import { previsualizarContractual } from "@/services/contractual.service";
 import { cargarMetaDesdeExcel } from "@/services/meta-desde-excel";
 import { fijarAjusteDelContratista } from "@/services/meta-edicion.service";
+import { datosDelEstudio } from "@/services/investigacion.service";
 
 let ok = 0;
 let mal = 0;
@@ -247,6 +248,53 @@ async function main() {
           })),
         ),
         "24420.00",
+      );
+    }
+    /*
+     * Y LA INVESTIGACION, que mide otra cosa.
+     *
+     * El estudio mide el proceso de planificacion -compromisos, restricciones,
+     * causas-, no el dinero. Pero el archivo de tareas sale del cronograma, y
+     * el cronograma sale del presupuesto: si repartir lo que cobra el
+     * contratista moviera la EDT, lo notaria ahi. Se comprueba en vez de
+     * suponerlo.
+     */
+    console.log("\n== LA INVESTIGACION NO SE ENTERA");
+    const estudio = await datosDelEstudio(sesion, obraId, 2);
+    comprobar("la exportacion responde", estudio.ok, true);
+    if (estudio.ok) {
+      const t = estudio.tablas;
+      for (const [nombre, tabla] of [
+        ["consolidado", t.consolidado],
+        ["compromisos", t.compromisos],
+        ["restricciones", t.restricciones],
+        ["aprendizaje", t.aprendizaje],
+        ["tareas", t.tareas],
+      ] as const) {
+        comprobar(`la tabla ${nombre} responde`, tabla.cabecera.length > 0, true);
+      }
+
+      // Ni una columna de dinero del contratista se cuela en el estudio: mide
+      // el proceso, no el costo.
+      const todas = [
+        ...t.consolidado.cabecera, ...t.compromisos.cabecera,
+        ...t.restricciones.cabecera, ...t.aprendizaje.cabecera, ...t.tareas.cabecera,
+      ];
+      comprobar(
+        "ninguna columna del estudio habla de contratista",
+        todas.filter((c) => /contratista|dcto|descuento|utilidad|gasto/i.test(c)).length,
+        0,
+      );
+      comprobar(
+        "el archivo de tareas trae sus columnas de plazo",
+        ["desv_inicio_dias", "desv_fin_dias", "duracion_plan_dias"].every((c) =>
+          t.tareas.cabecera.includes(c),
+        ),
+        true,
+      );
+      console.log(
+        `  tareas exportadas: ${t.tareas.filas.length}` +
+          ` | variables del diccionario: ${t.diccionario.filas.length}`,
       );
     }
   } finally {
