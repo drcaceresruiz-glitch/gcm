@@ -1158,3 +1158,50 @@ export async function obraPilotoExistente(
     select: { id: true },
   });
 }
+
+export interface ObraDelEstudio {
+  id: string;
+  nombre: string;
+  interrupcion: Date | null;
+  semanas: number;
+  esPiloto: boolean;
+}
+
+/**
+ * Las obras de la empresa con su estado de estudio.
+ *
+ * Es la lista de la pantalla transversal de investigacion, que existe por una
+ * razon concreta: la obra de ensayo se crea desde ahi, y si esa accion viviera
+ * dentro de una obra no habria forma de llegar a ella cuando todavia no hay
+ * ninguna. Un boton al que no se puede llegar es un boton que no existe.
+ */
+export async function obrasDelEstudio(
+  sesion: SesionActiva,
+): Promise<ObraDelEstudio[]> {
+  if (!sesion.esOperador) return [];
+
+  const { NOMBRE_PILOTO } = await import("@/lib/piloto-simulado");
+
+  const obras = await prisma.project.findMany({
+    where: { companyId: sesion.companyId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      nombreObra: true,
+      fechaInterrupcionEstudio: true,
+      _count: { select: { planesSemanales: true } },
+    },
+  });
+
+  return obras
+    // Las obras que este usuario no alcanza no salen: la condicion de
+    // operador no amplia el alcance dentro de la empresa.
+    .filter((o) => alcanzaObra(sesion, o.id))
+    .map((o) => ({
+      id: o.id,
+      nombre: o.nombreObra,
+      interrupcion: o.fechaInterrupcionEstudio,
+      semanas: o._count.planesSemanales,
+      esPiloto: o.nombreObra.startsWith(NOMBRE_PILOTO),
+    }));
+}

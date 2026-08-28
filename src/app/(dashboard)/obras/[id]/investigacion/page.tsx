@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Download } from "lucide-react";
 
@@ -6,13 +7,11 @@ import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
 import {
   analisisDelEstudio,
-  obraPilotoExistente,
   resumenDelEstudio,
 } from "@/services/investigacion.service";
 import { fechaCorta } from "@/utils/fechas";
 import {
   AnalisisDelEstudio,
-  ObraDeEnsayo,
   PanelDelEstudio,
 } from "@/components/investigacion/PanelDelEstudio";
 
@@ -49,10 +48,9 @@ export default async function InvestigacionPage({
   const obra = await obtenerObra(sesion, id);
   if (!obra) notFound();
 
-  const [resumen, analisis, piloto] = await Promise.all([
+  const [resumen, analisis] = await Promise.all([
     resumenDelEstudio(sesion, id),
     analisisDelEstudio(sesion, id),
-    obraPilotoExistente(sesion),
   ]);
   if (!resumen) notFound();
 
@@ -98,7 +96,13 @@ export default async function InvestigacionPage({
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">
+        <Link
+          href="/investigacion"
+          className="text-sm underline underline-offset-2 opacity-70"
+        >
+          Volver a Investigación
+        </Link>
+        <h2 className="mt-2 text-xl font-semibold tracking-tight">
           Datos para investigación
         </h2>
         <p className="mt-1 max-w-3xl text-sm text-pretty opacity-70">
@@ -144,8 +148,6 @@ export default async function InvestigacionPage({
           cerrado: a.cerradoAt ? fechaCorta(a.cerradoAt) : "",
         }))}
       />
-
-      <ObraDeEnsayo existente={piloto?.id ?? null} />
 
       <section className="space-y-3">
         <div>

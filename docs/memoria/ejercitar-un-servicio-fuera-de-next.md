@@ -28,6 +28,14 @@ Para saber si algo esta roto ANTES de investigar, `npx tsx scripts/humo.ts`
 con el `dev` levantado recorre todas las pantallas y avisa de las que
 revientan al renderizar; crea su propia sesion en la base, sin contrasenas.
 
+**Y OJO AL REINICIAR EL `dev`**: tras cada `prisma generate` hay que
+reiniciarlo o las pantallas revientan con `Unknown field` sobre columnas que
+si existen en la base. Pero `pkill -f "next dev"` NO lo mata en Windows: los
+procesos son `node.exe` y el viejo sigue escuchando el 3000 con el cliente
+antiguo, asi que el reinicio parece hecho y no lo esta. Se mata por puerto:
+`Get-NetTCPConnection -LocalPort 3000 -State Listen` y `Stop-Process` sobre su
+`OwningProcess`. El 27/08/2026 costo tres diagnosticos falsos seguidos.
+
 **Why:** el 27/08/2026 «la pantalla de nueva obra no carga» resulto ser el
 Excel al guardarse (P2000, descripcion de 1264 caracteres contra un
 VarChar(500)). La pantalla renderizaba perfecta en local y el humo la daba por

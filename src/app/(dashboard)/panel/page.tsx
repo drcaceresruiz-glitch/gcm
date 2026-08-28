@@ -284,6 +284,16 @@ export default async function PanelPage({
                 pregunta: "quién usa GCM",
                 href: "/operador",
               },
+              /* La investigacion vive AQUI y no dentro de una obra: la obra de
+                 ensayo se crea desde esta pantalla, y quien todavia no tiene
+                 ninguna obra no podria llegar a un boton que estuviera dentro
+                 de una. */
+              {
+                clave: "investigacion",
+                titulo: "Investigación",
+                pregunta: "datos para analizar fuera",
+                href: "/investigacion",
+              },
             ],
           },
         ]
