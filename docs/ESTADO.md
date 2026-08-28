@@ -6,12 +6,12 @@ qué está construido así.
 **Lo que FALTA vive en [`PENDIENTES.md`](PENDIENTES.md)**, aparte, para poder
 tacharlo sin reescribir esto.
 
-Última actualización: 27 de agosto de 2026 (noche).
+Última actualización: 28 de agosto de 2026 (noche).
 
 > **Este documento se escribió por capas y las más nuevas van arriba.** Las
 > secciones numeradas del final son del 8 de agosto; los anexos recogen lo
 > ocurrido después. **Ante una contradicción, manda siempre el anexo más
-> reciente**, que es el del 27 de agosto.
+> reciente**, que es el del 28 de agosto.
 >
 > Entre el 12 y el 21 de agosto entraron 297 commits y el sistema cambió de
 > forma en cosas de fondo —el contractual ahora se genera desde el presupuesto
@@ -19,6 +19,50 @@ tacharlo sin reescribir esto.
 > abajo te suena raro, comprueba primero si el anexo lo desmiente.
 
 ---
+
+## Anexo — 28 de agosto de 2026
+
+**El dia de la tesis.** No entro codigo de producto: entro el aparato que
+convierte GCM en instrumento de medicion, y los documentos del estudio.
+
+### Lo que quedo cerrado
+
+- **La fase previa se resuelve sin tocar el planteamiento.** El problema era
+  real: no hay obra en ejecucion, luego no hay datos anteriores a la
+  implantacion. La respuesta esta en `docs/tesis/protocolo-fase-previa.md` y
+  consiste en gestionar diez a doce semanas con **Last Planner en papel**
+  antes de implantar el sistema. Se eligio esa via porque el titulo dice
+  «aplicacion web basada en el Last Planner System»: la variable independiente
+  es la HERRAMIENTA, no el metodo, y el metodo tiene que existir en las dos
+  fases. Cualquier otra salida obligaba a mover titulo, preguntas u objetivos,
+  y el usuario pidio expresamente que no se movieran.
+
+  El protocolo trae el ritual semanal con sus tiempos, tres formatos
+  imprimibles —plan semanal con PPC, registro de restricciones con fecha
+  comprometida y fecha real, y fechas reales de tareas—, las nueve causas con
+  su definicion de uso, y como cargar despues esas semanas marcandolas como
+  reconstruidas.
+
+  **Dos cosas que parecen debilidades y no lo son, y hay que declararlas asi:**
+  que el equipo se sepa medido actua IGUAL en las dos fases, luego el efecto
+  Hawthorne queda controlado por diseno; y las diez semanas no son tiempo
+  perdido, porque el equipo tiene que aprender el ritual de todos modos.
+
+  **El riesgo vivo:** la tabla de nueve causas es tambien el instrumento del
+  Kappa de Cohen. Si a mitad de la fase alguien cambia el criterio de
+  clasificacion, las dos series dejan de ser comparables y no hay arreglo
+  posterior.
+
+- **Como se entra a Investigacion, contestado.** El usuario pregunto si el
+  operador tenia un acceso independiente. No lo tiene: mismo correo, misma
+  clave, y el sistema le abre el area de operador porque su correo esta en la
+  lista del servidor. Lo que si tiene consecuencias es que **Investigacion
+  solo muestra las obras de la empresa con la que se inicio sesion**: si la
+  obra del estudio es de un cliente, hace falta una cuenta del usuario dentro
+  de esa constructora —el mismo correo sirve— y alli tambien sera operador.
+
+- **Produccion verificada.** `06a06ea` corriendo, `coherencia: ok`,
+  `despliegue: al dia`, `reloj: vivo`, `operadores: 1`.
 
 ## Anexo — 27 de agosto de 2026
 

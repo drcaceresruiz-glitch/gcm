@@ -3,14 +3,38 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 27 de agosto de 2026 (noche).
+Ultima revision: 28 de agosto de 2026 (noche).
 
-## AL ABRIR LA PROXIMA SESION (despues del 27 de agosto de 2026)
+## AL ABRIR LA PROXIMA SESION (despues del 28 de agosto de 2026)
 
-**No queda nada a medias.** El dia se cerro con lo pedido hecho, probado y
-publicado (`d5356f8` corriendo en produccion, `/api/health` en verde). El
-relato completo esta en el anexo del 27 de agosto de `ESTADO.md`; aqui solo lo
-que hay que TENER PRESENTE:
+**No queda nada a medias.** `06a06ea` corriendo en produccion, `/api/health`
+en verde (`coherencia: ok`, `despliegue: al dia`, `reloj: vivo`,
+`operadores: 1`). El 28 no entro codigo de producto: entraron los documentos
+del estudio. El relato esta en el anexo del 28 de agosto de `ESTADO.md`.
+
+**Lo que hay que tener presente del 28:**
+
+1. **La fase previa de la tesis se hace con Last Planner EN PAPEL**, diez a
+   doce semanas, antes de implantar el sistema
+   (`docs/tesis/protocolo-fase-previa.md`). Se eligio asi para no mover el
+   titulo ni los objetivos: la variable independiente es la herramienta, no el
+   metodo. **Nada de lo que se decida a partir de ahora debe obligar a
+   cambiarlos**; el usuario lo pidio expresamente.
+2. **La tabla de nueve causas de no cumplimiento no se toca durante el
+   estudio.** Es a la vez el instrumento del Kappa de Cohen y el eje de la
+   comparacion entre fases: cambiar una definicion a mitad rompe las series
+   sin arreglo posible. Lo mismo vale para como se calculan el PPC y las
+   fechas de restricciones.
+3. **Donde va a vivir la obra del estudio, sin decidir.** Investigacion solo
+   muestra las obras de la empresa con la que se inicio sesion. Si la obra es
+   de un cliente, el usuario necesita una cuenta suya dentro de esa
+   constructora —el mismo correo vale— y alli tambien sera operador.
+
+### Lo que quedaba del 27 de agosto de 2026
+
+El dia se cerro con lo pedido hecho, probado y publicado. El relato completo
+esta en el anexo del 27 de agosto de `ESTADO.md`; aqui solo lo que hay que
+TENER PRESENTE:
 
 1. **El hosting se quedo sin cupo de procesos y bloqueo la cuenta entera** al
    publicar por la tarde: ni Terminal, ni gestor de Node, ni *Resource Usage*

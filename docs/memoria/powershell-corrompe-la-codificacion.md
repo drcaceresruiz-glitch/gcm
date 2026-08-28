@@ -1,8 +1,11 @@
 ---
 name: powershell-corrompe-la-codificacion
-description: Editar un archivo del proyecto con Get-Content/Set-Content de PowerShell 5.1 recodifica cada tilde, comilla angular y raya larga, y no lo caza ninguna herramienta
-metadata:
+description: "Editar un archivo del proyecto con Get-Content/Set-Content de PowerShell 5.1 recodifica cada tilde, comilla angular y raya larga, y no lo caza ninguna herramienta"
+metadata: 
+  node_type: memory
   type: project
+  originSessionId: e835fad8-f802-4255-b684-265781b24162
+  modified: 2026-08-21T05:56:52.119Z
 ---
 
 En este equipo PowerShell es **5.1**. `Get-Content -Raw` lee un archivo sin BOM

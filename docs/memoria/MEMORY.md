@@ -27,3 +27,5 @@
 - [Rescatar el hosting sin consola](rescatar-el-hosting-sin-consola.md) — «Unable to fork»: ampliar el plan no lo arregla; apartar el paquete, reiniciar por archivo y devolverlo
 - [Un replace sin comprobar divide esquema y base](replace-sin-comprobar-divide-esquema-y-base.md) — paso dos veces el 27/08/2026: la columna entro en la base y no en schema.prisma
 - [Las guardas del repo obligan a registrar](las-guardas-del-repo-obligan-a-registrar.md) — tabla, pantalla o funcion de operador nuevas: hay pruebas que exigen declararlas
+- [La tesis se apoya en GCM](tesis-sobre-gcm.md) — series cronologicas interrumpidas; el titulo, objetivos e hipotesis NO se tocan al resolver problemas
+- [Operar GCM no es un acceso aparte](operar-gcm-no-es-un-acceso-aparte.md) — mismo correo y misma clave; Investigacion solo ve la empresa con la que se entro
