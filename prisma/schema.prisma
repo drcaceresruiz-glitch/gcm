@@ -2491,6 +2491,21 @@ model AnalisisCausa {
   responsableUserId String?
   fechaCompromiso   DateTime? @db.Date
 
+  /// Cuando se abrio DE VERDAD este analisis, si no fue el dia en que se
+  /// escribio la fila.
+  ///
+  /// `createdAt` y la apertura real son lo mismo mientras la obra registra
+  /// sobre la marcha. Dejan de serlo al reconstruir un periodo anterior: si
+  /// hoy se cargan los analisis que el equipo hizo hace tres meses, todos
+  /// nacen con fecha de hoy y la latencia de reaccion sale inventada para ese
+  /// periodo entero.
+  ///
+  /// Solo la escribe quien opera GCM, desde la pantalla del estudio, y manda
+  /// sobre `createdAt` cuando esta puesta. Vacia en el uso normal, y eso es lo
+  /// que la hace fiable: un campo que hubiera que rellenar siempre acabaria
+  /// puesto a ojo.
+  aperturaDeclarada DateTime? @db.Date
+
   /// Con fecha, el analisis esta cerrado: se dio por resuelto. No se borra,
   /// porque lo que se intento y no funciono es lo mas util del historial.
   cerradoAt  DateTime?

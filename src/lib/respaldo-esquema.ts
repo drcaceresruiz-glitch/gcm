@@ -533,7 +533,7 @@ export const TABLAS: readonly TablaRespaldo[] = [
     modelo: "analisisCausa",
     refs: [{ campo: "projectId", a: "projects" }],
     externas: [{ campo: "responsableUserId", a: "usuario", siFalta: "null" }],
-    fechas: ["fechaCompromiso"],
+    fechas: ["fechaCompromiso", "aperturaDeclarada"],
   },
   {
     /// El usuario es obligatorio aqui, asi que si ya no existe la fila se

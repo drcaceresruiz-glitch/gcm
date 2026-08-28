@@ -61,6 +61,10 @@ export interface Tablas {
   /// Una fila por analisis de causa raiz, con TRC, LRO y el cierre de su
   /// accion correctiva. Es la variable dependiente de aprendizaje.
   aprendizaje: Tabla;
+  /// Una fila por tarea del cronograma, con la desviacion entre lo
+  /// planificado y lo ejecutado en dias. Es la variable continua mas rica
+  /// para medir variabilidad temporal.
+  tareas: Tabla;
   diccionario: Tabla;
 }
 
@@ -158,6 +162,51 @@ export async function datosDelEstudio(
     },
   });
 
+  /*
+   * EL CRONOGRAMA DE REFERENCIA ES LA LINEA BASE, y si no hay, la PRIMERA
+   * version importada.
+   *
+   * Medir la desviacion contra el cronograma vigente no mide nada: cada
+   * reprogramacion mueve las fechas del plan hacia donde ya esta la obra, y
+   * la desviacion tiende a cero sola. El plan original es el unico contra el
+   * que una desviacion significa algo, y por eso se prefiere la version
+   * marcada como linea base -que es una decision explicita de la obra- sobre
+   * cualquier otra.
+   */
+  const cronograma = await prisma.cronograma.findFirst({
+    where: { projectId: obraId },
+    orderBy: [{ lineaBaseAt: { sort: "desc", nulls: "last" } }, { version: "asc" }],
+    select: {
+      version: true,
+      lineaBaseAt: true,
+      tareas: {
+        select: {
+          uid: true,
+          codigo: true,
+          nombre: true,
+          inicio: true,
+          fin: true,
+          duracionDias: true,
+          esHito: true,
+          esCritico: true,
+          esResumen: true,
+          sinProgramar: true,
+        },
+      },
+    },
+  });
+
+  const ejecucion = await prisma.ejecucionTarea.findMany({
+    where: { projectId: obraId },
+    select: {
+      uid: true,
+      inicioReal: true,
+      finReal: true,
+      origenInicio: true,
+      origenFin: true,
+    },
+  });
+
   const analisis = await prisma.analisisCausa.findMany({
     where: { projectId: obraId },
     orderBy: { createdAt: "asc" },
@@ -165,6 +214,7 @@ export async function datosDelEstudio(
       id: true,
       causa: true,
       createdAt: true,
+      aperturaDeclarada: true,
       fechaCompromiso: true,
       cerradoAt: true,
     },
@@ -345,6 +395,15 @@ export async function datosDelEstudio(
   );
 
   const filasAprendizaje = analisis.map((a) => {
+    /*
+     * LA APERTURA DECLARADA MANDA sobre la fecha de registro.
+     *
+     * Son la misma cosa cuando la obra analiza sobre la marcha. Dejan de
+     * serlo al reconstruir un periodo anterior: sin esto, todos los analisis
+     * cargados hoy tendrian fecha de hoy y la latencia de reaccion saldria
+     * inventada para el periodo entero.
+     */
+    const apertura = a.aperturaDeclarada ?? a.createdAt;
     // Los incumplimientos de ESA causa, con la semana en que ocurrieron.
     const eventos = planes
       .filter((p) => p.compromisos.some((c) => c.causa === a.causa))
@@ -361,11 +420,11 @@ export async function datosDelEstudio(
      * el problema resuelto. Meterlo en cualquiera de los lados ensuciaria la
      * comparacion que la TRC quiere hacer.
      */
-    const antes = eventos.filter((e) => e.corte < a.createdAt);
+    const antes = eventos.filter((e) => e.corte < apertura);
     const despues =
       a.cerradoAt === null ? [] : eventos.filter((e) => e.corte > a.cerradoAt!);
 
-    const semanasAntes = planes.filter((p) => p.fechaCorte < a.createdAt).length;
+    const semanasAntes = planes.filter((p) => p.fechaCorte < apertura).length;
     const semanasDespues =
       a.cerradoAt === null
         ? 0
@@ -377,7 +436,7 @@ export async function datosDelEstudio(
     const primero = eventos[0];
     const latencia = lro(
       primero ? (indice.get(primero.corte.getTime()) ?? null) : null,
-      semanaDe(a.createdAt),
+      semanaDe(apertura),
     );
 
     return [
@@ -385,9 +444,10 @@ export async function datosDelEstudio(
       a.id,
       CODIGO_CAUSA[a.causa] ?? "",
       a.causa,
-      iso(a.createdAt),
-      semanaDe(a.createdAt) ?? "",
-      fase(a.createdAt),
+      iso(apertura),
+      a.aperturaDeclarada === null ? "REGISTRO" : "DECLARADA",
+      semanaDe(apertura) ?? "",
+      fase(apertura),
       iso(a.fechaCompromiso),
       iso(a.cerradoAt),
       a.cerradoAt === null ? "0" : "1",
@@ -404,6 +464,63 @@ export async function datosDelEstudio(
       num(trc(eventosAntes, semanasAntes, eventosDespues, semanasDespues), 2),
     ];
   });
+
+  // -------------------------------------------------------------------------
+  // Tareas: una fila por tarea del cronograma, con su desviacion en dias.
+  // -------------------------------------------------------------------------
+  const porUid = new Map(ejecucion.map((e) => [e.uid, e]));
+
+  const filasTareas = (cronograma?.tareas ?? [])
+    /*
+     * FUERA LOS RESUMENES Y LO NO PROGRAMADO.
+     *
+     * Un resumen no se ejecuta: sus fechas son el envoltorio de las tareas
+     * que tiene dentro, y contarlo ademas de a sus hijas mete el mismo
+     * retraso dos veces en la muestra. Una tarea sin programar no tiene
+     * fecha plan contra la que desviarse.
+     */
+    .filter((t) => !t.esResumen && !t.sinProgramar)
+    .map((t) => {
+      const e = porUid.get(t.uid);
+      const inicioReal = e?.inicioReal ?? null;
+      const finReal = e?.finReal ?? null;
+
+      const desvInicio =
+        inicioReal === null ? null : diasEntre(t.inicio, inicioReal);
+      const desvFin = finReal === null ? null : diasEntre(t.fin, finReal);
+
+      // Duracion real en dias de calendario, extremos incluidos: una tarea
+      // que empieza y acaba el mismo dia dura un dia, no cero.
+      const duracionReal =
+        inicioReal !== null && finReal !== null
+          ? diasEntre(inicioReal, finReal) + 1
+          : null;
+
+      const duracionPlan = Number(t.duracionDias);
+
+      return [
+        obra.id,
+        t.uid,
+        t.codigo ?? "",
+        t.nombre.replace(/\s+/g, " ").slice(0, 120),
+        t.esHito ? "1" : "0",
+        t.esCritico ? "1" : "0",
+        // La fase se decide por la fecha PLANIFICADA de fin: es cuando el
+        // estudio esperaba que esa tarea terminara, y no depende de si acabo.
+        fase(t.fin),
+        iso(t.inicio),
+        iso(t.fin),
+        iso(inicioReal),
+        iso(finReal),
+        e?.origenInicio ?? "",
+        e?.origenFin ?? "",
+        desvInicio === null ? "" : desvInicio,
+        desvFin === null ? "" : desvFin,
+        num(duracionPlan, 2),
+        duracionReal === null ? "" : duracionReal,
+        duracionReal === null ? "" : num(duracionReal - duracionPlan, 2),
+      ];
+    });
 
   return {
     ok: true,
@@ -447,14 +564,31 @@ export async function datosDelEstudio(
         nombre: "dataset_aprendizaje",
         cabecera: [
           "obra_id", "analisis_id", "causa_cod", "causa_etiqueta",
-          "fecha_apertura", "semana_apertura", "fase_estudio",
+          "fecha_apertura", "apertura_origen", "semana_apertura", "fase_estudio",
           "fecha_compromiso", "fecha_cierre", "cerrada", "cerrada_a_tiempo",
           "lro_semanas", "eventos_antes", "semanas_antes", "eventos_despues",
           "semanas_despues", "trc_pct",
         ],
         filas: filasAprendizaje,
       },
-      diccionario: diccionario(lesDias, interrupcion, cierreTcac),
+      tareas: {
+        nombre: "dataset_tareas",
+        cabecera: [
+          "obra_id", "tarea_uid", "codigo", "nombre", "es_hito", "es_critico",
+          "fase_estudio", "inicio_plan", "fin_plan", "inicio_real", "fin_real",
+          "origen_inicio", "origen_fin", "desv_inicio_dias", "desv_fin_dias",
+          "duracion_plan_dias", "duracion_real_dias", "desv_duracion_dias",
+        ],
+        filas: filasTareas,
+      },
+      diccionario: diccionario(
+        lesDias,
+        interrupcion,
+        cierreTcac,
+        cronograma
+          ? { version: cronograma.version, esLineaBase: cronograma.lineaBaseAt !== null }
+          : null,
+      ),
     },
   };
 }
@@ -472,6 +606,7 @@ function diccionario(
   lesDias: number,
   interrupcion: Date | null,
   cierre: import("@/lib/aprendizaje").Tcac,
+  cronograma: { version: number; esLineaBase: boolean } | null,
 ): Tabla {
   const v = (
     archivo: string,
@@ -522,6 +657,8 @@ function diccionario(
         "Observaciones con ciclo completo sobre las que se calculan media y desviacion."),
       v("aprendizaje", "trc_pct", "escala", "%",
         "Tasa de recurrencia: frecuencia semanal de la causa despues del cierre del analisis sobre la de antes de su apertura, x100. Cerca de 0 = el patron dejo de repetirse. Vacia si falta alguna de las dos ventanas."),
+      v("aprendizaje", "apertura_origen", "nominal", "-",
+        "DECLARADA: alguien declaro cuando se abrio de verdad el analisis, porque se cargo al reconstruir un periodo anterior. REGISTRO: la fecha es la del dia en que se escribio en el sistema."),
       v("aprendizaje", "lro_semanas", "escala", "semanas",
         "Latencia de reaccion: semanas entre el primer evento del patron y la apertura formal del analisis de causa raiz."),
       v("aprendizaje", "cerrada / cerrada_a_tiempo", "nominal", "0/1",
@@ -530,6 +667,18 @@ function diccionario(
         "Numerador y denominador de la frecuencia previa. Se publican para que la TRC se pueda recalcular y auditar."),
       v("consolidado", "hhi_causas", "escala", "indice",
         "Concentracion de las causas de la semana (Herfindahl-Hirschman): suma de los cuadrados de las proporciones. De 1/9 (repartido entre las nueve categorias) a 1,0 (todo por una sola). Un valor ALTO indica madurez: lo evitable ya se resolvio y queda lo externo."),
+      v("tareas", "desv_fin_dias", "escala", "dias",
+        "Dias entre la fecha de fin PLANIFICADA y la real. Positivo = termino tarde. Vacio si la tarea no ha terminado."),
+      v("tareas", "desv_inicio_dias", "escala", "dias",
+        "Dias entre la fecha de inicio planificada y la real. Positivo = arranco tarde."),
+      v("tareas", "origen_inicio / origen_fin", "nominal", "-",
+        "DECLARADA: la fecha la escribio una persona. DERIVADA: se dedujo de los reportes de avance, asi que arrastra el habito de reporte del equipo. Filtrar por DECLARADA para el analisis fino."),
+      v("tareas", "duracion_real_dias", "escala", "dias",
+        "Dias de calendario entre inicio y fin reales, extremos incluidos: una tarea de un dia dura 1, no 0."),
+      v("tareas", "(cronograma de referencia)", "-", "-",
+        cronograma
+          ? `Las fechas planificadas salen de la version ${cronograma.version} del cronograma${cronograma.esLineaBase ? ", marcada como LINEA BASE" : " (no hay linea base marcada; se usa la primera version importada)"}. Medir contra el cronograma vigente no serviria: cada reprogramacion mueve el plan hacia donde ya esta la obra y la desviacion tenderia a cero sola.`
+          : "Esta obra no tiene cronograma importado: el archivo de tareas sale vacio."),
       v("(formato)", "codificacion", "-", "-",
         "UTF-8 sin BOM. Separador de columnas segun el parametro sep (coma por defecto). Punto como separador decimal. Fechas en ISO YYYY-MM-DD."),
       v("(formato)", "valores perdidos", "-", "-",
@@ -713,4 +862,89 @@ export async function resumenDelEstudio(
     restricciones,
     restriccionesMedibles: medibles,
   };
+}
+
+/**
+ * Declarar cuando se abrio de verdad un analisis de causa raiz.
+ *
+ * Solo hace falta al reconstruir un periodo anterior: sin esto, los analisis
+ * que el equipo hizo en mayo y se cargan en agosto tendrian fecha de agosto, y
+ * la latencia de reaccion —cuanto tarda la obra en analizar un patron que se
+ * repite— saldria inventada para todo ese tramo.
+ *
+ * Manda sobre `createdAt` cuando esta puesta, y se puede borrar pasando null,
+ * que devuelve el analisis a su fecha de registro. Es un ajuste del
+ * instrumento, no del trabajo de la obra, y por eso vive con el resto del
+ * estudio y pide la misma condicion: operar GCM.
+ */
+export async function declararAperturaDeAnalisis(
+  sesion: SesionActiva,
+  obraId: string,
+  analisisId: string,
+  fecha: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!sesion.esOperador) return { ok: false, error: SOLO_OPERADOR };
+  if (!alcanzaObra(sesion, obraId)) {
+    return { ok: false, error: "Esa obra no es tuya." };
+  }
+
+  let valor: Date | null = null;
+  if (fecha !== null && fecha !== "") {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return { ok: false, error: "La fecha tiene que ser del tipo 2026-05-20." };
+    }
+    valor = new Date(`${fecha}T00:00:00.000Z`);
+  }
+
+  // Atado a la obra Y a la empresa antes de tocarlo: con el id de un analisis
+  // ajeno se estaria reescribiendo el estudio de otra constructora.
+  const analisis = await prisma.analisisCausa.findFirst({
+    where: { id: analisisId, projectId: obraId, project: { companyId: sesion.companyId } },
+    select: { id: true },
+  });
+  if (!analisis) return { ok: false, error: "Ese análisis no es de esta obra." };
+
+  await prisma.analisisCausa.update({
+    where: { id: analisis.id },
+    data: { aperturaDeclarada: valor },
+  });
+
+  return { ok: true };
+}
+
+export interface AnalisisDelEstudio {
+  id: string;
+  causa: string;
+  registrado: Date;
+  aperturaDeclarada: Date | null;
+  cerradoAt: Date | null;
+}
+
+/** Los analisis de causa raiz de la obra, para poder fecharlos a mano. */
+export async function analisisDelEstudio(
+  sesion: SesionActiva,
+  obraId: string,
+): Promise<AnalisisDelEstudio[]> {
+  if (!sesion.esOperador) return [];
+  if (!alcanzaObra(sesion, obraId)) return [];
+
+  const filas = await prisma.analisisCausa.findMany({
+    where: { projectId: obraId, project: { companyId: sesion.companyId } },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      causa: true,
+      createdAt: true,
+      aperturaDeclarada: true,
+      cerradoAt: true,
+    },
+  });
+
+  return filas.map((f) => ({
+    id: f.id,
+    causa: f.causa,
+    registrado: f.createdAt,
+    aperturaDeclarada: f.aperturaDeclarada,
+    cerradoAt: f.cerradoAt,
+  }));
 }

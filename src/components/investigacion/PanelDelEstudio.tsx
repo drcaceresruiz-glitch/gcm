@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { AlertCircle, Check } from "lucide-react";
 
 import {
+  accionDeclararApertura,
   accionFijarInterrupcion,
   accionMarcarOrigen,
   type EstadoEstudio,
@@ -275,6 +276,131 @@ function CambiarOrigen({
           {estado.error}
         </span>
       )}
+    </form>
+  );
+}
+
+export interface AnalisisEnPantalla {
+  id: string;
+  causa: string;
+  registrado: string;
+  aperturaDeclarada: string;
+  cerrado: string;
+}
+
+/**
+ * Fechar a mano la apertura de los analisis de causa raiz.
+ *
+ * SOLO SIRVE PARA LOS RECONSTRUIDOS, y por eso la tabla dice de donde viene
+ * cada fecha. Un analisis registrado el dia que ocurrio no necesita nada: su
+ * fecha de registro ES su apertura. Los que se cargan despues, al reconstruir
+ * un periodo anterior, nacen todos con la fecha de hoy, y sin corregirla la
+ * latencia de reaccion de ese tramo no significa nada.
+ */
+export function AnalisisDelEstudio({
+  obraId,
+  analisis,
+}: {
+  obraId: string;
+  analisis: readonly AnalisisEnPantalla[];
+}) {
+  if (analisis.length === 0) {
+    return (
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold">Análisis de causa raíz</h3>
+        <p className="max-w-3xl text-sm text-pretty opacity-70">
+          Esta obra todavía no tiene ninguno. Sin análisis no hay tasa de
+          recurrencia ni latencia de reacción que medir: son la variable de
+          aprendizaje organizacional.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm font-semibold">Análisis de causa raíz</h3>
+      <p className="max-w-3xl text-sm text-pretty opacity-70">
+        Si cargaste análisis de un periodo anterior, declara aquí{" "}
+        <strong>cuándo se abrieron de verdad</strong>. Todos nacen con la fecha
+        del día en que se escribieron, y la latencia de reacción se mide desde
+        ahí: sin corregirla, ese tramo del estudio mide cuándo tecleaste, no
+        cuándo reaccionó la obra. Déjala vacía en los que se registraron sobre
+        la marcha.
+      </p>
+
+      <div
+        className="overflow-x-auto rounded-xl border"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left" style={{ backgroundColor: "var(--superficie)" }}>
+              <th className="p-2 font-medium">Causa</th>
+              <th className="p-2 font-medium">Registrado</th>
+              <th className="p-2 font-medium">Cerrado</th>
+              <th className="p-2 font-medium">Apertura real</th>
+            </tr>
+          </thead>
+          <tbody>
+            {analisis.map((a) => (
+              <tr key={a.id} style={{ borderTop: "1px solid var(--borde)" }}>
+                <td className="p-2 font-medium">{a.causa}</td>
+                <td className="p-2 tabular-nums opacity-70">{a.registrado}</td>
+                <td className="p-2 tabular-nums opacity-70">
+                  {a.cerrado || <span className="opacity-60">sin cerrar</span>}
+                </td>
+                <td className="p-2">
+                  <DeclararApertura obraId={obraId} analisis={a} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function DeclararApertura({
+  obraId,
+  analisis,
+}: {
+  obraId: string;
+  analisis: AnalisisEnPantalla;
+}) {
+  const [estado, declarar] = useActionState<EstadoEstudio, FormData>(
+    accionDeclararApertura,
+    {},
+  );
+
+  return (
+    <form action={declarar} className="flex items-center gap-2">
+      <input type="hidden" name="obraId" value={obraId} />
+      <input type="hidden" name="analisisId" value={analisis.id} />
+
+      <input
+        type="date"
+        name="fecha"
+        defaultValue={analisis.aperturaDeclarada}
+        className="rounded border px-2 py-1 text-xs"
+        style={{ borderColor: "var(--borde)", backgroundColor: "var(--fondo)" }}
+      />
+
+      <button
+        type="submit"
+        className="rounded border px-2 py-1 text-xs"
+        style={{ borderColor: "var(--borde)" }}
+      >
+        guardar
+      </button>
+
+      {estado.error && (
+        <span className="text-xs" style={{ color: "var(--color-peligro)" }}>
+          {estado.error}
+        </span>
+      )}
+      {estado.ok && <Check className="size-3.5 opacity-60" aria-hidden="true" />}
     </form>
   );
 }

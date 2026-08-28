@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { obtenerSesion } from "@/services/sesion.service";
 import {
+  declararAperturaDeAnalisis,
   fijarPuntoDeInterrupcion,
   marcarOrigenDeSemana,
 } from "@/services/investigacion.service";
@@ -61,6 +62,32 @@ export async function accionMarcarOrigen(
   if (!origen) return { error: "Ese origen no existe." };
 
   const r = await marcarOrigenDeSemana(sesion, obraId, planId, origen);
+  if (!r.ok) return { error: r.error };
+
+  revalidatePath(`/obras/${obraId}/investigacion`);
+  return { ok: true };
+}
+
+/**
+ * Declarar la fecha real de apertura de un analisis de causa raiz.
+ *
+ * Solo hace falta en los analisis cargados al reconstruir un periodo
+ * anterior. Vacio = quitar la declaracion y volver a la fecha de registro.
+ */
+export async function accionDeclararApertura(
+  _previo: EstadoEstudio,
+  datos: FormData,
+): Promise<EstadoEstudio> {
+  const sesion = await obtenerSesion();
+  if (!sesion) redirect("/login");
+
+  const obraId = String(datos.get("obraId") ?? "");
+  const analisisId = String(datos.get("analisisId") ?? "");
+  if (!obraId || !analisisId) return { error: "Falta el análisis." };
+
+  const fecha = String(datos.get("fecha") ?? "").trim();
+
+  const r = await declararAperturaDeAnalisis(sesion, obraId, analisisId, fecha || null);
   if (!r.ok) return { error: r.error };
 
   revalidatePath(`/obras/${obraId}/investigacion`);

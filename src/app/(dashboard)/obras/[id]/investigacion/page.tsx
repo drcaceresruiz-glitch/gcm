@@ -4,9 +4,15 @@ import { Download } from "lucide-react";
 
 import { obtenerSesion } from "@/services/sesion.service";
 import { obtenerObra } from "@/services/obras.service";
-import { resumenDelEstudio } from "@/services/investigacion.service";
+import {
+  analisisDelEstudio,
+  resumenDelEstudio,
+} from "@/services/investigacion.service";
 import { fechaCorta } from "@/utils/fechas";
-import { PanelDelEstudio } from "@/components/investigacion/PanelDelEstudio";
+import {
+  AnalisisDelEstudio,
+  PanelDelEstudio,
+} from "@/components/investigacion/PanelDelEstudio";
 
 export const metadata: Metadata = { title: "Datos para investigación" };
 
@@ -41,7 +47,10 @@ export default async function InvestigacionPage({
   const obra = await obtenerObra(sesion, id);
   if (!obra) notFound();
 
-  const resumen = await resumenDelEstudio(sesion, id);
+  const [resumen, analisis] = await Promise.all([
+    resumenDelEstudio(sesion, id),
+    analisisDelEstudio(sesion, id),
+  ]);
   if (!resumen) notFound();
 
   const descargas = [
@@ -62,6 +71,12 @@ export default async function InvestigacionPage({
       titulo: "Restricciones",
       detalle:
         "Una fila por restricción, con el retraso de liberación en días. Es la variable continua para el análisis de capacidad.",
+    },
+    {
+      tabla: "tareas",
+      titulo: "Tareas del cronograma",
+      detalle:
+        "Una fila por tarea, con la desviación en días entre lo planificado y lo ejecutado. Es la variable continua más rica para medir variabilidad temporal.",
     },
     {
       tabla: "aprendizaje",
@@ -112,6 +127,19 @@ export default async function InvestigacionPage({
         reconstruidas={resumen.reconstruidas}
         restricciones={resumen.restricciones}
         restriccionesMedibles={resumen.restriccionesMedibles}
+      />
+
+      <AnalisisDelEstudio
+        obraId={id}
+        analisis={analisis.map((a) => ({
+          id: a.id,
+          causa: a.causa,
+          registrado: fechaCorta(a.registrado),
+          aperturaDeclarada: a.aperturaDeclarada
+            ? a.aperturaDeclarada.toISOString().slice(0, 10)
+            : "",
+          cerrado: a.cerradoAt ? fechaCorta(a.cerradoAt) : "",
+        }))}
       />
 
       <section className="space-y-3">

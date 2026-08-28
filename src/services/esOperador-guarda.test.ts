@@ -53,6 +53,8 @@ const FUNCIONES: Readonly<Record<string, readonly string[]>> = {
     "fijarPuntoDeInterrupcion",
     "marcarOrigenDeSemana",
     "resumenDelEstudio",
+    "declararAperturaDeAnalisis",
+    "analisisDelEstudio",
   ],
   "soporte.service.ts": [
     "hiloDeSoportePorOperador",

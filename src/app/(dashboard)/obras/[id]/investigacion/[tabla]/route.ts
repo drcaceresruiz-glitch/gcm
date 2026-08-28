@@ -12,6 +12,7 @@ import { nombreDeArchivo } from "@/lib/nombre-archivo";
  *   /obras/<id>/investigacion/restricciones   una fila por restriccion
  *   /obras/<id>/investigacion/consolidado     una fila por semana (la serie)
  *   /obras/<id>/investigacion/aprendizaje     una fila por analisis de causa raiz
+ *   /obras/<id>/investigacion/tareas          una fila por tarea del cronograma
  *   /obras/<id>/investigacion/diccionario     que significa cada variable
  *
  * Dos parametros, los dos con valor por defecto:
@@ -32,6 +33,7 @@ const TABLAS = [
   "restricciones",
   "consolidado",
   "aprendizaje",
+  "tareas",
   "diccionario",
 ] as const;
 type NombreTabla = (typeof TABLAS)[number];
