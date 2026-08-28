@@ -3,9 +3,51 @@
 Lo que falta, ordenado por lo que duele antes. Este documento y `ESTADO.md`
 son la unica memoria entre sesiones: lo que no esta escrito aqui, se pierde.
 
-Ultima revision: 28 de agosto de 2026 (noche).
+Ultima revision: 28 de agosto de 2026 (tarde, tras el trabajo del contratista).
 
-## AL ABRIR LA PROXIMA SESION (despues del 28 de agosto de 2026)
+## AL ABRIR LA PROXIMA SESION (despues del 28 de agosto de 2026, tarde)
+
+**No queda nada a medias.** `3eb64b9` corriendo en produccion, `/api/health` en
+verde, 3.235 pruebas. El relato del dia esta en el anexo del 28 de agosto de
+`ESTADO.md`.
+
+**LO QUE HAY QUE TENER PRESENTE:**
+
+1. **`docs/*.xlsx` y `docs/*.docx` estan en el `.gitignore`, y no es una
+   preferencia.** El 28 de agosto un `git add -A docs/` subio el presupuesto de
+   un cliente a este repositorio, que es PUBLICO. Se retiro y se reescribio el
+   historial, pero **nunca se usa `git add -A` sobre `docs/`**: los documentos
+   de trabajo viven ahi a proposito y no se versionan.
+
+2. **Queda fuera de nuestro alcance, y es del usuario:** GitHub puede conservar
+   el objeto huerfano un tiempo —purgarlo se pide al soporte del repositorio— y
+   cualquier clon anterior al 28/08 todavia lo tiene. Si alguien mas clono el
+   repositorio, necesita `git fetch --all` y `git reset --hard origin/main`.
+
+3. **Lo que cobra el contratista se reparte entre las partidas.** Si alguna vez
+   hay que tocar como se calcula un importe, mirar antes
+   `lib/cascada-contratista`: el reparto tiene que seguir cuadrando al centimo
+   con la cotizacion, y el contractual se genera ENCIMA de ese costo.
+
+4. **`EntradaItemMeta` no admite campos opcionales.** Dos veces se ha perdido un
+   dato en silencio por anadirlo sin declararlo ahi: primero el recargo, y el
+   28/08 el precio cotizado. El sintoma nunca es un error: es una cifra creible
+   y equivocada.
+
+5. **La tesis esta cerrada como esta.** Se evaluo medir costos y se descarto; el
+   motivo esta en `docs/tesis/revision-critica.md`. Si vuelve a salir, esa es la
+   respuesta, no se vuelve a evaluar.
+
+**LO QUE ESPERA AL USUARIO, y no es trabajo de codigo:**
+
+- Conceder `obra:crear` al rol RESIDENTE en *Empresa -> Permisos*, si quiere que
+  los residentes creen obras. Comprobado que basta con eso.
+- Llevar al cliente el informe del presupuesto —esta en su escritorio— y decidir
+  las 41 partidas del capitulo 11 y los descuentos comerciales.
+- El trabajo de campo de la tesis: tres expertos, el Kappa y la obra. El plan y
+  las herramientas estan en su escritorio.
+
+### Lo que quedaba del 28 de agosto por la manana
 
 **No queda nada a medias.** `06a06ea` corriendo en produccion, `/api/health`
 en verde (`coherencia: ok`, `despliegue: al dia`, `reloj: vivo`,

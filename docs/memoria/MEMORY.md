@@ -29,3 +29,4 @@
 - [Las guardas del repo obligan a registrar](las-guardas-del-repo-obligan-a-registrar.md) — tabla, pantalla o funcion de operador nuevas: hay pruebas que exigen declararlas
 - [La tesis se apoya en GCM](tesis-sobre-gcm.md) — series cronologicas interrumpidas; el titulo, objetivos e hipotesis NO se tocan al resolver problemas
 - [Operar GCM no es un acceso aparte](operar-gcm-no-es-un-acceso-aparte.md) — mismo correo y misma clave; Investigacion solo ve la empresa con la que se entro
+- [Nunca git add -A en docs](nunca-git-add-a-en-docs.md) — ahi viven archivos de clientes y el repositorio es publico; se anaden por nombre, uno a uno

@@ -64,6 +64,59 @@ convierte GCM en instrumento de medicion, y los documentos del estudio.
 - **Produccion verificada.** `06a06ea` corriendo, `coherencia: ok`,
   `despliegue: al dia`, `reloj: vivo`, `operadores: 1`.
 
+### La tarde: lo que cobra el contratista, y un descuido caro
+
+**Faltaba el primer eslabon del presupuesto.** Una constructora no inventa el
+costo de un capitulo: se lo cotiza un contratista, y esa cotizacion no termina
+en la suma de las partidas —lleva su descuento, y sobre el importe ya
+descontado sus gastos generales y su utilidad—. Eso es lo que hay que pagarle y
+es el costo real del capitulo; solo despues se aplica el recargo que genera el
+contractual. Dos cascadas ENCADENADAS, y confundirlas seria cobrarle al cliente
+el margen del subcontrato o pagarle al contratista el propio.
+
+Se reparte entre las partidas y no se deja al pie, y esa es la decision: el
+avance se valoriza partida a partida, asi que con los precios de cotizacion
+terminar el capitulo sumaria lo cotizado y no lo pactado. El metrado y el precio
+del contratista no se tocan —son los que se comparan en obra—, y por eso la
+partida pasa a suma alzada.
+
+Entra por el Excel (tres columnas nuevas) y se edita en la pantalla, con la
+cascada recalculandose mientras se teclea. Varios contratistas en un capitulo:
+cada uno en su subcapitulo, manda el ancestro mas cercano.
+
+**Y AL COMPROBAR LA CADENA APARECIO LO QUE NADIE BUSCABA:** el contractual
+recalculaba cada linea desde metrado x precio, asi que se comia el ajuste
+entero. El costo real se guardaba bien —22.420— y el papel que firma el cliente
+salia de los 10.000 de cotizacion. Ahora, cuando el importe no se explica por la
+multiplicacion, manda el importe.
+
+**Lo mismo que ya habia pasado, volvio a pasar.** `EntradaItemMeta` declara sus
+campos obligatorios porque el recargo se perdio una vez en silencio: el
+importador lo leia y el mapeo no lo copiaba. El precio cotizado se cayo por el
+mismo sitio y con el mismo sintoma. Se arreglo igual —obligatorios— y conviene
+recordarlo: ese tipo no admite campos opcionales.
+
+### El descuido: el presupuesto del cliente acabo en un repositorio publico
+
+Un `git add -A docs/` para subir dos documentos de la tesis se llevo tres
+archivos que llevaban semanas fuera A PROPOSITO: el presupuesto del cliente y
+los dos borradores de la tesis. Estuvieron accesibles unos veinte minutos.
+
+Se retiraron, se reescribio el historial de la rama —los dos commits ya no
+existen— y se ignoran POR PATRON, no uno a uno. Lo que queda fuera de nuestro
+alcance esta anotado en `PENDIENTES.md`: GitHub puede conservar el objeto un
+tiempo, y cualquier clon anterior sigue teniendolo.
+
+### La tesis quedo cerrada como estaba
+
+Se evaluo incorporar variables de costo y se descarto, con el motivo escrito en
+`docs/tesis/revision-critica.md` para poder contestarlo si lo preguntan: el
+costo lo mueven cosas que el sistema no controla y con un solo grupo no hay
+forma de aislar el efecto. Tambien entraron las herramientas del trabajo de
+campo —las dos hojas que calculan la V de Aiken y el Kappa, la carta a los
+expertos y el plan con su calendario—, verificadas abriendolas con Excel contra
+casos de resultado conocido.
+
 ## Anexo — 27 de agosto de 2026
 
 El día del **presupuesto de un cliente de verdad**, y de un incidente de
