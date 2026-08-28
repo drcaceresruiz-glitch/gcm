@@ -495,29 +495,45 @@ function clasificarCodigo(
    * hojas del arbol, y una hoja es una partida a la que se le podra poner
    * su unidad, su cantidad y su precio dentro de GCM.
    */
+  /*
+   * LA CABECERA DE UN GRUPO VIVE UN ESCALON POR ENCIMA DE SU CONTENIDO.
+   *
+   * `7.02.00 REDES DE DESAGUE` y `7.02.01 Corte de piso` tienen los mismos
+   * tres segmentos, asi que contando puntos salen al MISMO nivel: el arbol
+   * queda plano y las trece partidas del bloque no siguen a su cabecera al
+   * moverla. El cero final es lo que la delata: `7.02.00` encabeza al grupo
+   * `7.02`, asi que su sitio es el de `7.02` -un escalon mas afuera-. Igual
+   * con `8.01.0` sobre `8.01.02`.
+   *
+   * VALE PARA LAS DOS VIAS DE CARGA, y hasta el 28/08/2026 solo se aplicaba a
+   * la de «solo estructura». Por la via normal el subcapitulo entraba al mismo
+   * nivel que sus propias partidas, y eso no era solo cosmetico: en la tabla
+   * no aparecia la flecha para plegarlo -se decide comparando con el nivel de
+   * la fila siguiente- y, sobre todo, la EDT del cronograma colgaba esas
+   * partidas del capitulo y no de su subcapitulo, porque alli «el nivel y el
+   * orden son lo unico que dice quien cuelga de quien».
+   *
+   * Se corrige el NIVEL, no el tipo: una cabecera con cero puede ser capitulo
+   * -si sus hijas llevan precio- o la partida costeada del paquete -si solo
+   * describen alcance-, y eso lo decide `cubiertaPorHijas` mas abajo. Su
+   * sitio en el arbol es el mismo en los dos casos.
+   */
+  const ultimoEsCero = segmentos.length > 1 && Number(ultimo) === 0;
+  const nivelReal = ultimoEsCero ? Math.max(0, nivel - 1) : nivel;
+
   if (soloEstructura) {
     /*
-     * LA CABECERA DE UN GRUPO VIVE UN ESCALON POR ENCIMA DE SU CONTENIDO.
-     *
-     * `7.02.00 REDES DE DESAGUE` y `7.02.01 Corte de piso` tienen los mismos
-     * tres segmentos, asi que contando puntos salen al MISMO nivel: el arbol
-     * quedaba plano y las trece partidas del bloque no seguian a su cabecera
-     * al moverla. Se vio en el ensayo con un presupuesto real.
-     *
-     * El cero final es lo que la delata: `7.02.00` es la cabecera del grupo
-     * `7.02`, asi que su sitio es el de `7.02` -un escalon mas afuera- y las
-     * `7.02.xx` cuelgan de ella. Igual con `8.01.0` sobre `8.01.2`.
+     * EN MODO ESTRUCTURA MANDA EL CODIGO Y NADA MAS: agrupa lo que tiene
+     * hijas y lo que lo dice su codigo; el resto son hojas a la espera de
+     * precio.
      */
-    const ultimoEsCero = segmentos.length > 1 && Number(ultimo) === 0;
-    const nivelReal = ultimoEsCero ? Math.max(0, nivel - 1) : nivel;
-
     if (esPadre || ultimoEsCero || segmentos.length === 1) {
       return { tipo: "CAPITULO", nivel: nivelReal };
     }
     return { tipo: "PARTIDA", nivel: nivelReal };
   }
 
-  if (esPadre) return { tipo: "CAPITULO", nivel };
+  if (esPadre) return { tipo: "CAPITULO", nivel: nivelReal };
 
   /*
    * Si la fila lleva un importe propio, es costeable, y manda sobre
@@ -547,17 +563,17 @@ function clasificarCodigo(
    * forma del codigo.
    */
   if (cubiertaPorHijas && !soloEstructura) {
-    return { tipo: "CAPITULO", nivel };
+    return { tipo: "CAPITULO", nivel: nivelReal };
   }
 
   if (tieneImporte && !soloEstructura) {
-    return { tipo: "PARTIDA", nivel };
+    return { tipo: "PARTIDA", nivel: nivelReal };
   }
 
   // Convencion explicita: un solo segmento ("1") o terminacion en cero
   // ("4.0") es capitulo.
   if (segmentos.length === 1 || Number(ultimo) === 0) {
-    return { tipo: "CAPITULO", nivel };
+    return { tipo: "CAPITULO", nivel: nivelReal };
   }
 
   /*
@@ -573,10 +589,10 @@ function clasificarCodigo(
    * que se pidio que no diera error-.
    */
   if (!tieneDatosEconomicos && !soloEstructura) {
-    return { tipo: "CAPITULO", nivel };
+    return { tipo: "CAPITULO", nivel: nivelReal };
   }
 
-  return { tipo: "PARTIDA", nivel };
+  return { tipo: "PARTIDA", nivel: nivelReal };
 }
 
 export interface OpcionesAnalisis {

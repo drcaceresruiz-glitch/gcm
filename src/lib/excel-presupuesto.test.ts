@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import ExcelJS from "exceljs";
 import { analizarExcel } from "./excel-presupuesto";
+import { subtotalesPorAncestro } from "./jerarquia-partidas";
 
 /**
  * Construye un Excel que imita una exportacion real de S10: filas de
@@ -637,5 +638,71 @@ describe("cargar solo la estructura", () => {
     // No se relaja para todo el mundo: una lista de dos columnas no es un
     // presupuesto, y confundirla con uno seria peor que rechazarla.
     expect(r.filaCabecera).toBeNull();
+  });
+});
+
+describe("subcapitulos: donde queda cada uno en el arbol", () => {
+  const conSubcapitulos = () =>
+    construirLibro([
+      ["7", "CAPITULO VII: SANITARIAS", null, null, null, null],
+      ["7.01", "PRIMER PISO", null, null, null, null],
+      ["7.01.01", "Punto de agua", "und", 10, 50, 500],
+      ["7.01.02", "Punto de desague", "und", 5, 80, 400],
+      ["7.02.00", "SEGUNDO PISO", null, null, null, null],
+      ["7.02.01", "Montante", "ml", 20, 30, 600],
+      ["7.02.02", "Sumidero", "und", 4, 25, 100],
+      ["8", "CAPITULO VIII", null, null, null, null],
+      ["8.01.0", "INSTALACIONES ELECTRICAS", null, null, null, null],
+      ["8.01.01", "Tablero", "und", 1, 900, 900],
+    ]);
+
+  it("una cabecera terminada en cero queda POR ENCIMA de sus partidas", async () => {
+    /*
+     * `7.02.00` y `7.02.01` tienen los mismos tres segmentos, asi que contando
+     * puntos salen al mismo nivel y el arbol queda plano. Y no es cosmetico:
+     * en la tabla la flecha de plegar se decide comparando con el nivel de la
+     * fila siguiente -sin diferencia, no hay flecha-, y la EDT del cronograma
+     * cuelga las tareas por nivel y orden, asi que esas partidas acabarian
+     * colgando del capitulo en vez de su subcapitulo.
+     *
+     * Hasta el 28/08/2026 esto solo se corregia en la carga «solo
+     * estructura»; por la via normal el arbol salia plano.
+     */
+    const r = await analizarExcel(await conSubcapitulos());
+    const nivel = new Map(r.filas.map((f) => [f.codigo, f.nivel]));
+
+    expect(nivel.get("7")).toBe(0);
+    expect(nivel.get("7.02.00")).toBe(1);
+    expect(nivel.get("7.02.01")).toBe(2);
+    expect(nivel.get("7.02.02")).toBe(2);
+
+    // Con un solo cero pasa igual: "8.01.0" encabeza a "8.01.01".
+    expect(nivel.get("8.01.0")).toBe(1);
+    expect(nivel.get("8.01.01")).toBe(2);
+  });
+
+  it("y queda al mismo nivel que un subcapitulo escrito sin ceros", async () => {
+    // Las dos convenciones conviven en el mismo presupuesto y tienen que
+    // dibujar el mismo arbol: "7.01" y "7.02.00" son hermanos.
+    const r = await analizarExcel(await conSubcapitulos());
+    const nivel = new Map(r.filas.map((f) => [f.codigo, f.nivel]));
+
+    expect(nivel.get("7.02.00")).toBe(nivel.get("7.01"));
+  });
+
+  it("el dinero cuelga entero de su capitulo, sin contarse dos veces", async () => {
+    const r = await analizarExcel(await conSubcapitulos());
+    const s = subtotalesPorAncestro(
+      r.filas.map((f) => ({
+        codigo: f.codigo,
+        parcial: f.tipo === "PARTIDA" ? f.parcial : null,
+      })),
+    );
+
+    expect(s.get("7.01")).toBe("900.00");
+    expect(s.get("7.02.00")).toBe("700.00");
+    expect(s.get("7")).toBe("1600.00");
+    expect(s.get("8")).toBe("900.00");
+    expect(r.montoTotal).toBe("2500.00");
   });
 });
