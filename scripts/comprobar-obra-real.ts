@@ -11,7 +11,6 @@
  * como queda el arbol una vez escrito: la profundidad y el padre se calculan al
  * guardar, y son otro camino.
  */
-import { readFile } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
 
 import { prisma } from "@/lib/prisma";
@@ -22,8 +21,19 @@ import { analizarExcel } from "@/lib/excel-presupuesto";
 import { generarEdtDesdePresupuesto } from "@/services/edt.service";
 import { subtotalesPorAncestro, sumarHojas } from "@/lib/jerarquia-partidas";
 import { datosDelEstudio } from "@/services/investigacion.service";
+import { construirPresupuestoReferencia } from "./generar-presupuesto-referencia";
 
-const ARCHIVO = "docs/PPTO DE OBRA CRIOCORD 2026.06.02.xlsx";
+/*
+ * Las cifras del presupuesto de referencia, calculadas a mano.
+ *
+ * Antes esto usaba el presupuesto de un cliente. Dejo de hacerlo por dos
+ * razones: ese archivo no se versiona -es de un tercero-, asi que quien clone
+ * el proyecto no podia correr nada; y sus formulas estan mal, lo que lo hace un
+ * banco de pruebas util pero no puede ser el UNICO. Un archivo defectuoso no
+ * dice si lo correcto entra bien.
+ */
+const TOTAL = "57470.00";
+const CAPITULOS_RAIZ = 4;
 
 let ok = 0;
 let mal = 0;
@@ -80,21 +90,10 @@ async function main() {
 
     // 1. Importar el presupuesto por el servicio real.
     //
-    // El archivo NO viaja en el repositorio: son datos comerciales de un
-    // cliente. Sin el, este guion no sirve, y decirlo claro vale mas que un
-    // ENOENT.
-    const b = await readFile(ARCHIVO).catch(() => {
-      throw new Error(
-        `Falta "${ARCHIVO}". No se versiona (es de un cliente): dejalo ahi ` +
-          `o cambia ARCHIVO por otro presupuesto y sus cifras esperadas.`,
-      );
-    });
-    const analisis = await analizarExcel(
-      b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer,
-    );
+    const analisis = await analizarExcel(await construirPresupuestoReferencia());
     console.log("== IMPORTACION");
     comprobar("errores del analisis", analisis.errores.length, 0);
-    comprobar("monto que anuncia el analisis", analisis.montoTotal, "806497.45");
+    comprobar("monto que anuncia el analisis", analisis.montoTotal, TOTAL);
 
     const aplicado = await aplicarImportacion(sesion, obraId, analisis.filas, false);
     comprobar("la importacion se aplico", aplicado.ok, true);
@@ -118,28 +117,28 @@ async function main() {
       codigo: g.codigoPartida,
       parcial: g.tipo === "PARTIDA" ? (g.parcial?.toString() ?? null) : null,
     }));
-    comprobar("costo directo de lo guardado", sumarHojas(nodos), "806497.45");
+    comprobar("costo directo de lo guardado", sumarHojas(nodos), TOTAL);
 
     const sub = subtotalesPorAncestro(nodos);
     const raices = guardadas.filter((g) => g.parentId === null && g.tipo === "CAPITULO");
     let sumaRaices = 0;
     for (const r of raices) sumaRaices += Number(sub.get(r.codigoPartida) ?? 0);
-    comprobar("capitulos raiz", raices.length, 12);
-    comprobar("suma de los capitulos raiz", sumaRaices.toFixed(2), "806497.45");
+    comprobar("capitulos raiz", raices.length, CAPITULOS_RAIZ);
+    comprobar("suma de los capitulos raiz", sumaRaices.toFixed(2), TOTAL);
 
     // 3. La jerarquia de un subcapitulo escrito con ceros.
-    console.log("\n== EL ARBOL DE UN SUBCAPITULO CON CEROS (7.02.00)");
-    const cab = guardadas.find((g) => g.codigoPartida === "7.02.00");
-    const hija = guardadas.find((g) => g.codigoPartida === "7.02.01");
-    comprobar("7.02.00 existe", cab !== undefined, true);
+    console.log("\n== EL ARBOL DE UN SUBCAPITULO CON CEROS (3.02.00)");
+    const cab = guardadas.find((g) => g.codigoPartida === "3.02.00");
+    const hija = guardadas.find((g) => g.codigoPartida === "3.02.01");
+    comprobar("3.02.00 existe", cab !== undefined, true);
     if (cab && hija) {
-      comprobar("7.02.00 nivel", cab.nivel, 1);
-      comprobar("7.02.00 cuelga del capitulo 7", porId.get(cab.parentId ?? "")?.codigoPartida, "7");
-      comprobar("7.02.00 conserva su importe", cab.parcial?.toString(), "13109.04");
-      comprobar("7.02.00 es suma alzada", cab.modalidad, "SUMA_ALZADA");
-      comprobar("7.02.01 nivel", hija.nivel, 2);
-      comprobar("7.02.01 cuelga de 7.02.00", porId.get(hija.parentId ?? "")?.codigoPartida, "7.02.00");
-      comprobar("7.02.01 no lleva importe propio", hija.parcial === null, true);
+      comprobar("3.02.00 nivel", cab.nivel, 1);
+      comprobar("3.02.00 cuelga del capitulo 3", porId.get(cab.parentId ?? "")?.codigoPartida, "3");
+      comprobar("3.02.00 conserva su importe", Number(cab.parcial).toFixed(2), "5000.00");
+      comprobar("3.02.00 es suma alzada", cab.modalidad, "SUMA_ALZADA");
+      comprobar("3.02.01 nivel", hija.nivel, 2);
+      comprobar("3.02.01 cuelga de 3.02.00", porId.get(hija.parentId ?? "")?.codigoPartida, "3.02.00");
+      comprobar("3.02.01 no lleva importe propio", hija.parcial === null, true);
     }
 
     // 4. La EDT desde el presupuesto.
@@ -166,12 +165,12 @@ async function main() {
           return { codigo: t.codigo ?? "", parcial: p?.parcial?.toString() ?? null };
         }),
       );
-      comprobar("el dinero de las hojas de la EDT", suma, "806497.45");
+      comprobar("el dinero de las hojas de la EDT", suma, TOTAL);
 
-      const t702 = tareas.find((t) => t.codigo === "7.02.00");
-      const t70201 = tareas.find((t) => t.codigo === "7.02.01");
-      comprobar("7.02.00 esta en la EDT y NO es resumen", t702 !== undefined && !t702.esResumen, true);
-      comprobar("7.02.01 (alcance) NO baja a la EDT", t70201 === undefined, true);
+      const t702 = tareas.find((t) => t.codigo === "3.02.00");
+      const t70201 = tareas.find((t) => t.codigo === "3.02.01");
+      comprobar("3.02.00 esta en la EDT y NO es resumen", t702 !== undefined && !t702.esResumen, true);
+      comprobar("3.02.01 (alcance) NO baja a la EDT", t70201 === undefined, true);
     }
     // 5. La exportacion del estudio sobre una obra de verdad.
     console.log("\n== INVESTIGACION: LA EXPORTACION");
@@ -241,9 +240,9 @@ async function main() {
         if (r.status === 200) {
           const texto = (await r.text()).replace(/<[^>]+>/g, " ").replace(/\\s+/g, " ");
           // Los subtotales de dos capitulos, tal como los escribe `soles`.
-          comprobar("se ve el subtotal del capitulo 1 (11,165.00)", texto.includes("11,165.00"), true);
-          comprobar("se ve el subtotal del capitulo 12 (1,960.00)", texto.includes("1,960.00"), true);
-          comprobar("y el costo directo de la obra", texto.includes("806,497.45"), true);
+          comprobar("se ve el subtotal del capitulo 1 (8,000.00)", texto.includes("8,000.00"), true);
+          comprobar("se ve el del capitulo con contratista (22,420.00)", texto.includes("22,420.00"), true);
+          comprobar("y el costo directo de la obra", texto.includes("57,470.00"), true);
         }
       } finally {
         await prisma.session.delete({ where: { id: s.id } }).catch(() => {});
