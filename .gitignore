@@ -122,3 +122,13 @@ checkout/datos/
 # dice QUÉ credenciales hacen falta. Sin ella, quien clone no sabe qué pedirle a
 # Izipay. Se exceptúa a mano; el .env de verdad sigue ignorado.
 !checkout/.env.example
+
+# Documentos de trabajo que NO se versionan, y no es una preferencia de estilo:
+# este repositorio es PUBLICO. El presupuesto es de un cliente -datos
+# comerciales de un tercero- y los dos de la tesis son borradores personales.
+#
+# Entraron una vez, el 28/08/2026, con un `git add -A docs/`. Por eso estan
+# aqui: para que la proxima vez el descuido no dependa de que alguien se
+# acuerde de anadirlos uno a uno.
+/docs/*.xlsx
+/docs/*.docx

@@ -157,3 +157,42 @@ haberlo pensado antes de ver el resultado, no después.
    antes de empezar la fase previa.
 3. Redactar el **fundamento teórico de H3** en el marco teórico.
 4. Empezar la fase previa en papel.
+
+---
+
+## Por qué no se miden costos, y qué contestar si lo preguntan
+
+**Se evaluó incorporarlos y se decidió no hacerlo el 28 de agosto de 2026.** No
+fue un olvido, y conviene tener la respuesta preparada porque es una pregunta
+probable.
+
+**El costo de una obra no es atribuible a la herramienta con este diseño.** Se
+mueve por cosas que el sistema no controla: el precio de los materiales, lo
+negociado con cada contratista, un adicional del cliente, el tipo de cambio. Con
+un solo grupo y sin control paralelo no hay forma de separar el efecto de la
+intervención de todo eso — es la amenaza de **historia**, y contra ella la serie
+cronológica no protege.
+
+Con el PPC no ocurre: es una medida **interna del proceso** —lo comprometido
+frente a lo cumplido— y el precio del acero no la mueve. Por eso las variables
+elegidas son de proceso y no de resultado económico.
+
+**Y hay una razón de prudencia.** El investigador desarrolló el sistema
+evaluado. Sostener que mejora la planificación con datos de proceso es
+defendible; sostener que ahorra dinero, con un diseño que no puede aislar el
+efecto, sería la afirmación más atacable del trabajo.
+
+### Lo que sí se hace
+
+- **Caracterizar la obra** en la descripción de la muestra: monto contratado,
+  número de partidas, plazo. No es una variable ni lleva hipótesis; sitúa el
+  estudio para que otro juzgue si le aplica.
+- **Declararlo en las conclusiones** como línea futura: la mejora observada en
+  confiabilidad sugiere un efecto económico que este diseño no permite
+  cuantificar.
+
+### Qué haría falta para medirlo
+
+Un diseño distinto: dos obras comparables —una con el sistema y otra sin él— o
+varias obras de la misma constructora, con un índice de desempeño del costo
+semanal. **Es un segundo estudio, no una ampliación de este.**

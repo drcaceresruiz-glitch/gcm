@@ -30,6 +30,14 @@ cambia entre fases es el soporte.
 - `docs/piloto/` — los CSV del piloto simulado y las figuras de plantilla.
 - La pantalla `Investigacion`, solo para quien opera GCM.
 
+**DECIDIDO EL 28/08/2026: no se incorporan variables de costo.** Se evaluo y
+se descarto, y el motivo esta escrito en `docs/tesis/revision-critica.md` para
+poder contestarlo si lo preguntan: el costo de una obra lo mueven cosas que el
+sistema no controla -precios, negociacion con cada contratista, adicionales-, y
+con un solo grupo no hay forma de separar el efecto de la intervencion de eso.
+El PPC no tiene ese problema porque es una medida interna del proceso. Si vuelve
+a salir el tema, la respuesta es esa, no volver a evaluarlo.
+
 **Lo que falta es de CAMPO, no de codigo:** elegir tres expertos y aplicar la
 V de Aiken, el Kappa de Cohen sobre 30 a 50 incumplimientos, y una obra real
 en ejecucion.
